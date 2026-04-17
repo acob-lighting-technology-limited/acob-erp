@@ -1,13 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { computeDepartmentPerformanceScore } from "@/lib/performance/scoring"
-
-type AdminProfileRow = {
-  role: string | null
-  department: string | null
-  is_department_lead: boolean | null
-  lead_departments: string[] | null
-}
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 
 type DepartmentRow = {
   name: string
@@ -47,18 +41,15 @@ export async function getAdminPmsData() {
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, department, is_department_lead, lead_departments")
-    .eq("id", user.id)
-    .maybeSingle<AdminProfileRow>()
+  // Use the middleware-injected scope (single source of truth)
+  const scope = await getRequestScope()
+  if (!scope) redirect("/profile")
 
-  const role = String(profile?.role || "").toLowerCase()
-  const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
-
+  const scopedDepts = getScopedDepartments(scope)
   let departments: string[] = []
 
-  if (isAdminLike) {
+  if (scopedDepts === null) {
+    // Global admin — see all departments
     const { data: allDepartments } = await supabase
       .from("departments")
       .select("name")
@@ -66,9 +57,8 @@ export async function getAdminPmsData() {
       .returns<DepartmentRow[]>()
     departments = (allDepartments || []).map((row) => row.name).filter(Boolean)
   } else {
-    departments = Array.from(
-      new Set([profile?.department, ...(profile?.lead_departments || [])].filter(Boolean) as string[])
-    )
+    // Lead or admin in lead mode — scope to managed departments (with aliases)
+    departments = scopedDepts.length > 0 ? scopedDepts : []
   }
 
   const { data: scopedProfiles } =

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import {
   LogOut,
@@ -53,6 +53,7 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
   const [isOpen, setIsOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const navRef = useRef<HTMLElement>(null)
   const router = useRouter()
   const pathname = usePathname()
   const isMaintenancePage = pathname.startsWith("/maintenance")
@@ -76,6 +77,50 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Navbar sits outside .admin-shell, so mirror scope tokens for scoped parts
+  // (search surface + initials avatars) without changing the full navbar theme.
+  useEffect(() => {
+    if (!isAdminMode) return
+
+    const applyScopedNavbarTokens = () => {
+      const nav = navRef.current
+      if (!nav) return
+      const adminShell = document.querySelector(".admin-shell") as HTMLElement | null
+      if (!adminShell) {
+        nav.style.removeProperty("--navbar-admin-primary")
+        nav.style.removeProperty("--navbar-admin-primary-foreground")
+        nav.style.removeProperty("--navbar-admin-accent-soft")
+        nav.style.removeProperty("--navbar-admin-sidebar-border")
+        return
+      }
+
+      const shellStyles = getComputedStyle(adminShell)
+      const primary = shellStyles.getPropertyValue("--admin-primary").trim()
+      const primaryForeground = shellStyles.getPropertyValue("--admin-primary-foreground").trim()
+      const accentSoft = shellStyles.getPropertyValue("--admin-accent-soft").trim()
+      const sidebarBorder = shellStyles.getPropertyValue("--admin-sidebar-border").trim()
+
+      if (primary) nav.style.setProperty("--navbar-admin-primary", primary)
+      if (primaryForeground) nav.style.setProperty("--navbar-admin-primary-foreground", primaryForeground)
+      if (accentSoft) nav.style.setProperty("--navbar-admin-accent-soft", accentSoft)
+      if (sidebarBorder) nav.style.setProperty("--navbar-admin-sidebar-border", sidebarBorder)
+    }
+
+    applyScopedNavbarTokens()
+
+    const observer = new MutationObserver(() => {
+      applyScopedNavbarTokens()
+    })
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["data-scope", "class"],
+    })
+
+    return () => observer.disconnect()
+  }, [isAdminMode, pathname])
 
   // Listen for sidebar state changes
   useEffect(() => {
@@ -120,7 +165,14 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
           <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
-            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold lg:text-base">
+            <AvatarFallback
+              className={cn(
+                "text-sm font-semibold lg:text-base",
+                isAdminMode
+                  ? "bg-[var(--navbar-admin-primary,var(--admin-primary))] text-[var(--navbar-admin-primary-foreground,var(--admin-primary-foreground))]"
+                  : "bg-primary text-primary-foreground"
+              )}
+            >
               {getInitials(user?.email, user?.user_metadata?.first_name, user?.user_metadata?.last_name)}
             </AvatarFallback>
           </Avatar>
@@ -201,6 +253,7 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
 
   return (
     <nav
+      ref={navRef}
       className={cn(
         "fixed top-0 right-0 left-0 z-50 w-full overflow-visible border-b",
         isAdminMode
@@ -217,7 +270,8 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
               size="icon"
               className={cn(
                 "h-full w-10 rounded-none",
-                isAdminMode && "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
+                isAdminMode &&
+                  "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
               )}
               onClick={() => setIsCollapsed(!isCollapsed)}
               title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -291,10 +345,22 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
 
       {/* Mobile menu - Only show if no sidebar context */}
       {isOpen && !sidebarContext && (
-        <div className="border-border space-y-2 border-t py-4 md:hidden">
+        <div
+          className={cn(
+            "space-y-2 border-t py-4 md:hidden",
+            isAdminMode ? "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))]" : "border-border"
+          )}
+        >
           <div className={`flex items-center px-4 py-2 mb-2${isCollapsed ? "" : "gap-3"}`}>
             <Avatar className="h-10 w-10">
-              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+              <AvatarFallback
+                className={cn(
+                  "font-semibold",
+                  isAdminMode
+                    ? "bg-[var(--navbar-admin-primary,var(--admin-primary))] text-[var(--navbar-admin-primary-foreground,var(--admin-primary-foreground))]"
+                    : "bg-primary text-primary-foreground"
+                )}
+              >
                 {getInitials(user?.email, user?.user_metadata?.first_name, user?.user_metadata?.last_name)}
               </AvatarFallback>
             </Avatar>
@@ -303,29 +369,76 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
               <p className="text-muted-foreground text-xs">{user?.email}</p>
             </div>
           </div>
-          <Link href={dashboardHref} className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link
+            href={dashboardHref}
+            className={cn(
+              "flex items-center gap-2 rounded px-4 py-2 text-sm",
+              isAdminMode
+                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                : "hover:bg-accent"
+            )}
+          >
             <LayoutDashboard className="h-4 w-4" />
             {dashboardLabel}
           </Link>
-          <Link href="/profile" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link
+            href="/profile"
+            className={cn(
+              "flex items-center gap-2 rounded px-4 py-2 text-sm",
+              isAdminMode
+                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                : "hover:bg-accent"
+            )}
+          >
             <User className="h-4 w-4" />
             Profile
           </Link>
-          <Link href="/feedback" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link
+            href="/feedback"
+            className={cn(
+              "flex items-center gap-2 rounded px-4 py-2 text-sm",
+              isAdminMode
+                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                : "hover:bg-accent"
+            )}
+          >
             <MessageSquare className="h-4 w-4" />
             Feedback
           </Link>
-          <Link href="/tools/signature" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link
+            href="/tools/signature"
+            className={cn(
+              "flex items-center gap-2 rounded px-4 py-2 text-sm",
+              isAdminMode
+                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                : "hover:bg-accent"
+            )}
+          >
             <FileSignature className="h-4 w-4" />
             Signature
           </Link>
-          <Link href="/tools/watermark" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+          <Link
+            href="/tools/watermark"
+            className={cn(
+              "flex items-center gap-2 rounded px-4 py-2 text-sm",
+              isAdminMode
+                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                : "hover:bg-accent"
+            )}
+          >
             <Droplet className="h-4 w-4" />
             Watermark
           </Link>
           {canAccessAdmin && !isAdminMode && (
             <>
-              <div className="border-border my-2 border-t"></div>
+              <div
+                className={cn(
+                  "my-2 border-t",
+                  isAdminMode
+                    ? "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))]"
+                    : "border-border"
+                )}
+              />
               <Link href="/admin" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
                 <ShieldCheck className="h-4 w-4" />
                 Admin
@@ -334,14 +447,34 @@ export function Navbar({ user, canAccessAdmin = false, isAdminMode = false }: Na
           )}
           {isAdminMode && (
             <>
-              <div className="border-border my-2 border-t"></div>
-              <Link href="/profile" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
+              <div
+                className={cn(
+                  "my-2 border-t",
+                  isAdminMode
+                    ? "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))]"
+                    : "border-border"
+                )}
+              />
+              <Link
+                href="/profile"
+                className={cn(
+                  "flex items-center gap-2 rounded px-4 py-2 text-sm",
+                  isAdminMode
+                    ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                    : "hover:bg-accent"
+                )}
+              >
                 <LayoutDashboard className="h-4 w-4" />
                 User Dashboard
               </Link>
             </>
           )}
-          <div className="border-border my-2 border-t"></div>
+          <div
+            className={cn(
+              "my-2 border-t",
+              isAdminMode ? "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))]" : "border-border"
+            )}
+          />
           <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start">
             <LogOut className="mr-2 h-4 w-4" />
             Logout

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminAuditLogsContent, type AuditLog, type UserProfile } from "./admin-audit-logs-content"
 import type { EmployeeMember as employeeMember } from "./types"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { normalizeAuditAction } from "@/lib/audit/core"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
@@ -55,6 +55,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   const dataClient = getServiceRoleClientOrFallback(supabase as any)
   const auditLogsRpcClient = dataClient as unknown as AuditLogsRpcClient
   const departmentScope = getDepartmentScope(scope, "general")
+  const queryDepartmentScope = departmentScope ? expandDepartmentScopeForQuery(departmentScope) : null
 
   const userProfile: UserProfile = {
     role: scope.role,
@@ -67,7 +68,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     p_limit: 500,
     p_offset: 0,
     p_hidden_actions: ["sync", "migrate", "update_schema", "migration"],
-    p_department_filter: departmentScope ?? null,
+    p_department_filter: queryDepartmentScope ?? null,
   })
 
   if (rpcError) {
@@ -212,7 +213,9 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     .order("last_name", { ascending: true })
   if (departmentScope) {
     employeeQuery =
-      departmentScope.length > 0 ? employeeQuery.in("department", departmentScope) : employeeQuery.eq("id", "__none__")
+      queryDepartmentScope && queryDepartmentScope.length > 0
+        ? employeeQuery.in("department", queryDepartmentScope)
+        : employeeQuery.eq("id", "__none__")
   }
   const { data: employeeData } = await employeeQuery
   const employee = (employeeData ?? []) as employeeMember[]

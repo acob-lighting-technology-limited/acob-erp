@@ -1,21 +1,37 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
-import { Briefcase, User, Calendar, CheckCircle, XCircle, List, LayoutGrid } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Briefcase, User, Calendar, CheckCircle, XCircle, Eye, Building2, UserCircle2 } from "lucide-react"
 import type { UserRole } from "@/types/database"
-import { formatName } from "@/lib/utils"
-import { EmptyState } from "@/components/ui/patterns"
-import { JobDescriptionFilterBar } from "./_components/job-description-filter-bar"
-import { JobDescriptionListView } from "./_components/job-description-list-view"
-import { JobDescriptionCardView } from "./_components/job-description-card-view"
 import { JobDescriptionDialog } from "./_components/job-description-dialog"
+
+interface Profile {
+  id: string
+  first_name: string
+  last_name: string
+  company_email: string
+  department: string
+  designation: string | null
+  phone_number: string | null
+  role: UserRole
+  job_description: string | null
+  job_description_updated_at: string | null
+  created_at: string
+}
+
+interface UserProfile {
+  role: UserRole
+  is_department_lead?: boolean
+  lead_departments?: string[]
+}
 
 interface JobDescriptionsData {
   profiles: Profile[]
@@ -47,182 +63,262 @@ async function fetchJobDescriptionsData(): Promise<JobDescriptionsData> {
   return { profiles: data || [], userProfile: profile }
 }
 
-interface Profile {
-  id: string
-  first_name: string
-  last_name: string
-  company_email: string
-  department: string
-  designation: string | null
-  phone_number: string | null
-  role: UserRole
-  job_description: string | null
-  job_description_updated_at: string | null
-  created_at: string
-}
-
-interface UserProfile {
-  role: UserRole
-  is_department_lead?: boolean
-  lead_departments?: string[]
-}
-
 export default function AdminJobDescriptionsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [employeeFilter, setEmployeeFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [nameSortOrder, setNameSortOrder] = useState<"asc" | "desc">("asc")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: QUERY_KEYS.adminJobDescriptions(),
     queryFn: fetchJobDescriptionsData,
   })
 
-  const profiles = data?.profiles ?? []
+  const profiles = useMemo(() => data?.profiles ?? [], [data?.profiles])
 
-  const handleViewJobDescription = (profile: Profile) => {
-    setSelectedProfile(profile)
-    setIsViewDialogOpen(true)
-  }
+  const stats = useMemo(() => {
+    const now = new Date()
+    return {
+      total: profiles.length,
+      completed: profiles.filter((p) => p.job_description).length,
+      pending: profiles.filter((p) => !p.job_description).length,
+      thisMonth: profiles.filter(
+        (p) =>
+          p.job_description_updated_at &&
+          new Date(p.job_description_updated_at).getMonth() === now.getMonth() &&
+          new Date(p.job_description_updated_at).getFullYear() === now.getFullYear()
+      ).length,
+    }
+  }, [profiles])
 
-  const filteredProfiles = profiles
-    .filter((profile) => {
-      const matchesSearch =
-        profile.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.company_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.designation?.toLowerCase().includes(searchQuery.toLowerCase())
+  const columns: DataTableColumn<Profile>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Employee",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => `${r.first_name} ${r.last_name}`,
+        render: (r) => (
+          <div className="flex items-center gap-2">
+            <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold">
+              {r.first_name.charAt(0)}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm leading-none font-medium">
+                {r.first_name} {r.last_name}
+              </span>
+              <span className="text-muted-foreground mt-1 text-[10px]">{r.company_email}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        resizable: true,
+        initialWidth: 150,
+        accessor: (r) => r.department,
+        render: (r) => <span className="text-sm">{r.department}</span>,
+      },
+      {
+        key: "designation",
+        label: "Designation",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => r.designation || "N/A",
+        render: (r) => <span className="text-muted-foreground text-sm">{r.designation || "—"}</span>,
+      },
+      {
+        key: "status",
+        label: "Document Status",
+        sortable: true,
+        accessor: (r) => (r.job_description ? "completed" : "pending"),
+        render: (r) =>
+          r.job_description ? (
+            <Badge
+              variant="outline"
+              className="gap-1.5 border-emerald-200 bg-emerald-500/10 px-2 py-0.5 text-emerald-500"
+            >
+              <CheckCircle className="h-3 w-3" /> Completed
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="gap-1.5 border-amber-200 bg-amber-500/10 px-2 py-0.5 text-amber-500">
+              <XCircle className="h-3 w-3" /> Pending
+            </Badge>
+          ),
+      },
+      {
+        key: "updated_at",
+        label: "Last Updated",
+        sortable: true,
+        accessor: (r) => r.job_description_updated_at || "",
+        render: (r) => (
+          <span className="text-muted-foreground text-xs italic">
+            {r.job_description_updated_at ? new Date(r.job_description_updated_at).toLocaleDateString() : "Never"}
+          </span>
+        ),
+      },
+    ],
+    []
+  )
 
-      const matchesDepartment = departmentFilter === "all" || profile.department === departmentFilter
-      const matchesEmployee = employeeFilter === "all" || profile.id === employeeFilter
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "completed" && profile.job_description) ||
-        (statusFilter === "pending" && !profile.job_description)
+  const departments = useMemo(
+    () => Array.from(new Set(profiles.map((p) => p.department).filter(Boolean))).sort(),
+    [profiles]
+  )
 
-      return matchesSearch && matchesDepartment && matchesEmployee && matchesStatus
-    })
-    .sort((a, b) => {
-      const lastNameA = formatName(a.last_name).toLowerCase()
-      const lastNameB = formatName(b.last_name).toLowerCase()
-      return nameSortOrder === "asc" ? lastNameA.localeCompare(lastNameB) : lastNameB.localeCompare(lastNameA)
-    })
-
-  const departments = Array.from(new Set(profiles.map((p) => p.department).filter(Boolean))) as string[]
-
-  const stats = {
-    total: profiles.length,
-    completed: profiles.filter((p) => p.job_description).length,
-    pending: profiles.filter((p) => !p.job_description).length,
-    thisMonth: profiles.filter(
-      (p) =>
-        p.job_description_updated_at &&
-        new Date(p.job_description_updated_at).getMonth() === new Date().getMonth() &&
-        new Date(p.job_description_updated_at).getFullYear() === new Date().getFullYear()
-    ).length,
-  }
+  const filters: DataTableFilter<Profile>[] = useMemo(
+    () => [
+      {
+        key: "status",
+        label: "Document Status",
+        options: [
+          { value: "completed", label: "Completed" },
+          { value: "pending", label: "Pending" },
+        ],
+        mode: "custom",
+        filterFn: (row, vals) => {
+          if (vals.length === 0) return true
+          const status = row.job_description ? "completed" : "pending"
+          return vals.includes(status)
+        },
+      },
+      {
+        key: "department",
+        label: "Department",
+        options: departments.map((d) => ({ value: d, label: d })),
+      },
+    ],
+    [departments]
+  )
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Job Descriptions"
-      description="View and manage employee job descriptions"
+      description="Centralized registry for employee JD documentation and updates."
       icon={Briefcase}
-      actions={
-        <div className="flex items-center rounded-lg border p-1">
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className="gap-2"
-          >
-            <List className="h-4 w-4" />
-            List
-          </Button>
-          <Button
-            variant={viewMode === "card" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("card")}
-            className="gap-2"
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Card
-          </Button>
-        </div>
-      }
+      backLink={{ href: "/admin", label: "Back to Admin" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
-          <StatCard title="Total employee" value={stats.total} icon={User} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total Staff"
+            value={stats.total}
+            icon={User}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
           <StatCard
             title="Completed"
             value={stats.completed}
             icon={CheckCircle}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
           />
           <StatCard
             title="Pending"
             value={stats.pending}
             icon={XCircle}
-            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            iconColor="text-orange-600 dark:text-orange-400"
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
           />
           <StatCard
-            title="Updated This Month"
+            title="Updated Recently"
             value={stats.thisMonth}
             icon={Calendar}
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            iconColor="text-purple-600 dark:text-purple-400"
+            iconBgColor="bg-purple-500/10"
+            iconColor="text-purple-500"
           />
         </div>
       }
-      filters={
-        <JobDescriptionFilterBar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          departmentFilter={departmentFilter}
-          onDepartmentChange={setDepartmentFilter}
-          employeeFilter={employeeFilter}
-          onEmployeeChange={setEmployeeFilter}
-          statusFilter={statusFilter}
-          onStatusChange={setStatusFilter}
-          departments={departments}
-          profiles={profiles}
-        />
-      }
-      filtersInCard={false}
     >
-      {filteredProfiles.length > 0 ? (
-        viewMode === "list" ? (
-          <JobDescriptionListView
-            profiles={filteredProfiles}
-            nameSortOrder={nameSortOrder}
-            onToggleSort={() => setNameSortOrder(nameSortOrder === "asc" ? "desc" : "asc")}
-            onView={handleViewJobDescription}
-          />
-        ) : (
-          <JobDescriptionCardView profiles={filteredProfiles} onView={handleViewJobDescription} />
-        )
-      ) : (
-        <Card className="border-2">
-          <CardContent className="p-12 text-center">
-            <EmptyState
-              icon={Briefcase}
-              title="No employee found"
-              description={
-                searchQuery || departmentFilter !== "all" || employeeFilter !== "all" || statusFilter !== "all"
-                  ? "No employee matches your filters."
-                  : "No employee members found."
-              }
-            />
-          </CardContent>
-        </Card>
-      )}
+      <DataTable<Profile>
+        data={profiles}
+        columns={columns}
+        getRowId={(r) => r.id}
+        isLoading={isLoading}
+        searchPlaceholder="Search name, email or designation..."
+        searchFn={(r, q) =>
+          `${r.first_name} ${r.last_name} ${r.company_email} ${r.designation}`.toLowerCase().includes(q)
+        }
+        filters={filters}
+        rowActions={[
+          {
+            label: "View Documentation",
+            icon: Eye,
+            onClick: (r) => {
+              setSelectedProfile(r)
+              setIsViewDialogOpen(true)
+            },
+          },
+        ]}
+        expandable={{
+          render: (r) => (
+            <div className="bg-muted/20 space-y-4 border-t p-6">
+              <div>
+                <h4 className="text-muted-foreground mb-2 flex items-center gap-2 text-[10px] font-black tracking-widest uppercase">
+                  <UserCircle2 className="h-3 w-3" /> Designation Details
+                </h4>
+                <p className="text-sm font-medium">{r.designation || "No designation specified"}</p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSelectedProfile(r)
+                    setIsViewDialogOpen(true)
+                  }}
+                  className="gap-2"
+                >
+                  <Eye className="h-4 w-4" /> Open Full Document
+                </Button>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(r) => (
+          <div
+            className="bg-card cursor-pointer rounded-xl border p-4 transition-all hover:shadow-md"
+            onClick={() => {
+              setSelectedProfile(r)
+              setIsViewDialogOpen(true)
+            }}
+          >
+            <div className="mb-3 flex items-start justify-between">
+              <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold">
+                {r.first_name.charAt(0)}
+              </div>
+              {r.job_description ? (
+                <Badge
+                  variant="outline"
+                  className="border-transparent bg-emerald-500/10 px-1.5 text-[9px] text-emerald-500"
+                >
+                  Completed
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="border-transparent bg-amber-500/10 px-1.5 text-[9px] text-amber-500"
+                >
+                  Pending
+                </Badge>
+              )}
+            </div>
+            <h4 className="text-sm leading-tight font-semibold">
+              {r.first_name} {r.last_name}
+            </h4>
+            <p className="text-muted-foreground mt-1 line-clamp-1 text-[10px]">{r.designation || "No Designation"}</p>
+            <div className="text-muted-foreground mt-4 flex items-center gap-2 border-t pt-4 text-[10px] font-medium tracking-widest uppercase">
+              <Building2 className="h-3 w-3" /> {r.department}
+            </div>
+          </div>
+        )}
+        urlSync
+      />
 
       <JobDescriptionDialog profile={selectedProfile} isOpen={isViewDialogOpen} onOpenChange={setIsViewDialogOpen} />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

@@ -3,6 +3,7 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { resolveApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import {
   areRequiredDocumentsVerified,
   assertNoOverlap,
@@ -257,9 +258,10 @@ export async function GET(request: NextRequest) {
 
     const role = String(requesterProfile?.role || "").toLowerCase()
     const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
-    const managedDepartments = Array.isArray(requesterProfile?.lead_departments)
-      ? requesterProfile.lead_departments
-      : []
+
+    // Resolve scope for department filtering (leads see only their departments)
+    const adminScope = await resolveApiAdminScope()
+    const scopedDepts = adminScope ? getScopedDepartments(adminScope) : null
 
     let query = supabase
       .from("leave_requests")
@@ -287,6 +289,16 @@ export async function GET(request: NextRequest) {
     if (all) {
       if (!isAdminLike && !requesterProfile?.is_department_lead) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      // Apply department scope at the DB level for leads
+      if (scopedDepts !== null) {
+        if (scopedDepts.length === 0) {
+          return NextResponse.json({ data: [], meta: { total: 0, page: 1, per_page: 20 } })
+        }
+        // Filter by the requester's department using the join
+        // profiles.department must be in scopedDepts — use a sub-query approach
+        // Supabase doesn't support join-column filtering, so we do a post-query user_id filter
+        // We'll fetch all and post-filter (already how it works), but NOW with api-scope
       }
     } else {
       query = query.eq("user_id", targetUserId)
@@ -372,14 +384,15 @@ export async function GET(request: NextRequest) {
 
     const profileMap = new Map((profileRows || []).map((row) => [row.id, row] as const))
     const leaveTypeMap = new Map((leaveTypeRows || []).map((row) => [row.id, row] as const))
+
+    // Apply department scope: filter rows by requester's department using scoped departments
+    // (scopedDepts=null means global admin view; scopedDepts=[] means lead with no depts→empty)
     const filteredRequestRows =
-      all && !isAdminLike
+      all && scopedDepts !== null
         ? requestRows.filter((row) => {
             const requesterDepartment = row.user_id ? profileMap.get(row.user_id)?.department || null : null
             if (!requesterDepartment) return false
-            return (
-              requesterDepartment === requesterProfile?.department || managedDepartments.includes(requesterDepartment)
-            )
+            return scopedDepts.includes(requesterDepartment)
           })
         : requestRows
     const evidenceByRequest = new Map<string, LeaveEvidenceRow[]>()
@@ -1028,6 +1041,7 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const dataClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -1051,13 +1065,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "You can only delete your own leave requests" }, { status: 403 })
     }
 
-    const canModify = await canRequesterModifyBeforeRelieverDecision(supabase, existingRequest)
-    if (!canModify) {
-      return NextResponse.json({ error: "Only requests pending reliever review can be deleted" }, { status: 400 })
+    const normalizedStatus = String(existingRequest.status || "").toLowerCase()
+    if (!["pending", "pending_evidence"].includes(normalizedStatus)) {
+      return NextResponse.json({ error: "Only pending leave requests can be deleted" }, { status: 400 })
     }
 
-    const { error } = await supabase.from("leave_requests").delete().eq("id", id)
+    const { data: deletedRows, error } = await dataClient.from("leave_requests").delete().eq("id", id).select("id")
     if (error) return NextResponse.json({ error: "Failed to delete leave request" }, { status: 500 })
+    if (!deletedRows || deletedRows.length === 0) {
+      return NextResponse.json(
+        { error: "Leave request could not be deleted. Please refresh and try again." },
+        { status: 409 }
+      )
+    }
 
     await writeAuditLog(
       supabase,

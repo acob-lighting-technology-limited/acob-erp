@@ -42,11 +42,6 @@ interface Department {
   name: string
 }
 
-interface Category {
-  id: string
-  name: string
-}
-
 async function getPaymentsData() {
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase)
@@ -125,13 +120,9 @@ async function getPaymentsData() {
     .select("id, name")
     .eq("id", currentUserDepartmentId || "")
 
-  // Fetch categories
-  const { data: categories } = await dataClient.from("payment_categories").select("id, name").order("name")
-
   return {
     payments: (payments || []) as Payment[],
     departments: (departments || []) as Department[],
-    categories: (categories || []) as Category[],
     loadError,
     currentUser: {
       id: user.id,
@@ -154,7 +145,6 @@ export default async function DepartmentPaymentsPage() {
     <PaymentsTable
       initialPayments={paymentsData.payments}
       initialDepartments={paymentsData.departments}
-      initialCategories={paymentsData.categories}
       initialError={paymentsData.loadError}
       currentUser={paymentsData.currentUser}
       basePath="/payments"

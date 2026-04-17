@@ -38,7 +38,7 @@ type CbtQuestionRow = {
 }
 
 function canManageQuestions(role: string | null | undefined) {
-  return ["developer", "super_admin"].includes(String(role || "").toLowerCase())
+  return ["developer", "super_admin", "admin"].includes(String(role || "").toLowerCase())
 }
 
 function canViewQuestions(role: string | null | undefined) {

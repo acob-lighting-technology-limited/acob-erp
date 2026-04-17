@@ -12,7 +12,6 @@ const log = logger("payment-export")
 interface ExportPayment {
   id: string
   title: string
-  category: string
   payment_type: "one-time" | "recurring"
   issuer_name?: string
   amount: number
@@ -63,7 +62,6 @@ export function usePaymentExport(
       }
 
       if (selectedColumns["#"]) row["#"] = index + 1
-      if (selectedColumns["Category"]) row["Category"] = p.category || "-"
       if (selectedColumns["Title"]) row["Title"] = p.title
       if (selectedColumns["Issuer"]) row["Issuer"] = p.issuer_name || "-"
       if (selectedColumns["Department"]) row["Department"] = p.department?.name || "-"
@@ -121,7 +119,6 @@ export function usePaymentExport(
 
       const headers: string[] = []
       if (selectedColumns["#"]) headers.push("#")
-      if (selectedColumns["Category"]) headers.push("Category")
       if (selectedColumns["Title"]) headers.push("Title")
       if (selectedColumns["Issuer"]) headers.push("Issuer")
       if (selectedColumns["Department"]) headers.push("Department")
@@ -142,7 +139,6 @@ export function usePaymentExport(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rowData: any[] = []
         if (selectedColumns["#"]) rowData.push(row["#"])
-        if (selectedColumns["Category"]) rowData.push(row["Category"])
         if (selectedColumns["Title"]) rowData.push(row["Title"])
         if (selectedColumns["Issuer"]) rowData.push(row["Issuer"])
         if (selectedColumns["Department"]) rowData.push(row["Department"])

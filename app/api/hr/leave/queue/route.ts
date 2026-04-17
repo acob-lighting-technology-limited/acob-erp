@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
+import { resolveApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 
 const log = logger("hr-leave-queue")
 export const dynamic = "force-dynamic"
@@ -21,6 +22,7 @@ type ProfileSummary = {
   full_name?: string | null
   company_email?: string | null
   role?: string | null
+  department?: string | null
 }
 
 type LeaveApprovalRow = {
@@ -69,22 +71,32 @@ export async function GET(request: NextRequest) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-
     const { searchParams } = new URL(request.url)
     const all = searchParams.get("all") === "true"
-    const canViewAll = ADMIN_LIKE_ROLES.includes(profile?.role || "")
+    // Leads can access the global queue but will see only their scoped departments
+    const { data: profileWithLead } = await supabase
+      .from("profiles")
+      .select("role, is_department_lead")
+      .eq("id", user.id)
+      .single<{ role: string | null; is_department_lead: boolean | null }>()
+    const isAdminLike = ADMIN_LIKE_ROLES.includes(profileWithLead?.role || "")
+    const isDeptLead = Boolean(profileWithLead?.is_department_lead)
+    const canViewAll = isAdminLike || isDeptLead
 
     if (all && !canViewAll) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
+
+    // Resolve scope for department filtering (leads see only their departments)
+    const scope = await resolveApiAdminScope()
+    const scopedDepts = scope ? getScopedDepartments(scope) : null
 
     let query = supabase
       .from("leave_requests")
       .select(
         `
         *,
-        user:profiles!leave_requests_user_id_profiles_fkey(id, full_name, company_email),
+        user:profiles!leave_requests_user_id_profiles_fkey(id, full_name, company_email, department),
         reliever:profiles!leave_requests_reliever_id_fkey(id, full_name, company_email),
         supervisor:profiles!leave_requests_supervisor_id_fkey(id, full_name, company_email),
         leave_type:leave_types!leave_requests_leave_type_id_fkey(id, name)
@@ -103,7 +115,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: `Failed to fetch approval queue: ${error.message}` }, { status: 500 })
     }
 
-    const typedRequests = (requests || []) as LeaveQueueRequestRow[]
+    // Apply department scope filter for leads viewing the global queue
+    let typedRequests = (requests || []) as LeaveQueueRequestRow[]
+    if (all && scopedDepts !== null) {
+      if (scopedDepts.length === 0) {
+        typedRequests = []
+      } else {
+        typedRequests = typedRequests.filter((row) => {
+          const dept = row.user?.department || ""
+          return scopedDepts.includes(dept)
+        })
+      }
+    }
+
     const requestIds = Array.from(new Set(typedRequests.map((row) => row.id).filter(Boolean)))
     const approverIds = Array.from(
       new Set(typedRequests.map((row) => row.current_approver_user_id).filter(Boolean))

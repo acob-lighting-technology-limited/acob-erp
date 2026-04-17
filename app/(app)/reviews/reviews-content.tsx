@@ -1,12 +1,10 @@
 "use client"
 
-import { Fragment, useMemo, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, ChevronDown, ChevronRight, FileText, Star } from "lucide-react"
-import Link from "next/link"
+import { FileText, Star, TrendingUp, CheckCircle, ClipboardList } from "lucide-react"
 import type { Review } from "./page"
 import { toast } from "sonner"
 import {
@@ -17,6 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
+import { formatName } from "@/lib/utils"
 
 interface ReviewsContentProps {
   initialReviews: Review[]
@@ -26,48 +28,9 @@ interface ReviewsContentProps {
 export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContentProps) {
   const [reviews, setReviews] = useState<Review[]>(initialReviews)
   const [selectedReview, setSelectedReview] = useState<Review | null>(null)
+  const [detailsReview, setDetailsReview] = useState<Review | null>(null)
   const [employeeComments, setEmployeeComments] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [expandedQuarters, setExpandedQuarters] = useState<Record<string, boolean>>({})
-  const [cycleFilter, setCycleFilter] = useState("all")
-
-  function renderStars(rating: number) {
-    return (
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`h-5 w-5 ${star <= rating ? "fill-yellow-500 text-yellow-500" : "text-gray-300"}`}
-          />
-        ))}
-      </div>
-    )
-  }
-
-  function getStatusBadge(status: string) {
-    const colors: { [key: string]: string } = {
-      draft: "bg-gray-100 text-gray-800",
-      submitted: "bg-blue-100 text-blue-800",
-      completed: "bg-green-100 text-green-800",
-    }
-    return colors[status] || "bg-gray-100 text-gray-800"
-  }
-
-  function isCbtOnlyDraftEntry(review: Review) {
-    return (
-      review.status === "draft" &&
-      review.reviewer_id === currentUserId &&
-      review.cbt_score != null &&
-      review.kpi_score == null &&
-      review.attendance_score == null &&
-      review.behaviour_score == null &&
-      !review.manager_comments &&
-      !review.strengths &&
-      !review.areas_for_improvement
-    )
-  }
-
-  const visibleReviews = reviews.filter((review) => !isCbtOnlyDraftEntry(review))
 
   function normalizeMetric(value: number | string | null | undefined): number | null {
     if (value === null || value === undefined) return null
@@ -80,14 +43,6 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
     return normalized === null ? "-" : `${normalized.toFixed(2).replace(/\.00$/, "")}`
   }
 
-  const averageFinalScore = (() => {
-    const finals = visibleReviews
-      .map((review) => normalizeMetric(review.final_score))
-      .filter((value): value is number => value !== null)
-    if (finals.length === 0) return null
-    return finals.reduce((sum, value) => sum + value, 0) / finals.length
-  })()
-
   function getQuarterLabel(review: Review) {
     if (review.review_cycle?.name) return review.review_cycle.name
     const date = new Date(review.created_at)
@@ -95,52 +50,109 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
     return `Q${quarter} ${date.getFullYear()}`
   }
 
-  function averageMetric(values: Array<number | string | null | undefined>) {
-    const valid = values.map((value) => normalizeMetric(value)).filter((value): value is number => value !== null)
-    if (valid.length === 0) return "-"
-    const avg = valid.reduce((sum, value) => sum + value, 0) / valid.length
-    return formatMetric(avg)
-  }
-
-  function reviewerLabel(review: Review) {
-    if (review.reviewer_id === currentUserId) return "You"
-    const fullName = `${review.reviewer?.first_name || ""} ${review.reviewer?.last_name || ""}`.trim()
-    return fullName || "System"
-  }
-
-  const quarterGroups = useMemo(() => {
-    const grouped = new Map<string, Review[]>()
-    for (const review of visibleReviews) {
-      const label = getQuarterLabel(review)
-      const existing = grouped.get(label) || []
-      existing.push(review)
-      grouped.set(label, existing)
-    }
-    return Array.from(grouped.entries())
-      .map(([quarter, quarterReviews]) => ({
-        quarter,
-        reviews: quarterReviews.sort(
-          (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-        ),
-      }))
-      .filter((group) => cycleFilter === "all" || group.quarter === cycleFilter)
-  }, [cycleFilter, visibleReviews])
-
-  const cycleOptions = useMemo(
-    () => Array.from(new Set(visibleReviews.map((review) => getQuarterLabel(review)))).sort(),
-    [visibleReviews]
+  const visibleReviews = useMemo(
+    () =>
+      reviews.filter((review) => {
+        // Filter out CBT only draft entries where current user is the reviewer
+        const isCbtOnlyDraft =
+          review.status === "draft" &&
+          review.reviewer_id === currentUserId &&
+          review.cbt_score != null &&
+          review.kpi_score == null &&
+          review.attendance_score == null &&
+          review.behaviour_score == null &&
+          !review.manager_comments &&
+          !review.strengths &&
+          !review.areas_for_improvement
+        return !isCbtOnlyDraft
+      }),
+    [reviews, currentUserId]
   )
 
-  function toggleQuarter(quarter: string) {
-    setExpandedQuarters((current) => ({
-      ...current,
-      [quarter]: !current[quarter],
-    }))
-  }
+  const stats = useMemo(() => {
+    const completions = visibleReviews.filter((r) => r.status === "completed").length
+    const scores = visibleReviews.map((r) => normalizeMetric(r.final_score)).filter((s): s is number => s !== null)
+    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+
+    return {
+      total: visibleReviews.length,
+      completed: completions,
+      avgScore: avgScore.toFixed(1) + "%",
+    }
+  }, [visibleReviews])
+
+  const columns: DataTableColumn<Review>[] = [
+    {
+      key: "quarter",
+      label: "Cycle",
+      sortable: true,
+      accessor: (r) => getQuarterLabel(r),
+      render: (r) => <span className="font-semibold">{getQuarterLabel(r)}</span>,
+    },
+    {
+      key: "reviewer",
+      label: "Reviewer",
+      accessor: (r) =>
+        r.reviewer_id === currentUserId
+          ? "You (Self)"
+          : `${r.reviewer?.first_name || ""} ${r.reviewer?.last_name || ""}`.trim(),
+    },
+    {
+      key: "kpi",
+      label: "KPI",
+      accessor: (r) => normalizeMetric(r.kpi_score) ?? 0,
+      render: (r) => <span>{formatMetric(r.kpi_score)}</span>,
+    },
+    {
+      key: "cbt",
+      label: "CBT",
+      accessor: (r) => normalizeMetric(r.cbt_score) ?? 0,
+      render: (r) => <span>{formatMetric(r.cbt_score)}</span>,
+    },
+    {
+      key: "final",
+      label: "Final Score",
+      sortable: true,
+      accessor: (r) => normalizeMetric(r.final_score) ?? 0,
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <span className="text-primary font-bold">{formatMetric(r.final_score)}%</span>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      accessor: (r) => r.status,
+      render: (r) => (
+        <Badge variant={r.status === "completed" ? "default" : "secondary"} className="capitalize">
+          {formatName(r.status || "draft")}
+        </Badge>
+      ),
+    },
+  ]
+
+  const filters: DataTableFilter<Review>[] = [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "draft", label: "Draft" },
+        { value: "submitted", label: "Submitted" },
+        { value: "completed", label: "Completed" },
+      ],
+    },
+    {
+      key: "quarter",
+      label: "Cycle",
+      mode: "custom",
+      options: Array.from(new Set(visibleReviews.map(getQuarterLabel))).map((q) => ({ value: q, label: q })),
+      filterFn: (row, selected) => selected.includes(getQuarterLabel(row)),
+    },
+  ]
 
   async function acknowledgeReview() {
     if (!selectedReview) return
-
     setIsSubmitting(true)
     try {
       const response = await fetch("/api/hr/performance/reviews", {
@@ -152,346 +164,196 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
           employee_comments: employeeComments || null,
         }),
       })
-      const payload = (await response.json().catch(() => null)) as { error?: string; data?: Review } | null
-      if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to acknowledge review")
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error || "Failed to acknowledge")
 
-      setReviews((currentReviews) =>
-        currentReviews.map((review) =>
-          review.id === selectedReview.id
-            ? { ...review, ...payload.data, employee_comments: employeeComments || null }
-            : review
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.id === selectedReview.id ? { ...r, ...payload.data, acknowledged_at: new Date().toISOString() } : r
         )
       )
       toast.success("Review acknowledged")
       setSelectedReview(null)
       setEmployeeComments("")
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to acknowledge review"
-      toast.error(message)
+      toast.error(error instanceof Error ? error.message : "Action failed")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <Link href="/profile" className="text-muted-foreground hover:text-foreground flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
-      </div>
-
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">My Performance Reviews</h1>
-          <p className="text-muted-foreground">View your performance evaluations</p>
+  const renderReviewDetails = (r: Review) => (
+    <div className="bg-muted/30 grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
+      <div className="space-y-4">
+        <h4 className="text-muted-foreground text-sm font-bold tracking-widest uppercase">Detailed Scores</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-background rounded border p-2">
+            <p className="text-muted-foreground text-[10px]">Attendance</p>
+            <p className="font-bold">{formatMetric(r.attendance_score)}/100</p>
+          </div>
+          <div className="bg-background rounded border p-2">
+            <p className="text-muted-foreground text-[10px]">Behaviour</p>
+            <p className="font-bold">{formatMetric(r.behaviour_score)}/100</p>
+          </div>
+          <div className="bg-background rounded border p-2">
+            <p className="text-muted-foreground text-[10px]">KPI Achievement</p>
+            <p className="font-bold">{formatMetric(r.kpi_score)}/100</p>
+          </div>
+          <div className="bg-background rounded border p-2">
+            <p className="text-muted-foreground text-[10px]">CBT Score</p>
+            <p className="font-bold">{formatMetric(r.cbt_score)}/100</p>
+          </div>
         </div>
-      </div>
-
-      <Card className="mb-6 border-2">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="flex-1" />
-            <div className="w-full md:w-64">
-              <select
-                value={cycleFilter}
-                onChange={(event) => setCycleFilter(event.target.value)}
-                className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-              >
-                <option value="all">All Cycles</option>
-                {cycleOptions.map((cycle) => (
-                  <option key={cycle} value={cycle}>
-                    {cycle}
-                  </option>
-                ))}
-              </select>
+        {r.overall_rating && (
+          <div className="flex items-center gap-2 pt-2">
+            <span className="text-sm font-medium">Overall Rating:</span>
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`h-4 w-4 ${star <= (r.overall_rating || 0) ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground/30"}`}
+                />
+              ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary */}
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-        <Card>
-          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold sm:text-2xl">{visibleReviews.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Average Final Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold sm:text-2xl">
-                {averageFinalScore == null ? "-" : formatMetric(averageFinalScore)}
-              </span>
-              <span className="text-muted-foreground text-sm">/100</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="px-3 pt-3 pb-1 sm:px-6 sm:pt-6 sm:pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-bold text-green-600 sm:text-2xl">
-              {visibleReviews.filter((review) => review.status === "completed").length}
-            </div>
-          </CardContent>
-        </Card>
+        )}
       </div>
-
-      {/* Reviews Table */}
-      {quarterGroups.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-            <h3 className="text-lg font-semibold">No reviews yet</h3>
-            <p className="text-muted-foreground">Your performance reviews will appear here</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Quarterly Reviews</CardTitle>
-            <CardDescription>Expand a quarter to view strengths, improvement areas, and comments.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <tr className="border-b text-left">
-                    <th className="px-3 py-2 font-medium">Quarter</th>
-                    <th className="px-3 py-2 font-medium">Reviewed By</th>
-                    <th className="px-3 py-2 font-medium">Reviews</th>
-                    <th className="px-3 py-2 font-medium">KPI</th>
-                    <th className="px-3 py-2 font-medium">CBT</th>
-                    <th className="px-3 py-2 font-medium">Attendance</th>
-                    <th className="px-3 py-2 font-medium">Behaviour</th>
-                    <th className="px-3 py-2 font-medium">Final</th>
-                    <th className="px-3 py-2 font-medium">Completed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quarterGroups.map((group) => {
-                    const isExpanded = Boolean(expandedQuarters[group.quarter])
-                    return (
-                      <Fragment key={group.quarter}>
-                        <tr key={`${group.quarter}-summary`} className="border-b">
-                          <td className="px-3 py-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className="h-auto px-0 py-0 font-semibold hover:bg-transparent hover:text-inherit"
-                              onClick={() => toggleQuarter(group.quarter)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="mr-2 h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="mr-2 h-4 w-4" />
-                              )}
-                              {group.quarter}
-                            </Button>
-                          </td>
-                          <td className="px-3 py-2">
-                            {Array.from(new Set(group.reviews.map((review) => reviewerLabel(review)))).join(", ")}
-                          </td>
-                          <td className="px-3 py-2">{group.reviews.length}</td>
-                          <td className="px-3 py-2">
-                            {averageMetric(group.reviews.map((review) => review.kpi_score))}
-                          </td>
-                          <td className="px-3 py-2">
-                            {averageMetric(group.reviews.map((review) => review.cbt_score))}
-                          </td>
-                          <td className="px-3 py-2">
-                            {averageMetric(group.reviews.map((review) => review.attendance_score))}
-                          </td>
-                          <td className="px-3 py-2">
-                            {averageMetric(group.reviews.map((review) => review.behaviour_score))}
-                          </td>
-                          <td className="px-3 py-2">
-                            {averageMetric(group.reviews.map((review) => review.final_score))}
-                          </td>
-                          <td className="px-3 py-2">
-                            {group.reviews.filter((review) => review.status === "completed").length}
-                          </td>
-                        </tr>
-                        {isExpanded ? (
-                          <tr key={`${group.quarter}-details`} className="border-b">
-                            <td colSpan={9} className="px-3 py-3">
-                              <div className="space-y-3">
-                                {group.reviews.map((review) => (
-                                  <div key={review.id} className="bg-muted/20 space-y-3 rounded-lg border p-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <div>
-                                        <p className="font-medium">
-                                          {review.reviewer_id === currentUserId
-                                            ? "Recorded by you"
-                                            : `Reviewed by ${review.reviewer?.first_name} ${review.reviewer?.last_name}`}
-                                        </p>
-                                        <p className="text-muted-foreground text-xs">
-                                          Review Date: {new Date(review.created_at).toLocaleDateString()}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Badge className={getStatusBadge(review.status || "draft")}>
-                                          {review.status || "draft"}
-                                        </Badge>
-                                        {review.review_cycle?.review_type ? (
-                                          <Badge variant="outline">{review.review_cycle.review_type}</Badge>
-                                        ) : null}
-                                      </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
-                                      <div className="rounded border px-2 py-1">
-                                        KPI: {formatMetric(review.kpi_score)}
-                                      </div>
-                                      <div className="rounded border px-2 py-1">
-                                        CBT: {formatMetric(review.cbt_score)}
-                                      </div>
-                                      <div className="rounded border px-2 py-1">
-                                        Attendance: {formatMetric(review.attendance_score)}
-                                      </div>
-                                      <div className="rounded border px-2 py-1">
-                                        Behaviour: {formatMetric(review.behaviour_score)}
-                                      </div>
-                                      <div className="rounded border px-2 py-1">
-                                        Final: {formatMetric(review.final_score)}
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-2 overflow-x-auto">
-                                      <p className="text-sm font-semibold">Review Details</p>
-                                      <table className="w-full text-sm">
-                                        <thead>
-                                          <tr className="border-b text-left">
-                                            <th className="text-muted-foreground w-16 px-2 py-2 font-medium">S/N</th>
-                                            <th className="text-muted-foreground w-52 px-2 py-2 font-medium">Title</th>
-                                            <th className="text-muted-foreground px-2 py-2 font-medium">Details</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          <tr className="border-b">
-                                            <td className="px-2 py-2">1</td>
-                                            <td className="text-muted-foreground px-2 py-2 font-medium">Strengths</td>
-                                            <td className="px-2 py-2">{review.strengths || "-"}</td>
-                                          </tr>
-                                          <tr className="border-b">
-                                            <td className="px-2 py-2">2</td>
-                                            <td className="text-muted-foreground px-2 py-2 font-medium">
-                                              Areas for Improvement
-                                            </td>
-                                            <td className="px-2 py-2">{review.areas_for_improvement || "-"}</td>
-                                          </tr>
-                                          <tr className="border-b">
-                                            <td className="px-2 py-2">3</td>
-                                            <td className="text-muted-foreground px-2 py-2 font-medium">
-                                              Manager Comments
-                                            </td>
-                                            <td className="px-2 py-2">{review.manager_comments || "-"}</td>
-                                          </tr>
-                                          <tr>
-                                            <td className="px-2 py-2">4</td>
-                                            <td className="text-muted-foreground px-2 py-2 font-medium">
-                                              Employee Comments
-                                            </td>
-                                            <td className="px-2 py-2">{review.employee_comments || "-"}</td>
-                                          </tr>
-                                        </tbody>
-                                      </table>
-                                    </div>
-
-                                    {review.status === "completed" && !review.acknowledged_at ? (
-                                      <Button
-                                        onClick={() => {
-                                          setSelectedReview(review)
-                                          setEmployeeComments(review.employee_comments || "")
-                                        }}
-                                      >
-                                        Acknowledge Review
-                                      </Button>
-                                    ) : null}
-
-                                    {review.acknowledged_at ? (
-                                      <Badge className="bg-green-100 text-green-800">
-                                        Acknowledged on {new Date(review.acknowledged_at).toLocaleDateString()}
-                                      </Badge>
-                                    ) : null}
-
-                                    {review.final_score == null ? (
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-sm font-medium">Overall Rating:</span>
-                                        {renderStars(review.overall_rating || 0)}
-                                        <span className="text-base font-bold">{review.overall_rating || 0}/5</span>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        ) : null}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
+      <div className="space-y-4">
+        <h4 className="text-muted-foreground text-sm font-bold tracking-widest uppercase">Comments & Feedback</h4>
+        <div className="space-y-2 text-sm">
+          <p>
+            <strong>Strengths:</strong> {r.strengths || "None recorded"}
+          </p>
+          <p>
+            <strong>Areas for Improvement:</strong> {r.areas_for_improvement || "None recorded"}
+          </p>
+          <p>
+            <strong>Manager Comments:</strong> {r.manager_comments || "None recorded"}
+          </p>
+          {r.acknowledged_at && (
+            <div className="mt-4 border-t pt-2">
+              <p className="text-xs font-medium text-emerald-600">
+                Acknowledged on {new Date(r.acknowledged_at).toLocaleDateString()}
+              </p>
+              <p className="text-muted-foreground italic">
+                &quot;{r.employee_comments || "No employee comments"}&quot;
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </div>
+        {r.status === "completed" && !r.acknowledged_at && (
+          <Button
+            onClick={() => {
+              setSelectedReview(r)
+              setEmployeeComments(r.employee_comments || "")
+            }}
+            className="mt-4 w-full"
+          >
+            Acknowledge Review
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <DataTablePage
+      title="My Performance Reviews"
+      description="View and acknowledge your quarterly and annual evaluations."
+      icon={FileText}
+      backLink={{ href: "/profile", label: "Back to Dashboard" }}
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            title="Total Reviews"
+            value={stats.total}
+            icon={ClipboardList}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Avg. Performance"
+            value={stats.avgScore}
+            icon={TrendingUp}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Completed"
+            value={stats.completed}
+            icon={CheckCircle}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
+      }
+    >
+      <DataTable<Review>
+        data={visibleReviews}
+        columns={columns}
+        getRowId={(r) => r.id}
+        filters={filters}
+        searchPlaceholder="Search reviewer or cycle..."
+        searchFn={(r, q) =>
+          `${getQuarterLabel(r)} ${r.reviewer?.first_name} ${r.reviewer?.last_name}`.toLowerCase().includes(q)
+        }
+        expandable={{
+          render: (r) => renderReviewDetails(r),
+        }}
+        rowActions={[
+          {
+            label: "View Detail",
+            onClick: (r) => setDetailsReview(r),
+          },
+          {
+            label: "Acknowledge",
+            onClick: (r) => {
+              setSelectedReview(r)
+              setEmployeeComments(r.employee_comments || "")
+            },
+            hidden: (r) => r.status !== "completed" || !!r.acknowledged_at,
+          },
+        ]}
+        urlSync
+      />
 
       <Dialog open={Boolean(selectedReview)} onOpenChange={(open) => !open && setSelectedReview(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Acknowledge Review</DialogTitle>
-            <DialogDescription>Confirm that you have read this completed performance review.</DialogDescription>
+            <DialogTitle>Acknowledge Performance Review</DialogTitle>
+            <DialogDescription>Confirm that you have read and understood this evaluation.</DialogDescription>
           </DialogHeader>
-          {selectedReview ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {[
-                  { label: "KPI Achievement", value: selectedReview.kpi_score },
-                  { label: "CBT", value: selectedReview.cbt_score },
-                  { label: "Attendance", value: selectedReview.attendance_score },
-                  { label: "Behaviour", value: selectedReview.behaviour_score },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-lg border p-3">
-                    <div className="text-muted-foreground text-xs">{item.label}</div>
-                    <div className="mt-1 text-lg font-semibold">
-                      {formatMetric(item.value)}
-                      {normalizeMetric(item.value) != null ? "/100" : ""}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Employee Comments</div>
-                <Textarea
-                  value={employeeComments}
-                  onChange={(event) => setEmployeeComments(event.target.value)}
-                  placeholder="Optional comments about this review"
-                  rows={4}
-                />
-              </div>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Any comments regarding this review?</p>
+              <Textarea
+                value={employeeComments}
+                onChange={(e) => setEmployeeComments(e.target.value)}
+                placeholder="Enter your feedback or comments here..."
+                rows={4}
+              />
             </div>
-          ) : null}
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedReview(null)} disabled={isSubmitting}>
+            <Button variant="outline" onClick={() => setSelectedReview(null)}>
               Cancel
             </Button>
             <Button onClick={acknowledgeReview} disabled={isSubmitting}>
-              I acknowledge this review
+              {isSubmitting ? "Processing..." : "I Acknowledge this Review"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <Dialog open={Boolean(detailsReview)} onOpenChange={(open) => !open && setDetailsReview(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Review Details</DialogTitle>
+            <DialogDescription>{detailsReview ? getQuarterLabel(detailsReview) : "Review details"}</DialogDescription>
+          </DialogHeader>
+          {detailsReview ? renderReviewDetails(detailsReview) : null}
+        </DialogContent>
+      </Dialog>
+    </DataTablePage>
   )
 }

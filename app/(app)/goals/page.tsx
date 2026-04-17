@@ -25,6 +25,8 @@ export interface Goal {
   cycle?: {
     name: string
   } | null
+  linked_tasks?: Array<{ id: string; work_item_number?: string | null; title: string; status: string }>
+  linked_help_desk?: Array<{ id: string; ticket_number?: string | null; title: string; status: string }>
 }
 
 async function getGoalsData() {
@@ -65,10 +67,58 @@ async function getGoalsData() {
     log.error("Error loading goals:", error)
   }
 
+  const goalIds = ((goals || []) as Goal[]).map((goal) => goal.id)
+
+  const [{ data: linkedTasks }, { data: linkedHelpDesk }] = await Promise.all([
+    goalIds.length > 0
+      ? supabase.from("tasks").select("id, goal_id, work_item_number, title, status").in("goal_id", goalIds)
+      : Promise.resolve({
+          data: [] as Array<{
+            id: string
+            goal_id: string
+            work_item_number?: string | null
+            title: string
+            status: string
+          }>,
+        }),
+    goalIds.length > 0
+      ? supabase.from("help_desk_tickets").select("id, goal_id, ticket_number, title, status").in("goal_id", goalIds)
+      : Promise.resolve({
+          data: [] as Array<{
+            id: string
+            goal_id: string
+            ticket_number?: string | null
+            title: string
+            status: string
+          }>,
+        }),
+  ])
+
+  const tasksByGoalId = new Map<
+    string,
+    Array<{ id: string; work_item_number?: string | null; title: string; status: string }>
+  >()
+  for (const task of linkedTasks || []) {
+    const rows = tasksByGoalId.get(task.goal_id) || []
+    rows.push({ id: task.id, work_item_number: task.work_item_number, title: task.title, status: task.status })
+    tasksByGoalId.set(task.goal_id, rows)
+  }
+  const helpDeskByGoalId = new Map<
+    string,
+    Array<{ id: string; ticket_number?: string | null; title: string; status: string }>
+  >()
+  for (const ticket of linkedHelpDesk || []) {
+    const rows = helpDeskByGoalId.get(ticket.goal_id) || []
+    rows.push({ id: ticket.id, ticket_number: ticket.ticket_number, title: ticket.title, status: ticket.status })
+    helpDeskByGoalId.set(ticket.goal_id, rows)
+  }
+
   return {
     goals: ((goals || []) as Goal[]).map((goal) => ({
       ...goal,
       cycle: goal.review_cycle_id ? cyclesById.get(goal.review_cycle_id) || null : null,
+      linked_tasks: tasksByGoalId.get(goal.id) || [],
+      linked_help_desk: helpDeskByGoalId.get(goal.id) || [],
     })),
     department: profile?.department || null,
   }

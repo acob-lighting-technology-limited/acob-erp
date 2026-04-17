@@ -1,19 +1,17 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Brain, CheckCircle2, Clock3, Download, FileText, Search, ShieldCheck, Target } from "lucide-react"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { Brain, CheckCircle2, Clock3, Download, FileText, ShieldCheck, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { StatCard } from "@/components/ui/stat-card"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
 
 type IconKey = "kpi" | "goals" | "attendance" | "cbt" | "behaviour" | "reviews"
 type TableColumn = { key: string; label: string }
-type TableRowData = Record<string, string | number | null | undefined>
+type TableRowData = Record<string, unknown> & { __rowId?: string }
 
 interface PmsTablePageProps {
   title: string
@@ -41,9 +39,8 @@ const iconMap = {
   reviews: FileText,
 }
 
-function normalizeCell(value: string | number | null | undefined) {
-  if (value === null || value === undefined) return "-"
-  if (typeof value === "number" && Number.isFinite(value)) return String(value)
+function normalizeCell(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-"
   return String(value)
 }
 
@@ -64,133 +61,212 @@ export function PmsTablePage({
   filterAllLabel = "All Departments",
 }: PmsTablePageProps) {
   const Icon = iconMap[icon]
-  const [searchQuery, setSearchQuery] = useState("")
-  const [secondaryFilter, setSecondaryFilter] = useState("all")
   const [isExportOpen, setIsExportOpen] = useState(false)
+
+  const tableColumns = useMemo<DataTableColumn<TableRowData>[]>(() => {
+    return columns.map((column, index) => ({
+      key: column.key,
+      label: column.label,
+      sortable: true,
+      accessor: (row) => normalizeCell(row[column.key]),
+      resizable: index < 2,
+      initialWidth: index === 0 ? 220 : index === 1 ? 260 : undefined,
+      render: (row) => {
+        const value = normalizeCell(row[column.key])
+        return index === 0 ? <span className="font-medium">{value}</span> : value
+      },
+    }))
+  }, [columns])
 
   const secondaryFilterOptions = useMemo(
     () =>
-      Array.from(new Set(rows.map((row) => normalizeCell(row[filterKey])).filter((option) => option !== "-"))).sort(),
-    [rows, filterKey]
+      Array.from(new Set(rows.map((row) => normalizeCell(row[filterKey])).filter((value) => value !== "-"))).map(
+        (value) => ({
+          value,
+          label: value,
+        })
+      ),
+    [filterKey, rows]
   )
 
-  const filteredRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    return rows.filter((row) => {
-      const values = columns.map((column) => normalizeCell(row[column.key]).toLowerCase())
-      const filterValue = normalizeCell(row[filterKey])
-      const matchesQuery = query.length === 0 || values.some((value) => value.includes(query))
-      const matchesSecondary = secondaryFilter === "all" || filterValue === secondaryFilter
-      return matchesQuery && matchesSecondary
-    })
-  }, [rows, columns, filterKey, searchQuery, secondaryFilter])
-
-  const exportRows = filteredRows.map((row, index) =>
-    Object.fromEntries([["S/N", index + 1], ...columns.map((column) => [column.label, normalizeCell(row[column.key])])])
+  const firstColumnKey = columns[0]?.key || filterKey
+  const firstColumnLabel = columns[0]?.label || "Type"
+  const firstColumnOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((row) => normalizeCell(row[firstColumnKey])).filter((value) => value !== "-"))).map(
+        (value) => ({
+          value,
+          label: value,
+        })
+      ),
+    [firstColumnKey, rows]
   )
+
+  const filters = useMemo<DataTableFilter<TableRowData>[]>(
+    () => [
+      {
+        key: filterKey,
+        label: filterLabel,
+        options: [{ value: "all", label: filterAllLabel }, ...secondaryFilterOptions],
+        mode: "custom",
+        filterFn: (row, selected) => {
+          if (!selected || selected.length === 0 || selected.includes("all")) return true
+          return selected.includes(normalizeCell(row[filterKey]))
+        },
+        multi: false,
+      },
+      {
+        key: firstColumnKey,
+        label: firstColumnLabel,
+        options: [{ value: "all", label: `All ${firstColumnLabel}` }, ...firstColumnOptions],
+        mode: "custom",
+        filterFn: (row, selected) => {
+          if (!selected || selected.length === 0 || selected.includes("all")) return true
+          return selected.includes(normalizeCell(row[firstColumnKey]))
+        },
+        multi: false,
+      },
+    ],
+    [
+      filterAllLabel,
+      filterKey,
+      filterLabel,
+      firstColumnKey,
+      firstColumnLabel,
+      firstColumnOptions,
+      secondaryFilterOptions,
+    ]
+  )
+
+  const exportRows = useMemo(
+    () =>
+      rows.map((row, index) =>
+        Object.fromEntries([
+          ["S/N", index + 1],
+          ...columns.map((column) => [column.label, normalizeCell(row[column.key])]),
+        ])
+      ),
+    [columns, rows]
+  )
+
+  const shouldRenderTaskExpansion = rows.some((row) => Array.isArray((row as { __tasks?: unknown }).__tasks))
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title={title}
-        description={description}
-        icon={Icon}
-        backLink={{ href: backHref, label: backLabel }}
-        actions={
-          <Button
-            variant="outline"
-            onClick={() => setIsExportOpen(true)}
-            disabled={filteredRows.length === 0}
-            className="h-8 gap-2"
-            size="sm"
-          >
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-        }
-      />
-
-      {summaryCards.length > 0 ? (
-        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-          {summaryCards.map((card) => (
-            <Card key={card.label}>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground text-sm">{card.label}</p>
-                <p className="text-2xl font-semibold">{card.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : null}
-
-      <Card className="mb-4 border-2">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
-              <Input
-                placeholder={searchPlaceholder}
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="pl-10"
+    <DataTablePage
+      title={title}
+      description={description}
+      icon={Icon}
+      backLink={{ href: backHref, label: backLabel }}
+      actions={
+        <Button
+          variant="outline"
+          onClick={() => setIsExportOpen(true)}
+          disabled={rows.length === 0}
+          className="h-8 gap-2"
+          size="sm"
+        >
+          <Download className="h-4 w-4" />
+          Export
+        </Button>
+      }
+      stats={
+        summaryCards.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {summaryCards.map((card, index) => (
+              <StatCard
+                key={card.label}
+                title={card.label}
+                value={card.value}
+                icon={Icon}
+                iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
+                iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
               />
-            </div>
-            <Select value={secondaryFilter} onValueChange={setSecondaryFilter}>
-              <SelectTrigger className="w-full md:w-56">
-                <SelectValue placeholder={filterLabel} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{filterAllLabel}</SelectItem>
-                {secondaryFilterOptions.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        ) : undefined
+      }
+    >
+      <DataTable<TableRowData>
+        data={rows.map((row, index) => ({ ...row, __rowId: `row-${index}-${normalizeCell(row[firstColumnKey])}` }))}
+        columns={tableColumns}
+        filters={filters}
+        getRowId={(row) => row.__rowId || normalizeCell(row[firstColumnKey])}
+        searchPlaceholder={searchPlaceholder}
+        searchFn={(row, query) =>
+          columns.some((column) => normalizeCell(row[column.key]).toLowerCase().includes(query))
+        }
+        expandable={
+          shouldRenderTaskExpansion
+            ? {
+                canExpand: (row) => Array.isArray((row as { __tasks?: unknown[] }).__tasks),
+                render: (row) => {
+                  const tasks =
+                    (
+                      row as {
+                        __tasks?: Array<{
+                          id: string
+                          title: string
+                          description?: string | null
+                          status: string
+                          dueDate?: string | null
+                          assignmentType?: string | null
+                        }>
+                      }
+                    ).__tasks || []
+                  if (tasks.length === 0) {
+                    return <p className="text-muted-foreground text-sm">No assigned tasks linked to this goal yet.</p>
+                  }
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{tableTitle}</CardTitle>
-          <CardDescription>{tableDescription}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredRows.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-sm">No records found.</p>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-muted-foreground text-sm">
-                Showing {filteredRows.length} of {rows.length} record(s).
-              </p>
-              <div className="overflow-x-auto">
-                <Table className="min-w-[1050px]">
-                  <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                    <TableRow>
-                      <TableHead className="w-16">S/N</TableHead>
-                      {columns.map((column) => (
-                        <TableHead key={column.key}>{column.label}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredRows.map((row, index) => (
-                      <TableRow key={`${normalizeCell(row.department)}-${index}`}>
-                        <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                        {columns.map((column) => (
-                          <TableCell key={column.key}>{normalizeCell(row[column.key])}</TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                        Assigned Tasks
+                      </p>
+                      <div className="overflow-x-auto rounded-lg border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/40">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Task</th>
+                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Status</th>
+                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Type</th>
+                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                Due Date
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tasks.map((task) => (
+                              <tr key={task.id} className="border-t">
+                                <td className="px-3 py-2">
+                                  <p className="font-medium">{task.title}</p>
+                                  {task.description ? (
+                                    <p className="text-muted-foreground text-xs">{task.description}</p>
+                                  ) : null}
+                                </td>
+                                <td className="px-3 py-2 capitalize">{String(task.status || "").replace(/_/g, " ")}</td>
+                                <td className="px-3 py-2 capitalize">
+                                  {String(task.assignmentType || "department").replace(/_/g, " ")}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {task.dueDate ? new Date(task.dueDate).toLocaleDateString("en-GB") : "-"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                },
+              }
+            : undefined
+        }
+        emptyTitle={tableTitle}
+        emptyDescription={tableDescription}
+        emptyIcon={Icon}
+        skeletonRows={5}
+        urlSync
+      />
 
       <ExportOptionsDialog
         open={isExportOpen}
@@ -209,6 +285,6 @@ export function PmsTablePage({
           void exportPmsRowsToPdf(exportRows, filename, title)
         }}
       />
-    </PageWrapper>
+    </DataTablePage>
   )
 }

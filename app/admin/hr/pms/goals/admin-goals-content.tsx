@@ -1,19 +1,25 @@
 "use client"
 
-import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Plus, Search, Target } from "lucide-react"
+import { Plus, Target, CheckCircle, Clock } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { useRouter } from "next/navigation"
+
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { StatCard } from "@/components/ui/stat-card"
+import {
+  DataTablePage,
+  DataTable,
+  type DataTableColumn,
+  type DataTableFilter,
+  type DataTableTab,
+} from "@/components/ui/data-table"
+
 import type { Goal } from "@/app/(app)/goals/page"
 
 type ReviewCycle = {
@@ -26,8 +32,6 @@ type GoalWithCycle = Goal & {
   cycle?: ReviewCycle | null
 }
 
-type TabKey = "department" | "cycle"
-
 const INITIAL_FORM = {
   department: "",
   review_cycle_id: "",
@@ -35,6 +39,11 @@ const INITIAL_FORM = {
   description: "",
   due_date: "",
 }
+
+const TABS: DataTableTab[] = [
+  { key: "department", label: "Department" },
+  { key: "cycle", label: "Cycle" },
+]
 
 export function AdminGoalsContent({
   initialGoals,
@@ -47,11 +56,9 @@ export function AdminGoalsContent({
   cycles: ReviewCycle[]
   canCreateGoal: boolean
 }) {
+  const router = useRouter()
   const [goals, setGoals] = useState(initialGoals)
-  const [tab, setTab] = useState<TabKey>("department")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [cycleFilter, setCycleFilter] = useState("all")
+  const [tab, setTab] = useState("department")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
@@ -60,43 +67,146 @@ export function AdminGoalsContent({
     review_cycle_id: cycles[0]?.id || "",
   })
 
-  const filteredGoalRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    return goals.filter((goal) => {
-      const matchesQuery =
-        query.length === 0 ||
-        [goal.title, goal.description, goal.department, goal.cycle?.name, goal.status]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(query))
-      const matchesDepartment = departmentFilter === "all" || (goal.department || "-") === departmentFilter
-      const matchesCycle = cycleFilter === "all" || (goal.review_cycle_id || "") === cycleFilter
-      return matchesQuery && matchesDepartment && matchesCycle
-    })
-  }, [cycleFilter, departmentFilter, goals, searchQuery])
+  // ─── Columns for Department Goals ──────────────────────────────────────────
+  const goalColumns: DataTableColumn<GoalWithCycle>[] = useMemo(
+    () => [
+      {
+        key: "title",
+        label: "Goal",
+        sortable: true,
+        resizable: true,
+        initialWidth: 250,
+        accessor: (r) => r.title,
+        render: (r) => (
+          <div className="space-y-1">
+            <p className="font-medium">{r.title}</p>
+            {r.description ? (
+              <p className="text-muted-foreground truncate text-xs" title={r.description}>
+                {r.description}
+              </p>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (r) => r.department || "-",
+      },
+      {
+        key: "cycle",
+        label: "Cycle",
+        sortable: true,
+        accessor: (r) => r.cycle?.name || "-",
+      },
+      {
+        key: "status",
+        label: "Status",
+        accessor: (r) => String(r.status || "").replaceAll("_", " "),
+        render: (r) => <span className="capitalize">{String(r.status || "").replaceAll("_", " ")}</span>,
+      },
+      {
+        key: "approval",
+        label: "Approval",
+        accessor: (r) => r.approval_status || "pending",
+        render: (r) => <span className="capitalize">{r.approval_status || "pending"}</span>,
+      },
+      {
+        key: "due",
+        label: "Due Date",
+        sortable: true,
+        accessor: (r) => r.due_date || "",
+        render: (r) => <span>{r.due_date ? new Date(r.due_date).toLocaleDateString() : "-"}</span>,
+        hideOnMobile: true,
+      },
+    ],
+    []
+  )
 
+  const goalFilters: DataTableFilter<GoalWithCycle>[] = useMemo(() => {
+    return [
+      {
+        key: "department",
+        label: "Department",
+        options: managedDepartments.map((d) => ({ value: d, label: d })),
+      },
+      {
+        key: "cycle",
+        label: "Cycle",
+        options: cycles.map((c) => ({ value: c.id, label: c.name })),
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(row.review_cycle_id || ""),
+      },
+    ]
+  }, [managedDepartments, cycles])
+
+  // ─── Columns for Cycle View ──────────────────────────────────────────────
   const cycleRows = useMemo(() => {
-    return cycles
-      .map((cycle) => {
-        const cycleGoals = goals.filter((goal) => goal.review_cycle_id === cycle.id)
-        return {
-          id: cycle.id,
-          cycle: cycle.name,
-          review_type: cycle.review_type || "-",
-          departments: new Set(cycleGoals.map((goal) => goal.department).filter(Boolean)).size,
-          goals: cycleGoals.length,
-          approved: cycleGoals.filter((goal) => goal.approval_status === "approved").length,
-        }
-      })
-      .filter((row) => {
-        const query = searchQuery.trim().toLowerCase()
-        const matchesQuery =
-          query.length === 0 ||
-          [row.cycle, row.review_type].some((value) => String(value).toLowerCase().includes(query))
-        const matchesCycle = cycleFilter === "all" || row.id === cycleFilter
-        return matchesQuery && matchesCycle
-      })
-  }, [cycleFilter, cycles, goals, searchQuery])
+    return cycles.map((cycle) => {
+      const cycleGoals = goals.filter((goal) => goal.review_cycle_id === cycle.id)
+      return {
+        id: cycle.id,
+        cycle: cycle.name,
+        review_type: cycle.review_type || "-",
+        departments: new Set(cycleGoals.map((goal) => goal.department).filter(Boolean)).size,
+        goals: cycleGoals.length,
+        approved: cycleGoals.filter((goal) => goal.approval_status === "approved").length,
+      }
+    })
+  }, [cycles, goals])
 
+  const cycleColumns: DataTableColumn<(typeof cycleRows)[number]>[] = useMemo(
+    () => [
+      {
+        key: "cycle",
+        label: "Cycle",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => r.cycle,
+        render: (r) => <span className="font-medium">{r.cycle}</span>,
+      },
+      {
+        key: "review_type",
+        label: "Review Type",
+        sortable: true,
+        accessor: (r) => r.review_type,
+      },
+      {
+        key: "departments",
+        label: "Departments",
+        align: "center",
+        accessor: (r) => String(r.departments),
+      },
+      {
+        key: "goals_count",
+        label: "Goals",
+        align: "center",
+        accessor: (r) => String(r.goals),
+      },
+      {
+        key: "approved",
+        label: "Approved",
+        align: "center",
+        accessor: (r) => String(r.approved),
+      },
+    ],
+    []
+  )
+
+  const cycleFilters: DataTableFilter<(typeof cycleRows)[number]>[] = useMemo(() => {
+    const types = Array.from(new Set(cycleRows.map((r) => r.review_type))).sort()
+    return [
+      {
+        key: "review_type",
+        label: "Review Type",
+        options: types.map((t) => ({ value: t, label: t })),
+      },
+    ]
+  }, [cycleRows])
+
+  // ─── Actions ─────────────────────────────────────────────────────────────
   async function handleCreateGoal() {
     if (!form.department || !form.review_cycle_id || !form.title.trim()) {
       toast.error("Department, cycle, and goal title are required")
@@ -123,160 +233,78 @@ export function AdminGoalsContent({
     }
   }
 
+  // ─── Render ──────────────────────────────────────────────────────────────
+  const pendingGoals = goals.filter((g) => g.approval_status === "pending").length
+  const approvedGoals = goals.filter((g) => g.approval_status === "approved").length
+
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="PMS Goals"
-        description="Department leads create department goals here, then create tasks under the specific goal."
-        icon={Target}
-        backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
-        actions={
-          canCreateGoal ? (
-            <Button size="sm" className="h-8 gap-2" onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Add Goal
-            </Button>
-          ) : undefined
-        }
-      />
-
-      <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)} className="mb-4">
-        <TabsList>
-          <TabsTrigger value="department">Department</TabsTrigger>
-          <TabsTrigger value="cycle">Cycle</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Card className="mb-4 border-2">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search goal, department, or cycle..."
-                className="pl-10"
-              />
-            </div>
-            {tab === "department" ? (
-              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="w-full md:w-56">
-                  <SelectValue placeholder="Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {managedDepartments.map((department) => (
-                    <SelectItem key={department} value={department}>
-                      {department}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-            <Select value={cycleFilter} onValueChange={setCycleFilter}>
-              <SelectTrigger className="w-full md:w-72">
-                <SelectValue placeholder="Cycle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cycles</SelectItem>
-                {cycles.map((cycle) => (
-                  <SelectItem key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{tab === "department" ? "Department Goals" : "Cycle View"}</CardTitle>
-          <CardDescription>
-            {tab === "department"
-              ? "Open the right goal row and create a task under it for one person or your department queue."
-              : "Review goal coverage by cycle before opening the cycle details."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {tab === "department" ? (
-            filteredGoalRows.length === 0 ? (
-              <p className="text-muted-foreground py-4 text-sm">No department goals found.</p>
-            ) : (
-              <Table className="min-w-[1100px]">
-                <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                  <TableRow>
-                    <TableHead className="w-16">S/N</TableHead>
-                    <TableHead>Goal</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Cycle</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Approval</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredGoalRows.map((goal, index) => (
-                    <TableRow key={goal.id}>
-                      <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p className="font-medium">{goal.title}</p>
-                          {goal.description ? (
-                            <p className="text-muted-foreground text-xs">{goal.description}</p>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>{goal.department || "-"}</TableCell>
-                      <TableCell>{goal.cycle?.name || "-"}</TableCell>
-                      <TableCell className="capitalize">{String(goal.status || "").replaceAll("_", " ")}</TableCell>
-                      <TableCell className="capitalize">{goal.approval_status || "pending"}</TableCell>
-                      <TableCell>{goal.due_date ? new Date(goal.due_date).toLocaleDateString() : "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/admin/hr/pms/goals/task?goal_id=${encodeURIComponent(goal.id)}`}>
-                          <Button size="sm" variant="outline">
-                            Create Task
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )
-          ) : cycleRows.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-sm">No cycle records found.</p>
-          ) : (
-            <Table className="min-w-[980px]">
-              <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                <TableRow>
-                  <TableHead className="w-16">S/N</TableHead>
-                  <TableHead>Cycle</TableHead>
-                  <TableHead>Review Type</TableHead>
-                  <TableHead>Departments</TableHead>
-                  <TableHead>Goals</TableHead>
-                  <TableHead>Approved</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cycleRows.map((row, index) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                    <TableCell className="font-medium">{row.cycle}</TableCell>
-                    <TableCell>{row.review_type}</TableCell>
-                    <TableCell>{row.departments}</TableCell>
-                    <TableCell>{row.goals}</TableCell>
-                    <TableCell>{row.approved}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+    <DataTablePage
+      title="PMS Goals"
+      description="Department leads create department goals here, then create tasks under the specific goal."
+      icon={Target}
+      backLink={{ href: "/admin/hr/pms", label: "Back to PMS" }}
+      tabs={TABS}
+      activeTab={tab}
+      onTabChange={setTab}
+      actions={
+        canCreateGoal ? (
+          <Button size="sm" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Goal
+          </Button>
+        ) : undefined
+      }
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard title="Total Goals" value={goals.length} icon={Target} />
+          <StatCard
+            title="Pending Approval"
+            value={pendingGoals}
+            icon={Clock}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Approved"
+            value={approvedGoals}
+            icon={CheckCircle}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+        </div>
+      }
+    >
+      {tab === "department" ? (
+        <DataTable<GoalWithCycle>
+          data={goals}
+          columns={goalColumns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search goal, department, cycle..."
+          searchFn={(row, q) =>
+            [row.title, row.description, row.department, row.cycle?.name, row.status]
+              .filter(Boolean)
+              .some((v) => String(v).toLowerCase().includes(q))
+          }
+          filters={goalFilters}
+          pagination={{ pageSize: 50 }}
+          rowActions={[
+            {
+              label: "Create Task",
+              onClick: (row) => router.push(`/admin/hr/pms/goals/task?goal_id=${encodeURIComponent(row.id)}`),
+            },
+          ]}
+        />
+      ) : (
+        <DataTable<(typeof cycleRows)[number]>
+          data={cycleRows}
+          columns={cycleColumns}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search cycle, type..."
+          searchFn={(row, q) => [row.cycle, row.review_type].some((value) => String(value).toLowerCase().includes(q))}
+          filters={cycleFilters}
+          pagination={{ pageSize: 50 }}
+        />
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-xl">
@@ -353,13 +381,13 @@ export function AdminGoalsContent({
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancel
               </Button>
-              <Button onClick={() => void handleCreateGoal()} loading={saving}>
-                Save Goal
+              <Button onClick={() => void handleCreateGoal()} disabled={saving}>
+                {saving ? "Saving..." : "Save Goal"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-    </PageWrapper>
+    </DataTablePage>
   )
 }

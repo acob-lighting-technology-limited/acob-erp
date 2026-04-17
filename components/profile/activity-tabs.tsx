@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -47,13 +48,29 @@ interface ActivityTabsProps {
 }
 
 export function ActivityTabs({ tasks, assets, documentation, feedback }: ActivityTabsProps) {
+  const [activeTab, setActiveTab] = useState("assets")
+
+  const viewAllMeta = useMemo(() => {
+    switch (activeTab) {
+      case "tasks":
+        return { count: tasks.length, href: "/tasks", label: "View all tasks" }
+      case "documentation":
+        return { count: documentation.length, href: "/documentation/internal", label: "View all docs" }
+      case "feedback":
+        return { count: feedback.length, href: "/feedback", label: "View all feedback" }
+      case "assets":
+      default:
+        return { count: assets.length, href: "/assets", label: "View all assets" }
+    }
+  }, [activeTab, assets.length, documentation.length, feedback.length, tasks.length])
+
   return (
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-base">Your Activity</CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="assets">
+        <Tabs defaultValue="assets" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="assets" className="gap-1.5">
               <Package className="h-4 w-4" />
@@ -268,6 +285,13 @@ export function ActivityTabs({ tasks, assets, documentation, feedback }: Activit
             )}
           </TabsContent>
         </Tabs>
+        {viewAllMeta.count > 5 ? (
+          <div className="mt-4 flex justify-start">
+            <Link href={viewAllMeta.href} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              {viewAllMeta.label}
+            </Link>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

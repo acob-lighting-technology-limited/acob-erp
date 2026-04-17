@@ -1,10 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { FileBarChart, ClipboardList, FileText, ChevronRight, Presentation, Users, ArrowLeft } from "lucide-react"
+import { FileBarChart, ClipboardList, FileText, ChevronRight, Presentation, Users } from "lucide-react"
 import { PageWrapper, PageHeader } from "@/components/layout"
+import { PageSection } from "@/components/ui/patterns"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 
 export default function PortalGeneralMeetingPage() {
   const reportCards = [
@@ -44,45 +44,39 @@ export default function PortalGeneralMeetingPage() {
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground gap-2">
-          <Link href="/reports">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Reports
-          </Link>
-        </Button>
-      </div>
-
       <PageHeader
         title="General Meeting"
         description="Access the documents and trackers that support your weekly general meeting."
         icon={FileBarChart}
+        backLink={{ href: "/reports", label: "Back to Reports" }}
       />
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {reportCards.map((card) => (
-          <Link key={card.title} href={card.href} className="group">
-            <Card className="hover:border-primary h-full border-2 transition-all hover:shadow-lg">
-              <CardHeader className="flex flex-row items-center gap-4 pb-2">
-                <div
-                  className={`${card.bgColor} ${card.color} flex h-12 w-12 items-center justify-center rounded-lg transition-transform group-hover:scale-110`}
-                >
-                  <card.icon className="h-6 w-6" />
-                </div>
-                <div className="flex-1">
-                  <CardTitle className="group-hover:text-primary text-xl transition-colors">{card.title}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <CardDescription className="text-sm leading-relaxed">{card.description}</CardDescription>
-                <div className="text-primary flex translate-x-[-10px] items-center text-sm font-medium opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100">
-                  Access Tool <ChevronRight className="ml-1 h-4 w-4" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      <PageSection title="General Meeting">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {reportCards.map((card) => (
+            <Link key={card.title} href={card.href} className="group">
+              <Card className="hover:border-primary h-full border-2 transition-all hover:shadow-lg">
+                <CardHeader className="flex flex-row items-center gap-4 pb-2">
+                  <div
+                    className={`${card.bgColor} ${card.color} flex h-12 w-12 items-center justify-center rounded-lg transition-transform group-hover:scale-110`}
+                  >
+                    <card.icon className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="group-hover:text-primary text-xl transition-colors">{card.title}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <CardDescription className="text-sm leading-relaxed">{card.description}</CardDescription>
+                  <div className="text-primary flex translate-x-[-10px] items-center text-sm font-medium opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100">
+                    Open <ChevronRight className="ml-1 h-4 w-4" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </PageSection>
     </PageWrapper>
   )
 }

@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
+import {
+  expandDepartmentScopeForQuery,
+  getDepartmentScope,
+  resolveAdminScope,
+  normalizeDepartmentName,
+} from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -143,7 +148,8 @@ export async function GET(request: Request) {
     if (scope) {
       const scopedDepartments = getDepartmentScope(scope, "finance")
       if (scopedDepartments && scopedDepartments.length > 0) {
-        const { data: deptRows } = await dataClient.from("departments").select("id").in("name", scopedDepartments)
+        const queryScopedDepartments = expandDepartmentScopeForQuery(scopedDepartments)
+        const { data: deptRows } = await dataClient.from("departments").select("id").in("name", queryScopedDepartments)
         const deptIds = (deptRows || []).map((row) => row.id)
         query = deptIds.length > 0 ? query.in("department_id", deptIds) : query.eq("department_id", "__none__")
       } else if (scopedDepartments && scopedDepartments.length === 0) {
@@ -254,12 +260,13 @@ export async function POST(request: Request) {
     if (scope) {
       const scopedDepartments = getDepartmentScope(scope, "finance")
       if (scopedDepartments) {
+        const queryScopedDepartments = expandDepartmentScopeForQuery(scopedDepartments)
         const { data: targetDepartment } = await dataClient
           .from("departments")
           .select("name")
           .eq("id", department_id)
           .single()
-        if (!targetDepartment || !scopedDepartments.includes(targetDepartment.name)) {
+        if (!targetDepartment || !queryScopedDepartments.includes(targetDepartment.name)) {
           return NextResponse.json(
             { error: "You can only create finance records in your scoped departments" },
             { status: 403 }

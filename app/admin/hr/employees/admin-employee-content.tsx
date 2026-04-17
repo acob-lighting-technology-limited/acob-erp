@@ -1,49 +1,50 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { formatName } from "@/lib/utils"
-import { ArrowLeft, Users, Shield, UserCog, LayoutGrid, List, Download, Plus, Loader2 } from "lucide-react"
+import { formatName, cn } from "@/lib/utils"
+import { Users, Shield, Mail, Phone, Download, Plus, Pencil, Eye, Building2, Calendar, IdCard } from "lucide-react"
 import type { UserRole, EmploymentStatus } from "@/types/database"
-import { getRoleDisplayName, getRoleBadgeColor, canAssignRoles } from "@/lib/permissions"
+import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { PendingApplicationsModal } from "./pending-applications-modal"
 import { formValidation } from "@/lib/validation"
-import {
-  canManageDeveloperAccounts,
-  canManageSuperAdminAccounts,
-  getAssignableRolesForActor,
-} from "@/lib/role-management"
+import { getAssignableRolesForActor } from "@/lib/role-management"
 import { logger } from "@/lib/logger"
 import { CreateUserDialog } from "@/components/employees/CreateUserDialog"
 import { EmployeeViewModal } from "@/components/employees/EmployeeViewModal"
 import { EmployeeDeletionDialog } from "@/components/employees/EmployeeDeletionDialog"
 import { EmployeeExportDialog } from "@/components/employees/EmployeeExportDialog"
-import { EmployeeFilterBar } from "@/components/employees/EmployeeFilterBar"
 import {
   buildEmployeeExportRows,
   exportEmployeesToExcel,
   exportEmployeesToPDF,
   exportEmployeesToWord,
 } from "@/lib/employees/employee-export"
-import { EmployeeListView } from "@/components/employees/EmployeeListView"
 import type { Database } from "@/types/database"
 import type { EmployeeAssignedItems, EmployeeProfile, EmployeeViewData } from "@/components/employees/types"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { Badge } from "@/components/ui/badge"
+import { StatCard } from "@/components/ui/stat-card"
+import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 
 const log = logger("hr-employees-admin-employee-content")
 
 async function fetchAllEmployees(): Promise<Employee[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("profiles").select("*").order("last_name", { ascending: true })
-  if (error) throw new Error(error.message)
-  return data || []
+  const response = await fetch("/api/admin/employees", { cache: "no-store" })
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(payload.error || "Failed to fetch employees")
+  }
+  const payload = (await response.json()) as { data: Employee[] }
+  return payload.data || []
 }
 
 export interface Employee {
@@ -89,40 +90,22 @@ function deriveLeadDepartments(department: string, isDepartmentLead: boolean): s
   return isDepartmentLead && department ? [department] : []
 }
 
+const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
+
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
   const searchParams = useSearchParams()
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees)
-  const [isLoading] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
-  const [employeeFilter, setEmployeeFilter] = useState<string[]>([])
-  const [roleFilter, setRoleFilter] = useState<string[]>([])
-  const [statusFilter, setStatusFilter] = useState<string[]>(["active", "suspended", "on_leave"])
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({
-    key: "last_name",
-    direction: "asc",
-  })
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
+  const [supabase] = useState(() => createClient())
+  const queryClient = useQueryClient()
+
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isDeleting] = useState(false)
-  const [assignedItems] = useState<EmployeeAssignedItems>({
-    tasks: [],
-    taskAssignments: [],
-    assets: [],
-    projects: [],
-    projectMemberships: [],
-    feedback: [],
-    documentation: [],
-  })
   const [modalViewMode, setModalViewMode] = useState<"profile" | "employment" | "edit" | "signature" | "status">(
     "profile"
   )
 
-  // Export dialog state
+  // Export state
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
   const [exportEmployeeDialogOpen, setExportEmployeeDialogOpen] = useState(false)
   const [exportType, setExportType] = useState<"excel" | "pdf" | "word" | null>(null)
@@ -144,12 +127,24 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     "Lead Departments": true,
     "Created At": true,
   })
+
   const [viewEmployeeProfile, setViewEmployeeProfile] = useState<EmployeeProfile | null>(null)
   const [viewEmployeeData, setViewEmployeeData] = useState<EmployeeViewData>({
     tasks: [],
     assets: [],
     documentation: [],
   })
+
+  const [assignedItems, setAssignedItems] = useState<EmployeeAssignedItems>({
+    tasks: [],
+    taskAssignments: [],
+    assets: [],
+    projects: [],
+    projectMemberships: [],
+    feedback: [],
+    documentation: [],
+  })
+
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false)
   const [isCreatingUser, setIsCreatingUser] = useState(false)
   const [createUserForm, setCreateUserForm] = useState({
@@ -165,7 +160,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     employeeNumber: "",
   })
 
-  // Form states
   const [editForm, setEditForm] = useState({
     role: "employee" as UserRole,
     admin_domains: [] as string[],
@@ -174,7 +168,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     office_location: "",
     designation: "",
     lead_departments: [] as string[],
-    // Expanded fields
     employee_number: "",
     first_name: "",
     last_name: "",
@@ -193,20 +186,18 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   })
   const [showMoreOptions, setShowMoreOptions] = useState(false)
 
-  const [supabase] = useState(() => createClient())
-  const queryClient = useQueryClient()
   const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
 
-  const { data: fetchedEmployees } = useQuery({
+  const {
+    data: employees = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminEmployees(),
     queryFn: fetchAllEmployees,
     initialData: initialEmployees,
   })
-
-  // Keep employees state in sync with query result
-  useEffect(() => {
-    if (fetchedEmployees) setEmployees(fetchedEmployees)
-  }, [fetchedEmployees])
 
   const loadData = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
@@ -221,22 +212,19 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       try {
         setSelectedEmployee(employee)
-
-        // Load full profile data to get all fields
         const { data: fullProfile } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
 
         if (fullProfile) {
           const isDepartmentLead = Boolean(fullProfile.is_department_lead)
           const normalizedDepartment = fullProfile.department || ""
           setEditForm({
-            role: fullProfile.role || "employee",
+            role: (fullProfile.role as UserRole) || "employee",
             admin_domains: Array.isArray(fullProfile.admin_domains) ? fullProfile.admin_domains : [],
             is_department_lead: isDepartmentLead,
             department: normalizedDepartment,
             office_location: fullProfile.office_location || "",
             designation: fullProfile.designation || "",
             lead_departments: deriveLeadDepartments(normalizedDepartment, isDepartmentLead),
-            // Expanded fields
             employee_number: fullProfile.employee_number || "",
             first_name: fullProfile.first_name || "",
             last_name: fullProfile.last_name || "",
@@ -253,93 +241,25 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             employment_date: fullProfile.employment_date || "",
             job_description: fullProfile.job_description || "",
           })
-        } else {
-          // Fallback to basic fields if full profile not found
-          const isDepartmentLead = Boolean(employee.is_department_lead)
-          const normalizedDepartment = employee.department || ""
-          setEditForm({
-            role: employee.role,
-            admin_domains: Array.isArray(employee.admin_domains) ? employee.admin_domains : [],
-            is_department_lead: isDepartmentLead,
-            department: normalizedDepartment,
-            office_location: employee.office_location || "",
-            designation: employee.designation || "",
-            lead_departments: deriveLeadDepartments(normalizedDepartment, isDepartmentLead),
-            employee_number: employee.employee_number || "",
-            first_name: employee.first_name || "",
-            last_name: employee.last_name || "",
-            other_names: employee.other_names || "",
-            company_email: employee.company_email || "",
-            additional_email: employee.additional_email || "",
-            phone_number: employee.phone_number || "",
-            additional_phone: "",
-            residential_address: employee.residential_address || "",
-            bank_name: "",
-            bank_account_number: "",
-            bank_account_name: "",
-            date_of_birth: "",
-            employment_date: "",
-            job_description: "",
-          })
         }
 
-        setShowMoreOptions(false) // Reset expanded state
-
-        // Set profile states so the unified modal has data
+        setShowMoreOptions(false)
         setSelectedEmployee(employee)
-        setViewEmployeeProfile(employee)
+        setViewEmployeeProfile(employee as unknown as EmployeeProfile)
         setModalViewMode("edit")
         setIsViewDialogOpen(true)
-      } catch (error: unknown) {
-        log.error({ err: String(error) }, "error loading employees for edit")
-        toast.error("Failed to load employees details")
+      } catch (_error: unknown) {
+        log.error({ err: String(_error) }, "error loading employee for edit")
+        toast.error("Failed to load employee details")
       }
     },
     [canManageUsers, supabase]
   )
 
-  // Handle userId from search params (for edit dialog)
-  useEffect(() => {
-    const userId = searchParams?.get("userId")
-    if (userId && employees.length > 0 && !isViewDialogOpen) {
-      const user = employees.find((employeeRecord) => employeeRecord.id === userId)
-      if (user) {
-        void handleEditEmployee(user)
-      }
-    }
-  }, [searchParams, employees, isViewDialogOpen, handleEditEmployee])
-
-  const handleViewEmployeeSignature = async (employee: Employee) => {
-    try {
-      setSelectedEmployee(employee)
-
-      setModalViewMode("signature")
-      setIsViewDialogOpen(true)
-      setViewEmployeeProfile(employee)
-
-      // Load full profile data for signature
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", employee.id).single()
-
-      if (profileData) {
-        const fullProfile = profileData as EmployeeProfile
-        setSelectedEmployee(fullProfile)
-        // If we're in view dialog, update the viewEmployeeProfile too
-        if (isViewDialogOpen) {
-          setViewEmployeeProfile(fullProfile)
-        }
-      }
-    } catch (error: unknown) {
-      log.error({ err: String(error) }, "error loading profile for signature")
-      toast.error("Failed to load profile data")
-    }
-  }
-
   const handleViewEmployeeDetails = async (employee: Employee) => {
     try {
       setSelectedEmployee(employee)
-      setModalViewMode("profile") // Always reset to profile when opening fresh
-      // Clear stale profile immediately so the modal never shows the previous
-      // employee's data while the new fetch is in flight.
+      setModalViewMode("profile")
       setViewEmployeeProfile(null)
       setViewEmployeeData({ tasks: [], assets: [], documentation: [] })
       setIsViewDialogOpen(true)
@@ -360,29 +280,24 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         assets: payload.related?.assets || [],
         documentation: payload.related?.documentation || [],
       })
-    } catch (error: unknown) {
-      log.error({ err: String(error) }, "error loading employee details")
-      toast.error("Failed to load employees details")
+
+      // Also fetch full assigned items for deletion check or detailed view
+      const detailResponse = await fetch(`/api/admin/hr/employees/${employee.id}/details`)
+      if (detailResponse.ok) {
+        const detailData = await detailResponse.json()
+        setAssignedItems(detailData)
+      }
+    } catch (_error: unknown) {
+      log.error({ err: String(_error) }, "error loading employee details")
+      toast.error("Failed to load employee details")
     }
   }
 
-  const confirmDeleteEmployee = async () => {
-    if (!selectedEmployee) return
-    toast.error("User deletion is disabled. Suspend or deactivate the employee instead.")
-    setIsDeleteDialogOpen(false)
-  }
-
   const handleSaveEmployee = async () => {
-    if (isSaving) return // Prevent duplicate submissions
+    if (isSaving) return
     setIsSaving(true)
     try {
-      if (!canManageUsers) {
-        toast.error("You can view users but cannot edit them")
-        setIsSaving(false)
-        return
-      }
-
-      if (!selectedEmployee) {
+      if (!canManageUsers || !selectedEmployee) {
         setIsSaving(false)
         return
       }
@@ -390,78 +305,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       const {
         data: { user },
       } = await supabase.auth.getUser()
-
       if (user && selectedEmployee.id === user.id && editForm.role !== selectedEmployee.role) {
         toast.error("You cannot change your own role from the HR employee editor")
-        setIsSaving(false)
-        return
-      }
-
-      // Check if user can assign this role
-      if (userProfile && !canAssignRoles(userProfile.role, editForm.role)) {
-        toast.error("You don't have permission to assign this role")
-        setIsSaving(false)
-        return
-      }
-
-      if (editForm.role === "developer" && !canManageDeveloperAccounts(userProfile?.role || "")) {
-        toast.error("Only super admin or developer can assign the developer role")
-        setIsSaving(false)
-        return
-      }
-
-      if (selectedEmployee.role === "developer" && !canManageDeveloperAccounts(userProfile?.role || "")) {
-        toast.error("Only super admin or developer can modify a developer account")
-        setIsSaving(false)
-        return
-      }
-
-      if (selectedEmployee.role === "developer" && editForm.role !== "developer") {
-        const { count, error: developerCountError } = await supabase
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "developer")
-
-        if (developerCountError) throw developerCountError
-
-        if ((count || 0) <= 1) {
-          toast.error("Cannot downgrade the last developer account")
-          setIsSaving(false)
-          return
-        }
-      }
-
-      if (
-        (selectedEmployee.role === "super_admin" || editForm.role === "super_admin") &&
-        !canManageSuperAdminAccounts(userProfile?.role || "")
-      ) {
-        toast.error("Only super admin can manage super admin accounts")
-        setIsSaving(false)
-        return
-      }
-
-      if (selectedEmployee.role === "super_admin" && editForm.role !== "super_admin") {
-        const { count, error: superAdminCountError } = await supabase
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "super_admin")
-
-        if (superAdminCountError) throw superAdminCountError
-
-        if ((count || 0) <= 1) {
-          toast.error("Cannot downgrade the last super admin account")
-          setIsSaving(false)
-          return
-        }
-      }
-
-      if (editForm.is_department_lead && !editForm.department) {
-        toast.error("A department lead must belong to a department")
-        setIsSaving(false)
-        return
-      }
-      if (editForm.role === "admin" && editForm.admin_domains.length === 0) {
-        toast.error("Admin role requires at least one admin domain")
         setIsSaving(false)
         return
       }
@@ -469,38 +314,23 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       const companyEmail = editForm.company_email.trim().toLowerCase()
       const additionalEmail = editForm.additional_email.trim().toLowerCase()
 
-      if (!companyEmail) {
-        toast.error("Company email is required")
+      if (!companyEmail || !formValidation.isCompanyEmail(companyEmail)) {
+        toast.error("Valid company email is required")
         setIsSaving(false)
         return
       }
 
-      if (!formValidation.isCompanyEmail(companyEmail)) {
-        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
-        setIsSaving(false)
-        return
-      }
+      const leadDepartments = deriveLeadDepartments(editForm.department, editForm.is_department_lead)
 
-      if (additionalEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(additionalEmail)) {
-        toast.error("Additional email must be a valid email address")
-        setIsSaving(false)
-        return
-      }
-
-      const isLead = editForm.is_department_lead
-      const leadDepartments = deriveLeadDepartments(editForm.department, isLead)
-
-      // Build update object with all fields
       const updateData: Database["public"]["Tables"]["profiles"]["Update"] = {
         role: editForm.role,
         admin_domains: editForm.role === "admin" ? editForm.admin_domains : null,
         department: editForm.department,
         office_location: editForm.office_location || null,
         designation: editForm.designation || null,
-        is_department_lead: isLead,
+        is_department_lead: editForm.is_department_lead,
         lead_departments: leadDepartments,
         updated_at: new Date().toISOString(),
-        // Always include expanded fields if they exist in form state
         first_name: editForm.first_name || "",
         last_name: editForm.last_name || "",
         other_names: editForm.other_names || null,
@@ -522,36 +352,25 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companyEmail, additionalEmail: additionalEmail || null }),
       })
-      const emailSyncResult = (await emailSyncResponse.json().catch(() => ({}))) as { error?: string }
-      if (!emailSyncResponse.ok) {
-        throw new Error(emailSyncResult.error || "Failed to sync employee login email")
-      }
+      if (!emailSyncResponse.ok) throw new Error("Failed to sync employee login email")
 
       const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
-
       if (error) throw error
 
       toast.success("Employee updated successfully")
-
-      // If we're in the unified view modal, switch back to profile mode and refresh data
       if (isViewDialogOpen) {
         setModalViewMode("profile")
-        // Refresh the viewEmployeeProfile to show updated data immediately
         const { data: updatedProfile } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", selectedEmployee.id)
           .single()
-
-        if (updatedProfile) {
-          setViewEmployeeProfile(updatedProfile as EmployeeProfile)
-        }
+        if (updatedProfile) setViewEmployeeProfile(updatedProfile as EmployeeProfile)
       }
-
       loadData()
-    } catch (error: unknown) {
-      log.error({ err: String(error) }, "error updating employee")
-      toast.error(error instanceof Error ? error.message : "Failed to update employees member")
+    } catch (_error: unknown) {
+      log.error({ err: String(_error) }, "error updating employee")
+      toast.error(_error instanceof Error ? _error.message : "Failed to update employee")
     } finally {
       setIsSaving(false)
     }
@@ -560,70 +379,23 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const handleCreateUser = async () => {
     if (isCreatingUser) return
     setIsCreatingUser(true)
-
     try {
-      if (!canManageUsers) {
-        toast.error("You can view users but cannot create users")
-        setIsCreatingUser(false)
-        return
-      }
-
-      // Validate required fields
+      if (!canManageUsers) throw new Error("Permission denied")
       if (!createUserForm.firstName.trim() || !createUserForm.lastName.trim() || !createUserForm.email.trim()) {
-        toast.error("First name, last name, and email are required")
-        setIsCreatingUser(false)
-        return
+        throw new Error("Required fields are missing")
       }
-
-      // Validate email domain
       if (!formValidation.isCompanyEmail(createUserForm.email)) {
-        toast.error("Only @acoblighting.com and @org.acoblighting.com emails are allowed")
-        setIsCreatingUser(false)
-        return
+        throw new Error("Invalid email domain")
       }
-
-      // Validate employee number (required and format check)
-      if (!createUserForm.employeeNumber.trim()) {
-        toast.error("Employee number is required")
-        setIsCreatingUser(false)
-        return
-      }
-
-      // Validate employee number format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)
-      const empNumPattern = /^ACOB\/[0-9]{4}\/[0-9]{3}$/
-      if (!empNumPattern.test(createUserForm.employeeNumber.trim())) {
-        toast.error("Employee number must be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)")
-        setIsCreatingUser(false)
-        return
-      }
-
-      // Check if user can assign this role
-      if (userProfile && !canAssignRoles(userProfile.role, createUserForm.role)) {
-        toast.error("You don't have permission to assign this role")
-        setIsCreatingUser(false)
-        return
-      }
-      if (createUserForm.role === "admin" && createUserForm.admin_domains.length === 0) {
-        toast.error("Admin role requires at least one admin domain")
-        setIsCreatingUser(false)
-        return
-      }
-
       const response = await fetch("/api/admin/create-user", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(createUserForm),
       })
-
       const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Failed to create user")
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create user")
-      }
-
-      toast.success("User created successfully! They can now login with their email and receive an OTP.")
+      toast.success("User created successfully")
       setIsCreateUserDialogOpen(false)
       setCreateUserForm({
         firstName: "",
@@ -638,67 +410,31 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         employeeNumber: "",
       })
       loadData()
-    } catch (error: unknown) {
-      log.error({ err: String(error) }, "error creating user")
-      toast.error(error instanceof Error ? error.message : "Failed to create user")
+    } catch (_error: unknown) {
+      toast.error(_error instanceof Error ? _error.message : "Failed to create user")
     } finally {
       setIsCreatingUser(false)
     }
   }
 
-  const filteredEmployees = employees
-    .filter((member) => {
-      const matchesSearch =
-        (member.first_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (member.last_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (member.company_email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (member.additional_email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (member.designation || "").toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesDepartment = departmentFilter.length === 0 || departmentFilter.includes(member.department)
-
-      const matchesEmployee = employeeFilter.length === 0 || employeeFilter.includes(member.id)
-
-      const matchesRole = roleFilter.length === 0 || roleFilter.includes(member.role)
-
-      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(member.employment_status || "active")
-
-      return matchesSearch && matchesDepartment && matchesEmployee && matchesRole && matchesStatus
-    })
-    .sort((a, b) => {
-      const { key, direction } = sortConfig
-
-      if (key === "employee_number") {
-        const empNoA = (a.employee_number || "").toLowerCase()
-        const empNoB = (b.employee_number || "").toLowerCase()
-        return direction === "asc" ? empNoA.localeCompare(empNoB) : empNoB.localeCompare(empNoA)
-      }
-
-      const lastNameA = formatName(a.last_name).toLowerCase()
-      const lastNameB = formatName(b.last_name).toLowerCase()
-
-      if (direction === "asc") {
-        return lastNameA.localeCompare(lastNameB)
-      } else {
-        return lastNameB.localeCompare(lastNameA)
-      }
-    })
-
-  const departments = Array.from(new Set(employees.map((s) => s.department).filter(Boolean))) as string[]
-
-  const roles: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
-
-  const stats = {
-    total: employees.length,
-    admins: employees.filter((s) => ["developer", "super_admin", "admin"].includes(s.role)).length,
-    leads: employees.filter((s) => s.is_department_lead).length,
-    employees: employees.filter((s) => s.role === "employee").length,
+  const handleExportExecute = async () => {
+    if (!exportType || employees.length === 0) return
+    try {
+      const exportRows = buildEmployeeExportRows(employees, { selectedColumns })
+      if (exportType === "excel") await exportEmployeesToExcel(exportRows)
+      else if (exportType === "pdf") await exportEmployeesToPDF(employees, { selectedColumns })
+      else if (exportType === "word") await exportEmployeesToWord(exportRows)
+      setExportEmployeeDialogOpen(false)
+    } catch (_error: unknown) {
+      toast.error("Export failed")
+    }
   }
 
-  // Export functions
-  const handleExportClick = (type: "excel" | "pdf" | "word") => {
-    setExportType(type)
-    setExportEmployeeDialogOpen(true)
+  const handleViewEmployeeSignature = (employee: EmployeeProfile) => {
+    setSelectedEmployee(employee as unknown as Employee)
+    setViewEmployeeProfile(employee)
+    setModalViewMode("signature")
+    setIsViewDialogOpen(true)
   }
 
   const getAvailableRoles = (): UserRole[] => {
@@ -706,181 +442,370 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     return getAssignableRolesForActor(userProfile.role) as UserRole[]
   }
 
-  if (isLoading) {
-    return (
-      <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="text-primary h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading employees...</p>
-        </div>
-      </div>
-    )
-  }
+  const columns: DataTableColumn<Employee>[] = useMemo(
+    () => [
+      {
+        key: "employee_number",
+        label: "Emp. No.",
+        sortable: true,
+        resizable: true,
+        initialWidth: 120,
+        accessor: (r) => r.employee_number || "",
+        render: (r) => <span className="text-muted-foreground font-mono text-sm">{r.employee_number || "—"}</span>,
+      },
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => `${r.last_name}, ${r.first_name}`,
+        render: (r) => (
+          <div className="flex flex-col">
+            <span
+              className={cn("font-medium", r.employment_status === "separated" && "text-muted-foreground line-through")}
+            >
+              {formatName(r.last_name)}, {formatName(r.first_name)}
+            </span>
+            {r.is_department_lead && (
+              <div className="flex items-center gap-1 text-xs text-amber-600">
+                <Shield className="h-3 w-3" />
+                <span>Dept Lead</span>
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "email",
+        label: "Email",
+        resizable: true,
+        initialWidth: 220,
+        accessor: (r) => r.company_email,
+        render: (r) => (
+          <div className="text-muted-foreground flex items-center gap-1.5 text-sm">
+            <Mail className="h-3.5 w-3.5 shrink-0" />
+            <span className="max-w-[180px] truncate">{r.company_email}</span>
+          </div>
+        ),
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        resizable: true,
+        initialWidth: 150,
+        accessor: (r) => r.department || "",
+      },
+      {
+        key: "role",
+        label: "Role",
+        sortable: true,
+        accessor: (r) => r.role,
+        render: (r) => <Badge className={getRoleBadgeColor(r.role)}>{getRoleDisplayName(r.role)}</Badge>,
+      },
+      {
+        key: "status",
+        label: "Status",
+        accessor: (r) => r.employment_status || "active",
+        render: (r) => <EmployeeStatusBadge status={r.employment_status || "active"} size="sm" />,
+      },
+    ],
+    []
+  )
+
+  const departments = useMemo(
+    () => Array.from(new Set(employees.map((e) => e.department).filter((x): x is string => !!x))).sort(),
+    [employees]
+  )
+  const offices = useMemo(
+    () => Array.from(new Set(employees.map((e) => e.office_location).filter((x): x is string => !!x))).sort(),
+    [employees]
+  )
+
+  const filters: DataTableFilter<Employee>[] = useMemo(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        options: departments.map((d) => ({ value: d, label: d })),
+        placeholder: "All Departments",
+      },
+      {
+        key: "office_location",
+        label: "Location",
+        options: offices.map((o) => ({ value: o, label: o })),
+        placeholder: "All Locations",
+      },
+      {
+        key: "role",
+        label: "Role",
+        options: roleList.map((r) => ({ value: r, label: getRoleDisplayName(r) })),
+        placeholder: "All Roles",
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "active", label: "Active" },
+          { value: "suspended", label: "Suspended" },
+          { value: "on_leave", label: "On Leave" },
+          { value: "separated", label: "Separated" },
+        ],
+        placeholder: "Active Statuses",
+      },
+    ],
+    [departments, offices]
+  )
+
+  const stats = useMemo(
+    () => ({
+      total: employees.length,
+      admins: employees.filter((s) => ["developer", "super_admin", "admin"].includes(s.role)).length,
+      leads: employees.filter((s) => s.is_department_lead).length,
+      employeesCount: employees.filter((s) => s.role === "employee").length,
+    }),
+    [employees]
+  )
+
+  // Handle userId from search params (for edit dialog)
+  useEffect(() => {
+    const userId = searchParams?.get("userId")
+    if (userId && employees.length > 0 && !isViewDialogOpen) {
+      const user = employees.find((e) => e.id === userId)
+      if (user) {
+        void handleEditEmployee(user)
+      }
+    }
+  }, [searchParams, employees, isViewDialogOpen, handleEditEmployee])
 
   return (
-    <div className="from-background via-background to-muted/20 min-h-screen w-full overflow-x-hidden bg-gradient-to-br">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <Link
-              href="/admin/hr"
-              className="text-muted-foreground hover:text-foreground mb-3 inline-flex items-center gap-2 text-sm font-medium transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to HR
-            </Link>
-            <h1 className="text-foreground flex items-center gap-2 text-2xl font-bold sm:gap-3 sm:text-3xl">
-              <Users className="text-primary h-6 w-6 sm:h-8 sm:w-8" />
-              Employee Management
-            </h1>
-            <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-              View and manage employees members, roles, and permissions
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {canManageUsers && <PendingApplicationsModal onEmployeeCreated={loadData} />}
-            {canManageUsers && (
-              <Button onClick={() => setIsCreateUserDialogOpen(true)} className="gap-2" size="sm">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Create User</span>
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setExportOptionsOpen(true)}
-              className="gap-2"
-              disabled={filteredEmployees.length === 0}
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
+    <DataTablePage
+      title="Employee Management"
+      description="View and manage employee profiles, roles, and permissions."
+      icon={Users}
+      backLink={{ href: "/admin/hr", label: "Back to HR" }}
+      actions={
+        <div className="flex items-center gap-2">
+          {canManageUsers && <PendingApplicationsModal onEmployeeCreated={loadData} />}
+          {canManageUsers && (
+            <Button onClick={() => setIsCreateUserDialogOpen(true)} variant="default" size="sm" className="h-8 gap-2">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Create User</span>
             </Button>
-            <div className="flex items-center rounded-lg border p-1">
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-1 sm:gap-2"
-              >
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">List</span>
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-1 sm:gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Card</span>
-              </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2"
+            onClick={() => setExportOptionsOpen(true)}
+            disabled={employees.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
+        </div>
+      }
+      stats={
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard
+            title="Total Staff"
+            value={stats.total}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Admins"
+            value={stats.admins}
+            icon={Shield}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+          <StatCard
+            title="Dept Leads"
+            value={stats.leads}
+            icon={Shield}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Employees"
+            value={stats.employeesCount}
+            icon={Users}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+        </div>
+      }
+    >
+      <DataTable<Employee>
+        data={employees}
+        columns={columns}
+        getRowId={(r) => r.id}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={refetch}
+        searchPlaceholder="Search name, email, designation..."
+        searchFn={(r, q) =>
+          `${r.first_name} ${r.last_name} ${r.company_email} ${r.designation}`.toLowerCase().includes(q)
+        }
+        filters={filters}
+        rowActions={[
+          {
+            label: "View Profile",
+            icon: Eye,
+            onClick: handleViewEmployeeDetails,
+          },
+          {
+            label: "Edit Employee",
+            icon: Pencil,
+            onClick: handleEditEmployee,
+            hidden: () => !canManageUsers,
+          },
+        ]}
+        expandable={{
+          render: (r) => (
+            <div className="animate-in fade-in slide-in-from-top-2 grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
+              <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
+                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                  <IdCard className="h-4 w-4" /> Identity
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Emp. No.</span>
+                    <span className="font-mono">{r.employee_number || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Joined</span>
+                    <span>{r.employment_date ? new Date(r.employment_date).toLocaleDateString() : "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">DOB</span>
+                    <span>{r.date_of_birth ? new Date(r.date_of_birth).toLocaleDateString() : "—"}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
+                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                  <Building2 className="h-4 w-4" /> Work info
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Designation</span>
+                    <span>{r.designation || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Office</span>
+                    <span>{r.office_location || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Address</span>
+                    <span className="max-w-[150px] truncate">{r.residential_address || "—"}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
+                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-amber-600 uppercase">
+                  <Calendar className="h-4 w-4" /> Contact
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Phone className="text-muted-foreground h-3.5 w-3.5" />
+                    <span>{r.phone_number || "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="text-muted-foreground h-3.5 w-3.5" />
+                    <span className="truncate">{r.additional_email || "—"}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-          <Card className="border-2">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Total Employee</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.total}</p>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(r) => (
+          <Card className="group transition-shadow hover:shadow-md">
+            <CardContent className="space-y-4 p-4">
+              <div className="flex items-start justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-semibold">
+                    {formatName(r.first_name)} {formatName(r.last_name)}
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">{r.designation || r.department}</p>
                 </div>
-                <div className="ml-1 shrink-0 rounded-lg bg-blue-100 p-1.5 dark:bg-blue-900/30">
-                  <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                </div>
+                <EmployeeStatusBadge status={r.employment_status || "active"} size="sm" />
               </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                <Badge className={getRoleBadgeColor(r.role)}>{getRoleDisplayName(r.role)}</Badge>
+                {r.is_department_lead && (
+                  <Badge variant="outline" className="border-amber-200 text-amber-600">
+                    Lead
+                  </Badge>
+                )}
+              </div>
+
+              <div className="text-muted-foreground space-y-1.5 pt-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5" />
+                  <span className="truncate">{r.company_email}</span>
+                </div>
+                {r.phone_number && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-3.5 w-3.5" />
+                    <span>{r.phone_number}</span>
+                  </div>
+                )}
+              </div>
+
+              <Button variant="outline" size="sm" className="h-8 w-full" onClick={() => handleViewEmployeeDetails(r)}>
+                View Profile
+              </Button>
             </CardContent>
           </Card>
+        )}
+        urlSync
+      />
 
-          <Card className="border-2">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Admins</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.admins}</p>
-                </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-red-100 p-1.5 dark:bg-red-900/30">
-                  <Shield className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Modals */}
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Employees"
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+          { id: "word", label: "Word (.docx)", icon: "word" },
+        ]}
+        onSelect={(id) => {
+          setExportType(id as "excel" | "pdf" | "word")
+          setExportOptionsOpen(false)
+          setExportEmployeeDialogOpen(true)
+        }}
+      />
 
-          <Card className="border-2">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Leads</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.leads}</p>
-                </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-purple-100 p-1.5 dark:bg-purple-900/30">
-                  <UserCog className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <EmployeeExportDialog
+        isOpen={exportEmployeeDialogOpen}
+        onOpenChange={setExportEmployeeDialogOpen}
+        exportType={exportType}
+        setExportType={setExportType}
+        selectedColumns={selectedColumns}
+        setSelectedColumns={setSelectedColumns}
+        onConfirm={handleExportExecute}
+      />
 
-          <Card className="border-2">
-            <CardContent className="p-2.5">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-muted-foreground truncate text-[10px] font-medium">Employee Members</p>
-                  <p className="text-foreground mt-0.5 text-base font-bold md:text-2xl">{stats.employees}</p>
-                </div>
-                <div className="ml-1 flex-shrink-0 rounded-lg bg-green-100 p-1.5 dark:bg-green-900/30">
-                  <Users className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <EmployeeFilterBar
-          filters={{ searchQuery, departmentFilter, employeeFilter, roleFilter, statusFilter }}
-          onFilterChange={(updated) => {
-            if (updated.searchQuery !== undefined) setSearchQuery(updated.searchQuery)
-            if (updated.departmentFilter !== undefined) setDepartmentFilter(updated.departmentFilter)
-            if (updated.employeeFilter !== undefined) setEmployeeFilter(updated.employeeFilter)
-            if (updated.roleFilter !== undefined) setRoleFilter(updated.roleFilter)
-            if (updated.statusFilter !== undefined) setStatusFilter(updated.statusFilter)
-          }}
-          departments={departments}
-          employees={employees}
-          roles={roles}
-        />
-
-        {/* Employee List */}
-        <EmployeeListView
-          employees={filteredEmployees}
-          viewMode={viewMode}
-          sortConfig={sortConfig}
-          onSortChange={setSortConfig}
-          onViewDetails={handleViewEmployeeDetails}
-          hasActiveFilters={
-            Boolean(searchQuery) || departmentFilter.length > 0 || roleFilter.length > 0 || employeeFilter.length > 0
-          }
-          getRoleBadgeColor={getRoleBadgeColor}
-          getRoleDisplayName={getRoleDisplayName}
-        />
-      </div>
-
-      {/* Create User Dialog */}
       <CreateUserDialog
         isOpen={isCreateUserDialogOpen}
         onOpenChange={setIsCreateUserDialogOpen}
         form={createUserForm}
         setForm={setCreateUserForm}
-        onCreate={handleCreateUser}
         isCreating={isCreatingUser}
+        onCreate={handleCreateUser}
         canManageUsers={canManageUsers}
         userProfile={userProfile}
       />
 
-      {/* View Details Dialog */}
       <EmployeeViewModal
         isOpen={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}
@@ -904,47 +829,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         getAvailableRoles={getAvailableRoles}
       />
 
-      {/* Deletion Disabled Dialog */}
       <EmployeeDeletionDialog
         isOpen={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         employee={selectedEmployee}
         assignedItems={assignedItems}
-        onDelete={confirmDeleteEmployee}
-        isDeleting={isDeleting}
+        onDelete={() => toast.error("User deletion is disabled. Suspend or deactivate the employee instead.")}
+        isDeleting={false}
       />
-
-      {/* Export Column Selection Dialog */}
-      <EmployeeExportDialog
-        isOpen={exportEmployeeDialogOpen}
-        onOpenChange={setExportEmployeeDialogOpen}
-        exportType={exportType}
-        setExportType={setExportType}
-        selectedColumns={selectedColumns}
-        setSelectedColumns={setSelectedColumns}
-        onConfirm={async () => {
-          const rows = buildEmployeeExportRows(filteredEmployees, { selectedColumns })
-          const filename = `employees-export-${new Date().toISOString().split("T")[0]}`
-          if (exportType === "excel") await exportEmployeesToExcel(rows, filename)
-          else if (exportType === "pdf") await exportEmployeesToPDF(filteredEmployees, { selectedColumns }, filename)
-          else if (exportType === "word") await exportEmployeesToWord(rows, filename)
-          setExportEmployeeDialogOpen(false)
-        }}
-      />
-
-      <ExportOptionsDialog
-        open={exportOptionsOpen}
-        onOpenChange={setExportOptionsOpen}
-        title="Export Employees"
-        options={[
-          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
-          { id: "pdf", label: "PDF", icon: "pdf" },
-          { id: "word", label: "Word (.docx)", icon: "word" },
-        ]}
-        onSelect={(id) => {
-          handleExportClick(id as "excel" | "pdf" | "word")
-        }}
-      />
-    </div>
+    </DataTablePage>
   )
 }

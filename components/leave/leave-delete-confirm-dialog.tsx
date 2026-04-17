@@ -2,7 +2,6 @@
 
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -10,20 +9,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import type { LeaveRequest } from "@/app/(app)/leave/page"
 
 interface LeaveDeleteConfirmDialogProps {
   request: LeaveRequest | null
   onOpenChange: (open: boolean) => void
-  onConfirm: (request: LeaveRequest) => void
+  onConfirm: (request: LeaveRequest) => Promise<void>
+  isDeleting?: boolean
 }
 
-export function LeaveDeleteConfirmDialog({ request, onOpenChange, onConfirm }: LeaveDeleteConfirmDialogProps) {
+export function LeaveDeleteConfirmDialog({
+  request,
+  onOpenChange,
+  onConfirm,
+  isDeleting = false,
+}: LeaveDeleteConfirmDialogProps) {
   return (
     <AlertDialog
       open={!!request}
       onOpenChange={(open) => {
-        if (!open) onOpenChange(false)
+        if (!open && !isDeleting) onOpenChange(false)
       }}
     >
       <AlertDialogContent>
@@ -34,15 +40,18 @@ export function LeaveDeleteConfirmDialog({ request, onOpenChange, onConfirm }: L
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <Button
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={isDeleting || !request}
             onClick={() => {
-              if (request) onConfirm(request)
+              if (request) {
+                void onConfirm(request)
+              }
             }}
           >
-            Delete
-          </AlertDialogAction>
+            {isDeleting ? "Deleting..." : "Delete"}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

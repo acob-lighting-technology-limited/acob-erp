@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { TicketStatusBadge } from "@/components/dashboard/help-desk/ticket-badges"
 import { Button } from "@/components/ui/button"
+import { PromptDialog } from "@/components/ui/prompt-dialog"
 import type { HelpDeskTicket } from "./help-desk-types"
 
 interface PendingApprovalsCardProps {
@@ -10,7 +12,7 @@ interface PendingApprovalsCardProps {
   onOpenChange: (open: boolean) => void
   tickets: HelpDeskTicket[]
   processingId?: string | null
-  onDecision?: (ticketId: string, decision: "approved" | "rejected") => void
+  onDecision?: (ticketId: string, decision: "approved" | "rejected", comments?: string) => void
 }
 
 export function PendingApprovalsCard({
@@ -20,46 +22,70 @@ export function PendingApprovalsCard({
   processingId,
   onDecision,
 }: PendingApprovalsCardProps) {
+  const [rejectPrompt, setRejectPrompt] = useState<{ ticketId: string } | null>(null)
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Pending Department Reviews</DialogTitle>
-        </DialogHeader>
-        <div className="max-h-[65vh] space-y-2 overflow-y-auto pr-1">
-          {tickets.map((ticket) => (
-            <div key={ticket.id} className="flex items-center justify-between rounded border p-3">
-              <div>
-                <p className="font-medium">{ticket.ticket_number}</p>
-                <p className="text-muted-foreground text-xs">{ticket.title}</p>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Pending Department Reviews</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[65vh] space-y-2 overflow-y-auto pr-1">
+            {tickets.map((ticket) => (
+              <div key={ticket.id} className="flex items-center justify-between rounded border p-3">
+                <div>
+                  <p className="font-medium">{ticket.ticket_number}</p>
+                  <p className="text-muted-foreground text-xs">{ticket.title}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TicketStatusBadge status={ticket.status} />
+                  {onDecision ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={processingId === ticket.id}
+                        onClick={() => onDecision(ticket.id, "approved")}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={processingId === ticket.id}
+                        onClick={() => setRejectPrompt({ ticketId: ticket.id })}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <TicketStatusBadge status={ticket.status} />
-                {onDecision ? (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={processingId === ticket.id}
-                      onClick={() => onDecision(ticket.id, "approved")}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={processingId === ticket.id}
-                      onClick={() => onDecision(ticket.id, "rejected")}
-                    >
-                      Reject
-                    </Button>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <PromptDialog
+        open={rejectPrompt !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setRejectPrompt(null)
+        }}
+        title="Reject Ticket"
+        description="Provide a reason for rejecting this request."
+        label="Rejection Reason"
+        placeholder="Explain why this ticket is rejected..."
+        inputType="textarea"
+        required={true}
+        confirmLabel="Reject Ticket"
+        confirmVariant="destructive"
+        onConfirm={(value) => {
+          if (!rejectPrompt || !onDecision) return
+          onDecision(rejectPrompt.ticketId, "rejected", value)
+          setRejectPrompt(null)
+        }}
+      />
+    </>
   )
 }

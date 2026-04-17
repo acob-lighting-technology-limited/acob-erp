@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
-import { DocumentationContent } from "../documentation-content"
 import { getDocumentationData, type DocumentationDataResult } from "../data"
+import { InternalDocumentationContent } from "./internal-documentation-content"
 
 export default async function InternalDocumentationPage() {
   const data = await getDocumentationData()
@@ -11,15 +11,5 @@ export default async function InternalDocumentationPage() {
 
   const docsData = data as Exclude<DocumentationDataResult, { redirect: "/auth/login" }>
 
-  return (
-    <DocumentationContent
-      initialDocs={docsData.docs}
-      userId={docsData.userId}
-      departmentDocs={docsData.departmentDocs}
-      defaultTab="knowledge-docs"
-      hideTabList={true}
-      backLinkHref="/documentation"
-      backLinkLabel="Back to Documentation"
-    />
-  )
+  return <InternalDocumentationContent initialDocs={docsData.docs} userId={docsData.userId} />
 }

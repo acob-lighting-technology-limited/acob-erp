@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import {
+  expandDepartmentScopeForQuery,
+  getDepartmentScope,
+  normalizeDepartmentName,
+  resolveAdminScope,
+} from "@/lib/admin/rbac"
 import { AdminTasksContent, type employee, type UserProfile } from "./management/admin-tasks-content"
 import type { Task } from "@/types/task"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
@@ -40,13 +45,19 @@ async function getAdminTasksData() {
   if (!scope) {
     return { redirect: "/profile" as const }
   }
-  const isGlobalTaskAssigner = hasGlobalTaskAssignmentAuthority({
+  const canAssignGlobally = hasGlobalTaskAssignmentAuthority({
     id: user.id,
     department: scope.department,
     is_department_lead: scope.isDepartmentLead,
     lead_departments: scope.leadDepartments,
   })
-  const departmentScope = isGlobalTaskAssigner ? null : getDepartmentScope(scope, "general")
+  const departmentScope =
+    scope.scopeMode === "lead"
+      ? getDepartmentScope(scope, "general")
+      : canAssignGlobally
+        ? null
+        : getDepartmentScope(scope, "general")
+  const queryDepartmentScope = departmentScope ? expandDepartmentScopeForQuery(departmentScope) : null
 
   const userProfile: UserProfile = {
     id: user.id,
@@ -55,7 +66,7 @@ async function getAdminTasksData() {
     is_department_lead: scope.isDepartmentLead,
     lead_departments: scope.leadDepartments,
     managed_departments: scope.managedDepartments,
-    is_global_task_assigner: isGlobalTaskAssigner,
+    is_global_task_assigner: scope.scopeMode === "lead" ? false : canAssignGlobally,
   }
 
   // Build query based on role - exclude weekly action point items
@@ -71,8 +82,8 @@ async function getAdminTasksData() {
     listAssignableProfiles(dataClient, {
       select:
         "id, first_name, last_name, company_email, department, employment_status, is_department_lead, lead_departments",
-      departmentScope,
-      allowLegacyNullStatus: false,
+      departmentScope: queryDepartmentScope,
+      allowLegacyNullStatus: true,
     }),
   ])
 
@@ -113,13 +124,19 @@ async function getAdminTasksData() {
   }) as Task[]
 
   // For leads, filter tasks strictly by their departments
-  let filteredTasks = tasksWithUsers || []
+  let filteredTasks = (tasksWithUsers || []).filter((task) => String(task.source_type || "") !== "action_item")
   if (departmentScope) {
+    const scopedDepartmentTokens = new Set(
+      departmentScope.map((departmentName) => normalizeDepartmentName(departmentName))
+    )
     filteredTasks = filteredTasks.filter((task) => {
-      if (task.department && departmentScope.includes(task.department)) {
+      if (task.department && scopedDepartmentTokens.has(normalizeDepartmentName(task.department))) {
         return true
       }
-      if (task.assigned_to_user?.department && departmentScope.includes(task.assigned_to_user.department)) {
+      if (
+        task.assigned_to_user?.department &&
+        scopedDepartmentTokens.has(normalizeDepartmentName(task.assigned_to_user.department))
+      ) {
         return true
       }
       return false
@@ -137,15 +154,17 @@ async function getAdminTasksData() {
     departments.sort()
   }
 
-  const goalIds = Array.from(new Set(filteredTasks.map((task) => task.goal_id).filter(Boolean))) as string[]
-  const { data: goalRows } =
-    goalIds.length > 0
-      ? await dataClient
-          .from("goals_objectives")
-          .select("id, title")
-          .in("id", goalIds)
-          .order("title", { ascending: true })
-      : { data: [] as GoalFilterOption[] }
+  let goalsQuery = dataClient.from("goals_objectives").select("id, title, department, approval_status")
+  if (departmentScope && departmentScope.length > 0) {
+    goalsQuery = goalsQuery.in("department", departmentScope)
+  }
+  const { data: goalRowsRaw } = await goalsQuery.order("title", { ascending: true })
+  const goalRows = (goalRowsRaw || [])
+    .filter((goal) => {
+      const approvalStatus = String(goal.approval_status || "").toLowerCase()
+      return approvalStatus === "approved"
+    })
+    .map((goal) => ({ id: goal.id, title: goal.title })) as GoalFilterOption[]
 
   return {
     tasks: filteredTasks as Task[],

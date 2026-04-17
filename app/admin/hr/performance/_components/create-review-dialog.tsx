@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -77,32 +76,28 @@ interface CreateReviewDialogProps {
   initialStatus?: "draft" | "submitted" | "completed"
 }
 
-async function fetchPerformanceCreateData(supabase: ReturnType<typeof createClient>): Promise<PerformanceCreateData> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Not authenticated")
+/**
+ * Fetch the employee list and review cycles for the dialog.
+ * Uses server-side scoped API routes — leads only see their dept's employees.
+ */
+async function fetchPerformanceCreateData(): Promise<PerformanceCreateData> {
+  const [employeesRes, cyclesRes] = await Promise.all([
+    fetch("/api/hr/performance/employees", { cache: "no-store" }),
+    fetch("/api/hr/performance/cycles", { cache: "no-store" }),
+  ])
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, is_department_lead, department_id")
-    .eq("id", user.id)
-    .single()
+  if (!employeesRes.ok) throw new Error("Failed to load employees")
 
-  let usersQuery = supabase.from("profiles").select("id, first_name, last_name, department_id, department")
-  if (profile?.is_department_lead && !["developer", "admin", "super_admin"].includes(profile.role)) {
-    usersQuery = usersQuery.eq("department_id", profile.department_id)
-  }
+  const employeesData = (await employeesRes.json()) as { data?: User[]; error?: string }
+  const cyclesData = (await cyclesRes.json()) as { data?: ReviewCycle[]; cycles?: ReviewCycle[] }
 
-  const { data: usersData } = await usersQuery
-  const cyclesResponse = await fetch("/api/hr/performance/cycles", { cache: "no-store" })
-  const cyclesData = (await cyclesResponse.json()) as { data?: ReviewCycle[]; cycles?: ReviewCycle[] }
   const cycles = Array.isArray(cyclesData.data)
     ? cyclesData.data
     : Array.isArray(cyclesData.cycles)
       ? cyclesData.cycles
       : []
-  return { users: usersData || [], cycles }
+
+  return { users: employeesData.data || [], cycles }
 }
 
 function clampScore(value: number) {
@@ -141,7 +136,6 @@ export function CreateReviewDialog({
   initialDepartment = "",
   initialStatus = "draft",
 }: CreateReviewDialogProps) {
-  const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [loadingScore, setLoadingScore] = useState(false)
   const [loadedSelectionKey, setLoadedSelectionKey] = useState("")
@@ -168,7 +162,7 @@ export function CreateReviewDialog({
 
   const { data, isLoading } = useQuery({
     queryKey: QUERY_KEYS.performanceCreateData(),
-    queryFn: () => fetchPerformanceCreateData(supabase),
+    queryFn: () => fetchPerformanceCreateData(),
     enabled: open,
   })
 

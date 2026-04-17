@@ -54,6 +54,7 @@ export async function sendEdgeNotificationEmail(input: SendEdgeNotificationEmail
     to: recipients,
     subject: withSubjectPrefix(input.moduleName, input.subject),
     html: input.html,
+    traceLabel: `notification-${input.moduleName.toLowerCase()}`,
   })
 
   return { sent: true as const, recipients }

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { AlertTriangle, Loader2, CheckCircle2, List } from "lucide-react"
 import { toast } from "sonner"
 import type { EmploymentStatus } from "@/types/database"
@@ -471,7 +472,7 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
 export function ChangeStatusDialog({ open, onOpenChange, employee, onSuccess }: ChangeStatusDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Change Employment Status</DialogTitle>
           <DialogDescription>
@@ -479,14 +480,18 @@ export function ChangeStatusDialog({ open, onOpenChange, employee, onSuccess }: 
           </DialogDescription>
         </DialogHeader>
 
-        <ChangeStatusContent
-          employee={employee}
-          onSuccess={() => {
-            onOpenChange(false)
-            onSuccess?.()
-          }}
-          onCancel={() => onOpenChange(false)}
-        />
+        <ScrollArea className="min-h-0 flex-1 pr-4">
+          <div className="pb-4">
+            <ChangeStatusContent
+              employee={employee}
+              onSuccess={() => {
+                onOpenChange(false)
+                onSuccess?.()
+              }}
+              onCancel={() => onOpenChange(false)}
+            />
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   )

@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
 import { getAdminPmsData } from "./_lib"
+import { getRequestScope } from "@/lib/admin/api-scope"
 
 const adminPmsLinks = [
   {
@@ -94,6 +95,9 @@ function formatPercent(value: number | null | undefined) {
 
 export default async function AdminPmsPage() {
   const { departments, scopedUserCount, summary } = await getAdminPmsData()
+  const scope = await getRequestScope()
+  const canAccessCbt = scope?.isAdminLike === true && scope.scopeMode !== "lead"
+  const visibleLinks = adminPmsLinks.filter((item) => item.href !== "/admin/hr/pms/cbt" || canAccessCbt)
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -143,7 +147,7 @@ export default async function AdminPmsPage() {
         description="Open each route from here as the new home for performance visibility and review actions."
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {adminPmsLinks.map((item) => (
+          {visibleLinks.map((item) => (
             <Card key={item.href}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

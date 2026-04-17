@@ -1,28 +1,20 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { useMemo, useState } from "react"
+import { ScrollText, Download, Eye, FileText, Plus, Pencil, Trash2 } from "lucide-react"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ScrollText, Download } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { toast } from "sonner"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
-import { normalizeAuditAction } from "@/lib/audit/core"
-import { AuditLogFilters } from "@/components/audit/AuditLogFilters"
-import { AuditLogTable } from "@/components/audit/AuditLogTable"
-import { AuditLogCard } from "@/components/audit/AuditLogCard"
 import { AuditLogDetailPanel } from "@/components/audit/AuditLogDetailPanel"
 import { exportAuditLogsToExcel, exportAuditLogsToPDF, exportAuditLogsToWord } from "@/lib/audit/audit-log-export"
 import { HIDDEN_ACTIONS } from "@/lib/audit/audit-log-display"
-import { logger } from "@/lib/logger"
-import { TableViewToggle } from "@/components/admin/table-view-toggle"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
-import type { AuditLog, AuditLogFiltersState, EmployeeMember, UserProfile } from "./types"
+import type { AuditLog, EmployeeMember, UserProfile } from "./types"
+import { formatName } from "@/lib/utils"
 
-// Re-export types consumed by page.tsx
 export type { AuditLog, EmployeeMember, UserProfile }
-
-const log = logger("audit-logs")
 
 interface AdminAuditLogsContentProps {
   initialLogs: AuditLog[]
@@ -32,15 +24,12 @@ interface AdminAuditLogsContentProps {
   userProfile: UserProfile
 }
 
-const DEFAULT_FILTERS: AuditLogFiltersState = {
-  searchQuery: "",
-  actionFilter: "all",
-  entityFilter: "all",
-  dateFilter: "all",
-  departmentFilter: "all",
-  employeeFilter: "all",
-  customStartDate: "",
-  customEndDate: "",
+const ACTION_COLOR_MAP: Record<string, string> = {
+  create: "bg-emerald-500/10 text-emerald-500 border-emerald-200",
+  update: "bg-blue-500/10 text-blue-500 border-blue-200",
+  delete: "bg-red-500/10 text-red-500 border-red-200",
+  approve: "bg-purple-500/10 text-purple-500 border-purple-200",
+  reject: "bg-amber-500/10 text-amber-500 border-amber-200",
 }
 
 export function AdminAuditLogsContent({
@@ -50,205 +39,170 @@ export function AdminAuditLogsContent({
   initialDepartments,
   userProfile,
 }: AdminAuditLogsContentProps) {
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
+
   const scopedDepartments = useMemo(
     () => userProfile.managed_departments ?? userProfile.lead_departments ?? [],
     [userProfile.managed_departments, userProfile.lead_departments]
   )
 
-  const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
-  const [totalCount, setTotalCount] = useState<number>(initialTotalCount)
-  const [filters, setFilters] = useState<AuditLogFiltersState>(DEFAULT_FILTERS)
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
-  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
-  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
-
-  const employee = initialemployee
-  const departments = initialDepartments
-  const supabase = createClient()
-
-  useEffect(() => {
-    if (initialLogs.length === 0 && initialTotalCount === 0) {
-      void loadLogs()
-    }
-    // Only perform the fallback when SSR provided no data.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function handleFilterChange<K extends keyof AuditLogFiltersState>(key: K, value: AuditLogFiltersState[K]) {
-    setFilters((prev) => ({ ...prev, [key]: value }))
-  }
-
-  // -------------------------------------------------------------------------
-  // Client-side refresh (manual only — initial data comes from server props)
-  // -------------------------------------------------------------------------
-  const loadLogs = async () => {
-    try {
-      const { count } = await supabase
-        .from("audit_logs")
-        .select("id", { count: "exact", head: true })
-        .not("action", "in", '("sync","migrate","update_schema","migration")')
-
-      setTotalCount(count || 0)
-
-      const { data: logsData, error: logsError } = await supabase
-        .from("audit_logs")
-        .select("*")
-        .not("action", "in", '("sync","migrate","update_schema","migration")')
-        .order("created_at", { ascending: false })
-        .limit(500)
-
-      if (logsError) {
-        log.error("Audit logs error details:", logsError)
-        if (logsError.message.includes("relation") && logsError.message.includes("does not exist")) {
-          toast.error("Audit logs table not found. Please run the database migration first.")
-        } else if (logsError.code === "PGRST301" || logsError.message.includes("permission")) {
-          toast.error("Permission denied. You may not have access to view audit logs.")
-        } else {
-          toast.error(`Failed to load audit logs: ${logsError.message}`)
-        }
-        throw logsError
-      }
-
-      if (logsData && logsData.length > 0) {
-        const userIdsSet = new Set(logsData.map((l) => l.user_id).filter(Boolean))
-        const { data: usersData } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, company_email, employee_number")
-          .in("id", Array.from(userIdsSet))
-
-        const usersMap = new Map(usersData?.map((u) => [u.id, u]))
-
-        const mapped: AuditLog[] = logsData.map((l) => {
-          const rawAction = l.action || l.operation?.toLowerCase() || "update"
-          const action = normalizeAuditAction(rawAction).action
-          const entity_type = l.entity_type || l.table_name || "unknown"
-          const entity_id = l.record_id || l.entity_id
-          const old_values = l.metadata?.old_values || l.old_values
-          const new_values = l.metadata?.new_values || l.new_values
-          return {
-            id: l.id,
-            user_id: l.user_id,
-            action,
-            entity_type,
-            entity_id,
-            old_values,
-            new_values,
-            metadata: l.metadata || {},
-            created_at: l.created_at,
-            user: l.user_id ? usersMap.get(l.user_id) || undefined : undefined,
-          }
-        })
-
-        setLogs(mapped)
-      } else {
-        setLogs([])
-      }
-    } catch (error) {
-      log.error("Error loading audit logs:", error)
-      toast.error("Failed to refresh audit logs")
-    } finally {
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Filtered view — pure derivation, no state
-  // -------------------------------------------------------------------------
-  const filteredLogs = useMemo(() => {
-    const {
-      searchQuery,
-      actionFilter,
-      entityFilter,
-      dateFilter,
-      departmentFilter,
-      employeeFilter,
-      customStartDate,
-      customEndDate,
-    } = filters
-
-    return logs.filter((entry) => {
-      const action = (entry.action || "unknown").toLowerCase()
+  const filteredData = useMemo(() => {
+    return initialLogs.filter((l) => {
+      // 1. Hide system-level / hidden actions
+      const action = (l.action || "unknown").toLowerCase()
       if (HIDDEN_ACTIONS.includes(action as (typeof HIDDEN_ACTIONS)[number])) return false
 
-      const q = searchQuery.toLowerCase()
-      const matchesSearch =
-        (entry.entity_type || "").toLowerCase().includes(q) ||
-        (entry.action || "").toLowerCase().includes(q) ||
-        (typeof entry.metadata?.event === "string" ? entry.metadata.event.toLowerCase().includes(q) : false) ||
-        (entry.user as { first_name?: string } | undefined)?.first_name?.toLowerCase().includes(q) ||
-        (entry.user as { last_name?: string } | undefined)?.last_name?.toLowerCase().includes(q)
-
-      const matchesAction = actionFilter === "all" || entry.action === actionFilter
-      const matchesEntity = entityFilter === "all" || entry.entity_type === entityFilter
-
-      let matchesDepartment = true
-      if (userProfile?.is_department_lead) {
+      // 2. Department scoping for leads
+      if (userProfile?.managed_departments || userProfile?.lead_departments) {
         if (scopedDepartments.length > 0) {
-          const userDept = employee.find((s) => s.id === entry.user_id)?.department
-          matchesDepartment = userDept ? scopedDepartments.includes(userDept) : false
-        }
-      } else {
-        matchesDepartment =
-          departmentFilter === "all" ||
-          (entry.user ? employee.find((s) => s.id === entry.user_id)?.department === departmentFilter : false)
-      }
-
-      const matchesEmployee = employeeFilter === "all" || entry.user_id === employeeFilter
-
-      let matchesDate = true
-      if (dateFilter !== "all") {
-        const logDate = new Date(entry.created_at)
-        const now = new Date()
-        const daysDiff = Math.floor((now.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24))
-        switch (dateFilter) {
-          case "today":
-            matchesDate = daysDiff === 0
-            break
-          case "week":
-            matchesDate = daysDiff <= 7
-            break
-          case "month":
-            matchesDate = daysDiff <= 30
-            break
-          case "custom":
-            if (customStartDate && customEndDate) {
-              const start = new Date(customStartDate)
-              const end = new Date(customEndDate)
-              end.setHours(23, 59, 59, 999)
-              matchesDate = logDate >= start && logDate <= end
-            } else if (customStartDate) {
-              matchesDate = logDate >= new Date(customStartDate)
-            } else if (customEndDate) {
-              const end = new Date(customEndDate)
-              end.setHours(23, 59, 59, 999)
-              matchesDate = logDate <= end
-            }
-            break
+          const userDept = initialemployee.find((s) => s.id === l.user_id)?.department
+          if (!userDept || !scopedDepartments.includes(userDept)) return false
         }
       }
 
-      return matchesSearch && matchesAction && matchesEntity && matchesDate && matchesDepartment && matchesEmployee
+      return true
     })
-  }, [logs, filters, userProfile, employee, scopedDepartments])
+  }, [initialLogs, initialemployee, userProfile, scopedDepartments])
 
   const stats = useMemo(
     () => ({
-      total: totalCount,
-      creates: logs.filter((l) => l.action === "create").length,
-      updates: logs.filter((l) => l.action === "update").length,
-      deletes: logs.filter((l) => l.action === "delete").length,
+      total: initialTotalCount,
+      creates: filteredData.filter((l) => l.action === "create").length,
+      updates: filteredData.filter((l) => l.action === "update").length,
+      deletes: filteredData.filter((l) => l.action === "delete").length,
     }),
-    [logs, totalCount]
+    [filteredData, initialTotalCount]
+  )
+
+  const columns: DataTableColumn<AuditLog>[] = useMemo(
+    () => [
+      {
+        key: "created_at",
+        label: "Time",
+        sortable: true,
+        accessor: (r) => r.created_at,
+        render: (r) => (
+          <div className="flex flex-col text-xs">
+            <span className="font-medium">{new Date(r.created_at).toLocaleDateString()}</span>
+            <span className="text-muted-foreground">{new Date(r.created_at).toLocaleTimeString()}</span>
+          </div>
+        ),
+      },
+      {
+        key: "action",
+        label: "Action",
+        sortable: true,
+        accessor: (r) => r.action || "update",
+        render: (r) => (
+          <Badge className={ACTION_COLOR_MAP[r.action || "update"] || "bg-muted text-muted-foreground"}>
+            {formatName(r.action || "update")}
+          </Badge>
+        ),
+      },
+      {
+        key: "entity_type",
+        label: "Module",
+        sortable: true,
+        accessor: (r) => r.entity_type,
+        render: (r) => (
+          <Badge variant="outline" className="font-normal capitalize">
+            {r.entity_type.replace("_", " ")}
+          </Badge>
+        ),
+      },
+      {
+        key: "user",
+        label: "User",
+        resizable: true,
+        initialWidth: 200,
+        accessor: (r) => (r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"),
+        render: (r) => (
+          <div className="flex items-center gap-2">
+            <div className="bg-muted flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold">
+              {r.user ? r.user.first_name.charAt(0) : "S"}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">
+                {r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"}
+              </span>
+              {r.user?.company_email && (
+                <span className="text-muted-foreground text-[10px]">{r.user.company_email}</span>
+              )}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "summary",
+        label: "Summary",
+        resizable: true,
+        initialWidth: 250,
+        accessor: (r) => {
+          if (r.metadata?.event) return String(r.metadata?.event)
+          if (r.task_info?.title) return `Task: ${r.task_info.title}`
+          if (r.asset_info?.unique_code) return `Asset: ${r.asset_info.unique_code}`
+          return `Modified ${r.entity_type}`
+        },
+        render: (r) => {
+          const summary = String(
+            r.metadata?.event ||
+              r.task_info?.title ||
+              r.asset_info?.unique_code ||
+              r.leave_request_info?.leave_type_name ||
+              `Modified ${r.entity_type}`
+          )
+          return <span className="block max-w-[250px] truncate text-sm">{summary}</span>
+        },
+      },
+    ],
+    []
+  )
+
+  const entityTypes = useMemo(() => Array.from(new Set(initialLogs.map((l) => l.entity_type))).sort(), [initialLogs])
+
+  const filters: DataTableFilter<AuditLog>[] = useMemo(
+    () => [
+      {
+        key: "action",
+        label: "Action",
+        options: [
+          { value: "create", label: "Create" },
+          { value: "update", label: "Update" },
+          { value: "delete", label: "Delete" },
+          { value: "approve", label: "Approve" },
+          { value: "reject", label: "Reject" },
+        ],
+      },
+      {
+        key: "entity_type",
+        label: "Module",
+        options: entityTypes.map((t) => ({ value: t, label: formatName(t) })),
+      },
+      {
+        key: "department",
+        label: "Department",
+        options: initialDepartments.map((d) => ({ value: d, label: d })),
+        mode: "custom",
+        filterFn: (row, vals) => {
+          if (vals.length === 0) return true
+          const userDept = initialemployee.find((e) => e.id === row.user_id)?.department
+          return !!userDept && vals.includes(userDept)
+        },
+      },
+    ],
+    [entityTypes, initialDepartments, initialemployee]
   )
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Audit Logs"
-      description="Complete audit trail of all system activities"
+      description="Comprehensive system activity trail for security and transparency."
       icon={ScrollText}
+      backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
-        <div className="flex flex-wrap items-center gap-2">
-          <TableViewToggle viewMode={viewMode} onChange={setViewMode} />
+        <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>
             <Download className="h-4 w-4" />
             Export
@@ -256,89 +210,147 @@ export function AdminAuditLogsContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 md:gap-4">
-          {[
-            { label: "Total Actions", value: stats.total, color: "blue" },
-            { label: "Creates", value: stats.creates, color: "green" },
-            { label: "Updates", value: stats.updates, color: "blue" },
-            { label: "Deletes", value: stats.deletes, color: "red" },
-          ].map(({ label, value, color }) => (
-            <Card key={label} className="border-2">
-              <CardContent className="p-3 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm font-medium">{label}</p>
-                    <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{value}</p>
-                  </div>
-                  <div className={`rounded-lg bg-${color}-100 p-3 dark:bg-${color}-900/30`}>
-                    <ScrollText className={`h-6 w-6 text-${color}-600 dark:text-${color}-400`} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            title="Total logs"
+            value={stats.total}
+            icon={ScrollText}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Creates"
+            value={stats.creates}
+            icon={Plus}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Updates"
+            value={stats.updates}
+            icon={Pencil}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Deletes"
+            value={stats.deletes}
+            icon={Trash2}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+        </div>
+      }
+    >
+      <DataTable<AuditLog>
+        data={filteredData}
+        columns={columns}
+        getRowId={(r) => r.id}
+        searchPlaceholder="Search action, module, user or summary..."
+        searchFn={(r, q) => {
+          const summary = String(r.metadata?.event || r.task_info?.title || r.asset_info?.unique_code || "")
+          const userName = r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"
+          return `${r.action} ${r.entity_type} ${userName} ${summary}`.toLowerCase().includes(q)
+        }}
+        filters={filters}
+        pagination={{ pageSize: 50 }}
+        rowActions={[
+          {
+            label: "View Details",
+            icon: Eye,
+            onClick: (r) => {
+              setSelectedLog(r)
+              setIsDetailsOpen(true)
+            },
+          },
+        ]}
+        expandable={{
+          render: (r) => (
+            <div className="bg-muted/20 space-y-6 border-t p-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="space-y-2">
+                  <h4 className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
+                    Entity Detail
+                  </h4>
+                  <div className="space-y-1 text-sm">
+                    <p>
+                      <span className="text-muted-foreground mr-2 font-medium">Type:</span>{" "}
+                      <span className="capitalize">{r.entity_type}</span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground mr-2 font-medium">ID:</span>{" "}
+                      <span className="font-mono text-xs">{r.entity_id || "—"}</span>
+                    </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      }
-      filters={
-        <AuditLogFilters
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          employee={employee}
-          departments={departments}
-          userProfile={userProfile}
-          scopedDepartments={scopedDepartments}
-        />
-      }
-      filtersInCard={false}
-    >
-      {filteredLogs.length > 0 ? (
-        viewMode === "list" ? (
-          <AuditLogTable
-            logs={filteredLogs}
-            onViewDetails={(l) => {
-              setSelectedLog(l)
+                <div className="space-y-2">
+                  <h4 className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
+                    Change Metrics
+                  </h4>
+                  <div className="space-y-1 text-sm">
+                    <p>
+                      <span className="text-muted-foreground mr-2 font-medium">Fields Changed:</span>{" "}
+                      <span>{r.changed_fields?.length || 0}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedLog(r)
+                    setIsDetailsOpen(true)
+                  }}
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4" /> Comprehensive View
+                </Button>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(r) => (
+          <div
+            className="bg-card group relative cursor-pointer rounded-xl border p-4 transition-all hover:shadow-md"
+            onClick={() => {
+              setSelectedLog(r)
               setIsDetailsOpen(true)
             }}
-          />
-        ) : (
-          <div className="space-y-3">
-            {filteredLogs.map((l) => (
-              <AuditLogCard
-                key={l.id}
-                log={l}
-                onViewDetails={(entry) => {
-                  setSelectedLog(entry)
-                  setIsDetailsOpen(true)
-                }}
-              />
-            ))}
+          >
+            <div className="mb-2 flex items-start justify-between">
+              <Badge className={ACTION_COLOR_MAP[r.action || "update"] || "bg-muted text-muted-foreground"}>
+                {formatName(r.action || "update")}
+              </Badge>
+              <span className="text-muted-foreground font-mono text-[10px]">
+                {new Date(r.created_at).toLocaleTimeString()}
+              </span>
+            </div>
+            <h4 className="truncate text-sm font-semibold">
+              {String(
+                r.metadata?.event || r.task_info?.title || r.asset_info?.unique_code || `Modified ${r.entity_type}`
+              )}
+            </h4>
+            <div className="mt-3 flex items-center gap-2 border-t pt-3">
+              <div className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold">
+                {r.user ? r.user.first_name.charAt(0) : "S"}
+              </div>
+              <span className="text-muted-foreground truncate text-xs">
+                {r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"}
+              </span>
+              <div className="ml-auto">
+                <Badge variant="outline" className="text-[9px] font-normal uppercase">
+                  {r.entity_type}
+                </Badge>
+              </div>
+            </div>
           </div>
-        )
-      ) : (
-        <Card className="border-2">
-          <CardContent className="p-12 text-center">
-            <ScrollText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-            <h3 className="text-foreground mb-2 text-xl font-semibold">No Audit Logs Found</h3>
-            <p className="text-muted-foreground">
-              {Object.entries(filters).some(
-                ([k, v]) => k !== "customStartDate" && k !== "customEndDate" && v !== "all" && v !== ""
-              )
-                ? "No logs match your filters"
-                : "No audit logs available yet"}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        )}
+        urlSync
+      />
 
-      {/* Pagination */}
-      {filteredLogs.length > 0 && (
-        <div className="text-muted-foreground text-center text-sm">
-          Showing {filteredLogs.length} of {totalCount} total logs
-          {totalCount > logs.length && ` (limited to last ${logs.length} entries)`}
-        </div>
-      )}
-
-      {/* Detail dialog */}
       <AuditLogDetailPanel log={selectedLog} open={isDetailsOpen} onClose={() => setIsDetailsOpen(false)} />
 
       <ExportOptionsDialog
@@ -351,20 +363,11 @@ export function AdminAuditLogsContent({
           { id: "word", label: "Word (.docx)", icon: "word" },
         ]}
         onSelect={(id) => {
-          if (id === "excel") {
-            exportAuditLogsToExcel(filteredLogs)
-            return
-          }
-          if (id === "pdf") {
-            exportAuditLogsToPDF(filteredLogs)
-            return
-          }
-          exportAuditLogsToWord(filteredLogs)
+          if (id === "excel") return exportAuditLogsToExcel(initialLogs)
+          if (id === "pdf") return exportAuditLogsToPDF(initialLogs)
+          exportAuditLogsToWord(initialLogs)
         }}
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
-
-  // expose for manual refresh button if needed
-  void loadLogs
 }

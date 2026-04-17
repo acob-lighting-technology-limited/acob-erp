@@ -2,17 +2,18 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Plus, Search, Target } from "lucide-react"
+import { Plus, Target } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader, PageWrapper } from "@/components/layout"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
+import { Badge } from "@/components/ui/badge"
 import type { Goal } from "./page"
 
 type GoalsContentProps = {
@@ -35,16 +36,8 @@ const INITIAL_FORM = {
   due_date: "",
 }
 
-function getApprovalLabel(status: Goal["approval_status"]) {
-  if (status === "approved") return "Approved"
-  if (status === "rejected") return "Rejected"
-  return "Pending"
-}
-
-function getApprovalClass(status: Goal["approval_status"]) {
-  if (status === "approved") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "rejected") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-  return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+type GoalRow = Goal & {
+  cycleLabel: string
 }
 
 export function GoalsContent({
@@ -59,11 +52,18 @@ export function GoalsContent({
   summaryCards = [],
 }: GoalsContentProps) {
   const [goals, setGoals] = useState<Goal[]>(initialGoals)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [cycleFilter, setCycleFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(INITIAL_FORM)
+
+  const rows = useMemo<GoalRow[]>(
+    () =>
+      goals.map((goal) => ({
+        ...goal,
+        cycleLabel: goal.cycle?.name || "-",
+      })),
+    [goals]
+  )
 
   const availableDepartments = useMemo(
     () =>
@@ -74,22 +74,92 @@ export function GoalsContent({
     [goals, managedDepartments]
   )
 
-  const filteredGoals = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    return goals.filter((goal) => {
-      const matchesQuery =
-        !query ||
-        [goal.title, goal.description, goal.department, goal.priority, goal.status, goal.cycle?.name]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(query))
-      const matchesCycle = cycleFilter === "all" || (goal.cycle?.name || "-") === cycleFilter
-      return matchesQuery && matchesCycle
-    })
-  }, [cycleFilter, goals, searchQuery])
+  const approvalClass = (status: Goal["approval_status"]) => {
+    if (status === "approved") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+    if (status === "rejected") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+    return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+  }
 
-  const cycleOptions = useMemo(
-    () => Array.from(new Set(goals.map((goal) => goal.cycle?.name).filter(Boolean) as string[])).sort(),
-    [goals]
+  const columns = useMemo<DataTableColumn<GoalRow>[]>(
+    () => [
+      {
+        key: "title",
+        label: "Goal",
+        sortable: true,
+        accessor: (row) => row.title,
+        resizable: true,
+        initialWidth: 280,
+        render: (row) => <span className="font-medium">{row.title}</span>,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (row) => row.department || "-",
+      },
+      {
+        key: "cycle",
+        label: "Cycle",
+        sortable: true,
+        accessor: (row) => row.cycleLabel,
+      },
+      {
+        key: "priority",
+        label: "Priority",
+        sortable: true,
+        accessor: (row) => row.priority,
+        render: (row) => <span className="capitalize">{row.priority}</span>,
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => row.status,
+        render: (row) => <span className="capitalize">{String(row.status || "").replace("_", " ")}</span>,
+      },
+      {
+        key: "approval",
+        label: "Approval",
+        sortable: true,
+        accessor: (row) => row.approval_status,
+        render: (row) => <Badge className={approvalClass(row.approval_status)}>{row.approval_status}</Badge>,
+      },
+      {
+        key: "due_date",
+        label: "Due Date",
+        sortable: true,
+        accessor: (row) => row.due_date || "",
+        render: (row) => (row.due_date ? new Date(row.due_date).toLocaleDateString("en-GB") : "-"),
+      },
+    ],
+    []
+  )
+
+  const filters = useMemo<DataTableFilter<GoalRow>[]>(
+    () => [
+      {
+        key: "approval_status",
+        label: "Approval",
+        mode: "custom",
+        options: [
+          { value: "pending", label: "Pending" },
+          { value: "approved", label: "Approved" },
+          { value: "rejected", label: "Rejected" },
+        ],
+        filterFn: (row, selected) => selected.includes(row.approval_status),
+      },
+      {
+        key: "cycle",
+        label: "Cycle",
+        mode: "custom",
+        options: Array.from(new Set(rows.map((row) => row.cycleLabel))).map((cycle) => ({
+          value: cycle,
+          label: cycle,
+        })),
+        filterFn: (row, selected) => selected.includes(row.cycleLabel),
+      },
+    ],
+    [rows]
   )
 
   async function handleCreateGoal() {
@@ -106,9 +176,7 @@ export function GoalsContent({
         body: JSON.stringify(form),
       })
       const payload = (await response.json().catch(() => null)) as { data?: Goal; error?: string } | null
-      if (!response.ok || !payload?.data) {
-        throw new Error(payload?.error || "Failed to create goal")
-      }
+      if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to create goal")
 
       setGoals((current) => [payload.data as Goal, ...current])
       setForm(INITIAL_FORM)
@@ -122,137 +190,123 @@ export function GoalsContent({
   }
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title={pageTitle}
-        description={pageDescription}
-        icon={Target}
-        backLink={{ href: backHref, label: backLabel }}
-        actions={
-          canCreateGoal ? (
-            <Button size="sm" className="h-8 gap-2" onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Add Goal
-            </Button>
-          ) : undefined
-        }
-      />
-
-      {summaryCards.length > 0 ? (
-        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-          {summaryCards.map((card) => (
-            <Card key={card.label}>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground text-sm">{card.label}</p>
-                <p className="text-2xl font-semibold">{card.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : null}
-
-      <Card className="mb-4 border-2">
-        <CardContent className="p-3 sm:p-6">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search goal, department, or status..."
-                className="pl-10"
+    <DataTablePage
+      title={pageTitle}
+      description={pageDescription}
+      icon={Target}
+      backLink={{ href: backHref, label: backLabel }}
+      actions={
+        canCreateGoal ? (
+          <Button size="sm" className="h-8 gap-2" onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add Goal
+          </Button>
+        ) : undefined
+      }
+      stats={
+        summaryCards.length > 0 ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {summaryCards.map((card, index) => (
+              <StatCard
+                key={card.label}
+                title={card.label}
+                value={card.value}
+                icon={Target}
+                iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
+                iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
               />
-            </div>
-            <Select value={cycleFilter} onValueChange={setCycleFilter}>
-              <SelectTrigger className="w-full md:w-64">
-                <SelectValue placeholder="Cycle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cycles</SelectItem>
-                {cycleOptions.map((cycle) => (
-                  <SelectItem key={cycle} value={cycle}>
-                    {cycle}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            ))}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Goal Table</CardTitle>
-          <CardDescription>
-            {canCreateGoal
-              ? "Department goals are created here, then tasks are created under each goal."
-              : "Goals are created from the admin side by your department lead."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredGoals.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-sm">No department goals found.</p>
-          ) : (
-            <Table className="min-w-[980px]">
-              <TableHeader className="bg-emerald-50 dark:bg-emerald-950/30">
-                <TableRow>
-                  <TableHead className="w-16">S/N</TableHead>
-                  <TableHead>Goal</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Cycle</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Approval</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  {showCreateTaskAction ? <TableHead className="text-right">Action</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredGoals.map((goal, index) => (
-                  <TableRow key={goal.id}>
-                    <TableCell className="text-muted-foreground font-medium">{index + 1}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="font-medium">{goal.title}</p>
-                        {goal.description ? <p className="text-muted-foreground text-xs">{goal.description}</p> : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>{goal.department || "-"}</TableCell>
-                    <TableCell>{goal.cycle?.name || "-"}</TableCell>
-                    <TableCell className="capitalize">{goal.priority}</TableCell>
-                    <TableCell className="capitalize">{String(goal.status || "").replace("_", " ")}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-medium ${getApprovalClass(goal.approval_status)}`}
-                      >
-                        {getApprovalLabel(goal.approval_status)}
-                      </span>
-                    </TableCell>
-                    <TableCell>{goal.due_date ? new Date(goal.due_date).toLocaleDateString() : "-"}</TableCell>
-                    {showCreateTaskAction ? (
-                      <TableCell className="text-right">
-                        <Link href={`/admin/tasks?goal_id=${encodeURIComponent(goal.id)}`}>
-                          <Button size="sm" variant="outline">
-                            Create Task
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        ) : undefined
+      }
+    >
+      <DataTable<GoalRow>
+        data={rows}
+        columns={columns}
+        filters={filters}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search goal, department, status, or cycle..."
+        searchFn={(row, query) =>
+          `${row.title} ${row.description} ${row.department} ${row.priority} ${row.status} ${row.cycleLabel}`
+            .toLowerCase()
+            .includes(query)
+        }
+        expandable={{
+          render: (row) => (
+            <div className="space-y-3">
+              <div>
+                <p className="text-muted-foreground text-xs uppercase">Description</p>
+                <p className="text-sm">{row.description || "No description provided."}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+                    Linked Tasks
+                  </p>
+                  {row.linked_tasks && row.linked_tasks.length > 0 ? (
+                    <div className="space-y-2">
+                      {row.linked_tasks.map((task) => (
+                        <div key={task.id} className="rounded border p-2 text-xs">
+                          <p className="font-medium">
+                            {task.work_item_number ? `${task.work_item_number} - ` : ""}
+                            {task.title}
+                          </p>
+                          <p className="text-muted-foreground capitalize">
+                            {String(task.status || "").replace(/_/g, " ")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">No linked tasks yet.</p>
+                  )}
+                </div>
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+                    Linked Help Desk
+                  </p>
+                  {row.linked_help_desk && row.linked_help_desk.length > 0 ? (
+                    <div className="space-y-2">
+                      {row.linked_help_desk.map((ticket) => (
+                        <div key={ticket.id} className="rounded border p-2 text-xs">
+                          <p className="font-medium">
+                            {ticket.ticket_number ? `${ticket.ticket_number} - ` : ""}
+                            {ticket.title}
+                          </p>
+                          <p className="text-muted-foreground capitalize">
+                            {String(ticket.status || "").replace(/_/g, " ")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">No linked help desk tickets yet.</p>
+                  )}
+                </div>
+              </div>
+              {showCreateTaskAction ? (
+                <Link href={`/admin/tasks?goal_id=${encodeURIComponent(row.id)}`}>
+                  <Button size="sm" variant="outline">
+                    Create Task
+                  </Button>
+                </Link>
+              ) : null}
+            </div>
+          ),
+        }}
+        emptyTitle="No department goals found"
+        emptyDescription="No goals match the current filters."
+        emptyIcon={Target}
+        skeletonRows={5}
+        urlSync
+      />
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Create Department Goal</DialogTitle>
             <DialogDescription>
-              Goals are now departmental. After saving the goal, create tasks under it and assign them from the task
-              manager.
+              Goals are departmental. After saving the goal, create tasks under it and assign them from task manager.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -319,13 +373,13 @@ export function GoalsContent({
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
                 Cancel
               </Button>
-              <Button onClick={() => void handleCreateGoal()} loading={saving}>
-                Save Goal
+              <Button onClick={() => void handleCreateGoal()} disabled={saving}>
+                {saving ? "Saving..." : "Save Goal"}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-    </PageWrapper>
+    </DataTablePage>
   )
 }

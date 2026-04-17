@@ -2,21 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EmptyState } from "@/components/ui/patterns"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
-import {
-  Building2,
-  MessageSquare,
-  Send,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  HeadphonesIcon,
-} from "lucide-react"
+import { Building2, MessageSquare, TrendingUp, AlertCircle, CheckCircle2, Clock, HeadphonesIcon } from "lucide-react"
 import type { Task } from "@/types/task"
 
 interface TaskUpdate {
@@ -90,11 +79,8 @@ interface UserTaskDetailsDialogProps {
   onOpenChange: (open: boolean) => void
   selectedTask: Task | null
   taskUpdates: TaskUpdate[]
-  newComment: string
-  setNewComment: (value: string) => void
   newStatus: string
   isSaving: boolean
-  onAddComment: () => Promise<void>
   onUpdateStatus: (status: string) => Promise<void>
 }
 
@@ -103,11 +89,8 @@ export function UserTaskDetailsDialog({
   onOpenChange,
   selectedTask,
   taskUpdates,
-  newComment,
-  setNewComment,
   newStatus,
   isSaving,
-  onAddComment,
   onUpdateStatus,
 }: UserTaskDetailsDialogProps) {
   return (
@@ -115,36 +98,42 @@ export function UserTaskDetailsDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Task Details"
-      description="Review progress, update status, and leave a clear handover trail."
-      desktopClassName="max-w-4xl"
+      description="Review and update quickly."
+      desktopClassName="max-w-2xl"
     >
       {selectedTask && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           <Card className="border">
-            <CardContent className="space-y-4 p-5">
-              <div className="space-y-2">
+            <CardContent className="space-y-3 p-4">
+              <div className="space-y-1">
                 {selectedTask.work_item_number && (
                   <div className="text-muted-foreground text-xs font-medium tracking-[0.2em] uppercase">
                     {selectedTask.work_item_number}
                   </div>
                 )}
-                <div className="text-foreground text-2xl font-semibold">{selectedTask.title}</div>
+                <div className="text-foreground text-base leading-tight font-semibold">{selectedTask.title}</div>
                 {selectedTask.description && (
-                  <p className="text-muted-foreground max-w-3xl text-sm leading-6">{selectedTask.description}</p>
+                  <p className="text-muted-foreground text-xs leading-5">{selectedTask.description}</p>
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Badge className={getStatusColor(selectedTask.status)}>
-                  <span className="flex items-center gap-1">
+              <div className="flex flex-wrap gap-2">
+                <Badge className={getStatusColor(selectedTask.status)} variant="outline">
+                  <span className="flex items-center gap-1 text-xs">
                     {getStatusIcon(selectedTask.status)}
                     {selectedTask.status.replace("_", " ")}
                   </span>
                 </Badge>
-                <Badge className={getPriorityColor(selectedTask.priority)}>{selectedTask.priority} priority</Badge>
-                {selectedTask.department && <Badge variant="outline">{selectedTask.department}</Badge>}
+                <Badge className={getPriorityColor(selectedTask.priority)} variant="outline">
+                  {selectedTask.priority} priority
+                </Badge>
+                {selectedTask.department && (
+                  <Badge variant="outline" className="text-xs">
+                    {selectedTask.department}
+                  </Badge>
+                )}
                 {selectedTask.source_type === "help_desk" && (
-                  <Badge variant="outline" className="gap-1">
+                  <Badge variant="outline" className="gap-1 text-xs">
                     <HeadphonesIcon className="h-3 w-3" />
                     Help Desk
                   </Badge>
@@ -153,118 +142,88 @@ export function UserTaskDetailsDialog({
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-6">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="space-y-3">
               {selectedTask.assignment_type === "department" && (
                 <Card className="bg-muted/30 border">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Building2 className="h-4 w-4" />
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <Building2 className="h-3.5 w-3.5" />
                       Department Task
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground text-sm leading-6">
+                  <CardContent className="pt-0">
+                    <p className="text-muted-foreground text-xs leading-5">
                       This task is assigned to the <strong>{selectedTask.department}</strong> department.
                     </p>
                     {!selectedTask.can_change_status && (
-                      <p className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                      <p className="mt-2 text-[11px] text-yellow-600 dark:text-yellow-400">
                         Only department leads, admins, and super admins can change the status.
                       </p>
                     )}
                   </CardContent>
                 </Card>
               )}
-            </div>
 
-            <div className="space-y-6">
-              <Card className="bg-muted/30 border">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Update Status</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Select
-                    value={newStatus}
-                    onValueChange={onUpdateStatus}
-                    disabled={
-                      isSaving || (selectedTask.assignment_type === "department" && !selectedTask.can_change_status)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {selectedTask.assignment_type === "department" && !selectedTask.can_change_status && (
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                      Only department leads, admins, and super admins can change the status of department tasks.
-                    </p>
-                  )}
-                  <p className="text-muted-foreground text-xs">
-                    If you add a note below before changing status, it will be saved with the status update.
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-muted/30 border">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Add Comment</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Textarea
-                    value={newComment}
-                    onChange={(event) => setNewComment(event.target.value)}
-                    placeholder="Add a comment or progress note..."
-                    className="min-h-[120px]"
-                  />
-                  <Button onClick={onAddComment} disabled={isSaving || !newComment.trim()} className="gap-2">
-                    <Send className="h-4 w-4" />
-                    Post Comment
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <Card className="border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Activity Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {taskUpdates.length > 0 ? (
-                <div className="space-y-4">
-                  {taskUpdates.map((update) => (
-                    <div key={update.id} className="flex gap-3 border-b pb-4 last:border-0">
-                      <div className="flex-1">
+              <section className="space-y-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Activity Timeline
+                </h3>
+                {taskUpdates.length > 0 ? (
+                  <div className="max-h-52 space-y-3 overflow-y-auto pr-1">
+                    {taskUpdates.map((update) => (
+                      <div key={update.id} className="border-l-2 pl-3">
                         {update.user && (
-                          <p className="text-foreground text-sm font-medium">
+                          <p className="text-foreground text-xs font-medium">
                             {update.user.first_name} {update.user.last_name}
                           </p>
                         )}
-                        <p className="text-muted-foreground text-sm">{update.content}</p>
-                        <p className="text-muted-foreground mt-1 text-xs">{formatDateTime(update.created_at)}</p>
+                        <p className="text-muted-foreground text-xs leading-5">{update.content}</p>
+                        <p className="text-muted-foreground mt-1 text-[11px]">{formatDateTime(update.created_at)}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  title="No updates yet"
-                  description="Task comments and status changes will appear here."
-                  icon={MessageSquare}
-                  className="border-0 p-4"
-                />
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No updates yet"
+                    description="Task comments and status changes will appear here."
+                    icon={MessageSquare}
+                    className="border-0 px-0 py-2"
+                  />
+                )}
+              </section>
+            </div>
+
+            <div className="space-y-3">
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold">Update Status</h3>
+                <Select
+                  value={newStatus}
+                  onValueChange={onUpdateStatus}
+                  disabled={isSaving || selectedTask.assignment_type === "department"}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                {selectedTask.assignment_type === "department" && (
+                  <p className="text-[11px] text-yellow-600 dark:text-yellow-400">
+                    Department task status can only be updated by leads from Admin Tasks.
+                  </p>
+                )}
+                <p className="text-muted-foreground text-[11px]">
+                  If you add a note below before changing status, it will be saved with the status update.
+                </p>
+              </section>
+            </div>
+          </div>
         </div>
       )}
     </ResponsiveModal>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -57,6 +58,8 @@ import { FilePreview } from "@/components/onedrive/file-preview"
 import type { FileItem, FileCategory } from "@/lib/onedrive"
 import { getFileCategory } from "@/lib/onedrive"
 import { toast } from "sonner"
+import JSZip from "jszip"
+import { saveAs } from "file-saver"
 
 interface DepartmentDocumentsBrowserProps {
   initialPath?: string
@@ -237,6 +240,7 @@ export function DepartmentDocumentsBrowser({
   const [isDragActive, setIsDragActive] = useState(false)
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([])
   const [uploadPanelOpen, setUploadPanelOpen] = useState(true)
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null)
   const [previewCategory, setPreviewCategory] = useState<FileCategory>("unknown")
@@ -245,6 +249,7 @@ export function DepartmentDocumentsBrowser({
   const folderInputRef = useRef<HTMLInputElement | null>(null)
   const isAdminMode = accessMode === "admin"
   const canManageCurrentFolder = isAdminMode && currentPath !== "/"
+  const selectedCount = selectedPaths.size
 
   useEffect(() => {
     folderInputRef.current?.setAttribute("webkitdirectory", "")
@@ -285,6 +290,17 @@ export function DepartmentDocumentsBrowser({
   }, [currentPath, fetchFiles])
 
   useEffect(() => {
+    setSelectedPaths((prev) => {
+      const valid = new Set(files.map((file) => file.path))
+      const next = new Set<string>()
+      prev.forEach((path) => {
+        if (valid.has(path)) next.add(path)
+      })
+      return next
+    })
+  }, [files])
+
+  useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.set("path", currentPath)
     router.replace(`?${params.toString()}`, { scroll: false })
@@ -293,6 +309,7 @@ export function DepartmentDocumentsBrowser({
   const navigateToFolder = (path: string) => {
     setCurrentPath(clampPath(path))
     setSearchQuery("")
+    setSelectedPaths(new Set())
   }
 
   const handleFileClick = (file: FileItem) => {
@@ -307,11 +324,158 @@ export function DepartmentDocumentsBrowser({
     setPreviewOpen(true)
   }
 
-  const handleDownload = (file: FileItem) => {
-    window.open(
-      `/api/onedrive/download?path=${encodeURIComponent(file.path)}&redirect=true&accessMode=${accessMode}`,
-      "_blank"
-    )
+  const toggleSelectedPath = (path: string, checked: boolean) => {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(path)
+      else next.delete(path)
+      return next
+    })
+  }
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (!checked) {
+      setSelectedPaths(new Set())
+      return
+    }
+    setSelectedPaths(new Set(files.map((file) => file.path)))
+  }
+
+  const fetchFolderContents = useCallback(
+    async (path: string): Promise<FileItem[]> => {
+      const params = new URLSearchParams()
+      params.set("path", path)
+      params.set("accessMode", accessMode)
+      const response = await fetch(`/api/onedrive?${params.toString()}`)
+      const payload = (await response.json().catch(() => null)) as { data?: FileItem[]; error?: string } | null
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to load folder contents")
+      }
+      return payload?.data || []
+    },
+    [accessMode]
+  )
+
+  const collectDownloadableFiles = useCallback(
+    async (item: FileItem): Promise<FileItem[]> => {
+      if (!item.isFolder) return [item]
+      const collected: FileItem[] = []
+      const stack = [item.path]
+      while (stack.length > 0) {
+        const nextPath = stack.pop()
+        if (!nextPath) continue
+        const children = await fetchFolderContents(nextPath)
+        for (const child of children) {
+          if (child.isFolder) stack.push(child.path)
+          else collected.push(child)
+        }
+      }
+      return collected
+    },
+    [fetchFolderContents]
+  )
+
+  const triggerFileDownload = useCallback(
+    async (path: string) => {
+      const params = new URLSearchParams()
+      params.set("path", path)
+      params.set("accessMode", accessMode)
+      const response = await fetch(`/api/onedrive/download?${params.toString()}`)
+      const payload = (await response.json().catch(() => null)) as {
+        data?: { downloadUrl?: string }
+        error?: string
+      } | null
+      if (!response.ok || !payload?.data?.downloadUrl) {
+        throw new Error(payload?.error || "Failed to get file download URL")
+      }
+      const link = document.createElement("a")
+      link.href = payload.data.downloadUrl
+      link.target = "_blank"
+      link.rel = "noopener noreferrer"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    },
+    [accessMode]
+  )
+
+  const fetchFileBlob = useCallback(
+    async (path: string): Promise<Blob> => {
+      const params = new URLSearchParams()
+      params.set("path", path)
+      params.set("accessMode", accessMode)
+      const response = await fetch(`/api/onedrive/download?${params.toString()}`)
+      const payload = (await response.json().catch(() => null)) as {
+        data?: { downloadUrl?: string }
+        error?: string
+      } | null
+      if (!response.ok || !payload?.data?.downloadUrl) {
+        throw new Error(payload?.error || "Failed to get file download URL")
+      }
+
+      const blobResponse = await fetch(payload.data.downloadUrl)
+      if (!blobResponse.ok) {
+        throw new Error("Failed to download file content")
+      }
+      return blobResponse.blob()
+    },
+    [accessMode]
+  )
+
+  const downloadSelection = useCallback(
+    async (items: FileItem[]) => {
+      if (items.length === 0) {
+        toast.error("No files selected for download")
+        return
+      }
+
+      setIsMutating(true)
+      try {
+        const fileMap = new Map<string, FileItem>()
+        for (const item of items) {
+          const filesToDownload = await collectDownloadableFiles(item)
+          for (const file of filesToDownload) {
+            fileMap.set(file.path, file)
+          }
+        }
+
+        const downloadQueue = Array.from(fileMap.values())
+        if (downloadQueue.length === 0) {
+          toast.error("No downloadable files found in selection")
+          return
+        }
+
+        const shouldZip = items.length > 1 || items.some((item) => item.isFolder)
+        if (shouldZip) {
+          const zip = new JSZip()
+          for (const file of downloadQueue) {
+            const blob = await fetchFileBlob(file.path)
+            const zipPath = file.path.replace(/^\/+/, "")
+            zip.file(zipPath || file.name, blob)
+          }
+          const archiveBlob = await zip.generateAsync({ type: "blob" })
+          const archiveName = `department-documents-${new Date().toISOString().slice(0, 10)}.zip`
+          saveAs(archiveBlob, archiveName)
+        } else {
+          await triggerFileDownload(downloadQueue[0].path)
+        }
+        toast.success(
+          shouldZip
+            ? `ZIP download ready (${downloadQueue.length} file${downloadQueue.length === 1 ? "" : "s"})`
+            : `Downloading ${downloadQueue.length} file`
+        )
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Failed to download selected files")
+      } finally {
+        setIsMutating(false)
+      }
+    },
+    [collectDownloadableFiles, fetchFileBlob, triggerFileDownload]
+  )
+
+  const handleDownloadSelected = async () => {
+    const selectedItems = files.filter((file) => selectedPaths.has(file.path))
+    await downloadSelection(selectedItems)
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -688,6 +852,13 @@ export function DepartmentDocumentsBrowser({
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-[44px]">
+            <Checkbox
+              checked={files.length > 0 && selectedCount === files.length}
+              onCheckedChange={(value) => toggleSelectAll(Boolean(value))}
+              aria-label="Select all items"
+            />
+          </TableHead>
           <TableHead className="w-[320px]">Name</TableHead>
           <TableHead className="w-[100px]">Type</TableHead>
           <TableHead className="w-[100px]">Size</TableHead>
@@ -703,6 +874,13 @@ export function DepartmentDocumentsBrowser({
 
           return (
             <TableRow key={file.id} className="group cursor-pointer" onClick={() => handleFileClick(file)}>
+              <TableCell onClick={(event) => event.stopPropagation()}>
+                <Checkbox
+                  checked={selectedPaths.has(file.path)}
+                  onCheckedChange={(value) => toggleSelectedPath(file.path, Boolean(value))}
+                  aria-label={`Select ${file.name}`}
+                />
+              </TableCell>
               <TableCell>
                 <div className="flex items-center gap-3">
                   <FileIcon category={file.isFolder ? "folder" : category} size={20} />
@@ -774,13 +952,24 @@ export function DepartmentDocumentsBrowser({
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleDownload(file)
+                            void downloadSelection([file])
                           }}
                         >
                           <Download className="mr-2 h-4 w-4" />
                           Download
                         </DropdownMenuItem>
                       </>
+                    )}
+                    {file.isFolder && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void downloadSelection([file])
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download Folder
+                      </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -803,6 +992,13 @@ export function DepartmentDocumentsBrowser({
             className="group bg-card hover:bg-accent/50 relative flex cursor-pointer flex-col items-center rounded-lg border p-4 transition-colors"
             onClick={() => handleFileClick(file)}
           >
+            <div className="absolute top-2 left-2 z-10" onClick={(event) => event.stopPropagation()}>
+              <Checkbox
+                checked={selectedPaths.has(file.path)}
+                onCheckedChange={(value) => toggleSelectedPath(file.path, Boolean(value))}
+                aria-label={`Select ${file.name}`}
+              />
+            </div>
             <FileIcon category={file.isFolder ? "folder" : category} size={48} className="mb-3" />
             <span className="line-clamp-2 w-full text-center text-sm font-medium">{file.name}</span>
             <span className="text-muted-foreground mt-1 text-xs">
@@ -856,13 +1052,24 @@ export function DepartmentDocumentsBrowser({
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleDownload(file)
+                          void downloadSelection([file])
                         }}
                       >
                         <Download className="mr-2 h-4 w-4" />
                         Download
                       </DropdownMenuItem>
                     </>
+                  )}
+                  {file.isFolder && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void downloadSelection([file])
+                      }}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Folder
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -874,7 +1081,7 @@ export function DepartmentDocumentsBrowser({
   )
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
       <Card
         className={isDragActive ? "border-primary bg-primary/5" : ""}
         onDragOver={(event) => {
@@ -906,6 +1113,17 @@ export function DepartmentDocumentsBrowser({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  void handleDownloadSelected()
+                }}
+                disabled={selectedCount === 0 || isMutating}
+              >
+                <Download className="h-4 w-4" />
+                Download Selected ({selectedCount})
+              </Button>
               {isAdminMode && (
                 <>
                   <Button
@@ -1176,6 +1394,6 @@ export function DepartmentDocumentsBrowser({
           </Card>
         </div>
       )}
-    </>
+    </div>
   )
 }

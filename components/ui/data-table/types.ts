@@ -141,6 +141,10 @@ export interface DataTableProps<TData> {
   currentPage?: number
   /** For server-side: called when user navigates to a new page */
   onPageChange?: (page: number) => void
+  /** Called when debounced search query changes */
+  onSearchChange?: (query: string) => void
+  /** Called when filter values change */
+  onFilterChange?: (filters: Record<string, string[]>) => void
 
   // ── Expandable ───────────────────────────────────────────────────────────
   expandable?: ExpandableConfig<TData>
@@ -199,6 +203,9 @@ export interface DataTablePageProps {
   tabs?: DataTableTab[]
   activeTab?: string
   onTabChange?: (tab: string) => void
+  secondaryTabs?: DataTableTab[]
+  secondaryActiveTab?: string
+  onSecondaryTabChange?: (tab: string) => void
   /** Stats row rendered between header and table content */
   stats?: ReactNode
   children: ReactNode

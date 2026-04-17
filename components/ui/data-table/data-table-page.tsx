@@ -22,6 +22,9 @@ export function DataTablePage({
   tabs,
   activeTab,
   onTabChange,
+  secondaryTabs,
+  secondaryActiveTab,
+  onSecondaryTabChange,
   stats,
   children,
 }: DataTablePageProps) {
@@ -35,6 +38,19 @@ export function DataTablePage({
         <Tabs value={activeTab} onValueChange={onTabChange} className="mb-4">
           <TabsList>
             {tabs.map((tab) => (
+              <TabsTrigger key={tab.key} value={tab.key}>
+                {tab.icon && <tab.icon className="mr-1.5 h-4 w-4" />}
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
+
+      {secondaryTabs && secondaryTabs.length > 0 && secondaryActiveTab && onSecondaryTabChange && (
+        <Tabs value={secondaryActiveTab} onValueChange={onSecondaryTabChange} className="mb-4">
+          <TabsList>
+            {secondaryTabs.map((tab) => (
               <TabsTrigger key={tab.key} value={tab.key}>
                 {tab.icon && <tab.icon className="mr-1.5 h-4 w-4" />}
                 {tab.label}

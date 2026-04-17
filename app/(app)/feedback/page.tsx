@@ -4,6 +4,8 @@ import { FeedbackContent } from "./feedback-content"
 
 export interface Feedback {
   id: string
+  user_id?: string | null
+  is_anonymous?: boolean | null
   feedback_type: string
   title: string
   description: string | null
@@ -32,7 +34,6 @@ async function getFeedbackData() {
 
   return {
     userFeedback: feedback || [],
-    userId: user.id,
   }
 }
 
@@ -43,7 +44,7 @@ export default async function FeedbackPage() {
     redirect(data.redirect)
   }
 
-  const feedbackData = data as { userFeedback: Feedback[]; userId: string }
+  const feedbackData = data as { userFeedback: Feedback[] }
 
-  return <FeedbackContent initialFeedback={feedbackData.userFeedback} userId={feedbackData.userId} />
+  return <FeedbackContent initialFeedback={feedbackData.userFeedback} />
 }

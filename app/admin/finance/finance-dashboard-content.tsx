@@ -2,14 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { PageLoader, EmptyState as QEmptyState } from "@/components/ui/query-states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { DollarSign, CreditCard, Clock, CheckCircle, AlertCircle, Package, ShoppingCart } from "lucide-react"
+import { DollarSign, CreditCard, Clock, AlertCircle, Package, ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
-import { EmptyState } from "@/components/ui/patterns"
 
 interface FinanceStats {
   totalPayments: number
@@ -38,11 +36,7 @@ async function fetchPayments(): Promise<FinancePayment[]> {
 }
 
 export function FinanceDashboardContent() {
-  const {
-    data: allPayments = [],
-    isLoading: loading,
-    isError,
-  } = useQuery({
+  const { data: allPayments = [] } = useQuery({
     queryKey: QUERY_KEYS.payments(),
     queryFn: fetchPayments,
   })
@@ -55,9 +49,6 @@ export function FinanceDashboardContent() {
     recurringPayments: allPayments.filter((p) => p.payment_type === "recurring").length,
     overduePayments: allPayments.filter((p) => p.status === "overdue").length,
   }
-
-  const recentPayments = allPayments.slice(0, 5)
-
   function formatCurrency(amount: number, currency: string | null = "NGN") {
     const safeCurrency = currency || "NGN"
     return new Intl.NumberFormat("en-NG", {
@@ -173,50 +164,6 @@ export function FinanceDashboardContent() {
             </CardContent>
           </Card>
         </div>
-      </Section>
-
-      {/* Recent Payments */}
-      <Section title="Recent Payments">
-        <Card>
-          <CardContent className="pt-6">
-            {loading ? (
-              <PageLoader />
-            ) : isError ? (
-              <QEmptyState message="Could not load payment data." />
-            ) : recentPayments.length === 0 ? (
-              <EmptyState
-                title="No payments found"
-                description="Recent payment activity will appear here once transactions are recorded."
-                icon={CreditCard}
-                className="border-0"
-              />
-            ) : (
-              <div className="space-y-4">
-                {recentPayments.map((payment) => (
-                  <div key={payment.id} className="flex items-center justify-between border-b pb-4 last:border-0">
-                    <div className="flex items-center gap-4">
-                      {payment.status === "paid" ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : payment.status === "overdue" ? (
-                        <AlertCircle className="h-5 w-5 text-red-500" />
-                      ) : (
-                        <Clock className="h-5 w-5 text-orange-500" />
-                      )}
-                      <div>
-                        <p className="font-medium">{payment.title}</p>
-                        <p className="text-muted-foreground text-sm">{payment.category}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">{formatCurrency(payment.amount || 0, payment.currency)}</p>
-                      <p className="text-muted-foreground text-sm capitalize">{payment.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </Section>
     </PageWrapper>
   )

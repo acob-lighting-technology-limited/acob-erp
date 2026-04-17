@@ -1,18 +1,17 @@
 "use client"
 
-import { useState } from "react"
-import { useSearchParams } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
+import { useState, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, List, LayoutGrid } from "lucide-react"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { Badge } from "@/components/ui/badge"
+import { FileText, List, Eye, User, FolderOpen, Calendar } from "lucide-react"
+import { StatCard } from "@/components/ui/stat-card"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
-import { AdminDocStatsCards } from "@/components/documentation/admin-doc-stats-cards"
-import { AdminDocFilterBar } from "@/components/documentation/admin-doc-filter-bar"
-import { AdminDocListView } from "@/components/documentation/admin-doc-list-view"
-import { AdminDocCardGrid } from "@/components/documentation/admin-doc-card-grid"
 import { AdminDocViewDialog } from "@/components/documentation/admin-doc-view-dialog"
+import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { AdminDocumentation, UserProfile, employeeMember } from "@/components/documentation/admin-doc-types"
 
 // Re-export types for consumers of this module
@@ -47,29 +46,20 @@ const getStatusColor = (isDraft: boolean) =>
 export function AdminDocumentationContent({
   initialDocumentation,
   initialemployee,
-  userProfile,
   departmentDocs,
   defaultTab,
   hideTabList = false,
   backLinkHref = "/admin",
   backLinkLabel = "Back to Admin",
 }: AdminDocumentationContentProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
   const initialTab = defaultTab || (tabFromUrl === "department-documents" ? "department-documents" : "knowledge-docs")
-  const [activeTab, setActiveTab] = useState<"knowledge-docs" | "department-documents">(
-    initialTab as "knowledge-docs" | "department-documents"
-  )
+  const [activeTab, setActiveTab] = useState<string>(initialTab)
 
-  const scopedDepartments = userProfile.managed_departments ?? userProfile.lead_departments ?? []
   const [documentation] = useState<AdminDocumentation[]>(initialDocumentation)
-  const [employee] = useState<employeeMember[]>(initialemployee)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [employeeFilter, setEmployeeFilter] = useState("all")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
+  const [employees] = useState<employeeMember[]>(initialemployee)
   const [selectedDoc, setSelectedDoc] = useState<AdminDocumentation | null>(null)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
 
@@ -78,33 +68,12 @@ export function AdminDocumentationContent({
     setIsViewDialogOpen(true)
   }
 
-  const filteredDocumentation = documentation.filter((doc) => {
-    const matchesSearch =
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.user?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.user?.last_name?.toLowerCase().includes(searchQuery.toLowerCase())
-
-    const matchesCategory = categoryFilter === "all" || doc.category === categoryFilter
-
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "published" && !doc.is_draft) ||
-      (statusFilter === "draft" && doc.is_draft)
-
-    let matchesDepartment = true
-    if (userProfile?.is_department_lead) {
-      if (scopedDepartments.length > 0) {
-        matchesDepartment = doc.user?.department ? scopedDepartments.includes(doc.user.department) : false
-      }
-    } else {
-      matchesDepartment = departmentFilter === "all" || doc.user?.department === departmentFilter
-    }
-
-    const matchesEmployee = employeeFilter === "all" || doc.user_id === employeeFilter
-
-    return matchesSearch && matchesCategory && matchesStatus && matchesDepartment && matchesEmployee
-  })
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", value)
+    router.replace(`?${params.toString()}`)
+  }
 
   const categories = Array.from(new Set(documentation.map((d) => d.category).filter(Boolean))) as string[]
   const departments = Array.from(new Set(documentation.map((d) => d.user?.department).filter(Boolean))) as string[]
@@ -120,107 +89,242 @@ export function AdminDocumentationContent({
     ).length,
   }
 
-  return (
-    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "knowledge-docs" | "department-documents")}>
-      {!hideTabList && (
-        <div className="mb-4">
-          <TabsList className="grid w-full max-w-lg grid-cols-2">
-            <TabsTrigger value="knowledge-docs">Internal Documentation</TabsTrigger>
-            <TabsTrigger value="department-documents">Department Documents</TabsTrigger>
-          </TabsList>
-        </div>
-      )}
+  const columns = useMemo<DataTableColumn<AdminDocumentation>[]>(
+    () => [
+      {
+        key: "title",
+        label: "Title",
+        sortable: true,
+        accessor: (row) => row.title,
+        resizable: true,
+        initialWidth: 300,
+        render: (row) => (
+          <div className="space-y-1">
+            <p className="font-medium">{row.title}</p>
+            <p className="text-muted-foreground text-xs">{formatDate(row.created_at)}</p>
+          </div>
+        ),
+      },
+      {
+        key: "category",
+        label: "Category",
+        sortable: true,
+        accessor: (row) => row.category || "",
+        render: (row) => (
+          <Badge variant="outline" className="text-xs">
+            {row.category || "General"}
+          </Badge>
+        ),
+      },
+      {
+        key: "author",
+        label: "Author",
+        sortable: true,
+        accessor: (row) => `${row.user?.first_name || ""} ${row.user?.last_name || ""}`,
+        render: (row) => (
+          <div className="space-y-1">
+            <p className="text-sm">
+              {row.user?.first_name} {row.user?.last_name}
+            </p>
+            <p className="text-muted-foreground text-xs">{row.user?.department}</p>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (row) => (row.is_draft ? "Draft" : "Published"),
+        render: (row) => <Badge className={getStatusColor(row.is_draft)}>{row.is_draft ? "Draft" : "Published"}</Badge>,
+      },
+      {
+        key: "updated_at",
+        label: "Last Updated",
+        sortable: true,
+        accessor: (row) => row.updated_at,
+        render: (row) => <span className="text-muted-foreground text-sm">{formatDate(row.updated_at)}</span>,
+      },
+    ],
+    []
+  )
 
-      <TabsContent value="knowledge-docs" className="space-y-4">
-        <AdminTablePage
-          title="Employee Documentation"
-          description="View all employee documentation and knowledge base articles"
-          icon={FileText}
-          backLinkHref={backLinkHref}
-          backLinkLabel={backLinkLabel}
-          actions={
-            <div className="flex items-center rounded-lg border p-1">
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-1 sm:gap-2"
-              >
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">List</span>
-              </Button>
-              <Button
-                variant={viewMode === "card" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("card")}
-                className="gap-1 sm:gap-2"
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Card</span>
-              </Button>
-            </div>
-          }
-          stats={
-            <AdminDocStatsCards
-              total={stats.total}
-              published={stats.published}
-              drafts={stats.drafts}
-              thisMonth={stats.thisMonth}
+  const filters = useMemo<DataTableFilter<AdminDocumentation>[]>(
+    () => [
+      {
+        key: "category",
+        label: "Category",
+        options: categories.map((c) => ({ value: c, label: c })),
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "Published", label: "Published" },
+          { value: "Draft", label: "Draft" },
+        ],
+      },
+      {
+        key: "department",
+        label: "Department",
+        options: departments.map((d) => ({ value: d, label: d })),
+        mode: "custom",
+        filterFn: (row, value) => {
+          if (!value || value.length === 0) return true
+          return value.includes(row.user?.department || "")
+        },
+      },
+      {
+        key: "author",
+        label: "Author",
+        options: employees.map((e) => ({ value: e.id, label: `${e.first_name} ${e.last_name}` })),
+        mode: "custom",
+        filterFn: (row, value) => {
+          if (!value || value.length === 0) return true
+          return value.includes(row.user_id)
+        },
+      },
+    ],
+    [categories, departments, employees]
+  )
+
+  const TABS: DataTableTab[] = useMemo(
+    () => [
+      { key: "knowledge-docs", label: "Internal Documentation", icon: FileText },
+      { key: "department-documents", label: "Department Documents", icon: List },
+    ],
+    []
+  )
+
+  return (
+    <DataTablePage
+      title="Employee Documentation"
+      description="Manage and view all internal writeups, knowledge base articles, and departmental files."
+      icon={FileText}
+      backLink={{ href: backLinkHref, label: backLinkLabel }}
+      tabs={hideTabList ? undefined : TABS}
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      stats={
+        activeTab === "knowledge-docs" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Total Docs"
+              value={stats.total}
+              icon={FileText}
+              iconBgColor="bg-blue-500/10"
+              iconColor="text-blue-500"
             />
-          }
-          filters={
-            <AdminDocFilterBar
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              categoryFilter={categoryFilter}
-              onCategoryChange={setCategoryFilter}
-              categories={categories}
-              statusFilter={statusFilter}
-              onStatusChange={setStatusFilter}
-              departmentFilter={departmentFilter}
-              onDepartmentChange={setDepartmentFilter}
-              departments={departments}
-              employeeFilter={employeeFilter}
-              onEmployeeChange={setEmployeeFilter}
-              employees={employee}
-              userProfile={userProfile}
+            <StatCard
+              title="Published"
+              value={stats.published}
+              icon={FileText}
+              iconBgColor="bg-emerald-500/10"
+              iconColor="text-emerald-500"
             />
-          }
-          filtersInCard={false}
-        >
-          {filteredDocumentation.length > 0 ? (
-            viewMode === "list" ? (
-              <AdminDocListView
-                docs={filteredDocumentation}
-                getStatusColor={getStatusColor}
-                formatDate={formatDate}
-                onView={handleViewDocument}
-              />
-            ) : (
-              <AdminDocCardGrid
-                docs={filteredDocumentation}
-                getStatusColor={getStatusColor}
-                formatDate={formatDate}
-                onView={handleViewDocument}
-              />
-            )
-          ) : (
-            <Card className="border-2">
-              <CardContent className="p-12 text-center">
-                <FileText className="text-muted-foreground mx-auto mb-4 h-16 w-16" />
-                <h3 className="text-foreground mb-2 text-xl font-semibold">No Documentation Found</h3>
-                <p className="text-muted-foreground">
-                  {searchQuery ||
-                  categoryFilter !== "all" ||
-                  statusFilter !== "all" ||
-                  departmentFilter !== "all" ||
-                  employeeFilter !== "all"
-                    ? "No documentation matches your filters"
-                    : "No documentation has been created yet"}
-                </p>
-              </CardContent>
-            </Card>
-          )}
+            <StatCard
+              title="Drafts"
+              value={stats.drafts}
+              icon={FileText}
+              iconBgColor="bg-amber-500/10"
+              iconColor="text-amber-500"
+            />
+            <StatCard
+              title="This Month"
+              value={stats.thisMonth}
+              icon={FileText}
+              iconBgColor="bg-violet-500/10"
+              iconColor="text-violet-500"
+            />
+          </div>
+        ) : null
+      }
+    >
+      {activeTab === "knowledge-docs" ? (
+        <>
+          <DataTable<AdminDocumentation>
+            data={documentation}
+            columns={columns}
+            filters={filters}
+            getRowId={(row) => row.id}
+            searchPlaceholder="Search titles or content..."
+            searchFn={(row, query) => {
+              const q = query.toLowerCase()
+              return (
+                row.title.toLowerCase().includes(q) ||
+                row.content.toLowerCase().includes(q) ||
+                (row.user?.first_name || "").toLowerCase().includes(q) ||
+                (row.user?.last_name || "").toLowerCase().includes(q)
+              )
+            }}
+            rowActions={[
+              {
+                label: "View",
+                icon: Eye,
+                onClick: handleViewDocument,
+              },
+            ]}
+            expandable={{
+              render: (doc) => (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-xs uppercase">Preview</p>
+                  <div className="bg-muted/30 rounded-lg border p-4">
+                    <MarkdownContent content={doc.content || "No content."} />
+                  </div>
+                </div>
+              ),
+            }}
+            viewToggle
+            cardRenderer={(doc) => (
+              <Card key={doc.id} className="border-2 transition-shadow hover:shadow-lg">
+                <CardHeader className="from-primary/5 to-background border-b bg-gradient-to-r p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="bg-primary/10 rounded-lg p-2">
+                      <FileText className="text-primary h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="line-clamp-2 text-base">{doc.title}</CardTitle>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
+                        {doc.category && (
+                          <Badge variant="outline" className="text-xs">
+                            {doc.category}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 p-4 pt-4">
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4" />
+                    <span className="truncate">
+                      {doc.user?.first_name} {doc.user?.last_name}
+                    </span>
+                  </div>
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <FolderOpen className="h-4 w-4" />
+                    <span className="truncate">{doc.user?.department || "No Department"}</span>
+                  </div>
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4" />
+                    <span>{formatDate(doc.created_at)}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDocument(doc)}
+                    className="mt-2 w-full gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View Document
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            emptyTitle="No Documentation Found"
+            emptyDescription="No documentation has been created yet or matches your filters."
+            urlSync
+          />
 
           <AdminDocViewDialog
             open={isViewDialogOpen}
@@ -229,26 +333,26 @@ export function AdminDocumentationContent({
             getStatusColor={getStatusColor}
             formatDate={formatDate}
           />
-        </AdminTablePage>
-      </TabsContent>
-
-      <TabsContent value="department-documents" className="space-y-4">
-        {departmentDocs.enabled ? (
-          <DepartmentDocumentsBrowser
-            initialPath={departmentDocs.initialPath}
-            rootLabel={departmentDocs.rootLabel}
-            lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
-            accessMode={departmentDocs.accessMode ?? "admin"}
-          />
-        ) : (
-          <Card className="border-2">
-            <CardContent className="p-12 text-center">
-              <h3 className="text-foreground mb-2 text-xl font-semibold">Department Documents Not Available</h3>
-              <p className="text-muted-foreground">No managed department folder is assigned to this account yet.</p>
-            </CardContent>
-          </Card>
-        )}
-      </TabsContent>
-    </Tabs>
+        </>
+      ) : (
+        <div className="space-y-4">
+          {departmentDocs.enabled ? (
+            <DepartmentDocumentsBrowser
+              initialPath={departmentDocs.initialPath}
+              rootLabel={departmentDocs.rootLabel}
+              lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
+              accessMode={departmentDocs.accessMode ?? "admin"}
+            />
+          ) : (
+            <Card className="border-2">
+              <CardContent className="p-12 text-center">
+                <h3 className="text-foreground mb-2 text-xl font-semibold">Department Documents Not Available</h3>
+                <p className="text-muted-foreground">No managed department folder is assigned to this account yet.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </DataTablePage>
   )
 }

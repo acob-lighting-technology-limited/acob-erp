@@ -14,15 +14,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Shield, Users } from "lucide-react"
+import { Lock, Shield, Users } from "lucide-react"
 import { toast } from "sonner"
 import { DepartmentLeadsManager } from "@/components/admin/department-leads-manager"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { ASSIGNABLE_ROLES } from "@/lib/role-management"
 import { RoleFormDialog } from "./_components/role-form-dialog"
 import { RoleUsersDialog } from "./_components/role-users-dialog"
-import { RolesTable } from "./_components/roles-table"
 import { DEFAULT_ROLES, fetchRolesData } from "./_components/roles-data"
 import type { Role, RoleFormData } from "./_components/role-form-dialog"
 import type { RoleMember } from "./_components/role-users-dialog"
@@ -198,18 +200,129 @@ export default function RolesPage() {
 
   log.debug("Rendering roles page", { total: roles.length, visible: visibleRoles.length })
 
+  const roleTypeOptions = [
+    { value: "System", label: "System" },
+    { value: "Custom", label: "Custom" },
+  ]
+
+  const permissionBandOptions = [
+    { value: "0-3", label: "0-3" },
+    { value: "4-8", label: "4-8" },
+    { value: "9+", label: "9+" },
+  ]
+
+  const columns: DataTableColumn<Role>[] = [
+    {
+      key: "name",
+      label: "Role",
+      sortable: true,
+      accessor: (role) => role.name,
+      render: (role) => <span className="font-medium capitalize">{role.name.replace(/_/g, " ")}</span>,
+      resizable: true,
+      initialWidth: 180,
+    },
+    {
+      key: "description",
+      label: "Description",
+      sortable: true,
+      accessor: (role) => role.description || "",
+      resizable: true,
+      initialWidth: 260,
+      render: (role) => <span className="text-muted-foreground">{role.description || "No description"}</span>,
+    },
+    {
+      key: "permissions_count",
+      label: "Permissions",
+      sortable: true,
+      accessor: (role) => role.permissions?.length || 0,
+      align: "center",
+      render: (role) => <Badge variant="secondary">{role.permissions?.length || 0}</Badge>,
+    },
+    {
+      key: "user_count",
+      label: "Users",
+      sortable: true,
+      accessor: (role) => role.user_count || 0,
+      align: "center",
+      render: (role) => (
+        <Button variant="ghost" size="sm" className="h-auto p-0" onClick={() => openRoleUsers(role.name)}>
+          <Users className="mr-1 h-4 w-4" />
+          {role.user_count || 0}
+        </Button>
+      ),
+    },
+    {
+      key: "role_type",
+      label: "Type",
+      sortable: true,
+      accessor: (role) => (role.is_system ? "System" : "Custom"),
+      render: (role) => (
+        <Badge variant={role.is_system ? "destructive" : "outline"}>{role.is_system ? "System" : "Custom"}</Badge>
+      ),
+    },
+  ]
+
+  const filters: DataTableFilter<Role>[] = [
+    {
+      key: "role_type",
+      label: "Type",
+      options: roleTypeOptions,
+    },
+    {
+      key: "permission_band",
+      label: "Permission Count",
+      mode: "custom",
+      options: permissionBandOptions,
+      filterFn: (role, value) => {
+        const count = role.permissions?.length || 0
+        const evaluate = (entry: string) => {
+          if (entry === "0-3") return count <= 3
+          if (entry === "4-8") return count >= 4 && count <= 8
+          if (entry === "9+") return count >= 9
+          return false
+        }
+        if (Array.isArray(value)) return value.some(evaluate)
+        return evaluate(value)
+      },
+    },
+  ]
+
   return (
-    <AdminTablePage
+    <DataTablePage
       title="Roles & Permissions"
       description="Configure access control for your organization."
       icon={Shield}
-      backLinkHref="/admin/settings"
-      backLinkLabel="Back to Settings"
+      backLink={{ href: "/admin/settings", label: "Back to Settings" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Total Roles" value={stats.total} icon={Shield} />
-          <StatCard title="System Roles" value={stats.system} icon={Shield} />
-          <StatCard title="Custom Roles" value={stats.custom} icon={Users} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Total Roles"
+            value={stats.total}
+            icon={Shield}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="System Roles"
+            value={stats.system}
+            icon={Lock}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+          <StatCard
+            title="Custom Roles"
+            value={stats.custom}
+            icon={Users}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Visible Roles"
+            value={visibleRoles.length}
+            icon={Shield}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
         </div>
       }
       actions={
@@ -224,12 +337,82 @@ export default function RolesPage() {
         />
       }
     >
-      <RolesTable
-        roles={visibleRoles}
-        loading={loading}
-        onEdit={openEdit}
-        onDelete={(role) => setPendingDelete(role)}
-        onViewUsers={openRoleUsers}
+      <DataTable<Role>
+        data={visibleRoles}
+        columns={columns}
+        filters={filters}
+        getRowId={(role) => role.id}
+        searchPlaceholder="Search role name or description..."
+        searchFn={(role, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            role.name.toLowerCase().includes(normalizedQuery) ||
+            (role.description || "").toLowerCase().includes(normalizedQuery)
+          )
+        }}
+        isLoading={loading}
+        rowActions={[
+          {
+            label: "Edit",
+            onClick: (role) => openEdit(role),
+          },
+          {
+            label: "View Users",
+            onClick: (role) => {
+              void openRoleUsers(role.name)
+            },
+          },
+          {
+            label: "Delete",
+            variant: "destructive",
+            onClick: (role) => setPendingDelete(role),
+          },
+        ]}
+        expandable={{
+          render: (role) => (
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Description</p>
+                <p className="mt-2 text-sm">{role.description || "No description provided"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Permissions</p>
+                <p className="mt-2 text-sm">{(role.permissions || []).join(", ") || "No explicit permissions"}</p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">Users Assigned</p>
+                <p className="mt-2 text-sm">{role.user_count || 0}</p>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(role) => (
+          <div className="space-y-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium capitalize">{role.name.replace(/_/g, " ")}</p>
+                <p className="text-muted-foreground text-sm">{role.description || "No description"}</p>
+              </div>
+              <Badge variant={role.is_system ? "destructive" : "outline"}>{role.is_system ? "System" : "Custom"}</Badge>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Permissions</span>
+                <span>{role.permissions?.length || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Users</span>
+                <span>{role.user_count || 0}</span>
+              </div>
+            </div>
+          </div>
+        )}
+        emptyTitle="No roles defined"
+        emptyDescription="Create a role to configure permissions and access control."
+        emptyIcon={Shield}
+        skeletonRows={5}
+        urlSync
       />
 
       <DepartmentLeadsManager />
@@ -280,6 +463,6 @@ export default function RolesPage() {
           setAddUserWarning(null)
         }}
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

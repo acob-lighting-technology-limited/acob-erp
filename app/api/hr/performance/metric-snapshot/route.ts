@@ -3,6 +3,7 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { computeIndividualPerformanceScore } from "@/lib/performance/scoring"
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 
 const log = logger("hr-performance-metric-snapshot")
 
@@ -11,13 +12,6 @@ const SnapshotQuerySchema = z.object({
   cycle_id: z.string().trim().optional().nullable(),
   view: z.enum(["individual", "department", "cycle"]).optional().default("individual"),
 })
-
-type AccessProfile = {
-  role?: string | null
-  department?: string | null
-  is_department_lead?: boolean | null
-  lead_departments?: string[] | null
-}
 
 type DepartmentRow = {
   name: string
@@ -71,53 +65,6 @@ function fullName(user: ScopedUserRow) {
   return [user.first_name, user.last_name].filter(Boolean).join(" ") || "Unnamed employee"
 }
 
-async function getScopedContext(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, department, is_department_lead, lead_departments")
-    .eq("id", userId)
-    .maybeSingle<AccessProfile>()
-
-  const role = String(profile?.role || "").toLowerCase()
-  const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
-
-  let departments: string[] = []
-  if (isAdminLike) {
-    const { data: departmentRows } = await supabase
-      .from("departments")
-      .select("name")
-      .order("name", { ascending: true })
-      .returns<DepartmentRow[]>()
-    departments = (departmentRows || []).map((row) => row.name).filter(Boolean)
-  } else {
-    departments = Array.from(
-      new Set([profile?.department, ...(profile?.lead_departments || [])].filter(Boolean) as string[])
-    )
-  }
-
-  const { data: users } =
-    departments.length > 0
-      ? await supabase
-          .from("profiles")
-          .select("id, first_name, last_name, department")
-          .in("department", departments)
-          .order("first_name", { ascending: true })
-          .returns<ScopedUserRow[]>()
-      : { data: [] as ScopedUserRow[] }
-
-  const { data: cycles } = await supabase
-    .from("review_cycles")
-    .select("id, name, review_type, start_date, end_date")
-    .order("start_date", { ascending: false })
-    .returns<ReviewCycleRow[]>()
-
-  return {
-    departments,
-    users: users || [],
-    cycles: cycles || [],
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -139,9 +86,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid query" }, { status: 400 })
     }
 
+    // Resolve scope from middleware header (single source of truth)
+    const scope = await getRequestScope()
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+    const scopedDepts = getScopedDepartments(scope)
+    let departments: string[]
+
+    if (scopedDepts === null) {
+      const { data: departmentRows } = await supabase
+        .from("departments")
+        .select("name")
+        .order("name", { ascending: true })
+        .returns<DepartmentRow[]>()
+      departments = (departmentRows || []).map((row) => row.name).filter(Boolean)
+    } else {
+      departments = scopedDepts.length > 0 ? scopedDepts : []
+    }
+
+    const { data: users } =
+      departments.length > 0
+        ? await supabase
+            .from("profiles")
+            .select("id, first_name, last_name, department")
+            .in("department", departments)
+            .order("first_name", { ascending: true })
+            .returns<ScopedUserRow[]>()
+        : { data: [] as ScopedUserRow[] }
+
+    const { data: cycles } = await supabase
+      .from("review_cycles")
+      .select("id, name, review_type, start_date, end_date")
+      .order("start_date", { ascending: false })
+      .returns<ReviewCycleRow[]>()
+
+    const context = { departments, users: users || [], cycles: cycles || [] }
+
     const metric = parsed.data.metric
-    const context = await getScopedContext(supabase, user.id)
     const selectedCycleId = parsed.data.cycle_id || context.cycles[0]?.id || null
+
     const selectedCycle = context.cycles.find((cycle) => cycle.id === selectedCycleId) || null
     const userIds = context.users.map((entry) => entry.id)
     const usersById = new Map(context.users.map((entry) => [entry.id, entry]))

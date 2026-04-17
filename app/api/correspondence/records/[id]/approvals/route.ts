@@ -6,9 +6,9 @@ import {
   canAccessDepartment,
   canAccessRecord,
   getAuthContext,
-  isAdminRole,
 } from "@/lib/correspondence/server"
 import { logger } from "@/lib/logger"
+import { normalizeDepartmentName } from "@/shared/departments"
 
 const log = logger("correspondence-records-approvals")
 
@@ -50,13 +50,23 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const decision = parsed.data.decision
     const comments = parsed.data.comments ? String(parsed.data.comments).trim() : null
 
-    const approvalScopeDepartment = record.department_name || record.assigned_department_name
-    const isApprover =
-      isAdminRole(profile.role) ||
-      (profile.is_department_lead && approvalScopeDepartment && canAccessDepartment(profile, approvalScopeDepartment))
+    const approvalScopeDepartment = String(record.department_name || record.assigned_department_name || "")
+    const normalizedScopeDepartment = normalizeDepartmentName(approvalScopeDepartment)
+    const designation = String((profile as { designation?: string | null })?.designation || "").toLowerCase()
+    const role = String(profile.role || "").toLowerCase()
+    const isManagingDirector =
+      role === "super_admin" || designation.includes("managing director") || designation === "md"
+    const isExecutiveLead =
+      Boolean(profile.is_department_lead) &&
+      normalizedScopeDepartment === normalizeDepartmentName("Executive Management") &&
+      canAccessDepartment(profile, "Executive Management")
+    const isApprover = isManagingDirector || isExecutiveLead
 
     if (!isApprover) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      return NextResponse.json(
+        { error: "Only Managing Director or Executive Management lead can approve correspondence" },
+        { status: 403 }
+      )
     }
 
     const { data: pendingApprovals, error: approvalError } = await supabase

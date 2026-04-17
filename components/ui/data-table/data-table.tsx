@@ -284,6 +284,8 @@ export function DataTable<TData>({
   totalRows,
   currentPage = 0,
   onPageChange,
+  onSearchChange,
+  onFilterChange,
   // Expandable
   expandable,
   // Actions
@@ -360,6 +362,16 @@ export function DataTable<TData>({
     }
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [searchQuery, filterValues, urlSync, pathname, router])
+
+  // ─── Trigger external search callback ──────────────────────────────────────
+  useEffect(() => {
+    if (onSearchChange) onSearchChange(searchQuery)
+  }, [searchQuery, onSearchChange])
+
+  // ─── Trigger external filter callback ──────────────────────────────────────
+  useEffect(() => {
+    if (onFilterChange) onFilterChange(filterValues)
+  }, [filterValues, onFilterChange])
 
   // ─── Sort state ────────────────────────────────────────────────────────────
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
@@ -439,6 +451,7 @@ export function DataTable<TData>({
 
   // ─── Filtering ─────────────────────────────────────────────────────────────
   const filteredData = useMemo(() => {
+    if (isServerPagination) return data
     let result = data
 
     // Search
@@ -466,10 +479,11 @@ export function DataTable<TData>({
     }
 
     return result
-  }, [data, searchQuery, searchFn, filterValues, filters, columns])
+  }, [data, searchQuery, searchFn, filterValues, filters, columns, isServerPagination])
 
   // ─── Sorting ───────────────────────────────────────────────────────────────
   const sortedData = useMemo(() => {
+    if (isServerPagination) return filteredData
     if (!sortConfig) return filteredData
     if (sortFn) return sortFn(filteredData, sortConfig)
 
@@ -482,7 +496,7 @@ export function DataTable<TData>({
       const cmp = aVal.localeCompare(bVal, undefined, { numeric: true })
       return sortConfig.direction === "asc" ? cmp : -cmp
     })
-  }, [filteredData, sortConfig, sortFn, columns])
+  }, [filteredData, sortConfig, sortFn, columns, isServerPagination])
 
   // ─── Pagination ────────────────────────────────────────────────────────────
   const total = isServerPagination ? (totalRows ?? data.length) : sortedData.length

@@ -1,28 +1,44 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
-import { ItemInfoButton } from "@/components/ui/item-info-button"
-import { PageHeader, PageWrapper } from "@/components/layout"
 import { toast } from "sonner"
-import { CalendarDays, Clock, Plus } from "lucide-react"
+import { CalendarDays, Clock, Plus, ExternalLink, Trash2, Pencil, Paperclip, CircleHelp } from "lucide-react"
 import type { LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
 import { LeaveTypesCard } from "@/components/leave/leave-types-card"
-import { ApprovalQueueCard } from "@/components/leave/approval-queue-card"
-import { LeaveRequestsCard } from "@/components/leave/leave-requests-card"
 import { LeaveDeleteConfirmDialog } from "@/components/leave/leave-delete-confirm-dialog"
 import { LeaveRequestFormDialog } from "@/components/leave/leave-request-form-dialog"
 import { LeaveRejectPromptDialog, LeaveEvidencePromptDialog } from "@/components/leave/leave-prompt-dialogs"
-import { fetchLeaveData, addDays, getTodayLocalIsoDate } from "@/components/leave/leave-data"
+import { fetchLeaveData, addDays } from "@/components/leave/leave-data"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { formatName } from "@/lib/utils"
 
 interface LeaveContentProps {
   currentUserId: string
   initialRequests: LeaveRequest[]
   initialBalances: LeaveBalance[]
   initialLeaveTypes: LeaveType[]
+}
+
+type ApproverQueueItem = LeaveRequest & {
+  user?: {
+    full_name?: string | null
+  } | null
+}
+
+type LeaveQueryData = {
+  requests: LeaveRequest[]
+  balances: LeaveBalance[]
+  approverQueue: ApproverQueueItem[]
+  leaveTypes: LeaveType[]
+  relieverOptions: { value: string; label: string }[]
 }
 
 const EMPTY_REQUEST_FORM = {
@@ -34,6 +50,11 @@ const EMPTY_REQUEST_FORM = {
   handover_note: "",
 }
 
+const TABS: DataTableTab[] = [
+  { key: "my-requests", label: "My Requests", icon: Clock },
+  { key: "approvals", label: "Pending Reviews", icon: Clock },
+]
+
 export function LeaveContent({
   currentUserId,
   initialRequests,
@@ -41,8 +62,9 @@ export function LeaveContent({
   initialLeaveTypes,
 }: LeaveContentProps) {
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState("my-requests")
 
-  const { data: leaveData } = useQuery({
+  const { data: leaveData } = useQuery<LeaveQueryData>({
     queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }),
     queryFn: () => fetchLeaveData(currentUserId),
     initialData: {
@@ -54,105 +76,170 @@ export function LeaveContent({
     },
   })
 
-  const requests = leaveData.requests
-  const balances = leaveData.balances
-  const leaveTypes = leaveData.leaveTypes
-  const approverQueue = leaveData.approverQueue
-  const relieverOptions = leaveData.relieverOptions
+  const { requests, balances, leaveTypes, approverQueue, relieverOptions } = leaveData
 
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [uploadingEvidenceFor, setUploadingEvidenceFor] = useState<string | null>(null)
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null)
-  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null)
-  const [requestsTab, setRequestsTab] = useState<"ongoing" | "history">("ongoing")
-  const [historyFilter, setHistoryFilter] = useState<"all" | "approved" | "rejected" | "cancelled">("all")
   const [rejectPrompt, setRejectPrompt] = useState<{ requestId: string } | null>(null)
   const [evidencePrompt, setEvidencePrompt] = useState<{ requestId: string; documentType: string } | null>(null)
   const [deleteConfirmRequest, setDeleteConfirmRequest] = useState<LeaveRequest | null>(null)
-  const approvalQueueRef = useRef<HTMLDivElement | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isOverviewOpen, setIsOverviewOpen] = useState(false)
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
-  const todayIsoDate = useMemo(() => getTodayLocalIsoDate(), [])
 
   const myRequests = useMemo(
     () => requests.filter((request) => request.user_id === currentUserId),
     [requests, currentUserId]
   )
-  const ongoingRequests = useMemo(
-    () =>
-      myRequests.filter((request) => {
-        if (request.status === "rejected" || request.status === "cancelled") return false
-        if (request.status !== "approved") return true
-        return !request.end_date || request.end_date >= todayIsoDate
-      }),
-    [myRequests, todayIsoDate]
-  )
-  const historyRequests = useMemo(
-    () =>
-      myRequests.filter((request) => {
-        if (request.status === "rejected" || request.status === "cancelled") return true
-        if (request.status !== "approved") return false
-        return Boolean(request.end_date && request.end_date < todayIsoDate)
-      }),
-    [myRequests, todayIsoDate]
-  )
-  const filteredHistoryRequests = useMemo(() => {
-    if (historyFilter === "all") return historyRequests
-    return historyRequests.filter((request) => request.status === historyFilter)
-  }, [historyFilter, historyRequests])
 
-  const hasPendingRequest = myRequests.some((request) => ["pending", "pending_evidence"].includes(request.status))
-  const leaveTypeMap = useMemo(() => new Map(leaveTypes.map((leaveType) => [leaveType.id, leaveType])), [leaveTypes])
-  const balanceMap = useMemo(() => new Map(balances.map((balance) => [balance.leave_type_id, balance])), [balances])
+  const balanceMap = useMemo(() => new Map(balances.map((b) => [b.leave_type_id, b])), [balances])
+  const leaveTypeMap = useMemo(() => new Map(leaveTypes.map((t) => [t.id, t])), [leaveTypes])
 
-  const preview = useMemo(
-    () => addDays(formData.start_date, Number(formData.days_count)),
-    [formData.start_date, formData.days_count]
-  )
-
-  const selectedLeaveType = useMemo(
-    () => leaveTypeMap.get(formData.leave_type_id),
-    [leaveTypeMap, formData.leave_type_id]
-  )
-  const selectedBalance = useMemo(() => balanceMap.get(formData.leave_type_id), [balanceMap, formData.leave_type_id])
-  const availableDays = selectedBalance?.balance_days ?? selectedLeaveType?.max_days ?? 0
-
-  const canSubmit =
-    formData.leave_type_id &&
-    formData.start_date &&
-    Number(formData.days_count) > 0 &&
-    formData.reason.trim().length >= 10 &&
-    formData.handover_note.trim().length >= 10 &&
-    formData.reliever_identifier.trim().length > 0 &&
-    selectedLeaveType?.eligibility_status !== "not_eligible" &&
-    Number(formData.days_count) <= availableDays
-  const pendingMyReviews = useMemo(() => approverQueue.length, [approverQueue])
-
-  function isRequesterEditable(request: LeaveRequest) {
-    if (request.user_id !== currentUserId) return false
-    const stage = request.current_stage_code || request.approval_stage
-    return (
-      ["pending", "pending_evidence"].includes(request.status) &&
-      (stage === "pending_reliever" || stage === "reliever_pending")
-    )
-  }
-
-  function resetRequestForm() {
-    setEditingRequestId(null)
-    setFormData(EMPTY_REQUEST_FORM)
-  }
-
-  function handleDialogOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen)
-    if (!nextOpen) {
-      resetRequestForm()
+  const stats = useMemo(() => {
+    const totalTaken = myRequests
+      .filter((r) => r.status === "approved")
+      .reduce((acc, r) => acc + (r.days_count || 0), 0)
+    const pending = myRequests.filter((r) => ["pending", "pending_evidence"].includes(r.status)).length
+    return {
+      totalTaken,
+      pending,
+      availableBalances: balances.filter((b) => b.balance_days > 0).length,
+      waitingReviews: approverQueue.length,
     }
-  }
+  }, [myRequests, balances, approverQueue])
 
-  function openCreateDialog() {
-    resetRequestForm()
-    setOpen(true)
-  }
+  const columns: DataTableColumn<LeaveRequest>[] = useMemo(
+    () => [
+      {
+        key: "leave_type",
+        label: "Type",
+        sortable: true,
+        accessor: (r) => leaveTypeMap.get(r.leave_type_id)?.name || "Leave",
+      },
+      {
+        key: "period",
+        label: "Period",
+        accessor: (r) => `${r.start_date} to ${r.end_date}`,
+        render: (r) => (
+          <div className="flex flex-col text-xs">
+            <span className="font-medium">
+              {r.start_date} to {r.end_date}
+            </span>
+            <span className="text-muted-foreground">{r.days_count} day(s)</span>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (r) => r.status,
+        render: (r) => (
+          <Badge
+            variant={
+              r.status === "approved"
+                ? "default"
+                : ["rejected", "cancelled"].includes(r.status)
+                  ? "destructive"
+                  : "outline"
+            }
+            className="capitalize"
+          >
+            {formatName(r.status)}
+          </Badge>
+        ),
+      },
+      {
+        key: "stage",
+        label: "Current Stage",
+        accessor: (r) => r.current_stage_code || r.approval_stage || "-",
+        render: (r) => (
+          <span className="text-muted-foreground text-xs">
+            {formatName(r.current_stage_code || r.approval_stage || "-")}
+          </span>
+        ),
+      },
+    ],
+    [leaveTypeMap]
+  )
+
+  const filters: DataTableFilter<LeaveRequest>[] = [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "pending", label: "Pending" },
+        { value: "pending_evidence", label: "Pending Evidence" },
+        { value: "approved", label: "Approved" },
+        { value: "rejected", label: "Rejected" },
+        { value: "cancelled", label: "Cancelled" },
+      ],
+    },
+    {
+      key: "leave_type",
+      label: "Leave Type",
+      options: leaveTypes.map((leaveType) => ({
+        value: leaveType.id,
+        label: leaveType.name,
+      })),
+      mode: "custom",
+      filterFn: (row, selected) => selected.includes(row.leave_type_id),
+    },
+  ]
+
+  const approvalFilters: DataTableFilter<ApproverQueueItem>[] = useMemo(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "pending", label: "Pending" },
+          { value: "pending_evidence", label: "Pending Evidence" },
+          { value: "approved", label: "Approved" },
+          { value: "rejected", label: "Rejected" },
+        ],
+      },
+      {
+        key: "leave_type",
+        label: "Leave Type",
+        options: leaveTypes.map((leaveType) => ({
+          value: leaveType.id,
+          label: leaveType.name,
+        })),
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(row.leave_type_id),
+      },
+    ],
+    [leaveTypes]
+  )
+
+  const staticRowActions: RowAction<LeaveRequest>[] = [
+    {
+      label: "Edit",
+      icon: Pencil,
+      onClick: (item) => openEditDialog(item),
+      hidden: (r) => {
+        const isEditAllowed =
+          ["pending", "pending_evidence"].includes(r.status) &&
+          ["pending_reliever", "reliever_pending"].includes(r.current_stage_code || r.approval_stage || "")
+        return !isEditAllowed
+      },
+    },
+    {
+      label: "Upload Evidence",
+      icon: Paperclip,
+      onClick: (item) => setEvidencePrompt({ requestId: item.id, documentType: "Sick Note" }),
+      hidden: (r) => r.status !== "pending_evidence",
+    },
+    {
+      label: "Delete",
+      icon: Trash2,
+      variant: "destructive",
+      onClick: (item) => setDeleteConfirmRequest(item),
+      hidden: (r) => !["pending", "pending_evidence"].includes(r.status),
+    },
+  ]
 
   function openEditDialog(request: LeaveRequest) {
     setEditingRequestId(request.id)
@@ -167,60 +254,57 @@ export function LeaveContent({
     setOpen(true)
   }
 
-  function invalidateLeaveData() {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
+  function openCreateDialog() {
+    setEditingRequestId(null)
+    setFormData(EMPTY_REQUEST_FORM)
+    setOpen(true)
   }
 
   async function handleSubmitRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!canSubmit) return
-
     setSubmitting(true)
     try {
-      const isEditing = Boolean(editingRequestId)
+      const isEditing = !!editingRequestId
       const response = await fetch("/api/hr/leave/requests", {
         method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(isEditing ? { id: editingRequestId, ...formData } : formData),
       })
-
       const payload = await response.json()
-      if (!response.ok)
-        throw new Error(
-          payload.error || (isEditing ? "Failed to update leave request" : "Failed to submit leave request")
-        )
-
-      toast.success(
-        payload.message || (isEditing ? "Leave request updated successfully" : "Leave request submitted successfully")
-      )
+      if (!response.ok) throw new Error(payload.error || "Failed to submit request")
+      toast.success(payload.message || "Request submitted")
       setOpen(false)
-      resetRequestForm()
-      invalidateLeaveData()
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
     } catch (error) {
-      const message = error instanceof Error ? error.message : "An unexpected error occurred"
-      toast.error(message)
+      toast.error(error instanceof Error ? error.message : "Submission failed")
     } finally {
       setSubmitting(false)
     }
   }
 
   async function executeDeleteRequest(request: LeaveRequest) {
-    setDeleteConfirmRequest(null)
-    setDeletingRequestId(request.id)
+    setIsDeleting(true)
     try {
       const response = await fetch(`/api/hr/leave/requests?id=${encodeURIComponent(request.id)}`, {
         method: "DELETE",
       })
-
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to delete leave request")
-
-      toast.success(payload.message || "Leave request deleted successfully")
-      invalidateLeaveData()
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || "Delete failed")
+      queryClient.setQueryData<LeaveQueryData>(QUERY_KEYS.leaveRequests({ userId: currentUserId }), (previous) => {
+        if (!previous) return previous
+        return {
+          ...previous,
+          requests: previous.requests.filter((item) => item.id !== request.id),
+          approverQueue: previous.approverQueue.filter((item) => item.id !== request.id),
+        }
+      })
+      setDeleteConfirmRequest(null)
+      toast.success(payload.message || "Leave request deleted")
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete leave request")
+      toast.error(error instanceof Error ? error.message : "Delete failed")
     } finally {
-      setDeletingRequestId(null)
+      setIsDeleting(false)
     }
   }
 
@@ -232,24 +316,15 @@ export function LeaveContent({
         body: JSON.stringify({ leave_request_id: requestId, action, comments }),
       })
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to process action")
-      toast.success(payload.message || "Action completed")
-      invalidateLeaveData()
+      if (!response.ok) throw new Error(payload.error || "Action failed")
+      toast.success(payload.message || "Action recorded")
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to process action")
-    }
-  }
-
-  function handleAction(requestId: string, action: "approve" | "reject") {
-    if (action === "reject") {
-      setRejectPrompt({ requestId })
-    } else {
-      submitAction(requestId, "approve", "")
+      toast.error(error instanceof Error ? error.message : "Action failed")
     }
   }
 
   async function submitEvidence(requestId: string, documentType: string, fileUrl: string) {
-    setUploadingEvidenceFor(requestId)
     try {
       const response = await fetch("/api/hr/leave/evidence", {
         method: "POST",
@@ -257,26 +332,136 @@ export function LeaveContent({
         body: JSON.stringify({ leave_request_id: requestId, document_type: documentType, file_url: fileUrl }),
       })
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to upload evidence")
-      toast.success(payload.message || "Evidence uploaded")
-      invalidateLeaveData()
+      if (!response.ok) throw new Error(payload.error || "Evidence upload failed")
+      toast.success(payload.message || "Evidence added")
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to upload evidence")
-    } finally {
-      setUploadingEvidenceFor(null)
+      toast.error(error instanceof Error ? error.message : "Evidence upload failed")
     }
   }
 
-  function handleUploadEvidence(requestId: string, documentType: string) {
-    setEvidencePrompt({ requestId, documentType })
-  }
+  const hasPendingRequest = myRequests.some((r) => ["pending", "pending_evidence"].includes(r.status))
 
   return (
-    <>
+    <DataTablePage
+      title="My Leave Center"
+      description="Track eligibility, submit requests, and manage approvals in one view."
+      icon={CalendarDays}
+      backLink={{ href: "/profile", label: "Back to Home" }}
+      tabs={TABS}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Taken (Days)"
+            value={stats.totalTaken}
+            icon={CalendarDays}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Ongoing Requests"
+            value={stats.pending}
+            icon={Clock}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Available Balances"
+            value={stats.availableBalances}
+            icon={ExternalLink}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          {stats.waitingReviews > 0 && (
+            <StatCard
+              title="Need Your Review"
+              value={stats.waitingReviews}
+              icon={Plus}
+              iconBgColor="bg-violet-500/10"
+              iconColor="text-violet-500"
+            />
+          )}
+        </div>
+      }
+      actions={
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsOverviewOpen(true)}>
+            <CircleHelp className="mr-2 h-4 w-4" />
+            Overview
+          </Button>
+          <Button onClick={openCreateDialog} disabled={hasPendingRequest}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Request
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-6">
+        {activeTab === "my-requests" && (
+          <DataTable<LeaveRequest>
+            data={myRequests}
+            columns={columns}
+            getRowId={(r) => r.id}
+            filters={filters}
+            searchPlaceholder="Search reason or type..."
+            searchFn={(r, q) => `${leaveTypeMap.get(r.leave_type_id)?.name} ${r.reason}`.toLowerCase().includes(q)}
+            rowActions={staticRowActions}
+            urlSync
+          />
+        )}
+
+        {activeTab === "approvals" && (
+          <DataTable<ApproverQueueItem>
+            data={approverQueue}
+            getRowId={(r) => r.id}
+            columns={[
+              {
+                key: "requester",
+                label: "Requester",
+                accessor: (r) => r.user?.full_name || "Employee",
+              },
+              {
+                key: "period",
+                label: "Period",
+                accessor: (r) => `${r.start_date} to ${r.end_date}`,
+              },
+              {
+                key: "status",
+                label: "Status",
+                render: (r) => <Badge variant="outline">{r.status}</Badge>,
+              },
+            ]}
+            filters={approvalFilters}
+            searchPlaceholder="Search requester or leave period..."
+            searchFn={(r, q) =>
+              `${r.user?.full_name || ""} ${r.start_date} ${r.end_date} ${r.reason || ""}`.toLowerCase().includes(q)
+            }
+            rowActions={[
+              {
+                label: "Approve",
+                onClick: (r) => submitAction(r.id, "approve", ""),
+              },
+              {
+                label: "Reject",
+                variant: "destructive",
+                onClick: (r) => setRejectPrompt({ requestId: r.id }),
+              },
+            ]}
+          />
+        )}
+      </div>
+
       <LeaveDeleteConfirmDialog
         request={deleteConfirmRequest}
-        onOpenChange={() => setDeleteConfirmRequest(null)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setDeleteConfirmRequest(null)
+          }
+        }}
         onConfirm={executeDeleteRequest}
+        isDeleting={isDeleting}
       />
 
       <LeaveRejectPromptDialog
@@ -297,95 +482,38 @@ export function LeaveContent({
         }}
       />
 
-      <PageWrapper maxWidth="full" background="gradient">
-        <PageHeader
-          title="Leave Management"
-          description="All leave types are visible with explicit eligibility and evidence rules."
-          icon={CalendarDays}
-          backLink={{ href: "/profile", label: "Back to Dashboard" }}
-          actions={
-            <>
-              <ItemInfoButton
-                title="Leave page guide"
-                summary="This page helps you understand leave eligibility, your own requests, and any approvals waiting on you."
-                details={[
-                  {
-                    label: "What each area does",
-                    value:
-                      "Leave Types explains what you can apply for, My Leave Requests tracks your submissions, and Pending Reviews appears when someone else's leave needs your decision.",
-                  },
-                  {
-                    label: "Where to start",
-                    value:
-                      "Check Leave Types and Balances first, then create a new request with a clear reason, reliever, and handover note.",
-                  },
-                  {
-                    label: "What happens after submission",
-                    value:
-                      "Your request moves through the approval workflow and may pause if evidence is missing or if an approver needs a clearer handover.",
-                  },
-                ]}
-              />
-              {pendingMyReviews > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={() => approvalQueueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                >
-                  Pending Reviews ({pendingMyReviews})
-                </Button>
-              )}
-              <Button onClick={openCreateDialog} disabled={hasPendingRequest}>
-                <Plus className="mr-2 h-4 w-4" />
-                New Request
-              </Button>
-            </>
-          }
-        />
+      <LeaveRequestFormDialog
+        open={open}
+        onOpenChange={setOpen}
+        editingRequestId={editingRequestId}
+        formData={formData}
+        setFormData={setFormData}
+        leaveTypes={leaveTypes}
+        relieverOptions={relieverOptions}
+        selectedLeaveType={leaveTypeMap.get(formData.leave_type_id)}
+        selectedBalance={balanceMap.get(formData.leave_type_id)}
+        availableDays={
+          balanceMap.get(formData.leave_type_id)?.balance_days ??
+          leaveTypeMap.get(formData.leave_type_id)?.max_days ??
+          0
+        }
+        preview={addDays(formData.start_date, Number(formData.days_count))}
+        canSubmit={!!formData.leave_type_id && !!formData.start_date && !!formData.reason}
+        submitting={submitting}
+        onSubmit={handleSubmitRequest}
+      />
 
-        <LeaveTypesCard leaveTypes={leaveTypes} balanceMap={balanceMap} />
-
-        <ApprovalQueueCard ref={approvalQueueRef} approverQueue={approverQueue} onAction={handleAction} />
-
-        <LeaveRequestsCard
-          ongoingRequests={ongoingRequests}
-          historyRequests={historyRequests}
-          filteredHistoryRequests={filteredHistoryRequests}
-          requestsTab={requestsTab}
-          setRequestsTab={setRequestsTab}
-          historyFilter={historyFilter}
-          setHistoryFilter={setHistoryFilter}
-          uploadingEvidenceFor={uploadingEvidenceFor}
-          deletingRequestId={deletingRequestId}
-          isRequesterEditable={isRequesterEditable}
-          onEdit={openEditDialog}
-          onDeleteRequest={setDeleteConfirmRequest}
-          onUploadEvidence={handleUploadEvidence}
-        />
-
-        <LeaveRequestFormDialog
-          open={open}
-          onOpenChange={handleDialogOpenChange}
-          editingRequestId={editingRequestId}
-          formData={formData}
-          setFormData={setFormData}
-          leaveTypes={leaveTypes}
-          relieverOptions={relieverOptions}
-          selectedLeaveType={selectedLeaveType}
-          selectedBalance={selectedBalance}
-          availableDays={availableDays}
-          preview={preview}
-          canSubmit={!!canSubmit}
-          submitting={submitting}
-          onSubmit={handleSubmitRequest}
-        />
-
-        {hasPendingRequest && (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4" />
-            You currently have an active leave request in workflow.
-          </div>
-        )}
-      </PageWrapper>
-    </>
+      <Dialog open={isOverviewOpen} onOpenChange={setIsOverviewOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Leave Overview</DialogTitle>
+            <DialogDescription>
+              Quick guide for leave balances, request flow, and what each leave type allows.
+            </DialogDescription>
+          </DialogHeader>
+          <LeaveTypesCard leaveTypes={leaveTypes} balanceMap={balanceMap} />
+        </DialogContent>
+      </Dialog>
+    </DataTablePage>
   )
 }

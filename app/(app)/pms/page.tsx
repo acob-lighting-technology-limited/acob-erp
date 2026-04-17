@@ -1,15 +1,5 @@
 import Link from "next/link"
-import {
-  Award,
-  BookOpen,
-  Brain,
-  CheckCircle2,
-  Clock3,
-  MessageSquare,
-  ShieldCheck,
-  Target,
-  TrendingUp,
-} from "lucide-react"
+import { Award, BookOpen, Brain, CheckCircle2, Clock3, ShieldCheck, Target, TrendingUp } from "lucide-react"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -52,12 +42,6 @@ const pmsLinks = [
     description: "Open your completed reviews and acknowledgements.",
     href: "/pms/reviews",
     icon: TrendingUp,
-  },
-  {
-    title: "Peer Feedback",
-    description: "Submit peer feedback for colleagues and view scores you've received.",
-    href: "/pms/peer-feedback",
-    icon: MessageSquare,
   },
   {
     title: "Development Plans",

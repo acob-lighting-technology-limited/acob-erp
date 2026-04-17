@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AdminGoalsContent } from "./admin-goals-content"
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import type { Goal } from "@/app/(app)/goals/page"
 
 type GoalWithCycle = Goal & {
@@ -22,24 +23,20 @@ async function getAdminGoalPageData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, department, is_department_lead, lead_departments")
-    .eq("id", user.id)
-    .maybeSingle<{
-      role?: string | null
-      department?: string | null
-      is_department_lead?: boolean | null
-      lead_departments?: string[] | null
-    }>()
+  const scope = await getRequestScope()
+  if (!scope) return { redirect: "/profile" as const }
 
-  const role = String(profile?.role || "").toLowerCase()
-  const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
-  const managedDepartments = isAdminLike
-    ? (await supabase.from("departments").select("name").order("name", { ascending: true })).data?.map(
-        (row) => row.name
-      ) || []
-    : Array.from(new Set([profile?.department, ...(profile?.lead_departments || [])].filter(Boolean) as string[]))
+  const scopedDepts = getScopedDepartments(scope)
+  let managedDepartments: string[]
+
+  if (scopedDepts === null) {
+    // Global admin — all departments
+    const { data: allDepts } = await supabase.from("departments").select("name").order("name", { ascending: true })
+    managedDepartments = (allDepts || []).map((row) => row.name).filter(Boolean)
+  } else {
+    // Lead or admin in lead mode — expand aliases
+    managedDepartments = scopedDepts.length > 0 ? scopedDepts : []
+  }
 
   const [goalsResult, cyclesResult] = await Promise.all([
     managedDepartments.length > 0
@@ -62,7 +59,7 @@ async function getAdminGoalPageData() {
   return {
     goals,
     cycles,
-    canCreateGoal: isAdminLike || Boolean(profile?.is_department_lead),
+    canCreateGoal: scope.isAdminLike || scope.isDepartmentLead,
     managedDepartments,
   }
 }

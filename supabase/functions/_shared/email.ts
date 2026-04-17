@@ -12,6 +12,16 @@ type SendEmailOptions = {
   from?: string
   replyTo?: string
   attachments?: EmailAttachment[]
+  traceLabel?: string
+}
+
+type SendEmailResult = {
+  id: string
+  attempts: number
+  totalDurationMs: number
+  rateLimitWaitMs: number
+  resendApiDurationMs: number
+  retryBackoffMs: number
 }
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")
@@ -25,13 +35,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function waitForRateLimit() {
+async function waitForRateLimit(): Promise<number> {
   const now = Date.now()
   const waitMs = Math.max(0, nextAvailableSendTime - now)
   if (waitMs > 0) {
     await sleep(waitMs)
   }
   nextAvailableSendTime = Math.max(now, nextAvailableSendTime) + RATE_LIMIT_INTERVAL_MS
+  return waitMs
 }
 
 function getErrorMessage(error: unknown): string {
@@ -43,7 +54,7 @@ function getErrorMessage(error: unknown): string {
   return "Failed to send email"
 }
 
-export async function sendEmail(options: SendEmailOptions): Promise<{ id: string }> {
+export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResult> {
   if (!RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY is not configured")
   }
@@ -57,22 +68,96 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ id: string
     replyTo: options.replyTo,
     attachments: options.attachments,
   }
+  const traceLabel = options.traceLabel || payload.subject
+  const recipientsCount = payload.to.length
+  const attachmentsCount = options.attachments?.length || 0
+  const totalStartedAt = Date.now()
+  let totalRateLimitWaitMs = 0
+  let totalResendApiDurationMs = 0
+  let totalRetryBackoffMs = 0
 
   let attempt = 0
   while (attempt < MAX_ATTEMPTS) {
-    await waitForRateLimit()
+    const attemptNumber = attempt + 1
+    const attemptStartedAt = Date.now()
+    const waitMs = await waitForRateLimit()
+    totalRateLimitWaitMs += waitMs
 
+    if (waitMs > 0) {
+      console.log(
+        `[email][${traceLabel}] rate-limit wait`,
+        JSON.stringify({
+          attempt: attemptNumber,
+          wait_ms: waitMs,
+          next_available_send_time: nextAvailableSendTime,
+        })
+      )
+    }
+
+    const resendStartedAt = Date.now()
     const { data, error } = await resend.emails.send(payload)
+    const resendApiDurationMs = Date.now() - resendStartedAt
+    totalResendApiDurationMs += resendApiDurationMs
+    const attemptDurationMs = Date.now() - attemptStartedAt
+
     if (!error && data?.id) {
-      return { id: data.id }
+      const totalDurationMs = Date.now() - totalStartedAt
+      console.log(
+        `[email][${traceLabel}] send success`,
+        JSON.stringify({
+          recipients_count: recipientsCount,
+          attachments_count: attachmentsCount,
+          attempt: attemptNumber,
+          attempt_duration_ms: attemptDurationMs,
+          resend_api_duration_ms: resendApiDurationMs,
+          total_duration_ms: totalDurationMs,
+          total_rate_limit_wait_ms: totalRateLimitWaitMs,
+          total_retry_backoff_ms: totalRetryBackoffMs,
+          email_id: data.id,
+        })
+      )
+
+      return {
+        id: data.id,
+        attempts: attemptNumber,
+        totalDurationMs,
+        rateLimitWaitMs: totalRateLimitWaitMs,
+        resendApiDurationMs: totalResendApiDurationMs,
+        retryBackoffMs: totalRetryBackoffMs,
+      }
     }
 
     attempt += 1
     if (attempt >= MAX_ATTEMPTS) {
+      console.error(
+        `[email][${traceLabel}] send failed`,
+        JSON.stringify({
+          recipients_count: recipientsCount,
+          attachments_count: attachmentsCount,
+          attempts: attempt,
+          attempt_duration_ms: attemptDurationMs,
+          resend_api_duration_ms: resendApiDurationMs,
+          total_duration_ms: Date.now() - totalStartedAt,
+          total_rate_limit_wait_ms: totalRateLimitWaitMs,
+          total_retry_backoff_ms: totalRetryBackoffMs,
+          error: getErrorMessage(error),
+        })
+      )
       throw new Error(getErrorMessage(error))
     }
 
-    await sleep(500 * 2 ** (attempt - 1))
+    const retryBackoffMs = 500 * 2 ** (attempt - 1)
+    totalRetryBackoffMs += retryBackoffMs
+    console.warn(
+      `[email][${traceLabel}] retry scheduled`,
+      JSON.stringify({
+        next_attempt: attempt + 1,
+        retry_backoff_ms: retryBackoffMs,
+        resend_api_duration_ms: resendApiDurationMs,
+        error: getErrorMessage(error),
+      })
+    )
+    await sleep(retryBackoffMs)
   }
 
   throw new Error("Failed to send email")

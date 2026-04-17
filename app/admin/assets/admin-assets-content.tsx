@@ -1223,6 +1223,15 @@ export function AdminAssetsContent({
   const officeOptions = Array.from(new Set(assets.map((asset) => asset.office_location).filter(Boolean) as string[]))
     .sort()
     .map((office) => ({ value: office, label: office }))
+  const employeeOptions = employees
+    .map((employee) => {
+      const fullName = `${formatName(employee.first_name)} ${formatName(employee.last_name)}`.trim()
+      return {
+        value: employee.id,
+        label: fullName || employee.company_email || "Unknown employee",
+      }
+    })
+    .sort((a, b) => a.label.localeCompare(b.label))
   const yearOptions = Array.from(new Set(assets.map((asset) => String(asset.acquisition_year))))
     .sort()
     .map((year) => ({ value: year, label: year }))
@@ -1241,7 +1250,7 @@ export function AdminAssetsContent({
       key: "asset_type",
       label: "Asset Type",
       sortable: true,
-      accessor: (asset) => ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type,
+      accessor: (asset) => asset.asset_type,
       render: (asset) => <span>{ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}</span>,
       resizable: true,
       initialWidth: 180,
@@ -1335,6 +1344,20 @@ export function AdminAssetsContent({
       placeholder: "All Asset Types",
     },
     {
+      key: "employee",
+      label: "Employee",
+      options: employeeOptions,
+      placeholder: "All Employees",
+      mode: "custom",
+      filterFn: (asset, values) => {
+        if (values.length === 0) return true
+        const assignmentType = getEffectiveAssignmentType(asset)
+        if (assignmentType === "department" || assignmentType === "office") return false
+        const assignedTo = asset.current_assignment?.assigned_to || ""
+        return assignedTo ? values.includes(assignedTo) : false
+      },
+    },
+    {
       key: "department",
       label: "Department",
       options: departmentOptions,
@@ -1363,21 +1386,6 @@ export function AdminAssetsContent({
       placeholder: "All Years",
       mode: "custom",
       filterFn: (asset, values) => values.length === 0 || values.includes(String(asset.acquisition_year)),
-    },
-    {
-      key: "issue_state",
-      label: "Issue State",
-      options: [
-        { value: "with_issues", label: "With Issues" },
-        { value: "clean", label: "No Issues" },
-      ],
-      placeholder: "All Issue States",
-      mode: "custom",
-      filterFn: (asset, values) => {
-        if (values.length === 0) return true
-        const hasIssues = (asset.unresolved_issues_count || 0) > 0
-        return values.some((value) => (value === "with_issues" ? hasIssues : !hasIssues))
-      },
     },
   ]
 

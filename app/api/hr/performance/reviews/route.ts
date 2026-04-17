@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { computeIndividualPerformanceScore } from "@/lib/performance/scoring"
 import { getUnifiedPerformanceReviews } from "@/lib/performance/review-data"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 
 const log = logger("hr-performance-reviews")
 
@@ -78,6 +79,7 @@ type ReviewRow = {
 type ReviewStatusRow = {
   id: string
   user_id: string
+
   status: string | null
   employee_comments?: string | null
   self_review_completed?: boolean | null
@@ -129,37 +131,53 @@ export async function GET(request: NextRequest) {
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 50, 1), 200) : 50
     const offset = offsetParam ? Math.max(parseInt(offsetParam, 10) || 0, 0) : 0
 
+    // Resolve scope from middleware header (single source of truth)
+    const scope = await getRequestScope()
+    if (!scope) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+    const scopedDepts = getScopedDepartments(scope)
+
+    // When requesting another user's review, verify that user is in our dept scope
     if (userId && userId !== user.id) {
-      const [{ data: profile }, { data: targetProfile }] = await Promise.all([
-        supabase
+      if (scopedDepts !== null) {
+        // Not global admin — verify target user is in scoped departments
+        const { data: targetProfile } = await supabase
           .from("profiles")
-          .select("role, department, is_department_lead, lead_departments")
-          .eq("id", user.id)
-          .single<{
-            role?: string | null
-            department?: string | null
-            is_department_lead?: boolean | null
-            lead_departments?: string[] | null
-          }>(),
-        supabase.from("profiles").select("department").eq("id", userId).single<{ department?: string | null }>(),
-      ])
+          .select("department")
+          .eq("id", userId)
+          .single<{ department?: string | null }>()
 
-      const role = String(profile?.role || "").toLowerCase()
-      const isAdmin = ["developer", "admin", "super_admin"].includes(role)
-      const managedDepartments = Array.isArray(profile?.lead_departments) ? profile.lead_departments : []
-      const canLeadTarget =
-        profile?.is_department_lead === true &&
-        Boolean(
-          targetProfile?.department &&
-            (targetProfile.department === profile.department || managedDepartments.includes(targetProfile.department))
-        )
-
-      if (!isAdmin && !canLeadTarget) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        const targetDept = targetProfile?.department || ""
+        if (!scopedDepts.includes(targetDept)) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
       }
     }
 
-    const { reviews, total } = await getUnifiedPerformanceReviews(supabase, { userId, cycleId, limit, offset })
+    // Resolve scoped user IDs for the list view (no userId filter)
+    let scopedUserIds: string[] | null = null
+    if (!userId && scopedDepts !== null) {
+      // Scoped — resolve the users in managed departments
+      if (scopedDepts.length > 0) {
+        const { data: deptUsers } = await supabase.from("profiles").select("id").in("department", scopedDepts)
+        scopedUserIds = (deptUsers || []).map((p) => p.id)
+      } else {
+        scopedUserIds = [] // empty scope — return nothing
+      }
+    }
+
+    // If we resolved an empty scope, return empty result immediately
+    if (scopedUserIds !== null && scopedUserIds.length === 0) {
+      return NextResponse.json({ data: [], meta: { total: 0, limit, offset, hasMore: false } })
+    }
+
+    const { reviews, total } = await getUnifiedPerformanceReviews(supabase, {
+      userId,
+      cycleId,
+      limit,
+      offset,
+      userIds: scopedUserIds ?? undefined,
+    })
     return NextResponse.json({
       data: reviews,
       meta: { total, limit, offset, hasMore: offset + reviews.length < total },

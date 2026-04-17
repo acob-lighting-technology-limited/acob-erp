@@ -30,6 +30,13 @@ const VALID_HD_TRANSITIONS: Record<string, string[]> = {
   rejected: ["new"],
   pending_lead_review: ["department_queue", "assigned", "cancelled"],
 }
+const DEPARTMENT_WORKFLOW_STATUSES = new Set([
+  "department_queue",
+  "department_assigned",
+  "pending_lead_review",
+  "pending_approval",
+  "approved_for_procurement",
+])
 const UpdateHelpDeskTicketSchema = z.object({
   status: z.enum(HELP_DESK_STATUSES).optional(),
   status_note: z.string().optional().nullable(),
@@ -127,11 +134,23 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       canLeadDepartment(profile, ticket.service_department) ||
       canLeadDepartment(profile, ticket.requester_department) ||
       ticket.assigned_to === user.id
+    const canLeadWorkflow =
+      isAdminRole(profile.role) ||
+      canLeadDepartment(profile, ticket.service_department) ||
+      canLeadDepartment(profile, ticket.requester_department)
+    const isDepartmentTicket =
+      String(ticket.handling_mode || "") === "queue" || DEPARTMENT_WORKFLOW_STATUSES.has(String(ticket.status || ""))
 
     const canRateTicket = ticket.requester_id === user.id
 
     if (nextStatus && !canManageWorkflow) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    if (nextStatus && isDepartmentTicket && !canLeadWorkflow) {
+      return NextResponse.json(
+        { error: "Department help desk tickets can only be updated by leads/admin from Admin Help Desk" },
+        { status: 403 }
+      )
     }
 
     const updates: Record<string, unknown> = {}
@@ -150,7 +169,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         const taskId = String(ticket.task_id || "")
         if (!taskId) {
           return NextResponse.json(
-            { error: "This help desk item must be linked to a task before work can continue" },
+            { error: "This help desk item must be linked to a department goal before work can continue" },
             { status: 400 }
           )
         }
@@ -163,7 +182,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
         if (!linkedTask?.goal_id) {
           return NextResponse.json(
-            { error: "Link this help desk task to a department goal before starting or resolving it" },
+            { error: "Link this help desk item to a department goal before starting or resolving it" },
             { status: 400 }
           )
         }

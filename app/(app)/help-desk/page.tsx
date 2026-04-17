@@ -12,6 +12,10 @@ type DepartmentRow = {
   name: string | null
 }
 
+type CommentCountRow = {
+  ticket_id: string | null
+}
+
 type HelpDeskPageData =
   | {
       redirectTo: "/auth/login"
@@ -36,25 +40,66 @@ async function getData() {
     return { redirectTo: "/auth/login" as const }
   }
 
-  const { data: tickets, error } = await dataClient
-    .from("help_desk_tickets")
-    .select("*")
-    .or(`requester_id.eq.${user.id},assigned_to.eq.${user.id},created_by.eq.${user.id}`)
-    .order("created_at", { ascending: false })
-
   const { data: profile } = await dataClient
     .from("profiles")
     .select("department, role, is_department_lead")
     .eq("id", user.id)
     .maybeSingle()
+
+  const { data: personalTickets, error: personalError } = await dataClient
+    .from("help_desk_tickets")
+    .select("*")
+    .or(`requester_id.eq.${user.id},assigned_to.eq.${user.id},created_by.eq.${user.id}`)
+    .order("created_at", { ascending: false })
+
+  const { data: departmentTickets, error: departmentError } = profile?.department
+    ? await dataClient
+        .from("help_desk_tickets")
+        .select("*")
+        .eq("service_department", profile.department)
+        .in("handling_mode", ["queue", "department"])
+        .order("created_at", { ascending: false })
+    : { data: [], error: null }
+
+  const mergedTickets = Array.from(
+    new Map([...(personalTickets || []), ...(departmentTickets || [])].map((ticket) => [ticket.id, ticket])).values()
+  ) as HelpDeskTicket[]
+
+  const goalIds = Array.from(
+    new Set(
+      mergedTickets
+        .map((ticket) => String((ticket as { goal_id?: string | null }).goal_id || "").trim())
+        .filter(Boolean)
+    )
+  )
+  const { data: goalsData } =
+    goalIds.length > 0
+      ? await dataClient.from("goals_objectives").select("id, title").in("id", goalIds)
+      : { data: [] as Array<{ id: string; title: string }> }
+  const goalTitleById = new Map(
+    ((goalsData as Array<{ id: string; title: string }> | null) || []).map((goal) => [goal.id, goal.title])
+  )
+
+  const ticketIds = mergedTickets.map((ticket) => ticket.id)
+  const { data: commentRows } =
+    ticketIds.length > 0
+      ? await dataClient.from("help_desk_comments").select("ticket_id").in("ticket_id", ticketIds)
+      : { data: [] }
+  const commentCountMap = new Map<string, number>()
+  for (const row of (commentRows as CommentCountRow[] | null) || []) {
+    const ticketId = String(row.ticket_id || "")
+    if (!ticketId) continue
+    commentCountMap.set(ticketId, (commentCountMap.get(ticketId) || 0) + 1)
+  }
+
   const { data: departmentRows } = await dataClient
     .from("departments")
     .select("name")
     .eq("is_active", true)
     .order("name", { ascending: true })
 
-  if (error) {
-    log.error("Error loading help desk tickets:", error)
+  if (personalError || departmentError) {
+    log.error("Error loading help desk tickets:", personalError || departmentError)
   }
 
   return {
@@ -66,8 +111,17 @@ async function getData() {
     initialDepartments: ((departmentRows as DepartmentRow[] | null) || [])
       .map((row) => String(row.name || "").trim())
       .filter(Boolean),
-    tickets: (tickets as HelpDeskTicket[] | null) || [],
-    loadError: error ? `Failed to load help desk tickets: ${error.message}` : null,
+    tickets: mergedTickets.map((ticket) => ({
+      ...ticket,
+      comment_count: commentCountMap.get(ticket.id) || 0,
+      goal_title: (ticket as { goal_id?: string | null }).goal_id
+        ? goalTitleById.get(String((ticket as { goal_id?: string | null }).goal_id || "")) || null
+        : null,
+    })),
+    loadError:
+      personalError || departmentError
+        ? `Failed to load help desk tickets: ${(personalError || departmentError)?.message}`
+        : null,
   } satisfies HelpDeskPageData
 }
 

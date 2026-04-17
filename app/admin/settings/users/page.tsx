@@ -1,44 +1,55 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, Search, Filter, Shield, UserPlus } from "lucide-react"
+import { Users, Shield, UserPlus, Pencil } from "lucide-react"
 import { toast } from "sonner"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
 import { StatCard } from "@/components/ui/stat-card"
-import { ListToolbar } from "@/components/ui/patterns"
 import { useSearchParams } from "next/navigation"
 import { logger } from "@/lib/logger"
 import { isValidRole } from "./_lib/role-helpers"
 import { fetchUsersSettingsData, fetchAllUsersForPicker, formatDate, type User } from "./_lib/queries"
 import { EditUserDialog } from "./_components/edit-user-dialog"
 import { AddUserToRoleDialog } from "./_components/add-user-to-role-dialog"
-import { UsersTable } from "./_components/users-table"
 import { InviteUserDialog } from "./_components/invite-user-dialog"
 import { getAssignableRolesForActor } from "@/lib/role-management"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 
 const log = logger("settings-users")
+
+const ROLE_COLORS: Record<string, "destructive" | "default" | "secondary"> = {
+  developer: "destructive",
+  super_admin: "destructive",
+  admin: "default",
+  employee: "secondary",
+  visitor: "secondary",
+}
 
 export default function UsersPage() {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [roleFilter, setRoleFilter] = useState<string>("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({ role: "", employment_status: "active", admin_domains: [] as string[] })
   const [isInviteOpen, setIsInviteOpen] = useState(searchParams.get("invite") === "1")
+  const [roleFilter, setRoleFilter] = useState<string>("all")
 
-  const { data: settingsData, isLoading: loading } = useQuery({
+  const {
+    data: settingsData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: QUERY_KEYS.adminUsersSettings(),
     queryFn: fetchUsersSettingsData,
   })
 
-  const users: User[] = settingsData?.users ?? []
+  const users = useMemo(() => settingsData?.users ?? [], [settingsData?.users])
   const currentUserRole: string = settingsData?.currentUserRole ?? ""
 
   useEffect(() => {
@@ -85,18 +96,102 @@ export default function UsersPage() {
     setIsDialogOpen(true)
   }
 
-  const filtered = users.filter((u) => {
-    const name = `${u.first_name || ""} ${u.last_name || ""} ${u.email || ""}`.toLowerCase()
-    return name.includes(searchQuery.toLowerCase()) && (roleFilter === "all" || u.role === roleFilter)
-  })
+  const columns: DataTableColumn<User>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        resizable: true,
+        initialWidth: 200,
+        accessor: (u) => `${u.first_name || ""} ${u.last_name || ""}`.trim(),
+        render: (u) => (
+          <span className="font-medium">
+            {u.first_name || u.last_name ? `${u.first_name || ""} ${u.last_name || ""}`.trim() : "—"}
+          </span>
+        ),
+      },
+      {
+        key: "email",
+        label: "Email",
+        sortable: true,
+        accessor: (u) => u.email || "",
+        render: (u) => <span className="text-muted-foreground">{u.email || "—"}</span>,
+      },
+      {
+        key: "role",
+        label: "Role",
+        sortable: true,
+        accessor: (u) => u.role,
+        render: (u) => (
+          <Badge variant={ROLE_COLORS[u.role] || "secondary"} className="capitalize">
+            {u.role?.replace("_", " ")}
+          </Badge>
+        ),
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (u) => u.department || "",
+        render: (u) => <span className="text-muted-foreground">{u.department || "—"}</span>,
+        hideOnMobile: true,
+      },
+      {
+        key: "status",
+        label: "Status",
+        accessor: (u) => (u.employment_status === "separated" ? "Separated" : u.is_active ? "Active" : "Inactive"),
+        render: (u) => (
+          <Badge variant={u.is_active ? "default" : "secondary"}>
+            {u.employment_status === "separated" ? "Separated" : u.is_active ? "Active" : "Inactive"}
+          </Badge>
+        ),
+      },
+      {
+        key: "created_at",
+        label: "Joined",
+        sortable: true,
+        accessor: (u) => u.created_at,
+        render: (u) => <span className="text-sm">{formatDate(u.created_at)}</span>,
+        hideOnMobile: true,
+      },
+    ],
+    []
+  )
 
-  const stats = {
-    total: users.length,
-    active: users.filter((u) => u.is_active).length,
-    admins: users.filter((u) => ["developer", "admin", "super_admin"].includes(u.role)).length,
-  }
+  const roles = useMemo(() => Array.from(new Set(users.map((u) => u.role))).sort(), [users])
 
-  const roles = Array.from(new Set(users.map((u) => u.role)))
+  const filters: DataTableFilter<User>[] = useMemo(
+    () => [
+      {
+        key: "role",
+        label: "Role",
+        options: roles.map((r) => ({ value: r, label: r.replace("_", " ") })),
+        placeholder: "All Roles",
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "Active", label: "Active" },
+          { value: "Inactive", label: "Inactive" },
+          { value: "Separated", label: "Separated" },
+        ],
+        placeholder: "All Statuses",
+      },
+    ],
+    [roles]
+  )
+
+  const stats = useMemo(
+    () => ({
+      total: users.length,
+      active: users.filter((u) => u.is_active).length,
+      admins: users.filter((u) => ["developer", "admin", "super_admin"].includes(u.role)).length,
+    }),
+    [users]
+  )
+
   const roleOptions = getAssignableRolesForActor(currentUserRole)
 
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false)
@@ -142,66 +237,110 @@ export default function UsersPage() {
   }
 
   return (
-    <AdminTablePage
+    <DataTablePage
       title="User Management"
       description="Manage user accounts and roles."
       icon={Users}
-      backLinkHref="/admin/settings"
-      backLinkLabel="Back to Settings"
+      backLink={{ href: "/admin/settings", label: "Back to Settings" }}
       actions={
         <div className="flex gap-2">
           {roleFilter !== "all" && (
-            <Button onClick={openAddUserDialog} variant="secondary">
+            <Button onClick={openAddUserDialog} variant="secondary" size="sm">
               <UserPlus className="mr-2 h-4 w-4" />
               Add User to {roleFilter.replace("_", " ")}
             </Button>
           )}
-          <Button onClick={() => setIsInviteOpen(true)}>
+          <Button onClick={() => setIsInviteOpen(true)} size="sm">
             <UserPlus className="mr-2 h-4 w-4" />
             Invite User
           </Button>
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4">
-          <StatCard title="Total Users" value={stats.total} icon={Users} />
-          <StatCard title="Active" value={stats.active} icon={Users} />
-          <StatCard title="Admins" value={stats.admins} icon={Shield} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            title="Total Users"
+            value={stats.total}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Active"
+            value={stats.active}
+            icon={Users}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Admins"
+            value={stats.admins}
+            icon={Shield}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
         </div>
       }
-      filters={
-        <ListToolbar
-          search={
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search by name or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          }
-          filters={
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                {roles.map((r) => (
-                  <SelectItem key={r} value={r} className="capitalize">
-                    {r.replace("_", " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          }
-        />
-      }
     >
-      <UsersTable users={filtered} loading={loading} onEdit={openEdit} formatDate={formatDate} />
+      <DataTable<User>
+        data={users}
+        columns={columns}
+        getRowId={(u) => u.id}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={refetch}
+        searchPlaceholder="Search by name or email..."
+        searchFn={(u, q) =>
+          `${u.first_name} ${u.last_name} ${u.email}`.toLowerCase().includes(q) ||
+          u.department?.toLowerCase().includes(q) ||
+          false
+        }
+        filters={filters}
+        rowActions={[
+          {
+            label: "Edit User",
+            icon: Pencil,
+            onClick: openEdit,
+          },
+        ]}
+        viewToggle
+        cardRenderer={(u) => (
+          <Card className="transition-shadow hover:shadow-md">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="leading-tight font-semibold">
+                    {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email || "Unknown"}
+                  </p>
+                  <p className="text-muted-foreground mt-0.5 text-xs">{u.email}</p>
+                </div>
+                <Badge variant={u.is_active ? "default" : "secondary"}>
+                  {u.employment_status === "separated" ? "Separated" : u.is_active ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant={ROLE_COLORS[u.role] || "secondary"} className="capitalize">
+                  {u.role?.replace("_", " ")}
+                </Badge>
+                {u.department && (
+                  <Badge variant="outline" className="border-2 font-normal">
+                    {u.department}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" size="sm" onClick={() => openEdit(u)} className="h-8">
+                  <Pencil className="mr-2 h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        urlSync
+      />
 
       <EditUserDialog
         open={isDialogOpen}
@@ -230,6 +369,6 @@ export default function UsersPage() {
         roleOptions={roleOptions}
         queryClient={queryClient}
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }

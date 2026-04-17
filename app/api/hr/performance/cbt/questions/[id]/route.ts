@@ -21,7 +21,7 @@ const UpdateSchema = z.object({
 type AccessProfile = { role?: string | null }
 
 function canManageQuestions(role: string | null | undefined) {
-  return ["developer", "super_admin"].includes(String(role || "").toLowerCase())
+  return ["developer", "super_admin", "admin"].includes(String(role || "").toLowerCase())
 }
 
 async function getAuthorizedContext() {

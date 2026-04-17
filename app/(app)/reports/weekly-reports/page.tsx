@@ -1,26 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
-import { toast } from "sonner"
-import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
-import { FileBarChart } from "lucide-react"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
+import { CalendarDays, Download, FileBarChart, FileSpreadsheet, Plus } from "lucide-react"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { WeeklyReportDialog } from "@/components/dashboard/reports/weekly-report-dialog"
-import { WeeklyReportFilters } from "./_components/weekly-report-filters"
-import {
+  autoNumberLines,
   exportAllToPPTX,
   sortReportsByDepartment,
   type WeeklyDeptOrder,
@@ -28,16 +19,20 @@ import {
   type WeeklyPptxTheme,
   type WeeklyReport,
 } from "@/lib/export-utils"
+import { WeeklyReportDialog } from "@/components/dashboard/reports/weekly-report-dialog"
+import { Button } from "@/components/ui/button"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { downloadWeeklyReportPdf } from "@/lib/reports/export-download"
+import { Badge } from "@/components/ui/badge"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { ReportTable } from "./_components/report-table"
 import { PptxModeDialog } from "./_components/pptx-mode-dialog"
-import { ReportExportActions } from "./_components/report-export-actions"
 
 interface UserProfile {
   id: string
   department: string | null
   role: string
   is_department_lead: boolean
+  lead_departments?: string[] | null
 }
 
 interface ReportDialogParams {
@@ -46,130 +41,160 @@ interface ReportDialogParams {
   dept?: string
 }
 
-async function fetchProfileAndDepts(supabase: ReturnType<typeof createClient>) {
+interface TrackerStatus {
+  id: string
+  department: string
+  status: string
+}
+
+interface WeeklyReportsData {
+  reports: WeeklyReport[]
+  trackingData: TrackerStatus[]
+}
+
+async function fetchProfileAndDepartments(supabase: ReturnType<typeof createClient>) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return { profile: null, allDepartments: [] }
 
-  const { data: p } = await supabase
+  if (!user) {
+    return { profile: null as UserProfile | null, allDepartments: [] as string[] }
+  }
+
+  const { data: profileData } = await supabase
     .from("profiles")
-    .select("id, department, role, is_department_lead")
+    .select("id, department, role, is_department_lead, lead_departments")
     .eq("id", user.id)
     .single()
 
-  const { data: depts } = await supabase.from("profiles").select("department").not("department", "is", null)
-  const uniqueDepts = Array.from(new Set((depts || []).map((d) => d.department).filter(Boolean))) as string[]
+  const { data: departmentsData } = await supabase.from("profiles").select("department").not("department", "is", null)
 
-  return { profile: p as UserProfile | null, allDepartments: uniqueDepts.sort() }
+  const allDepartments = Array.from(
+    new Set(
+      (departmentsData || [])
+        .map((row) => row.department)
+        .filter((department): department is string => Boolean(department))
+    )
+  ).sort((a, b) => a.localeCompare(b))
+
+  return {
+    profile: profileData as UserProfile | null,
+    allDepartments,
+  }
 }
 
-async function fetchReports(
+async function fetchWeeklyReports(
   supabase: ReturnType<typeof createClient>,
-  profile: UserProfile | null,
-  weekFilter: number,
-  yearFilter: number,
+  week: number,
+  year: number,
   deptFilter: string
-): Promise<WeeklyReport[]> {
-  if (!profile) return []
-
+): Promise<WeeklyReportsData> {
   let query = supabase
     .from("weekly_reports")
-    .select("*, profiles:user_id ( first_name, last_name )")
+    .select(
+      "id, department, week_number, year, work_done, tasks_new_week, challenges, status, user_id, created_at, profiles(first_name, last_name)"
+    )
     .eq("status", "submitted")
-    .eq("week_number", weekFilter)
-    .eq("year", yearFilter)
+    .eq("week_number", week)
+    .eq("year", year)
     .order("department", { ascending: true })
 
   if (deptFilter !== "all") {
     query = query.eq("department", deptFilter)
   }
 
-  const { data, error } = await query
+  const { data: reportsData, error } = await query
   if (error) throw new Error(error.message)
-  return sortReportsByDepartment(data || [])
+
+  const reports = sortReportsByDepartment((reportsData || []) as WeeklyReport[])
+  const departments = Array.from(new Set(reports.map((report) => report.department))).filter(Boolean)
+
+  if (departments.length === 0) {
+    return { reports, trackingData: [] }
+  }
+
+  const { data: tasksData, error: tasksError } = await supabase
+    .from("tasks")
+    .select("id, department, status")
+    .eq("category", "weekly_action")
+    .eq("week_number", week)
+    .eq("year", year)
+    .in("department", departments)
+
+  if (tasksError) {
+    return { reports, trackingData: [] }
+  }
+
+  return {
+    reports,
+    trackingData: (tasksData || []) as TrackerStatus[],
+  }
+}
+
+function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
+  const deptActions = trackingData.filter((action) => action.department === department)
+  if (deptActions.length === 0) {
+    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+  }
+  if (deptActions.every((action) => action.status === "completed")) {
+    return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
+  }
+  if (deptActions.some((action) => action.status === "in_progress" || action.status === "completed")) {
+    return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
+  }
+  if (deptActions.some((action) => action.status === "not_started")) {
+    return { label: "Not Started", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" }
+  }
+  return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
 }
 
 export default function WeeklyReportsPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [deptFilter, setDeptFilter] = useState("all")
-  const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
   const [weekFilter, setWeekFilter] = useState(currentOfficeWeek.week)
+  const [yearFilter, setYearFilter] = useState(currentOfficeWeek.year)
+  const [deptFilter, setDeptFilter] = useState("all")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedReportParams, setSelectedReportParams] = useState<ReportDialogParams | null>(null)
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [pptxModeDialogOpen, setPptxModeDialogOpen] = useState(false)
   const [pendingPptxExport, setPendingPptxExport] = useState<
     { kind: "single"; report: WeeklyReport } | { kind: "all" } | null
   >(null)
-  const [isFilteredWeekLocked, setIsFilteredWeekLocked] = useState(false)
-  const [meetingDate, setMeetingDate] = useState<string | undefined>(undefined)
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
+  const [exportTarget, setExportTarget] = useState<{ kind: "all" } | { kind: "single"; report: WeeklyReport }>({
+    kind: "all",
+  })
 
   const supabase = createClient()
   const queryClient = useQueryClient()
 
   const { data: profileData } = useQuery({
     queryKey: ["portal-weekly-reports-profile"],
-    queryFn: () => fetchProfileAndDepts(supabase),
+    queryFn: () => fetchProfileAndDepartments(supabase),
   })
 
   const profile = profileData?.profile ?? null
-  const allDepartments = profileData?.allDepartments ?? []
+  const allDepartments = useMemo(() => profileData?.allDepartments ?? [], [profileData?.allDepartments])
 
   const {
-    data: reports = [],
-    isLoading: loading,
-    refetch: refetchReports,
+    data: reportsData,
+    isLoading,
+    refetch,
+    error,
   } = useQuery({
     queryKey: QUERY_KEYS.weeklyReports({ week: weekFilter, year: yearFilter, dept: deptFilter }),
-    queryFn: () => fetchReports(supabase, profile, weekFilter, yearFilter, deptFilter),
-    enabled: !!profile,
+    queryFn: () => fetchWeeklyReports(supabase, weekFilter, yearFilter, deptFilter),
+    enabled: Boolean(profile),
   })
 
-  useEffect(() => {
-    const loadFilteredWeekLock = async () => {
-      const state = await fetchWeeklyReportLockState(supabase, weekFilter, yearFilter)
-      setIsFilteredWeekLocked(state.isLocked)
-      setMeetingDate(state.meetingDate || undefined)
-    }
-    loadFilteredWeekLock()
-  }, [supabase, weekFilter, yearFilter])
+  const reports = useMemo(() => reportsData?.reports ?? [], [reportsData?.reports])
+  const trackingData = useMemo(() => reportsData?.trackingData ?? [], [reportsData?.trackingData])
 
-  const handleDelete = async (id: string) => {
-    const target = reports.find((r) => r.id === id)
-    if (target) {
-      const lock = await fetchWeeklyReportLockState(supabase, target.week_number, target.year)
-      if (lock.isLocked) {
-        toast.error("This report week is locked. Delete is no longer allowed.")
-        return
-      }
-    }
-    try {
-      const { error } = await supabase.from("weekly_reports").delete().eq("id", id)
-      if (error) throw error
-      toast.success("Report deleted")
-      queryClient.invalidateQueries({
-        queryKey: QUERY_KEYS.weeklyReports({ week: weekFilter, year: yearFilter, dept: deptFilter }),
-      })
-    } catch {
-      toast.error("Failed to delete report")
-    }
-  }
+  const { data: lockState } = useQuery({
+    queryKey: ["portal-weekly-report-lock", weekFilter, yearFilter],
+    queryFn: () => fetchWeeklyReportLockState(supabase, weekFilter, yearFilter),
+  })
 
-  const toggleRow = (id: string) => {
-    const next = new Set(expandedRows)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setExpandedRows(next)
-  }
-
-  const filteredReports = reports.filter(
-    (r) =>
-      r.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.work_done?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const meetingDate = lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)
 
   const openAllPptxModeDialog = () => {
     setPendingPptxExport({ kind: "all" })
@@ -187,76 +212,354 @@ export default function WeeklyReportsPortal() {
     order: WeeklyDeptOrder = "default"
   ) => {
     if (!pendingPptxExport) return
+
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(filteredReports, weekFilter, yearFilter, mode, theme, meetingDate, order)
+      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, meetingDate, order)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
       await exportToPPTX(pendingPptxExport.report, mode, theme, meetingDate)
     }
+
     setPptxModeDialogOpen(false)
     setPendingPptxExport(null)
   }
 
-  const isLead =
-    Boolean(profile?.is_department_lead) || ["admin", "super_admin", "developer"].includes(profile?.role || "")
+  const stats = useMemo(() => {
+    const total = reports.length
+    const withTrackerStarted = reports.filter((report) => {
+      const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+      return trackerStatus.label === "Started" || trackerStatus.label === "Finished"
+    }).length
+    const finished = reports.filter(
+      (report) => getActionTrackerStatus(report.department, trackingData).label === "Finished"
+    ).length
+    const locked = lockState?.isLocked ? reports.length : 0
+    return { total, withTrackerStarted, finished, locked }
+  }, [lockState?.isLocked, reports, trackingData])
+
+  const trackerStatusOptions = useMemo(
+    () => [
+      { value: "Pending", label: "Pending" },
+      { value: "Started", label: "Started" },
+      { value: "Finished", label: "Finished" },
+      { value: "Not Started", label: "Not Started" },
+    ],
+    []
+  )
+
+  const columns = useMemo<DataTableColumn<WeeklyReport>[]>(
+    () => [
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (report) => report.department,
+        resizable: true,
+        initialWidth: 180,
+      },
+      {
+        key: "meeting_date",
+        label: "Meeting Date",
+        sortable: true,
+        accessor: () => meetingDate,
+        render: () => {
+          const date = new Date(`${meetingDate}T00:00:00`)
+          if (Number.isNaN(date.getTime())) return "-"
+          return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+        },
+      },
+      {
+        key: "week_number",
+        label: "Week",
+        sortable: true,
+        accessor: (report) => report.week_number,
+        render: (report) => <span className="font-medium">{`W${report.week_number}`}</span>,
+      },
+      {
+        key: "year",
+        label: "Year",
+        sortable: true,
+        accessor: (report) => report.year,
+      },
+      {
+        key: "submitted_by",
+        label: "Submitted By",
+        sortable: true,
+        accessor: (report) => {
+          const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+          return profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
+        },
+        render: (report) => {
+          const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+          return profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
+        },
+      },
+      {
+        key: "created_at",
+        label: "Submission Date",
+        sortable: true,
+        accessor: (report) => report.created_at,
+        render: (report) =>
+          new Date(report.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      },
+      {
+        key: "tracker_status",
+        label: "Action Tracker",
+        sortable: true,
+        accessor: (report) => getActionTrackerStatus(report.department, trackingData).label,
+        render: (report) => {
+          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
+        },
+      },
+    ],
+    [meetingDate, trackingData]
+  )
+
+  const filters = useMemo<DataTableFilter<WeeklyReport>[]>(
+    () => [
+      {
+        key: "week_number",
+        label: "Week",
+        options: Array.from({ length: 53 }, (_, index) => {
+          const week = index + 1
+          return { value: String(week), label: `Week ${week}` }
+        }),
+        multi: false,
+        placeholder: `Week ${weekFilter}`,
+      },
+      {
+        key: "year",
+        label: "Year",
+        options: [
+          currentOfficeWeek.year - 1,
+          currentOfficeWeek.year,
+          currentOfficeWeek.year + 1,
+          currentOfficeWeek.year + 2,
+        ].map((year) => ({
+          value: String(year),
+          label: String(year),
+        })),
+        multi: false,
+        placeholder: String(yearFilter),
+      },
+      {
+        key: "department",
+        label: "Department",
+        options: allDepartments.map((department) => ({ value: department, label: department })),
+        multi: false,
+        placeholder: "Every Department",
+      },
+      {
+        key: "tracker_status",
+        label: "Action Tracker",
+        options: trackerStatusOptions,
+      },
+    ],
+    [allDepartments, currentOfficeWeek.year, trackerStatusOptions, weekFilter, yearFilter]
+  )
 
   return (
-    <AdminTablePage
-      title="Weekly Departmental Reports"
-      description="Browse weekly updates and progress from all departments"
+    <DataTablePage
+      title="Weekly Reports"
+      description="Review and export departmental reports."
       icon={FileBarChart}
-      backLinkHref="/reports"
-      backLinkLabel="Back to Reports"
-      actionsPlacement="below"
+      backLink={{ href: "/reports/general-meeting", label: "Back to General Meeting" }}
       actions={
-        <ReportExportActions
-          filteredReports={filteredReports}
-          weekFilter={weekFilter}
-          yearFilter={yearFilter}
-          meetingDate={meetingDate}
-          isLead={isLead}
-          onOpenPptxDialog={openAllPptxModeDialog}
-          onSubmitNew={() => {
-            setSelectedReportParams({ week: weekFilter, year: yearFilter, dept: profile?.department ?? undefined })
-            setIsDialogOpen(true)
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2"
+            onClick={() => {
+              setExportTarget({ kind: "all" })
+              setExportOptionsOpen(true)
+            }}
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button
+            size="sm"
+            className="h-8 gap-2"
+            onClick={() => {
+              setSelectedReportParams({
+                week: weekFilter,
+                year: yearFilter,
+                dept: profile?.department || undefined,
+              })
+              setIsDialogOpen(true)
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Add Report
+          </Button>
+        </div>
       }
-      filters={
-        <WeeklyReportFilters
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          weekFilter={weekFilter}
-          onWeekChange={setWeekFilter}
-          yearFilter={yearFilter}
-          onYearChange={setYearFilter}
-          deptFilter={deptFilter}
-          onDeptChange={setDeptFilter}
-          allDepartments={allDepartments}
-          isDepartmentLead={Boolean(profile?.is_department_lead)}
-          loading={loading}
-          onRefresh={() => refetchReports()}
-        />
+      stats={
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title="Reports"
+            value={stats.total}
+            icon={FileBarChart}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Tracker Started"
+            value={stats.withTrackerStarted}
+            icon={CalendarDays}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Finished"
+            value={stats.finished}
+            icon={FileSpreadsheet}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="Locked Week"
+            value={stats.locked}
+            icon={Download}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </div>
       }
     >
-      <ReportTable
-        reports={filteredReports}
-        loading={loading}
-        expandedRows={expandedRows}
-        onToggleRow={toggleRow}
-        meetingDate={meetingDate}
-        isFilteredWeekLocked={isFilteredWeekLocked}
-        currentUserDepartment={null}
-        onEdit={(report) => {
-          setSelectedReportParams({
-            week: report.week_number,
-            year: report.year,
-            dept: report.department ?? undefined,
-          })
-          setIsDialogOpen(true)
+      <DataTable<WeeklyReport>
+        data={reports}
+        columns={columns}
+        filters={filters}
+        getRowId={(report) => report.id}
+        searchPlaceholder="Search department or report details..."
+        searchFn={(report, query) => {
+          const normalizedQuery = query.toLowerCase()
+          return (
+            report.department.toLowerCase().includes(normalizedQuery) ||
+            report.work_done.toLowerCase().includes(normalizedQuery) ||
+            report.tasks_new_week.toLowerCase().includes(normalizedQuery) ||
+            report.challenges.toLowerCase().includes(normalizedQuery)
+          )
         }}
-        onDelete={(id) => setPendingDeleteId(id)}
-        onOpenPptxDialog={openSinglePptxModeDialog}
+        isLoading={isLoading}
+        error={error instanceof Error ? error.message : null}
+        onRetry={() => {
+          void refetch()
+        }}
+        onFilterChange={(filterValues) => {
+          const weekValue = filterValues.week_number?.[0]
+          const yearValue = filterValues.year?.[0]
+          const deptValue = filterValues.department?.[0]
+
+          if (weekValue) {
+            const parsedWeek = Number(weekValue)
+            if (!Number.isNaN(parsedWeek) && parsedWeek !== weekFilter) {
+              setWeekFilter(parsedWeek)
+            }
+          }
+
+          if (yearValue) {
+            const parsedYear = Number(yearValue)
+            if (!Number.isNaN(parsedYear) && parsedYear !== yearFilter) {
+              setYearFilter(parsedYear)
+            }
+          }
+
+          if (deptValue !== undefined && deptValue !== deptFilter) {
+            setDeptFilter(deptValue)
+          }
+        }}
+        rowActions={[
+          {
+            label: "Export",
+            onClick: (report) => {
+              setExportTarget({ kind: "single", report })
+              setExportOptionsOpen(true)
+            },
+          },
+        ]}
+        expandable={{
+          render: (report) => (
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
+                <div className="space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm dark:border-blue-900/30">
+                  {autoNumberLines(report.work_done)
+                    .split("\n")
+                    .map((line, index) => (
+                      <div key={index}>{line}</div>
+                    ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                  Tasks for New Week
+                </h4>
+                <div className="space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm dark:border-emerald-900/30">
+                  {autoNumberLines(report.tasks_new_week)
+                    .split("\n")
+                    .map((line, index) => (
+                      <div key={index}>{line}</div>
+                    ))}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
+                <div className="space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm dark:border-rose-900/30">
+                  {autoNumberLines(report.challenges)
+                    .split("\n")
+                    .map((line, index) => (
+                      <div key={index}>{line}</div>
+                    ))}
+                </div>
+              </div>
+              <div className="md:col-span-3">
+                <Link
+                  href={`/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
+                  className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
+                >
+                  View action tracker
+                </Link>
+              </div>
+            </div>
+          ),
+        }}
+        viewToggle
+        cardRenderer={(report) => {
+          const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+          const submitterName = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
+          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+
+          return (
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{report.department}</p>
+                  <p className="text-muted-foreground text-sm">{submitterName}</p>
+                </div>
+                <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Week</span>
+                  <span>{`W${report.week_number}, ${report.year}`}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Submitted</span>
+                  <span>{new Date(report.created_at).toLocaleDateString("en-GB")}</span>
+                </div>
+              </div>
+            </div>
+          )
+        }}
+        emptyTitle="No weekly reports found"
+        emptyDescription="No records were found for the selected criteria."
+        emptyIcon={FileBarChart}
+        skeletonRows={5}
+        urlSync
       />
 
       <WeeklyReportDialog
@@ -265,34 +568,58 @@ export default function WeeklyReportsPortal() {
           setIsDialogOpen(false)
           setSelectedReportParams(null)
         }}
-        onSuccess={() =>
-          queryClient.invalidateQueries({
-            queryKey: QUERY_KEYS.weeklyReports({ week: weekFilter, year: yearFilter, dept: deptFilter }),
-          })
-        }
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.weeklyReports() })}
         initialData={selectedReportParams ?? undefined}
       />
 
-      <AlertDialog open={pendingDeleteId !== null} onOpenChange={(open) => !open && setPendingDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Report</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (pendingDeleteId) handleDelete(pendingDeleteId)
-                setPendingDeleteId(null)
-              }}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ExportOptionsDialog
+        open={exportOptionsOpen}
+        onOpenChange={setExportOptionsOpen}
+        title="Export Weekly Reports"
+        options={[
+          { id: "pdf", label: "PDF", icon: "pdf" },
+          { id: "word", label: "Word (.docx)", icon: "word" },
+          { id: "pptx", label: "PowerPoint (.pptx)", icon: "pptx" },
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+        ]}
+        onSelect={(id) => {
+          if (exportTarget.kind === "single") {
+            const report = exportTarget.report
+            if (id === "pdf") {
+              void import("@/lib/export-utils").then(({ exportToPDF }) => exportToPDF(report, meetingDate))
+              return
+            }
+            if (id === "word") {
+              void import("@/lib/export-utils").then(({ exportToDocx }) => exportToDocx(report, meetingDate))
+              return
+            }
+            if (id === "excel") {
+              void import("@/lib/export-utils").then(({ exportToXLSX }) => exportToXLSX(report, meetingDate))
+              return
+            }
+            openSinglePptxModeDialog(report)
+            return
+          }
+
+          if (id === "pdf") {
+            void downloadWeeklyReportPdf({ week: weekFilter, year: yearFilter })
+            return
+          }
+          if (id === "word") {
+            void import("@/lib/export-utils").then(({ exportAllToDocx }) =>
+              exportAllToDocx(reports, weekFilter, yearFilter, meetingDate)
+            )
+            return
+          }
+          if (id === "excel") {
+            void import("@/lib/export-utils").then(({ exportAllToXLSX }) =>
+              exportAllToXLSX(reports, weekFilter, yearFilter, meetingDate)
+            )
+            return
+          }
+          openAllPptxModeDialog()
+        }}
+      />
 
       <PptxModeDialog
         isOpen={pptxModeDialogOpen}
@@ -303,6 +630,6 @@ export default function WeeklyReportsPortal() {
         onExport={runPptxExport}
         showOrderStep={pendingPptxExport?.kind === "all"}
       />
-    </AdminTablePage>
+    </DataTablePage>
   )
 }
