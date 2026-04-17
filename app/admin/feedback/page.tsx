@@ -48,6 +48,15 @@ export default async function AdminFeedbackPage() {
   let feedbackWithProfiles: FeedbackRecord[] = []
   if (feedbackData && feedbackData.length > 0) {
     const userIds = Array.from(new Set(feedbackData.map((f) => f.user_id).filter(Boolean)))
+    let profilesData:
+      | {
+          id: string
+          first_name: string | null
+          last_name: string | null
+          company_email: string | null
+          department: string | null
+        }[]
+      | null = null
 
     if (userIds.length > 0) {
       let profilesQuery = dataClient
@@ -62,18 +71,19 @@ export default async function AdminFeedbackPage() {
             : profilesQuery.eq("id", "__none__")
       }
 
-      const { data: profilesData, error: profilesError } = await profilesQuery
+      const { data, error: profilesError } = await profilesQuery
 
       if (profilesError) {
         log.error("Error fetching profiles:", profilesError)
       }
-
-      // Merge profiles with feedback
-      feedbackWithProfiles = feedbackData.map((fb) => ({
-        ...fb,
-        profiles: profilesData?.find((p) => p.id === fb.user_id) || null,
-      })) as FeedbackRecord[]
+      profilesData = data || []
     }
+
+    feedbackWithProfiles = feedbackData.map((fb) => ({
+      ...fb,
+      user_id: fb.is_anonymous ? null : fb.user_id,
+      profiles: fb.is_anonymous ? null : profilesData?.find((p) => p.id === fb.user_id) || null,
+    })) as FeedbackRecord[]
   }
 
   // Calculate stats

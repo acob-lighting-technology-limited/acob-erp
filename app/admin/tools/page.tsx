@@ -1,17 +1,9 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Wrench, ArrowRight, Hash, FileSignature, Droplet } from "lucide-react"
+import { Wrench, ArrowRight, FileSignature, Droplet } from "lucide-react"
 import { AdminTablePage } from "@/components/admin/admin-table-page"
 
 const tools = [
-  {
-    name: "Reference Generator",
-    description: "Manage incoming/outgoing correspondence references and approval workflow",
-    href: "/admin/tools/reference-generator",
-    icon: Hash,
-    color: "text-violet-500",
-    bgColor: "bg-violet-50 dark:bg-violet-950/30",
-  },
   {
     name: "Email Signature",
     description: "Generate professional employee email signatures",

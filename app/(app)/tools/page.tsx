@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileSignature, Droplet, ArrowRight, Wrench, Hash, Briefcase } from "lucide-react"
+import { FileSignature, Droplet, ArrowRight, Wrench, Briefcase } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
 const tools = [
@@ -29,14 +29,6 @@ const tools = [
     icon: Droplet,
     color: "text-teal-500",
     bgColor: "bg-teal-50 dark:bg-teal-950/30",
-  },
-  {
-    name: "Reference Generator",
-    description: "Generate and track incoming/outgoing reference records with approval workflow",
-    href: "/tools/reference-generator",
-    icon: Hash,
-    color: "text-violet-500",
-    bgColor: "bg-violet-50 dark:bg-violet-950/30",
   },
   {
     name: "Job Description",

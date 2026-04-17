@@ -48,6 +48,7 @@ const EMPTY_REQUEST_FORM = {
   reason: "",
   reliever_identifier: "",
   handover_note: "",
+  attachment: null as File | null,
 }
 
 const TABS: DataTableTab[] = [
@@ -250,6 +251,7 @@ export function LeaveContent({
       reason: request.reason || "",
       reliever_identifier: request.reliever_id || "",
       handover_note: request.handover_note || "",
+      attachment: null,
     })
     setOpen(true)
   }
@@ -265,15 +267,49 @@ export function LeaveContent({
     setSubmitting(true)
     try {
       const isEditing = !!editingRequestId
+      const { attachment, ...requestPayload } = formData
       const response = await fetch("/api/hr/leave/requests", {
         method: isEditing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isEditing ? { id: editingRequestId, ...formData } : formData),
+        body: JSON.stringify(isEditing ? { id: editingRequestId, ...requestPayload } : requestPayload),
       })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to submit request")
+
+      const createdOrUpdatedId = String(payload?.data?.id || editingRequestId || "")
+      if (attachment && createdOrUpdatedId) {
+        const uploadPayload = new FormData()
+        uploadPayload.set("file", attachment)
+        uploadPayload.set("document_type", "supporting_document")
+
+        const uploadResponse = await fetch("/api/hr/leave/evidence/upload", {
+          method: "POST",
+          body: uploadPayload,
+        })
+        const uploadBody = await uploadResponse.json().catch(() => ({}))
+        if (!uploadResponse.ok || !uploadBody?.data?.file_url) {
+          throw new Error(uploadBody?.error || "Leave request saved, but attachment upload failed")
+        }
+
+        const evidenceResponse = await fetch("/api/hr/leave/evidence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leave_request_id: createdOrUpdatedId,
+            document_type: "supporting_document",
+            file_url: String(uploadBody.data.file_url),
+            notes: "Uploaded with leave request form",
+          }),
+        })
+        const evidenceBody = await evidenceResponse.json().catch(() => ({}))
+        if (!evidenceResponse.ok) {
+          throw new Error(evidenceBody?.error || "Leave request saved, but evidence link failed")
+        }
+      }
+
       toast.success(payload.message || "Request submitted")
       setOpen(false)
+      setFormData(EMPTY_REQUEST_FORM)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Submission failed")

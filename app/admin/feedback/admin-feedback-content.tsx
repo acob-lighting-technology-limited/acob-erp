@@ -137,19 +137,25 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         resizable: true,
         initialWidth: 200,
         accessor: (r) =>
-          r.profiles ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown" : "Unknown",
+          r.is_anonymous
+            ? "Anonymous"
+            : r.profiles
+              ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown"
+              : "Unknown",
         render: (r) => (
           <div className="flex items-center gap-2">
             <div className="bg-muted ring-border flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ring-1">
-              {r.profiles?.first_name ? r.profiles.first_name.charAt(0) : "?"}
+              {r.is_anonymous ? "A" : r.profiles?.first_name ? r.profiles.first_name.charAt(0) : "?"}
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-medium">
-                {r.profiles
-                  ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown"
-                  : "Unknown"}
+                {r.is_anonymous
+                  ? "Anonymous"
+                  : r.profiles
+                    ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown"
+                    : "Unknown"}
               </span>
-              {r.profiles?.company_email && (
+              {!r.is_anonymous && r.profiles?.company_email && (
                 <div className="text-muted-foreground group flex items-center gap-1 text-[10px]">
                   <Mail className="h-2.5 w-2.5" />
                   <span className="group-hover:text-foreground transition-colors">{r.profiles.company_email}</span>
@@ -163,8 +169,8 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         key: "department",
         label: "Department",
         sortable: true,
-        accessor: (r) => r.profiles?.department || "Unassigned",
-        render: (r) => <span className="text-sm">{r.profiles?.department || "—"}</span>,
+        accessor: (r) => (r.is_anonymous ? "Hidden" : r.profiles?.department || "Unassigned"),
+        render: (r) => <span className="text-sm">{r.is_anonymous ? "Hidden" : r.profiles?.department || "—"}</span>,
       },
       {
         key: "title",
@@ -279,7 +285,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         getRowId={(r) => r.id}
         searchPlaceholder="Search ref #, title, requester name or email..."
         searchFn={(r, q) =>
-          `${r.id} ${r.title} ${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""} ${r.profiles?.company_email || ""}`
+          `${r.id} ${r.title} ${r.is_anonymous ? "anonymous" : ""} ${r.profiles?.first_name || ""} ${r.profiles?.last_name || ""} ${r.profiles?.company_email || ""}`
             .toLowerCase()
             .includes(q)
         }
@@ -343,12 +349,14 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
             <h4 className="truncate text-sm font-semibold">{r.title}</h4>
             <div className="mt-4 flex items-center gap-2 border-t pt-3">
               <div className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-bold">
-                {r.profiles?.first_name ? r.profiles.first_name.charAt(0) : "?"}
+                {r.is_anonymous ? "A" : r.profiles?.first_name ? r.profiles.first_name.charAt(0) : "?"}
               </div>
               <span className="text-muted-foreground truncate text-xs">
-                {r.profiles
-                  ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown"
-                  : "Unknown"}
+                {r.is_anonymous
+                  ? "Anonymous"
+                  : r.profiles
+                    ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown"
+                    : "Unknown"}
               </span>
               <div className="ml-auto flex items-center gap-2">
                 <Badge variant="outline" className="text-[9px] font-normal uppercase">

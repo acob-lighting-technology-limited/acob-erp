@@ -20,7 +20,7 @@ export async function GET() {
 
     const { data, error } = await listAssignableProfiles(supabase, {
       select: "id, full_name, first_name, last_name, employment_status",
-      allowLegacyNullStatus: false,
+      allowLegacyNullStatus: true,
       excludeUserId: user.id,
       orderBy: "first_name",
     })

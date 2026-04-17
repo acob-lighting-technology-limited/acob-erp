@@ -60,67 +60,174 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       Boolean(profile.is_department_lead) &&
       normalizedScopeDepartment === normalizeDepartmentName("Executive Management") &&
       canAccessDepartment(profile, "Executive Management")
-    const isApprover = isManagingDirector || isExecutiveLead
+    const isDepartmentLeadForRecord =
+      Boolean(profile.is_department_lead) &&
+      Boolean(approvalScopeDepartment) &&
+      canAccessDepartment(profile, approvalScopeDepartment)
+    const isExecutiveApprover = isManagingDirector || isExecutiveLead
 
-    if (!isApprover) {
-      return NextResponse.json(
-        { error: "Only Managing Director or Executive Management lead can approve correspondence" },
-        { status: 403 }
-      )
-    }
-
-    const { data: pendingApprovals, error: approvalError } = await supabase
+    const { data: existingApprovals, error: approvalError } = await supabase
       .from("correspondence_approvals")
       .select("*")
       .eq("correspondence_id", record.id)
-      .eq("status", "pending")
       .order("created_at", { ascending: true })
 
     if (approvalError) throw approvalError
 
-    let targetApproval = pendingApprovals?.[0]
+    const departmentApproval = (existingApprovals || []).find(
+      (approval) => approval.approval_stage === "department_review"
+    )
+    const executiveApproval = (existingApprovals || []).find(
+      (approval) => approval.approval_stage === "executive_review"
+    )
 
-    if (!targetApproval) {
-      const { data: inserted, error: insertError } = await supabase
-        .from("correspondence_approvals")
-        .insert({
-          correspondence_id: record.id,
-          approval_stage: "department_review",
-          approver_id: user.id,
-          status: decision,
-          comments,
-          decided_at: new Date().toISOString(),
-        })
-        .select("*")
-        .single()
-
-      if (insertError) throw insertError
-      targetApproval = inserted
-    } else {
-      const { data: updatedApproval, error: updateApprovalError } = await supabase
-        .from("correspondence_approvals")
-        .update({
-          approver_id: user.id,
-          status: decision,
-          comments,
-          decided_at: new Date().toISOString(),
-        })
-        .eq("id", targetApproval.id)
-        .select("*")
-        .single()
-
-      if (updateApprovalError) throw updateApprovalError
-      targetApproval = updatedApproval
+    if (decision !== "approved" && !isDepartmentLeadForRecord && !isExecutiveApprover) {
+      return NextResponse.json(
+        { error: "Only department leads or executive approvers can reject/return correspondence" },
+        { status: 403 }
+      )
     }
 
-    const nextRecordStatus =
-      decision === "approved" ? "approved" : decision === "rejected" ? "rejected" : "returned_for_correction"
+    if (decision === "approved" && !departmentApproval && !isDepartmentLeadForRecord) {
+      return NextResponse.json({ error: "Department lead approval is required first" }, { status: 403 })
+    }
+
+    let targetApproval = departmentApproval
+    let nextRecordStatus: "under_review" | "approved" | "rejected" | "returned_for_correction" = "under_review"
+    let approvedAt: string | null = null
+
+    if (decision === "approved") {
+      if (!departmentApproval || departmentApproval.status !== "approved") {
+        if (!isDepartmentLeadForRecord) {
+          return NextResponse.json({ error: "Department lead approval is required first" }, { status: 403 })
+        }
+
+        if (!departmentApproval) {
+          const { data: inserted, error: insertError } = await supabase
+            .from("correspondence_approvals")
+            .insert({
+              correspondence_id: record.id,
+              approval_stage: "department_review",
+              approver_id: user.id,
+              status: "approved",
+              comments,
+              decided_at: new Date().toISOString(),
+            })
+            .select("*")
+            .single()
+          if (insertError) throw insertError
+          targetApproval = inserted
+        } else {
+          const { data: updatedApproval, error: updateApprovalError } = await supabase
+            .from("correspondence_approvals")
+            .update({
+              approver_id: user.id,
+              status: "approved",
+              comments,
+              decided_at: new Date().toISOString(),
+            })
+            .eq("id", departmentApproval.id)
+            .select("*")
+            .single()
+          if (updateApprovalError) throw updateApprovalError
+          targetApproval = updatedApproval
+        }
+
+        if (!executiveApproval) {
+          const { error: insertExecutiveError } = await supabase.from("correspondence_approvals").insert({
+            correspondence_id: record.id,
+            approval_stage: "executive_review",
+            status: "pending",
+          })
+          if (insertExecutiveError) throw insertExecutiveError
+        }
+
+        nextRecordStatus = "under_review"
+      } else {
+        if (!isExecutiveApprover) {
+          return NextResponse.json(
+            { error: "Only Managing Director or Executive Management lead can finalize approval" },
+            { status: 403 }
+          )
+        }
+
+        if (!executiveApproval) {
+          const { data: insertedExecutive, error: insertExecutiveError } = await supabase
+            .from("correspondence_approvals")
+            .insert({
+              correspondence_id: record.id,
+              approval_stage: "executive_review",
+              approver_id: user.id,
+              status: "approved",
+              comments,
+              decided_at: new Date().toISOString(),
+            })
+            .select("*")
+            .single()
+          if (insertExecutiveError) throw insertExecutiveError
+          targetApproval = insertedExecutive
+        } else {
+          const { data: updatedExecutive, error: updateExecutiveError } = await supabase
+            .from("correspondence_approvals")
+            .update({
+              approver_id: user.id,
+              status: "approved",
+              comments,
+              decided_at: new Date().toISOString(),
+            })
+            .eq("id", executiveApproval.id)
+            .select("*")
+            .single()
+          if (updateExecutiveError) throw updateExecutiveError
+          targetApproval = updatedExecutive
+        }
+
+        nextRecordStatus = "approved"
+        approvedAt = new Date().toISOString()
+      }
+    } else {
+      const stage = decision === "rejected" ? "department_review" : "department_review"
+      const candidate =
+        (existingApprovals || []).find((approval) => approval.approval_stage === stage) || departmentApproval
+      if (!candidate) {
+        const { data: inserted, error: insertError } = await supabase
+          .from("correspondence_approvals")
+          .insert({
+            correspondence_id: record.id,
+            approval_stage: stage,
+            approver_id: user.id,
+            status: decision,
+            comments,
+            decided_at: new Date().toISOString(),
+          })
+          .select("*")
+          .single()
+        if (insertError) throw insertError
+        targetApproval = inserted
+      } else {
+        const { data: updated, error: updateError } = await supabase
+          .from("correspondence_approvals")
+          .update({
+            approver_id: user.id,
+            status: decision,
+            comments,
+            decided_at: new Date().toISOString(),
+          })
+          .eq("id", candidate.id)
+          .select("*")
+          .single()
+        if (updateError) throw updateError
+        targetApproval = updated
+      }
+
+      nextRecordStatus = decision === "rejected" ? "rejected" : "returned_for_correction"
+    }
 
     const { data: updatedRecord, error: recordUpdateError } = await supabase
       .from("correspondence_records")
       .update({
         status: nextRecordStatus,
-        approved_at: decision === "approved" ? new Date().toISOString() : null,
+        approved_at: approvedAt,
       })
       .eq("id", record.id)
       .select("*")

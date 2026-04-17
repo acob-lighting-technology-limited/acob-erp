@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -93,7 +93,7 @@ export default function AttendanceReportsPage() {
     queryFn: fetchDepartmentsList,
   })
 
-  async function generateReport() {
+  const generateReport = useCallback(async () => {
     setLoading(true)
     try {
       const supabase = createClient()
@@ -161,7 +161,11 @@ export default function AttendanceReportsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters.department_id, filters.end_date, filters.start_date])
+
+  useEffect(() => {
+    void generateReport()
+  }, [generateReport])
 
   function exportCSV() {
     const headers = ["Name", "Department", "Total Days", "Present", "Late", "Absent", "Total Hours", "Attendance Rate"]

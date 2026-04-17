@@ -29,8 +29,8 @@ export async function PATCH(_: Request, { params }: { params: { id: string } }) 
       return NextResponse.json({ error: "Booking not found" }, { status: 404 })
     }
 
-    if (!["pending", "approved"].includes(String(booking.status))) {
-      return NextResponse.json({ error: "Only pending or approved bookings can be cancelled" }, { status: 400 })
+    if (String(booking.status) !== "pending") {
+      return NextResponse.json({ error: "Only pending bookings can be cancelled" }, { status: 400 })
     }
 
     if (new Date(booking.start_at).getTime() <= Date.now()) {

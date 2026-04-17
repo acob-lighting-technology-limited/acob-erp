@@ -188,6 +188,7 @@ export function WeeklyReportsContent({
   })
 
   const isFilteredWeekLocked = lockState?.isLocked ?? false
+  const canMutateFilteredWeek = lockState?.canMutate ?? !isFilteredWeekLocked
   const meetingDate = lockState?.meetingDate || getDefaultMeetingDateIso(weekFilter, yearFilter)
 
   const handleDelete = async (id: string) => {
@@ -397,11 +398,16 @@ export function WeeklyReportsContent({
           </Button>
           <Button
             onClick={() => {
+              if (!canMutateFilteredWeek) {
+                toast.error("This report week is locked after the grace period.")
+                return
+              }
               setEditingReport(null)
               setIsAdminDialogOpen(true)
             }}
             className="h-8 gap-2"
             size="sm"
+            disabled={!canMutateFilteredWeek}
           >
             <Plus className="h-4 w-4" />
             Add Report
@@ -483,6 +489,10 @@ export function WeeklyReportsContent({
           {
             label: "Edit",
             onClick: (report) => {
+              if (!canMutateFilteredWeek) {
+                toast.error("This report week is locked after the grace period.")
+                return
+              }
               if (!canMutateReport(report)) {
                 toast.error("You can only edit your own reports")
                 return
@@ -490,11 +500,13 @@ export function WeeklyReportsContent({
               setEditingReport(report)
               setIsAdminDialogOpen(true)
             },
+            hidden: () => !canMutateFilteredWeek,
           },
           {
             label: "Delete",
             variant: "destructive",
             onClick: (report) => setPendingDeleteId(report.id),
+            hidden: () => !canMutateFilteredWeek,
           },
           {
             label: "Export",

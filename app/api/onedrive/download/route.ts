@@ -41,6 +41,7 @@ async function createClient() {
  * Query params:
  *   - path: File path in OneDrive
  *   - redirect: If "true", redirect to download URL instead of returning JSON
+ *   - raw: If "true", stream file bytes through this API (same-origin download)
  */
 export async function GET(request: Request) {
   try {
@@ -73,6 +74,7 @@ export async function GET(request: Request) {
 
     const path = searchParams.get("path")
     const redirect = searchParams.get("redirect") === "true"
+    const raw = searchParams.get("raw") === "true"
 
     if (!path) {
       return NextResponse.json({ error: "No path provided" }, { status: 400 })
@@ -83,6 +85,25 @@ export async function GET(request: Request) {
     }
 
     const downloadUrl = await onedrive.getDownloadUrl(path)
+
+    if (raw) {
+      const upstream = await fetch(downloadUrl)
+      if (!upstream.ok) {
+        return NextResponse.json({ error: "Failed to stream file from OneDrive" }, { status: 502 })
+      }
+
+      const arrayBuffer = await upstream.arrayBuffer()
+      const fileName = decodeURIComponent(path.split("/").filter(Boolean).pop() || "download")
+      const contentType = upstream.headers.get("content-type") || "application/octet-stream"
+
+      return new NextResponse(arrayBuffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": `attachment; filename="${fileName.replace(/"/g, "")}"`,
+          "Cache-Control": "no-store",
+        },
+      })
+    }
 
     if (redirect) {
       return NextResponse.redirect(downloadUrl)
