@@ -2,6 +2,11 @@ import { defineConfig, globalIgnores } from "eslint/config"
 import nextVitals from "eslint-config-next/core-web-vitals"
 
 export default defineConfig([
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: "off",
+    },
+  },
   ...nextVitals,
   {
     rules: {
@@ -14,6 +19,7 @@ export default defineConfig([
       "react-hooks/static-components": "off",
       "react-hooks/set-state-in-effect": "off",
       "react/no-unescaped-entities": "warn",
+      "import/no-anonymous-default-export": "off",
       "@next/next/no-img-element": "warn",
       "prefer-const": "error",
       "no-restricted-syntax": [

@@ -1,4 +1,4 @@
 export {
-  /* @next-codemod-error `default` export is re-exported. Check if this component uses `params` or `searchParams`*/
+  /* @next-codemod-ignore `default` export is re-exported. Check if this component uses `params` or `searchParams`*/
   default,
 } from "../fleet/page"
