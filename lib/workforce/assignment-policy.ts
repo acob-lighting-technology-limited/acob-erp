@@ -28,6 +28,7 @@ export interface AssignableQueryOptions extends AssignablePolicyOptions {
 
 interface AssignableStatusQuery<TSelf> {
   eq(column: string, value: string | boolean): TSelf
+  ilike(column: string, value: string): TSelf
   or(filters: string): TSelf
 }
 
@@ -42,7 +43,7 @@ export function isAssignableEmploymentStatus(
   status: EmploymentStatus | string | null | undefined,
   options: AssignablePolicyOptions = {}
 ): boolean {
-  if (status === "active") return true
+  if (typeof status === "string" && status.toLowerCase() === "active") return true
   if (options.allowLegacyNullStatus === false) return false
   return status == null
 }
@@ -74,9 +75,9 @@ export function applyAssignableStatusFilter<TQuery extends AssignableStatusQuery
   options: AssignablePolicyOptions = {}
 ) {
   if (options.allowLegacyNullStatus === false) {
-    return query.eq("employment_status", "active")
+    return query.ilike("employment_status", "active")
   }
-  return query.or("employment_status.eq.active,employment_status.is.null")
+  return query.or("employment_status.ilike.active,employment_status.is.null")
 }
 
 export async function buildAssignableProfilesQuery(

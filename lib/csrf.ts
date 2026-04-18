@@ -28,6 +28,7 @@ export function validateCsrf(request: Request, cookieToken: string | undefined):
   return crypto.timingSafeEqual(a, b)
 }
 
-export function getCsrfCookie() {
-  return cookies().get(CSRF_COOKIE)?.value
+export async function getCsrfCookie() {
+  const cookieStore = await cookies()
+  return cookieStore.get(CSRF_COOKIE)?.value
 }

@@ -15,7 +15,8 @@ const CreateHelpDeskCommentSchema = z.object({
   visibility: z.string().optional(),
 })
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, profile } = await getAuthContext()
 
@@ -59,7 +60,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, profile } = await getAuthContext()
 

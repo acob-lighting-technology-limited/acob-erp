@@ -3,7 +3,8 @@ import { NextResponse } from "next/server"
 import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-preview"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const supabase = await createServerClient()
   const {
     data: { user: caller },

@@ -74,12 +74,9 @@ export function SearchableSelect({
   React.useEffect(() => {
     if (portal !== undefined) {
       setResolvedPortal(portal)
-      return
+    } else {
+      setResolvedPortal(true)
     }
-    const triggerEl = triggerRef.current
-    if (!triggerEl) return
-    const inDialog = Boolean(triggerEl.closest('[role="dialog"]'))
-    setResolvedPortal(!inDialog)
   }, [portal, open])
 
   // Shared content component to avoid duplication

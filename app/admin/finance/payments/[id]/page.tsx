@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, use } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useRouter } from "next/navigation"
@@ -73,7 +73,8 @@ async function fetchAdminPaymentPageData(id: string): Promise<AdminPaymentPageDa
   }
 }
 
-export default function PaymentDetailsPage({ params }: { params: { id: string } }) {
+export default function PaymentDetailsPage(props: { params: Promise<{ id: string }> }) {
+  const params = use(props.params)
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -315,7 +316,7 @@ export default function PaymentDetailsPage({ params }: { params: { id: string } 
     setUploadDialogOpen(true)
   }
 
-  const handleFileUpload = async (e: React.FormEvent, inputRef: React.RefObject<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.FormEvent, inputRef: React.RefObject<HTMLInputElement | null>) => {
     e.preventDefault()
     if (!inputRef.current?.files?.[0] || !uploadDate) return
 

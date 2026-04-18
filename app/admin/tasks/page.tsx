@@ -192,7 +192,8 @@ async function getAdminTasksData() {
   }
 }
 
-export default async function AdminTasksPage({ searchParams }: { searchParams?: { goal_id?: string } }) {
+export default async function AdminTasksPage(props: { searchParams?: Promise<{ goal_id?: string }> }) {
+  const searchParams = await props.searchParams
   const data = await getAdminTasksData()
 
   if ("redirect" in data && data.redirect) {

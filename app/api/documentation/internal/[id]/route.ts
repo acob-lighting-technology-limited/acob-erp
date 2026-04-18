@@ -90,7 +90,11 @@ async function getAuthenticatedDoc(id: string) {
   return { supabase, user, doc: doc as UserDocumentationRow | null }
 }
 
-async function getEmployeeDisplayName(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, email?: string) {
+async function getEmployeeDisplayName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  email?: string
+) {
   const dataClient = getServiceRoleClientOrFallback(supabase)
   const { data: profile } = await dataClient
     .from("profiles")
@@ -177,7 +181,8 @@ async function deleteSharePointFolderIfExists(folderPath: string | null) {
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, doc } = await getAuthenticatedDoc(params.id)
 
@@ -209,11 +214,16 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     if (currentFolderPath && currentFolderPath !== desiredFolderPath && onedrive.isEnabled()) {
       await onedrive.createFolder(getParentFolderPath(desiredFolderPath))
-      await onedrive.moveItem(currentFolderPath, getParentFolderPath(desiredFolderPath), getFolderNameFromPath(desiredFolderPath))
+      await onedrive.moveItem(
+        currentFolderPath,
+        getParentFolderPath(desiredFolderPath),
+        getFolderNameFromPath(desiredFolderPath)
+      )
       folderPath = desiredFolderPath
     }
 
-    const textFilePath = remapPathPrefix(doc.sharepoint_text_file_path, currentFolderPath, folderPath) || `${folderPath}/documentation.txt`
+    const textFilePath =
+      remapPathPrefix(doc.sharepoint_text_file_path, currentFolderPath, folderPath) || `${folderPath}/documentation.txt`
     const updatedAt = new Date().toISOString()
 
     const attachments = await syncDocumentationAssets({
@@ -284,7 +294,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, doc } = await getAuthenticatedDoc(params.id)
 
