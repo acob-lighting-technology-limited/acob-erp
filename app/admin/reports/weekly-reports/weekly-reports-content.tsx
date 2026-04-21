@@ -62,11 +62,7 @@ async function fetchAdminWeeklyReports(
   const { data, error } = await query
   if (error) throw new Error(error.message)
 
-  const normalizedReports = (data || []).map((report) => ({
-    ...report,
-    department: normalizeDepartmentName(report.department),
-  }))
-  const sortedData = sortReportsByDepartment(normalizedReports)
+  const sortedData = sortReportsByDepartment((data || []) as WeeklyReport[])
 
   const { data: actions, error: actionsError } = await supabase
     .from("tasks")
@@ -78,12 +74,7 @@ async function fetchAdminWeeklyReports(
 
   return {
     reports: sortedData,
-    trackingData: actionsError
-      ? []
-      : (actions || []).map((action) => ({
-          ...action,
-          department: normalizeDepartmentName(action.department),
-        })),
+    trackingData: actionsError ? [] : ((actions || []) as TrackerStatus[]),
   }
 }
 
@@ -112,7 +103,10 @@ interface WeeklyReportsContentProps {
 }
 
 function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
-  const deptActions = trackingData.filter((action) => action.department === department)
+  const normalizedDepartment = normalizeDepartmentName(department)
+  const deptActions = trackingData.filter(
+    (action) => normalizeDepartmentName(action.department) === normalizedDepartment
+  )
   if (deptActions.length === 0) {
     return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
   }
@@ -166,7 +160,10 @@ export function WeeklyReportsContent({
 
   const canMutateReport = (report: WeeklyReport) => {
     if (isGlobalReportsEditor) return true
-    return managedDepartments.includes(report.department)
+    const normalizedReportDepartment = normalizeDepartmentName(report.department)
+    return managedDepartments.some((department) =>
+      getDepartmentAliases(department).includes(normalizedReportDepartment)
+    )
   }
 
   const {

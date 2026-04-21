@@ -25,6 +25,7 @@ import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { downloadWeeklyReportPdf } from "@/lib/reports/export-download"
 import { Badge } from "@/components/ui/badge"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 import { PptxModeDialog } from "./_components/pptx-mode-dialog"
 
 interface UserProfile {
@@ -108,6 +109,7 @@ async function fetchWeeklyReports(
 
   const reports = sortReportsByDepartment((reportsData || []) as WeeklyReport[])
   const departments = Array.from(new Set(reports.map((report) => report.department))).filter(Boolean)
+  const departmentsForTasks = Array.from(new Set(departments.flatMap((department) => getDepartmentAliases(department))))
 
   if (departments.length === 0) {
     return { reports, trackingData: [] }
@@ -119,7 +121,7 @@ async function fetchWeeklyReports(
     .eq("category", "weekly_action")
     .eq("week_number", week)
     .eq("year", year)
-    .in("department", departments)
+    .in("department", departmentsForTasks)
 
   if (tasksError) {
     return { reports, trackingData: [] }
@@ -132,7 +134,10 @@ async function fetchWeeklyReports(
 }
 
 function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
-  const deptActions = trackingData.filter((action) => action.department === department)
+  const normalizedDepartment = normalizeDepartmentName(department)
+  const deptActions = trackingData.filter(
+    (action) => normalizeDepartmentName(action.department) === normalizedDepartment
+  )
   if (deptActions.length === 0) {
     return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
   }

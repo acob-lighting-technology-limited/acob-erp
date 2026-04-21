@@ -2,6 +2,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-preview"
 import { createClient as createServerClient } from "@/lib/supabase/server"
+import { normalizeDepartmentName } from "@/shared/departments"
 
 export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -14,8 +15,20 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: callerProfile } = await supabase.from("profiles").select("role").eq("id", caller.id).single()
-  if (!callerProfile || !["developer", "super_admin", "admin"].includes(callerProfile.role)) {
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("role, department, is_department_lead, lead_departments")
+    .eq("id", caller.id)
+    .single<{
+      role?: string | null
+      department?: string | null
+      is_department_lead?: boolean | null
+      lead_departments?: string[] | null
+    }>()
+  const callerRole = String(callerProfile?.role || "").toLowerCase()
+  const callerIsAdminLike = ["developer", "super_admin", "admin"].includes(callerRole)
+  const callerIsLead = callerProfile?.is_department_lead === true
+  if (!callerProfile || (!callerIsAdminLike && !callerIsLead)) {
     return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
   }
 
@@ -53,6 +66,16 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
 
   if (error || !pendingUser) {
     return NextResponse.json({ error: "Pending user not found" }, { status: 404 })
+  }
+
+  if (!callerIsAdminLike) {
+    const managedDepartments = Array.from(
+      new Set([callerProfile?.department, ...(callerProfile?.lead_departments || [])].filter(Boolean) as string[])
+    ).map((departmentName) => normalizeDepartmentName(departmentName))
+    const pendingDepartment = normalizeDepartmentName(String(pendingUser.department || ""))
+    if (managedDepartments.length === 0 || !managedDepartments.includes(pendingDepartment)) {
+      return NextResponse.json({ error: "Forbidden: Department scope mismatch" }, { status: 403 })
+    }
   }
 
   const requiredFields = [
