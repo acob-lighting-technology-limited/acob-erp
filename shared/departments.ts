@@ -14,13 +14,6 @@ type CanonicalDepartment = (typeof CANONICAL_DEPARTMENT_ORDER)[number]
 
 const DEPARTMENT_ALIASES: Partial<Record<CanonicalDepartment, readonly string[]>> = {
   Accounts: ["Finance"],
-  "IT and Communications": ["ICT", "IT & Communications"],
-  "Admin & HR": ["Admin and HR", "HR", "Human Resources"],
-  "Legal, Regulatory and Compliance": [
-    "Regulatory and Compliance",
-    "Regulatory and Compilance",
-    "Legal Regulatory and Compliance",
-  ],
   "Operations and Maintenance": ["Operations"],
 } as const
 

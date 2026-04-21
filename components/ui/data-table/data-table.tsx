@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect, useRef, type KeyboardEvent } from "react"
+import { Fragment, useState, useMemo, useCallback, useEffect, useRef, type KeyboardEvent } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import {
   DndContext,
@@ -853,14 +853,14 @@ export function DataTable<TData>({
   // ─── Table inner ──────────────────────────────────────────────────────────
 
   const tableInner = (
-    <div className="overflow-x-auto">
-      <Table style={minWidth ? { minWidth } : undefined} className={minWidth ? `min-w-[${minWidth}]` : undefined}>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          modifiers={[restrictToHorizontalAxis]}
-          onDragEnd={handleColumnDragEnd}
-        >
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToHorizontalAxis]}
+      onDragEnd={handleColumnDragEnd}
+    >
+      <div className="overflow-x-auto">
+        <Table style={minWidth ? { minWidth } : undefined} className={minWidth ? `min-w-[${minWidth}]` : undefined}>
           <TableHeader className={cn(headerClassName, "sticky top-0 z-10")}>
             <SortableContext items={visibleColumns.map((c) => c.key)} strategy={horizontalListSortingStrategy}>
               <TableRow>
@@ -895,117 +895,116 @@ export function DataTable<TData>({
               </TableRow>
             </SortableContext>
           </TableHeader>
-        </DndContext>
 
-        <TableBody ref={tableBodyRef}>
-          {paginatedData.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={totalCols} className="p-0">
-                <EmptyState
-                  EmptyIcon={EmptyIcon}
-                  emptyTitle={emptyTitle}
-                  emptyDescription={emptyDescription}
-                  hasActiveFilters={hasActiveFilters}
-                  onClearFilters={clearAllFilters}
-                />
-              </TableCell>
-            </TableRow>
-          ) : (
-            paginatedData.map((row, index) => {
-              const rowId = getRowId(row)
-              const isExpanded = expandedRows.has(rowId)
-              const canExpand = expandable && (!expandable.canExpand || expandable.canExpand(row))
-              const globalIndex = activePage * pageSize + index
+          <TableBody ref={tableBodyRef}>
+            {paginatedData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={totalCols} className="p-0">
+                  <EmptyState
+                    EmptyIcon={EmptyIcon}
+                    emptyTitle={emptyTitle}
+                    emptyDescription={emptyDescription}
+                    hasActiveFilters={hasActiveFilters}
+                    onClearFilters={clearAllFilters}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedData.map((row, index) => {
+                const rowId = getRowId(row)
+                const isExpanded = expandedRows.has(rowId)
+                const canExpand = expandable && (!expandable.canExpand || expandable.canExpand(row))
+                const globalIndex = activePage * pageSize + index
 
-              return (
-                <>
-                  <TableRow
-                    key={rowId}
-                    data-row-id={rowId}
-                    tabIndex={0}
-                    onKeyDown={(e) => handleRowKeyDown(e, rowId)}
-                    className={cn(
-                      isExpanded && "border-b-0",
-                      selectedRows.has(rowId) && "bg-muted/50",
-                      "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
-                    )}
-                  >
-                    {selectable && (
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedRows.has(rowId)}
-                          onCheckedChange={() => toggleSelect(rowId)}
-                          aria-label={`Select row ${globalIndex + 1}`}
-                        />
-                      </TableCell>
-                    )}
-                    {expandable && (
-                      <TableCell>
-                        {canExpand ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => toggleExpand(rowId)}
-                            aria-label={isExpanded ? "Collapse row" : "Expand row"}
-                            aria-expanded={isExpanded}
-                          >
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </Button>
-                        ) : null}
-                      </TableCell>
-                    )}
-                    {showRowNumbers && (
-                      <TableCell className="text-muted-foreground font-medium">{globalIndex + 1}</TableCell>
-                    )}
-                    {visibleColumns.map((col) => (
-                      <TableCell
-                        key={col.key}
-                        className={cn(
-                          col.align === "right" && "text-right",
-                          col.align === "center" && "text-center",
-                          col.hideOnMobile && "hidden md:table-cell"
-                        )}
-                      >
-                        {col.render ? col.render(row, globalIndex) : col.accessor ? (col.accessor(row) ?? "-") : "-"}
-                      </TableCell>
-                    ))}
-                    {rowActions && rowActions.length > 0 && (
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {rowActions
-                            .filter((a) => !a.hidden || !a.hidden(row))
-                            .map((action) => (
-                              <Button
-                                key={action.label}
-                                size="sm"
-                                variant={action.variant === "destructive" ? "destructive" : "outline"}
-                                onClick={() => action.onClick(row)}
-                                className="gap-1"
-                              >
-                                {action.icon && <action.icon className="h-3.5 w-3.5" />}
-                                {action.label}
-                              </Button>
-                            ))}
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-
-                  {expandable && isExpanded && canExpand && (
-                    <TableRow key={`${rowId}-expanded`} className="bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={totalCols} className="p-4">
-                        {expandable.render(row)}
-                      </TableCell>
+                return (
+                  <Fragment key={rowId}>
+                    <TableRow
+                      data-row-id={rowId}
+                      tabIndex={0}
+                      onKeyDown={(e) => handleRowKeyDown(e, rowId)}
+                      className={cn(
+                        isExpanded && "border-b-0",
+                        selectedRows.has(rowId) && "bg-muted/50",
+                        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+                      )}
+                    >
+                      {selectable && (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedRows.has(rowId)}
+                            onCheckedChange={() => toggleSelect(rowId)}
+                            aria-label={`Select row ${globalIndex + 1}`}
+                          />
+                        </TableCell>
+                      )}
+                      {expandable && (
+                        <TableCell>
+                          {canExpand ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => toggleExpand(rowId)}
+                              aria-label={isExpanded ? "Collapse row" : "Expand row"}
+                              aria-expanded={isExpanded}
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </Button>
+                          ) : null}
+                        </TableCell>
+                      )}
+                      {showRowNumbers && (
+                        <TableCell className="text-muted-foreground font-medium">{globalIndex + 1}</TableCell>
+                      )}
+                      {visibleColumns.map((col) => (
+                        <TableCell
+                          key={col.key}
+                          className={cn(
+                            col.align === "right" && "text-right",
+                            col.align === "center" && "text-center",
+                            col.hideOnMobile && "hidden md:table-cell"
+                          )}
+                        >
+                          {col.render ? col.render(row, globalIndex) : col.accessor ? (col.accessor(row) ?? "-") : "-"}
+                        </TableCell>
+                      ))}
+                      {rowActions && rowActions.length > 0 && (
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {rowActions
+                              .filter((a) => !a.hidden || !a.hidden(row))
+                              .map((action) => (
+                                <Button
+                                  key={action.label}
+                                  size="sm"
+                                  variant={action.variant === "destructive" ? "destructive" : "outline"}
+                                  onClick={() => action.onClick(row)}
+                                  className="gap-1"
+                                >
+                                  {action.icon && <action.icon className="h-3.5 w-3.5" />}
+                                  {action.label}
+                                </Button>
+                              ))}
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
-                  )}
-                </>
-              )
-            })
-          )}
-        </TableBody>
-      </Table>
-    </div>
+
+                    {expandable && isExpanded && canExpand && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={totalCols} className="p-4">
+                          {expandable.render(row)}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </DndContext>
   )
 
   // ─── Render ───────────────────────────────────────────────────────────────

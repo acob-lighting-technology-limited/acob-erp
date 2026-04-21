@@ -33,6 +33,7 @@ interface MeetingReminderFormProps {
   savingDraft: boolean
   knowledgeDepartment: string
   knowledgePresenterId: string
+  knowledgePresenterName: string
   meetingPreparedById: string
   setMeetingPreparedById: (v: string) => void
   departmentOptions: string[]
@@ -57,12 +58,17 @@ export function MeetingReminderForm({
   savingDraft,
   knowledgeDepartment,
   knowledgePresenterId,
+  knowledgePresenterName,
   meetingPreparedById,
   setMeetingPreparedById,
   departmentOptions,
   presenterOptions,
   meetingPreparedByOptions,
 }: MeetingReminderFormProps) {
+  const VISITOR_ITEM_VALUE = "__visitor_presenter__"
+  const presenterSelectValue =
+    knowledgePresenterId !== "none" ? knowledgePresenterId : knowledgePresenterName.trim() ? VISITOR_ITEM_VALUE : "none"
+
   return (
     <>
       <div className="flex flex-wrap gap-4">
@@ -165,12 +171,15 @@ export function MeetingReminderForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="ks-presenter">Presenter</Label>
-            <Select value={knowledgePresenterId} disabled>
+            <Select value={presenterSelectValue} disabled>
               <SelectTrigger id="ks-presenter" className="w-[260px]">
                 <SelectValue placeholder="Select presenter" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Not selected</SelectItem>
+                {knowledgePresenterName.trim() ? (
+                  <SelectItem value={VISITOR_ITEM_VALUE}>{knowledgePresenterName.trim()} (Visitor)</SelectItem>
+                ) : null}
                 {presenterOptions.map((emp) => (
                   <SelectItem key={emp.id} value={emp.id}>
                     {emp.full_name}

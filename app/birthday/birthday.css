@@ -176,8 +176,18 @@
 .birthday-grid {
   display: grid;
   width: 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--birthday-columns, 2), minmax(0, 1fr));
   gap: 1rem;
+}
+
+.birthday-grid[data-count="1"] {
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+.birthday-grid[data-count="2"] {
+  max-width: 62rem;
+  margin-inline: auto;
 }
 
 .birthday-photo-shell {

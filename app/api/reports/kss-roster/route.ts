@@ -26,6 +26,7 @@ const CreateKssRosterSchema = z.object({
     .max(2100, "meetingYear must be between 2000 and 2100"),
   department: z.string().trim().min(1, "department is required"),
   presenterId: z.string().optional().nullable(),
+  presenterName: z.string().trim().optional().nullable(),
   notes: z.string().optional().nullable(),
 })
 
@@ -33,6 +34,7 @@ const UpdateKssRosterSchema = z.object({
   id: z.string().trim().min(1, "id is required"),
   department: z.string().trim().optional(),
   presenterId: z.string().optional().nullable(),
+  presenterName: z.string().trim().optional().nullable(),
   notes: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
 })
@@ -61,6 +63,30 @@ function normalizeDepartment(value: string): string {
 
 function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
   return getDepartmentScope(scope, "general") === null
+}
+
+function resolvePresenterInput(input: { presenterId?: string | null; presenterName?: string | null }): {
+  presenterId: string | null
+  presenterName: string | null
+} {
+  const presenterId = input.presenterId ? String(input.presenterId).trim() : null
+  const presenterName = input.presenterName ? String(input.presenterName).trim() : null
+
+  if (!presenterId && !presenterName) {
+    throw new Error("Please select an employee presenter or enter a visitor name")
+  }
+
+  if (presenterId) {
+    return {
+      presenterId,
+      presenterName: null,
+    }
+  }
+
+  return {
+    presenterId: null,
+    presenterName,
+  }
 }
 
 async function assertWeekIsMutable(supabase: ReportsClient, meetingWeek: number, meetingYear: number) {
@@ -135,7 +161,7 @@ export async function GET(request: Request) {
     let query = dataClient
       .from("kss_weekly_roster")
       .select(
-        "id, meeting_week, meeting_year, department, presenter_id, notes, is_active, created_by, created_at, updated_at",
+        "id, meeting_week, meeting_year, department, presenter_id, presenter_name, notes, is_active, created_by, created_at, updated_at",
         { count: "exact" }
       )
       .order("meeting_year", { ascending: false })
@@ -209,7 +235,10 @@ export async function POST(request: Request) {
     const meetingWeek = parsed.data.meetingWeek
     const meetingYear = parsed.data.meetingYear
     const department = normalizeDepartment(parsed.data.department)
-    const presenterId = parsed.data.presenterId ? String(parsed.data.presenterId) : null
+    const presenter = resolvePresenterInput({
+      presenterId: parsed.data.presenterId,
+      presenterName: parsed.data.presenterName,
+    })
     const notes = parsed.data.notes ? String(parsed.data.notes) : null
 
     await assertWeekAllowsRosterCreate(supabase as ReportsClient, meetingWeek, meetingYear)
@@ -220,13 +249,14 @@ export async function POST(request: Request) {
         meeting_week: meetingWeek,
         meeting_year: meetingYear,
         department,
-        presenter_id: presenterId,
+        presenter_id: presenter.presenterId,
+        presenter_name: presenter.presenterName,
         notes,
         is_active: true,
         created_by: user.id,
       })
       .select(
-        "id, meeting_week, meeting_year, department, presenter_id, notes, is_active, created_by, created_at, updated_at"
+        "id, meeting_week, meeting_year, department, presenter_id, presenter_name, notes, is_active, created_by, created_at, updated_at"
       )
       .single()
 
@@ -243,7 +273,8 @@ export async function POST(request: Request) {
           meeting_week: meetingWeek,
           meeting_year: meetingYear,
           department,
-          presenter_id: presenterId,
+          presenter_id: presenter.presenterId,
+          presenter_name: presenter.presenterName,
         },
         context: {
           actorId: user.id,
@@ -259,6 +290,9 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal Server Error"
     log.error({ err: String(error) }, "POST /api/reports/kss-roster failed")
+    if (message.includes("Please select an employee presenter or enter a visitor name")) {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
     if (message.includes("locked and can no longer be changed")) {
       return NextResponse.json({ error: message }, { status: 409 })
     }
@@ -291,7 +325,7 @@ export async function PATCH(request: Request) {
 
     const { data: existing, error: fetchError } = await dataClient
       .from("kss_weekly_roster")
-      .select("id, department, meeting_week, meeting_year")
+      .select("id, department, presenter_id, presenter_name, meeting_week, meeting_year")
       .eq("id", id)
       .single()
 
@@ -305,8 +339,14 @@ export async function PATCH(request: Request) {
     if (typeof parsed.data.department === "string" && parsed.data.department.trim()) {
       patch.department = normalizeDepartment(parsed.data.department)
     }
-    if (parsed.data.presenterId !== undefined)
-      patch.presenter_id = parsed.data.presenterId ? String(parsed.data.presenterId) : null
+    if (parsed.data.presenterId !== undefined || parsed.data.presenterName !== undefined) {
+      const presenter = resolvePresenterInput({
+        presenterId: parsed.data.presenterId ?? existing.presenter_id,
+        presenterName: parsed.data.presenterName ?? existing.presenter_name,
+      })
+      patch.presenter_id = presenter.presenterId
+      patch.presenter_name = presenter.presenterName
+    }
     if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes ? String(parsed.data.notes) : null
     if (parsed.data.isActive !== undefined) patch.is_active = Boolean(parsed.data.isActive)
 
@@ -319,7 +359,7 @@ export async function PATCH(request: Request) {
       .update(patch)
       .eq("id", id)
       .select(
-        "id, meeting_week, meeting_year, department, presenter_id, notes, is_active, created_by, created_at, updated_at"
+        "id, meeting_week, meeting_year, department, presenter_id, presenter_name, notes, is_active, created_by, created_at, updated_at"
       )
       .single()
 
@@ -346,9 +386,13 @@ export async function PATCH(request: Request) {
     )
 
     return NextResponse.json({ data: updated })
-  } catch (error) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal Server Error"
     log.error({ err: String(error) }, "PATCH /api/reports/kss-roster failed")
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    if (message.includes("Please select an employee presenter or enter a visitor name")) {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 

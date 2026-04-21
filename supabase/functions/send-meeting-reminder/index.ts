@@ -23,6 +23,8 @@ type ReminderType = "meeting" | "knowledge_sharing"
 type KnowledgePresenter = {
   id?: string
   full_name?: string
+  presenter_name?: string
+  name?: string
   department?: string | null
 }
 
@@ -82,6 +84,15 @@ function normalizeEmail(value: string | null | undefined): string {
   return String(value || "")
     .trim()
     .toLowerCase()
+}
+
+function getKnowledgePresenterName(value?: KnowledgePresenter): string | null {
+  const fullName = String(value?.full_name || value?.presenter_name || value?.name || "").trim()
+  return fullName || null
+}
+
+function isKnowledgeSharingAgendaItem(item: string): boolean {
+  return /knowledge\s*sharing\s*session/i.test(String(item || ""))
 }
 
 async function createInAppMeetingNotifications(params: {
@@ -148,7 +159,7 @@ async function createInAppMeetingNotifications(params: {
   if (userIds.size === 0) return
 
   const notificationTitle = reminderType === "meeting" ? "General Meeting Reminder" : "Knowledge Sharing Reminder"
-  const notificationRows = Array.from(userIds).map((userId) => ({
+  let notificationRows: Array<Record<string, unknown>> = Array.from(userIds).map((userId) => ({
     user_id: userId,
     type: "system",
     category: "meetings",
@@ -163,15 +174,36 @@ async function createInAppMeetingNotifications(params: {
       meeting_date: meetingDate || null,
       meeting_time: meetingTime || null,
       knowledge_sharing_department: knowledgeSharingDepartment || null,
-      knowledge_sharing_presenter: knowledgeSharingPresenter?.full_name || null,
+      knowledge_sharing_presenter: getKnowledgePresenterName(knowledgeSharingPresenter),
       recipient_email_count: successfulEmailSet.size,
       sent_at: new Date().toISOString(),
     },
   }))
 
-  const { error: insertError } = await supabase.from("notifications").insert(notificationRows)
-  if (insertError) {
-    throw new Error(`Failed to create in-app notifications: ${insertError.message}`)
+  // Handle schema drift safely: retry insert by removing unknown columns reported by PostgREST.
+  const maxInsertAttempts = 4
+  for (let attempt = 1; attempt <= maxInsertAttempts; attempt++) {
+    const { error: insertError } = await supabase.from("notifications").insert(notificationRows)
+    if (!insertError) {
+      return
+    }
+
+    const missingColumnMatch = insertError.message.match(/Could not find the '([^']+)' column/i)
+    const missingColumn = missingColumnMatch?.[1]
+    if (!missingColumn) {
+      throw new Error(`Failed to create in-app notifications: ${insertError.message}`)
+    }
+
+    const hasColumnInRows = notificationRows.some((row) => Object.prototype.hasOwnProperty.call(row, missingColumn))
+    if (!hasColumnInRows || attempt === maxInsertAttempts) {
+      throw new Error(`Failed to create in-app notifications: ${insertError.message}`)
+    }
+
+    console.warn(`[meeting-reminder] notifications schema drift detected; retrying without column '${missingColumn}'`)
+    notificationRows = notificationRows.map((row) => {
+      const { [missingColumn]: _, ...rest } = row
+      return rest
+    })
   }
 }
 
@@ -214,46 +246,33 @@ function buildMeetingReminderHtml(
   const preparedBy = escapeHtml(preparedByName?.trim() || "ACOB Team")
   const designation = escapeHtml(preparedByDesignation?.trim() || "")
   const department = escapeHtml(preparedByDepartment?.trim() || "Admin & HR Department")
+  const presenterName = getKnowledgePresenterName(kssPresenter)
+  const isGuestPresenter = Boolean(presenterName) && !kssPresenter?.id
+  const presenterDisplayText = presenterName ? `${presenterName}${isGuestPresenter ? " (Guest)" : ""}` : ""
+  const kssDepartmentLabel = (kssDepartment || kssPresenter?.department || "").trim()
+  const agendaRows = [...agenda]
+  const kssAgendaIndex = agendaRows.findIndex((item) => isKnowledgeSharingAgendaItem(item))
+  if (kssAgendaIndex >= 0 && presenterDisplayText) {
+    const departmentSuffix = !isGuestPresenter && kssDepartmentLabel ? ` (${kssDepartmentLabel})` : ""
+    agendaRows[kssAgendaIndex] = `${agendaRows[kssAgendaIndex]} - ${presenterDisplayText}${departmentSuffix}`
+  }
+
   let agendaHtml = ""
-  for (let i = 0; i < agenda.length; i++) {
+  for (let i = 0; i < agendaRows.length; i++) {
     agendaHtml +=
-      '<tr><td style="padding: 10px 18px; font-size: 14px; color: #d1d5db; border-bottom: 1px solid #334155;">' +
+      '<tr><td style="padding: 10px 18px; font-size: 14px; color: #374151; border-bottom: 1px solid #e5e7eb;">' +
       '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>' +
       '<td valign="top" style="width: 36px; padding: 0 12px 0 0;">' +
       '<span style="display: inline-block; background: #000; color: #16a34a; font-weight: 700; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px;">' +
       (i + 1) +
       "</span>" +
       "</td>" +
-      '<td valign="top" style="padding: 2px 0 0 0; color: #d1d5db; line-height: 1.5;">' +
-      escapeHtml(agenda[i]) +
+      '<td valign="top" style="padding: 2px 0 0 0; color: #374151; line-height: 1.5;">' +
+      escapeHtml(agendaRows[i]) +
       "</td>" +
       "</tr></table>" +
       "</td></tr>"
   }
-
-  // KSS block — rendered separately so the agenda text is irrelevant
-  const presenterName = kssPresenter?.full_name?.trim()
-  const kssdept = (kssDepartment || kssPresenter?.department || "").trim()
-  const kssBlock =
-    presenterName || kssdept
-      ? '<div style="margin: 0 0 22px 0; border: 1px solid #c7d2fe; border-radius: 8px; overflow: hidden; background: #eef2ff;">' +
-        '<div style="padding: 10px 18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #c7d2fe; background: #e0e7ff; color: #3730a3;">Knowledge Sharing Session</div>' +
-        '<table style="width:100%; border-collapse: collapse;">' +
-        (kssdept
-          ? '<tr><td style="padding: 8px 18px; font-size: 13px; color: #374151; border-bottom: 1px solid #e0e7ff; width: 110px; font-weight: 600;">Department</td>' +
-            '<td style="padding: 8px 18px; font-size: 13px; color: #374151; border-bottom: 1px solid #e0e7ff;">' +
-            escapeHtml(kssdept) +
-            "</td></tr>"
-          : "") +
-        (presenterName
-          ? '<tr><td style="padding: 8px 18px; font-size: 13px; color: #374151; width: 110px; font-weight: 600;">Presenter</td>' +
-            '<td style="padding: 8px 18px; font-size: 13px; color: #374151;">' +
-            escapeHtml(presenterName) +
-            "</td></tr>"
-          : "") +
-        "</table>" +
-        "</div>"
-      : ""
 
   return (
     "<!DOCTYPE html>" +
@@ -311,7 +330,6 @@ function buildMeetingReminderHtml(
     agendaHtml +
     "</table>" +
     "</div>" +
-    kssBlock +
     '<div class="note-box">' +
     "<strong>Note:</strong> Your attendance is crucial to ensure we're all on the same page and can collaborate effectively. " +
     `Please join on time, and feel free to reach out to <a href="mailto:${MEETING_CONTACT_EMAIL}" style="color:#1e40af;font-weight:600;text-decoration:none;">me</a> or any team member if you have questions or concerns.` +
@@ -749,7 +767,7 @@ serve(async (req) => {
           meeting_date: effectiveMeetingDate || null,
           meeting_time: meetingTime || null,
           knowledge_sharing_department: knowledgeSharingDepartment || null,
-          knowledge_sharing_presenter: knowledgeSharingPresenter?.full_name || null,
+          knowledge_sharing_presenter: getKnowledgePresenterName(knowledgeSharingPresenter),
           kss_roster_status: kssRosterStatus || null,
           prepared_by: meetingPreparedByName || null,
           prepared_by_designation: meetingPreparedByDesignation || null,

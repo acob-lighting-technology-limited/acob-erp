@@ -34,6 +34,10 @@ export interface LeaveRequest {
   status: string
   approval_stage: string
   reliever_id?: string | null
+  approved_by?: string | null
+  reliever_decision_at?: string | null
+  supervisor_decision_at?: string | null
+  hr_decision_at?: string | null
   current_stage_code?: string
   current_stage_order?: number
   current_approver_user_id?: string
@@ -55,6 +59,11 @@ export interface LeaveRequest {
     company_email?: string | null
   } | null
   supervisor?: {
+    id?: string
+    full_name?: string | null
+    company_email?: string | null
+  } | null
+  approved_by_profile?: {
     id?: string
     full_name?: string | null
     company_email?: string | null
@@ -87,6 +96,23 @@ export interface LeaveType {
   eligibility_reason: string | null
   required_documents: string[]
   missing_documents: string[]
+}
+
+type RelieverOption = {
+  value: string
+  label: string
+}
+
+type InitialRelieverDebug = {
+  reason?: string
+  user_id?: string
+  requester_profile_id?: string
+  requester_department?: string | null
+  requester_department_id?: string | null
+  resolution_source?: string
+  total_profiles_scanned?: number
+  matched_profiles?: number
+  options_count?: number
 }
 
 async function getLeaveData() {
@@ -124,7 +150,7 @@ async function getLeaveData() {
       supabase
         .from("profiles")
         .select(
-          "id, role, gender, employment_date, employment_type, marital_status, has_children, pregnancy_status, work_location"
+          "id, role, gender, employment_date, employment_type, marital_status, has_children, pregnancy_status, work_location, department, department_id"
         )
         .eq("id", user.id)
         .single(),
@@ -133,6 +159,8 @@ async function getLeaveData() {
   const requesterProfile = profileData || {
     id: user.id,
     role: "employee",
+    department: null,
+    department_id: null,
     gender: "unspecified",
     employment_date: null,
     employment_type: null,
@@ -163,12 +191,85 @@ async function getLeaveData() {
     })
   )
 
+  const relieverCandidatesById = new Map<
+    string,
+    {
+      id: string
+      full_name?: string | null
+      first_name?: string | null
+      last_name?: string | null
+      department?: string | null
+      department_id?: string | null
+    }
+  >()
+  let totalProfilesScanned = 0
+
+  if (requesterProfile.department_id) {
+    const { data: deptIdRows } = await supabase
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, department, department_id")
+      .eq("department_id", requesterProfile.department_id)
+      .neq("id", requesterProfile.id)
+      .order("first_name", { ascending: true })
+    for (const row of deptIdRows || []) {
+      if (row.id) relieverCandidatesById.set(row.id, row)
+    }
+    totalProfilesScanned += (deptIdRows || []).length
+  }
+
+  if (requesterProfile.department) {
+    const { data: deptNameRows } = await supabase
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, department, department_id")
+      .eq("department", requesterProfile.department)
+      .neq("id", requesterProfile.id)
+      .order("first_name", { ascending: true })
+    for (const row of deptNameRows || []) {
+      if (row.id) relieverCandidatesById.set(row.id, row)
+    }
+    totalProfilesScanned += (deptNameRows || []).length
+  }
+
+  const normalizedRequesterDept = String(requesterProfile.department || "")
+    .trim()
+    .toLowerCase()
+  const relieverRows = Array.from(relieverCandidatesById.values()).filter((row) => {
+    const sameDeptId = Boolean(requesterProfile.department_id && row.department_id === requesterProfile.department_id)
+    const sameDeptName =
+      normalizedRequesterDept.length > 0 &&
+      String(row.department || "")
+        .trim()
+        .toLowerCase() === normalizedRequesterDept
+    return sameDeptId || sameDeptName
+  })
+
+  const relieverOptions: RelieverOption[] = relieverRows
+    .map((row) => ({
+      value: row.id,
+      label: row.full_name?.trim() || `${row.first_name || ""} ${row.last_name || ""}`.trim() || "Unnamed",
+    }))
+    .filter((row) => Boolean(row.value))
+
+  const relieverDebug: InitialRelieverDebug = {
+    reason: !requesterProfile.department && !requesterProfile.department_id ? "requester_has_no_department" : undefined,
+    user_id: user.id,
+    requester_profile_id: requesterProfile.id || null,
+    requester_department: requesterProfile.department || null,
+    requester_department_id: requesterProfile.department_id || null,
+    resolution_source: "leave_page_server_prefetch",
+    total_profiles_scanned: totalProfilesScanned,
+    matched_profiles: relieverRows.length,
+    options_count: relieverOptions.length,
+  }
+
   return {
     currentUserId: user.id,
     currentUserRole: requesterProfile.role || "employee",
     requests: (requestsData || []) as LeaveRequest[],
     balances: (balancesData || []) as LeaveBalance[],
     leaveTypes: enrichedLeaveTypes as LeaveType[],
+    relieverOptions,
+    relieverDebug,
   }
 }
 
@@ -185,6 +286,8 @@ export default async function LeavePage() {
     requests: LeaveRequest[]
     balances: LeaveBalance[]
     leaveTypes: LeaveType[]
+    relieverOptions: RelieverOption[]
+    relieverDebug: InitialRelieverDebug
   }
 
   return (
@@ -193,6 +296,8 @@ export default async function LeavePage() {
       initialRequests={leaveData.requests}
       initialBalances={leaveData.balances}
       initialLeaveTypes={leaveData.leaveTypes}
+      initialRelieverOptions={leaveData.relieverOptions}
+      initialRelieverDebug={leaveData.relieverDebug}
     />
   )
 }

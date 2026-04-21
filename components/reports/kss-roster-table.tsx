@@ -54,6 +54,7 @@ type KssRosterEntry = {
   meeting_year: number
   department: string
   presenter_id: string | null
+  presenter_name: string | null
   created_by: string | null
   notes: string | null
   created_at: string
@@ -70,6 +71,7 @@ type KssDocument = {
   document_type: "knowledge_sharing_session"
   department: string | null
   presenter_id: string | null
+  presenter_name: string | null
   file_name: string
   mime_type?: string | null
   signed_url: string | null
@@ -92,6 +94,7 @@ type KssResult = {
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 type UploadPhase = "idle" | "saving" | "converting" | "uploading"
+type PresenterType = "employee" | "visitor"
 
 interface Props {
   employees: Employee[]
@@ -153,7 +156,9 @@ export function KssRosterTable({
   const [weekNumber, setWeekNumber] = useState(defaultWeek)
   const [yearNumber, setYearNumber] = useState(defaultYear)
   const [department, setDepartment] = useState("none")
+  const [presenterType, setPresenterType] = useState<PresenterType>("employee")
   const [presenterId, setPresenterId] = useState("none")
+  const [visitorPresenterName, setVisitorPresenterName] = useState("")
   const [notes, setNotes] = useState("")
   const [file, setFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
@@ -252,6 +257,16 @@ export function KssRosterTable({
       .sort((a, b) => a.full_name.localeCompare(b.full_name))
   }, [allowInactivePresentersForSelection, department, employees])
 
+  const getPresenterName = useCallback(
+    (row: Pick<KssRosterEntry, "presenter_id" | "presenter_name">): string => {
+      if (row.presenter_id) {
+        return employeeNameById.get(row.presenter_id) || row.presenter_name || "Unknown"
+      }
+      return row.presenter_name || "-"
+    },
+    [employeeNameById]
+  )
+
   const selectedWeekExistingRow = useMemo(
     () => roster.find((row) => row.meeting_week === weekNumber && row.meeting_year === yearNumber) || null,
     [roster, weekNumber, yearNumber]
@@ -272,7 +287,9 @@ export function KssRosterTable({
   useEffect(() => {
     if (!canUploadMissingForLockedWeek || !selectedWeekExistingRow || editingId) return
     setDepartment(selectedWeekExistingRow.department || "none")
+    setPresenterType(selectedWeekExistingRow.presenter_id ? "employee" : "visitor")
     setPresenterId(selectedWeekExistingRow.presenter_id || "none")
+    setVisitorPresenterName(selectedWeekExistingRow.presenter_name || "")
     setNotes(selectedWeekExistingRow.notes || "")
   }, [canUploadMissingForLockedWeek, selectedWeekExistingRow, editingId])
 
@@ -294,7 +311,9 @@ export function KssRosterTable({
     setWeekNumber(defaultWeek)
     setYearNumber(defaultYear)
     setDepartment("none")
+    setPresenterType("employee")
     setPresenterId("none")
+    setVisitorPresenterName("")
     setNotes("")
     setFile(null)
     setEditingId(null)
@@ -337,7 +356,9 @@ export function KssRosterTable({
       setWeekNumber(row.meeting_week)
       setYearNumber(row.meeting_year)
       setDepartment(row.department)
+      setPresenterType(row.presenter_id ? "employee" : "visitor")
       setPresenterId(row.presenter_id || "none")
+      setVisitorPresenterName(row.presenter_name || "")
       setNotes(row.notes || "")
       setFile(null)
     },
@@ -361,8 +382,15 @@ export function KssRosterTable({
       toast.error("Please select department")
       return
     }
-    if (presenterId === "none") {
+    const normalizedVisitorName = visitorPresenterName.trim()
+    const resolvedPresenterId = presenterType === "employee" ? presenterId : "none"
+    const resolvedPresenterName = presenterType === "visitor" ? normalizedVisitorName : ""
+    if (presenterType === "employee" && resolvedPresenterId === "none") {
       toast.error("Please select presenter")
+      return
+    }
+    if (presenterType === "visitor" && !resolvedPresenterName) {
+      toast.error("Please enter visitor presenter name")
       return
     }
 
@@ -374,6 +402,7 @@ export function KssRosterTable({
         meeting_year: number
         department?: string | null
         presenter_id?: string | null
+        presenter_name?: string | null
       } | null = null
 
       const skipRosterWrite =
@@ -393,14 +422,16 @@ export function KssRosterTable({
               ? {
                   id: editingId,
                   department,
-                  presenterId,
+                  presenterId: resolvedPresenterId === "none" ? null : resolvedPresenterId,
+                  presenterName: resolvedPresenterName || null,
                   notes: notes || null,
                 }
               : {
                   meetingWeek: weekNumber,
                   meetingYear: yearNumber,
                   department,
-                  presenterId,
+                  presenterId: resolvedPresenterId === "none" ? null : resolvedPresenterId,
+                  presenterName: resolvedPresenterName || null,
                   notes: notes || null,
                 }
           ),
@@ -418,7 +449,11 @@ export function KssRosterTable({
         fd.append("meetingYear", String(savedRoster?.meeting_year || yearNumber))
         fd.append("documentType", "knowledge_sharing_session")
         fd.append("department", String(savedRoster?.department || department))
-        fd.append("presenterId", String(savedRoster?.presenter_id || presenterId))
+        const uploadPresenterId =
+          savedRoster?.presenter_id || (resolvedPresenterId === "none" ? null : resolvedPresenterId)
+        const uploadPresenterName = savedRoster?.presenter_name || resolvedPresenterName || null
+        if (uploadPresenterId) fd.append("presenterId", String(uploadPresenterId))
+        if (uploadPresenterName) fd.append("presenterName", String(uploadPresenterName))
         if (notes.trim()) fd.append("notes", notes.trim())
 
         if (requiresConversion) {
@@ -638,8 +673,8 @@ export function KssRosterTable({
         key: "presenter",
         label: "Presenter",
         sortable: true,
-        accessor: (row) => (row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"),
-        render: (row) => (row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"),
+        accessor: (row) => getPresenterName(row),
+        render: (row) => getPresenterName(row),
       },
       {
         key: "meeting_date",
@@ -688,7 +723,7 @@ export function KssRosterTable({
           }),
       },
     ],
-    [docByWeekYear, employeeNameById]
+    [docByWeekYear, employeeNameById, getPresenterName]
   )
 
   const filters = useMemo<DataTableFilter<KssRosterEntry>[]>(
@@ -732,7 +767,11 @@ export function KssRosterTable({
       actions.push({
         label: "Score",
         onClick: (row: KssRosterEntry) => {
-          if (!row.presenter_id || row.presenter_id === currentUserId) {
+          if (!row.presenter_id) {
+            toast.error("Only employee presenters can be scored")
+            return
+          }
+          if (row.presenter_id === currentUserId) {
             toast.error("You can only score another presenter")
             return
           }
@@ -771,7 +810,7 @@ export function KssRosterTable({
       icon: Download,
       onClick: (row: KssRosterEntry) => {
         const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
-        const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
+        const presenterName = getPresenterName(row)
         if (!doc?.signed_url) {
           toast.error("No uploaded KSS file is available for this week")
           return
@@ -783,8 +822,8 @@ export function KssRosterTable({
   }, [
     currentUserId,
     docByWeekYear,
-    employeeNameById,
     enableScoring,
+    getPresenterName,
     handleDownload,
     openEdit,
     openScoreDialog,
@@ -928,7 +967,10 @@ export function KssRosterTable({
                 <Label>Department</Label>
                 <Select
                   value={department}
-                  onValueChange={setDepartment}
+                  onValueChange={(value) => {
+                    setDepartment(value)
+                    setPresenterId("none")
+                  }}
                   disabled={isFormLocked || canUploadMissingForLockedWeek}
                 >
                   <SelectTrigger>
@@ -946,27 +988,57 @@ export function KssRosterTable({
               </div>
 
               <div className="space-y-2">
-                <Label>Presenter</Label>
+                <Label>Presenter Type</Label>
                 <Select
-                  value={presenterId}
-                  onValueChange={setPresenterId}
-                  disabled={isFormLocked || canUploadMissingForLockedWeek || department === "none"}
+                  value={presenterType}
+                  onValueChange={(value: PresenterType) => {
+                    setPresenterType(value)
+                    setPresenterId("none")
+                    setVisitorPresenterName("")
+                  }}
+                  disabled={isFormLocked || canUploadMissingForLockedWeek}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select presenter" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Select presenter</SelectItem>
-                    {presenterOptions.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.full_name}
-                        {!isAssignableEmploymentStatus(emp.employment_status, { allowLegacyNullStatus: false })
-                          ? " (separated)"
-                          : ""}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="visitor">Visitor</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Presenter</Label>
+                {presenterType === "employee" ? (
+                  <Select
+                    value={presenterId}
+                    onValueChange={setPresenterId}
+                    disabled={isFormLocked || canUploadMissingForLockedWeek || department === "none"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select presenter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select presenter</SelectItem>
+                      {presenterOptions.map((emp) => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.full_name}
+                          {!isAssignableEmploymentStatus(emp.employment_status, { allowLegacyNullStatus: false })
+                            ? " (separated)"
+                            : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={visitorPresenterName}
+                    onChange={(e) => setVisitorPresenterName(e.target.value)}
+                    placeholder="Enter visitor full name"
+                    disabled={isFormLocked || canUploadMissingForLockedWeek}
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1063,8 +1135,8 @@ export function KssRosterTable({
               <DialogDescription>
                 Submit your KSS evaluation for{" "}
                 {scoringRow?.presenter_id
-                  ? employeeNameById.get(scoringRow.presenter_id) || "this presenter"
-                  : "this presenter"}
+                  ? getPresenterName(scoringRow)
+                  : scoringRow?.presenter_name || "this presenter"}
                 .
               </DialogDescription>
             </DialogHeader>
@@ -1135,7 +1207,7 @@ export function KssRosterTable({
           searchPlaceholder="Search department, presenter, week, or year..."
           searchFn={(row, query) => {
             const normalizedQuery = query.toLowerCase()
-            const presenterName = row.presenter_id ? (employeeNameById.get(row.presenter_id) || "").toLowerCase() : ""
+            const presenterName = getPresenterName(row).toLowerCase()
             return (
               row.department.toLowerCase().includes(normalizedQuery) ||
               presenterName.includes(normalizedQuery) ||
@@ -1154,7 +1226,7 @@ export function KssRosterTable({
           expandable={{
             render: (row) => {
               const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
-              const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
+              const presenterName = getPresenterName(row)
               const submittedBy = row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"
               return (
                 <div className="grid gap-4 md:grid-cols-4">
@@ -1186,7 +1258,7 @@ export function KssRosterTable({
           }}
           viewToggle
           cardRenderer={(row) => {
-            const presenterName = row.presenter_id ? employeeNameById.get(row.presenter_id) || "Unknown" : "-"
+            const presenterName = getPresenterName(row)
             const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
             return (
               <div className="space-y-3 rounded-xl border p-4">

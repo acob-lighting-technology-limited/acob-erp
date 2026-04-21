@@ -13,6 +13,7 @@ import { Loader2, Sparkles } from "lucide-react"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { fetchWeeklyReportLockState, type WeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { sanitizeReportText } from "@/lib/export-utils"
+import { useAdminScopeOptional } from "@/components/admin-scope-context"
 
 interface WeeklyReport {
   id: string
@@ -80,11 +81,21 @@ export function WeeklyReportAdminDialog({
   })
 
   const [supabase] = useState(() => createClient())
-  const isLead = currentUser.is_department_lead
+  const adminScope = useAdminScopeOptional()
+  const normalizedRole = (currentUser.role || "").trim().toLowerCase()
+  const isAdminLikeRole =
+    normalizedRole === "developer" || normalizedRole === "super_admin" || normalizedRole === "admin"
+
+  // Restrict to managed departments only when the current admin view is truly lead-scoped.
+  const isLeadScopedView = Boolean(
+    adminScope
+      ? adminScope.scopeMode === "lead" || (!adminScope.isAdminLike && adminScope.isDepartmentLead)
+      : currentUser.is_department_lead && !isAdminLikeRole
+  )
 
   useEffect(() => {
     const fetchMetadata = async () => {
-      if (isLead && currentUser.department) {
+      if (isLeadScopedView && currentUser.department) {
         setDepartments([currentUser.department])
         return
       }
@@ -95,7 +106,7 @@ export function WeeklyReportAdminDialog({
       }
     }
     fetchMetadata()
-  }, [currentUser.department, isLead, supabase])
+  }, [currentUser.department, isLeadScopedView, supabase])
 
   useEffect(() => {
     const fetchLockState = async () => {
@@ -173,7 +184,7 @@ export function WeeklyReportAdminDialog({
       setSelectedExistingReportId(report.id)
       setFormData({
         user_id: report.user_id,
-        department: isLead ? currentUser.department || report.department : report.department,
+        department: isLeadScopedView ? currentUser.department || report.department : report.department,
         week_number: report.week_number,
         year: report.year,
         work_done: autoNumberReportText(report.work_done || ""),
@@ -186,7 +197,7 @@ export function WeeklyReportAdminDialog({
       setFormData((prev) => ({
         ...prev,
         user_id: currentUser.id || "",
-        department: isLead ? currentUser.department || "" : "",
+        department: isLeadScopedView ? currentUser.department || "" : "",
         week_number: currentOfficeWeek.week,
         year: currentOfficeWeek.year,
         work_done: "",
@@ -194,7 +205,15 @@ export function WeeklyReportAdminDialog({
         challenges: "",
       }))
     }
-  }, [currentUser.department, currentUser.id, currentOfficeWeek.week, currentOfficeWeek.year, isLead, report, isOpen])
+  }, [
+    currentUser.department,
+    currentUser.id,
+    currentOfficeWeek.week,
+    currentOfficeWeek.year,
+    isLeadScopedView,
+    report,
+    isOpen,
+  ])
 
   const isLockedForExistingReport = Boolean(lockState?.isLocked && selectedExistingReportId)
 
@@ -214,15 +233,15 @@ export function WeeklyReportAdminDialog({
     }
     setLoading(true)
     try {
-      if (isLead && report && report.user_id !== currentUser.id) {
+      if (isLeadScopedView && report && report.user_id !== currentUser.id) {
         throw new Error("You can only edit reports you created")
       }
 
       const safeFormData = {
         id: report?.id || selectedExistingReportId || undefined,
         ...formData,
-        user_id: isLead ? currentUser.id : formData.user_id,
-        department: isLead ? currentUser.department || formData.department : formData.department,
+        user_id: isLeadScopedView ? currentUser.id : formData.user_id,
+        department: isLeadScopedView ? currentUser.department || formData.department : formData.department,
       }
 
       const response = await fetch("/api/reports/weekly-reports", {
@@ -302,7 +321,7 @@ export function WeeklyReportAdminDialog({
                 onValueChange={(val) => setFormData((p) => ({ ...p, department: val }))}
                 options={departments.map((d) => ({ value: d, label: d }))}
                 placeholder="Select department"
-                disabled={isLead}
+                disabled={isLeadScopedView}
               />
             </div>
             <div className="space-y-2">

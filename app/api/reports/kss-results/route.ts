@@ -65,15 +65,24 @@ export async function POST(request: NextRequest) {
 
     const { data: roster, error: rosterError } = await supabase
       .from("kss_weekly_roster")
-      .select("id, presenter_id, meeting_week, meeting_year")
+      .select("id, presenter_id, presenter_name, meeting_week, meeting_year")
       .eq("id", parsed.data.roster_id)
-      .single<{ id: string; presenter_id?: string | null; meeting_week: number; meeting_year: number }>()
+      .single<{
+        id: string
+        presenter_id?: string | null
+        presenter_name?: string | null
+        meeting_week: number
+        meeting_year: number
+      }>()
 
     if (rosterError || !roster) {
       return NextResponse.json({ error: "KSS roster entry not found" }, { status: 404 })
     }
 
     if (!roster.presenter_id) {
+      if (roster.presenter_name) {
+        return NextResponse.json({ error: "Visitor presenters cannot be scored yet" }, { status: 400 })
+      }
       return NextResponse.json({ error: "This KSS roster entry does not have a presenter yet" }, { status: 400 })
     }
 

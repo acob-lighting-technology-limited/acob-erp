@@ -250,7 +250,45 @@ export async function loadRouteRows(supabase: LeaveRoutingClient, requesterKind:
     .order("stage_order", { ascending: true })
 
   if (error) throw new Error("Failed to load leave route configuration")
-  return (data || []) as RouteConfigRow[]
+  const routeRows = (data || []) as RouteConfigRow[]
+  return applyRequesterStageOrder(routeRows, requesterKind)
+}
+
+function applyRequesterStageOrder(routeRows: RouteConfigRow[], requesterKind: RequesterKind) {
+  const rolePriority: Partial<Record<RequesterKind, Record<string, number>>> = {
+    dept_lead: {
+      reliever: 10,
+      department_lead: 20,
+      admin_hr_lead: 30,
+      hcs: 35,
+      md: 40,
+    },
+    admin_hr_lead: {
+      reliever: 10,
+      hcs: 30,
+      md: 40,
+    },
+    hcs: {
+      reliever: 10,
+      admin_hr_lead: 30,
+      md: 40,
+    },
+  }
+
+  const configuredPriority = rolePriority[requesterKind]
+  if (!configuredPriority) return routeRows
+
+  return [...routeRows].sort((left, right) => {
+    const leftPriority = configuredPriority[left.approver_role_code]
+    const rightPriority = configuredPriority[right.approver_role_code]
+    const normalizedLeft = typeof leftPriority === "number" ? leftPriority : 1000 + left.stage_order
+    const normalizedRight = typeof rightPriority === "number" ? rightPriority : 1000 + right.stage_order
+
+    if (normalizedLeft === normalizedRight) {
+      return left.stage_order - right.stage_order
+    }
+    return normalizedLeft - normalizedRight
+  })
 }
 
 export async function buildResolvedRouteSnapshot(params: {
@@ -276,6 +314,11 @@ export async function buildResolvedRouteSnapshot(params: {
     })
 
     if (!approver?.id) {
+      // Explicit business rule: if no department lead is configured, skip that stage
+      // and continue with the next configured approver (e.g. Admin & HR lead).
+      if (row.approver_role_code === "department_lead") {
+        continue
+      }
       throw new Error(`LEAVE_APPROVER_NOT_CONFIGURED:${row.approver_role_code}`)
     }
 
