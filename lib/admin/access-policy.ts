@@ -1,4 +1,10 @@
 import type { AdminDomain, AdminScopeMode } from "@/lib/admin/rbac"
+import {
+  buildAccessContextV2,
+  canAccessRouteV2,
+  resolveAdminRouteKeyV2,
+  type AccessContextV2,
+} from "@/lib/admin/policy-v2"
 
 export interface AdminAccessScope {
   role: string | null | undefined
@@ -29,29 +35,17 @@ export function getDomainForAdminPath(path: string): AdminDomain | null {
 }
 
 export function canAccessAdminPath(scope: AdminAccessScope, path: string): boolean {
-  const role = String(scope.role || "")
-    .trim()
-    .toLowerCase()
-  const isDevRoute = path.startsWith("/admin/dev")
+  const context = buildAccessContextV2({
+    role: scope.role || "",
+    isDepartmentLead: scope.isDepartmentLead,
+    isAdminLike: scope.isAdminLike,
+    managedDepartments: [],
+    adminDomains: scope.adminDomains,
+    scopeMode: scope.scopeMode,
+  })
 
-  if (isDevRoute) return role === "developer"
-  if (path === "/admin") return scope.isAdminLike || scope.isDepartmentLead
-
-  if (!scope.isAdminLike && !scope.isDepartmentLead) return false
-
-  // Explicit lead context (or pure lead identity) behaves as lead-scoped view:
-  // broad section access, no dev routes.
-  if (scope.scopeMode === "lead" || (!scope.isAdminLike && scope.isDepartmentLead)) {
-    return true
-  }
-
-  if (role === "developer" || role === "super_admin") return true
-
-  if (role === "admin") {
-    const mappedDomain = getDomainForAdminPath(path)
-    const domains = Array.isArray(scope.adminDomains) ? scope.adminDomains : []
-    return Boolean(mappedDomain && domains.includes(mappedDomain))
-  }
-
-  return false
+  const route = resolveAdminRouteKeyV2(path)
+  return canAccessRouteV2(context, route)
 }
+
+export { buildAccessContextV2, type AccessContextV2 }

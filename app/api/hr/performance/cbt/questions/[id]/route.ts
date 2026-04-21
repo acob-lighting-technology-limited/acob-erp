@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 
 const log = logger("hr-performance-cbt-question-detail")
 
@@ -18,33 +19,30 @@ const UpdateSchema = z.object({
   is_active: z.boolean().optional(),
 })
 
-type AccessProfile = { role?: string | null }
-
-function canManageQuestions(role: string | null | undefined) {
-  return ["developer", "super_admin", "admin"].includes(String(role || "").toLowerCase())
-}
-
 async function getAuthorizedContext() {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { supabase, user: null, profile: null }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle<AccessProfile>()
-  return { supabase, dataClient: getServiceRoleClientOrFallback(supabase), user, profile }
+  if (!user) return { supabase, user: null as null }
+  return { supabase, dataClient: getServiceRoleClientOrFallback(supabase), user }
 }
 
 export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   try {
-    const { supabase, dataClient, user, profile } = await getAuthorizedContext()
-    if (!user || !canManageQuestions(profile?.role)) {
+    const { supabase, dataClient, user } = await getAuthorizedContext()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const contextResult = await requireAccessContextV2()
+    if (!contextResult.ok) {
+      return contextResult.response
+    }
+    const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.pms.cbt.manage")
+    if (!routeAccess.ok) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -88,8 +86,17 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 export async function DELETE(_: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   try {
-    const { supabase, dataClient, user, profile } = await getAuthorizedContext()
-    if (!user || !canManageQuestions(profile?.role)) {
+    const { supabase, dataClient, user } = await getAuthorizedContext()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const contextResult = await requireAccessContextV2()
+    if (!contextResult.ok) {
+      return contextResult.response
+    }
+    const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.pms.cbt.manage")
+    if (!routeAccess.ok) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

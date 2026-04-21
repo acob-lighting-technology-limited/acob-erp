@@ -2,9 +2,11 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { canAccessAdminSection, normalizeDepartmentName, resolveAdminScope } from "@/lib/admin/rbac"
+import { normalizeDepartmentName } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
+import { canMutateV2 } from "@/lib/admin/policy-v2"
 
 const log = logger("api-reports-weekly-reports")
 
@@ -74,9 +76,13 @@ export async function PATCH(request: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
-    if (!scope || !canAccessAdminSection(scope, "reports")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const contextResult = await requireAccessContextV2()
+    if (!contextResult.ok) {
+      return contextResult.response
+    }
+    const routeAccess = enforceRouteAccessV2(contextResult.context, "reports.weekly")
+    if (!routeAccess.ok) {
+      return routeAccess.response
     }
 
     const dataClient = getServiceRoleClientOrFallback(supabase as ReportsClient)
@@ -97,14 +103,16 @@ export async function PATCH(request: Request) {
     const status = parsed.data.status || "submitted"
     const reportId = String(parsed.data.id || "").trim()
 
-    const isGlobalReportsEditor =
-      scope.role === "developer" ||
-      scope.role === "super_admin" ||
-      (scope.role === "admin" && Array.isArray(scope.adminDomains) && scope.adminDomains.includes("reports"))
-
-    if (!isGlobalReportsEditor && !scope.managedDepartments.includes(department)) {
+    const canWriteDepartment = canMutateV2(contextResult.context, "reports.weekly", department)
+    if (!canWriteDepartment) {
       log.warn(
-        { department, managedDepartments: scope.managedDepartments, userId: user.id, role: scope.role },
+        {
+          department,
+          managedDepartments: contextResult.context.managedDepartments,
+          userId: user.id,
+          role: contextResult.context.baseRole,
+          actingContext: contextResult.context.actingContext,
+        },
         "Weekly report save forbidden by department scope"
       )
       return NextResponse.json({ error: "You cannot manage reports for this department" }, { status: 403 })
@@ -158,7 +166,7 @@ export async function PATCH(request: Request) {
     log.info(
       {
         userId: user.id,
-        role: scope.role,
+        role: contextResult.context.baseRole,
         department,
         weekNumber,
         yearNumber,
@@ -166,7 +174,7 @@ export async function PATCH(request: Request) {
         existingId: targetExisting?.id || null,
         existingUserId: targetExisting?.user_id || null,
         isWeekMutable,
-        isGlobalReportsEditor,
+        actingContext: contextResult.context.actingContext,
       },
       "Weekly report save pre-write state"
     )
@@ -204,6 +212,10 @@ export async function PATCH(request: Request) {
         { status: 409 }
       )
     }
+
+    const isGlobalReportsEditor =
+      contextResult.context.actingContext === "global_admin" &&
+      ["developer", "super_admin", "admin"].includes(contextResult.context.baseRole)
 
     if (!isGlobalReportsEditor && targetExisting?.user_id && targetExisting.user_id !== user.id) {
       log.warn(

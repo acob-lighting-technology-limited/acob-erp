@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 
 const log = logger("hr-performance-cbt")
 
@@ -12,13 +13,6 @@ const SaveCbtScoreSchema = z.object({
   review_cycle_id: z.string().trim().min(1, "Review cycle is required"),
   cbt_score: z.number().min(0, "CBT score must be at least 0").max(100, "CBT score cannot exceed 100"),
 })
-
-type AccessProfile = {
-  role?: string | null
-  department?: string | null
-  is_department_lead?: boolean | null
-  lead_departments?: string[] | null
-}
 
 type ScopedUserRow = {
   id: string
@@ -94,24 +88,6 @@ function chooseCanonicalReview(reviews: CbtReviewRow[]): CbtReviewRow | null {
   })[0]
 }
 
-async function getScopedAccess(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, department, is_department_lead, lead_departments")
-    .eq("id", userId)
-    .maybeSingle<AccessProfile>()
-
-  const role = String(profile?.role || "").toLowerCase()
-  const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
-  const scopedDepartments = isAdminLike
-    ? null
-    : Array.from(new Set([profile?.department, ...(profile?.lead_departments || [])].filter(Boolean) as string[]))
-
-  const canManage = isAdminLike || profile?.is_department_lead === true
-
-  return { profile, role, isAdminLike, scopedDepartments, canManage }
-}
-
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -123,21 +99,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const access = await getScopedAccess(supabase, user.id)
-    if (!access.canManage) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const contextResult = await requireAccessContextV2()
+    if (!contextResult.ok) {
+      return contextResult.response
+    }
+
+    const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.pms.cbt.manage")
+    if (!routeAccess.ok) {
+      return routeAccess.response
     }
 
     const cycleId = new URL(request.url).searchParams.get("cycle_id")
 
-    let usersQuery = supabase
+    const usersQuery = supabase
       .from("profiles")
       .select("id, first_name, last_name, department")
       .order("first_name", { ascending: true })
-
-    if (access.scopedDepartments && access.scopedDepartments.length > 0) {
-      usersQuery = usersQuery.in("department", access.scopedDepartments)
-    }
 
     const [{ data: users }, { data: cycles }] = await Promise.all([
       usersQuery.returns<ScopedUserRow[]>(),
@@ -216,9 +193,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const access = await getScopedAccess(supabase, user.id)
-    if (!access.canManage) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const contextResult = await requireAccessContextV2()
+    if (!contextResult.ok) {
+      return contextResult.response
+    }
+
+    const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.pms.cbt.manage")
+    if (!routeAccess.ok) {
+      return routeAccess.response
     }
 
     const parsed = SaveCbtScoreSchema.safeParse(await request.json())
@@ -249,12 +231,6 @@ export async function POST(request: NextRequest) {
 
     if (!targetProfile) {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 })
-    }
-
-    if (access.scopedDepartments && access.scopedDepartments.length > 0) {
-      if (!access.scopedDepartments.includes(String(targetProfile.department || ""))) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
     }
 
     const { data: existingReviews } = await adminSupabase

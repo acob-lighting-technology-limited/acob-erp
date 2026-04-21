@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 
 const log = logger("hr-performance-cbt-questions")
 
@@ -19,10 +20,6 @@ const QuestionSchema = z.object({
   is_active: z.boolean().optional().default(true),
 })
 
-type AccessProfile = {
-  role?: string | null
-}
-
 type CbtQuestionRow = {
   id: string
   prompt: string
@@ -37,34 +34,29 @@ type CbtQuestionRow = {
   review_cycle_id?: string | null
 }
 
-function canManageQuestions(role: string | null | undefined) {
-  return ["developer", "super_admin", "admin"].includes(String(role || "").toLowerCase())
-}
-
-function canViewQuestions(role: string | null | undefined) {
-  return ["developer", "super_admin", "admin"].includes(String(role || "").toLowerCase())
-}
-
 async function getAuthorizedProfile() {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) return { supabase, user: null, profile: null }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle<AccessProfile>()
-  return { supabase, dataClient: getServiceRoleClientOrFallback(supabase), user, profile }
+  if (!user) return { supabase, user: null as null }
+  return { supabase, dataClient: getServiceRoleClientOrFallback(supabase), user }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const { dataClient, user, profile } = await getAuthorizedProfile()
-    if (!user || !canViewQuestions(profile?.role)) {
+    const { dataClient, user } = await getAuthorizedProfile()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const contextResult = await requireAccessContextV2()
+    if (!contextResult.ok) {
+      return contextResult.response
+    }
+    const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.pms.cbt.manage")
+    if (!routeAccess.ok) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -93,8 +85,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, dataClient, user, profile } = await getAuthorizedProfile()
-    if (!user || !canManageQuestions(profile?.role)) {
+    const { supabase, dataClient, user } = await getAuthorizedProfile()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const contextResult = await requireAccessContextV2()
+    if (!contextResult.ok) {
+      return contextResult.response
+    }
+    const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.pms.cbt.manage")
+    if (!routeAccess.ok) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

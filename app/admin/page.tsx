@@ -18,7 +18,7 @@ import {
   secondaryModules,
 } from "@/components/admin/dashboard-helpers"
 import { logger } from "@/lib/logger"
-import { canAccessAdminPath } from "@/lib/admin/access-policy"
+import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
 const log = logger("")
 
@@ -280,20 +280,9 @@ export default async function AdminDashboardPage() {
     })
   }
 
+  const accessContext = scope ? buildAccessContextV2(scope) : null
   const canAccessAction = (_requiredRoles: string[], href: string) =>
-    Boolean(
-      scope &&
-        canAccessAdminPath(
-          {
-            role: scope.role,
-            isDepartmentLead: scope.isDepartmentLead,
-            isAdminLike: scope.isAdminLike,
-            adminDomains: scope.adminDomains,
-            scopeMode: scope.scopeMode,
-          },
-          href
-        )
-    )
+    Boolean(accessContext && canAccessRouteV2(accessContext, resolveAdminRouteKeyV2(href)))
 
   const filteredPrimaryModules = primaryModules.filter((a) => canAccessAction(a.roles, a.href))
   const filteredSecondaryModules = secondaryModules.filter((a) => canAccessAction(a.roles, a.href))

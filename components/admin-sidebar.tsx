@@ -34,8 +34,8 @@ import { useSidebar } from "@/components/sidebar-context"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion, AnimatePresence } from "framer-motion"
-import type { AdminDomain, AdminScopeMode } from "@/lib/admin/rbac"
-import { canAccessAdminPath } from "@/lib/admin/access-policy"
+import { normalizeDepartmentName } from "@/shared/departments"
+import { canAccessRouteV2, resolveAdminRouteKeyV2, type AccessContextV2, type AdminDomain } from "@/lib/admin/policy-v2"
 
 interface AdminSidebarProps {
   user?: {
@@ -54,7 +54,7 @@ interface AdminSidebarProps {
     admin_domains?: string[] | null
     lead_departments?: string[]
   }
-  adminScopeMode?: AdminScopeMode
+  adminScopeMode?: "global" | "lead"
 }
 
 const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "communications"]
@@ -280,20 +280,42 @@ export function AdminSidebar({ user, profile, adminScopeMode = "global" }: Admin
   }
 
   const adminDomains = useMemo(() => normalizeAdminDomains(profile?.admin_domains), [profile?.admin_domains])
+  const accessContext = useMemo<AccessContextV2 | null>(() => {
+    if (!profile?.role) return null
+    const managedDepartmentSet = new Set<string>()
+    if (profile.department) {
+      managedDepartmentSet.add(normalizeDepartmentName(profile.department))
+    }
+    for (const department of profile.lead_departments || []) {
+      managedDepartmentSet.add(normalizeDepartmentName(department))
+    }
+
+    return {
+      baseRole: String(profile.role).toLowerCase(),
+      isDepartmentLead: Boolean(profile.is_department_lead),
+      isAdminLike: ["developer", "admin", "super_admin"].includes(String(profile.role).toLowerCase()),
+      adminDomains,
+      actingContext:
+        adminScopeMode === "lead" ||
+        (!["developer", "admin", "super_admin"].includes(String(profile.role).toLowerCase()) &&
+          Boolean(profile.is_department_lead))
+          ? "department_lead"
+          : "global_admin",
+      managedDepartments: Array.from(managedDepartmentSet),
+    }
+  }, [
+    adminDomains,
+    adminScopeMode,
+    profile?.department,
+    profile?.is_department_lead,
+    profile?.lead_departments,
+    profile?.role,
+  ])
 
   const canAccessRoute = (requiredRoles: string[], href: string) => {
-    if (!profile?.role) return false
+    if (!profile?.role || !accessContext) return false
     if (!requiredRoles.includes(profile.role)) return false
-    return canAccessAdminPath(
-      {
-        role: profile.role,
-        isDepartmentLead: Boolean(profile.is_department_lead),
-        isAdminLike: ["developer", "admin", "super_admin"].includes(profile.role),
-        adminDomains,
-        scopeMode: adminScopeMode,
-      },
-      href
-    )
+    return canAccessRouteV2(accessContext, resolveAdminRouteKeyV2(href))
   }
 
   const filteredNavigation = adminNavigation.filter((item) => canAccessRoute(item.roles, item.href))
