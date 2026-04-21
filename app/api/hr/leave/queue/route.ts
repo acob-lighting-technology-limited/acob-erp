@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
-import { resolveApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 
 const log = logger("hr-leave-queue")
 export const dynamic = "force-dynamic"
@@ -14,8 +14,6 @@ const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_md: "hr_pending",
   pending_hcs: "hr_pending",
 }
-
-const ADMIN_LIKE_ROLES = ["developer", "admin", "super_admin"]
 
 type ProfileSummary = {
   id: string
@@ -73,22 +71,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const all = searchParams.get("all") === "true"
-    // Leads can access the global queue but will see only their scoped departments
-    const { data: profileWithLead } = await supabase
-      .from("profiles")
-      .select("role, is_department_lead")
-      .eq("id", user.id)
-      .single<{ role: string | null; is_department_lead: boolean | null }>()
-    const isAdminLike = ADMIN_LIKE_ROLES.includes(profileWithLead?.role || "")
-    const isDeptLead = Boolean(profileWithLead?.is_department_lead)
-    const canViewAll = isAdminLike || isDeptLead
+    // Leads can access the global queue but will see only their scoped departments.
+    // Resolve once from centralized request scope (middleware header first).
+    const scope = await getRequestScope()
+    const canViewAll = Boolean(scope?.isAdminLike || scope?.isDepartmentLead)
 
     if (all && !canViewAll) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     // Resolve scope for department filtering (leads see only their departments)
-    const scope = await resolveApiAdminScope()
     const scopedDepts = scope ? getScopedDepartments(scope) : null
 
     let query = supabase

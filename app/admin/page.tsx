@@ -12,14 +12,13 @@ import { PrimaryModuleGrid, SecondaryModuleGrid } from "@/components/admin/modul
 import { RecentActivityFeed } from "@/components/admin/recent-activity-feed"
 import type { NotificationItem } from "@/components/admin/dashboard-types"
 import {
-  normalizeAdminDomains,
-  getDomainForAdminPath,
   normalizeToken,
   buildRecentActivity,
   primaryModules,
   secondaryModules,
 } from "@/components/admin/dashboard-helpers"
 import { logger } from "@/lib/logger"
+import { canAccessAdminPath } from "@/lib/admin/access-policy"
 
 const log = logger("")
 
@@ -281,17 +280,20 @@ export default async function AdminDashboardPage() {
     })
   }
 
-  const canAccessAction = (requiredRoles: string[], href: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((profile as any)?.is_department_lead && profile?.role !== "admin") return !href.startsWith("/admin/dev")
-    if (!profile?.role || !requiredRoles.includes(profile.role)) return false
-    if (profile.role !== "admin") return true
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const adminDomains = normalizeAdminDomains((profile as any)?.admin_domains)
-    if (href === "/admin") return true
-    const mappedDomain = getDomainForAdminPath(href)
-    return Boolean(mappedDomain && adminDomains.includes(mappedDomain))
-  }
+  const canAccessAction = (_requiredRoles: string[], href: string) =>
+    Boolean(
+      scope &&
+        canAccessAdminPath(
+          {
+            role: scope.role,
+            isDepartmentLead: scope.isDepartmentLead,
+            isAdminLike: scope.isAdminLike,
+            adminDomains: scope.adminDomains,
+            scopeMode: scope.scopeMode,
+          },
+          href
+        )
+    )
 
   const filteredPrimaryModules = primaryModules.filter((a) => canAccessAction(a.roles, a.href))
   const filteredSecondaryModules = secondaryModules.filter((a) => canAccessAction(a.roles, a.href))
