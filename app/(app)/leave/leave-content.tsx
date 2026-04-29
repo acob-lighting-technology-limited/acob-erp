@@ -1,18 +1,19 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { CalendarDays, Clock, Plus, ExternalLink, Trash2, Pencil, Paperclip, CircleHelp } from "lucide-react"
-import type { LeaveBalance, LeaveRequest, LeaveType } from "./page"
+import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
 import { LeaveTypesCard } from "@/components/leave/leave-types-card"
 import { LeaveDeleteConfirmDialog } from "@/components/leave/leave-delete-confirm-dialog"
 import { LeaveRequestFormDialog } from "@/components/leave/leave-request-form-dialog"
 import { LeaveRejectPromptDialog, LeaveEvidencePromptDialog } from "@/components/leave/leave-prompt-dialogs"
 import { fetchLeaveData, addDays } from "@/components/leave/leave-data"
+import type { LeaveCalendarData, LeaveRelieverDebug } from "@/components/leave/leave-data"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -25,6 +26,8 @@ interface LeaveContentProps {
   initialRequests: LeaveRequest[]
   initialBalances: LeaveBalance[]
   initialLeaveTypes: LeaveType[]
+  initialRelieverOptions: { value: string; label: string }[]
+  initialRelieverDebug: LeaveRelieverDebug | null
 }
 
 type ApproverQueueItem = LeaveRequest & {
@@ -39,12 +42,24 @@ type LeaveQueryData = {
   approverQueue: ApproverQueueItem[]
   leaveTypes: LeaveType[]
   relieverOptions: { value: string; label: string }[]
+  relieverDebug: LeaveRelieverDebug | null
+  leaveCalendar: LeaveCalendarData
+}
+
+type LeaveRoutePreview = {
+  requester_kind: string
+  stages: Array<{
+    stage_code: string
+    role_code: string
+    label: string
+  }>
 }
 
 const EMPTY_REQUEST_FORM = {
   leave_type_id: "",
   start_date: "",
   days_count: 1,
+  emergency_override: false,
   reason: "",
   reliever_identifier: "",
   handover_note: "",
@@ -61,6 +76,8 @@ export function LeaveContent({
   initialRequests,
   initialBalances,
   initialLeaveTypes,
+  initialRelieverOptions,
+  initialRelieverDebug,
 }: LeaveContentProps) {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState("my-requests")
@@ -73,11 +90,16 @@ export function LeaveContent({
       balances: initialBalances,
       approverQueue: [],
       leaveTypes: initialLeaveTypes,
-      relieverOptions: [],
+      relieverOptions: initialRelieverOptions,
+      relieverDebug: initialRelieverDebug,
+      leaveCalendar: {
+        blackout_months: [12, 1],
+        department_booked_dates: [],
+      },
     },
   })
 
-  const { requests, balances, leaveTypes, approverQueue, relieverOptions } = leaveData
+  const { requests, balances, leaveTypes, approverQueue, relieverOptions, relieverDebug, leaveCalendar } = leaveData
 
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -87,7 +109,31 @@ export function LeaveContent({
   const [deleteConfirmRequest, setDeleteConfirmRequest] = useState<LeaveRequest | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isOverviewOpen, setIsOverviewOpen] = useState(false)
+  const [isCreateBlockedOpen, setIsCreateBlockedOpen] = useState(false)
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
+
+  useEffect(() => {
+    if (!open) return
+    // eslint-disable-next-line no-console
+    console.log("[leave][reliever-debug]", {
+      relieverOptionsCount: relieverOptions.length,
+      relieverDebug,
+    })
+  }, [open, relieverDebug, relieverOptions.length])
+
+  const { data: leaveRoutePreview } = useQuery<LeaveRoutePreview>({
+    queryKey: ["leave-flow-my-preview", formData.reliever_identifier || ""],
+    queryFn: async () => {
+      const relieverIdParam = formData.reliever_identifier
+        ? `?reliever_id=${encodeURIComponent(formData.reliever_identifier)}`
+        : ""
+      const response = await fetch(`/api/hr/leave/flow/my-preview${relieverIdParam}`)
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || "Failed to load approval route preview")
+      return payload.data as LeaveRoutePreview
+    },
+    enabled: open,
+  })
 
   const myRequests = useMemo(
     () => requests.filter((request) => request.user_id === currentUserId),
@@ -96,6 +142,29 @@ export function LeaveContent({
 
   const balanceMap = useMemo(() => new Map(balances.map((b) => [b.leave_type_id, b])), [balances])
   const leaveTypeMap = useMemo(() => new Map(leaveTypes.map((t) => [t.id, t])), [leaveTypes])
+  const consumedDaysByType = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const request of myRequests) {
+      if (["rejected", "cancelled"].includes(String(request.status || "").toLowerCase())) continue
+      const leaveTypeId = request.leave_type_id
+      const current = map.get(leaveTypeId) || 0
+      map.set(leaveTypeId, current + Number(request.days_count || 0))
+    }
+    return map
+  }, [myRequests])
+  const availableDaysByType = useMemo(() => {
+    const entries = leaveTypes.map((leaveType) => {
+      const policyMax = Number(leaveType.max_days || 0)
+      const consumed = Number(consumedDaysByType.get(leaveType.id) || 0)
+      const derivedRemaining = Math.max(0, policyMax - consumed)
+      const balanceRaw = balanceMap.get(leaveType.id)?.balance_days
+      const normalizedBalance = Math.max(0, Number(balanceRaw ?? derivedRemaining))
+      const effectiveMax = policyMax > 0 ? Math.min(policyMax, normalizedBalance) : normalizedBalance
+      return [leaveType.id, Math.max(0, effectiveMax)] as const
+    })
+    return Object.fromEntries(entries) as Record<string, number>
+  }, [balanceMap, consumedDaysByType, leaveTypes])
+  const selectedAvailableDays = formData.leave_type_id ? (availableDaysByType[formData.leave_type_id] ?? 0) : 0
 
   const stats = useMemo(() => {
     const totalTaken = myRequests
@@ -248,6 +317,7 @@ export function LeaveContent({
       leave_type_id: request.leave_type_id,
       start_date: request.start_date,
       days_count: Number(request.days_count) || 1,
+      emergency_override: false,
       reason: request.reason || "",
       reliever_identifier: request.reliever_id || "",
       handover_note: request.handover_note || "",
@@ -378,6 +448,26 @@ export function LeaveContent({
 
   const hasPendingRequest = myRequests.some((r) => ["pending", "pending_evidence"].includes(r.status))
 
+  function approvalStageLabel(code?: string | null) {
+    const value = String(code || "").toLowerCase()
+    if (value.includes("reliever")) return "Reliever"
+    if (value.includes("department_lead")) return "Department Lead"
+    if (value.includes("admin_hr_lead")) return "Admin & HR Lead"
+    if (value.includes("hcs")) return "HCS"
+    if (value.includes("md")) return "MD"
+    return formatName(code || "Stage")
+  }
+
+  function approvalStageKey(code?: string | null) {
+    const value = String(code || "").toLowerCase()
+    if (value.includes("reliever")) return "reliever"
+    if (value.includes("department_lead")) return "department_lead"
+    if (value.includes("admin_hr_lead")) return "admin_hr_lead"
+    if (value.includes("hcs")) return "hcs"
+    if (value.includes("md")) return "md"
+    return value || "unknown"
+  }
+
   return (
     <DataTablePage
       title="My Leave Center"
@@ -427,7 +517,15 @@ export function LeaveContent({
             <CircleHelp className="mr-2 h-4 w-4" />
             Overview
           </Button>
-          <Button onClick={openCreateDialog} disabled={hasPendingRequest}>
+          <Button
+            onClick={() => {
+              if (hasPendingRequest) {
+                setIsCreateBlockedOpen(true)
+                return
+              }
+              openCreateDialog()
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             New Request
           </Button>
@@ -444,6 +542,134 @@ export function LeaveContent({
             searchPlaceholder="Search reason or type..."
             searchFn={(r, q) => `${leaveTypeMap.get(r.leave_type_id)?.name} ${r.reason}`.toLowerCase().includes(q)}
             rowActions={staticRowActions}
+            expandable={{
+              render: (row) => {
+                const timeline = [...(row.approvals || [])].sort((left, right) => {
+                  const leftOrder = Number(left.stage_order || left.approval_level || 999)
+                  const rightOrder = Number(right.stage_order || right.approval_level || 999)
+                  if (leftOrder !== rightOrder) return leftOrder - rightOrder
+                  return String(left.approved_at || "").localeCompare(String(right.approved_at || ""))
+                })
+
+                const stageAuditMap = new Map<string, LeaveApprovalAudit>()
+                for (const item of timeline) {
+                  const key = approvalStageKey(item.stage_code)
+                  const existing = stageAuditMap.get(key)
+                  if (!existing) {
+                    stageAuditMap.set(key, item)
+                    continue
+                  }
+
+                  const existingTime = existing.approved_at ? new Date(existing.approved_at).getTime() : 0
+                  const nextTime = item.approved_at ? new Date(item.approved_at).getTime() : 0
+                  if (nextTime >= existingTime) {
+                    stageAuditMap.set(key, item)
+                  }
+                }
+
+                if (timeline.length === 0) {
+                  if (row.reliever_decision_at) {
+                    stageAuditMap.set("reliever", {
+                      id: `${row.id}-reliever-fallback`,
+                      status: row.status === "rejected" ? "rejected" : "approved",
+                      stage_code: "pending_reliever",
+                      approved_at: row.reliever_decision_at,
+                      approver: row.reliever
+                        ? {
+                            id: row.reliever.id,
+                            full_name: row.reliever.full_name,
+                            company_email: row.reliever.company_email,
+                          }
+                        : null,
+                    })
+                  }
+
+                  if (row.supervisor_decision_at) {
+                    stageAuditMap.set("department_lead", {
+                      id: `${row.id}-deptlead-fallback`,
+                      status: row.status === "rejected" ? "rejected" : "approved",
+                      stage_code: "pending_department_lead",
+                      approved_at: row.supervisor_decision_at,
+                      approver: row.supervisor
+                        ? {
+                            id: row.supervisor.id,
+                            full_name: row.supervisor.full_name,
+                            company_email: row.supervisor.company_email,
+                          }
+                        : null,
+                    })
+                  }
+
+                  if (row.hr_decision_at) {
+                    stageAuditMap.set("admin_hr_lead", {
+                      id: `${row.id}-hr-fallback`,
+                      status: row.status === "rejected" ? "rejected" : "approved",
+                      stage_code: "pending_admin_hr_lead",
+                      approved_at: row.hr_decision_at,
+                      approver: row.approved_by_profile
+                        ? {
+                            id: row.approved_by_profile.id,
+                            full_name: row.approved_by_profile.full_name,
+                            company_email: row.approved_by_profile.company_email,
+                          }
+                        : null,
+                    })
+                  }
+                }
+
+                const stageOrder = ["reliever", "department_lead", "admin_hr_lead", "hcs", "md"]
+                const stageName: Record<string, string> = {
+                  reliever: "Reliever",
+                  department_lead: "Department Lead",
+                  admin_hr_lead: "Admin & HR Lead",
+                  hcs: "HCS",
+                  md: "MD",
+                }
+
+                return (
+                  <div className="grid gap-3 p-2 text-sm md:grid-cols-2">
+                    <div className="space-y-1">
+                      <p>
+                        <span className="text-muted-foreground">Reliever:</span>{" "}
+                        <span className="font-medium">{row.reliever?.full_name || "Not assigned"}</span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Current Stage:</span>{" "}
+                        <span className="font-medium">
+                          {approvalStageLabel(row.current_stage_code || row.approval_stage)}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground text-xs">Approval Timeline</p>
+                      {stageAuditMap.size === 0 ? (
+                        <p className="text-muted-foreground text-xs">No approvals recorded yet.</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {stageOrder.map((stageKey) => {
+                            const item = stageAuditMap.get(stageKey)
+                            return (
+                              <li key={stageKey} className="text-xs">
+                                <span className="font-medium">{stageName[stageKey]}:</span>{" "}
+                                {item ? (
+                                  <>
+                                    <span className="capitalize">{item.status}</span>
+                                    {item.approver?.full_name ? ` by ${item.approver.full_name}` : ""}
+                                    {item.approved_at ? ` at ${new Date(item.approved_at).toLocaleString()}` : ""}
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground">Pending / not acted</span>
+                                )}
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )
+              },
+            }}
             urlSync
           />
         )}
@@ -526,15 +752,23 @@ export function LeaveContent({
         setFormData={setFormData}
         leaveTypes={leaveTypes}
         relieverOptions={relieverOptions}
+        relieverDebug={relieverDebug}
         selectedLeaveType={leaveTypeMap.get(formData.leave_type_id)}
         selectedBalance={balanceMap.get(formData.leave_type_id)}
-        availableDays={
-          balanceMap.get(formData.leave_type_id)?.balance_days ??
-          leaveTypeMap.get(formData.leave_type_id)?.max_days ??
-          0
-        }
+        availableDays={selectedAvailableDays}
+        availableDaysByType={availableDaysByType}
+        approvalRouteStages={leaveRoutePreview?.stages || []}
         preview={addDays(formData.start_date, Number(formData.days_count))}
-        canSubmit={!!formData.leave_type_id && !!formData.start_date && !!formData.reason}
+        leaveCalendar={leaveCalendar}
+        canSubmit={
+          !!formData.leave_type_id &&
+          !!formData.start_date &&
+          !!formData.reason &&
+          !!formData.reliever_identifier &&
+          !!formData.handover_note &&
+          Number(formData.days_count) > 0 &&
+          Number(formData.days_count) <= selectedAvailableDays
+        }
         submitting={submitting}
         onSubmit={handleSubmitRequest}
       />
@@ -548,6 +782,21 @@ export function LeaveContent({
             </DialogDescription>
           </DialogHeader>
           <LeaveTypesCard leaveTypes={leaveTypes} balanceMap={balanceMap} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateBlockedOpen} onOpenChange={setIsCreateBlockedOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cannot Create New Request</DialogTitle>
+            <DialogDescription>
+              You already have an ongoing leave request. Submit a new one only after the current request is approved,
+              rejected, or cancelled.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button onClick={() => setIsCreateBlockedOpen(false)}>Okay</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </DataTablePage>

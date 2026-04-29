@@ -2,6 +2,7 @@ import Image from "next/image"
 import { redirect } from "next/navigation"
 import { Sparkles, Stars } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
+import type { CSSProperties } from "react"
 
 type Celebrant = {
   displayName: string
@@ -22,24 +23,15 @@ function getPreviousWeekRangeLabel() {
   const endOfPreviousWeek = new Date(startOfThisWeek)
   endOfPreviousWeek.setDate(startOfThisWeek.getDate() - 1)
 
-  const sameMonth = startOfPreviousWeek.getMonth() === endOfPreviousWeek.getMonth()
-  const sameYear = startOfPreviousWeek.getFullYear() === endOfPreviousWeek.getFullYear()
-
-  const startFormatter = new Intl.DateTimeFormat("en-NG", {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
     month: "long",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" }),
-  })
-
-  const endFormatter = new Intl.DateTimeFormat("en-NG", {
-    month: sameMonth && sameYear ? undefined : "long",
-    day: "numeric",
     year: "numeric",
   })
 
   return {
-    start: startFormatter.format(startOfPreviousWeek),
-    end: endFormatter.format(endOfPreviousWeek),
+    start: formatter.format(startOfPreviousWeek),
+    end: formatter.format(endOfPreviousWeek),
   }
 }
 
@@ -59,27 +51,26 @@ export default async function BirthdayPage() {
     supabase
       .from("profiles")
       .select("first_name, last_name, full_name")
-      .eq("first_name", "Anointed")
-      .eq("last_name", "Emoghene")
-      .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("first_name, last_name, full_name")
-      .eq("first_name", "Joshua")
-      .eq("last_name", "Ibe")
+      .eq("first_name", "Tansi")
+      .eq("last_name", "Orhorhomuke")
       .maybeSingle(),
   ])
 
   const celebrants: Celebrant[] = [
     {
-      displayName: "Ann",
-      imageSrc: "/images/birthday/annointed-birthday.jpeg",
-    },
-    {
-      displayName: "Joshua",
-      imageSrc: "/images/birthday/joshua-ibe.jpeg",
+      displayName: "Mr. Tansi Orhorhomuke",
+      imageSrc: "/images/birthday/tansi-orhorhomuke.jpeg",
     },
   ]
+  const celebrantCount = celebrants.length
+  const desktopColumns = Math.min(Math.max(celebrantCount, 1), 3)
+  const gridStyle = { "--birthday-columns": desktopColumns } as CSSProperties
+  const imageSizes =
+    desktopColumns === 1
+      ? "(max-width: 1100px) 100vw, 44vw"
+      : desktopColumns === 2
+        ? "(max-width: 1100px) 100vw, 36vw"
+        : "(max-width: 1100px) 100vw, 30vw"
 
   const previousWeekRange = getPreviousWeekRangeLabel()
 
@@ -97,9 +88,9 @@ export default async function BirthdayPage() {
 
           <div className="birthday-copy-stack">
             <p className="birthday-overline">Celebrating last week&apos;s birthdays this week</p>
-            <h1 className="birthday-title">Mr. Joshua Ibe and Miss Ann Emoghene</h1>
+            <h1 className="birthday-title">Mr. Tansi Orhorhomuke</h1>
             <p className="birthday-subtitle">
-              ACOB Family celebrates you today and we appreciate your contributions to the growth of the organisation.
+              ACOB Family celebrates you today and appreciates your contributions to the growth of the organisation.
             </p>
           </div>
 
@@ -114,12 +105,12 @@ export default async function BirthdayPage() {
             </div>
             <div className="birthday-meta-card">
               <span className="birthday-meta-label">Message</span>
-              <strong>Wishing you both joy, grace, peace, and a beautiful year ahead</strong>
+              <strong>Wishing you joy, grace, peace, and a beautiful year ahead</strong>
             </div>
           </div>
         </div>
 
-        <div className="birthday-hero__visual birthday-grid">
+        <div className="birthday-hero__visual birthday-grid" data-count={celebrantCount} style={gridStyle}>
           {celebrants.map((celebrant) => (
             <article key={celebrant.displayName} className="birthday-photo-shell">
               <Image
@@ -127,7 +118,7 @@ export default async function BirthdayPage() {
                 alt={celebrant.displayName}
                 fill
                 priority
-                sizes="(max-width: 1100px) 100vw, 36vw"
+                sizes={imageSizes}
                 className="birthday-photo"
               />
               <div className="birthday-photo__veil" aria-hidden="true" />

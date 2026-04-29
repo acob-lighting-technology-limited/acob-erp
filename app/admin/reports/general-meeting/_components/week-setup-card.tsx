@@ -27,6 +27,8 @@ type AuthUser = {
 }
 
 type OfficeYearRow = { year: number; anchor_day: number; is_locked: boolean }
+type KssPresenterType = "employee" | "visitor"
+const EXTERNAL_VISITOR_DEPARTMENT = "Guest"
 
 function getInitialOfficeWeek() {
   const now = new Date()
@@ -55,7 +57,9 @@ export function WeekSetupCard() {
   const [meetingTimeInput, setMeetingTimeInput] = useState("08:30")
   const [meetingGraceHours, setMeetingGraceHours] = useState(24)
   const [kssDepartmentInput, setKssDepartmentInput] = useState("none")
+  const [kssPresenterType, setKssPresenterType] = useState<KssPresenterType>("employee")
   const [kssPresenterIdInput, setKssPresenterIdInput] = useState("none")
+  const [kssPresenterNameInput, setKssPresenterNameInput] = useState("")
   const [savingMeetingWindow, setSavingMeetingWindow] = useState(false)
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [showWeekSetup, setShowWeekSetup] = useState(false)
@@ -105,7 +109,10 @@ export function WeekSetupCard() {
   })
 
   const departmentOptions = useMemo(
-    () => Array.from(new Set(employees.map((employee) => employee.department))).sort((a, b) => a.localeCompare(b)),
+    () =>
+      Array.from(new Set([...employees.map((employee) => employee.department), EXTERNAL_VISITOR_DEPARTMENT])).sort(
+        (a, b) => a.localeCompare(b)
+      ),
     [employees]
   )
 
@@ -136,7 +143,7 @@ export function WeekSetupCard() {
           .maybeSingle(),
         supabase
           .from("kss_weekly_roster")
-          .select("id, department, presenter_id")
+          .select("id, department, presenter_id, presenter_name")
           .eq("meeting_week", weekNumber)
           .eq("meeting_year", yearNumber)
           .maybeSingle(),
@@ -157,6 +164,10 @@ export function WeekSetupCard() {
           typeof rosterResult.data?.presenter_id === "string" && rosterResult.data.presenter_id
             ? rosterResult.data.presenter_id
             : "none",
+        kssPresenterName:
+          typeof rosterResult.data?.presenter_name === "string" && rosterResult.data.presenter_name.trim()
+            ? rosterResult.data.presenter_name.trim()
+            : "",
       }
     },
   })
@@ -177,6 +188,10 @@ export function WeekSetupCard() {
     setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
     setKssDepartmentInput(weekSetupData.kssDepartment || "none")
     setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
+    setKssPresenterNameInput(weekSetupData.kssPresenterName || "")
+    setKssPresenterType(
+      weekSetupData.kssPresenterId && weekSetupData.kssPresenterId !== "none" ? "employee" : "visitor"
+    )
   }, [weekSetupData])
 
   const saveMeetingWindow = async () => {
@@ -192,12 +207,23 @@ export function WeekSetupCard() {
       toast.error("Grace hours must be between 0 and 24")
       return
     }
-    if (kssDepartmentInput === "none") {
-      toast.error("KSS department is required")
+    const normalizedVisitorName = kssPresenterNameInput.trim()
+    const resolvedPresenterId = kssPresenterType === "employee" ? kssPresenterIdInput : "none"
+    const resolvedPresenterName = kssPresenterType === "visitor" ? normalizedVisitorName : ""
+
+    const resolvedDepartment =
+      kssDepartmentInput === "none" && kssPresenterType === "visitor" ? EXTERNAL_VISITOR_DEPARTMENT : kssDepartmentInput
+
+    if (resolvedDepartment === "none") {
+      toast.error("KSS host department is required for employee presenter")
       return
     }
-    if (kssPresenterIdInput === "none") {
+    if (kssPresenterType === "employee" && resolvedPresenterId === "none") {
       toast.error("KSS presenter is required")
+      return
+    }
+    if (kssPresenterType === "visitor" && !resolvedPresenterName) {
+      toast.error("Visitor presenter name is required")
       return
     }
 
@@ -220,8 +246,9 @@ export function WeekSetupCard() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 id: weekSetupData.rosterId,
-                department: kssDepartmentInput,
-                presenterId: kssPresenterIdInput,
+                department: resolvedDepartment,
+                presenterId: resolvedPresenterId === "none" ? null : resolvedPresenterId,
+                presenterName: resolvedPresenterName || null,
                 isActive: true,
               }),
             })
@@ -231,8 +258,9 @@ export function WeekSetupCard() {
               body: JSON.stringify({
                 meetingWeek: weekNumber,
                 meetingYear: yearNumber,
-                department: kssDepartmentInput,
-                presenterId: kssPresenterIdInput,
+                department: resolvedDepartment,
+                presenterId: resolvedPresenterId === "none" ? null : resolvedPresenterId,
+                presenterName: resolvedPresenterName || null,
               }),
             }),
       ])
@@ -476,26 +504,55 @@ export function WeekSetupCard() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-[minmax(220px,320px)_1fr] md:items-end">
+            <div className="grid gap-3 md:grid-cols-[minmax(180px,220px)_minmax(220px,320px)_1fr] md:items-end">
               <div className="w-full">
-                <Label className="mb-1.5 block text-xs font-semibold">KSS Presenter</Label>
+                <Label className="mb-1.5 block text-xs font-semibold">Presenter Type</Label>
                 <Select
-                  value={kssPresenterIdInput}
-                  onValueChange={setKssPresenterIdInput}
-                  disabled={isWeekSetupLocked || kssDepartmentInput === "none"}
+                  value={kssPresenterType}
+                  onValueChange={(value: KssPresenterType) => {
+                    setKssPresenterType(value)
+                    setKssPresenterIdInput("none")
+                    setKssPresenterNameInput("")
+                  }}
+                  disabled={isWeekSetupLocked}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select presenter" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Select presenter</SelectItem>
-                    {presenterOptions.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.full_name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="visitor">Visitor</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="w-full">
+                <Label className="mb-1.5 block text-xs font-semibold">KSS Presenter</Label>
+                {kssPresenterType === "employee" ? (
+                  <Select
+                    value={kssPresenterIdInput}
+                    onValueChange={setKssPresenterIdInput}
+                    disabled={isWeekSetupLocked || kssDepartmentInput === "none"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select presenter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select presenter</SelectItem>
+                      {presenterOptions.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={kssPresenterNameInput}
+                    onChange={(event) => setKssPresenterNameInput(event.target.value)}
+                    placeholder="Enter visitor full name"
+                    disabled={isWeekSetupLocked}
+                  />
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <Button
@@ -513,7 +570,7 @@ export function WeekSetupCard() {
                       ? "Your role can override the grace-period lock for this week."
                       : lockState?.unlockUntil
                         ? "This week is temporarily unlocked, so changes are allowed until the unlock window closes."
-                        : "Saving here updates the week's meeting date, meeting time, KSS presenter, and lock grace window together."}
+                        : "Saving here updates the week's meeting date, meeting time, KSS presenter (employee or visitor), and lock grace window together."}
                 </span>
               </div>
             </div>

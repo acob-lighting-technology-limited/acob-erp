@@ -94,6 +94,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [duration, setDuration] = useState("30 minutes")
   const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
   const [knowledgePresenterId, setKnowledgePresenterId] = useState("none")
+  const [knowledgePresenterName, setKnowledgePresenterName] = useState("")
   const [meetingPreparedById, setMeetingPreparedById] = useState("none")
 
   // Broadcast fields
@@ -165,6 +166,24 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     () => (knowledgePresenterId === "none" ? null : employees.find((e) => e.id === knowledgePresenterId) || null),
     [employees, knowledgePresenterId]
   )
+
+  const selectedKnowledgePresenter = useMemo(() => {
+    if (selectedPresenter) {
+      return {
+        id: selectedPresenter.id,
+        full_name: selectedPresenter.full_name,
+        department: selectedPresenter.department,
+      }
+    }
+
+    const visitorName = knowledgePresenterName.trim()
+    if (!visitorName) return null
+
+    return {
+      full_name: visitorName,
+      department: knowledgeDepartment !== "none" ? knowledgeDepartment : null,
+    }
+  }, [knowledgeDepartment, knowledgePresenterName, selectedPresenter])
 
   const meetingPreparedByOptions = useMemo(
     () =>
@@ -326,6 +345,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         if (!picked || cancelled) {
           setKnowledgeDepartment("none")
           setKnowledgePresenterId("none")
+          setKnowledgePresenterName("")
           return
         }
 
@@ -338,8 +358,14 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         const presenterId = typeof picked.presenter_id === "string" ? picked.presenter_id : null
         if (presenterId && employees.some((emp) => emp.id === presenterId)) {
           setKnowledgePresenterId(presenterId)
+          setKnowledgePresenterName("")
         } else {
           setKnowledgePresenterId("none")
+          setKnowledgePresenterName(
+            typeof picked.presenter_name === "string" && picked.presenter_name.trim()
+              ? picked.presenter_name.trim()
+              : ""
+          )
         }
       } catch {
         // Fail silently; form still works with manual selection.
@@ -586,14 +612,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             agenda: reminderType === "meeting" ? agendaText : undefined,
             knowledgeSharingDepartment:
               reminderType === "meeting" && knowledgeDepartment !== "none" ? knowledgeDepartment : undefined,
-            knowledgeSharingPresenter:
-              reminderType === "meeting" && selectedPresenter
-                ? {
-                    id: selectedPresenter.id,
-                    full_name: selectedPresenter.full_name,
-                    department: selectedPresenter.department,
-                  }
-                : undefined,
+            knowledgeSharingPresenter: reminderType === "meeting" ? selectedKnowledgePresenter || undefined : undefined,
             meetingPreparedByName:
               reminderType === "meeting" ? selectedMeetingPreparedBy?.full_name || "ACOB Team" : undefined,
             meetingPreparedByDesignation:
@@ -693,12 +712,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           .map((l) => l.replace(/^\d+\.\s*/, "").trim())
           .filter(Boolean)
         if (knowledgeDepartment !== "none") payload.knowledgeSharingDepartment = knowledgeDepartment
-        if (selectedPresenter)
-          payload.knowledgeSharingPresenter = {
-            id: selectedPresenter.id,
-            full_name: selectedPresenter.full_name,
-            department: selectedPresenter.department,
-          }
+        if (selectedKnowledgePresenter) payload.knowledgeSharingPresenter = selectedKnowledgePresenter
         payload.meetingPreparedByName = selectedMeetingPreparedBy?.full_name || "ACOB Team"
         payload.meetingPreparedByDesignation = selectedMeetingPreparedBy?.designation || null
         payload.meetingPreparedByDepartment = selectedMeetingPreparedBy?.department || "Admin & HR"
@@ -858,6 +872,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   savingDraft={savingMeetingDraft}
                   knowledgeDepartment={knowledgeDepartment}
                   knowledgePresenterId={knowledgePresenterId}
+                  knowledgePresenterName={knowledgePresenterName}
                   meetingPreparedById={meetingPreparedById}
                   setMeetingPreparedById={setMeetingPreparedById}
                   departmentOptions={departmentOptions}
@@ -961,7 +976,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           broadcastSubject={broadcastSubject}
           selectedMeetingPreparedByName={selectedMeetingPreparedBy?.full_name ?? null}
           selectedBroadcastPreparedByName={selectedBroadcastPreparedBy?.full_name ?? null}
-          selectedPresenterName={selectedPresenter?.full_name ?? null}
+          selectedPresenterName={selectedKnowledgePresenter?.full_name ?? null}
           knowledgeDepartment={knowledgeDepartment}
           broadcastAttachmentCount={broadcastAttachments.length}
           resolvedRecipients={resolvedRecipients}

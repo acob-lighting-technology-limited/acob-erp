@@ -24,10 +24,12 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getPaginationRange, PaginationSchema } from "@/lib/pagination"
 
 const log = logger("leave-requests")
+const BLACKOUT_MONTHS = new Set([12, 1])
 const CreateLeaveRequestSchema = z.object({
   leave_type_id: z.string().trim().min(1, "Missing required fields"),
   start_date: z.string().trim().min(1, "Missing required fields"),
   days_count: z.unknown().optional(),
+  emergency_override: z.boolean().optional(),
   end_date: z.string().optional().nullable(),
   reason: z.string().trim().min(1, "Missing required fields"),
   reliever_identifier: z.string().trim().min(1, "Missing required fields"),
@@ -39,6 +41,7 @@ const UpdateLeaveRequestSchema = z.object({
   leave_type_id: z.string().optional(),
   start_date: z.string().optional(),
   days_count: z.unknown().optional(),
+  emergency_override: z.boolean().optional(),
   end_date: z.string().optional().nullable(),
   reason: z.string().optional(),
   reliever_identifier: z.string().optional(),
@@ -62,6 +65,11 @@ type ProfileReferenceRow = {
   company_email?: string | null
   department_id?: string | null
   department?: string | null
+}
+
+type DepartmentReferenceRow = {
+  id: string
+  department_id?: string | null
 }
 
 type LeaveTypeReferenceRow = {
@@ -109,6 +117,10 @@ type LeaveRequestRow = LeaveRequestStageState & {
   leave_type_id: string
   reliever_id?: string | null
   supervisor_id?: string | null
+  approved_by?: string | null
+  reliever_decision_at?: string | null
+  supervisor_decision_at?: string | null
+  hr_decision_at?: string | null
   route_snapshot?: Array<{
     stage_order?: number | null
     approver_role_code?: string | null
@@ -123,6 +135,59 @@ type LeaveRequestRow = LeaveRequestStageState & {
 
 type LeavePolicySummary = {
   required_documents?: string[] | null
+}
+
+type RelieverOption = {
+  value: string
+  label: string
+}
+
+type RelieverDebug = {
+  reason?: string
+  user_id: string
+  requester_profile_id: string | null
+  requester_department: string | null
+  requester_department_id: string | null
+  resolution_source: string
+  total_profiles_scanned: number
+  matched_profiles: number
+  options_count: number
+}
+
+function normalizeDepartment(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+}
+
+function buildProfileLabel(row: ProfileReferenceRow) {
+  return row.full_name?.trim() || `${row.first_name || ""} ${row.last_name || ""}`.trim() || "Unnamed"
+}
+
+async function deriveRemainingDays(params: {
+  supabase: SupabaseServerClient
+  userId: string
+  leaveTypeId: string
+  maxDays: number
+  excludeRequestId?: string
+}) {
+  let query = params.supabase
+    .from("leave_requests")
+    .select("id, days_count, status")
+    .eq("user_id", params.userId)
+    .eq("leave_type_id", params.leaveTypeId)
+    .in("status", ["pending", "pending_evidence", "approved"])
+
+  if (params.excludeRequestId) {
+    query = query.neq("id", params.excludeRequestId)
+  }
+
+  const { data } = await query
+  const usedDays = ((data || []) as Array<{ days_count?: number | null }>).reduce(
+    (acc, row) => acc + Number(row.days_count || 0),
+    0
+  )
+  return Math.max(0, Number(params.maxDays || 0) - usedDays)
 }
 
 function isRelieverStage(request: LeaveRequestStageState) {
@@ -225,9 +290,48 @@ async function canRequesterModifyBeforeRelieverDecision(
   return !(relieverDecisionRows && relieverDecisionRows.length > 0)
 }
 
+async function getUserDepartmentId(supabase: SupabaseServerClient, userId: string) {
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, department_id")
+    .eq("id", userId)
+    .maybeSingle<DepartmentReferenceRow>()
+
+  return data?.department_id || null
+}
+
+function assertSameDepartmentReliever(params: {
+  requesterDepartmentId?: string | null
+  relieverDepartmentId?: string | null
+}) {
+  if (!params.requesterDepartmentId || !params.relieverDepartmentId) {
+    throw new Error("Requester and reliever must both have a department before leave can be submitted.")
+  }
+
+  if (params.requesterDepartmentId !== params.relieverDepartmentId) {
+    throw new Error("Reliever must be from your department.")
+  }
+}
+
+function assertBlackoutWindowAllowed(params: { startDate: string; endDate: string; emergencyOverride?: boolean }) {
+  if (params.emergencyOverride) return
+
+  const start = new Date(`${params.startDate}T00:00:00`)
+  const end = new Date(`${params.endDate}T00:00:00`)
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const month = cursor.getMonth() + 1
+    if (BLACKOUT_MONTHS.has(month)) {
+      throw new Error(
+        "Leave dates in December and January are restricted. Enable emergency override in the leave form if this is urgent."
+      )
+    }
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const dataClient = getServiceRoleClientOrFallback(supabase)
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -245,13 +349,15 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status")
     const userId = searchParams.get("user_id")
     const all = searchParams.get("all") === "true"
-    const { data: requesterProfile } = await supabase
+    const { data: requesterProfile } = await dataClient
       .from("profiles")
-      .select("role, department, is_department_lead, lead_departments")
+      .select("id, role, department, department_id, is_department_lead, lead_departments")
       .eq("id", user.id)
       .single<{
+        id?: string | null
         role?: string | null
         department?: string | null
+        department_id?: string | null
         is_department_lead?: boolean | null
         lead_departments?: string[] | null
       }>()
@@ -272,7 +378,7 @@ export async function GET(request: NextRequest) {
           id, full_name, first_name, last_name, company_email, department
         ),
         leave_type:leave_types!leave_requests_leave_type_id_fkey (
-          id, name, color, requires_evidence
+          id, name
         ),
         approvals:leave_approvals (
           id, approver_id, status, stage_code, approved_at, comments
@@ -347,6 +453,7 @@ export async function GET(request: NextRequest) {
       if (row.user_id) profileIdSet.add(row.user_id)
       if (row.reliever_id) profileIdSet.add(row.reliever_id)
       if (row.supervisor_id) profileIdSet.add(row.supervisor_id)
+      if (row.approved_by) profileIdSet.add(row.approved_by)
     }
     for (const approval of approvalRows) {
       if (approval.approver_id) profileIdSet.add(approval.approver_id)
@@ -435,6 +542,7 @@ export async function GET(request: NextRequest) {
           user: leaveRequest.user_id ? profileMap.get(leaveRequest.user_id) || null : null,
           reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
           supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
+          approved_by_profile: leaveRequest.approved_by ? profileMap.get(leaveRequest.approved_by) || null : null,
           leave_type: leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) || null : null,
           evidence: evidenceByRequest.get(leaveRequest.id) || [],
           approvals: approvalsByRequest.get(leaveRequest.id) || [],
@@ -478,9 +586,70 @@ export async function GET(request: NextRequest) {
       relieverCommitments = relieverRows || []
     }
 
+    const requesterDepartment = requesterProfile?.department || null
+    const requesterDepartmentId = requesterProfile?.department_id || null
+    const requesterProfileId = requesterProfile?.id || user.id
+
+    const relieverCandidatesById = new Map<string, ProfileReferenceRow>()
+    let totalProfilesScanned = 0
+
+    if (requesterDepartmentId) {
+      const { data: byDeptId } = await dataClient
+        .from("profiles")
+        .select("id, first_name, last_name, full_name, company_email, department_id, department")
+        .eq("department_id", requesterDepartmentId)
+        .neq("id", requesterProfileId)
+        .order("first_name", { ascending: true })
+      const rows = (byDeptId as ProfileReferenceRow[] | null) || []
+      totalProfilesScanned += rows.length
+      for (const row of rows) {
+        if (row.id) relieverCandidatesById.set(row.id, row)
+      }
+    }
+
+    if (requesterDepartment) {
+      const { data: byDeptName } = await dataClient
+        .from("profiles")
+        .select("id, first_name, last_name, full_name, company_email, department_id, department")
+        .eq("department", requesterDepartment)
+        .neq("id", requesterProfileId)
+        .order("first_name", { ascending: true })
+      const rows = (byDeptName as ProfileReferenceRow[] | null) || []
+      totalProfilesScanned += rows.length
+      for (const row of rows) {
+        if (row.id) relieverCandidatesById.set(row.id, row)
+      }
+    }
+
+    const requesterDepartmentName = normalizeDepartment(requesterDepartment)
+    const relieverRows = Array.from(relieverCandidatesById.values()).filter((row) => {
+      const sameDepartmentId = Boolean(requesterDepartmentId && row.department_id === requesterDepartmentId)
+      const sameDepartmentName =
+        requesterDepartmentName.length > 0 && normalizeDepartment(row.department) === requesterDepartmentName
+      return sameDepartmentId || sameDepartmentName
+    })
+
+    const relieverOptions: RelieverOption[] = relieverRows
+      .map((row) => ({ value: row.id, label: buildProfileLabel(row) }))
+      .filter((row) => Boolean(row.value))
+
+    const relieverDebug: RelieverDebug = {
+      reason: !requesterDepartment && !requesterDepartmentId ? "requester_has_no_department" : undefined,
+      user_id: user.id,
+      requester_profile_id: requesterProfileId || null,
+      requester_department: requesterDepartment,
+      requester_department_id: requesterDepartmentId,
+      resolution_source: "requests_get_profile",
+      total_profiles_scanned: totalProfilesScanned,
+      matched_profiles: relieverRows.length,
+      options_count: relieverOptions.length,
+    }
+
     return NextResponse.json({
       data: enriched,
       balances: balances || [],
+      reliever_options: relieverOptions,
+      reliever_debug: relieverDebug,
       reliever_commitments: relieverCommitments,
       pagination: {
         page: paginationParsed.data.page,
@@ -510,7 +679,16 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
-    const { leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } = parsed.data
+    const {
+      leave_type_id,
+      start_date,
+      days_count,
+      emergency_override,
+      end_date,
+      reason,
+      reliever_identifier,
+      handover_note,
+    } = parsed.data
 
     const parsedDays = Number(days_count)
     const fallbackDays = end_date
@@ -539,7 +717,7 @@ export async function POST(request: NextRequest) {
 
     const { data: leaveType } = await supabase
       .from("leave_types")
-      .select("id, name, code")
+      .select("id, name, code, max_days")
       .eq("id", leave_type_id)
       .single()
     if (!leaveType) {
@@ -570,12 +748,21 @@ export async function POST(request: NextRequest) {
       accrualMode: (policy.accrual_mode as "calendar_days" | "business_days") || "calendar_days",
       location: requester.work_location || "global",
     })
+    assertBlackoutWindowAllowed({
+      startDate: start_date,
+      endDate,
+      emergencyOverride: emergency_override,
+    })
 
     const reliever = await resolveProfileByIdentifier(supabase, reliever_identifier, "Reliever")
 
     if (reliever.id === user.id) {
       return NextResponse.json({ error: "You cannot assign yourself as reliever" }, { status: 400 })
     }
+    assertSameDepartmentReliever({
+      requesterDepartmentId: requester.department_id,
+      relieverDepartmentId: reliever.department_id,
+    })
 
     await assertNoOverlap(validationClient, user.id, start_date, endDate)
     await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, start_date, endDate)
@@ -596,14 +783,43 @@ export async function POST(request: NextRequest) {
       }),
     ])
 
+    let reservationAccepted = Boolean(balanceReserved)
     if (reserveError) {
-      return NextResponse.json({ error: "Failed to validate leave balance" }, { status: 500 })
+      log.warn(
+        { err: String(reserveError), userId: user.id, leaveTypeId: leave_type_id, effectiveDays },
+        "Reserve balance check failed; deriving fallback remaining days"
+      )
+      const maxDays = Number(leaveType.max_days || 0)
+      const derivedRemaining = await deriveRemainingDays({
+        supabase,
+        userId: user.id,
+        leaveTypeId: leave_type_id,
+        maxDays,
+      })
+      if (effectiveDays > derivedRemaining) {
+        return NextResponse.json(
+          {
+            error: `Insufficient leave balance. You requested ${effectiveDays} day(s), but only ${derivedRemaining} day(s) remain.`,
+          },
+          { status: 400 }
+        )
+      }
+      reservationAccepted = true
     }
 
-    if (!balanceReserved) {
-      const remainingDays = balance?.balance_days ?? 0
+    if (!reservationAccepted) {
+      const maxDays = Number(leaveType.max_days || 0)
+      const derivedRemaining = await deriveRemainingDays({
+        supabase,
+        userId: user.id,
+        leaveTypeId: leave_type_id,
+        maxDays,
+      })
+      const remainingDays = Math.max(0, Math.min(Number(balance?.balance_days ?? derivedRemaining), derivedRemaining))
       return NextResponse.json(
-        { error: `Insufficient leave balance. You have ${remainingDays} days remaining.` },
+        {
+          error: `Insufficient leave balance. You requested ${effectiveDays} day(s), but only ${remainingDays} day(s) remain.`,
+        },
         { status: 400 }
       )
     }
@@ -679,7 +895,7 @@ export async function POST(request: NextRequest) {
         supervisor_id: departmentLeadStage?.approver_user_id || null,
         handover_note,
         requested_days_mode: policy.accrual_mode || "calendar_days",
-        request_kind: "standard",
+        request_kind: emergency_override ? "emergency" : "standard",
       })
       .select()
       .single()
@@ -762,8 +978,17 @@ export async function PATCH(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
-    const { id, leave_type_id, start_date, days_count, end_date, reason, reliever_identifier, handover_note } =
-      parsed.data
+    const {
+      id,
+      leave_type_id,
+      start_date,
+      days_count,
+      emergency_override,
+      end_date,
+      reason,
+      reliever_identifier,
+      handover_note,
+    } = parsed.data
 
     const { data: existingRequest, error: fetchError } = await supabase
       .from("leave_requests")
@@ -784,10 +1009,15 @@ export async function PATCH(request: NextRequest) {
       existingRequest.current_approver_user_id === user.id
     ) {
       const newReliever = await resolveProfileByIdentifier(supabase, reliever_identifier, "Reliever")
+      const requesterDepartmentId = await getUserDepartmentId(supabase, existingRequest.user_id)
 
       if (!newReliever?.id || newReliever.id === existingRequest.user_id) {
         return NextResponse.json({ error: "Invalid reliever selected" }, { status: 400 })
       }
+      assertSameDepartmentReliever({
+        requesterDepartmentId,
+        relieverDepartmentId: newReliever.department_id,
+      })
 
       await assertRelieverAvailability(
         validationClient,
@@ -882,7 +1112,7 @@ export async function PATCH(request: NextRequest) {
 
     const { data: leaveType } = await supabase
       .from("leave_types")
-      .select("id, name, code")
+      .select("id, name, code, max_days")
       .eq("id", targetLeaveTypeId)
       .single()
 
@@ -914,16 +1144,31 @@ export async function PATCH(request: NextRequest) {
       accrualMode: (policy.accrual_mode as "calendar_days" | "business_days") || "calendar_days",
       location: requester.work_location || "global",
     })
+    assertBlackoutWindowAllowed({
+      startDate: targetStartDate,
+      endDate,
+      emergencyOverride: emergency_override,
+    })
 
     let relieverId = existingRequest.reliever_id
+    let relieverDepartmentId: string | null | undefined = existingRequest.reliever_id ? undefined : null
     if (reliever_identifier) {
       const reliever = await resolveProfileByIdentifier(supabase, reliever_identifier, "Reliever")
       relieverId = reliever.id
+      relieverDepartmentId = reliever.department_id
+    }
+
+    if (relieverId && typeof relieverDepartmentId === "undefined") {
+      relieverDepartmentId = await getUserDepartmentId(supabase, relieverId)
     }
 
     if (!relieverId || relieverId === user.id) {
       return NextResponse.json({ error: "Invalid reliever selected" }, { status: 400 })
     }
+    assertSameDepartmentReliever({
+      requesterDepartmentId: requester.department_id,
+      relieverDepartmentId,
+    })
 
     await assertNoOverlap(validationClient, user.id, targetStartDate, endDate, id)
     await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, targetStartDate, endDate, id)
@@ -944,13 +1189,45 @@ export async function PATCH(request: NextRequest) {
       }),
     ])
 
+    let reservationAccepted = Boolean(balanceReserved)
     if (reserveError) {
-      return NextResponse.json({ error: "Failed to validate leave balance" }, { status: 500 })
+      log.warn(
+        { err: String(reserveError), userId: user.id, leaveTypeId: targetLeaveTypeId, targetDays, requestId: id },
+        "Reserve balance check failed on update; deriving fallback remaining days"
+      )
+      const maxDays = Number(leaveType.max_days || 0)
+      const derivedRemaining = await deriveRemainingDays({
+        supabase,
+        userId: user.id,
+        leaveTypeId: targetLeaveTypeId,
+        maxDays,
+        excludeRequestId: id,
+      })
+      if (targetDays > derivedRemaining) {
+        return NextResponse.json(
+          {
+            error: `Insufficient leave balance. You requested ${targetDays} day(s), but only ${derivedRemaining} day(s) remain.`,
+          },
+          { status: 400 }
+        )
+      }
+      reservationAccepted = true
     }
 
-    if (!balanceReserved) {
+    if (!reservationAccepted) {
+      const maxDays = Number(leaveType.max_days || 0)
+      const derivedRemaining = await deriveRemainingDays({
+        supabase,
+        userId: user.id,
+        leaveTypeId: targetLeaveTypeId,
+        maxDays,
+        excludeRequestId: id,
+      })
+      const remainingDays = Math.max(0, Math.min(Number(balance?.balance_days ?? derivedRemaining), derivedRemaining))
       return NextResponse.json(
-        { error: `Insufficient leave balance. You have ${balance?.balance_days ?? 0} days remaining.` },
+        {
+          error: `Insufficient leave balance. You requested ${targetDays} day(s), but only ${remainingDays} day(s) remain.`,
+        },
         { status: 400 }
       )
     }
@@ -984,6 +1261,8 @@ export async function PATCH(request: NextRequest) {
         supervisor_id: departmentLeadStage?.approver_user_id || null,
         handover_note: handover_note || existingRequest.handover_note,
         requested_days_mode: policy.accrual_mode || "calendar_days",
+        request_kind:
+          existingRequest.request_kind === "extension" ? "extension" : emergency_override ? "emergency" : "standard",
         status: eligibility.status === "missing_evidence" ? "pending_evidence" : "pending",
         requester_route_kind: requesterRouteKind,
         route_snapshot: routeSnapshot,

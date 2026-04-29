@@ -1,37 +1,95 @@
 import type { LeaveBalance, LeaveRequest, LeaveType } from "@/app/(app)/leave/page"
 
+export type LeaveCalendarData = {
+  blackout_months: number[]
+  department_booked_dates: Array<{
+    date: string
+    count: number
+    employees: string[]
+  }>
+}
+
+export type LeaveRelieverDebug = {
+  reason?: string
+  user_id?: string
+  requester_profile_id?: string
+  requester_department?: string | null
+  requester_department_id?: string | null
+  resolution_source?: string
+  total_profiles_scanned?: number
+  matched_profiles?: number
+  options_count?: number
+}
+
+/** Loose shape covering all leave API JSON responses */
+type LeaveApiPayload = {
+  data?: unknown
+  error?: string
+  balances?: unknown
+  reliever_options?: unknown
+  reliever_debug?: unknown
+}
+
 export async function fetchLeaveData(currentUserId: string) {
-  const [requestRes, queueRes, typesRes, relieversRes] = await Promise.all([
-    fetch("/api/hr/leave/requests?limit=100"),
-    fetch("/api/hr/leave/queue"),
-    fetch("/api/hr/leave/types"),
-    fetch("/api/hr/leave/relievers"),
+  const [requestRes, queueRes, typesRes, relieversRes, calendarRes] = await Promise.all([
+    fetch("/api/hr/leave/requests?limit=100").catch(() => null),
+    fetch("/api/hr/leave/queue").catch(() => null),
+    fetch("/api/hr/leave/types").catch(() => null),
+    fetch("/api/hr/leave/relievers").catch(() => null),
+    fetch("/api/hr/leave/calendar").catch(() => null),
   ])
 
-  const [requestPayload, queuePayload, typesPayload, relieversPayload] = await Promise.all([
-    requestRes.json().catch(() => ({})),
-    queueRes.json().catch(() => ({})),
-    typesRes.json().catch(() => ({})),
-    relieversRes.json().catch(() => ({})),
+  const parseJson = async (res: Response | null): Promise<LeaveApiPayload> => (res ? res.json().catch(() => ({})) : {})
+
+  const [requestPayload, queuePayload, typesPayload, relieversPayload, calendarPayload] = await Promise.all([
+    parseJson(requestRes),
+    parseJson(queueRes),
+    parseJson(typesRes),
+    parseJson(relieversRes),
+    parseJson(calendarRes),
   ])
 
-  const errors: string[] = []
+  // Log per-endpoint failures but do NOT throw — partial data is still useful
+  const warnings: string[] = []
+  if (!requestRes?.ok) warnings.push(`requests: ${requestPayload.error || requestRes?.statusText || "network error"}`)
+  if (!queueRes?.ok) warnings.push(`queue: ${queuePayload.error || queueRes?.statusText || "network error"}`)
+  if (!typesRes?.ok) warnings.push(`types: ${typesPayload.error || typesRes?.statusText || "network error"}`)
+  if (!relieversRes?.ok)
+    warnings.push(`relievers: ${relieversPayload.error || relieversRes?.statusText || "network error"}`)
+  if (!calendarRes?.ok)
+    warnings.push(`calendar: ${calendarPayload.error || calendarRes?.statusText || "network error"}`)
 
-  if (!requestRes.ok) errors.push(`requests: ${requestPayload.error || requestRes.statusText}`)
-  if (!queueRes.ok) errors.push(`queue: ${queuePayload.error || queueRes.statusText}`)
-  if (!typesRes.ok) errors.push(`types: ${typesPayload.error || typesRes.statusText}`)
-  if (!relieversRes.ok) errors.push(`relievers: ${relieversPayload.error || relieversRes.statusText}`)
+  if (warnings.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`[leave-data] Partial fetch warnings: ${warnings.join(" | ")}`)
+  }
 
-  if (errors.length > 0) throw new Error(`Leave data partial failure -> ${errors.join(" | ")}`)
+  // Only throw if the critical requests endpoint fails — everything else degrades gracefully
+  if (!requestRes?.ok) {
+    throw new Error(`Leave requests fetch failed: ${requestPayload.error || requestRes?.statusText || "network error"}`)
+  }
 
-  const ownedRequests = (requestPayload.data || []).filter((row: LeaveRequest) => row.user_id === currentUserId)
+  const reqData = Array.isArray(requestPayload.data) ? requestPayload.data : []
+  const ownedRequests = reqData.filter((row: LeaveRequest) => row.user_id === currentUserId)
 
   return {
     requests: ownedRequests as LeaveRequest[],
-    balances: (requestPayload.balances || []) as LeaveBalance[],
-    approverQueue: (queuePayload.data || []) as LeaveRequest[],
-    leaveTypes: (typesPayload.data || []) as LeaveType[],
-    relieverOptions: (relieversPayload.data || []) as { value: string; label: string }[],
+    balances: (Array.isArray(requestPayload.balances) ? requestPayload.balances : []) as LeaveBalance[],
+    approverQueue: (queueRes?.ok && Array.isArray(queuePayload.data) ? queuePayload.data : []) as LeaveRequest[],
+    leaveTypes: (typesRes?.ok && Array.isArray(typesPayload.data) ? typesPayload.data : []) as LeaveType[],
+    relieverOptions: (relieversRes?.ok && Array.isArray(relieversPayload.data)
+      ? relieversPayload.data
+      : Array.isArray(requestPayload.reliever_options)
+        ? requestPayload.reliever_options
+        : []) as { value: string; label: string }[],
+    relieverDebug: (relieversPayload && typeof relieversPayload === "object" && "debug" in relieversPayload
+      ? (relieversPayload as { debug?: LeaveRelieverDebug }).debug || null
+      : requestPayload && typeof requestPayload === "object" && "reliever_debug" in requestPayload
+        ? ((requestPayload as { reliever_debug?: LeaveRelieverDebug }).reliever_debug ?? null)
+        : null) as LeaveRelieverDebug | null,
+    leaveCalendar: (calendarRes?.ok && calendarPayload.data
+      ? calendarPayload.data
+      : { blackout_months: [12, 1], department_booked_dates: [] }) as LeaveCalendarData,
   }
 }
 

@@ -200,7 +200,7 @@ export async function GET(request: Request) {
       const { data: row, error: rowError } = await supabase
         .from("meeting_week_documents")
         .select(
-          "id, meeting_week, meeting_year, document_type, department, presenter_id, file_name, file_path, mime_type"
+          "id, meeting_week, meeting_year, document_type, department, presenter_id, presenter_name, file_name, file_path, mime_type"
         )
         .eq("id", id)
         .single()
@@ -235,7 +235,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("meeting_week_documents")
       .select(
-        "id, meeting_week, meeting_year, document_type, department, presenter_id, notes, file_name, file_path, mime_type, file_size, version_no, is_current, replaced_by, uploaded_by, created_at, updated_at"
+        "id, meeting_week, meeting_year, document_type, department, presenter_id, presenter_name, notes, file_name, file_path, mime_type, file_size, version_no, is_current, replaced_by, uploaded_by, created_at, updated_at"
       )
       .order("meeting_year", { ascending: false })
       .order("meeting_week", { ascending: false })
@@ -302,6 +302,7 @@ export async function POST(request: Request) {
     const documentType = parseDocumentType(formData.get("documentType"))
     const notes = formData.get("notes") ? String(formData.get("notes")) : null
     const presenterId = formData.get("presenterId") ? String(formData.get("presenterId")) : null
+    const presenterNameInput = formData.get("presenterName") ? String(formData.get("presenterName")) : null
     const rawDept = formData.get("department") ? String(formData.get("department")) : ""
     const department = rawDept ? normalizeDepartment(rawDept) : null
 
@@ -340,9 +341,9 @@ export async function POST(request: Request) {
           { status: 400 }
         )
       }
-      if (!presenterId) {
+      if (!presenterId && !presenterNameInput?.trim()) {
         return NextResponse.json(
-          { error: "presenterId is required for Knowledge Sharing Session documents" },
+          { error: "presenterId or presenterName is required for Knowledge Sharing Session documents" },
           { status: 400 }
         )
       }
@@ -368,15 +369,23 @@ export async function POST(request: Request) {
     let normalizedFileName = file.name
 
     if (documentType === "knowledge_sharing_session") {
-      const { data: presenter, error: presenterError } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .eq("id", presenterId)
-        .single()
-      if (presenterError || !presenter?.full_name) {
-        return NextResponse.json({ error: "Presenter not found" }, { status: 400 })
+      if (presenterId) {
+        const { data: presenter, error: presenterError } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .eq("id", presenterId)
+          .single()
+        if (presenterError || !presenter?.full_name) {
+          return NextResponse.json({ error: "Presenter not found" }, { status: 400 })
+        }
+        presenterName = presenter.full_name
+      } else {
+        const visitorName = presenterNameInput?.trim()
+        if (!visitorName) {
+          return NextResponse.json({ error: "Visitor presenter name is required" }, { status: 400 })
+        }
+        presenterName = visitorName
       }
-      presenterName = presenter.full_name
     }
 
     // On Vercel (Linux), LibreOffice isn't available — upload the original file as-is
@@ -488,6 +497,7 @@ export async function POST(request: Request) {
         document_type: documentType,
         department,
         presenter_id: documentType === "knowledge_sharing_session" ? presenterId : null,
+        presenter_name: documentType === "knowledge_sharing_session" ? presenterName : null,
         notes,
         file_name: normalizedFileName,
         file_path: filePath,
@@ -499,7 +509,7 @@ export async function POST(request: Request) {
         uploaded_by: user.id,
       })
       .select(
-        "id, meeting_week, meeting_year, document_type, department, presenter_id, notes, file_name, file_path, mime_type, file_size, version_no, is_current, replaced_by, uploaded_by, created_at, updated_at"
+        "id, meeting_week, meeting_year, document_type, department, presenter_id, presenter_name, notes, file_name, file_path, mime_type, file_size, version_no, is_current, replaced_by, uploaded_by, created_at, updated_at"
       )
       .single()
 

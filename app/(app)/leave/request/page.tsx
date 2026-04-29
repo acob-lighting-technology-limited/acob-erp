@@ -200,8 +200,8 @@ export default function LeaveRequestPage() {
                 value={formData.reliever_identifier}
                 onValueChange={(value) => setFormData((prev) => ({ ...prev, reliever_identifier: value }))}
                 options={relieverOptions}
-                placeholder="Select reliever"
-                searchPlaceholder="Search employee..."
+                placeholder="Select reliever from your department"
+                searchPlaceholder="Search your department..."
               />
             </FormFieldGroup>
 
