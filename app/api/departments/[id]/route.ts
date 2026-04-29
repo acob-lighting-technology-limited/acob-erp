@@ -41,7 +41,8 @@ async function createClient() {
 }
 
 // GET /api/departments/[id] - Get a single department
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const {
@@ -81,7 +82,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 // PUT /api/departments/[id] - Update a department (admin-like only)
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
 
@@ -141,7 +143,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 // DELETE /api/departments/[id] - Soft delete a department (admin-like only)
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
 

@@ -36,7 +36,7 @@ type ReportsBackfillClient = {
 
 async function isAuthorizedCronRequest() {
   const cronSecret = process.env.CRON_SECRET
-  const requestHeaders = headers()
+  const requestHeaders = await headers()
   const bearerToken = requestHeaders
     .get("authorization")
     ?.replace(/^Bearer\s+/i, "")

@@ -75,11 +75,6 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
 
-  // Ensure build fails on ESLint errors (matches Vercel behavior)
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
-
   async headers() {
     return [
       {

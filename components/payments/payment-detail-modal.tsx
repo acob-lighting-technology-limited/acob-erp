@@ -343,7 +343,7 @@ export function PaymentDetailModal({
     setUploadDialogOpen(true)
   }
 
-  const handleFileUpload = async (e: React.FormEvent, inputRef: React.RefObject<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.FormEvent, inputRef: React.RefObject<HTMLInputElement | null>) => {
     e.preventDefault()
     if (!inputRef.current?.files?.[0] || !uploadDate) return
 

@@ -28,7 +28,8 @@ function resolveKindFromPath(filePath: string): DocumentType {
   return "draft"
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const requestUrl = new URL(_request.url)
     const { supabase, user, profile } = await getAuthContext()
@@ -110,7 +111,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, profile } = await getAuthContext()
 

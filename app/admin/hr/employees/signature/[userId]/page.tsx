@@ -9,7 +9,8 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
-export default async function AdminEmployeeSignaturePage({ params }: { params: { userId: string } }) {
+export default async function AdminEmployeeSignaturePage(props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params
   const supabase = await createClient()
   const typedSupabase = supabase as SupabaseClient<Database>
 

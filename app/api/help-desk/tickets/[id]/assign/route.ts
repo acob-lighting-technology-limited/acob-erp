@@ -27,7 +27,8 @@ function managesDepartmentStrict(profile: HelpDeskProfile, department: string | 
   return managedDepartments.includes(department) || profile?.department === department
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, profile } = await getAuthContext()
 

@@ -26,7 +26,8 @@ function isManageUsersRole(role: string | null | undefined): boolean {
   return role === "developer" || role === "super_admin" || role === "admin"
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const {

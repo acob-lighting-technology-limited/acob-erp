@@ -21,7 +21,7 @@ interface PaymentUploadDialogProps {
   uploadType: "invoice" | "receipt"
   uploading: boolean
   replaceDocumentId: string | null
-  onSubmit: (e: React.FormEvent, fileInputRef: React.RefObject<HTMLInputElement>) => void
+  onSubmit: (e: React.FormEvent, fileInputRef: React.RefObject<HTMLInputElement | null>) => void
 }
 
 export function PaymentUploadDialog({

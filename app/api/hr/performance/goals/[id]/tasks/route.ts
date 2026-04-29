@@ -34,7 +34,8 @@ function canLead(profile: ProfileRecord | null, department: string | null | unde
   return profile.department === department || leadDepartments.includes(department)
 }
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const {
@@ -70,7 +71,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const {

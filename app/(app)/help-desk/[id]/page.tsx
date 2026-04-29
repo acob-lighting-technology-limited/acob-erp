@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server"
 import { TicketDetailContent } from "./ticket-detail-content"
 import { canLeadDepartment } from "@/lib/help-desk/server"
 
-export default async function HelpDeskTicketPage({ params }: { params: { id: string } }) {
+export default async function HelpDeskTicketPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const supabase = await createClient()
   const {
     data: { user },

@@ -49,7 +49,8 @@ function isFinanceDepartment(value: string | null | undefined): boolean {
 }
 
 // GET /api/payments/[id] - Get a single payment
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const { id } = params
@@ -114,7 +115,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 // PATCH /api/payments/[id] - Update a payment
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const { id } = params
@@ -229,7 +231,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE /api/payments/[id] - Soft delete a payment
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const { id } = params

@@ -29,8 +29,8 @@ function getNodeText(node: React.ReactNode): string {
   return ""
 }
 
-function findSelectItems(nodes: React.ReactNode): React.ReactElement[] {
-  const items: React.ReactElement[] = []
+function findSelectItems(nodes: React.ReactNode): SelectLikeElement[] {
+  const items: SelectLikeElement[] = []
   React.Children.forEach(nodes, (child) => {
     if (!isSelectElement(child)) return
     const typeValue = child.type as DisplayNameType

@@ -102,7 +102,8 @@ async function assertPaymentAccess(supabase: PaymentsClient, userId: string, pay
 }
 
 // GET /api/payments/[id]/documents - List all documents for a payment
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const { id: paymentId } = params
@@ -146,7 +147,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 // POST /api/payments/[id]/documents - Upload a new document (with optional replacement)
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const dataClient = getServiceRoleClientOrFallback(supabase)

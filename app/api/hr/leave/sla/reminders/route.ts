@@ -42,7 +42,7 @@ export async function PATCH() {
 
     // Allow secure scheduled execution (e.g. Vercel Cron) via CRON secret.
     // If no valid cron token is provided, fall back to authenticated RBAC checks.
-    const requestHeaders = headers()
+    const requestHeaders = await headers()
     const bearerToken = requestHeaders
       .get("authorization")
       ?.replace(/^Bearer\s+/i, "")

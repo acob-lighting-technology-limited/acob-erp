@@ -30,7 +30,8 @@ async function createClient() {
   })
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string; attachmentId: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string; attachmentId: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const {

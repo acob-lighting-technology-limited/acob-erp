@@ -2,7 +2,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
-export async function PATCH(_: Request, { params }: { params: { id: string } }) {
+export async function PATCH(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const {

@@ -5,7 +5,8 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { FileSignature } from "lucide-react"
 
-export default async function AnniversarySignaturePage({ searchParams }: { searchParams: { userId?: string } }) {
+export default async function AnniversarySignaturePage(props: { searchParams: Promise<{ userId?: string }> }) {
+  const searchParams = await props.searchParams
   const supabase = await createClient()
 
   const { data, error } = await supabase.auth.getUser()

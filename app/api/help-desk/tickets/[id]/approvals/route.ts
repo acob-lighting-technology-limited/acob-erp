@@ -75,7 +75,8 @@ function stageRank(stage: string) {
   return rank >= 0 ? rank : Number.MAX_SAFE_INTEGER
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, profile } = await getAuthContext()
 

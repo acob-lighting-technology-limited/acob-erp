@@ -94,7 +94,8 @@ function dedupePdfExtension(fileName: string): string {
   return trimmed.toLowerCase().endsWith(".pdf.pdf") ? trimmed.slice(0, -4) : trimmed
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string; documentId: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string; documentId: string }> }) {
+  const params = await props.params
   try {
     const supabase = await createClient()
     const dataClient = getServiceRoleClientOrFallback(supabase)

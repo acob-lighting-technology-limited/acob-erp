@@ -30,7 +30,8 @@ const UpdateCorrespondenceRecordSchema = z.object({
   change_summary: z.string().optional().nullable(),
 })
 
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, profile } = await getAuthContext()
 
@@ -79,7 +80,8 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   try {
     const { supabase, user, profile } = await getAuthContext()
 
