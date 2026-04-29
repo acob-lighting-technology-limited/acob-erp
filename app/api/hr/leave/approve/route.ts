@@ -12,6 +12,7 @@ import {
 import { getRouteStageByOrder, stageCodeForRole } from "@/lib/hr/leave-routing"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { getRequestScope } from "@/lib/admin/api-scope"
 
 const log = logger("hr-leave-approve")
 
@@ -150,12 +151,14 @@ export async function PATCH(request: NextRequest) {
     const { leave_request_id, comments, override_evidence } = parsed.data
     const action = normalizeAction(parsed.data)
 
+    const requestScope = await getRequestScope()
+
     const { data: actorProfile } = await supabase
       .from("profiles")
       .select("id, role, full_name, company_email")
       .eq("id", user.id)
       .single()
-    const isHRAdmin = ["developer", "admin", "super_admin"].includes(actorProfile?.role)
+    const canOverrideEvidence = requestScope?.isAdminLike === true && requestScope.scopeMode !== "lead"
     const actorName = actorProfile?.full_name || actorProfile?.company_email || "An approver"
 
     const { data: leaveRequest, error: fetchError } = await supabase
@@ -195,7 +198,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "LEAVE_STAGE_NOT_ASSIGNED_TO_ACTOR" }, { status: 403 })
     }
 
-    if (typedLeaveRequest.status === "pending_evidence" && action === "approved" && !isHRAdmin) {
+    if (typedLeaveRequest.status === "pending_evidence" && action === "approved" && !canOverrideEvidence) {
       return NextResponse.json({ error: "Request is awaiting evidence verification before approval." }, { status: 400 })
     }
 

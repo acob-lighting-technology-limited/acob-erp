@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
-import { resolveApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
+import { applyDataScopeV2 } from "@/lib/admin/policy-v2"
 
 const log = logger("hr-leave-queue")
 export const dynamic = "force-dynamic"
@@ -14,8 +16,6 @@ const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_md: "hr_pending",
   pending_hcs: "hr_pending",
 }
-
-const ADMIN_LIKE_ROLES = ["developer", "admin", "super_admin"]
 
 type ProfileSummary = {
   id: string
@@ -73,23 +73,28 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const all = searchParams.get("all") === "true"
-    // Leads can access the global queue but will see only their scoped departments
-    const { data: profileWithLead } = await supabase
-      .from("profiles")
-      .select("role, is_department_lead")
-      .eq("id", user.id)
-      .single<{ role: string | null; is_department_lead: boolean | null }>()
-    const isAdminLike = ADMIN_LIKE_ROLES.includes(profileWithLead?.role || "")
-    const isDeptLead = Boolean(profileWithLead?.is_department_lead)
-    const canViewAll = isAdminLike || isDeptLead
+    const scope = await getRequestScope()
+    let scopedDepts = scope ? getScopedDepartments(scope) : null
+    let scopedMode: "all" | "dept" | "none" = "all"
 
-    if (all && !canViewAll) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (all) {
+      const contextResult = await requireAccessContextV2()
+      if (!contextResult.ok) {
+        return contextResult.response
+      }
+      const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.main")
+      if (!routeAccess.ok) {
+        return routeAccess.response
+      }
+      if (routeAccess.dataScope === "none") {
+        scopedMode = "none"
+      } else if (routeAccess.dataScope === "all") {
+        scopedMode = "all"
+      } else {
+        scopedMode = "dept"
+        scopedDepts = routeAccess.dataScope
+      }
     }
-
-    // Resolve scope for department filtering (leads see only their departments)
-    const scope = await resolveApiAdminScope()
-    const scopedDepts = scope ? getScopedDepartments(scope) : null
 
     let query = supabase
       .from("leave_requests")
@@ -117,15 +122,10 @@ export async function GET(request: NextRequest) {
 
     // Apply department scope filter for leads viewing the global queue
     let typedRequests = (requests || []) as LeaveQueueRequestRow[]
-    if (all && scopedDepts !== null) {
-      if (scopedDepts.length === 0) {
-        typedRequests = []
-      } else {
-        typedRequests = typedRequests.filter((row) => {
-          const dept = row.user?.department || ""
-          return scopedDepts.includes(dept)
-        })
-      }
+    if (all && scopedMode === "none") {
+      typedRequests = []
+    } else if (all && scopedMode === "dept" && scopedDepts) {
+      typedRequests = applyDataScopeV2(typedRequests, scopedDepts, (row) => row.user?.department || null)
     }
 
     const requestIds = Array.from(new Set(typedRequests.map((row) => row.id).filter(Boolean)))

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
 import type { EmploymentStatus } from "@/types/database"
 import { resolveAdminScope, roleCanEnterAdmin } from "@/lib/admin/rbac"
+import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
 // ---------------------------------------------------------------------------
 // Maintenance-mode in-memory cache (30 s TTL).
@@ -111,6 +112,16 @@ export async function updateSession(request: NextRequest) {
       if (needsScope) {
         const scope = await resolveAdminScope(supabase, user.id)
         if (scope) {
+          if (pathname.startsWith("/admin")) {
+            const routeKey = resolveAdminRouteKeyV2(pathname)
+            const accessContext = buildAccessContextV2(scope)
+            if (!canAccessRouteV2(accessContext, routeKey)) {
+              const blockedTarget = request.nextUrl.clone()
+              blockedTarget.pathname = "/admin"
+              return NextResponse.redirect(blockedTarget)
+            }
+          }
+
           const encoded = Buffer.from(JSON.stringify(scope)).toString("base64")
           // Build new request headers with the scope injected
           const forwardedHeaders = new Headers(request.headers)

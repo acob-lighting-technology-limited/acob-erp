@@ -3,7 +3,8 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { resolveApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
+import { applyDataScopeV2 } from "@/lib/admin/policy-v2"
 import {
   areRequiredDocumentsVerified,
   assertNoOverlap,
@@ -349,25 +350,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status")
     const userId = searchParams.get("user_id")
     const all = searchParams.get("all") === "true"
-    const { data: requesterProfile } = await dataClient
-      .from("profiles")
-      .select("id, role, department, department_id, is_department_lead, lead_departments")
-      .eq("id", user.id)
-      .single<{
-        id?: string | null
-        role?: string | null
-        department?: string | null
-        department_id?: string | null
-        is_department_lead?: boolean | null
-        lead_departments?: string[] | null
-      }>()
-
-    const role = String(requesterProfile?.role || "").toLowerCase()
-    const isAdminLike = ["developer", "admin", "super_admin"].includes(role)
-
-    // Resolve scope for department filtering (leads see only their departments)
-    const adminScope = await resolveApiAdminScope()
-    const scopedDepts = adminScope ? getScopedDepartments(adminScope) : null
+    let scopedMode: "all" | "dept" | "none" = "all"
+    let scopedDepartments: string[] = []
 
     let query = supabase
       .from("leave_requests")
@@ -393,18 +377,20 @@ export async function GET(request: NextRequest) {
     const targetUserId = userId || user.id
 
     if (all) {
-      if (!isAdminLike && !requesterProfile?.is_department_lead) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      const contextResult = await requireAccessContextV2()
+      if (!contextResult.ok) {
+        return contextResult.response
       }
-      // Apply department scope at the DB level for leads
-      if (scopedDepts !== null) {
-        if (scopedDepts.length === 0) {
-          return NextResponse.json({ data: [], meta: { total: 0, page: 1, per_page: 20 } })
-        }
-        // Filter by the requester's department using the join
-        // profiles.department must be in scopedDepts — use a sub-query approach
-        // Supabase doesn't support join-column filtering, so we do a post-query user_id filter
-        // We'll fetch all and post-filter (already how it works), but NOW with api-scope
+      const routeAccess = enforceRouteAccessV2(contextResult.context, "hr.main")
+      if (!routeAccess.ok) {
+        return routeAccess.response
+      }
+      if (routeAccess.dataScope === "none") {
+        return NextResponse.json({ data: [], meta: { total: 0, page: 1, per_page: 20 } })
+      }
+      if (routeAccess.dataScope !== "all") {
+        scopedMode = "dept"
+        scopedDepartments = routeAccess.dataScope
       }
     } else {
       query = query.eq("user_id", targetUserId)
@@ -492,15 +478,11 @@ export async function GET(request: NextRequest) {
     const profileMap = new Map((profileRows || []).map((row) => [row.id, row] as const))
     const leaveTypeMap = new Map((leaveTypeRows || []).map((row) => [row.id, row] as const))
 
-    // Apply department scope: filter rows by requester's department using scoped departments
-    // (scopedDepts=null means global admin view; scopedDepts=[] means lead with no depts→empty)
     const filteredRequestRows =
-      all && scopedDepts !== null
-        ? requestRows.filter((row) => {
-            const requesterDepartment = row.user_id ? profileMap.get(row.user_id)?.department || null : null
-            if (!requesterDepartment) return false
-            return scopedDepts.includes(requesterDepartment)
-          })
+      all && scopedMode === "dept"
+        ? applyDataScopeV2(requestRows, scopedDepartments, (row) =>
+            row.user_id ? profileMap.get(row.user_id)?.department || null : null
+          )
         : requestRows
     const evidenceByRequest = new Map<string, LeaveEvidenceRow[]>()
     const approvalsByRequest = new Map<string, Array<LeaveApprovalRow & { approver: ProfileReferenceRow | null }>>()
@@ -585,6 +567,12 @@ export async function GET(request: NextRequest) {
 
       relieverCommitments = relieverRows || []
     }
+
+    const { data: requesterProfile } = await supabase
+      .from("profiles")
+      .select("id, department_id, department")
+      .eq("id", user.id)
+      .maybeSingle<ProfileReferenceRow>()
 
     const requesterDepartment = requesterProfile?.department || null
     const requesterDepartmentId = requesterProfile?.department_id || null

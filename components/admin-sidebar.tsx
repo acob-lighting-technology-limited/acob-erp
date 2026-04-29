@@ -34,7 +34,8 @@ import { useSidebar } from "@/components/sidebar-context"
 import type { UserRole } from "@/types/database"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion, AnimatePresence } from "framer-motion"
-import type { AdminScopeMode } from "@/lib/admin/rbac"
+import { normalizeDepartmentName } from "@/shared/departments"
+import { canAccessRouteV2, resolveAdminRouteKeyV2, type AccessContextV2, type AdminDomain } from "@/lib/admin/policy-v2"
 
 interface AdminSidebarProps {
   user?: {
@@ -53,10 +54,8 @@ interface AdminSidebarProps {
     admin_domains?: string[] | null
     lead_departments?: string[]
   }
-  adminScopeMode?: AdminScopeMode
+  adminScopeMode?: "global" | "lead"
 }
-
-type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "communications"
 
 const ADMIN_DOMAINS: AdminDomain[] = ["hr", "finance", "assets", "reports", "tasks", "communications"]
 
@@ -74,26 +73,6 @@ function normalizeAdminDomains(domains: string[] | null | undefined): AdminDomai
     )
   ).filter((value): value is AdminDomain => ADMIN_DOMAINS.includes(value as AdminDomain))
   return normalized
-}
-
-function getDomainForAdminPath(path: string): AdminDomain | null {
-  if (path.startsWith("/admin/hr")) return "hr"
-  if (path.startsWith("/admin/finance") || path.startsWith("/admin/purchasing")) return "finance"
-  if (path.startsWith("/admin/assets") || path.startsWith("/admin/inventory")) return "assets"
-  if (path.startsWith("/admin/reports") || path.startsWith("/admin/audit-logs")) return "reports"
-  if (path.startsWith("/admin/tasks")) return "tasks"
-  if (
-    path.startsWith("/admin/documentation") ||
-    path.startsWith("/admin/feedback") ||
-    path.startsWith("/admin/notifications") ||
-    path.startsWith("/admin/communications") ||
-    path.startsWith("/admin/correspondence") ||
-    path.startsWith("/admin/tools") ||
-    path.startsWith("/admin/help-desk")
-  ) {
-    return "communications"
-  }
-  return null
 }
 
 const adminNavigation = [
@@ -301,18 +280,42 @@ export function AdminSidebar({ user, profile, adminScopeMode = "global" }: Admin
   }
 
   const adminDomains = useMemo(() => normalizeAdminDomains(profile?.admin_domains), [profile?.admin_domains])
+  const accessContext = useMemo<AccessContextV2 | null>(() => {
+    if (!profile?.role) return null
+    const managedDepartmentSet = new Set<string>()
+    if (profile.department) {
+      managedDepartmentSet.add(normalizeDepartmentName(profile.department))
+    }
+    for (const department of profile.lead_departments || []) {
+      managedDepartmentSet.add(normalizeDepartmentName(department))
+    }
+
+    return {
+      baseRole: String(profile.role).toLowerCase(),
+      isDepartmentLead: Boolean(profile.is_department_lead),
+      isAdminLike: ["developer", "admin", "super_admin"].includes(String(profile.role).toLowerCase()),
+      adminDomains,
+      actingContext:
+        adminScopeMode === "lead" ||
+        (!["developer", "admin", "super_admin"].includes(String(profile.role).toLowerCase()) &&
+          Boolean(profile.is_department_lead))
+          ? "department_lead"
+          : "global_admin",
+      managedDepartments: Array.from(managedDepartmentSet),
+    }
+  }, [
+    adminDomains,
+    adminScopeMode,
+    profile?.department,
+    profile?.is_department_lead,
+    profile?.lead_departments,
+    profile?.role,
+  ])
 
   const canAccessRoute = (requiredRoles: string[], href: string) => {
-    if (!profile?.role) return false
-    if (profile.is_department_lead && profile.role !== "admin") {
-      return !href.startsWith("/admin/dev")
-    }
+    if (!profile?.role || !accessContext) return false
     if (!requiredRoles.includes(profile.role)) return false
-    if (profile.role !== "admin") return true
-
-    if (href === "/admin") return true
-    const mappedDomain = getDomainForAdminPath(href)
-    return Boolean(mappedDomain && adminDomains.includes(mappedDomain))
+    return canAccessRouteV2(accessContext, resolveAdminRouteKeyV2(href))
   }
 
   const filteredNavigation = adminNavigation.filter((item) => canAccessRoute(item.roles, item.href))
