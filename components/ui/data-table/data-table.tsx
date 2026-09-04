@@ -1659,7 +1659,7 @@ export function DataTable<TData>({
                       variant={action.variant ?? "default"}
                       className={cn("flex-1 gap-2", action.className)}
                     >
-                      <a href={action.href}>
+                      <a href={action.href} onClick={() => setDetailRow(null)}>
                         {Icon && <Icon className="h-4 w-4" />}
                         {action.label}
                       </a>
@@ -1669,7 +1669,10 @@ export function DataTable<TData>({
                       key={action.label}
                       variant={action.variant ?? "default"}
                       className={cn("flex-1 gap-2", action.className)}
-                      onClick={action.onClick}
+                      onClick={() => {
+                        setDetailRow(null)
+                        action.onClick?.()
+                      }}
                     >
                       {Icon && <Icon className="h-4 w-4" />}
                       {action.label}

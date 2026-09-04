@@ -5,7 +5,7 @@ import { CircleHelp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface ItemInfoDetail {
   label: string
@@ -45,24 +45,24 @@ export function ItemInfoButton({
         <TooltipContent>{triggerLabel}</TooltipContent>
       </Tooltip>
 
-      <ResponsiveModal
-        open={open}
-        onOpenChange={setOpen}
-        title={title}
-        description={summary}
-        desktopClassName="max-w-2xl"
-      >
-        <div className="space-y-3">
-          {details.map((detail) => (
-            <Card key={`${detail.label}-${detail.value.slice(0, 24)}`} className="border">
-              <CardContent className="space-y-1 p-4">
-                <div className="text-sm font-semibold">{detail.label}</div>
-                <p className="text-muted-foreground text-sm leading-6">{detail.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </ResponsiveModal>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            {summary ? <DialogDescription>{summary}</DialogDescription> : null}
+          </DialogHeader>
+          <div className="space-y-3">
+            {details.map((detail) => (
+              <Card key={`${detail.label}-${detail.value.slice(0, 24)}`} className="border">
+                <CardContent className="space-y-1 p-4">
+                  <div className="text-sm font-semibold">{detail.label}</div>
+                  <p className="text-muted-foreground text-sm leading-6">{detail.value}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

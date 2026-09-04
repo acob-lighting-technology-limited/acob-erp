@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
@@ -207,182 +207,185 @@ export function TaskReviewDecisionDialog({
   }
 
   return (
-    <ResponsiveModal
+    <Dialog
       open={open}
       onOpenChange={(v) => {
         if (!v) handleReset()
         onOpenChange(v)
       }}
-      title="Task Review & Governance"
-      description="Review task status, grant approvals, reassign, or extend timelines."
-      desktopClassName="max-w-xl"
     >
-      <div className="space-y-4 pt-2">
-        {/* Task Summary Card */}
-        <div className="bg-muted/40 space-y-2 rounded-lg border p-3.5 text-sm">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-foreground font-semibold">{task.title}</p>
-              {task.description && (
-                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{task.description}</p>
+      <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Task Review & Governance</DialogTitle>
+          <DialogDescription>Review task status, grant approvals, reassign, or extend timelines.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          {/* Task Summary Card */}
+          <div className="bg-muted/40 space-y-2 rounded-lg border p-3.5 text-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-foreground font-semibold">{task.title}</p>
+                {task.description && (
+                  <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{task.description}</p>
+                )}
+              </div>
+              <Badge variant="outline" className="shrink-0 capitalize">
+                {task.status.replaceAll("_", " ")}
+              </Badge>
+            </div>
+
+            <div className="text-muted-foreground grid grid-cols-2 gap-2 pt-1 text-xs">
+              <div>
+                <span className="text-foreground font-medium">Assignee: </span>
+                {task.assigned_to_user
+                  ? formatFullName(task.assigned_to_user.first_name, task.assigned_to_user.last_name)
+                  : "Unassigned"}
+              </div>
+              <div>
+                <span className="text-foreground font-medium">Due Date: </span>
+                {task.due_date ? formatWATDate(task.due_date) : "None"}
+              </div>
+              {task.goal_title && (
+                <div className="col-span-2">
+                  <span className="text-foreground font-medium">Goal: </span>
+                  {task.goal_title}
+                </div>
               )}
             </div>
-            <Badge variant="outline" className="shrink-0 capitalize">
-              {task.status.replaceAll("_", " ")}
-            </Badge>
-          </div>
 
-          <div className="text-muted-foreground grid grid-cols-2 gap-2 pt-1 text-xs">
-            <div>
-              <span className="text-foreground font-medium">Assignee: </span>
-              {task.assigned_to_user
-                ? formatFullName(task.assigned_to_user.first_name, task.assigned_to_user.last_name)
-                : "Unassigned"}
-            </div>
-            <div>
-              <span className="text-foreground font-medium">Due Date: </span>
-              {task.due_date ? formatWATDate(task.due_date) : "None"}
-            </div>
-            {task.goal_title && (
-              <div className="col-span-2">
-                <span className="text-foreground font-medium">Goal: </span>
-                {task.goal_title}
+            {isUnableToComplete && task.unable_to_complete_reason && (
+              <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+                <span className="mb-0.5 block font-semibold">Reported Issue / Reason:</span>
+                {task.unable_to_complete_reason}
               </div>
             )}
           </div>
 
-          {isUnableToComplete && task.unable_to_complete_reason && (
-            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
-              <span className="mb-0.5 block font-semibold">Reported Issue / Reason:</span>
-              {task.unable_to_complete_reason}
-            </div>
-          )}
-        </div>
+          {/* Decision dropdown */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Decision / Action</Label>
+            <Select
+              value={actionType ?? ""}
+              onValueChange={(val) => {
+                setActionType(val as DecisionId)
+                setComment("")
+                setRating(null)
+                setNewAssignee("")
+                setNewDueDate("")
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a decision..." />
+              </SelectTrigger>
+              <SelectContent>
+                {DECISIONS.map((decision) => {
+                  const blockedReason = decision.available(task) ? null : decision.unavailableReason
+                  return (
+                    <SelectItem key={decision.id} value={decision.id} disabled={Boolean(blockedReason)}>
+                      {decision.label}
+                      {blockedReason ? ` (${blockedReason})` : ""}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            {actionType && (
+              <p className="text-muted-foreground text-[11px]">
+                {DECISIONS.find((d) => d.id === actionType)?.description}
+              </p>
+            )}
+          </div>
 
-        {/* Decision dropdown */}
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">Decision / Action</Label>
-          <Select
-            value={actionType ?? ""}
-            onValueChange={(val) => {
-              setActionType(val as DecisionId)
-              setComment("")
-              setRating(null)
-              setNewAssignee("")
-              setNewDueDate("")
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a decision..." />
-            </SelectTrigger>
-            <SelectContent>
-              {DECISIONS.map((decision) => {
-                const blockedReason = decision.available(task) ? null : decision.unavailableReason
-                return (
-                  <SelectItem key={decision.id} value={decision.id} disabled={Boolean(blockedReason)}>
-                    {decision.label}
-                    {blockedReason ? ` (${blockedReason})` : ""}
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
+          {/* Selected Action Form */}
           {actionType && (
-            <p className="text-muted-foreground text-[11px]">
-              {DECISIONS.find((d) => d.id === actionType)?.description}
-            </p>
+            <div className="space-y-3 rounded-lg border p-3.5">
+              {actionType === "reassign" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">New Assignee *</Label>
+                  <SearchableSelect
+                    options={employeeOptions}
+                    value={newAssignee}
+                    onValueChange={setNewAssignee}
+                    placeholder="Select new team member..."
+                  />
+                </div>
+              )}
+
+              {(actionType === "extend" || actionType === "reassign") && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">New Due Date {actionType === "extend" && "*"}</Label>
+                  <Input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    className="text-xs"
+                  />
+                </div>
+              )}
+
+              {actionType === "approve" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Performance Rating *</Label>
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-5">
+                    {Array.from({ length: TASK_RATING_MAX - TASK_RATING_MIN + 1 }, (_, i) => TASK_RATING_MIN + i).map(
+                      (value) => (
+                        <Button
+                          key={value}
+                          type="button"
+                          variant={rating === value ? "default" : "outline"}
+                          size="sm"
+                          className="h-auto w-full min-w-0 flex-col gap-0.5 px-1 py-2 text-center whitespace-normal"
+                          onClick={() => setRating(value)}
+                        >
+                          <span className="text-sm font-semibold">{value}</span>
+                          <span className="w-full text-[10px] leading-tight text-balance opacity-80">
+                            {TASK_RATING_LABELS[value]}
+                          </span>
+                        </Button>
+                      )
+                    )}
+                  </div>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    {`Worth up to ${task.weight ?? TASK_WEIGHT_DEFAULT} points toward the assignee's KPI score (task weight ${task.weight ?? TASK_WEIGHT_DEFAULT})`}
+                    {rating
+                      ? ` — this rating earns ${Math.round((((task.weight ?? TASK_WEIGHT_DEFAULT) * rating) / TASK_RATING_MAX) * 100) / 100}.`
+                      : "."}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">
+                  {actionType === "approve"
+                    ? "Approval Note (Optional)"
+                    : actionType === "rework"
+                      ? "Rework Instructions *"
+                      : actionType === "fail"
+                        ? "Reason for rejection *"
+                        : actionType === "extend"
+                          ? "Extension Reason *"
+                          : "Reassignment Note"}
+                </Label>
+                <Textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Enter notes or explanation for audit log..."
+                  className="min-h-[70px] text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={handleReset} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSubmitDecision} disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Confirm Decision"}
+                </Button>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Selected Action Form */}
-        {actionType && (
-          <div className="space-y-3 rounded-lg border p-3.5">
-            {actionType === "reassign" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">New Assignee *</Label>
-                <SearchableSelect
-                  options={employeeOptions}
-                  value={newAssignee}
-                  onValueChange={setNewAssignee}
-                  placeholder="Select new team member..."
-                />
-              </div>
-            )}
-
-            {(actionType === "extend" || actionType === "reassign") && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">New Due Date {actionType === "extend" && "*"}</Label>
-                <Input
-                  type="date"
-                  value={newDueDate}
-                  onChange={(e) => setNewDueDate(e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-            )}
-
-            {actionType === "approve" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Performance Rating *</Label>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-5">
-                  {Array.from({ length: TASK_RATING_MAX - TASK_RATING_MIN + 1 }, (_, i) => TASK_RATING_MIN + i).map(
-                    (value) => (
-                      <Button
-                        key={value}
-                        type="button"
-                        variant={rating === value ? "default" : "outline"}
-                        size="sm"
-                        className="h-auto w-full min-w-0 flex-col gap-0.5 px-1 py-2 text-center whitespace-normal"
-                        onClick={() => setRating(value)}
-                      >
-                        <span className="text-sm font-semibold">{value}</span>
-                        <span className="w-full text-[10px] leading-tight text-balance opacity-80">
-                          {TASK_RATING_LABELS[value]}
-                        </span>
-                      </Button>
-                    )
-                  )}
-                </div>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
-                  {`Worth up to ${task.weight ?? TASK_WEIGHT_DEFAULT} points toward the assignee's KPI score (task weight ${task.weight ?? TASK_WEIGHT_DEFAULT})`}
-                  {rating
-                    ? ` — this rating earns ${Math.round((((task.weight ?? TASK_WEIGHT_DEFAULT) * rating) / TASK_RATING_MAX) * 100) / 100}.`
-                    : "."}
-                </p>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">
-                {actionType === "approve"
-                  ? "Approval Note (Optional)"
-                  : actionType === "rework"
-                    ? "Rework Instructions *"
-                    : actionType === "fail"
-                      ? "Reason for rejection *"
-                      : actionType === "extend"
-                        ? "Extension Reason *"
-                        : "Reassignment Note"}
-              </Label>
-              <Textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Enter notes or explanation for audit log..."
-                className="min-h-[70px] text-xs"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={handleReset} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleSubmitDecision} disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Confirm Decision"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    </ResponsiveModal>
+      </DialogContent>
+    </Dialog>
   )
 }
