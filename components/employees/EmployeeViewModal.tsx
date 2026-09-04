@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { formatWATDate, formatDateOfBirth } from "@/lib/utils/date"
+import { formatWATDate, formatDateOfBirth, formatDDMMYYYY } from "@/lib/utils/date"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -80,6 +80,7 @@ export interface EditForm {
   birthday: string
   birth_year: string
   employment_date: string
+  confirmation_date: string
   job_description: string
   attendance_exempt: boolean
   employment_status: EmploymentStatus
@@ -413,6 +414,20 @@ export function EmployeeViewModal({
                           </div>
                         )}
                       </div>
+                      <div className="col-span-2 grid grid-cols-2 gap-2 border-t pt-2">
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Employment Date</span>
+                          <span className="text-foreground mt-0.5 block text-xs font-medium">
+                            {formatDDMMYYYY(viewEmployeeProfile.employment_date) || "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[11px]">Confirmation Date</span>
+                          <span className="text-foreground mt-0.5 block text-xs font-medium">
+                            {formatDDMMYYYY(viewEmployeeProfile.confirmation_date) || "Probation (Pending)"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="bg-card space-y-3 rounded-lg border p-4 shadow-xs">
@@ -533,6 +548,33 @@ export function EmployeeViewModal({
                         </Button>
                       </div>
                     )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 pt-1 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground block text-[11px] font-semibold uppercase">
+                        Employment Date
+                      </span>
+                      <span className="text-foreground text-sm font-medium">
+                        {formatDDMMYYYY(viewEmployeeProfile.employment_date) || "Not specified"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground block text-[11px] font-semibold uppercase">
+                        Confirmation Date
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-foreground text-sm font-medium">
+                          {formatDDMMYYYY(viewEmployeeProfile.confirmation_date) || "Not Confirmed"}
+                        </span>
+                        {!viewEmployeeProfile.confirmation_date && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Probation (Pending)
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1026,7 +1068,7 @@ export function EmployeeViewModal({
                     <Calendar className="text-primary h-3.5 w-3.5" /> Employment Dates & Info
                   </span>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
                       <Label htmlFor="edit_hire_date" className="text-xs">
                         Employment Date
@@ -1036,6 +1078,19 @@ export function EmployeeViewModal({
                         type="date"
                         value={editForm.employment_date}
                         onChange={(e) => setEditForm({ ...editForm, employment_date: e.target.value })}
+                        className="mt-1 h-8 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit_confirmation_date" className="text-xs">
+                        Confirmation Date
+                      </Label>
+                      <Input
+                        id="edit_confirmation_date"
+                        type="date"
+                        value={editForm.confirmation_date}
+                        onChange={(e) => setEditForm({ ...editForm, confirmation_date: e.target.value })}
                         className="mt-1 h-8 text-xs"
                       />
                     </div>

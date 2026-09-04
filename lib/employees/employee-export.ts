@@ -8,7 +8,7 @@ import { getRoleDisplayName } from "@/lib/permissions"
 import { logger } from "@/lib/logger"
 import { toast } from "sonner"
 import type { UserRole, EmploymentStatus } from "@/types/database"
-import { toLocalISODate, formatWATDate, formatDateOfBirth } from "@/lib/utils/date"
+import { toLocalISODate, formatWATDate, formatDateOfBirth, formatDDMMYYYY } from "@/lib/utils/date"
 
 export interface Employee {
   id: string
@@ -32,6 +32,7 @@ export interface Employee {
   date_of_birth: string | null
   birthday: string | null
   employment_date: string | null
+  confirmation_date?: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -71,7 +72,14 @@ export function buildEmployeeExportRows(employees: Employee[], opts: ExportOptio
     if (selectedColumns["Bank Account Name"]) row["Bank Account Name"] = member.bank_account_name || "-"
     if (selectedColumns["Date of Birth"])
       row["Date of Birth"] = formatDateOfBirth(member.date_of_birth, member.birthday) || "-"
-    if (selectedColumns["Employment Date"]) row["Employment Date"] = member.employment_date || "-"
+    if (selectedColumns["Employment Date"])
+      row["Employment Date"] = member.employment_date
+        ? formatDDMMYYYY(member.employment_date) || member.employment_date
+        : "-"
+    if (selectedColumns["Confirmation Date"])
+      row["Confirmation Date"] = member.confirmation_date
+        ? formatDDMMYYYY(member.confirmation_date) || member.confirmation_date
+        : "-"
     if (selectedColumns["Employment Type"]) {
       const type = member.employment_type || "full_time"
       row["Employment Type"] =
@@ -229,8 +237,12 @@ export async function exportEmployeesToPDF(
         headers.push("Date of Birth")
       }
       if (selectedColumns["Employment Date"]) {
-        row.push(member.employment_date || "-")
+        row.push(member.employment_date ? formatDDMMYYYY(member.employment_date) || member.employment_date : "-")
         headers.push("Employment Date")
+      }
+      if (selectedColumns["Confirmation Date"]) {
+        row.push(member.confirmation_date ? formatDDMMYYYY(member.confirmation_date) || member.confirmation_date : "-")
+        headers.push("Confirmation Date")
       }
       if (selectedColumns["Employment Type"]) {
         const type = member.employment_type || "full_time"

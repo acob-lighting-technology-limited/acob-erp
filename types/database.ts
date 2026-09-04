@@ -31,6 +31,7 @@ export type Database = {
           birthday: string | null // MM-DD, canonical month/day; source for birthday emails & derived date_of_birth
           birth_year: number | null // year only, null until known; combines with birthday to form date_of_birth
           employment_date: string | null
+          confirmation_date: string | null
           is_admin: boolean
           role: Database["public"]["Enums"]["user_role"]
           admin_domains: string[] | null
@@ -75,6 +76,7 @@ export type Database = {
           birthday?: string | null
           birth_year?: number | null
           employment_date?: string | null
+          confirmation_date?: string | null
           is_admin?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           admin_domains?: string[] | null
@@ -112,6 +114,7 @@ export type Database = {
           birthday?: string | null
           birth_year?: number | null
           employment_date?: string | null
+          confirmation_date?: string | null
           is_admin?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           admin_domains?: string[] | null
@@ -321,6 +324,7 @@ export interface Profile {
   birthday?: string | null // MM-DD canonical month/day
   birth_year?: number | null // year only, null until known
   employment_date?: string
+  confirmation_date?: string | null
   is_admin: boolean
   role: UserRole
   admin_domains?: string[] | null

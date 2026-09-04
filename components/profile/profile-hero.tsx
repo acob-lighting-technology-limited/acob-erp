@@ -42,6 +42,7 @@ interface ProfileHeroProps {
     birthday?: string | null
     residential_address?: string | null
     employment_date?: string | null
+    confirmation_date?: string | null
     role: string
     is_department_lead?: boolean | null
   }
@@ -204,8 +205,13 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
 
   const desigAndDept = [profile.designation, profile.department].filter(Boolean).join(" · ")
   const joinedInfo = joinedDate ? `Joined ${joinedDate}${tenure ? ` · ${tenure}` : ""}` : null
+  const confirmationInfo = profile.confirmation_date
+    ? `Confirmed ${formatWATDate(new Date(profile.confirmation_date), { day: "numeric", month: "short", year: "numeric" })}`
+    : profile.employment_date
+      ? "Probation (Pending Confirmation)"
+      : null
 
-  const identityLine = [profile.designation, profile.department, joinedInfo].filter(Boolean)
+  const identityLine = [profile.designation, profile.department, joinedInfo, confirmationInfo].filter(Boolean)
 
   const renderAvatar = (sizeClass: string) => (
     <div className="group relative shrink-0">
@@ -286,10 +292,12 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
           </div>
 
           {/* Full-width identity details */}
-          {(desigAndDept || joinedInfo) && (
+          {(desigAndDept || joinedInfo || confirmationInfo) && (
             <div className="space-y-0.5 pt-0.5 text-xs">
               {desigAndDept && <p className="text-foreground/90 text-sm font-medium">{desigAndDept}</p>}
-              {joinedInfo && <p className="text-muted-foreground">{joinedInfo}</p>}
+              {(joinedInfo || confirmationInfo) && (
+                <p className="text-muted-foreground">{[joinedInfo, confirmationInfo].filter(Boolean).join(" · ")}</p>
+              )}
             </div>
           )}
 

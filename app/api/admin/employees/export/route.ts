@@ -23,6 +23,7 @@ const SAFE_FIELDS = [
   "office_location",
   "phone_number",
   "employment_date",
+  "confirmation_date",
 ]
 
 const SENSITIVE_FIELDS = ["bank_name", "bank_account_number", "bank_account_name"]

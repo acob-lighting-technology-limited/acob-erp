@@ -114,6 +114,7 @@ export interface Employee {
   date_of_birth: string | null
   birthday: string | null
   employment_date: string | null
+  confirmation_date?: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -221,6 +222,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     "Office Location": true,
     "Date of Birth": true,
     "Employment Date": true,
+    "Confirmation Date": true,
     "Employment Type": true,
     "Contract Category": true,
     "Lead Departments": true,
@@ -272,6 +274,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     birthday: "",
     birth_year: "",
     employment_date: "",
+    confirmation_date: "",
     job_description: "",
     attendance_exempt: false,
     employment_status: "active",
@@ -385,7 +388,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             bank_account_name: fullProfile.bank_account_name || "",
             birthday: fullProfile.birthday || "",
             birth_year: fullProfile.birth_year != null ? String(fullProfile.birth_year) : "",
-            employment_date: fullProfile.employment_date || "",
+            employment_date: fullProfile.employment_date ? fullProfile.employment_date.split("T")[0] : "",
+            confirmation_date: fullProfile.confirmation_date ? fullProfile.confirmation_date.split("T")[0] : "",
             job_description: fullProfile.job_description || "",
             attendance_exempt: Boolean(fullProfile.attendance_exempt),
             device_key: fullProfile.device_key || "",
@@ -622,6 +626,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         birthday: editForm.birthday || null,
         birth_year: editForm.birth_year ? Number(editForm.birth_year) : null,
         employment_date: editForm.employment_date || null,
+        confirmation_date: editForm.confirmation_date || null,
         job_description: editForm.job_description || null,
       }
 
@@ -1113,6 +1118,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     <span>{r.employment_date ? formatWATDate(r.employment_date) : "—"}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-muted-foreground">Confirmed</span>
+                    <span>{r.confirmation_date ? formatWATDate(r.confirmation_date) : "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-muted-foreground">DOB</span>
                     <span>{formatDateOfBirth(r.date_of_birth, r.birthday) ?? "—"}</span>
                   </div>
@@ -1224,6 +1233,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 icon: Calendar,
                 label: "Joined",
                 value: r.employment_date ? formatWATDate(r.employment_date) : "-",
+              },
+              {
+                icon: Calendar,
+                label: "Confirmed",
+                value: r.confirmation_date ? formatWATDate(r.confirmation_date) : "Probation (Pending)",
               },
             ],
             actions: (r) => [
