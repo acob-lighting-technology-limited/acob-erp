@@ -102,6 +102,54 @@ export interface AdminLunchMenu extends LunchMenu {
   view_count?: number
 }
 
+export type MenuEffectiveStatus = "draft" | "voting_open" | "deadline_passed" | "closed" | "cancelled"
+
+export function getMenuStatusInfo(menu: { status: string; archived_at?: string | null; votingOpen?: boolean }): {
+  key: MenuEffectiveStatus
+  label: string
+  tone: string
+  accentClass: string
+} {
+  if (menu.archived_at) {
+    return {
+      key: "cancelled",
+      label: "Cancelled",
+      tone: "border border-border/80 bg-muted/60 text-muted-foreground hover:bg-muted/80 shadow-none",
+      accentClass: "bg-slate-400",
+    }
+  }
+  if (menu.status === "draft") {
+    return {
+      key: "draft",
+      label: "Draft",
+      tone: "border border-border/80 bg-muted/60 text-muted-foreground hover:bg-muted/80 shadow-none",
+      accentClass: "bg-slate-400 dark:bg-slate-600",
+    }
+  }
+  if (menu.status === "closed") {
+    return {
+      key: "closed",
+      label: "Closed",
+      tone: "border-0 bg-red-500/10 text-red-500 hover:bg-red-500/20 shadow-none",
+      accentClass: "bg-red-500",
+    }
+  }
+  if (menu.votingOpen) {
+    return {
+      key: "voting_open",
+      label: "Voting open",
+      tone: "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 shadow-none",
+      accentClass: "bg-emerald-500",
+    }
+  }
+  return {
+    key: "deadline_passed",
+    label: "Deadline passed",
+    tone: "border-0 bg-amber-500/10 text-amber-600 dark:text-amber-500 hover:bg-amber-500/20 shadow-none",
+    accentClass: "bg-amber-500",
+  }
+}
+
 export interface LunchSummaryRow {
   user_id: string
   full_name: string
@@ -885,25 +933,9 @@ export function LunchRegisterPage({
     {
       key: "status",
       label: "Status",
-      accessor: (row) => row.status,
+      accessor: (row) => getMenuStatusInfo(row).label,
       render: (row) => {
-        if (row.archived_at) {
-          return <Badge className="border bg-gray-100 text-gray-500 hover:bg-gray-100/80">Cancelled</Badge>
-        }
-        const tone =
-          row.status === "published" && row.votingOpen
-            ? "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-            : row.status === "draft"
-              ? "border bg-gray-100 text-gray-500 hover:bg-gray-100/80"
-              : "border-0 bg-red-500/10 text-red-500 hover:bg-red-500/20"
-        const label =
-          row.status === "draft"
-            ? "Draft"
-            : row.status === "closed"
-              ? "Closed"
-              : row.votingOpen
-                ? "Voting open"
-                : "Deadline passed"
+        const { label, tone } = getMenuStatusInfo(row)
         return <Badge className={tone}>{label}</Badge>
       },
     },
@@ -972,10 +1004,24 @@ export function LunchRegisterPage({
       key: "status",
       label: "Status",
       options: [
+        { value: "voting_open", label: "Voting open" },
+        { value: "deadline_passed", label: "Deadline passed" },
         { value: "draft", label: "Draft" },
-        { value: "published", label: "Published" },
         { value: "closed", label: "Closed" },
+        { value: "cancelled", label: "Cancelled" },
       ],
+      mode: "custom" as const,
+      filterFn: (row, selectedValues) => {
+        if (selectedValues.length === 0) return true
+        const status = getMenuStatusInfo(row)
+        if (
+          selectedValues.includes("published") &&
+          (status.key === "voting_open" || status.key === "deadline_passed")
+        ) {
+          return true
+        }
+        return selectedValues.includes(status.key)
+      },
     },
     {
       key: "has_votes",
@@ -1479,7 +1525,11 @@ export function LunchRegisterPage({
             searchPlaceholder="Search a dish…"
             searchFn={(row, q) => {
               const needle = q.toLowerCase()
-              return row.groups.some((g) => g.options.some((o) => o.name.toLowerCase().includes(needle)))
+              return (
+                row.groups.some((g) => g.options.some((o) => o.name.toLowerCase().includes(needle))) ||
+                getMenuStatusInfo(row).label.toLowerCase().includes(needle) ||
+                formatWATDate(row.date).toLowerCase().includes(needle)
+              )
             }}
             filters={menuFilters}
             isLoading={fetchingMenus}
@@ -1490,26 +1540,26 @@ export function LunchRegisterPage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              accentClass: (row) =>
-                row.archived_at ? "bg-slate-400" : row.votingOpen ? "bg-emerald-500" : "bg-blue-500",
+              accentClass: (row) => getMenuStatusInfo(row).accentClass,
               title: (row) => formatWATDate(row.date),
               subtitle: (row) => `${row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}`,
-              trailing: (row) => (
-                <Badge variant={row.votingOpen ? "default" : "secondary"} className="text-[10px]">
-                  {row.votingOpen ? "Voting Open" : row.status}
-                </Badge>
-              ),
+              trailing: (row) => {
+                const status = getMenuStatusInfo(row)
+                return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+              },
               detail: {
                 title: (row) => `Lunch Menu: ${formatWATDate(row.date)}`,
-                subtitle: (row) => (row.votingOpen ? "Voting is currently open" : `Status: ${row.status}`),
-                badges: (row) => (
-                  <Badge variant={row.votingOpen ? "default" : "secondary"} className="text-[10px]">
-                    {row.votingOpen ? "Voting Open" : row.status}
-                  </Badge>
-                ),
+                subtitle: (row) => {
+                  const status = getMenuStatusInfo(row)
+                  return row.votingOpen ? "Voting is currently open" : `Status: ${status.label}`
+                },
+                badges: (row) => {
+                  const status = getMenuStatusInfo(row)
+                  return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+                },
                 fields: (row) => [
                   { label: "Date", value: formatWATDate(row.date) },
-                  { label: "Status", value: row.status },
+                  { label: "Status", value: getMenuStatusInfo(row).label },
                   { label: "Categories", value: `${row.groups.length} group(s)` },
                   {
                     label: "Menu Items",
@@ -1531,27 +1581,28 @@ export function LunchRegisterPage({
                 ],
               },
             }}
-            cardRenderer={(row) => (
-              <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{formatWATDate(row.date)}</p>
+            cardRenderer={(row) => {
+              const status = getMenuStatusInfo(row)
+              return (
+                <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{formatWATDate(row.date)}</p>
+                    </div>
+                    <Badge className={status.tone}>{status.label}</Badge>
                   </div>
-                  <Badge variant={row.votingOpen ? "default" : "secondary"}>
-                    {row.votingOpen ? "Voting Open" : row.status}
-                  </Badge>
+                  <div className="text-muted-foreground line-clamp-2 text-xs">
+                    {row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}
+                  </div>
+                  <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+                    <span className="text-muted-foreground">{row.votes.length} votes cast</span>
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setEditingMenu(row)}>
+                      Edit
+                    </Button>
+                  </div>
                 </div>
-                <div className="text-muted-foreground line-clamp-2 text-xs">
-                  {row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}
-                </div>
-                <div className="flex items-center justify-between border-t pt-2 text-[10px]">
-                  <span className="text-muted-foreground">{row.votes.length} votes cast</span>
-                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setEditingMenu(row)}>
-                    Edit
-                  </Button>
-                </div>
-              </div>
-            )}
+              )
+            }}
             expandable={{ render: (row) => <MenuVotesPanel menu={row} totalStaff={employees.length} /> }}
             rowActions={[
               {
