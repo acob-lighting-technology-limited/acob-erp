@@ -688,6 +688,7 @@ export function AttendanceContent({
             data={rows}
             columns={columns}
             filters={filters}
+            showRowNumbers={false}
             getRowId={(row) => row.id}
             searchPlaceholder="Search day, clock in/out, or status..."
             searchFn={(row, query) =>
