@@ -233,7 +233,7 @@ export function GoalsContent({
       }
       stats={
         summaryCards.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {summaryCards.map((card, index) => (
               <StatCard
                 key={card.label}
