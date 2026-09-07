@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildAuditRpcParams, isCriticalAuditAction, type AuditPayload } from "@/lib/audit/core"
+import { getAuditRequestContext } from "@/lib/audit/request-context"
 
 import { logger } from "@/lib/logger"
 
 const log = logger("lib-audit-write-audit")
-
 
 export class AuditWriteError extends Error {
   details?: unknown
@@ -27,7 +27,19 @@ export async function writeAuditLog(
   payload: AuditPayload,
   options?: WriteAuditOptions
 ): Promise<string | null> {
-  const params = buildAuditRpcParams(payload)
+  // Callers rarely have the request to hand, so IP/user-agent are filled from
+  // the ambient request here. An explicit value on the payload always wins.
+  const requestContext = await getAuditRequestContext()
+  const enrichedPayload: AuditPayload = {
+    ...payload,
+    context: {
+      ...payload.context,
+      ipAddress: payload.context.ipAddress ?? requestContext.ipAddress,
+      userAgent: payload.context.userAgent ?? requestContext.userAgent,
+    },
+  }
+
+  const params = buildAuditRpcParams(enrichedPayload)
   const shouldFailClosed =
     options?.failOpen === true
       ? false
