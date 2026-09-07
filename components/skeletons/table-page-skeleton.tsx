@@ -103,9 +103,12 @@ export function TablePageSkeleton({
 
         {/* ── 2. Tabs (optional) ── */}
         {tabs && tabs > 0 ? (
-          <div className="flex gap-1">
+          <div className={tabs === 2 ? "grid grid-cols-2 gap-1 sm:flex" : "flex gap-1"}>
             {Array.from({ length: tabs }).map((_, i) => (
-              <SkeletonLine key={`tab-${i}`} className="h-9 w-20 rounded-md" />
+              <SkeletonLine
+                key={`tab-${i}`}
+                className={tabs === 2 ? "h-9 w-full rounded-md sm:w-20" : "h-9 w-20 rounded-md"}
+              />
             ))}
           </div>
         ) : null}
