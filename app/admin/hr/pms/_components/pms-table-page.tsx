@@ -293,18 +293,29 @@ export function PmsTablePage({
       }
       stats={
         summaryCards.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
-            {summaryCards.map((card, index) => (
-              <StatCard
-                key={card.label}
-                variant="compact"
-                title={card.label}
-                value={card.value}
-                icon={Icon}
-                iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
-                iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
-              />
-            ))}
+          <div
+            className={cn(
+              "grid gap-2 sm:gap-3",
+              summaryCards.length <= 2 && "grid-cols-2",
+              summaryCards.length === 3 && "grid-cols-3",
+              summaryCards.length >= 4 && "grid-cols-3 sm:grid-cols-4"
+            )}
+          >
+            {summaryCards.map((card, index) => {
+              const hideOnMobile = summaryCards.length > 3 && index >= 3
+              return (
+                <StatCard
+                  key={card.label}
+                  variant="compact"
+                  title={card.label}
+                  value={card.value}
+                  icon={Icon}
+                  iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
+                  iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
+                  className={hideOnMobile ? "hidden sm:block" : undefined}
+                />
+              )
+            })}
           </div>
         ) : undefined
       }
