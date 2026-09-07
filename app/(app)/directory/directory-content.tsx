@@ -6,12 +6,25 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toLocalISODate } from "@/lib/utils/date"
 import { exportDirectoryToCsv, exportDirectoryToExcel, type DirectoryExportRow } from "@/lib/directory/export"
-import { Building2, Check, Copy, Download, Mail, MapPin, Phone, RefreshCw, ShieldCheck, Users } from "lucide-react"
+import {
+  Briefcase,
+  Building2,
+  Check,
+  Copy,
+  Download,
+  FileSignature,
+  Mail,
+  MapPin,
+  Phone,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+} from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -30,13 +43,14 @@ type DirectoryRow = {
   is_department_lead: boolean | null
   lead_departments: string[] | null
   employment_status: string | null
+  employment_type: string | null
   /** Short-lived signed URL; the private storage path never leaves the server. */
   avatar_url: string | null
 }
 
-/** Field/contract staff are on the payroll but have no office contact details to look up. */
+/** Field contractors on payroll (CTR group without company email). */
 function isContractStaff(row: DirectoryRow): boolean {
-  return (row.employment_status || "").toLowerCase() === "contract"
+  return (row.employment_status || "").toLowerCase() === "contract" && !row.company_email
 }
 
 /**
@@ -153,9 +167,13 @@ export function DirectoryContent() {
   const [exportOpen, setExportOpen] = useState(false)
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRows, setProcessedRows] = useState<DirectoryRow[]>([])
+
+  type DirectoryTab = "employees" | "contract" | "all"
+  const [activeTab, setActiveTab] = useState<DirectoryTab>("employees")
+
   // Controlled only so the "leads" metric can toggle its own filter; the toolbar
   // still renders and drives these values exactly as it does uncontrolled.
-  const [filterValues, setFilterValues] = useState<Record<string, string[]>>({ staff_type: ["permanent"] })
+  const [filterValues, setFilterValues] = useState<Record<string, string[]>>({})
   const leadsOnly = filterValues.is_department_lead?.length === 1 && filterValues.is_department_lead[0] === "lead"
 
   const {
@@ -165,8 +183,29 @@ export function DirectoryContent() {
     refetch,
   } = useQuery({ queryKey: QUERY_KEYS.directory(), queryFn: fetchDirectory })
 
+  const tabs: DataTableTab[] = useMemo(() => {
+    const contract = rows.filter(isContractStaff).length
+    const regular = rows.length - contract
+
+    return [
+      { key: "employees", label: `Employees (${regular})`, icon: Briefcase },
+      { key: "contract", label: `Contract Staff (${contract})`, icon: FileSignature },
+      { key: "all", label: `All Staff (${rows.length})`, icon: Users },
+    ]
+  }, [rows])
+
+  const scopedRows = useMemo(() => {
+    if (activeTab === "employees") {
+      return rows.filter((r) => !isContractStaff(r))
+    }
+    if (activeTab === "contract") {
+      return rows.filter(isContractStaff)
+    }
+    return rows
+  }, [rows, activeTab])
+
   const handleExport = (format: string) => {
-    const source = processedRows.length ? processedRows : rows
+    const source = processedRows.length ? processedRows : scopedRows
     const exportRows: DirectoryExportRow[] = source.map((r) => ({
       Name: displayName(r),
       Designation: r.designation || "",
@@ -185,30 +224,29 @@ export function DirectoryContent() {
 
   const departmentOptions = useMemo(
     () =>
-      Array.from(new Set(rows.map((r) => r.department).filter((d): d is string => Boolean(d))))
+      Array.from(new Set(scopedRows.map((r) => r.department).filter((d): d is string => Boolean(d))))
         .sort()
         .map((d) => ({ value: d, label: d })),
-    [rows]
+    [scopedRows]
   )
 
   const officeOptions = useMemo(
     () =>
-      Array.from(new Set(rows.map((r) => r.office_location).filter((o): o is string => Boolean(o))))
+      Array.from(new Set(scopedRows.map((r) => r.office_location).filter((o): o is string => Boolean(o))))
         .sort()
         .map((o) => ({ value: o, label: o })),
-    [rows]
+    [scopedRows]
   )
 
-  // Stats follow what the table is actually showing, so the headline count doesn't claim
-  // people the default staff-type filter has hidden.
+  // Stats follow what the table is actually showing within the active tab scope.
   const stats = useMemo(() => {
-    const source = processedRows.length ? processedRows : rows
+    const source = processedRows.length ? processedRows : scopedRows
     const total = source.length
     const departments = new Set(source.map((r) => r.department).filter(Boolean)).size
     const leads = source.filter((r) => r.is_department_lead).length
     const offices = new Set(source.map((r) => r.office_location).filter(Boolean)).size
     return { total, departments, leads, offices }
-  }, [rows, processedRows])
+  }, [scopedRows, processedRows])
 
   const columns = useMemo<DataTableColumn<DirectoryRow>[]>(
     () => [
@@ -289,19 +327,6 @@ export function DirectoryContent() {
       { key: "department", label: "Department", options: departmentOptions },
       { key: "office_location", label: "Office", options: officeOptions },
       {
-        // Contract/field staff are hidden unless asked for: they have no office contact
-        // details, so they add ~46 empty rows to what is meant to be a lookup tool.
-        key: "staff_type",
-        label: "Staff type",
-        options: [
-          { value: "permanent", label: "Office staff" },
-          { value: "contract", label: "Contract staff" },
-        ],
-        // Seeded in `filterValues` above: defaults are ignored in controlled mode.
-        mode: "custom",
-        filterFn: (row, values) => values.includes(isContractStaff(row) ? "contract" : "permanent"),
-      },
-      {
         // Not "Role" — that means the system role (admin/employee) on the HR employees page,
         // and using the same word for two different things made the two pages read alike.
         key: "is_department_lead",
@@ -324,6 +349,12 @@ export function DirectoryContent() {
     <DataTablePage
       title="Staff Directory"
       description="Contact details for everyone at ACOB — search by name, department or office."
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(tab) => {
+        setActiveTab(tab as DirectoryTab)
+        setFilterValues({})
+      }}
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -349,8 +380,8 @@ export function DirectoryContent() {
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
           <StatCard
             variant="compact"
-            title="Colleagues"
-            value={stats.total === rows.length ? stats.total : `${stats.total} of ${rows.length}`}
+            title={activeTab === "contract" ? "Contract Staff" : "Colleagues"}
+            value={stats.total === scopedRows.length ? stats.total : `${stats.total} of ${scopedRows.length}`}
             icon={Users}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
@@ -413,7 +444,7 @@ export function DirectoryContent() {
       />
 
       <DataTable<DirectoryRow>
-        data={rows}
+        data={scopedRows}
         columns={columns}
         filters={filters}
         filterValues={filterValues}
@@ -468,10 +499,17 @@ export function DirectoryContent() {
                 </Badge>
               ) : null,
             fields: (r) => [
-              { icon: Mail, label: "Email", value: r.company_email },
-              { icon: Mail, label: "Alt. email", value: r.additional_email, muted: true },
-              { icon: Phone, label: "Phone", value: r.phone_number },
-              { icon: Phone, label: "Alt. phone", value: r.additional_phone, muted: true },
+              { icon: Mail, label: "Email", value: r.company_email, fullWidth: true, copyable: true },
+              {
+                icon: Mail,
+                label: "Alt. email",
+                value: r.additional_email,
+                muted: true,
+                fullWidth: true,
+                copyable: true,
+              },
+              { icon: Phone, label: "Phone", value: r.phone_number, copyable: true },
+              { icon: Phone, label: "Alt. phone", value: r.additional_phone, muted: true, copyable: true },
               { icon: Building2, label: "Department", value: r.department },
               { icon: MapPin, label: "Office", value: r.office_location },
             ],
