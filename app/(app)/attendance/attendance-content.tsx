@@ -714,17 +714,9 @@ export function AttendanceContent({
             emptyIcon={Clock}
             skeletonRows={6}
             mobileRow={{
-              // The whole point of this log is spotting the days that cost you
-              // something, so those days carry an accent instead of blending in.
-              accentClass: (row) =>
-                row.normalizedStatus === "absent"
-                  ? "bg-rose-500"
-                  : ["late", "incomplete"].includes(row.normalizedStatus)
-                    ? "bg-amber-500"
-                    : undefined,
               title: (row) => (
                 <span className="text-foreground font-medium">
-                  {formatWATDate(row.date, { day: "numeric", month: "short", year: "numeric" })}
+                  {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                 </span>
               ),
               // Three clauses truncate on a phone before the third is readable.
