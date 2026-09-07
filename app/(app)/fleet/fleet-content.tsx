@@ -560,14 +560,6 @@ export function FleetContent() {
         // fits, the row list where it does not.
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            row.status === "pending"
-              ? "bg-amber-500"
-              : row.status === "approved"
-                ? "bg-emerald-500"
-                : row.status === "rejected"
-                  ? "bg-rose-500"
-                  : undefined,
           title: (row) => row.resourceName,
           subtitle: (row) => `${row.timeRange} · ${row.requester?.full_name || "Self"}`,
           trailing: (row) => statusPill(row),
