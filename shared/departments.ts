@@ -4,9 +4,14 @@ export const DEPT_BGI = "Business, Growth and Innovation" as const
 export const DEPT_CORPORATE_SERVICES = "Corporate Services" as const
 export const DEPT_EXECUTIVE_MANAGEMENT = "Executive Management" as const
 export const DEPT_ITC = "IT and Communications" as const
+export const DEPT_LOGISTICS = "Logistics" as const
+export const DEPT_ME = "Monitoring and Evaluation" as const
 export const DEPT_OPM = "Operations and Maintenance" as const
 export const DEPT_PROJECT = "Project" as const
+export const DEPT_QA = "Quality Assurance" as const
 export const DEPT_REGULATORY = "Regulatory and Compliance" as const
+export const DEPT_SE = "Stakeholder Engagement" as const
+export const DEPT_SIWES = "SIWES" as const
 export const DEPT_TECHNICAL = "Technical" as const
 
 export const CANONICAL_DEPARTMENT_ORDER = [
@@ -16,9 +21,14 @@ export const CANONICAL_DEPARTMENT_ORDER = [
   DEPT_CORPORATE_SERVICES,
   DEPT_EXECUTIVE_MANAGEMENT,
   DEPT_ITC,
+  DEPT_LOGISTICS,
+  DEPT_ME,
   DEPT_OPM,
   DEPT_PROJECT,
+  DEPT_QA,
   DEPT_REGULATORY,
+  DEPT_SE,
+  DEPT_SIWES,
   DEPT_TECHNICAL,
 ] as const
 
@@ -41,7 +51,7 @@ const DEPARTMENT_ALIASES: Partial<Record<CanonicalDepartment, readonly string[]>
     "Business, Growth & Innovation",
     "BGI",
   ],
-  [DEPT_OPM]: ["Operations", "Operations & Maintenance", "O&M", "OPM"],
+  [DEPT_OPM]: ["Operations", "Operations & Maintenance", "O&M", "OPM", "OPS"],
   [DEPT_ITC]: [
     "ICT",
     "IT",
@@ -49,6 +59,7 @@ const DEPARTMENT_ALIASES: Partial<Record<CanonicalDepartment, readonly string[]>
     "IT and Communication",
     "Information and Communications Technology",
     "Information Technology and Communications",
+    "ITC",
   ],
   [DEPT_REGULATORY]: [
     "Legal, Regulatory and Compliance",
@@ -58,19 +69,33 @@ const DEPARTMENT_ALIASES: Partial<Record<CanonicalDepartment, readonly string[]>
     "Legal Regulatory and Compliance",
     "LRC",
     "REG",
+    "RC",
   ],
+  [DEPT_EXECUTIVE_MANAGEMENT]: ["MD", "Executive", "EXM", "Managing Director"],
+  [DEPT_LOGISTICS]: ["LOG"],
+  [DEPT_QA]: ["QA", "Quality Assurance & Control"],
+  [DEPT_SE]: ["SE", "Stakeholder Relations"],
+  [DEPT_ME]: ["ME", "M&E", "M and E"],
+  [DEPT_PROJECT]: ["PRJ", "Projects"],
+  [DEPT_TECHNICAL]: ["TECH"],
+  [DEPT_SIWES]: ["Internship", "Intern"],
 } as const
 
 const DEPARTMENT_SHORT_CODES: Record<CanonicalDepartment, string> = {
   [DEPT_ACCOUNTS]: "ACC",
-  [DEPT_ADMIN_HR]: "AHR",
+  [DEPT_ADMIN_HR]: "HR",
   [DEPT_BGI]: "BGI",
   [DEPT_CORPORATE_SERVICES]: "CS",
-  [DEPT_EXECUTIVE_MANAGEMENT]: "EXM",
-  [DEPT_ITC]: "ITC",
-  [DEPT_OPM]: "OPM",
+  [DEPT_EXECUTIVE_MANAGEMENT]: "MD",
+  [DEPT_ITC]: "ICT",
+  [DEPT_LOGISTICS]: "LOG",
+  [DEPT_ME]: "ME",
+  [DEPT_OPM]: "OPS",
   [DEPT_PROJECT]: "PRJ",
-  [DEPT_REGULATORY]: "LRC",
+  [DEPT_QA]: "QA",
+  [DEPT_REGULATORY]: "RC",
+  [DEPT_SE]: "SE",
+  [DEPT_SIWES]: "SIWES",
   [DEPT_TECHNICAL]: "TECH",
 } as const
 
@@ -81,14 +106,15 @@ export const DEFAULT_DEPARTMENT_DESCRIPTIONS: Record<string, string> = {
   [DEPT_CORPORATE_SERVICES]: "Corporate communications, facilities, legal support, and operational logistics.",
   [DEPT_EXECUTIVE_MANAGEMENT]: "Executive leadership, strategic direction, governance, and organizational oversight.",
   [DEPT_ITC]: "Information technology infrastructure, software systems, network security, and internal communications.",
+  [DEPT_LOGISTICS]: "Supply chain, inventory tracking, equipment dispatch, and logistics management.",
+  [DEPT_ME]: "Performance tracking, project impact assessment, metrics evaluation, and quality audit.",
   [DEPT_OPM]: "Field operations, system maintenance, infrastructure reliability, and quality assurance.",
   [DEPT_PROJECT]: "Project planning, execution, vendor coordination, and milestone delivery.",
+  [DEPT_QA]: "Quality standards compliance, process inspection, product testing, and assurance audits.",
   [DEPT_REGULATORY]: "Legal compliance, policy adherence, statutory regulations, and industry standards.",
-  "Stakeholder Relations":
-    "Stakeholder engagement, client partnerships, external communication, and relationship management.",
+  [DEPT_SE]: "Stakeholder engagement, client partnerships, external communication, and relationship management.",
+  [DEPT_SIWES]: "Students industrial work experience scheme, trainee onboarding, and skills development.",
   [DEPT_TECHNICAL]: "Technical engineering, research and development, design specifications, and hardware solutions.",
-  "Monitoring and Evaluation":
-    "Performance tracking, project impact assessment, metrics evaluation, and quality audit.",
 }
 
 export function getDefaultDepartmentDescription(departmentName: string): string {
@@ -151,9 +177,10 @@ export function getCanonicalDepartmentOrder(): string[] {
   return [...CANONICAL_DEPARTMENT_ORDER]
 }
 
-export function getDepartmentShortCode(value: string): string {
+export function getDepartmentShortCode(value: string | null | undefined): string {
+  if (!value) return "-"
   const canonical = normalizeDepartmentName(value) as CanonicalDepartment
-  return DEPARTMENT_SHORT_CODES[canonical] ?? normalizeDepartmentName(value)
+  return DEPARTMENT_SHORT_CODES[canonical] ?? (normalizeDepartmentName(value) || value.trim())
 }
 
 export function getDepartmentSortIndex(value: string): number {

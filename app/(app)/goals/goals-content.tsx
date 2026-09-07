@@ -35,7 +35,7 @@ type GoalsContentProps = {
   backHref?: string
   backLabel?: string
   showCreateTaskAction?: boolean
-  summaryCards?: Array<{ label: string; value: string | number }>
+  summaryCards?: Array<{ label: string; value: string | number; tooltip?: string; description?: string }>
 }
 
 const INITIAL_FORM = {
@@ -240,6 +240,8 @@ export function GoalsContent({
                 variant="compact"
                 title={card.label}
                 value={card.value}
+                tooltip={card.tooltip}
+                description={card.description}
                 icon={Target}
                 iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
                 iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
