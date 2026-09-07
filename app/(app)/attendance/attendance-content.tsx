@@ -518,9 +518,11 @@ export function AttendanceContent({
   const todayHours = todayRecord?.total_hours ? `${todayRecord.total_hours.toFixed(2)} hrs` : "-"
   const todayStatus = todayRecord ? normalizeStatus(todayRecord, todayIso) : "absent"
 
-  // Computed stats from whatever rows survive the active filter
+  // Computed stats from current month workdays
   const { totalWorkedHours, totalMissedHours, attendedDays, totalWorkdays } = useMemo(() => {
-    const scorable = filteredRows.filter((row) => {
+    const currentYM = toLocalYearMonth()
+    const scorable = rows.filter((row) => {
+      if (!row.date.startsWith(currentYM)) return false
       if (isCoveredStatus(row.normalizedStatus)) return false
       // Exclude a day still in progress (clocked in today, not yet clocked out)
       if (row.date === todayIso && row.clock_in && !row.clock_out) return false
@@ -547,7 +549,7 @@ export function AttendanceContent({
       attendedDays: attended,
       totalWorkdays: scorable.length,
     }
-  }, [filteredRows, todayIso])
+  }, [rows, todayIso])
 
   function exportCSV() {
     const headers = ["Date", "Day", "Clock In", "Clock Out", "Total Hours", "Work Hour", "Status"]
@@ -688,7 +690,6 @@ export function AttendanceContent({
             data={rows}
             columns={columns}
             filters={filters}
-            showRowNumbers={false}
             getRowId={(row) => row.id}
             searchPlaceholder="Search day, clock in/out, or status..."
             searchFn={(row, query) =>
@@ -715,6 +716,7 @@ export function AttendanceContent({
             emptyIcon={Clock}
             skeletonRows={6}
             mobileRow={{
+              leading: () => null,
               title: (row) => (
                 <span className="text-foreground font-medium">
                   {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
