@@ -375,17 +375,14 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
   const { filters: individualCycleFilters } = useCycleFilters<IndividualRow>({
     cycles: data.cycles,
     getRowCycleId: (row) => row.review_cycle_id,
-    defaultCadence: "quarterly",
   })
   const { filters: departmentCycleFilters } = useCycleFilters<DepartmentRow>({
     cycles: data.cycles,
     getRowCycleId: (row) => row.cycleId,
-    defaultCadence: "quarterly",
   })
   const { filters: cycleTabCycleFilters } = useCycleFilters<CycleRow>({
     cycles: data.cycles,
     getRowCycleId: (row) => row.id,
-    defaultCadence: "quarterly",
   })
 
   const individualColumns: DataTableColumn<IndividualRow>[] = [

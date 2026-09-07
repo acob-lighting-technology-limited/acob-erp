@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { DataTableFilter } from "@/components/ui/data-table"
 import {
+  ALL_CYCLES_VALUE,
   CADENCE_OPTIONS,
   cadencePeriodLabel,
   cycleOptionLabel,
@@ -18,7 +19,7 @@ export type CycleFilterCycle = CadenceCycle & { name: string; status?: string | 
 
 /**
  * Two-stage cycle filter:
- * 1. Cycle Type: Cycle (default / quarterly), Biannual, Annual.
+ * 1. Cycle Type: Cycle, Biannual, Annual, All.
  * 2. Period: Dynamically shows Quarters when on "Cycle", Halves when on "Biannual", Years when on "Annual".
  */
 export function useCycleFilters<TRow>({
@@ -27,7 +28,7 @@ export function useCycleFilters<TRow>({
   cycleKey = "cycle",
   cycleLabel,
   includeCyclePicker = true,
-  defaultCadence = "quarterly",
+  defaultCadence = "all",
 }: {
   cycles: CycleFilterCycle[]
   getRowCycleId: (row: TRow) => string | null | undefined
@@ -62,6 +63,10 @@ export function useCycleFilters<TRow>({
   const seededRef = useRef(false)
   useEffect(() => {
     if (cycles.length === 0) return
+    if (cadence === "all") {
+      setSelectedCycleId("")
+      return
+    }
     if (!seededRef.current) {
       seededRef.current = true
       setSelectedCycleId(pickCurrentCycle(cycles, toLocalISODate(), cadence)?.id ?? "")
@@ -100,8 +105,8 @@ export function useCycleFilters<TRow>({
         options: CADENCE_OPTIONS,
         multi: false,
         mode: "custom",
-        defaultValues: [cadence],
-        filterFn: (row, values) => matchesSelection(row, (values[0] as PmsCadence) || cadence),
+        defaultValues: cadence === "all" ? undefined : [cadence],
+        filterFn: (row, values) => matchesSelection(row, (values[0] as PmsCadence) || "all"),
         render: (values, onChange) => {
           const currentCadence = (values[0] as PmsCadence) || cadence
           return (
@@ -110,9 +115,14 @@ export function useCycleFilters<TRow>({
               onValueChange={(value) => {
                 const next = value as PmsCadence
                 setCadence(next)
-                onChange([next])
-                const newCycle = pickCurrentCycle(cycles, toLocalISODate(), next)
-                setSelectedCycleId(newCycle?.id ?? "")
+                if (next === "all") {
+                  onChange([])
+                  setSelectedCycleId("")
+                } else {
+                  onChange([next])
+                  const newCycle = pickCurrentCycle(cycles, toLocalISODate(), next)
+                  setSelectedCycleId(newCycle?.id ?? "")
+                }
               }}
             >
               <SelectTrigger className="w-full">
@@ -143,8 +153,13 @@ export function useCycleFilters<TRow>({
           <Select
             value={visibleCycles.some((cycle) => cycle.id === selectedCycleId) ? selectedCycleId : ""}
             onValueChange={(value) => {
-              onChange([value])
-              setSelectedCycleId(value)
+              if (value === ALL_CYCLES_VALUE || !value) {
+                onChange([])
+                setSelectedCycleId("")
+              } else {
+                onChange([value])
+                setSelectedCycleId(value)
+              }
             }}
           >
             <SelectTrigger className="w-full">
@@ -152,11 +167,14 @@ export function useCycleFilters<TRow>({
                 placeholder={
                   visibleCycles.length === 0
                     ? `No ${dynamicPeriodLabel.toLowerCase()}s`
-                    : `Select ${dynamicPeriodLabel}`
+                    : selectedCycleId
+                      ? undefined
+                      : `All ${dynamicPeriodLabel}s`
                 }
               />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value={ALL_CYCLES_VALUE}>All {dynamicPeriodLabel}s</SelectItem>
               {visibleCycles.map((cycle) => (
                 <SelectItem
                   key={cycle.id}
