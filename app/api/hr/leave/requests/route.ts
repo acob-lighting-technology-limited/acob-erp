@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import {
-  addIsoDays,
-  countLeaveDays,
-  trimRangeToWorkingDays,
-  NO_HOLIDAYS,
-  type HolidaySet,
-} from "@/lib/hr/leave-days"
+import { addIsoDays, countLeaveDays, trimRangeToWorkingDays, NO_HOLIDAYS, type HolidaySet } from "@/lib/hr/leave-days"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
@@ -131,7 +125,10 @@ async function resolveSegmentsWithHolidays(
   segments: { start_date: string; end_date: string }[],
   location?: string | null
 ) {
-  const dates = segments.flatMap((segment) => [segment.start_date, segment.end_date]).filter(Boolean).sort()
+  const dates = segments
+    .flatMap((segment) => [segment.start_date, segment.end_date])
+    .filter(Boolean)
+    .sort()
   const spanStart = dates[0]
   const spanEnd = dates[dates.length - 1]
   if (!spanStart || !spanEnd) throw new Error("At least one date range is required")
@@ -170,7 +167,6 @@ type LeaveTypeReferenceRow = {
   id: string
   name?: string | null
   code?: string | null
-  description?: string | null
   max_days?: number | null
   requires_approval?: boolean | null
 }
@@ -558,10 +554,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (leaveTypeIds.length > 0) {
-      const { data } = await dataClient
+      const { data, error: leaveTypeError } = await dataClient
         .from("leave_types")
-        .select("id, name, code, description, max_days, requires_approval")
+        .select("id, name, code, max_days, requires_approval")
         .in("id", leaveTypeIds)
+      // Don't fail silently: an unselectable column here used to blank the leave
+      // type on every row in the UI with no trace of why.
+      if (leaveTypeError) {
+        console.error("[hr/leave/requests] leave_types lookup failed:", leaveTypeError.message)
+      }
       leaveTypeRows = data || []
     }
 
@@ -615,7 +616,10 @@ export async function GET(request: NextRequest) {
           reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
           supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
           approved_by_profile: leaveRequest.approved_by ? profileMap.get(leaveRequest.approved_by) || null : null,
-          leave_type: leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) || null : null,
+          leave_type:
+            (leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) : null) ??
+            (leaveRequest as { leave_type?: LeaveTypeReferenceRow | null }).leave_type ??
+            null,
           evidence: evidenceByRequest.get(leaveRequest.id) || [],
           approvals: approvalsByRequest.get(leaveRequest.id) || [],
           required_documents: requiredDocs,
