@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cn } from "@/lib/utils"
 import {
@@ -18,7 +17,6 @@ import {
   Clock,
   Download,
   IdCard,
-  Info,
   Mail,
   RefreshCw,
   Shield,
@@ -156,24 +154,22 @@ export function OnboardingContent() {
   const rows = useMemo(() => data?.rows ?? [], [data])
   const meta = data?.meta ?? null
 
-  type OnboardingTab = "onboardable" | "signed_in" | "never" | "all"
-  const [activeTab, setActiveTab] = useState<OnboardingTab>("onboardable")
+  type OnboardingTab = "signed_in" | "never" | "all"
+  const [activeTab, setActiveTab] = useState<OnboardingTab>("signed_in")
 
   const stats = useMemo(() => {
     // Exited staff are gone, not "not yet onboarded" — excluded so they don't
     // inflate "Never Signed In" with people who will never sign in again.
     const current = rows.filter((row) => row.employment_status !== "exited")
     const total = current.length
-    const onboardable = current.filter((row) => row.email && row.email.trim() !== "").length
     const signedIn = current.filter((row) => row.has_signed_in).length
-    const neverSignedIn = onboardable - signedIn
-    const rate = onboardable > 0 ? Math.round((signedIn / onboardable) * 100) : 0
-    return { total, onboardable, signedIn, neverSignedIn, rate }
+    const eligible = current.filter((row) => row.email && row.email.trim() !== "")
+    const neverSignedIn = eligible.filter((row) => !row.has_signed_in).length
+    return { total, signedIn, neverSignedIn }
   }, [rows])
 
   const tabs: DataTableTab[] = useMemo(
     () => [
-      { key: "onboardable", label: `Onboardable (${stats.onboardable})`, icon: UserCheck },
       { key: "signed_in", label: `Signed In (${stats.signedIn})`, icon: CheckCircle2 },
       { key: "never", label: `Never (${stats.neverSignedIn})`, icon: UserX },
       { key: "all", label: `All (${rows.length})`, icon: Users },
@@ -182,9 +178,6 @@ export function OnboardingContent() {
   )
 
   const scopedRows = useMemo(() => {
-    if (activeTab === "onboardable") {
-      return rows.filter((r) => r.employment_status !== "exited" && r.email && r.email.trim() !== "")
-    }
     if (activeTab === "signed_in") {
       return rows.filter((r) => r.employment_status !== "exited" && r.has_signed_in)
     }
@@ -378,22 +371,14 @@ export function OnboardingContent() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <StatCard
             variant="compact"
-            title="Profiles"
+            title="Total Profiles"
             value={stats.total}
             icon={Users}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Onboardable"
-            value={stats.onboardable}
-            icon={UserCheck}
-            iconBgColor="bg-indigo-500/10"
-            iconColor="text-indigo-500"
           />
           <StatCard
             variant="compact"
@@ -415,16 +400,6 @@ export function OnboardingContent() {
       }
     >
       <div className="space-y-4">
-        {meta && !meta.authSourceAvailable ? (
-          <Alert className="border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-200">
-            <Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <AlertDescription className="text-xs">
-              The auth service could not be read, so sign-in status falls back to in-app login logs only. Anyone whose
-              last sign-in predates login logging will be shown as never signed in.
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
         <DataTable<OnboardingRow>
           data={scopedRows}
           columns={columns}
