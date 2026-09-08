@@ -1169,14 +1169,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.employment_status === "exited"
-              ? "bg-rose-500"
-              : r.employment_status === "suspended"
-                ? "bg-amber-500"
-                : r.employment_status === "on_leave"
-                  ? "bg-blue-500"
-                  : "bg-emerald-500",
           leading: (r) => <EmployeeAvatar employee={r} size="sm" />,
           title: (r) => `${formatName(r.first_name)} ${formatName(r.last_name)}`,
           subtitle: (r) => `${r.designation || r.department || "Employee"} · ${r.office_location || r.company_email}`,
