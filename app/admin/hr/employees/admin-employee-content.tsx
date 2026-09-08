@@ -318,9 +318,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
     return [
       { key: "employees", label: `Employees (${regular})`, icon: Briefcase },
-      { key: "contract", label: `Contract Staff (${contract})`, icon: FileSignature },
-      { key: "former", label: `Former Staff (${former})`, icon: UserMinus },
-      { key: "all", label: `All Staff (${employees.length})`, icon: Users },
+      { key: "contract", label: `Contract (${contract})`, icon: FileSignature },
+      { key: "former", label: `Former (${former})`, icon: UserMinus },
+      { key: "all", label: `All (${employees.length})`, icon: Users },
     ]
   }, [employees])
 
