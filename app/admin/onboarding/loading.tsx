@@ -3,7 +3,8 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function OnboardingLoading() {
   return (
     <TablePageSkeleton
-      filters={5}
+      tabs={4}
+      filters={3}
       columns={7}
       rows={10}
       showStats={true}

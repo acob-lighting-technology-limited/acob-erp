@@ -4,6 +4,7 @@ import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { REAUTH_SOURCE } from "@/lib/auth/login-log"
+import { getAvatarSignedUrls } from "@/lib/profile-photos"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 
@@ -26,6 +27,7 @@ export interface OnboardingRow {
   designation: string | null
   role: string
   employment_status: string
+  avatar_url?: string | null
   /** True when auth has ever recorded a successful sign-in for this account. */
   has_signed_in: boolean
   /** auth.users.last_sign_in_at — authoritative, covers logins from before app logging existed. */
@@ -56,6 +58,7 @@ interface ProfileRow {
   role: string | null
   employment_status: string | null
   created_at: string
+  avatar_path?: string | null
 }
 
 interface LoginLogRow {
@@ -139,7 +142,7 @@ export async function GET(request: NextRequest) {
     dataClient
       .from("profiles")
       .select(
-        "id, employee_number, company_email, additional_email, first_name, last_name, department, designation, role, employment_status, created_at"
+        "id, employee_number, company_email, additional_email, first_name, last_name, department, designation, role, employment_status, created_at, avatar_path"
       )
       .order("last_name", { ascending: true }),
     dataClient.from("dev_login_logs").select("user_id, auth_method, login_at, metadata"),
@@ -156,6 +159,10 @@ export async function GET(request: NextRequest) {
   }
 
   const profiles = (profilesResult.data ?? []) as unknown as ProfileRow[]
+  const signedUrlsByPath = await getAvatarSignedUrls(
+    dataClient,
+    profiles.map((p) => p.avatar_path).filter((path): path is string => Boolean(path))
+  )
   const logRows = (logsResult.error ? [] : ((logsResult.data ?? []) as unknown as LoginLogRow[])).filter(
     // Re-auth rows are password re-verifications, not sign-ins — counting them
     // would make a user who only ever changed their password look onboarded.
@@ -197,6 +204,7 @@ export async function GET(request: NextRequest) {
       designation: profile.designation,
       role: profile.role || "employee",
       employment_status: profile.employment_status || "active",
+      avatar_url: profile.avatar_path ? (signedUrlsByPath.get(profile.avatar_path) ?? null) : null,
       has_signed_in: Boolean(lastSignInAt),
       last_sign_in_at: lastSignInAt,
       first_sign_in_at: logs?.first ?? null,
