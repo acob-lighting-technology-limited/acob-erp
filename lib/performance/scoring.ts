@@ -19,13 +19,23 @@ type GoalScoreBreakdown = {
   is_system_generated: boolean
 }
 
-type AttendanceBreakdown = {
+export type AttendanceBreakdownDay = {
+  id: string
+  date: string
+  clock_in: string | null
+  clock_out: string | null
+  total_hours: number | null
+  status: string
+}
+
+export type AttendanceBreakdown = {
   present: number
   total: number
   score: number | null
   late_penalty_total_ngn?: number
   late_penalty_steps_total?: number
   late_days?: number
+  records?: AttendanceBreakdownDay[]
 }
 
 type DepartmentMetricBreakdown = {
@@ -327,7 +337,7 @@ export async function computeIndividualPerformanceScore(
 
   let attendanceQuery = supabase
     .from("attendance_records")
-    .select("status, date, clock_in, clock_out, waived")
+    .select("id, status, date, clock_in, clock_out, total_hours, waived")
     .eq("user_id", params.userId)
 
   if (cycle) {
@@ -418,6 +428,7 @@ export async function computeIndividualPerformanceScore(
     let lateDays = 0
     let presentDays = 0
     let scorableDays = 0
+    const dailyRecords: AttendanceBreakdownDay[] = []
 
     for (const day of workdays) {
       if (holidayDateSet.has(day)) continue
@@ -431,12 +442,30 @@ export async function computeIndividualPerformanceScore(
       if (rawStoredStatus === "leave_without_pay" || rawStoredStatus === "lwp") continue
 
       // Skip today if the employee is still clocked in (unfinished day).
-      if (day === todayIso && row?.clock_in && !row?.clock_out) continue
+      if (day === todayIso && row?.clock_in && !row?.clock_out) {
+        dailyRecords.push({
+          id: (row as { id?: string })?.id || `in-progress-${day}`,
+          date: day,
+          clock_in: row.clock_in,
+          clock_out: null,
+          total_hours: null,
+          status: "in_progress",
+        })
+        continue
+      }
 
       scorableDays++
 
       if (!row) {
         // No record for this workday — counts as absent (0 credit).
+        dailyRecords.push({
+          id: `absent-${day}`,
+          date: day,
+          clock_in: null,
+          clock_out: null,
+          total_hours: null,
+          status: "absent",
+        })
         continue
       }
 
@@ -481,7 +510,34 @@ export async function computeIndividualPerformanceScore(
       ) {
         presentDays++
       }
+
+      dailyRecords.push({
+        id: (row as { id?: string })?.id || `record-${day}`,
+        date: day,
+        clock_in: row.clock_in ?? null,
+        clock_out: row.clock_out ?? null,
+        total_hours: (row as { total_hours?: number | null })?.total_hours ?? null,
+        status: status,
+      })
     }
+
+    const coveredDates = new Set(dailyRecords.map((r) => r.date))
+    for (const row of attendance || []) {
+      const day = String(row.date || "").slice(0, 10)
+      if (day && !coveredDates.has(day)) {
+        dailyRecords.push({
+          id: (row as { id?: string })?.id || `extra-${day}`,
+          date: day,
+          clock_in: row.clock_in ?? null,
+          clock_out: row.clock_out ?? null,
+          total_hours: (row as { total_hours?: number | null })?.total_hours ?? null,
+          status: row.status || "present",
+        })
+      }
+    }
+
+    dailyRecords.sort((a, b) => b.date.localeCompare(a.date))
+    attendanceBreakdown.records = dailyRecords
 
     attendanceBreakdown.present = presentDays
     attendanceBreakdown.total = scorableDays
@@ -490,6 +546,26 @@ export async function computeIndividualPerformanceScore(
     attendanceBreakdown.late_penalty_total_ngn = latePenaltyTotalNgn
     attendanceBreakdown.late_penalty_steps_total = latePenaltyStepsTotal
     attendanceBreakdown.late_days = lateDays
+  } else if (attendance && attendance.length > 0) {
+    attendanceBreakdown.records = (
+      attendance as Array<{
+        id?: string
+        date?: string | null
+        clock_in?: string | null
+        clock_out?: string | null
+        total_hours?: number | null
+        status?: string | null
+      }>
+    )
+      .map((row) => ({
+        id: row.id || `rec-${row.date}`,
+        date: String(row.date || "").slice(0, 10),
+        clock_in: row.clock_in ?? null,
+        clock_out: row.clock_out ?? null,
+        total_hours: row.total_hours ?? null,
+        status: row.status || "unknown",
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date))
   }
 
   let latestReviewQuery = supabase

@@ -349,7 +349,7 @@ export function PmsTablePage({
               const hours = normalizeCell(row.total_hours)
               const cycle = normalizeCell(row.cycle)
 
-              const timeRange = inTime !== "-" || outTime !== "-" ? `${inTime} – ${outTime}` : null
+              const timeRange = inTime !== "-" || outTime !== "-" ? `${inTime} – ${outTime}` : "No clock-in"
               const parts = [
                 timeRange,
                 hours !== "-" && hours !== "Pending" ? hours : null,
