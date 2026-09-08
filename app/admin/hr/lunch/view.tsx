@@ -1540,14 +1540,16 @@ export function LunchRegisterPage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              title: (row) => formatWATDate(row.date),
+              title: (row) =>
+                formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
               subtitle: (row) => `${row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}`,
               trailing: (row) => {
                 const status = getMenuStatusInfo(row)
                 return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
               },
               detail: {
-                title: (row) => `Lunch Menu: ${formatWATDate(row.date)}`,
+                title: (row) =>
+                  `Lunch Menu: ${formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}`,
                 subtitle: (row) => {
                   const status = getMenuStatusInfo(row)
                   return row.votingOpen ? "Voting is currently open" : `Status: ${status.label}`
@@ -1557,7 +1559,15 @@ export function LunchRegisterPage({
                   return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
                 },
                 fields: (row) => [
-                  { label: "Date", value: formatWATDate(row.date) },
+                  {
+                    label: "Date",
+                    value: formatWATDate(row.date, {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  },
                   { label: "Status", value: getMenuStatusInfo(row).label },
                   { label: "Categories", value: `${row.groups.length} group(s)` },
                   {
@@ -1586,7 +1596,9 @@ export function LunchRegisterPage({
                 <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-semibold">{formatWATDate(row.date)}</p>
+                      <p className="text-sm font-semibold">
+                        {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                      </p>
                     </div>
                     <Badge className={status.tone}>{status.label}</Badge>
                   </div>
@@ -2356,7 +2368,8 @@ export function LunchRegisterPage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              title: (row) => formatWATDate(row.date),
+              title: (row) =>
+                formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
               subtitle: (row) =>
                 `${row.review_count} reviews · Avg Rating: ${row.average_rating ? row.average_rating.toFixed(1) : "N/A"} ★`,
               trailing: (row) => (
@@ -2368,7 +2381,9 @@ export function LunchRegisterPage({
             cardRenderer={(row) => (
               <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
                 <div className="flex items-start justify-between">
-                  <p className="text-sm font-semibold">{formatWATDate(row.date)}</p>
+                  <p className="text-sm font-semibold">
+                    {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                  </p>
                   <Badge variant="outline">
                     {row.average_rating ? `${row.average_rating.toFixed(1)} ★` : "No rating"}
                   </Badge>
