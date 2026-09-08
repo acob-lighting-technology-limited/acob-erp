@@ -1844,64 +1844,54 @@ export function LunchRegisterPage({
       {activeTab === "leaderboard" && (
         <div className="space-y-4">
           {/* Inline controls matching LeaderboardView filters */}
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Cycle</Label>
-              <Select
-                value={leaderboardPeriodMode}
-                onValueChange={(v) => setLeaderboardPeriodMode(v as "month" | "year" | "all")}
-              >
-                <SelectTrigger className="border-input bg-background h-9 w-[140px] text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="month">Monthly</SelectItem>
-                  <SelectItem value="year">Yearly</SelectItem>
-                  <SelectItem value="all">All Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <Select
+              value={leaderboardPeriodMode}
+              onValueChange={(v) => setLeaderboardPeriodMode(v as "month" | "year" | "all")}
+            >
+              <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Cycle">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Monthly</SelectItem>
+                <SelectItem value="year">Yearly</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
 
             {leaderboardPeriodMode === "month" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Month</Label>
-                <Select value={leaderboardMonth} onValueChange={setLeaderboardMonth}>
-                  <SelectTrigger className="border-input bg-background h-9 w-[180px] text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monthOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={leaderboardMonth} onValueChange={setLeaderboardMonth}>
+                <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Month">
+                  <SelectValue placeholder="Select Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
             {leaderboardPeriodMode === "year" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Year</Label>
-                <Select value={leaderboardYear} onValueChange={setLeaderboardYear}>
-                  <SelectTrigger className="border-input bg-background h-9 w-[140px] text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {yearOptions.map((y) => (
-                      <SelectItem key={y} value={y}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={leaderboardYear} onValueChange={setLeaderboardYear}>
+                <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
-            <div className="space-y-1">
-              <Label className="text-xs">Department</Label>
+            <div className={cn(leaderboardPeriodMode === "month" && "col-span-2 sm:col-span-1")}>
               <Select value={selectedLeaderboardDept} onValueChange={setSelectedLeaderboardDept}>
-                <SelectTrigger className="border-input bg-background h-9 w-[180px] text-sm">
+                <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Department">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
