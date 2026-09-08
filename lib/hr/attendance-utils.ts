@@ -96,3 +96,43 @@ export function quarterBounds(year: number, quarter: Quarter): { start: string; 
   const end = toLocalISODate(new Date(Date.UTC(year, monthEnd, 0)))
   return { start, end }
 }
+
+/** Returns month options { value: "YYYY-MM", label: "Month YYYY" } down to tracking start. */
+export function getAttendanceMonthOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = []
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth()
+
+  const [trackingStartYear, trackingStartMonth] = ATTENDANCE_TRACKING_START.split("-").map(Number)
+  const startYear = trackingStartYear
+  const startMonth = trackingStartMonth - 1
+
+  let y = currentYear
+  let m = currentMonth
+
+  while (y > startYear || (y === startYear && m >= startMonth)) {
+    const d = new Date(y, m, 1)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    options.push({ value, label })
+    m--
+    if (m < 0) {
+      m = 11
+      y--
+    }
+  }
+
+  return options
+}
+
+/** Returns distinct years as numbers down to tracking start. */
+export function getAttendanceYearOptions(): number[] {
+  const currentYear = new Date().getFullYear()
+  const [startYear] = ATTENDANCE_TRACKING_START.split("-").map(Number)
+  const years: number[] = []
+  for (let y = currentYear; y >= startYear; y--) {
+    years.push(y)
+  }
+  return years.length > 0 ? years : [currentYear]
+}
