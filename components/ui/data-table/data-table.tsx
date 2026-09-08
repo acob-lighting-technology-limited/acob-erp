@@ -73,7 +73,7 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Copy } from "lucide-react"
-import type { DataTableProps, SortConfig } from "./types"
+import type { DataTableDetailConfig, DataTableProps, SortConfig } from "./types"
 
 // ─── Debounce hook ───────────────────────────────────────────────────────────
 
@@ -392,7 +392,33 @@ export function DataTable<TData>({
   )
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [detailRow, setDetailRow] = useState<TData | null>(null)
-  const detailConfig = mobileRow?.detail
+
+  // A row tap must land on the sheet, never on a desktop-sized modal. Pages that
+  // gave only `onSelect` used to get the modal straight away, so the phone lost
+  // the one surface built for it — this fills the gap from `columns`, which
+  // already carry every label and accessor a sheet needs.
+  //
+  // `hideOnMobile` columns are deliberately *included*: that flag means "too wide
+  // for the mobile table", and the sheet is exactly where that data belongs.
+  const detailConfig = useMemo<DataTableDetailConfig<TData> | undefined>(() => {
+    if (mobileRow?.detail) return mobileRow.detail
+    if (!mobileRow) return undefined
+    const fieldColumns = columns.filter((column) => column.accessor)
+    const onSelect = mobileRow.onSelect
+    return {
+      title: mobileRow.title,
+      subtitle: mobileRow.subtitle,
+      fields: (row: TData) =>
+        fieldColumns
+          .map((column) => ({ label: column.label, value: String(column.accessor?.(row) ?? "") }))
+          // A synthesized sheet has no editorial eye on it, so blanks and the
+          // placeholders a table renders in their place are dropped here instead.
+          .filter((field) => field.value !== "" && field.value !== "-" && field.value !== "—"),
+      actions: onSelect
+        ? (row: TData) => [{ label: "Open", icon: ExternalLink, onClick: () => onSelect(row) }]
+        : undefined,
+    }
+  }, [mobileRow, columns])
 
   // ─── View mode (user-controlled; never auto-switch) ──────────────────────
   // Declared above the URL sync because it is part of it: a shared link that
@@ -1503,7 +1529,7 @@ export function DataTable<TData>({
               const sn = snByRowId.get(rowId) ?? 1
 
               const handleSelect = () => {
-                if (mobileRow.detail) setDetailRow(row)
+                if (detailConfig) setDetailRow(row)
                 else if (mobileRow.onSelect) mobileRow.onSelect(row)
                 else if (canExpand) toggleExpand(rowId)
               }

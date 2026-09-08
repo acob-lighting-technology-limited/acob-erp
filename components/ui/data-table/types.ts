@@ -24,6 +24,16 @@ export interface DataTableDetailField {
   fullWidth?: boolean
 }
 
+/** The standard mobile detail sheet — supplied by a page, or synthesized from `columns`. */
+export interface DataTableDetailConfig<TData> {
+  title: (row: TData) => ReactNode
+  subtitle?: (row: TData) => ReactNode
+  avatar?: (row: TData) => ReactNode
+  badges?: (row: TData) => ReactNode
+  fields: (row: TData) => DataTableDetailField[]
+  actions?: (row: TData) => DataTableDetailAction[]
+}
+
 /** A primary action button in the detail sheet footer (call, email, open…). */
 export interface DataTableDetailAction {
   label: string
@@ -285,15 +295,14 @@ export interface DataTableProps<TData> {
      * The standard detail sheet. Supplying this makes tapping a row open a bottom
      * sheet with the same anatomy on every page — avatar, title, badges, tap-to-copy
      * fields, and footer actions — so no page hand-rolls its own.
+     *
+     * **Optional.** Omit it and `DataTable` synthesizes one from `columns` — every
+     * column with an `accessor` becomes a field, and an `onSelect` becomes the
+     * sheet's primary button. A row tap therefore always opens the sheet; it never
+     * jumps a phone straight into a desktop-sized modal. Supply this explicitly
+     * only to curate which fields appear or to add more actions.
      */
-    detail?: {
-      title: (row: TData) => string
-      subtitle?: (row: TData) => ReactNode
-      avatar?: (row: TData) => ReactNode
-      badges?: (row: TData) => ReactNode
-      fields: (row: TData) => DataTableDetailField[]
-      actions?: (row: TData) => DataTableDetailAction[]
-    }
+    detail?: DataTableDetailConfig<TData>
   }
 
   // ── URL Sync ─────────────────────────────────────────────────────────────

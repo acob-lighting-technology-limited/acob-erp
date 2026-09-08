@@ -615,6 +615,23 @@ see the columns.
 
 Pages that supply `mobileRow` **without** `contactsView` are unchanged: there is no
 separate List mode there, so the row list still stands in for the table below `md`.
+
+### A row tap opens the sheet — never a modal
+
+Tapping a row on mobile opens the detail sheet. It must never open a dialog
+directly: a desktop-sized modal on a phone skips the one surface built for that
+width. Put the modal behind a **button in the sheet** instead — pass `onSelect`
+and it becomes the sheet's primary action.
+
+`mobileRow.detail` is optional. Omit it and `DataTable` synthesizes the sheet from
+`columns` — every column with an `accessor` becomes a field (`hideOnMobile` ones
+included; the sheet is exactly where data too wide for the mobile table belongs),
+and `onSelect` becomes the footer button. Supply `detail` explicitly only to
+curate which fields show or to add more actions.
+
+- ❌ `onSelect` that opens a dialog and no `detail` — that *was* the bug on 42
+  tables: the tap flew past the sheet straight into the modal.
+
 `defaultViewMode` takes either a mode or `{ mobile, desktop }`. Records pages with
 many columns want `{ mobile: "contacts", desktop: "list" }` — the row list where
 the columns will not fit, the table where they will. A lookup page passes a plain

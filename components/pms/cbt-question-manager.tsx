@@ -529,6 +529,16 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
         columns={columns}
         filters={filters}
         getRowId={(question) => question.id}
+        mobileRow={{
+          title: (question) => question.prompt,
+          subtitle: (question) =>
+            `${question.department || "General"} · ${cycleNameById.get(question.review_cycle_id || "") || "Unassigned"}`,
+          trailing: (question) => (
+            <Badge variant={question.is_active === false ? "secondary" : "default"}>
+              {question.is_active === false ? "Inactive" : "Active"}
+            </Badge>
+          ),
+        }}
         pagination={{ pageSize: 50 }}
         searchPlaceholder="Search question text, options, explanation, or answer..."
         searchFn={(question, query) =>
