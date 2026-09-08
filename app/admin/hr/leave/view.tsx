@@ -978,12 +978,6 @@ export function LeaveApprovePage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              accentClass: (r) =>
-                r.status === "rejected" || r.status === "cancelled"
-                  ? "bg-rose-500"
-                  : r.status === "approved" || r.status === "completed"
-                    ? "bg-emerald-500"
-                    : "bg-amber-500",
               title: (r) => r.user?.full_name || "Employee",
               subtitle: (r) => `${r.leave_type?.name || "Leave"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
               trailing: (r) => (

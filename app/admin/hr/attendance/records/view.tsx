@@ -504,14 +504,6 @@ export function AdminAttendanceRecordsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.status === "present"
-                ? "bg-emerald-500"
-                : r.status === "late"
-                  ? "bg-amber-500"
-                  : r.status === "absent"
-                    ? "bg-red-500"
-                    : "bg-blue-500",
             title: (r) => `${r.user_name} · ${formatDate(r.date)}`,
             subtitle: (r) =>
               `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)} · ${r.total_hours?.toFixed(1) ?? 0}h`,

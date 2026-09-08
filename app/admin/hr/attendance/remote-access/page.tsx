@@ -316,7 +316,6 @@ export default function RemoteAccessPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (e) => (e.remote_checkin_enabled ? "bg-emerald-500" : "bg-slate-400"),
             title: (e) => `${e.user_name} · ${e.employee_number}`,
             subtitle: (e) =>
               `${e.department} · Photo: ${e.face_photo_set ? "Set" : "Missing"} · Last: ${formatDate(e.last_remote_checkin)}`,

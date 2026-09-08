@@ -1167,14 +1167,6 @@ export function AttendanceReportsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.attendance_exempt
-                ? "bg-slate-400"
-                : r.absent_days > 2
-                  ? "bg-rose-500"
-                  : r.late_days > 3
-                    ? "bg-amber-500"
-                    : "bg-emerald-500",
             title: (r) => r.user_name,
             subtitle: (r) =>
               `${r.department} · ${r.present_days} present · ${r.late_days} late · ${r.absent_days} absent`,

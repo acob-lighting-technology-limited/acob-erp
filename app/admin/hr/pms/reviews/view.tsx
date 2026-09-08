@@ -923,8 +923,6 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.status === "completed" ? "bg-emerald-500" : r.status === "submitted" ? "bg-blue-500" : "bg-amber-500",
             title: (r) => employeeName(r),
             subtitle: (r) =>
               `${r.user?.department ?? "No dept"} · ${r.cycle?.name ?? "No cycle"} · ${r.final_score !== null ? `${r.final_score?.toFixed(1)}%` : "No score"}`,

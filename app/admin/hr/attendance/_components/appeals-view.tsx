@@ -224,8 +224,6 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "approved" ? "bg-emerald-500" : r.status === "rejected" ? "bg-rose-500" : "bg-amber-500",
           title: (r) => `${r.user_name} · ${r.department}`,
           subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
           trailing: (r) => statusBadge(r.status),

@@ -315,8 +315,6 @@ export default function UsersPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (u) =>
-            u.employment_status === "exited" ? "bg-rose-500" : u.is_active ? "bg-emerald-500" : "bg-slate-400",
           title: (u) => (u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email || "User"),
           subtitle: (u) => `${u.role.replace(/_/g, " ")} · ${u.department || "No department"} · ${u.email}`,
           trailing: (u) => (

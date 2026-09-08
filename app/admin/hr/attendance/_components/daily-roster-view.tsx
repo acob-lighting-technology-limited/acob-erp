@@ -531,14 +531,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "present" || r.status === "early"
-              ? "bg-emerald-500"
-              : r.status === "late"
-                ? "bg-amber-500"
-                : r.status === "absent"
-                  ? "bg-red-500"
-                  : "bg-blue-500",
           title: (r) => r.user_name,
           subtitle: (r) => `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)}`,
           trailing: (r) => (

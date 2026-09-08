@@ -422,7 +422,6 @@ export function OnboardingContent() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) => (row.has_signed_in ? "bg-emerald-500" : "bg-red-500"),
             title: (row) => row.full_name,
             subtitle: (row) =>
               `${row.email || "No email"} · ${row.department || "No dept"} · ${row.employee_number || "No ID"}`,

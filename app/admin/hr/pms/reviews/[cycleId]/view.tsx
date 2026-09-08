@@ -695,8 +695,6 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.status === "completed" ? "bg-emerald-500" : r.status === "submitted" ? "bg-blue-500" : "bg-amber-500",
             title: (r) => `${r.user?.first_name || ""} ${r.user?.last_name || ""}`.trim() || "Unknown",
             subtitle: (r) =>
               `${r.user?.department || "No dept"} · KPI: ${fmt(r.kpi_score)} · Final: ${fmt(r.final_score)}`,
