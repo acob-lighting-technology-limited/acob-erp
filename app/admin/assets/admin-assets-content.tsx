@@ -1510,6 +1510,22 @@ export function AdminAssetsContent({
           />
           <StatCard
             variant="compact"
+            title="Open Issues"
+            value={stats.unresolvedIssues}
+            icon={AlertCircle}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Maintenance"
+            value={stats.maintenance}
+            icon={Wrench}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            variant="compact"
             title="Available"
             value={stats.available}
             icon={Package}
@@ -1523,22 +1539,6 @@ export function AdminAssetsContent({
             icon={Package}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Maintenance"
-            value={stats.maintenance}
-            icon={Wrench}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Open Issues"
-            value={stats.unresolvedIssues}
-            icon={AlertCircle}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
           />
         </StatGrid>
       }

@@ -247,11 +247,11 @@ export function AdminAuditLogsContent({
           />
           <StatCard
             variant="compact"
-            title="Creates"
-            value={stats.creates}
-            icon={Plus}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
+            title="Deletes"
+            value={stats.deletes}
+            icon={Trash2}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
           />
           <StatCard
             variant="compact"
@@ -263,11 +263,11 @@ export function AdminAuditLogsContent({
           />
           <StatCard
             variant="compact"
-            title="Deletes"
-            value={stats.deletes}
-            icon={Trash2}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
+            title="Creates"
+            value={stats.creates}
+            icon={Plus}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
           />
         </StatGrid>
       }

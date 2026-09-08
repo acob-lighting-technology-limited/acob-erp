@@ -1318,6 +1318,14 @@ export function LunchRegisterPage({
             />
             <StatCard
               variant="compact"
+              title="Meal Cost (Unit)"
+              value={`₦${cost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+              icon={Settings}
+              iconBgColor="bg-violet-500/10"
+              iconColor="text-violet-500"
+            />
+            <StatCard
+              variant="compact"
               title="Surcharge (Unit)"
               value={`₦${employeeSurcharge.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
               icon={Utensils}
@@ -1331,14 +1339,6 @@ export function LunchRegisterPage({
               icon={Utensils}
               iconBgColor="bg-emerald-500/10"
               iconColor="text-emerald-500"
-            />
-            <StatCard
-              variant="compact"
-              title="Meal Cost (Unit)"
-              value={`₦${cost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-              icon={Settings}
-              iconBgColor="bg-violet-500/10"
-              iconColor="text-violet-500"
             />
           </StatGrid>
         ) : undefined

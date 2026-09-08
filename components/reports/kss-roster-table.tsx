@@ -904,19 +904,19 @@ export function KssRosterTable({
           />
           <StatCard
             variant="compact"
-            title="Past"
-            value={stats.past}
-            icon={FileText}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
             title="Upcoming"
             value={stats.upcoming}
             icon={ShieldAlert}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Past"
+            value={stats.past}
+            icon={FileText}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
           />
         </StatGrid>
       }

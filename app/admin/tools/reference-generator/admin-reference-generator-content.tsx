@@ -459,14 +459,6 @@ export function AdminReferenceGeneratorContent({
         <StatGrid>
           <StatCard
             variant="compact"
-            title="Total"
-            value={stats.total}
-            icon={FileText}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
             title="Under Review"
             value={stats.underReview}
             icon={Clock}
@@ -488,6 +480,14 @@ export function AdminReferenceGeneratorContent({
             icon={ShieldCheck}
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Total"
+            value={stats.total}
+            icon={FileText}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
           />
         </StatGrid>
       }
