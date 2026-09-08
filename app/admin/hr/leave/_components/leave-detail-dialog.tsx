@@ -136,7 +136,7 @@ export function LeaveDetailDialog({
   const employeeName = leave.user?.full_name || "Employee"
   const employeeEmail = leave.user?.company_email || ""
   const employeeDept = leave.user?.department || "Unassigned"
-  const leaveTypeName = leave.leave_type?.name || "Leave Request"
+  const leaveTypeName = leave.leave_type?.name || "—"
 
   const evidenceCount = (leave.evidence?.length || 0) + (leave.handover_checklist_url ? 1 : 0)
 

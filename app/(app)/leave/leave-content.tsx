@@ -903,11 +903,11 @@ export function LeaveContent({
             title: (r) =>
               r.isIncomingReview
                 ? r.user?.full_name || "Employee Request"
-                : leaveTypeMap.get(r.leave_type_id)?.name || "Leave Request",
+                : leaveTypeMap.get(r.leave_type_id)?.name || "—",
             subtitle: (r) => (
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
                 <Badge variant="outline" className="text-[10px] font-medium">
-                  {leaveTypeMap.get(r.leave_type_id)?.name || "Leave"}
+                  {leaveTypeMap.get(r.leave_type_id)?.name || "—"}
                 </Badge>
                 <span className="inline-flex items-center gap-1">
                   <CalendarDays className="text-muted-foreground/70 h-3.5 w-3.5" />
