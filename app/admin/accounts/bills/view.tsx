@@ -346,14 +346,6 @@ export function BillsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (bill) =>
-            bill.status === "cancelled"
-              ? "bg-rose-500"
-              : bill.status === "paid"
-                ? "bg-emerald-500"
-                : bill.status === "overdue"
-                  ? "bg-red-500"
-                  : "bg-blue-500",
           title: (bill) => `${bill.bill_number} · ${bill.supplier_name}`,
           subtitle: (bill) => `${formatCurrency(bill.total_amount, bill.currency)} · Due ${formatDate(bill.due_date)}`,
           trailing: (bill) => (

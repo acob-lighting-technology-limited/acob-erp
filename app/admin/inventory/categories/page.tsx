@@ -370,7 +370,6 @@ export default function CategoriesPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (category) => ((category.product_count || 0) > 0 ? "bg-emerald-500" : "bg-slate-400"),
           title: (category) => category.name,
           subtitle: (category) =>
             `${category.product_count || 0} products · ${category.description || "No description"}`,

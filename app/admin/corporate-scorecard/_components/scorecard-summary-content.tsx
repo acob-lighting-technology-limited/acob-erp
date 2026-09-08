@@ -175,7 +175,6 @@ export function ScorecardSummaryContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-blue-500",
           title: (r) => r.department,
           subtitle: (r) =>
             `CORE KPIs: ${r.coreKpiCount} · Attainment: ${r.attainmentPct != null ? `${r.attainmentPct}%` : "No data"}`,

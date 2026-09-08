@@ -467,14 +467,6 @@ export default function AdminRequisitionsPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.status === "rejected"
-                ? "bg-rose-500"
-                : r.status === "approved"
-                  ? "bg-emerald-500"
-                  : r.is_emergency
-                    ? "bg-red-500"
-                    : "bg-amber-500",
             title: (r) => `${r.requisition_number} · ₦${Number(r.amount).toLocaleString()}`,
             subtitle: (r) => `${r.project_name} · ${r.requester?.full_name || "Staff"} · ${r.department}`,
             trailing: (r) => (
@@ -526,7 +518,6 @@ export default function AdminRequisitionsPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (c) => (c.is_active ? "bg-emerald-500" : "bg-slate-400"),
             title: (c) => c.name,
             subtitle: (c) => `${c.code} · ${c.description || "No description"}`,
             trailing: (c) => (

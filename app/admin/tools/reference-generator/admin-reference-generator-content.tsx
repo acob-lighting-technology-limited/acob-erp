@@ -576,14 +576,6 @@ export function AdminReferenceGeneratorContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "approved"
-              ? "bg-emerald-500"
-              : r.status === "rejected"
-                ? "bg-rose-500"
-                : r.status === "under_review"
-                  ? "bg-blue-500"
-                  : "bg-amber-500",
           title: (r) => `${r.reference_number} · ${r.subject}`,
           subtitle: (r) =>
             `${r.department_name || r.assigned_department_name || "No dept"} · ${r.recipient_name || "No recipient"} · ${formatWATDate(r.created_at)}`,

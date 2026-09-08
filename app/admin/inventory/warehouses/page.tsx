@@ -405,7 +405,6 @@ export default function WarehousesPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (warehouse) => (warehouse.is_active ? "bg-emerald-500" : "bg-slate-400"),
           title: (warehouse) => warehouse.name,
           subtitle: (warehouse) =>
             `${warehouse.code} · ${getRegionFromAddress(warehouse.address)} · ${warehouse.address || "No address"}`,

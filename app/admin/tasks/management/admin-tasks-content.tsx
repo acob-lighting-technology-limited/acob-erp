@@ -681,12 +681,6 @@ export function AdminTasksContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "completed"
-              ? "bg-emerald-500"
-              : r.priority === "urgent" || r.priority === "high"
-                ? "bg-rose-500"
-                : "bg-blue-500",
           title: (r) => r.title,
           subtitle: (r) =>
             `${r.work_item_number || "Task"} · ${workflowOwnerLabel(r)} · Due ${r.due_date ? formatWATDate(r.due_date) : "No deadline"}`,

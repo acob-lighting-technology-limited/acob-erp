@@ -366,14 +366,6 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "open"
-              ? "bg-emerald-500"
-              : r.status === "in_progress"
-                ? "bg-blue-500"
-                : r.status === "resolved"
-                  ? "bg-violet-500"
-                  : "bg-slate-400",
           title: (r) => r.title,
           subtitle: (r) =>
             `${r.is_anonymous ? "Anonymous" : r.profiles ? `${r.profiles.first_name || ""} ${r.profiles.last_name || ""}`.trim() || "Unknown" : "Unknown"} · ${r.feedback_type} · ${formatWATDate(r.created_at)}`,

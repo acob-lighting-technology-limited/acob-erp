@@ -306,7 +306,6 @@ export default function SuppliersPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (supplier) => (supplier.is_active ? "bg-emerald-500" : "bg-slate-400"),
           title: (supplier) => supplier.name,
           subtitle: (supplier) => `${supplier.code} · ${supplier.contact_person || supplier.email || "No contact"}`,
           trailing: (supplier) => (

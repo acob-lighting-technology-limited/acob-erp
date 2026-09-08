@@ -263,8 +263,6 @@ export interface DataTableProps<TData> {
    * and changes nothing until adopted.
    */
   mobileRow?: {
-    /** Left status accent bar, e.g. "bg-red-500". */
-    accentClass?: (row: TData) => string | undefined
     /** Avatar, S/N bubble, or icon slot. Receives row and 1-based Serial Number (sn). */
     leading?: (row: TData, sn: number) => ReactNode
     /** Primary line. */

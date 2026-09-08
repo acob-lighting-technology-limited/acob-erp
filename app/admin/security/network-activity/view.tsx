@@ -596,8 +596,6 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.category === "review" ? "bg-red-500" : r.category === "normal" ? "bg-emerald-500" : "bg-blue-500",
           title: (r) => r.domain,
           subtitle: (r) =>
             `${whoName(r) || r.matched_identifier} · ${formatWATDate(r.visited_at, { hour: "2-digit", minute: "2-digit" })}`,

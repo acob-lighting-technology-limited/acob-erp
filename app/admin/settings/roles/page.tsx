@@ -395,7 +395,6 @@ export default function RolesPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (role) => (role.is_system ? "bg-rose-500" : "bg-emerald-500"),
           title: (role) => role.name.replace(/_/g, " "),
           subtitle: (role) => `${role.user_count || 0} users · ${role.permissions?.length || 0} permissions`,
           trailing: (role) => (

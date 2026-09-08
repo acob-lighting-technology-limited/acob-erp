@@ -315,7 +315,6 @@ export function DepartmentCascadeContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) => (r.role === "core" ? "bg-emerald-500" : "bg-blue-500"),
           title: (r) => r.measure,
           subtitle: (r) =>
             `${r.role.toUpperCase()} · ${r.perspective} · Attainment: ${r.capped_pct != null ? `${r.capped_pct}%` : "-"}`,

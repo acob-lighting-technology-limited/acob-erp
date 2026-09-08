@@ -292,14 +292,6 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.is_emergency
-              ? "bg-rose-500"
-              : r.status === "approved"
-                ? "bg-emerald-500"
-                : r.status === "rejected"
-                  ? "bg-slate-400"
-                  : "bg-amber-500",
           title: (r) => r.purpose,
           subtitle: (r) =>
             `${r.requisition_number} · ${r.project_name || r.department} · ₦${(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}`,

@@ -553,8 +553,6 @@ export function AdminHelpDeskContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.priority === "urgent" ? "bg-rose-500" : r.priority === "high" ? "bg-amber-500" : "bg-blue-500",
           title: (r) => r.title,
           subtitle: (r) => `${r.ticket_number} · ${r.service_department} · ${r.requester_department || "Staff"}`,
           trailing: (r) => (

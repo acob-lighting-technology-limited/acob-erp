@@ -571,12 +571,6 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            getBypassType(row).includes("Emergency")
-              ? "bg-red-500"
-              : getBypassType(row).includes("Manual")
-                ? "bg-amber-500"
-                : "bg-blue-500",
           title: (row) => getBypassSummary(row),
           subtitle: (row) =>
             `${formatWATDateTime(row.created_at)} · By: ${row.actor ? `${row.actor.first_name} ${row.actor.last_name}` : "System"}`,

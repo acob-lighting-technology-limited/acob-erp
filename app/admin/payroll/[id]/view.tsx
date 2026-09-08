@@ -666,7 +666,6 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-emerald-500",
           title: (r) => formatEmployeeName(r),
           subtitle: (r) =>
             `${r.department || "General"} · Gross: ${money(r.breakdown.monthlyGross)} · Net: ${money(r.breakdown.netPay)}`,

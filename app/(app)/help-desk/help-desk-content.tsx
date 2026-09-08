@@ -657,12 +657,6 @@ export function HelpDeskContent({
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
           // Urgency first: an urgent ticket needs answering whatever else is open.
-          accentClass: (ticket) =>
-            ["urgent", "high"].includes(ticket.priority)
-              ? "bg-rose-500"
-              : ["resolved", "closed"].includes(ticket.status)
-                ? "bg-emerald-500"
-                : undefined,
           title: (ticket) => ticket.title,
           subtitle: (ticket) =>
             [

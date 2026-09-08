@@ -942,12 +942,6 @@ export function ActionTrackerContent({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) =>
-              row.summaryStatus === "Finished"
-                ? "bg-emerald-500"
-                : row.summaryStatus === "Started"
-                  ? "bg-blue-500"
-                  : "bg-amber-500",
             title: (row) => row.department,
             subtitle: (row) => `${row.totalPoints} action points · ${row.completedPoints} completed`,
             trailing: (row) => (
@@ -1043,12 +1037,6 @@ export function ActionTrackerContent({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) =>
-              row.status === "completed"
-                ? "bg-emerald-500"
-                : row.status === "in_progress"
-                  ? "bg-blue-500"
-                  : "bg-amber-500",
             title: (row) => row.title,
             subtitle: (row) =>
               `${(row.assignees || []).map((person) => person.name).join(", ") || row.department} · ${row.timeline_text || "No timeline"}`,

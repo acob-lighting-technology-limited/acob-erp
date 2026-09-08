@@ -382,8 +382,6 @@ export function AdminAuditLogsContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.action === "delete" ? "bg-rose-500" : r.action === "create" ? "bg-emerald-500" : "bg-blue-500",
           title: (r) => getAuditLogSummary(r),
           subtitle: (r) =>
             `${r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"} · ${r.entity_type} · ${new Date(r.created_at).toLocaleTimeString("en-US", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" })}`,

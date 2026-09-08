@@ -437,7 +437,6 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) => (row.status === "completed" ? "bg-emerald-500" : "bg-amber-500"),
             title: (row) => row.name,
             subtitle: (row) => `${row.start_date} - ${row.end_date} · Pay: ${row.pay_date || "N/A"}`,
             trailing: (row) => (
@@ -487,7 +486,6 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-emerald-500",
             title: (row) => row.user?.full_name || "Unknown",
             subtitle: (row) =>
               `${row.user?.department || "General"} · ${row.payroll_periods?.name || "N/A"} · Net: ₦${Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,

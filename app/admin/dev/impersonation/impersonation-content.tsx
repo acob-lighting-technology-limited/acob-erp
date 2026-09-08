@@ -287,8 +287,6 @@ export function DevImpersonationContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            String(row.employment_status).toLowerCase() === "active" ? "bg-emerald-500" : "bg-slate-400",
           title: (row) => row.full_name,
           subtitle: (row) => `${row.department} · ${row.role}`,
           trailing: (row) => (

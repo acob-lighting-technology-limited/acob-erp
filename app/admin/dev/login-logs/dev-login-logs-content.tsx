@@ -1213,7 +1213,6 @@ export function DevLoginLogsContent() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-emerald-500",
             title: (row) => row.full_name || row.email,
             subtitle: (row) =>
               `${row.department || "General"} · ${row.auth_method || "auth"} · ${formatWATDate(row.login_at)}`,

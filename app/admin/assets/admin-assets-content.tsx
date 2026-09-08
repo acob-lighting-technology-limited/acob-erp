@@ -1602,14 +1602,6 @@ export function AdminAssetsContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (asset) =>
-            asset.deleted_at
-              ? "bg-slate-400"
-              : asset.status === "maintenance" || (asset.unresolved_issues_count || 0) > 0
-                ? "bg-rose-500"
-                : asset.status === "assigned"
-                  ? "bg-blue-500"
-                  : "bg-emerald-500",
           title: (asset) =>
             `${asset.unique_code} · ${asset.asset_model || ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}`,
           subtitle: (asset) =>

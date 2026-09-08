@@ -421,7 +421,6 @@ export function FinanceReportsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-blue-500",
           title: (row) => row.title,
           subtitle: (row) =>
             `${row.department_name || "Unknown"} · ${row.category || "Other"} · ${formatMonth(getPeriodLabel(row.created_at))}`,

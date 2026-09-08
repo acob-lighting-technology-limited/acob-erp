@@ -358,14 +358,6 @@ export function InvoicesPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (invoice) =>
-            invoice.status === "cancelled"
-              ? "bg-rose-500"
-              : invoice.status === "paid"
-                ? "bg-emerald-500"
-                : invoice.status === "overdue"
-                  ? "bg-red-500"
-                  : "bg-blue-500",
           title: (invoice) => `${invoice.invoice_number} · ${invoice.customer_name}`,
           subtitle: (invoice) =>
             `${formatCurrency(invoice.total_amount, invoice.currency)} · Due ${formatDate(invoice.due_date)}`,

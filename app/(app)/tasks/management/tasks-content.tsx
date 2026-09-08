@@ -428,8 +428,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         mobileRow={{
           // Overdue outranks priority: a late task needs answering whatever its
           // priority was when it was set.
-          accentClass: (t) =>
-            isTaskOverdue(t) ? "bg-rose-500" : ["high", "urgent"].includes(t.priority) ? "bg-amber-500" : undefined,
           title: (t) => t.title,
           subtitle: (t) =>
             [

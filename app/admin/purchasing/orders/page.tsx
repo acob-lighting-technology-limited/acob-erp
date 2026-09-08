@@ -309,12 +309,6 @@ export default function PurchaseOrdersPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (order) =>
-            order.status === "cancelled"
-              ? "bg-rose-500"
-              : order.status === "approved" || order.status === "received"
-                ? "bg-emerald-500"
-                : "bg-amber-500",
           title: (order) => `${order.po_number} · ${order.supplier_name || "Supplier"}`,
           subtitle: (order) =>
             `${formatCurrency(order.total_amount, order.currency)} · Expected ${order.expected_date ? formatDate(order.expected_date) : "Not set"}`,

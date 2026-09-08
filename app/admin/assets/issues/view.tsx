@@ -391,7 +391,6 @@ export function AssetIssuesPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (issue) => (issue.resolved ? "bg-emerald-500" : "bg-amber-500"),
           title: (issue) => `${issue.asset?.unique_code || "Asset"} · ${issue.description}`,
           subtitle: (issue) => `Assigned: ${assignedTo(issue)} · Reported: ${formatWATDate(issue.created_at)}`,
           trailing: (issue) => (

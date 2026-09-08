@@ -217,12 +217,6 @@ export function SecurityEventsContent({ rows, error }: { rows: AuditLogRow[]; er
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            getSeverity(row) === "Critical"
-              ? "bg-red-500"
-              : getSeverity(row) === "High"
-                ? "bg-amber-500"
-                : "bg-blue-500",
           title: (row) => row.action || row.operation || "Unknown action",
           subtitle: (row) => `${row.entity_type || "Security"} · ${formatWATDateTime(row.created_at)}`,
           trailing: (row) => (

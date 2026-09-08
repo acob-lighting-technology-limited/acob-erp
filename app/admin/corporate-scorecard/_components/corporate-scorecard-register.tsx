@@ -259,7 +259,6 @@ export function CorporateScorecardRegister() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-blue-500",
           title: (r) => r.measure,
           subtitle: (r) => `${r.perspective} · ${r.strategic_objective}`,
           trailing: (r) => (

@@ -332,12 +332,6 @@ export default function ProductsPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (product) =>
-            product.quantity_on_hand <= 0
-              ? "bg-rose-500"
-              : product.status === "active"
-                ? "bg-emerald-500"
-                : "bg-slate-400",
           title: (product) => product.name,
           subtitle: (product) =>
             `${product.sku} · ${product.category_name || "Uncategorized"} · Stock: ${product.quantity_on_hand}`,

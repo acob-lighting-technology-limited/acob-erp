@@ -539,14 +539,6 @@ export function Roster2View({ departments, lockedDepartment }: { departments: st
                     onClick={() => setPeeked(r)}
                     className="hover:bg-muted/40 active:bg-muted relative flex w-full items-center gap-3 py-2.5 pr-3.5 pl-3 text-left transition-colors"
                   >
-                    {/* Status as a left accent — readable at a glance, costs no width */}
-                    <span
-                      className={cn(
-                        "absolute inset-y-1 left-0 w-1 rounded-r",
-                        STATUS_DOT[r.status] ?? "bg-muted-foreground/30"
-                      )}
-                    />
-
                     <span className="bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold">
                       {initialsOf(r.user_name)}
                     </span>

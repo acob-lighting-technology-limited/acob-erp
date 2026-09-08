@@ -126,7 +126,6 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-red-500",
           title: (r) => r.message,
           subtitle: (r) => `${r.source} · ${r.route || "-"} · ${formatWATDateTime(r.created_at)}`,
           trailing: (r) => (

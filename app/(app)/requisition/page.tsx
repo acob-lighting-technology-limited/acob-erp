@@ -324,14 +324,6 @@ export default function RequisitionListPage() {
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
           // An emergency requisition is the one that cannot wait in the queue.
-          accentClass: (r) =>
-            r.is_emergency
-              ? "bg-rose-500"
-              : r.status === "approved"
-                ? "bg-emerald-500"
-                : r.status === "rejected"
-                  ? "bg-slate-400"
-                  : "bg-amber-500",
           title: (r) => r.purpose,
           subtitle: (r) => `${r.requisition_number} · ${r.project_name || r.department} · ${formatNaira(r.amount)}`,
           trailing: (r) => <StageBadge requisition={r} />,

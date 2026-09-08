@@ -398,8 +398,6 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "completed" ? "bg-emerald-500" : r.status === "active" ? "bg-blue-500" : "bg-amber-500",
           title: (r) => r.project_name,
           subtitle: (r) => `${r.location} · ${formatCapacity(r.capacity_w)} · ${r.technology_type || "General"}`,
           trailing: (r) => (

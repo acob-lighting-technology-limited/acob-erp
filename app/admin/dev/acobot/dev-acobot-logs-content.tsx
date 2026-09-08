@@ -354,7 +354,6 @@ export function DevAcobotLogsContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) => (row.had_context ? "bg-violet-500" : "bg-blue-500"),
           title: (row) => row.question,
           subtitle: (row) => `${isWebsite ? "Visitor" : row.full_name || "Unknown"} · ${formatWATDate(row.created_at)}`,
           trailing: (row) =>

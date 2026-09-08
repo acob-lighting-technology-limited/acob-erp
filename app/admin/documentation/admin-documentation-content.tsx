@@ -288,7 +288,6 @@ export function AdminDocumentationContent({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              accentClass: (doc) => (doc.is_draft ? "bg-amber-500" : "bg-emerald-500"),
               title: (doc) => doc.title,
               subtitle: (doc) =>
                 `${doc.user ? `${doc.user.first_name} ${doc.user.last_name}` : "Unknown"} · ${doc.category || "General"} · ${formatDate(doc.updated_at)}`,

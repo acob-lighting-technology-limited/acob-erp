@@ -238,7 +238,6 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         // list where they do not.
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) => (row.statusLabel === "maintenance" ? "bg-amber-500" : undefined),
           title: (row) => row.assetTypeLabel,
           subtitle: (row) =>
             [row.asset?.unique_code, row.asset?.asset_model].filter(Boolean).join(" · ") || "No code recorded",

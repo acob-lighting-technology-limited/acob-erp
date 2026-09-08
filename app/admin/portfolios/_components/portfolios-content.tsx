@@ -336,8 +336,6 @@ export function PortfoliosContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "closed" ? "bg-slate-400" : r.status === "on_hold" ? "bg-amber-500" : "bg-emerald-500",
           title: (r) => (r.code ? `${r.code} — ${r.name}` : r.name),
           subtitle: (r) =>
             `${r.rollup.projectCount} projects · ${r.rollup.deliveryPct ?? 0}% delivery · ${r.rollup.overdueCount} overdue`,

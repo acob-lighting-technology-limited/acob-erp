@@ -275,7 +275,6 @@ export default function AdminJobDescriptionsPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) => (r.job_description ? "bg-emerald-500" : "bg-amber-500"),
           title: (r) => `${r.first_name} ${r.last_name}`,
           subtitle: (r) => `${r.department} · ${r.designation || "No designation"} · ${r.company_email}`,
           trailing: (r) =>

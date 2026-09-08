@@ -217,12 +217,6 @@ export function RoleEscalationsContent({ rows, error }: { rows: AuditLogRow[]; e
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            getRoleTier(row) === "Super Admin"
-              ? "bg-red-500"
-              : getRoleTier(row) === "Admin"
-                ? "bg-amber-500"
-                : "bg-blue-500",
           title: (row) => row.action || row.operation || "Unknown action",
           subtitle: (row) => `${row.entity_type || "Role"} · ${formatWATDateTime(row.created_at)}`,
           trailing: (row) => (

@@ -268,7 +268,6 @@ export default function ReceiptsPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-emerald-500",
           title: (receipt) => `${receipt.receipt_number} · ${receipt.supplier_name || "Supplier"}`,
           subtitle: (receipt) => `PO: ${receipt.po_number || "None"} · Received ${formatDate(receipt.received_date)}`,
           trailing: (receipt) => (
