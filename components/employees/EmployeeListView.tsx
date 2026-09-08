@@ -169,6 +169,9 @@ export function EmployeeListView({
                 const leadDepartments = member.lead_departments.filter(Boolean)
                 const createdAt = member.created_at ? formatWATDate(member.created_at) : "-"
                 const employmentDate = member.employment_date ? formatWATDate(member.employment_date) : "-"
+                const confirmationDate = member.confirmation_date
+                  ? formatWATDate(member.confirmation_date)
+                  : "Probation (Pending)"
 
                 return (
                   <Fragment key={member.id}>
@@ -359,6 +362,10 @@ export function EmployeeListView({
                                 <div className="flex items-center justify-between gap-3 pt-1">
                                   <span className="text-muted-foreground">Employment Date</span>
                                   <span className="text-foreground font-medium">{employmentDate}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-muted-foreground">Confirmation Date</span>
+                                  <span className="text-foreground font-medium">{confirmationDate}</span>
                                 </div>
                                 <div className="flex items-center justify-between gap-3">
                                   <span className="text-muted-foreground">Profile Created</span>

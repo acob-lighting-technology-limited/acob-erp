@@ -8,6 +8,7 @@ import { ShoppingCart, Users, FileText, Package, AlertTriangle, Clock } from "lu
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 
 interface PurchasingStats {
   totalSuppliers: number
@@ -42,7 +43,7 @@ export default function PurchasingDashboard() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-4">
+      <StatGrid>
         <StatCard title="Suppliers" value={stats.totalSuppliers} icon={Users} description="Registered vendors" />
         <StatCard
           title="Active Orders"
@@ -64,7 +65,7 @@ export default function PurchasingDashboard() {
           icon={FileText}
           description="Total order amount"
         />
-      </div>
+      </StatGrid>
 
       {/* Module Cards */}
       <Section title="Purchasing Management">

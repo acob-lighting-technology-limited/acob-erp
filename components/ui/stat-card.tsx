@@ -18,6 +18,7 @@ interface StatCardProps {
   trend?: Trend
   variant?: Variant
   description?: string
+  tooltip?: string
   className?: string
 }
 
@@ -30,6 +31,7 @@ export function StatCard({
   trend,
   variant = "default",
   description,
+  tooltip,
   className,
 }: StatCardProps) {
   // `compact` scales down below `sm` rather than being one fixed size. A phone
@@ -38,12 +40,17 @@ export function StatCard({
   // than a screenful and the list is still visible underneath.
   if (variant === "compact") {
     return (
-      <Card className={cn("border", className)}>
+      <Card className={cn("border", className)} title={tooltip}>
         <CardContent className="p-2.5 sm:p-3.5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-muted-foreground truncate text-[10px] leading-tight font-medium sm:text-xs">{title}</p>
-              <p className="text-foreground mt-0.5 truncate text-base leading-tight font-bold sm:text-xl">{value}</p>
+              <p
+                className="text-foreground mt-0.5 truncate text-base leading-tight font-bold sm:text-xl"
+                title={tooltip}
+              >
+                {value}
+              </p>
             </div>
             {Icon && (
               <div className={cn("shrink-0 rounded-md p-1.5 sm:rounded-lg sm:p-2", iconBgColor)}>
@@ -64,7 +71,7 @@ export function StatCard({
 
   if (variant === "large") {
     return (
-      <Card className={cn("border", className)}>
+      <Card className={cn("border", className)} title={tooltip}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3.5 pt-3.5 pb-2 sm:px-6 sm:pt-6 sm:pb-2">
           <CardTitle className="text-muted-foreground truncate text-xs font-medium sm:text-sm">{title}</CardTitle>
           {Icon && (
@@ -74,7 +81,9 @@ export function StatCard({
           )}
         </CardHeader>
         <CardContent className="px-3.5 pb-3.5 sm:px-6 sm:pb-6">
-          <div className="text-xl font-bold sm:text-3xl">{value}</div>
+          <div className="text-xl font-bold sm:text-3xl" title={tooltip}>
+            {value}
+          </div>
           {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-xs sm:text-sm">{description}</p>}
           {trend && (
             <p className={cn("mt-1 text-xs sm:mt-2 sm:text-sm", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
@@ -88,12 +97,15 @@ export function StatCard({
   }
 
   return (
-    <Card className={cn("border", className)}>
+    <Card className={cn("border", className)} title={tooltip}>
       {/* Mobile: compact horizontal row with clear, balanced typography */}
       <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 sm:hidden">
         <div className="min-w-0">
           <p className="text-muted-foreground truncate text-xs font-medium">{title}</p>
-          <p className="text-foreground line-clamp-2 text-sm leading-tight font-bold break-words" title={String(value)}>
+          <p
+            className="text-foreground line-clamp-2 text-sm leading-tight font-bold break-words"
+            title={tooltip || String(value)}
+          >
             {value}
           </p>
           {description && <p className="text-muted-foreground line-clamp-1 text-[11px]">{description}</p>}
@@ -121,7 +133,7 @@ export function StatCard({
         )}
       </CardHeader>
       <CardContent className="hidden px-6 pb-6 sm:block">
-        <div className="line-clamp-2 text-xl font-bold break-words lg:text-2xl" title={String(value)}>
+        <div className="line-clamp-2 text-xl font-bold break-words lg:text-2xl" title={tooltip || String(value)}>
           {value}
         </div>
         {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">{description}</p>}

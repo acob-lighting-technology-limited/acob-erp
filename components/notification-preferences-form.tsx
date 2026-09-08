@@ -8,13 +8,19 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Bell, Mail, ShieldAlert } from "lucide-react"
+import { PushNotificationToggle } from "@/components/push-notification-toggle"
 
 interface NotificationPreferencesFormProps {
   userId: string
   initialEmailNotifications: boolean
+  vapidPublicKey: string
 }
 
-export function NotificationPreferencesForm({ userId, initialEmailNotifications }: NotificationPreferencesFormProps) {
+export function NotificationPreferencesForm({
+  userId,
+  initialEmailNotifications,
+  vapidPublicKey,
+}: NotificationPreferencesFormProps) {
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -24,13 +30,17 @@ export function NotificationPreferencesForm({ userId, initialEmailNotifications 
     setIsLoading(true)
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          email_notifications: emailNotifications,
+      // Upsert, because most users have never had a preferences row: the
+      // delivery gate defaults a missing row to "allowed", so opting out has
+      // to create the row rather than update a row that isn't there.
+      const { error } = await supabase.from("notification_preferences").upsert(
+        {
+          user_id: userId,
+          email_enabled: emailNotifications,
           updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId)
+        },
+        { onConflict: "user_id" }
+      )
 
       if (error) throw error
 
@@ -75,6 +85,11 @@ export function NotificationPreferencesForm({ userId, initialEmailNotifications 
               </div>
               <Switch id="email-notifs" checked={emailNotifications} onCheckedChange={setEmailNotifications} />
             </div>
+
+            {/* Device-scoped, so it saves immediately rather than on submit:
+                the browser permission grant belongs to this device, not to the
+                account-level preferences saved below. */}
+            <PushNotificationToggle vapidPublicKey={vapidPublicKey} />
 
             <div className="bg-muted/30 flex items-start justify-between space-x-4 rounded-lg border p-4">
               <div className="flex items-start gap-3">

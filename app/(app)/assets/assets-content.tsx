@@ -10,6 +10,7 @@ import type { AssetAssignment } from "./page"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 
 interface AssetsContentProps {
@@ -159,7 +160,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
       backLink={{ href: "/profile", label: "Back to Dashboard" }}
       spacing="tight"
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Personal Assets"
@@ -196,7 +197,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
             iconColor="text-violet-500"
             className={maintenanceCount > 0 ? "hidden sm:block" : undefined}
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<AssetRow>
@@ -238,7 +239,6 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         // list where they do not.
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) => (row.statusLabel === "maintenance" ? "bg-amber-500" : undefined),
           title: (row) => row.assetTypeLabel,
           subtitle: (row) =>
             [row.asset?.unique_code, row.asset?.asset_model].filter(Boolean).join(" · ") || "No code recorded",

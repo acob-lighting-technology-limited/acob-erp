@@ -12,6 +12,7 @@ import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import {
   AlertDialog,
@@ -375,17 +376,14 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
   const { filters: individualCycleFilters } = useCycleFilters<IndividualRow>({
     cycles: data.cycles,
     getRowCycleId: (row) => row.review_cycle_id,
-    defaultCadence: "quarterly",
   })
   const { filters: departmentCycleFilters } = useCycleFilters<DepartmentRow>({
     cycles: data.cycles,
     getRowCycleId: (row) => row.cycleId,
-    defaultCadence: "quarterly",
   })
   const { filters: cycleTabCycleFilters } = useCycleFilters<CycleRow>({
     cycles: data.cycles,
     getRowCycleId: (row) => row.id,
-    defaultCadence: "quarterly",
   })
 
   const individualColumns: DataTableColumn<IndividualRow>[] = [
@@ -759,7 +757,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Rows"
@@ -791,9 +789,8 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             icon={Brain}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       {tab === "individual" ? (
@@ -829,7 +826,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) => (typeof row.cbt_score === "number" ? "bg-emerald-500" : "bg-amber-500"),
             title: (row) => row.employee,
             subtitle: (row) =>
               `${row.department} · ${formatCycleName(row.cycle)} · Score: ${scoreLabel(row.cbt_score)}`,
@@ -884,7 +880,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-blue-500",
             title: (row) => row.department,
             subtitle: (row) =>
               `${formatCycleName(row.cycle)} · ${row.scores_recorded}/${row.total_employees} completed`,
@@ -934,7 +929,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-purple-500",
             title: (row) => formatCycleName(row.cycle),
             subtitle: (row) =>
               `${row.review_type} · ${row.questions} questions · Avg: ${scoreLabel(row.average_score)}`,

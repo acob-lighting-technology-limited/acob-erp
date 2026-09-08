@@ -16,6 +16,7 @@ import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { getAdminAccountsData } from "./_lib"
 
@@ -172,7 +173,7 @@ export async function AdminAccountsPage({ basePath, lockedDepartmentId }: AdminA
         backLink={{ href: base, label: isDeptView ? "Back to Dept" : "Back to Admin" }}
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
+      <StatGrid>
         <StatCard
           variant="compact"
           title="Pending Requisitions"
@@ -210,7 +211,7 @@ export async function AdminAccountsPage({ basePath, lockedDepartmentId }: AdminA
           icon={Building2}
           description="Registered company equipment"
         />
-      </div>
+      </StatGrid>
 
       <Section
         title={isDeptView ? "Department Accounts Modules" : "Accounts Modules"}

@@ -9,6 +9,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { PurchaseOrderFormDialog } from "./_components/purchase-order-form-dialog"
@@ -217,16 +218,7 @@ export default function PurchaseOrdersPage() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
-          <StatCard
-            variant="compact"
-            title="Total Orders"
-            value={stats.total}
-            icon={ShoppingCart}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending"
@@ -251,7 +243,15 @@ export default function PurchaseOrdersPage() {
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Total Orders"
+            value={stats.total}
+            icon={ShoppingCart}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<PurchaseOrder>
@@ -309,12 +309,6 @@ export default function PurchaseOrdersPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (order) =>
-            order.status === "cancelled"
-              ? "bg-rose-500"
-              : order.status === "approved" || order.status === "received"
-                ? "bg-emerald-500"
-                : "bg-amber-500",
           title: (order) => `${order.po_number} · ${order.supplier_name || "Supplier"}`,
           subtitle: (order) =>
             `${formatCurrency(order.total_amount, order.currency)} · Expected ${order.expected_date ? formatDate(order.expected_date) : "Not set"}`,

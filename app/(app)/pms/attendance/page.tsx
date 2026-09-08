@@ -1,10 +1,19 @@
 import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
 import { getCadenceType } from "@/lib/pms/cadence"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { getCurrentUserPmsData } from "../_lib"
 
 function formatPercent(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
+}
+
+function formatClockTime(value: string | null | undefined): string {
+  if (!value || value === "-") return "-"
+  const parts = value.split(":")
+  if (parts.length >= 2) {
+    return `${parts[0]}:${parts[1]}`
+  }
+  return value
 }
 
 export default async function PmsAttendancePage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
@@ -22,16 +31,22 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
     return `Q${quarter} ${year}`
   }
 
-  const rows = attendance.recent.map((record) => ({
-    cycle: getCycleLabel(record.date),
-    month: formatWATDate(record.date, { month: "long" }),
-    date: formatWATDate(record.date),
-    clock_in: record.clock_in || "-",
-    clock_out: record.clock_out || "In progress",
-    total_hours: record.total_hours !== null ? `${record.total_hours.toFixed(2)} hrs` : "Pending",
-    status: record.status || "unknown",
-    __rawStatus: record.status,
-  }))
+  const todayISO = toLocalISODate()
+
+  const rows = attendance.recent.map((record) => {
+    const isToday = record.date === todayISO
+    const inProgress = isToday && Boolean(record.clock_in) && !record.clock_out
+    return {
+      date: formatWATDate(record.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+      clock_in: formatClockTime(record.clock_in),
+      clock_out: inProgress ? "In progress" : formatClockTime(record.clock_out),
+      total_hours: record.total_hours !== null ? `${record.total_hours.toFixed(2)} hrs` : inProgress ? "Pending" : "-",
+      cycle: getCycleLabel(record.date),
+      month: formatWATDate(record.date, { month: "long" }),
+      status: record.status || "unknown",
+      __rawStatus: record.status,
+    }
+  })
 
   return (
     <PmsTablePage
@@ -43,7 +58,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
       cycles={cycles}
       activeCycleId={activeCycleId}
       summaryCards={[
-        { label: "Attendance Score", value: formatPercent(score.attendance_score) },
+        { label: "Score", value: formatPercent(score.attendance_score), tooltip: "Attendance Score" },
         { label: "Present Days", value: score.breakdown.attendance.present },
         { label: "Tracked Days", value: score.breakdown.attendance.total },
       ]}
@@ -51,11 +66,11 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
       tableDescription={`Attendance entries for ${score.cycle_name || "the selected cycle"}.`}
       rows={rows}
       columns={[
-        { key: "cycle", label: cycleColumnLabel },
         { key: "date", label: "Date" },
         { key: "clock_in", label: "Clock In" },
         { key: "clock_out", label: "Clock Out" },
         { key: "total_hours", label: "Total Hours" },
+        { key: "cycle", label: cycleColumnLabel },
         { key: "status", label: "Status" },
       ]}
       searchPlaceholder="Search attendance records..."

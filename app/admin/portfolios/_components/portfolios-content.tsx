@@ -10,6 +10,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { PROJECT_HEALTH_LABELS, type ProjectHealthStatus } from "@/lib/projects/health"
 import { PortfolioDialog } from "./portfolio-dialog"
@@ -278,7 +279,7 @@ export function PortfoliosContent() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Portfolios"
@@ -286,14 +287,6 @@ export function PortfoliosContent() {
             icon={Layers}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Projects"
-            value={stats.projectCount}
-            icon={FolderKanban}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
           />
           <StatCard
             variant="compact"
@@ -311,7 +304,15 @@ export function PortfoliosContent() {
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Projects"
+            value={stats.projectCount}
+            icon={FolderKanban}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<Portfolio>
@@ -336,8 +337,6 @@ export function PortfoliosContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "closed" ? "bg-slate-400" : r.status === "on_hold" ? "bg-amber-500" : "bg-emerald-500",
           title: (r) => (r.code ? `${r.code} — ${r.name}` : r.name),
           subtitle: (r) =>
             `${r.rollup.projectCount} projects · ${r.rollup.deliveryPct ?? 0}% delivery · ${r.rollup.overdueCount} overdue`,

@@ -8,6 +8,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import type { BadgeProps } from "@/components/ui/badge"
@@ -236,7 +237,7 @@ export default function ProductsPage() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Products"
@@ -244,15 +245,6 @@ export default function ProductsPage() {
             icon={Package}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Active"
-            value={stats.active}
-            icon={Tags}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -270,7 +262,15 @@ export default function ProductsPage() {
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Active"
+            value={stats.active}
+            icon={Tags}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<Product>
@@ -332,12 +332,6 @@ export default function ProductsPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (product) =>
-            product.quantity_on_hand <= 0
-              ? "bg-rose-500"
-              : product.status === "active"
-                ? "bg-emerald-500"
-                : "bg-slate-400",
           title: (product) => product.name,
           subtitle: (product) =>
             `${product.sku} · ${product.category_name || "Uncategorized"} · Stock: ${product.quantity_on_hand}`,

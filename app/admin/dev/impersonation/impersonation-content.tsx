@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 
 type ImpersonationRow = {
@@ -226,7 +227,7 @@ export function DevImpersonationContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      <StatGrid>
         <StatCard
           variant="compact"
           title="Users"
@@ -259,7 +260,7 @@ export function DevImpersonationContent() {
           iconBgColor="bg-violet-500/10"
           iconColor="text-violet-500"
         />
-      </div>
+      </StatGrid>
 
       <DataTable<ImpersonationRow>
         data={rows}
@@ -287,8 +288,6 @@ export function DevImpersonationContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            String(row.employment_status).toLowerCase() === "active" ? "bg-emerald-500" : "bg-slate-400",
           title: (row) => row.full_name,
           subtitle: (row) => `${row.department} · ${row.role}`,
           trailing: (row) => (

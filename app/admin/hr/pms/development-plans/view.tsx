@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import {
   Dialog,
@@ -494,7 +495,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Plans"
@@ -526,9 +527,8 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
             icon={TrendingUp}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<DevelopmentPlan>
@@ -582,14 +582,6 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (plan) =>
-            plan.status === "completed"
-              ? "bg-emerald-500"
-              : plan.status === "active"
-                ? "bg-blue-500"
-                : plan.status === "cancelled"
-                  ? "bg-red-500"
-                  : "bg-amber-500",
           title: (plan) => `${formatName(plan.user)} · ${plan.title}`,
           subtitle: (plan) =>
             `${plan.user?.department || "No dept"} · ${FOCUS_LABELS[plan.focus_area] || plan.focus_area} · Progress: ${plan.progress_pct}%`,

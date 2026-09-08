@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, ShieldAlert, ShieldCheck, Siren } from "lucide-react"
 import { formatWATDateTime } from "@/lib/utils/date"
@@ -131,7 +132,7 @@ export function SecurityEventsContent({ rows, error }: { rows: AuditLogRow[]; er
       icon={ShieldAlert}
       backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Events"
@@ -164,7 +165,7 @@ export function SecurityEventsContent({ rows, error }: { rows: AuditLogRow[]; er
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<AuditLogRow>
@@ -217,12 +218,6 @@ export function SecurityEventsContent({ rows, error }: { rows: AuditLogRow[]; er
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            getSeverity(row) === "Critical"
-              ? "bg-red-500"
-              : getSeverity(row) === "High"
-                ? "bg-amber-500"
-                : "bg-blue-500",
           title: (row) => row.action || row.operation || "Unknown action",
           subtitle: (row) => `${row.entity_type || "Security"} · ${formatWATDateTime(row.created_at)}`,
           trailing: (row) => (

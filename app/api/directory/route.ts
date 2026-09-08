@@ -14,7 +14,7 @@ const log = logger("directory")
 // avatar_path is read but never returned — it is exchanged for a short-lived signed URL,
 // since profile photos live in a private bucket.
 const DIRECTORY_COLUMNS =
-  "id, first_name, last_name, full_name, company_email, additional_email, phone_number, additional_phone, department, designation, office_location, is_department_lead, lead_departments, employment_status, avatar_path"
+  "id, first_name, last_name, full_name, company_email, additional_email, phone_number, additional_phone, department, designation, office_location, is_department_lead, lead_departments, employment_status, employment_type, avatar_path"
 
 type DirectoryRow = {
   id: string
@@ -31,6 +31,7 @@ type DirectoryRow = {
   is_department_lead: boolean | null
   lead_departments: string[] | null
   employment_status: string | null
+  employment_type: string | null
   avatar_path: string | null
 }
 

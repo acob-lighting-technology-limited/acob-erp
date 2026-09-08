@@ -1,7 +1,6 @@
 "use client"
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
@@ -50,71 +49,71 @@ export function DataTablePage({
       {/* 2 ── Tabs */}
       {tabs && tabs.length > 0 && activeTab && onTabChange && (
         <div className="mb-4">
-          <div className="sm:hidden">
-            <Select value={activeTab} onValueChange={onTabChange}>
-              <SelectTrigger className="bg-muted/60 w-full font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
+          <Tabs value={activeTab} onValueChange={onTabChange}>
+            {tabs.length <= 4 ? (
+              <TabsList
+                className={cn(
+                  "grid w-full sm:inline-flex sm:w-auto",
+                  tabs.length === 2 && "grid-cols-2",
+                  tabs.length === 3 && "grid-cols-3",
+                  tabs.length === 4 && "grid-cols-4"
+                )}
+              >
                 {tabs.map((tab) => (
-                  <SelectItem key={tab.key} value={tab.key}>
-                    <div className="flex items-center gap-2">
-                      {tab.icon && <tab.icon className="text-muted-foreground h-4 w-4 shrink-0" />}
-                      <span>{tab.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="hidden sm:block">
-            <Tabs value={activeTab} onValueChange={onTabChange}>
-              <TabsList>
-                {tabs.map((tab) => (
-                  <TabsTrigger key={tab.key} value={tab.key}>
-                    {tab.icon && <tab.icon className="mr-1.5 h-4 w-4" />}
-                    {tab.label}
+                  <TabsTrigger key={tab.key} value={tab.key} className="truncate px-2">
+                    {tab.icon && <tab.icon className="mr-1.5 h-4 w-4 shrink-0" />}
+                    <span className="truncate">{tab.label}</span>
                   </TabsTrigger>
                 ))}
               </TabsList>
-            </Tabs>
-          </div>
+            ) : (
+              <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <TabsList className="inline-flex w-max min-w-full justify-start sm:min-w-0">
+                  {tabs.map((tab) => (
+                    <TabsTrigger key={tab.key} value={tab.key} className="whitespace-nowrap">
+                      {tab.icon && <tab.icon className="mr-1.5 h-4 w-4 shrink-0" />}
+                      <span>{tab.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+            )}
+          </Tabs>
         </div>
       )}
 
       {secondaryTabs && secondaryTabs.length > 0 && secondaryActiveTab && onSecondaryTabChange && (
         <div className="mb-4">
-          <div className="sm:hidden">
-            <Select value={secondaryActiveTab} onValueChange={onSecondaryTabChange}>
-              <SelectTrigger className="bg-muted/60 w-full font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
+          <Tabs value={secondaryActiveTab} onValueChange={onSecondaryTabChange}>
+            {secondaryTabs.length <= 4 ? (
+              <TabsList
+                className={cn(
+                  "grid w-full sm:inline-flex sm:w-auto",
+                  secondaryTabs.length === 2 && "grid-cols-2",
+                  secondaryTabs.length === 3 && "grid-cols-3",
+                  secondaryTabs.length === 4 && "grid-cols-4"
+                )}
+              >
                 {secondaryTabs.map((tab) => (
-                  <SelectItem key={tab.key} value={tab.key}>
-                    <div className="flex items-center gap-2">
-                      {tab.icon && <tab.icon className="text-muted-foreground h-4 w-4 shrink-0" />}
-                      <span>{tab.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="hidden sm:block">
-            <Tabs value={secondaryActiveTab} onValueChange={onSecondaryTabChange}>
-              <TabsList>
-                {secondaryTabs.map((tab) => (
-                  <TabsTrigger key={tab.key} value={tab.key}>
-                    {tab.icon && <tab.icon className="mr-1.5 h-4 w-4" />}
-                    {tab.label}
+                  <TabsTrigger key={tab.key} value={tab.key} className="truncate px-2">
+                    {tab.icon && <tab.icon className="mr-1.5 h-4 w-4 shrink-0" />}
+                    <span className="truncate">{tab.label}</span>
                   </TabsTrigger>
                 ))}
               </TabsList>
-            </Tabs>
-          </div>
+            ) : (
+              <div className="overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <TabsList className="inline-flex w-max min-w-full justify-start sm:min-w-0">
+                  {secondaryTabs.map((tab) => (
+                    <TabsTrigger key={tab.key} value={tab.key} className="whitespace-nowrap">
+                      {tab.icon && <tab.icon className="mr-1.5 h-4 w-4 shrink-0" />}
+                      <span>{tab.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+            )}
+          </Tabs>
         </div>
       )}
 

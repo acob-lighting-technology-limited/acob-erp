@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { createClient } from "@/lib/supabase/client"
@@ -436,7 +437,7 @@ export function MeetingDocumentTypeTable({
         )
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Documents"
@@ -444,15 +445,6 @@ export function MeetingDocumentTypeTable({
             icon={FileText}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Locked"
-            value={stats.locked}
-            icon={Lock}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -470,7 +462,15 @@ export function MeetingDocumentTypeTable({
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Locked"
+            value={stats.locked}
+            icon={Lock}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+        </StatGrid>
       }
     >
       <AlertDialog

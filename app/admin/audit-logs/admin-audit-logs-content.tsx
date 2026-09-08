@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AuditLogDetailPanel } from "@/components/audit/AuditLogDetailPanel"
@@ -235,28 +236,12 @@ export function AdminAuditLogsContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total logs"
             value={stats.total}
             icon={ScrollText}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Creates"
-            value={stats.creates}
-            icon={Plus}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Updates"
-            value={stats.updates}
-            icon={Pencil}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
           />
@@ -268,7 +253,23 @@ export function AdminAuditLogsContent({
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Updates"
+            value={stats.updates}
+            icon={Pencil}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Creates"
+            value={stats.creates}
+            icon={Plus}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<AuditLog>
@@ -382,8 +383,6 @@ export function AdminAuditLogsContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.action === "delete" ? "bg-rose-500" : r.action === "create" ? "bg-emerald-500" : "bg-blue-500",
           title: (r) => getAuditLogSummary(r),
           subtitle: (r) =>
             `${r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"} · ${r.entity_type} · ${new Date(r.created_at).toLocaleTimeString("en-US", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" })}`,

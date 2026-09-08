@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 import { CreateReferenceDialog, type CreateReferenceForm } from "@/components/correspondence/create-reference-dialog"
 import { cn, formatName } from "@/lib/utils"
@@ -392,7 +393,7 @@ export function PortalReferenceGeneratorContent({
       spacing="tight"
       actionsPlacement="inline-always"
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total References"
@@ -424,9 +425,8 @@ export function PortalReferenceGeneratorContent({
             icon={Mail}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<CorrespondenceRecord>

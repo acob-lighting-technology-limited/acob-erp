@@ -9,6 +9,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
 
@@ -127,7 +128,7 @@ export function ScorecardSummaryContent() {
       backLink={{ href: "/admin/corporate-scorecard", label: "Back to Register" }}
       stats={
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Company-Wide"
@@ -146,7 +147,7 @@ export function ScorecardSummaryContent() {
                 description={`${p.objectives.length} objective${p.objectives.length === 1 ? "" : "s"}`}
               />
             ))}
-          </div>
+          </StatGrid>
         </div>
       }
     >
@@ -175,7 +176,6 @@ export function ScorecardSummaryContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-blue-500",
           title: (r) => r.department,
           subtitle: (r) =>
             `CORE KPIs: ${r.coreKpiCount} · Attainment: ${r.attainmentPct != null ? `${r.attainmentPct}%` : "No data"}`,

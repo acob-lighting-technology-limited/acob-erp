@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import {
   Headset,
@@ -422,16 +423,7 @@ export function AdminHelpDeskContent({
       activeTab={activeTab}
       onTabChange={setActiveTab}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
-          <StatCard
-            variant="compact"
-            title="Total Tickets"
-            value={stats.total}
-            icon={Headset}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="In Progress"
@@ -439,6 +431,14 @@ export function AdminHelpDeskContent({
             icon={Clock}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
+          />
+          <StatCard
+            variant="compact"
+            title="SLA Breached"
+            value={stats.breached}
+            icon={ShieldCheck}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
           />
           <StatCard
             variant="compact"
@@ -450,13 +450,13 @@ export function AdminHelpDeskContent({
           />
           <StatCard
             variant="compact"
-            title="SLA Breached"
-            value={stats.breached}
-            icon={ShieldCheck}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
+            title="Total Tickets"
+            value={stats.total}
+            icon={Headset}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<HelpDeskTicket>
@@ -553,8 +553,6 @@ export function AdminHelpDeskContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.priority === "urgent" ? "bg-rose-500" : r.priority === "high" ? "bg-amber-500" : "bg-blue-500",
           title: (r) => r.title,
           subtitle: (r) => `${r.ticket_number} · ${r.service_department} · ${r.requester_department || "Staff"}`,
           trailing: (r) => (

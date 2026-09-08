@@ -1,5 +1,6 @@
 import { Calendar, CheckCircle, CreditCard, TriangleAlert, Wallet } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 
 interface PaymentStats {
   totalDue: number
@@ -16,7 +17,7 @@ interface PaymentStatsCardsProps {
 
 export function PaymentStatsCards({ stats, formatCurrency }: PaymentStatsCardsProps) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
+    <StatGrid>
       <StatCard
         variant="compact"
         title="Total Outstanding"
@@ -24,22 +25,6 @@ export function PaymentStatsCards({ stats, formatCurrency }: PaymentStatsCardsPr
         icon={CreditCard}
         iconBgColor="bg-blue-500/10"
         iconColor="text-blue-500"
-      />
-      <StatCard
-        variant="compact"
-        title="Total Paid"
-        value={formatCurrency(stats.totalPaid, "NGN")}
-        icon={Wallet}
-        iconBgColor="bg-emerald-500/10"
-        iconColor="text-emerald-500"
-      />
-      <StatCard
-        variant="compact"
-        title="Completed"
-        value={stats.countCompleted}
-        icon={CheckCircle}
-        iconBgColor="bg-violet-500/10"
-        iconColor="text-violet-500"
       />
       <StatCard
         variant="compact"
@@ -57,6 +42,22 @@ export function PaymentStatsCards({ stats, formatCurrency }: PaymentStatsCardsPr
         iconBgColor="bg-amber-500/10"
         iconColor="text-amber-500"
       />
-    </div>
+      <StatCard
+        variant="compact"
+        title="Total Paid"
+        value={formatCurrency(stats.totalPaid, "NGN")}
+        icon={Wallet}
+        iconBgColor="bg-emerald-500/10"
+        iconColor="text-emerald-500"
+      />
+      <StatCard
+        variant="compact"
+        title="Completed"
+        value={stats.countCompleted}
+        icon={CheckCircle}
+        iconBgColor="bg-violet-500/10"
+        iconColor="text-violet-500"
+      />
+    </StatGrid>
   )
 }

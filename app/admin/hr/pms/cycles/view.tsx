@@ -30,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 
 type CycleStatus = "planned" | "active" | "closed" | "locked"
@@ -348,7 +349,7 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total"
@@ -382,7 +383,7 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<ReviewCycle>
@@ -429,14 +430,6 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (cycle) =>
-            cycle.status === "active"
-              ? "bg-emerald-500"
-              : cycle.status === "closed"
-                ? "bg-blue-500"
-                : cycle.status === "locked"
-                  ? "bg-slate-500"
-                  : "bg-amber-500",
           title: (cycle) => cycle.name,
           subtitle: (cycle) =>
             `${cycle.review_type.replace(/_/g, " ")} · ${formatDate(cycle.start_date)} - ${formatDate(cycle.end_date)}`,

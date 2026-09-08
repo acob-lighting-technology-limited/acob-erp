@@ -73,7 +73,7 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Copy } from "lucide-react"
-import type { DataTableProps, SortConfig } from "./types"
+import type { DataTableDetailConfig, DataTableProps, SortConfig } from "./types"
 
 // ─── Debounce hook ───────────────────────────────────────────────────────────
 
@@ -392,7 +392,33 @@ export function DataTable<TData>({
   )
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [detailRow, setDetailRow] = useState<TData | null>(null)
-  const detailConfig = mobileRow?.detail
+
+  // A row tap must land on the sheet, never on a desktop-sized modal. Pages that
+  // gave only `onSelect` used to get the modal straight away, so the phone lost
+  // the one surface built for it — this fills the gap from `columns`, which
+  // already carry every label and accessor a sheet needs.
+  //
+  // `hideOnMobile` columns are deliberately *included*: that flag means "too wide
+  // for the mobile table", and the sheet is exactly where that data belongs.
+  const detailConfig = useMemo<DataTableDetailConfig<TData> | undefined>(() => {
+    if (mobileRow?.detail) return mobileRow.detail
+    if (!mobileRow) return undefined
+    const fieldColumns = columns.filter((column) => column.accessor)
+    const onSelect = mobileRow.onSelect
+    return {
+      title: mobileRow.title,
+      subtitle: mobileRow.subtitle,
+      fields: (row: TData) =>
+        fieldColumns
+          .map((column) => ({ label: column.label, value: String(column.accessor?.(row) ?? "") }))
+          // A synthesized sheet has no editorial eye on it, so blanks and the
+          // placeholders a table renders in their place are dropped here instead.
+          .filter((field) => field.value !== "" && field.value !== "-" && field.value !== "—"),
+      actions: onSelect
+        ? (row: TData) => [{ label: "Open", icon: ExternalLink, onClick: () => onSelect(row) }]
+        : undefined,
+    }
+  }, [mobileRow, columns])
 
   // ─── View mode (user-controlled; never auto-switch) ──────────────────────
   // Declared above the URL sync because it is part of it: a shared link that
@@ -1498,13 +1524,12 @@ export function DataTable<TData>({
           <div className="divide-y">
             {group.rows.map((row) => {
               const rowId = getRowId(row)
-              const accent = mobileRow.accentClass?.(row)
               const canExpand = expandable && (!expandable.canExpand || expandable.canExpand(row))
               const isExpanded = expandedRows.has(rowId)
               const sn = snByRowId.get(rowId) ?? 1
 
               const handleSelect = () => {
-                if (mobileRow.detail) setDetailRow(row)
+                if (detailConfig) setDetailRow(row)
                 else if (mobileRow.onSelect) mobileRow.onSelect(row)
                 else if (canExpand) toggleExpand(rowId)
               }
@@ -1524,7 +1549,6 @@ export function DataTable<TData>({
                     onClick={handleSelect}
                     className="hover:bg-muted/40 active:bg-muted relative flex w-full items-center gap-3 py-2.5 pr-3.5 pl-3 text-left transition-colors"
                   >
-                    {accent && <span className={cn("absolute inset-y-1 left-0 w-1 rounded-r", accent)} />}
                     {leadingContent && <span className="shrink-0">{leadingContent}</span>}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{mobileRow.title(row)}</span>
@@ -1659,7 +1683,7 @@ export function DataTable<TData>({
                       variant={action.variant ?? "default"}
                       className={cn("flex-1 gap-2", action.className)}
                     >
-                      <a href={action.href}>
+                      <a href={action.href} onClick={() => setDetailRow(null)}>
                         {Icon && <Icon className="h-4 w-4" />}
                         {action.label}
                       </a>
@@ -1669,7 +1693,10 @@ export function DataTable<TData>({
                       key={action.label}
                       variant={action.variant ?? "default"}
                       className={cn("flex-1 gap-2", action.className)}
-                      onClick={action.onClick}
+                      onClick={() => {
+                        setDetailRow(null)
+                        action.onClick?.()
+                      }}
                     >
                       {Icon && <Icon className="h-4 w-4" />}
                       {action.label}
@@ -1853,7 +1880,7 @@ export function DataTable<TData>({
               to the right edge here sit under it whenever the footer scrolls through
               that band. */}
           {pagination && totalPages > 1 && !listRendersEverything && !isLoading && !error && (
-            <div className="flex items-center gap-4 border-t px-4 py-3 text-sm">
+            <div className="flex items-center justify-between gap-4 border-t px-4 py-3 text-sm">
               <p className="text-muted-foreground">
                 Page {activePage + 1} of {totalPages}
               </p>

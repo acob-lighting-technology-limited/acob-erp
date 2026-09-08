@@ -337,14 +337,6 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (n) =>
-            n.type === "error"
-              ? "bg-red-500"
-              : n.type === "warning"
-                ? "bg-amber-500"
-                : n.type === "success"
-                  ? "bg-emerald-500"
-                  : "bg-blue-500",
           title: (n) => n.title,
           subtitle: (n) => `${n.category} · ${n.priority} · ${n.timestamp}`,
           trailing: (n) => (

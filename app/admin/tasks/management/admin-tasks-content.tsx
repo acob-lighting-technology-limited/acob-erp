@@ -27,10 +27,11 @@ import { TaskFormDialog } from "@/components/tasks/TaskFormDialog"
 import type { TaskFormState } from "@/components/tasks/TaskFormDialog"
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog"
 import { TaskReviewDecisionDialog } from "@/components/tasks/TaskReviewDecisionDialog"
-import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
@@ -515,16 +516,7 @@ export function AdminTasksContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending"
@@ -548,7 +540,6 @@ export function AdminTasksContent({
             icon={Send}
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -558,7 +549,15 @@ export function AdminTasksContent({
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Total Tasks"
+            value={stats.total}
+            icon={ClipboardList}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<Task>
@@ -681,12 +680,6 @@ export function AdminTasksContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "completed"
-              ? "bg-emerald-500"
-              : r.priority === "urgent" || r.priority === "high"
-                ? "bg-rose-500"
-                : "bg-blue-500",
           title: (r) => r.title,
           subtitle: (r) =>
             `${r.work_item_number || "Task"} · ${workflowOwnerLabel(r)} · Due ${r.due_date ? formatWATDate(r.due_date) : "No deadline"}`,
@@ -789,37 +782,39 @@ export function AdminTasksContent({
         taskToDelete={taskToDelete}
       />
 
-      <ResponsiveModal
-        open={isWorkflowOpen}
-        onOpenChange={setIsWorkflowOpen}
-        title="Tasks & PMS Governance Guide"
-        description="Understanding task lifecycles, review governance, and KPI scoring impact."
-        desktopClassName="max-w-lg"
-      >
-        <div className="space-y-3 pt-2 text-xs">
-          <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-            <p className="text-foreground font-semibold">1. Multi-Assignment & Individual Tasks</p>
-            <p className="text-muted-foreground">
-              When assigning a task to multiple team members or a whole department, individual task instances are
-              generated. Each employee has direct, separate accountability.
-            </p>
+      <Dialog open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
+        <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Tasks & PMS Governance Guide</DialogTitle>
+            <DialogDescription>
+              Understanding task lifecycles, review governance, and KPI scoring impact.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2 text-xs">
+            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
+              <p className="text-foreground font-semibold">1. Multi-Assignment & Individual Tasks</p>
+              <p className="text-muted-foreground">
+                When assigning a task to multiple team members or a whole department, individual task instances are
+                generated. Each employee has direct, separate accountability.
+              </p>
+            </div>
+            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
+              <p className="text-foreground font-semibold">2. Strategic Goal Linking (Optional)</p>
+              <p className="text-muted-foreground">
+                Tasks can be created with or without linking to strategic goals. Goal-linked tasks feed into the goal
+                achievement formula for performance reviews.
+              </p>
+            </div>
+            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
+              <p className="text-foreground font-semibold">3. Lead Review & Status Progression</p>
+              <p className="text-muted-foreground">
+                Submitted tasks require lead/admin approval to reach Completed status and award KPI points. Blocked
+                tasks can be reassigned (neutral for KPI), granted extensions, or marked failed.
+              </p>
+            </div>
           </div>
-          <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-            <p className="text-foreground font-semibold">2. Strategic Goal Linking (Optional)</p>
-            <p className="text-muted-foreground">
-              Tasks can be created with or without linking to strategic goals. Goal-linked tasks feed into the goal
-              achievement formula for performance reviews.
-            </p>
-          </div>
-          <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-            <p className="text-foreground font-semibold">3. Lead Review & Status Progression</p>
-            <p className="text-muted-foreground">
-              Submitted tasks require lead/admin approval to reach Completed status and award KPI points. Blocked tasks
-              can be reassigned (neutral for KPI), granted extensions, or marked failed.
-            </p>
-          </div>
-        </div>
-      </ResponsiveModal>
+        </DialogContent>
+      </Dialog>
     </DataTablePage>
   )
 }

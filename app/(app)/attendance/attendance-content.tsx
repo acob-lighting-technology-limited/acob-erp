@@ -23,6 +23,7 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { EmployeeCalendarView } from "./calendar-view"
 import { AppealDialog } from "./_components/appeal-dialog"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import {
   AlertDialog,
@@ -518,9 +519,11 @@ export function AttendanceContent({
   const todayHours = todayRecord?.total_hours ? `${todayRecord.total_hours.toFixed(2)} hrs` : "-"
   const todayStatus = todayRecord ? normalizeStatus(todayRecord, todayIso) : "absent"
 
-  // Computed stats from whatever rows survive the active filter
+  // Computed stats from current month workdays
   const { totalWorkedHours, totalMissedHours, attendedDays, totalWorkdays } = useMemo(() => {
-    const scorable = filteredRows.filter((row) => {
+    const currentYM = toLocalYearMonth()
+    const scorable = rows.filter((row) => {
+      if (!row.date.startsWith(currentYM)) return false
       if (isCoveredStatus(row.normalizedStatus)) return false
       // Exclude a day still in progress (clocked in today, not yet clocked out)
       if (row.date === todayIso && row.clock_in && !row.clock_out) return false
@@ -547,7 +550,7 @@ export function AttendanceContent({
       attendedDays: attended,
       totalWorkdays: scorable.length,
     }
-  }, [filteredRows, todayIso])
+  }, [rows, todayIso])
 
   function exportCSV() {
     const headers = ["Date", "Day", "Clock In", "Clock Out", "Total Hours", "Work Hour", "Status"]
@@ -608,7 +611,7 @@ export function AttendanceContent({
         actionsPlacement="inline-always"
         stats={
           <TooltipProvider>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+            <StatGrid>
               <StatCard
                 variant="compact"
                 title="Today Status"
@@ -657,27 +660,25 @@ export function AttendanceContent({
                   </p>
                 </TooltipContent>
               </Tooltip>
-              <div className="hidden sm:block">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="h-full cursor-help">
-                      <StatCard
-                        variant="compact"
-                        className="h-full"
-                        title="Missed Hours"
-                        value={`${totalMissedHours} hrs`}
-                        icon={AlertCircle}
-                        iconBgColor="bg-amber-500/10"
-                        iconColor="text-amber-500"
-                      />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-xs">Total unworked hours deducted across expected workdays.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="h-full cursor-help">
+                    <StatCard
+                      variant="compact"
+                      className="h-full"
+                      title="Missed Hours"
+                      value={`${totalMissedHours} hrs`}
+                      icon={AlertCircle}
+                      iconBgColor="bg-amber-500/10"
+                      iconColor="text-amber-500"
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="max-w-xs text-xs">Total unworked hours deducted across expected workdays.</p>
+                </TooltipContent>
+              </Tooltip>
+            </StatGrid>
           </TooltipProvider>
         }
       >
@@ -714,17 +715,10 @@ export function AttendanceContent({
             emptyIcon={Clock}
             skeletonRows={6}
             mobileRow={{
-              // The whole point of this log is spotting the days that cost you
-              // something, so those days carry an accent instead of blending in.
-              accentClass: (row) =>
-                row.normalizedStatus === "absent"
-                  ? "bg-rose-500"
-                  : ["late", "incomplete"].includes(row.normalizedStatus)
-                    ? "bg-amber-500"
-                    : undefined,
+              leading: () => null,
               title: (row) => (
                 <span className="text-foreground font-medium">
-                  {formatWATDate(row.date, { day: "numeric", month: "short", year: "numeric" })}
+                  {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                 </span>
               ),
               // Three clauses truncate on a phone before the third is readable.

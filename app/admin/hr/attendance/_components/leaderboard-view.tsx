@@ -4,14 +4,15 @@ import { useCallback, useEffect, useMemo, useState, type ComponentType } from "r
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Timer, UserX, AlertCircle, Sunrise, Sunset, FileWarning, Building2 } from "lucide-react"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
+import { cn } from "@/lib/utils"
 import {
   ATTENDANCE_TRACKING_START,
+  getAttendanceMonthOptions,
+  getAttendanceYearOptions,
   monthBounds,
   quarterBounds,
   toLocalISODate,
@@ -297,6 +298,9 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
     return visible.map((d) => ({ value: d, label: d }))
   }, [departments, lockedDepartment])
 
+  const monthOptions = useMemo(() => getAttendanceMonthOptions(), [])
+  const yearOptions = useMemo(() => getAttendanceYearOptions(), [])
+
   const rankings = useMemo(() => {
     return METRICS.map((metric) => {
       const rows = reports
@@ -420,64 +424,66 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Cycle</Label>
-            <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as "month" | "quarter" | "all")}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as "month" | "quarter" | "all")}>
+            <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Cycle">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Monthly</SelectItem>
+              <SelectItem value="quarter">Quarterly</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {periodMode === "month" && (
+            <Select value={yearMonth} onValueChange={setYearMonth}>
+              <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Month">
+                <SelectValue placeholder="Select Month" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="month">Monthly</SelectItem>
-                <SelectItem value="quarter">Quarterly</SelectItem>
-                <SelectItem value="all">All Time</SelectItem>
+                {monthOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          </div>
-          {periodMode === "month" && (
-            <div className="space-y-1">
-              <Label className="text-xs">Month</Label>
-              <Input
-                type="month"
-                value={yearMonth}
-                onChange={(e) => setYearMonth(e.target.value)}
-                className="w-[160px]"
-              />
-            </div>
           )}
+
           {periodMode === "quarter" && (
             <>
-              <div className="space-y-1">
-                <Label className="text-xs">Quarter</Label>
-                <Select value={quarter} onValueChange={(v) => setQuarter(v as Quarter)}>
-                  <SelectTrigger className="w-[100px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Q1">Q1</SelectItem>
-                    <SelectItem value="Q2">Q2</SelectItem>
-                    <SelectItem value="Q3">Q3</SelectItem>
-                    <SelectItem value="Q4">Q4</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Year</Label>
-                <Input
-                  type="number"
-                  value={quarterYear}
-                  onChange={(e) => setQuarterYear(Number(e.target.value) || quarterYear)}
-                  className="w-[100px]"
-                />
-              </div>
+              <Select value={quarter} onValueChange={(v) => setQuarter(v as Quarter)}>
+                <SelectTrigger className="h-9 w-full sm:w-[90px]" aria-label="Quarter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Q1">Q1</SelectItem>
+                  <SelectItem value="Q2">Q2</SelectItem>
+                  <SelectItem value="Q3">Q3</SelectItem>
+                  <SelectItem value="Q4">Q4</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={String(quarterYear)} onValueChange={(v) => setQuarterYear(Number(v) || quarterYear)}>
+                <SelectTrigger className="h-9 w-full sm:w-[100px]" aria-label="Year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </>
           )}
+
           {!lockedDepartment && (
-            <div className="space-y-1">
-              <Label className="text-xs">Department</Label>
+            <div className={cn(periodMode === "month" && "col-span-2 sm:col-span-1")}>
               <Select value={department} onValueChange={setDepartment}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Department">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
@@ -494,43 +500,22 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
         </div>
 
         {/* View Scope Toggle */}
-        <div className="space-y-1">
-          <Label className="text-xs">View Scope</Label>
-          <div className="bg-muted flex items-center gap-1 rounded-lg border p-1">
+        <div className="border-input bg-muted/50 flex h-9 items-center rounded-lg border p-0.5">
+          {(["individual", "department", "combined"] as const).map((scope) => (
             <button
+              key={scope}
               type="button"
-              onClick={() => setViewScope("individual")}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                viewScope === "individual"
+              onClick={() => setViewScope(scope)}
+              className={cn(
+                "flex-1 rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors sm:flex-initial",
+                viewScope === scope
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
-              }`}
+              )}
             >
-              Individual
+              {scope}
             </button>
-            <button
-              type="button"
-              onClick={() => setViewScope("department")}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                viewScope === "department"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Department
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewScope("combined")}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                viewScope === "combined"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Combined
-            </button>
-          </div>
+          ))}
         </div>
       </div>
 

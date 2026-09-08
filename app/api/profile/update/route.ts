@@ -23,7 +23,6 @@ const UpdateProfileSchema = z.object({
     .nullable()
     .optional(),
   birth_year: z.number().int().min(1900).max(2100).nullable().optional(),
-  employment_date: z.string().nullable().optional(),
 })
 
 export async function PATCH(request: Request) {
@@ -52,7 +51,6 @@ export async function PATCH(request: Request) {
     }
 
     const payload = {
-      id: user.id,
       first_name: data.first_name ?? null,
       last_name: data.last_name ?? null,
       other_names: data.other_names ?? null,
@@ -67,11 +65,10 @@ export async function PATCH(request: Request) {
       bank_account_name: data.bank_account_name ?? null,
       birthday: data.birthday ?? null,
       birth_year: data.birth_year ?? null,
-      employment_date: data.employment_date ?? null,
       updated_at: new Date().toISOString(),
     }
 
-    const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" })
+    const { error } = await supabase.from("profiles").update(payload).eq("id", user.id)
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }

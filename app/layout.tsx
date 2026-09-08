@@ -22,6 +22,21 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "Matrix",
   description: "Matrix — the internal workspace platform for ACOB Lighting Technology Limited",
+  applicationName: "Matrix",
+  manifest: "/manifest.webmanifest",
+  // iOS ignores the manifest's icons and name for home-screen installs, so the
+  // Apple-specific tags below are what actually control the installed app.
+  appleWebApp: {
+    capable: true,
+    title: "Matrix",
+    // "default" keeps the status bar opaque so iOS lays content out below it.
+    // "black-translucent" would render the header under the notch, because
+    // nothing in the app pads for env(safe-area-inset-top) yet.
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 }
 
 export const viewport: Viewport = {
@@ -29,6 +44,15 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Standalone mode paints the status bar and gesture area with this, so it
+  // has to track the active theme or one of the two modes looks wrong.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f1f0ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#080707" },
+  ],
+  // Fills the iOS safe areas (notch / home indicator) once the app runs
+  // full-screen, which only happens after Add to Home Screen.
+  viewportFit: "cover",
 }
 
 async function HeaderWrapperWithData() {

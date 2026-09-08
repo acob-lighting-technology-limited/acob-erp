@@ -13,6 +13,7 @@ import { useDepartments } from "@/hooks/use-departments"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { formatName } from "@/lib/utils"
 import { logger } from "@/lib/logger"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -455,15 +456,7 @@ export function AdminReferenceGeneratorContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
-          <StatCard
-            variant="compact"
-            title="Total"
-            value={stats.total}
-            icon={FileText}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Under Review"
@@ -487,9 +480,16 @@ export function AdminReferenceGeneratorContent({
             icon={ShieldCheck}
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
-            className="hidden sm:block"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Total"
+            value={stats.total}
+            icon={FileText}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<CorrespondenceRecord>
@@ -576,14 +576,6 @@ export function AdminReferenceGeneratorContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "approved"
-              ? "bg-emerald-500"
-              : r.status === "rejected"
-                ? "bg-rose-500"
-                : r.status === "under_review"
-                  ? "bg-blue-500"
-                  : "bg-amber-500",
           title: (r) => `${r.reference_number} · ${r.subject}`,
           subtitle: (r) =>
             `${r.department_name || r.assigned_department_name || "No dept"} · ${r.recipient_name || "No recipient"} · ${formatWATDate(r.created_at)}`,

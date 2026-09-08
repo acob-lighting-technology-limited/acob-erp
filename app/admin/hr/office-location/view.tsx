@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle, Mail, MapPin, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
@@ -479,7 +480,7 @@ export function OfficeLocationsPage({
         ) : null
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Spaces"
@@ -513,7 +514,7 @@ export function OfficeLocationsPage({
             iconColor="text-violet-500"
             className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<OfficeLocation>
@@ -592,7 +593,6 @@ export function OfficeLocationsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (location) => (location.is_active ? "bg-emerald-500" : "bg-slate-400"),
           title: (location) => location.name,
           subtitle: (location) =>
             `${OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type} · ${location.department || "All Departments"} · ${location.employee_count || 0} employees`,

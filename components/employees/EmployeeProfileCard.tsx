@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { User, Mail, Phone, Building2, MapPin, Shield, Calendar } from "lucide-react"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatWATDate, formatDDMMYYYY } from "@/lib/utils/date"
 import type { UserRole } from "@/types/database"
 import type { UserProfile } from "./employee-detail-types"
 
@@ -130,6 +130,26 @@ export function EmployeeProfileCard({ profile, fullName, initials }: EmployeePro
               </div>
             </div>
           )}
+
+          {profile.employment_date && (
+            <div className="flex items-center gap-3">
+              <Calendar className="text-muted-foreground h-5 w-5" />
+              <div>
+                <p className="text-muted-foreground text-sm">Employment Date</p>
+                <p className="font-medium">{formatDDMMYYYY(profile.employment_date)}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Calendar className="text-muted-foreground h-5 w-5" />
+            <div>
+              <p className="text-muted-foreground text-sm">Confirmation Date</p>
+              <p className="font-medium">
+                {profile.confirmation_date ? formatDDMMYYYY(profile.confirmation_date) : "Probation (Pending)"}
+              </p>
+            </div>
+          </div>
 
           <div className="flex items-center gap-3">
             <Calendar className="text-muted-foreground h-5 w-5" />

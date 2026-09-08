@@ -1,16 +1,30 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDateTime, formatWATRelative, toLocalISODate } from "@/lib/utils/date"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cn } from "@/lib/utils"
-import { Download, RefreshCw, Users, UserCheck, UserX } from "lucide-react"
+import {
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Download,
+  IdCard,
+  Mail,
+  RefreshCw,
+  Shield,
+  UserCheck,
+  Users,
+  UserX,
+} from "lucide-react"
 
 export interface OnboardingRow {
   id: string
@@ -22,6 +36,7 @@ export interface OnboardingRow {
   designation: string | null
   role: string
   employment_status: string
+  avatar_url?: string | null
   has_signed_in: boolean
   last_sign_in_at: string | null
   first_sign_in_at: string | null
@@ -30,6 +45,38 @@ export interface OnboardingRow {
   email_confirmed: boolean
   account_created_at: string | null
   profile_created_at: string
+}
+
+const AVATAR_SIZES = {
+  sm: "h-8 w-8 text-xs",
+  md: "h-10 w-10 text-sm",
+  lg: "h-12 w-12 text-base",
+  xl: "h-16 w-16 text-xl",
+} as const
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return (name.slice(0, 2) || "AC").toUpperCase()
+}
+
+function OnboardingAvatar({ row, size = "md" }: { row: OnboardingRow; size?: keyof typeof AVATAR_SIZES }) {
+  const name = row.full_name || row.email || "User"
+  return (
+    <span
+      className={cn(
+        "bg-primary/10 text-primary flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold",
+        AVATAR_SIZES[size]
+      )}
+    >
+      {row.avatar_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={row.avatar_url} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        getInitials(name)
+      )}
+    </span>
+  )
 }
 
 interface OnboardingMeta {
@@ -108,17 +155,40 @@ export function OnboardingContent() {
   const rows = useMemo(() => data?.rows ?? [], [data])
   const meta = data?.meta ?? null
 
+  type OnboardingTab = "signed_in" | "never" | "all"
+  const [activeTab, setActiveTab] = useState<OnboardingTab>("signed_in")
+
   const stats = useMemo(() => {
     // Exited staff are gone, not "not yet onboarded" — excluded so they don't
     // inflate "Never Signed In" with people who will never sign in again.
     const current = rows.filter((row) => row.employment_status !== "exited")
     const total = current.length
-    const onboardable = current.filter((row) => row.email && row.email.trim() !== "").length
     const signedIn = current.filter((row) => row.has_signed_in).length
-    const neverSignedIn = onboardable - signedIn
-    const rate = onboardable > 0 ? Math.round((signedIn / onboardable) * 100) : 0
-    return { total, onboardable, signedIn, neverSignedIn, rate }
+    const eligible = current.filter((row) => row.email && row.email.trim() !== "")
+    const neverSignedIn = eligible.filter((row) => !row.has_signed_in).length
+    return { total, signedIn, neverSignedIn }
   }, [rows])
+
+  const tabs: DataTableTab[] = useMemo(
+    () => [
+      { key: "signed_in", label: `Signed In (${stats.signedIn})`, icon: CheckCircle2 },
+      { key: "never", label: `Never (${stats.neverSignedIn})`, icon: UserX },
+      { key: "all", label: `All (${rows.length})`, icon: Users },
+    ],
+    [stats, rows.length]
+  )
+
+  const scopedRows = useMemo(() => {
+    if (activeTab === "signed_in") {
+      return rows.filter((r) => r.employment_status !== "exited" && r.has_signed_in)
+    }
+    if (activeTab === "never") {
+      return rows.filter(
+        (r) => r.employment_status !== "exited" && !r.has_signed_in && r.email && r.email.trim() !== ""
+      )
+    }
+    return rows
+  }, [rows, activeTab])
 
   const departmentOptions = useMemo(
     () =>
@@ -154,9 +224,12 @@ export function OnboardingContent() {
         resizable: true,
         initialWidth: 240,
         render: (row) => (
-          <div className="space-y-1">
-            <p className="font-medium">{row.full_name}</p>
-            <p className="text-muted-foreground text-xs">{row.employee_number || "No employee number"}</p>
+          <div className="flex items-center gap-2.5">
+            <OnboardingAvatar row={row} size="sm" />
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate font-medium">{row.full_name}</span>
+              <span className="text-muted-foreground font-mono text-xs">{row.employee_number || "—"}</span>
+            </div>
           </div>
         ),
       },
@@ -166,8 +239,8 @@ export function OnboardingContent() {
         sortable: true,
         accessor: (row) => row.email,
         resizable: true,
-        initialWidth: 260,
-        render: (row) => <span className="text-sm break-all">{row.email || "-"}</span>,
+        initialWidth: 240,
+        render: (row) => <span className="text-muted-foreground text-sm break-all">{row.email || "—"}</span>,
       },
       {
         key: "signed_in",
@@ -179,19 +252,6 @@ export function OnboardingContent() {
             <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600">Signed in</Badge>
           ) : (
             <Badge className="border-red-500/20 bg-red-500/10 text-red-600">Never signed in</Badge>
-          ),
-      },
-      {
-        key: "first_sign_in_at",
-        label: "First Sign-in",
-        sortable: true,
-        accessor: (row) => row.first_sign_in_at || "",
-        hideOnMobile: true,
-        render: (row) =>
-          row.first_sign_in_at ? (
-            <span className="text-sm">{formatWATDateTime(row.first_sign_in_at)}</span>
-          ) : (
-            <span className="text-muted-foreground">—</span>
           ),
       },
       {
@@ -208,6 +268,20 @@ export function OnboardingContent() {
           ),
       },
       {
+        key: "first_sign_in_at",
+        label: "First Sign-in",
+        sortable: true,
+        accessor: (row) => row.first_sign_in_at || "",
+        hideOnMobile: true,
+        defaultVisible: false,
+        render: (row) =>
+          row.first_sign_in_at ? (
+            <span className="text-sm">{formatWATDateTime(row.first_sign_in_at)}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
         key: "department",
         label: "Department",
         sortable: true,
@@ -215,7 +289,6 @@ export function OnboardingContent() {
         hideOnMobile: true,
         render: (row) => row.department || "—",
       },
-
       {
         key: "employment_status",
         label: "Employment",
@@ -225,20 +298,21 @@ export function OnboardingContent() {
         defaultVisible: false,
         render: (row) => <span className="capitalize">{row.employment_status.replace(/_/g, " ")}</span>,
       },
+      {
+        key: "role",
+        label: "Role",
+        sortable: true,
+        accessor: (row) => row.role,
+        hideOnMobile: true,
+        defaultVisible: false,
+        render: (row) => <span className="capitalize">{row.role.replace(/_/g, " ")}</span>,
+      },
     ],
     []
   )
 
   const filters = useMemo<DataTableFilter<OnboardingRow>[]>(
     () => [
-      {
-        key: "signed_in",
-        label: "Sign-in Status",
-        options: [
-          { value: "Signed in", label: "Signed in" },
-          { value: "Never signed in", label: "Never signed in" },
-        ],
-      },
       {
         key: "department",
         label: "Department",
@@ -253,25 +327,13 @@ export function OnboardingContent() {
         key: "employment_status",
         label: "Employment Status",
         options: employmentStatusOptions,
-        defaultValues: ["active", "contract"],
-      },
-      {
-        key: "has_email",
-        label: "Email Presence",
-        options: [
-          { value: "With Email", label: "With Email" },
-          { value: "Without Email", label: "Without Email" },
-        ],
-        defaultValues: ["With Email"],
-        filterFn: (row, selected) =>
-          selected.includes(row.email && row.email.trim() !== "" ? "With Email" : "Without Email"),
       },
     ],
     [departmentOptions, employmentStatusOptions, roleOptions]
   )
 
   const exportCsv = () => {
-    const csv = toCsv(rows)
+    const csv = toCsv(scopedRows)
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
@@ -287,6 +349,9 @@ export function OnboardingContent() {
       description="Every staff profile, including not-yet-onboarded placeholders, and whether the person has ever signed in."
       icon={UserCheck}
       backLink={{ href: "/admin", label: "Back to Admin" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as OnboardingTab)}
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -294,44 +359,35 @@ export function OnboardingContent() {
             size="sm"
             onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOnboarding() })}
             disabled={isLoading}
+            className="h-8 gap-1.5 sm:gap-2"
           >
-            <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
-            Refresh
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button size="sm" onClick={exportCsv} disabled={rows.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
+          <Button size="sm" onClick={exportCsv} disabled={scopedRows.length === 0} className="h-8 gap-1.5 sm:gap-2">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export CSV</span>
+            <span className="sm:hidden">Export</span>
           </Button>
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
-            title="Profiles"
+            title="Total Profiles"
             value={stats.total}
             icon={Users}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
-            description="All profile records, including not-yet-onboarded placeholders"
-          />
-          <StatCard
-            variant="compact"
-            title="Onboardable"
-            value={stats.onboardable}
-            icon={UserCheck}
-            iconBgColor="bg-indigo-500/10"
-            iconColor="text-indigo-500"
-            description="Have an email and can sign in"
           />
           <StatCard
             variant="compact"
             title="Signed In"
             value={stats.signedIn}
-            icon={UserCheck}
+            icon={CheckCircle2}
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
-            description={`${stats.rate}% of onboardable`}
           />
           <StatCard
             variant="compact"
@@ -340,21 +396,13 @@ export function OnboardingContent() {
             icon={UserX}
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
-            description="Onboardable but haven't logged in yet"
           />
-        </div>
+        </StatGrid>
       }
     >
       <div className="space-y-4">
-        {meta && !meta.authSourceAvailable ? (
-          <p className="text-muted-foreground text-xs">
-            The auth service could not be read, so sign-in status falls back to in-app login logs only. Anyone whose
-            last sign-in predates login logging will be shown as never signed in.
-          </p>
-        ) : null}
-
         <DataTable<OnboardingRow>
-          data={rows}
+          data={scopedRows}
           columns={columns}
           filters={filters}
           getRowId={(row) => row.id}
@@ -422,10 +470,9 @@ export function OnboardingContent() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) => (row.has_signed_in ? "bg-emerald-500" : "bg-red-500"),
+            leading: (row) => <OnboardingAvatar row={row} size="sm" />,
             title: (row) => row.full_name,
-            subtitle: (row) =>
-              `${row.email || "No email"} · ${row.department || "No dept"} · ${row.employee_number || "No ID"}`,
+            subtitle: (row) => [row.department, row.employee_number || row.email].filter(Boolean).join(" · ") || "—",
             trailing: (row) =>
               row.has_signed_in ? (
                 <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
@@ -434,13 +481,70 @@ export function OnboardingContent() {
               ) : (
                 <Badge className="border-red-500/20 bg-red-500/10 text-[10px] text-red-600">Never</Badge>
               ),
+            detail: {
+              title: (row) => row.full_name,
+              subtitle: (row) => [row.designation, row.department].filter(Boolean).join(" · ") || "Staff Profile",
+              avatar: (row) => <OnboardingAvatar row={row} size="xl" />,
+              badges: (row) =>
+                row.has_signed_in ? (
+                  <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600">Signed in</Badge>
+                ) : (
+                  <Badge className="border-red-500/20 bg-red-500/10 text-red-600">Never signed in</Badge>
+                ),
+              fields: (row) => [
+                { icon: Mail, label: "Email", value: row.email || "—", fullWidth: true, copyable: Boolean(row.email) },
+                {
+                  icon: Mail,
+                  label: "Alt. Email",
+                  value: row.additional_email || "—",
+                  muted: !row.additional_email,
+                  fullWidth: true,
+                  copyable: Boolean(row.additional_email),
+                },
+                { icon: Building2, label: "Department", value: row.department || "—" },
+                {
+                  icon: IdCard,
+                  label: "Staff ID",
+                  value: row.employee_number || "—",
+                  copyable: Boolean(row.employee_number),
+                },
+                { icon: Shield, label: "Role", value: row.role.replace(/_/g, " ") },
+                { icon: UserCheck, label: "Employment", value: row.employment_status.replace(/_/g, " ") },
+                {
+                  icon: Calendar,
+                  label: "First Sign-in",
+                  value: row.first_sign_in_at ? formatWATDateTime(row.first_sign_in_at) : "Not recorded",
+                },
+                {
+                  icon: Calendar,
+                  label: "Last Sign-in",
+                  value: row.last_sign_in_at ? formatWATDateTime(row.last_sign_in_at) : "Not recorded",
+                },
+                {
+                  icon: Clock,
+                  label: "Recorded Sign-ins",
+                  value:
+                    row.sign_in_count > 0
+                      ? `${row.sign_in_count}${row.last_auth_method ? ` via ${row.last_auth_method}` : ""}`
+                      : "0",
+                },
+                {
+                  icon: Calendar,
+                  label: "Account Created",
+                  value: formatWATDateTime(row.account_created_at || row.profile_created_at),
+                },
+              ],
+            },
           }}
           cardRenderer={(row) => (
-            <div className="space-y-3 rounded-xl border p-4">
+            <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{row.full_name}</p>
-                  <p className="text-muted-foreground text-sm break-all">{row.email}</p>
+                <div className="flex items-center gap-2.5">
+                  <OnboardingAvatar row={row} size="md" />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{row.full_name}</p>
+                    <p className="text-muted-foreground truncate text-xs">{row.email || "No email"}</p>
+                  </div>
                 </div>
                 {row.has_signed_in ? (
                   <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600">Signed in</Badge>
@@ -448,10 +552,14 @@ export function OnboardingContent() {
                   <Badge className="border-red-500/20 bg-red-500/10 text-red-600">Never</Badge>
                 )}
               </div>
-              <div className="grid gap-1 text-sm">
+              <div className="grid gap-1 border-t pt-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Department</span>
                   <span>{row.department || "—"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Staff ID</span>
+                  <span className="font-mono">{row.employee_number || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Last sign-in</span>

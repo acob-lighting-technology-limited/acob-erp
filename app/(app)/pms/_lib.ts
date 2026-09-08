@@ -83,22 +83,28 @@ export async function getCurrentUserPmsData(cycleId?: string) {
 
   const score = await computeIndividualPerformanceScore(supabase, { userId: user.id, cycleId })
 
-  let attendanceQuery = supabase
-    .from("attendance_records")
-    .select("id, date, clock_in, clock_out, total_hours, status")
-    .eq("user_id", user.id)
-    .order("date", { ascending: false })
+  let recentAttendance: AttendanceRow[] = []
 
-  if (score.cycle_start_date && score.cycle_end_date) {
-    attendanceQuery = attendanceQuery.gte("date", score.cycle_start_date).lte("date", score.cycle_end_date)
+  if (score.breakdown.attendance.records && score.breakdown.attendance.records.length > 0) {
+    recentAttendance = score.breakdown.attendance.records
   } else {
-    attendanceQuery = attendanceQuery.limit(100)
+    let attendanceQuery = supabase
+      .from("attendance_records")
+      .select("id, date, clock_in, clock_out, total_hours, status")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+
+    if (score.cycle_start_date && score.cycle_end_date) {
+      attendanceQuery = attendanceQuery.gte("date", score.cycle_start_date).lte("date", score.cycle_end_date)
+    } else {
+      attendanceQuery = attendanceQuery.limit(100)
+    }
+
+    const { data: attendance } = await attendanceQuery.returns<AttendanceRow[]>()
+    recentAttendance = attendance || []
   }
 
-  const { data: attendance } = await attendanceQuery.returns<AttendanceRow[]>()
-
   const goalRows = goals || []
-  const recentAttendance = attendance || []
   const cycles: ReviewCycleOption[] = (cycleRows || []).map((c) => ({
     id: c.id,
     name: c.name || "Review Cycle",
@@ -126,10 +132,8 @@ export async function getCurrentUserPmsData(cycleId?: string) {
     },
     attendance: {
       recent: recentAttendance,
-      presentDays: recentAttendance.filter((record) =>
-        ["present", "wfh", "remote"].includes(String(record.status || "").toLowerCase())
-      ).length,
-      trackedDays: recentAttendance.length,
+      presentDays: score.breakdown.attendance.present,
+      trackedDays: score.breakdown.attendance.total,
     },
     latestReview: latestReview?.[0] ?? null,
   }

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { DataTablePage } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -352,7 +353,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
       icon={Calculator}
       backLink={{ href: "/admin/payroll", label: "Back to Payroll" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Altered Monthly Gross"
@@ -399,7 +400,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <div className="space-y-6">

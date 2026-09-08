@@ -13,6 +13,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -132,7 +133,7 @@ export default async function ListPage() {
       />
 
       {/* Stats Section */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <StatGrid>
         <StatCard
           title="Total Items"
           value={pageData.stats.total}
@@ -147,7 +148,7 @@ export default async function ListPage() {
           iconBgColor="bg-green-100 dark:bg-green-900/30"
           iconColor="text-green-600 dark:text-green-400"
         />
-      </div>
+      </StatGrid>
 
       {/* Filters Section */}
       <Card>

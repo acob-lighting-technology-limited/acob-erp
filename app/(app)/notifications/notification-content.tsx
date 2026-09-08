@@ -466,8 +466,6 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (n) =>
-            !n.read && (n.priority === "urgent" || n.priority === "high") ? "bg-rose-500" : undefined,
           leading: (n) => {
             const Icon = TYPE_ICONS[n.type as NotificationType] || Info
             return (

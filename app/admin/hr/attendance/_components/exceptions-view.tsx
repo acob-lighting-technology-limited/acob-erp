@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Clock, AlertTriangle, XCircle, FileText, Pencil, Building, MessageSquare, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { toLocalISODate, monthBounds, toLocalYearMonth, isLate } from "@/lib/hr/attendance-utils"
@@ -294,7 +295,7 @@ export function ExceptionsView({ departments, lockedDepartment }: ExceptionsView
   return (
     <>
       {/* Stats */}
-      <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+      <StatGrid className="mb-4">
         <StatCard
           variant="compact"
           title="Late"
@@ -319,7 +320,7 @@ export function ExceptionsView({ departments, lockedDepartment }: ExceptionsView
           iconBgColor="bg-red-500/10"
           iconColor="text-red-500"
         />
-      </div>
+      </StatGrid>
 
       {/* Date range controls */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -363,8 +364,6 @@ export function ExceptionsView({ departments, lockedDepartment }: ExceptionsView
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "late" ? "bg-amber-500" : r.status === "absent" ? "bg-red-500" : "bg-cyan-500",
           title: (r) => `${r.user_name} · ${r.date}`,
           subtitle: (r) => `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)}`,
           trailing: (r) => issueBadge(r),

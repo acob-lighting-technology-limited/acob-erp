@@ -8,6 +8,7 @@ import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { exportPmsRowsToExcel } from "@/lib/pms/export"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
@@ -284,7 +285,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total"
@@ -318,7 +319,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<PeerFeedbackRow>
@@ -376,7 +377,6 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) => (row.score >= 70 ? "bg-emerald-500" : "bg-amber-500"),
           title: (row) => `${formatName(row.subject)} (by ${formatName(row.reviewer)})`,
           subtitle: (row) =>
             `${row.subject?.department || "No dept"} · ${cycleNameMap.get(row.review_cycle_id) || "No cycle"} · Score: ${row.score}%`,

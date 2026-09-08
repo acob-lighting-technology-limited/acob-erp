@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
 import { averageCappedPct, ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
@@ -238,7 +239,7 @@ export function DepartmentCascadeContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Department Attainment"
@@ -259,7 +260,7 @@ export function DepartmentCascadeContent({
             value={`${recordedCount}/${coreRows.length}`}
             description="CORE KPIs with an actual"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<CascadeRow>
@@ -315,7 +316,6 @@ export function DepartmentCascadeContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) => (r.role === "core" ? "bg-emerald-500" : "bg-blue-500"),
           title: (r) => r.measure,
           subtitle: (r) =>
             `${r.role.toUpperCase()} · ${r.perspective} · Attainment: ${r.capped_pct != null ? `${r.capped_pct}%` : "-"}`,

@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 
@@ -309,7 +310,7 @@ export function AssetIssuesPage({
       icon={AlertCircle}
       backLink={{ href: backLinkHref ?? "/admin/assets", label: "Back to Assets" }}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Issues"
@@ -341,9 +342,8 @@ export function AssetIssuesPage({
             icon={Package}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<AssetIssue>
@@ -391,7 +391,6 @@ export function AssetIssuesPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (issue) => (issue.resolved ? "bg-emerald-500" : "bg-amber-500"),
           title: (issue) => `${issue.asset?.unique_code || "Asset"} · ${issue.description}`,
           subtitle: (issue) => `Assigned: ${assignedTo(issue)} · Reported: ${formatWATDate(issue.created_at)}`,
           trailing: (issue) => (

@@ -18,6 +18,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { Switch } from "@/components/ui/switch"
 import type { Database } from "@/types/database"
+import { formatDDMMYYYY } from "@/lib/utils/date"
 
 type ProfileRecord = Database["public"]["Tables"]["profiles"]["Row"] & {
   email_notifications?: boolean | null
@@ -48,12 +49,11 @@ const ProfileFormSchema = z
     bankAccountName: z.string().optional(),
     birthday: z.string().optional(),
     birthYear: z.string().optional(),
-    employmentDate: z.string().optional(),
     emailNotifications: z.boolean(),
   })
   .refine((data) => !data.additionalPhone || data.additionalPhone !== data.phoneNumber, {
     path: ["additionalPhone"],
-    message: "Additional phone number must be different from main phone number",
+    message: "Additional phone number must be different from primary phone number",
   })
 
 type ProfileFormValues = z.infer<typeof ProfileFormSchema>
@@ -78,7 +78,6 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
       bankAccountName: profile?.bank_account_name || "",
       birthday: profile?.birthday || "",
       birthYear: profile?.birth_year != null ? String(profile.birth_year) : "",
-      employmentDate: profile?.employment_date ? profile.employment_date.substring(0, 10) : "",
       emailNotifications: profile?.email_notifications ?? true,
     },
   })
@@ -106,7 +105,6 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
       bank_name: data.bankName,
       bank_account_number: data.bankAccountNumber,
       bank_account_name: data.bankAccountName,
-      employment_date: data.employmentDate || null,
       email_notifications: data.emailNotifications,
       updated_at: new Date().toISOString(),
     }
@@ -313,9 +311,36 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                   />
                   <p className="text-muted-foreground text-xs">Year is optional — leave it blank if you prefer.</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="employmentDate">Employment Date</Label>
-                  <Input id="employmentDate" type="date" {...form.register("employmentDate")} />
+                <div className="space-y-3 sm:col-span-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="employmentDateDisplay" className="text-muted-foreground text-xs font-medium">
+                        Employment Date
+                      </Label>
+                      <Input
+                        id="employmentDateDisplay"
+                        value={formatDDMMYYYY(profile?.employment_date) || "Not recorded"}
+                        disabled
+                        readOnly
+                        className="bg-muted/40 cursor-not-allowed font-mono text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="confirmationDateDisplay" className="text-muted-foreground text-xs font-medium">
+                        Confirmation Date
+                      </Label>
+                      <Input
+                        id="confirmationDateDisplay"
+                        value={formatDDMMYYYY(profile?.confirmation_date) || "Not Yet Due"}
+                        disabled
+                        readOnly
+                        className="bg-muted/40 cursor-not-allowed font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground text-[11px]">
+                    Official employment and confirmation dates are managed strictly by HR/Admin.
+                  </p>
                 </div>
               </div>
             </div>

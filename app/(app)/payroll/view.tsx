@@ -4,6 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import { DataTablePage, DataTable } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { FileText, Eye, Printer, DollarSign, Calendar, Receipt } from "lucide-react"
@@ -93,7 +94,7 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
   const fmtEntry = (v: number | string) => fmt(Number(v))
 
   const stats = (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <StatGrid>
       <StatCard
         variant="compact"
         title="Latest Net Pay"
@@ -118,7 +119,7 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
         iconBgColor="bg-amber-500/10"
         iconColor="text-amber-500"
       />
-    </div>
+    </StatGrid>
   )
 
   // Render from the immutable breakdown snapshot captured at publish time.

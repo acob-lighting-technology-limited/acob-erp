@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { DataTablePage, DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -100,6 +101,54 @@ export interface AdminLunchMenu extends LunchMenu {
   reviews?: { id: string; rating: number; comment: string | null; created_at: string }[]
   viewers?: LunchMenuViewRecord[]
   view_count?: number
+}
+
+export type MenuEffectiveStatus = "draft" | "voting_open" | "deadline_passed" | "closed" | "cancelled"
+
+export function getMenuStatusInfo(menu: { status: string; archived_at?: string | null; votingOpen?: boolean }): {
+  key: MenuEffectiveStatus
+  label: string
+  tone: string
+  accentClass: string
+} {
+  if (menu.archived_at) {
+    return {
+      key: "cancelled",
+      label: "Cancelled",
+      tone: "border border-border/80 bg-muted/60 text-muted-foreground hover:bg-muted/80 shadow-none",
+      accentClass: "bg-slate-400",
+    }
+  }
+  if (menu.status === "draft") {
+    return {
+      key: "draft",
+      label: "Draft",
+      tone: "border border-border/80 bg-muted/60 text-muted-foreground hover:bg-muted/80 shadow-none",
+      accentClass: "bg-slate-400 dark:bg-slate-600",
+    }
+  }
+  if (menu.status === "closed") {
+    return {
+      key: "closed",
+      label: "Closed",
+      tone: "border-0 bg-red-500/10 text-red-500 hover:bg-red-500/20 shadow-none",
+      accentClass: "bg-red-500",
+    }
+  }
+  if (menu.votingOpen) {
+    return {
+      key: "voting_open",
+      label: "Voting open",
+      tone: "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 shadow-none",
+      accentClass: "bg-emerald-500",
+    }
+  }
+  return {
+    key: "deadline_passed",
+    label: "Deadline passed",
+    tone: "border-0 bg-amber-500/10 text-amber-600 dark:text-amber-500 hover:bg-amber-500/20 shadow-none",
+    accentClass: "bg-amber-500",
+  }
 }
 
 export interface LunchSummaryRow {
@@ -885,25 +934,9 @@ export function LunchRegisterPage({
     {
       key: "status",
       label: "Status",
-      accessor: (row) => row.status,
+      accessor: (row) => getMenuStatusInfo(row).label,
       render: (row) => {
-        if (row.archived_at) {
-          return <Badge className="border bg-gray-100 text-gray-500 hover:bg-gray-100/80">Cancelled</Badge>
-        }
-        const tone =
-          row.status === "published" && row.votingOpen
-            ? "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-            : row.status === "draft"
-              ? "border bg-gray-100 text-gray-500 hover:bg-gray-100/80"
-              : "border-0 bg-red-500/10 text-red-500 hover:bg-red-500/20"
-        const label =
-          row.status === "draft"
-            ? "Draft"
-            : row.status === "closed"
-              ? "Closed"
-              : row.votingOpen
-                ? "Voting open"
-                : "Deadline passed"
+        const { label, tone } = getMenuStatusInfo(row)
         return <Badge className={tone}>{label}</Badge>
       },
     },
@@ -972,10 +1005,24 @@ export function LunchRegisterPage({
       key: "status",
       label: "Status",
       options: [
+        { value: "voting_open", label: "Voting open" },
+        { value: "deadline_passed", label: "Deadline passed" },
         { value: "draft", label: "Draft" },
-        { value: "published", label: "Published" },
         { value: "closed", label: "Closed" },
+        { value: "cancelled", label: "Cancelled" },
       ],
+      mode: "custom" as const,
+      filterFn: (row, selectedValues) => {
+        if (selectedValues.length === 0) return true
+        const status = getMenuStatusInfo(row)
+        if (
+          selectedValues.includes("published") &&
+          (status.key === "voting_open" || status.key === "deadline_passed")
+        ) {
+          return true
+        }
+        return selectedValues.includes(status.key)
+      },
     },
     {
       key: "has_votes",
@@ -1260,7 +1307,7 @@ export function LunchRegisterPage({
       onTabChange={(t) => setActiveTab(t as LunchTab)}
       stats={
         activeTab === "summary" ? (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Total Meals Registered"
@@ -1276,7 +1323,6 @@ export function LunchRegisterPage({
               icon={Settings}
               iconBgColor="bg-violet-500/10"
               iconColor="text-violet-500"
-              className="hidden sm:block"
             />
             <StatCard
               variant="compact"
@@ -1294,7 +1340,7 @@ export function LunchRegisterPage({
               iconBgColor="bg-emerald-500/10"
               iconColor="text-emerald-500"
             />
-          </div>
+          </StatGrid>
         ) : undefined
       }
       actions={
@@ -1436,7 +1482,7 @@ export function LunchRegisterPage({
     >
       {activeTab === "menus" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Menus Published"
@@ -1470,7 +1516,7 @@ export function LunchRegisterPage({
               iconBgColor="bg-violet-500/10"
               iconColor="text-violet-500"
             />
-          </div>
+          </StatGrid>
 
           <DataTable<AdminLunchMenu>
             data={menus}
@@ -1479,7 +1525,11 @@ export function LunchRegisterPage({
             searchPlaceholder="Search a dish…"
             searchFn={(row, q) => {
               const needle = q.toLowerCase()
-              return row.groups.some((g) => g.options.some((o) => o.name.toLowerCase().includes(needle)))
+              return (
+                row.groups.some((g) => g.options.some((o) => o.name.toLowerCase().includes(needle))) ||
+                getMenuStatusInfo(row).label.toLowerCase().includes(needle) ||
+                formatWATDate(row.date).toLowerCase().includes(needle)
+              )
             }}
             filters={menuFilters}
             isLoading={fetchingMenus}
@@ -1490,26 +1540,35 @@ export function LunchRegisterPage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              accentClass: (row) =>
-                row.archived_at ? "bg-slate-400" : row.votingOpen ? "bg-emerald-500" : "bg-blue-500",
-              title: (row) => formatWATDate(row.date),
+              title: (row) =>
+                formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
               subtitle: (row) => `${row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}`,
-              trailing: (row) => (
-                <Badge variant={row.votingOpen ? "default" : "secondary"} className="text-[10px]">
-                  {row.votingOpen ? "Voting Open" : row.status}
-                </Badge>
-              ),
+              trailing: (row) => {
+                const status = getMenuStatusInfo(row)
+                return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+              },
               detail: {
-                title: (row) => `Lunch Menu: ${formatWATDate(row.date)}`,
-                subtitle: (row) => (row.votingOpen ? "Voting is currently open" : `Status: ${row.status}`),
-                badges: (row) => (
-                  <Badge variant={row.votingOpen ? "default" : "secondary"} className="text-[10px]">
-                    {row.votingOpen ? "Voting Open" : row.status}
-                  </Badge>
-                ),
+                title: (row) =>
+                  `Lunch Menu: ${formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}`,
+                subtitle: (row) => {
+                  const status = getMenuStatusInfo(row)
+                  return row.votingOpen ? "Voting is currently open" : `Status: ${status.label}`
+                },
+                badges: (row) => {
+                  const status = getMenuStatusInfo(row)
+                  return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+                },
                 fields: (row) => [
-                  { label: "Date", value: formatWATDate(row.date) },
-                  { label: "Status", value: row.status },
+                  {
+                    label: "Date",
+                    value: formatWATDate(row.date, {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  },
+                  { label: "Status", value: getMenuStatusInfo(row).label },
                   { label: "Categories", value: `${row.groups.length} group(s)` },
                   {
                     label: "Menu Items",
@@ -1531,27 +1590,30 @@ export function LunchRegisterPage({
                 ],
               },
             }}
-            cardRenderer={(row) => (
-              <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">{formatWATDate(row.date)}</p>
+            cardRenderer={(row) => {
+              const status = getMenuStatusInfo(row)
+              return (
+                <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                    <Badge className={status.tone}>{status.label}</Badge>
                   </div>
-                  <Badge variant={row.votingOpen ? "default" : "secondary"}>
-                    {row.votingOpen ? "Voting Open" : row.status}
-                  </Badge>
+                  <div className="text-muted-foreground line-clamp-2 text-xs">
+                    {row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}
+                  </div>
+                  <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+                    <span className="text-muted-foreground">{row.votes.length} votes cast</span>
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setEditingMenu(row)}>
+                      Edit
+                    </Button>
+                  </div>
                 </div>
-                <div className="text-muted-foreground line-clamp-2 text-xs">
-                  {row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}
-                </div>
-                <div className="flex items-center justify-between border-t pt-2 text-[10px]">
-                  <span className="text-muted-foreground">{row.votes.length} votes cast</span>
-                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setEditingMenu(row)}>
-                    Edit
-                  </Button>
-                </div>
-              </div>
-            )}
+              )
+            }}
             expandable={{ render: (row) => <MenuVotesPanel menu={row} totalStaff={employees.length} /> }}
             rowActions={[
               {
@@ -1618,7 +1680,7 @@ export function LunchRegisterPage({
       {activeTab === "daily" && (
         <div className="space-y-4">
           {/* Daily Stats Cards (Always Visible) */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Total Meals Registered"
@@ -1651,7 +1713,7 @@ export function LunchRegisterPage({
               iconBgColor="bg-emerald-500/10"
               iconColor="text-emerald-500"
             />
-          </div>
+          </StatGrid>
 
           {/* Date Navigator (Always Visible) */}
           <div className="flex flex-wrap items-center gap-3">
@@ -1782,64 +1844,54 @@ export function LunchRegisterPage({
       {activeTab === "leaderboard" && (
         <div className="space-y-4">
           {/* Inline controls matching LeaderboardView filters */}
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Cycle</Label>
-              <Select
-                value={leaderboardPeriodMode}
-                onValueChange={(v) => setLeaderboardPeriodMode(v as "month" | "year" | "all")}
-              >
-                <SelectTrigger className="border-input bg-background h-9 w-[140px] text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="month">Monthly</SelectItem>
-                  <SelectItem value="year">Yearly</SelectItem>
-                  <SelectItem value="all">All Time</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <Select
+              value={leaderboardPeriodMode}
+              onValueChange={(v) => setLeaderboardPeriodMode(v as "month" | "year" | "all")}
+            >
+              <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Cycle">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Monthly</SelectItem>
+                <SelectItem value="year">Yearly</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
 
             {leaderboardPeriodMode === "month" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Month</Label>
-                <Select value={leaderboardMonth} onValueChange={setLeaderboardMonth}>
-                  <SelectTrigger className="border-input bg-background h-9 w-[180px] text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monthOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={leaderboardMonth} onValueChange={setLeaderboardMonth}>
+                <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Month">
+                  <SelectValue placeholder="Select Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
             {leaderboardPeriodMode === "year" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Year</Label>
-                <Select value={leaderboardYear} onValueChange={setLeaderboardYear}>
-                  <SelectTrigger className="border-input bg-background h-9 w-[140px] text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {yearOptions.map((y) => (
-                      <SelectItem key={y} value={y}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Select value={leaderboardYear} onValueChange={setLeaderboardYear}>
+                <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((y) => (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
-            <div className="space-y-1">
-              <Label className="text-xs">Department</Label>
+            <div className={cn(leaderboardPeriodMode === "month" && "col-span-2 sm:col-span-1")}>
               <Select value={selectedLeaderboardDept} onValueChange={setSelectedLeaderboardDept}>
-                <SelectTrigger className="border-input bg-background h-9 w-[180px] text-sm">
+                <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Department">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2306,7 +2358,8 @@ export function LunchRegisterPage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              title: (row) => formatWATDate(row.date),
+              title: (row) =>
+                formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
               subtitle: (row) =>
                 `${row.review_count} reviews · Avg Rating: ${row.average_rating ? row.average_rating.toFixed(1) : "N/A"} ★`,
               trailing: (row) => (
@@ -2318,7 +2371,9 @@ export function LunchRegisterPage({
             cardRenderer={(row) => (
               <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
                 <div className="flex items-start justify-between">
-                  <p className="text-sm font-semibold">{formatWATDate(row.date)}</p>
+                  <p className="text-sm font-semibold">
+                    {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                  </p>
                   <Badge variant="outline">
                     {row.average_rating ? `${row.average_rating.toFixed(1)} ★` : "No rating"}
                   </Badge>

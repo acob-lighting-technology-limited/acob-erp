@@ -23,6 +23,7 @@ import {
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
@@ -682,7 +683,7 @@ export default function ActionTrackerPortal() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
+        <StatGrid>
           <StatCard
             variant="compact"
             title={activeTab === "directives" ? "Total Directives" : "Total Action Points"}
@@ -714,7 +715,6 @@ export default function ActionTrackerPortal() {
             icon={CircleDashed}
             iconBgColor="bg-slate-500/10"
             iconColor="text-slate-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -723,9 +723,8 @@ export default function ActionTrackerPortal() {
             icon={Clock}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       {activeTab === "weekly" ? (
@@ -772,12 +771,6 @@ export default function ActionTrackerPortal() {
           contactsView
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) =>
-              row.summaryStatus === "Finished"
-                ? "bg-emerald-500"
-                : row.summaryStatus === "Not Started"
-                  ? "bg-rose-500"
-                  : "bg-amber-500",
             title: (row) => row.department,
             subtitle: (row) =>
               `${row.completedPoints} of ${row.totalPoints} done · ${row.inProgressPoints} in progress · ${row.notStartedPoints} not started`,
@@ -861,12 +854,6 @@ export default function ActionTrackerPortal() {
           contactsView
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) =>
-              row.status === "completed"
-                ? "bg-emerald-500"
-                : row.status === "not_started"
-                  ? "bg-rose-500"
-                  : "bg-amber-500",
             title: (row) => row.title,
             subtitle: (row) =>
               [(row.assignees || []).map((person) => person.name).join(", ") || row.department, row.timeline_text]

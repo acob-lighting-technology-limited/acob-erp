@@ -32,7 +32,7 @@ interface PmsTablePageProps {
   rows: TableRowData[]
   columns: TableColumn[]
   searchPlaceholder?: string
-  summaryCards?: Array<{ label: string; value: string | number }>
+  summaryCards?: Array<{ label: string; value: string | number; tooltip?: string; description?: string }>
   filterKey?: string
   filterLabel?: string
   filterAllLabel?: string
@@ -43,6 +43,7 @@ interface PmsTablePageProps {
    */
   extraFilters?: { key: string; label: string; allLabel?: string }[]
   hideSecondaryFilter?: boolean
+  hideFirstColumnFilter?: boolean
   cbtExpandable?: boolean
   headerActions?: React.ReactNode
   cycles?: ReviewCycleOption[]
@@ -125,6 +126,7 @@ export function PmsTablePage({
   filterAllLabel = "All Departments",
   extraFilters,
   hideSecondaryFilter = false,
+  hideFirstColumnFilter = false,
   cbtExpandable = false,
   headerActions,
   cycles,
@@ -206,7 +208,7 @@ export function PmsTablePage({
       })
     }
 
-    if (!hasCycles || firstColumnKey !== "cycle") {
+    if (!hideFirstColumnFilter && firstColumnKey !== "date" && (!hasCycles || firstColumnKey !== "cycle")) {
       activeFilters.push({
         key: firstColumnKey,
         label: firstColumnLabel,
@@ -258,6 +260,7 @@ export function PmsTablePage({
     firstColumnOptions,
     secondaryFilterOptions,
     hideSecondaryFilter,
+    hideFirstColumnFilter,
   ])
 
   // Export the rows currently visible in the table (respects search + filters + sort),
@@ -293,18 +296,31 @@ export function PmsTablePage({
       }
       stats={
         summaryCards.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
-            {summaryCards.map((card, index) => (
-              <StatCard
-                key={card.label}
-                variant="compact"
-                title={card.label}
-                value={card.value}
-                icon={Icon}
-                iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
-                iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
-              />
-            ))}
+          <div
+            className={cn(
+              "grid gap-2 sm:gap-3",
+              summaryCards.length <= 2 && "grid-cols-2",
+              summaryCards.length === 3 && "grid-cols-3",
+              summaryCards.length >= 4 && "grid-cols-3 sm:grid-cols-4"
+            )}
+          >
+            {summaryCards.map((card, index) => {
+              const hideOnMobile = summaryCards.length > 3 && index >= 3
+              return (
+                <StatCard
+                  key={card.label}
+                  variant="compact"
+                  title={card.label}
+                  value={card.value}
+                  icon={Icon}
+                  iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
+                  iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
+                  tooltip={card.tooltip}
+                  description={card.description}
+                  className={hideOnMobile ? "hidden sm:block" : undefined}
+                />
+              )
+            })}
           </div>
         ) : undefined
       }
@@ -324,8 +340,25 @@ export function PmsTablePage({
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: () => null,
           title: (row) => normalizeCell(row[firstColumnKey]),
           subtitle: (row) => {
+            if (icon === "attendance") {
+              const inTime = normalizeCell(row.clock_in)
+              const outTime = normalizeCell(row.clock_out)
+              const hours = normalizeCell(row.total_hours)
+              const cycle = normalizeCell(row.cycle)
+
+              const timeRange = inTime !== "-" || outTime !== "-" ? `${inTime} – ${outTime}` : "No clock-in"
+              const parts = [
+                timeRange,
+                hours !== "-" && hours !== "Pending" ? hours : null,
+                cycle !== "-" ? cycle : null,
+              ].filter(Boolean)
+
+              return parts.length > 0 ? parts.join(" · ") : "No clock-in"
+            }
+
             const second = columns[1]?.key ? normalizeCell(row[columns[1].key]) : null
             const scoreCol = columns.find((c) => ["cbt_score", "score", "rating", "metric_value"].includes(c.key))
             const scoreVal = scoreCol ? normalizeCell(row[scoreCol.key]) : null
@@ -357,6 +390,16 @@ export function PmsTablePage({
           },
           detail: {
             title: (row) => normalizeCell(row[firstColumnKey]),
+            subtitle: (row) => {
+              if (icon === "attendance") {
+                const cycle = normalizeCell(row.cycle)
+                const hours = normalizeCell(row.total_hours)
+                return (
+                  [cycle !== "-" ? cycle : null, hours !== "-" ? hours : null].filter(Boolean).join(" · ") || undefined
+                )
+              }
+              return undefined
+            },
             fields: (row) =>
               columns.slice(1).map((col) => ({
                 label: col.label,

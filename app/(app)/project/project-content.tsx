@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Progress } from "@/components/ui/progress"
 import { FolderGit2, FolderKanban, RefreshCw, Calendar, MapPin, Wrench, ShieldCheck, Briefcase } from "lucide-react"
 import { ProjectTaskViewer } from "./_components/project-task-viewer"
@@ -247,7 +248,7 @@ export function ProjectContent() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Assigned Projects"
@@ -279,9 +280,8 @@ export function ProjectContent() {
             icon={FolderGit2}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<ProjectRow>

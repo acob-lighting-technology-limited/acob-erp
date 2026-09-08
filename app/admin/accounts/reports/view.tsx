@@ -8,6 +8,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { EmptyState } from "@/components/ui/patterns"
@@ -261,7 +262,7 @@ export function FinanceReportsPage({
         </Select>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Revenue"
@@ -295,7 +296,7 @@ export function FinanceReportsPage({
             iconColor="text-blue-500"
             className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <div className="grid gap-6 lg:grid-cols-2">
@@ -421,7 +422,6 @@ export function FinanceReportsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-blue-500",
           title: (row) => row.title,
           subtitle: (row) =>
             `${row.department_name || "Unknown"} · ${row.category || "Other"} · ${formatMonth(getPeriodLabel(row.created_at))}`,

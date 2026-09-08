@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
@@ -254,7 +255,7 @@ export default function SiteLocationsPage() {
           </div>
         }
         stats={
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Total Sites"
@@ -279,7 +280,7 @@ export default function SiteLocationsPage() {
               iconBgColor="bg-slate-500/10"
               iconColor="text-slate-500"
             />
-          </div>
+          </StatGrid>
         }
       >
         <DataTable<Site>
@@ -295,7 +296,6 @@ export default function SiteLocationsPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (s) => (s.is_active ? "bg-emerald-500" : "bg-slate-400"),
             title: (s) => s.name,
             subtitle: (s) => `${s.address || "No address"} · Radius: ${s.radius_metres}m`,
             trailing: (s) => (

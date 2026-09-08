@@ -10,10 +10,33 @@ export const NOTIFICATION_KEYS = [
   "communications",
   "reports",
   "system",
+  // Present in notifications.category from the start but never modelled here,
+  // so they had no delivery policy of their own until push needed one.
+  "approvals",
+  "tasks",
 ] as const
 
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]
-export type NotificationChannel = "in_app" | "email"
+export type NotificationChannel = "in_app" | "email" | "push"
+
+/**
+ * Channels map 1:1 onto `<channel>_enabled` / `<channel>_mandatory` columns in
+ * notification_delivery_policies, notification_preferences and
+ * notification_user_delivery_preferences. Deriving the column name keeps a new
+ * channel from needing a new branch in every check below.
+ */
+const enabledColumn = (channel: NotificationChannel) => `${channel}_enabled` as const
+const mandatoryColumn = (channel: NotificationChannel) => `${channel}_mandatory` as const
+
+const CHANNEL_ENABLED_COLUMNS = "in_app_enabled, email_enabled, push_enabled"
+const CHANNEL_MANDATORY_COLUMNS = "in_app_mandatory, email_mandatory, push_mandatory"
+
+type ChannelFlags = Record<string, boolean | null | undefined>
+
+/** Absent or null means "no preference recorded", which the gate treats as allowed. */
+function allows(flags: ChannelFlags | undefined, channel: NotificationChannel): boolean {
+  return flags?.[enabledColumn(channel)] !== false
+}
 
 export function isNotificationKey(value: string): value is NotificationKey {
   return (NOTIFICATION_KEYS as readonly string[]).includes(value)
@@ -36,12 +59,12 @@ export async function isSystemNotificationChannelEnabled(
 
   const { data: policy } = await supabase
     .from("notification_delivery_policies")
-    .select("in_app_enabled, email_enabled")
+    .select(CHANNEL_ENABLED_COLUMNS)
     .eq("notification_key", notificationKey)
     .maybeSingle()
 
   if (!policy) return true
-  return channel === "email" ? policy.email_enabled !== false : policy.in_app_enabled !== false
+  return allows(policy as ChannelFlags, channel)
 }
 
 export async function isSystemNotificationChannelMandatory(
@@ -53,12 +76,12 @@ export async function isSystemNotificationChannelMandatory(
 
   const { data: policy } = await supabase
     .from("notification_delivery_policies")
-    .select("in_app_mandatory, email_mandatory")
+    .select(CHANNEL_MANDATORY_COLUMNS)
     .eq("notification_key", notificationKey)
     .maybeSingle()
 
   if (!policy) return false
-  return channel === "email" ? policy.email_mandatory === true : policy.in_app_mandatory === true
+  return (policy as ChannelFlags)[mandatoryColumn(channel)] === true
 }
 
 export async function resolveChannelEligibleUserIds(
@@ -80,57 +103,36 @@ export async function resolveChannelEligibleUserIds(
   const [policyRes, globalPrefsRes, modulePrefsRes] = await Promise.all([
     supabase
       .from("notification_delivery_policies")
-      .select("in_app_mandatory, email_mandatory")
+      .select(CHANNEL_MANDATORY_COLUMNS)
       .eq("notification_key", params.notificationKey)
       .maybeSingle(),
     supabase
       .from("notification_preferences")
-      .select("user_id, in_app_enabled, email_enabled")
+      .select(`user_id, ${CHANNEL_ENABLED_COLUMNS}`)
       .in("user_id", uniqueUserIds),
     supabase
       .from("notification_user_delivery_preferences")
-      .select("user_id, in_app_enabled, email_enabled")
+      .select(`user_id, ${CHANNEL_ENABLED_COLUMNS}`)
       .eq("notification_key", params.notificationKey)
       .in("user_id", uniqueUserIds),
   ])
-  const isMandatory =
-    params.channel === "email" ? policyRes.data?.email_mandatory === true : policyRes.data?.in_app_mandatory === true
 
-  const globalPrefMap = new Map<string, { in_app_enabled: boolean; email_enabled: boolean }>(
-    ((globalPrefsRes.data || []) as Array<{ user_id: string; in_app_enabled: boolean; email_enabled: boolean }>).map(
-      (row) => [row.user_id, row]
+  const isMandatory = (policyRes.data as ChannelFlags | null)?.[mandatoryColumn(params.channel)] === true
+
+  const toPrefMap = (rows: unknown) =>
+    new Map<string, ChannelFlags>(
+      ((rows || []) as Array<ChannelFlags & { user_id: string }>).map((row) => [row.user_id, row])
     )
-  )
 
-  const modulePrefMap = new Map<string, { in_app_enabled: boolean | null; email_enabled: boolean | null }>(
-    (
-      (modulePrefsRes.data || []) as Array<{
-        user_id: string
-        in_app_enabled: boolean | null
-        email_enabled: boolean | null
-      }>
-    ).map((row) => [row.user_id, row])
-  )
+  const globalPrefMap = toPrefMap(globalPrefsRes.data)
+  const modulePrefMap = toPrefMap(modulePrefsRes.data)
 
   return uniqueUserIds.filter((userId) => {
-    const globalPref = globalPrefMap.get(userId)
-    const modulePref = modulePrefMap.get(userId)
-
     if (isMandatory) {
       return true
     }
 
-    const globalAllowed =
-      params.channel === "email" ? globalPref?.email_enabled !== false : globalPref?.in_app_enabled !== false
-    const moduleAllowed =
-      params.channel === "email"
-        ? modulePref?.email_enabled === null ||
-          modulePref?.email_enabled === undefined ||
-          modulePref?.email_enabled === true
-        : modulePref?.in_app_enabled === null ||
-          modulePref?.in_app_enabled === undefined ||
-          modulePref?.in_app_enabled === true
-
-    return globalAllowed && moduleAllowed
+    // Both the global and the per-module preference must allow the channel.
+    return allows(globalPrefMap.get(userId), params.channel) && allows(modulePrefMap.get(userId), params.channel)
   })
 }

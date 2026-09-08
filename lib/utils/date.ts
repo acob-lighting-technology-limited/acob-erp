@@ -247,3 +247,39 @@ export function formatWATDateTimeRange(
   const fullEnd = formatWATDateTime(endDate, { day: "numeric", month: "short", year: "numeric" })
   return `${fullStart} – ${fullEnd}`
 }
+
+/**
+ * Format a YYYY-MM-DD string or Date object as DD-MM-YYYY in WAT.
+ * e.g. "2026-04-01" -> "01-04-2026"
+ */
+export function formatDDMMYYYY(date: string | Date | null | undefined): string | null {
+  if (!date) return null
+  const d = typeof date === "string" ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) return null
+  const { year, month, day } = getWATDateParts(d)
+  return `${day}-${month}-${year}`
+}
+
+/**
+ * Normalizes a DD-MM-YYYY or YYYY-MM-DD string into standard SQL YYYY-MM-DD.
+ */
+export function normalizeDateToISO(val: string | null | undefined): string | null {
+  if (!val) return null
+  const trimmed = val.trim()
+  if (!trimmed) return null
+  const ddmmyyyy = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+  if (ddmmyyyy) {
+    const day = ddmmyyyy[1].padStart(2, "0")
+    const month = ddmmyyyy[2].padStart(2, "0")
+    const year = ddmmyyyy[3]
+    return `${year}-${month}-${day}`
+  }
+  const yyyymmdd = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
+  if (yyyymmdd) {
+    const year = yyyymmdd[1]
+    const month = yyyymmdd[2].padStart(2, "0")
+    const day = yyyymmdd[3].padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+  return null
+}

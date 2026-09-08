@@ -46,6 +46,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 
 type FleetResource = {
@@ -487,7 +488,7 @@ export function FleetContent() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Applications"
@@ -519,9 +520,8 @@ export function FleetContent() {
             icon={CalendarClock}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<FleetBookingRow>
@@ -560,14 +560,6 @@ export function FleetContent() {
         // fits, the row list where it does not.
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            row.status === "pending"
-              ? "bg-amber-500"
-              : row.status === "approved"
-                ? "bg-emerald-500"
-                : row.status === "rejected"
-                  ? "bg-rose-500"
-                  : undefined,
           title: (row) => row.resourceName,
           subtitle: (row) => `${row.timeRange} · ${row.requester?.full_name || "Self"}`,
           trailing: (row) => statusPill(row),

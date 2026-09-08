@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Card, CardContent } from "@/components/ui/card"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
@@ -844,7 +845,7 @@ export function AdminPmsReviewsPage({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title={tab === "individual" ? "Total Reviews" : tab === "department" ? "Departments" : "Cycles"}
@@ -877,7 +878,7 @@ export function AdminPmsReviewsPage({
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       {/* ── Calibration tab ──────────────────────────────────────────────── */}
@@ -923,8 +924,6 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.status === "completed" ? "bg-emerald-500" : r.status === "submitted" ? "bg-blue-500" : "bg-amber-500",
             title: (r) => employeeName(r),
             subtitle: (r) =>
               `${r.user?.department ?? "No dept"} · ${r.cycle?.name ?? "No cycle"} · ${r.final_score !== null ? `${r.final_score?.toFixed(1)}%` : "No score"}`,
@@ -990,7 +989,6 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-blue-500",
             title: (r) => r.department,
             subtitle: (r) => `${r.cycle} · Reviews: ${r.submitted}/${r.reviews} · Avg: ${r.final}`,
             trailing: (r) => <span className="text-xs font-semibold">{r.final}</span>,
@@ -1075,7 +1073,6 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-purple-500",
             title: (r) => r.cycle,
             subtitle: (r) => `${r.review_type} · ${r.reviews} staff · Completed: ${r.completed}`,
             trailing: (r) => (

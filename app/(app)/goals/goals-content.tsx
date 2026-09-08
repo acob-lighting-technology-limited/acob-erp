@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import type { Goal } from "./page"
 import { apiFetch } from "@/lib/api-client"
@@ -35,7 +36,7 @@ type GoalsContentProps = {
   backHref?: string
   backLabel?: string
   showCreateTaskAction?: boolean
-  summaryCards?: Array<{ label: string; value: string | number }>
+  summaryCards?: Array<{ label: string; value: string | number; tooltip?: string; description?: string }>
 }
 
 const INITIAL_FORM = {
@@ -233,19 +234,21 @@ export function GoalsContent({
       }
       stats={
         summaryCards.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
+          <StatGrid>
             {summaryCards.map((card, index) => (
               <StatCard
                 key={card.label}
                 variant="compact"
                 title={card.label}
                 value={card.value}
+                tooltip={card.tooltip}
+                description={card.description}
                 icon={Target}
                 iconBgColor={index === 0 ? "bg-blue-500/10" : index === 1 ? "bg-emerald-500/10" : "bg-amber-500/10"}
                 iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
               />
             ))}
-          </div>
+          </StatGrid>
         ) : undefined
       }
     >

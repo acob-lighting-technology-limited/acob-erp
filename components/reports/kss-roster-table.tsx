@@ -25,6 +25,7 @@ import {
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
@@ -884,7 +885,7 @@ export function KssRosterTable({
         )
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="KSS Rows"
@@ -903,21 +904,21 @@ export function KssRosterTable({
           />
           <StatCard
             variant="compact"
-            title="Past"
-            value={stats.past}
-            icon={FileText}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
             title="Upcoming"
             value={stats.upcoming}
             icon={ShieldAlert}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Past"
+            value={stats.past}
+            icon={FileText}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+        </StatGrid>
       }
     >
       <div className="space-y-4">

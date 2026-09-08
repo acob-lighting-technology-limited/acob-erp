@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 
 type Assignment = { id: string; department: string; role: "core" | "support" }
@@ -181,7 +182,7 @@ export function CorporateScorecardRegister() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total KPIs"
@@ -201,7 +202,7 @@ export function CorporateScorecardRegister() {
               iconColor="text-violet-500"
             />
           ))}
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<RegisterRow>
@@ -259,7 +260,6 @@ export function CorporateScorecardRegister() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-blue-500",
           title: (r) => r.measure,
           subtitle: (r) => `${r.perspective} · ${r.strategic_objective}`,
           trailing: (r) => (

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { getCurrentUserAccountsData } from "./_lib"
 
@@ -84,7 +85,7 @@ export default async function AccountsPage() {
         backLink={{ href: "/profile", label: "Back to Dashboard" }}
       />
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+      <StatGrid>
         <StatCard
           variant="compact"
           title="My Requisitions"
@@ -118,7 +119,7 @@ export default async function AccountsPage() {
           description="Equipment in your custody"
           className="hidden sm:block"
         />
-      </div>
+      </StatGrid>
 
       <Section title="Accounts Areas" description="Select an accounts module below to view details or perform actions.">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-2">

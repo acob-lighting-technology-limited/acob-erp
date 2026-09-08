@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DocViewDialog } from "@/components/documentation/doc-view-dialog"
 import { DocFormDialog, type DocFormData } from "@/components/documentation/doc-form-dialog"
 import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
@@ -376,7 +377,7 @@ export function InternalDocumentationContent({ initialDocs, userId }: InternalDo
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Docs"
@@ -401,7 +402,7 @@ export function InternalDocumentationContent({ initialDocs, userId }: InternalDo
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Documentation>

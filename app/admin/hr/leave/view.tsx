@@ -16,6 +16,9 @@ import {
   Plus,
   CalendarDays,
   Users,
+  Building2,
+  Mail,
+  User,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { LeaveDetailDialog } from "./_components/leave-detail-dialog"
 import { AddLeaveDialog } from "./_components/add-leave-dialog"
@@ -397,7 +401,7 @@ export function LeaveApprovePage({
         sortable: true,
         resizable: true,
         initialWidth: 150,
-        accessor: (r) => r.leave_type?.name || "Leave Request",
+        accessor: (r) => r.leave_type?.name || "—",
       },
       {
         key: "period",
@@ -612,18 +616,10 @@ export function LeaveApprovePage({
         }
         stats={
           activeTab === "calendar" ? (
-            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            <StatGrid>
               <StatCard
                 variant="compact"
-                title="Days Taken"
-                value={calendarStats.total_days}
-                icon={CalendarDays}
-                iconBgColor="bg-blue-500/10"
-                iconColor="text-blue-500"
-              />
-              <StatCard
-                variant="compact"
-                title="Employees on Leave"
+                title="On Leave"
                 value={calendarStats.active_leaves}
                 icon={Users}
                 iconBgColor="bg-violet-500/10"
@@ -631,7 +627,7 @@ export function LeaveApprovePage({
               />
               <StatCard
                 variant="compact"
-                title="Approved Leaves"
+                title="Approved"
                 value={calendarStats.approved_count}
                 icon={CheckCircle2}
                 iconBgColor="bg-emerald-500/10"
@@ -639,30 +635,22 @@ export function LeaveApprovePage({
               />
               <StatCard
                 variant="compact"
-                title="Pending Approval"
+                title="Pending"
                 value={calendarStats.pending_count}
                 icon={Clock}
                 iconBgColor="bg-amber-500/10"
                 iconColor="text-amber-500"
               />
-            </div>
+            </StatGrid>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            <StatGrid>
               <StatCard
                 variant="compact"
-                title="Total Requests"
+                title="Total"
                 value={stats.total}
                 icon={CalendarCheck2}
                 iconBgColor="bg-blue-500/10"
                 iconColor="text-blue-500"
-              />
-              <StatCard
-                variant="compact"
-                title="Total Days"
-                value={stats.totalDays}
-                icon={CalendarDays}
-                iconBgColor="bg-violet-500/10"
-                iconColor="text-violet-500"
               />
               <StatCard
                 variant="compact"
@@ -674,13 +662,13 @@ export function LeaveApprovePage({
               />
               <StatCard
                 variant="compact"
-                title="Pending Approval"
+                title="Pending"
                 value={stats.pending}
                 icon={Clock}
                 iconBgColor="bg-amber-500/10"
                 iconColor="text-amber-500"
               />
-            </div>
+            </StatGrid>
           )
         }
         tabs={dynamicTabs}
@@ -978,14 +966,18 @@ export function LeaveApprovePage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              accentClass: (r) =>
-                r.status === "rejected" || r.status === "cancelled"
-                  ? "bg-rose-500"
-                  : r.status === "approved" || r.status === "completed"
-                    ? "bg-emerald-500"
-                    : "bg-amber-500",
+              leading: (r) => (
+                <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
+                  {(r.user?.full_name || "E")
+                    .split(" ")
+                    .slice(0, 2)
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()}
+                </div>
+              ),
               title: (r) => r.user?.full_name || "Employee",
-              subtitle: (r) => `${r.leave_type?.name || "Leave"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
+              subtitle: (r) => `${r.leave_type?.name || "—"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
               trailing: (r) => (
                 <div className="flex items-center gap-1.5">
                   <Badge
@@ -1002,9 +994,82 @@ export function LeaveApprovePage({
                   </Badge>
                 </div>
               ),
-              onSelect: (r) => {
-                setSelectedLeaveDetail(r)
-                setDetailDialogOpen(true)
+              detail: {
+                title: (r) => r.user?.full_name || "Employee",
+                subtitle: (r) => r.leave_type?.name || "—",
+                avatar: (r) => (
+                  <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold">
+                    {(r.user?.full_name || "E")
+                      .split(" ")
+                      .slice(0, 2)
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()}
+                  </div>
+                ),
+                badges: (r) => (
+                  <Badge
+                    variant={
+                      r.status === "approved" || r.status === "completed"
+                        ? "default"
+                        : r.status === "rejected" || r.status === "cancelled"
+                          ? "destructive"
+                          : "secondary"
+                    }
+                  >
+                    {r.status}
+                  </Badge>
+                ),
+                fields: (r) => [
+                  {
+                    icon: User,
+                    label: "Employee",
+                    value: r.user?.full_name || "—",
+                    fullWidth: true,
+                  },
+                  {
+                    icon: Mail,
+                    label: "Email",
+                    value: r.user?.company_email || "—",
+                    fullWidth: true,
+                    copyable: Boolean(r.user?.company_email),
+                  },
+                  {
+                    icon: Building2,
+                    label: "Department",
+                    value: r.user?.department || "—",
+                  },
+                  {
+                    icon: CalendarDays,
+                    label: "Leave Type",
+                    value: r.leave_type?.name || "—",
+                  },
+                  {
+                    icon: CalendarDays,
+                    label: "Period",
+                    value: `${r.start_date} to ${r.end_date}`,
+                  },
+                  {
+                    icon: Clock,
+                    label: "Duration",
+                    value: `${r.days_count} day${Number(r.days_count) > 1 ? "s" : ""}`,
+                  },
+                  {
+                    icon: FileText,
+                    label: "Reason",
+                    value: r.reason || "—",
+                    fullWidth: true,
+                  },
+                ],
+                actions: (r) => [
+                  {
+                    label: "View Full Detail",
+                    onClick: () => {
+                      setSelectedLeaveDetail(r)
+                      setDetailDialogOpen(true)
+                    },
+                  },
+                ],
               },
             }}
             cardRenderer={(r) => (

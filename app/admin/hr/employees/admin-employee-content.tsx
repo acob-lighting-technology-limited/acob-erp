@@ -65,6 +65,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
 
@@ -114,6 +115,7 @@ export interface Employee {
   date_of_birth: string | null
   birthday: string | null
   employment_date: string | null
+  confirmation_date?: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -221,6 +223,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     "Office Location": true,
     "Date of Birth": true,
     "Employment Date": true,
+    "Confirmation Date": true,
     "Employment Type": true,
     "Contract Category": true,
     "Lead Departments": true,
@@ -272,6 +275,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     birthday: "",
     birth_year: "",
     employment_date: "",
+    confirmation_date: "",
     job_description: "",
     attendance_exempt: false,
     employment_status: "active",
@@ -315,9 +319,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
     return [
       { key: "employees", label: `Employees (${regular})`, icon: Briefcase },
-      { key: "contract", label: `Contract Staff (${contract})`, icon: FileSignature },
-      { key: "former", label: `Former Staff (${former})`, icon: UserMinus },
-      { key: "all", label: `All Staff (${employees.length})`, icon: Users },
+      { key: "contract", label: `Contract (${contract})`, icon: FileSignature },
+      { key: "former", label: `Former (${former})`, icon: UserMinus },
+      { key: "all", label: `All (${employees.length})`, icon: Users },
     ]
   }, [employees])
 
@@ -385,7 +389,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             bank_account_name: fullProfile.bank_account_name || "",
             birthday: fullProfile.birthday || "",
             birth_year: fullProfile.birth_year != null ? String(fullProfile.birth_year) : "",
-            employment_date: fullProfile.employment_date || "",
+            employment_date: fullProfile.employment_date ? fullProfile.employment_date.split("T")[0] : "",
+            confirmation_date: fullProfile.confirmation_date ? fullProfile.confirmation_date.split("T")[0] : "",
             job_description: fullProfile.job_description || "",
             attendance_exempt: Boolean(fullProfile.attendance_exempt),
             device_key: fullProfile.device_key || "",
@@ -622,6 +627,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         birthday: editForm.birthday || null,
         birth_year: editForm.birth_year ? Number(editForm.birth_year) : null,
         employment_date: editForm.employment_date || null,
+        confirmation_date: editForm.confirmation_date || null,
         job_description: editForm.job_description || null,
       }
 
@@ -1045,7 +1051,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Staff"
@@ -1077,9 +1083,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             icon={Users}
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Employee>
@@ -1111,6 +1116,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Joined</span>
                     <span>{r.employment_date ? formatWATDate(r.employment_date) : "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Confirmed</span>
+                    <span>{r.confirmation_date ? formatWATDate(r.confirmation_date) : "—"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">DOB</span>
@@ -1160,14 +1169,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.employment_status === "exited"
-              ? "bg-rose-500"
-              : r.employment_status === "suspended"
-                ? "bg-amber-500"
-                : r.employment_status === "on_leave"
-                  ? "bg-blue-500"
-                  : "bg-emerald-500",
           leading: (r) => <EmployeeAvatar employee={r} size="sm" />,
           title: (r) => `${formatName(r.first_name)} ${formatName(r.last_name)}`,
           subtitle: (r) => `${r.designation || r.department || "Employee"} · ${r.office_location || r.company_email}`,
@@ -1224,6 +1225,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 icon: Calendar,
                 label: "Joined",
                 value: r.employment_date ? formatWATDate(r.employment_date) : "-",
+              },
+              {
+                icon: Calendar,
+                label: "Confirmed",
+                value: r.confirmation_date ? formatWATDate(r.confirmation_date) : "Probation (Pending)",
               },
             ],
             actions: (r) => [

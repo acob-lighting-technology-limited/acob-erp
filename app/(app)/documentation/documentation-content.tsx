@@ -14,6 +14,7 @@ import type { Documentation } from "./page"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
 import { DocViewDialog } from "@/components/documentation/doc-view-dialog"
 import { DocFormDialog, type DocFormData } from "@/components/documentation/doc-form-dialog"
@@ -301,7 +302,7 @@ export function DocumentationContent({
             </Button>
           }
           stats={
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <StatGrid>
               <StatCard
                 variant="compact"
                 title="Total"
@@ -326,7 +327,7 @@ export function DocumentationContent({
                 iconBgColor="bg-amber-500/10"
                 iconColor="text-amber-500"
               />
-            </div>
+            </StatGrid>
           }
         >
           <DataTable<Documentation>

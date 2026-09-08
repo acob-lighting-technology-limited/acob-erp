@@ -29,6 +29,7 @@ import {
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
@@ -299,7 +300,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
       backLink={{ href: "/profile", label: "Back to Dashboard" }}
       spacing="tight"
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Reviews"
@@ -324,7 +325,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Review>

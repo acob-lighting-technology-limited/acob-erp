@@ -9,6 +9,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { BillFormDialog } from "./_components/bill-form-dialog"
@@ -247,16 +248,7 @@ export function BillsPage({
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
-          <StatCard
-            variant="compact"
-            title="Total Bills"
-            value={stats.total}
-            icon={Receipt}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending"
@@ -264,6 +256,14 @@ export function BillsPage({
             icon={FileClock}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Outstanding"
+            value={formatCurrency(stats.outstanding)}
+            icon={Wallet}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
           />
           <StatCard
             variant="compact"
@@ -275,13 +275,13 @@ export function BillsPage({
           />
           <StatCard
             variant="compact"
-            title="Outstanding"
-            value={formatCurrency(stats.outstanding)}
-            icon={Wallet}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
+            title="Total Bills"
+            value={stats.total}
+            icon={Receipt}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Bill>
@@ -346,14 +346,6 @@ export function BillsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (bill) =>
-            bill.status === "cancelled"
-              ? "bg-rose-500"
-              : bill.status === "paid"
-                ? "bg-emerald-500"
-                : bill.status === "overdue"
-                  ? "bg-red-500"
-                  : "bg-blue-500",
           title: (bill) => `${bill.bill_number} · ${bill.supplier_name}`,
           subtitle: (bill) => `${formatCurrency(bill.total_amount, bill.currency)} · Due ${formatDate(bill.due_date)}`,
           trailing: (bill) => (

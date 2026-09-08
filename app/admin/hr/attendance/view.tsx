@@ -15,6 +15,7 @@ import { AttendanceReportDialog } from "./_components/attendance-report-dialog"
 import { AttendanceExportDialog } from "./_components/attendance-export-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -32,6 +33,7 @@ import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import {
   ATTENDANCE_TRACKING_START,
+  getAttendanceMonthOptions,
   getWorkdaysInMonth,
   monthBounds,
   quarterBounds,
@@ -884,32 +886,7 @@ export function AttendanceReportsPage({
 
   const departmentOptions = useMemo(() => departments.map((d) => ({ value: d, label: d })), [departments])
 
-  const monthOptions = useMemo(() => {
-    const options: { value: string; label: string }[] = []
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth()
-
-    const [trackingStartYear, trackingStartMonth] = ATTENDANCE_TRACKING_START.split("-").map(Number)
-    const startYear = trackingStartYear
-    const startMonth = trackingStartMonth - 1
-
-    let y = currentYear
-    let m = currentMonth
-
-    while (y > startYear || (y === startYear && m >= startMonth)) {
-      const d = new Date(y, m, 1)
-      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-      const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-      options.push({ value, label })
-      m--
-      if (m < 0) {
-        m = 11
-        y--
-      }
-    }
-    return options
-  }, [])
+  const monthOptions = useMemo(() => getAttendanceMonthOptions(), [])
 
   const stats = useMemo(() => {
     const totalHours = reports.reduce((a, r) => a + (r.total_hours ?? 0), 0)
@@ -1102,7 +1079,7 @@ export function AttendanceReportsPage({
       }
       stats={
         activeTab === "summary" ? (
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Employees"
@@ -1127,7 +1104,7 @@ export function AttendanceReportsPage({
               iconBgColor="bg-amber-500/10"
               iconColor="text-amber-500"
             />
-          </div>
+          </StatGrid>
         ) : undefined
       }
     >
@@ -1167,14 +1144,6 @@ export function AttendanceReportsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.attendance_exempt
-                ? "bg-slate-400"
-                : r.absent_days > 2
-                  ? "bg-rose-500"
-                  : r.late_days > 3
-                    ? "bg-amber-500"
-                    : "bg-emerald-500",
             title: (r) => r.user_name,
             subtitle: (r) =>
               `${r.department} · ${r.present_days} present · ${r.late_days} late · ${r.absent_days} absent`,

@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
@@ -288,7 +289,7 @@ export default function CategoriesPage() {
         </Dialog>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Categories"
@@ -320,9 +321,8 @@ export default function CategoriesPage() {
             icon={FolderOpen}
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Category>
@@ -370,7 +370,6 @@ export default function CategoriesPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (category) => ((category.product_count || 0) > 0 ? "bg-emerald-500" : "bg-slate-400"),
           title: (category) => category.name,
           subtitle: (category) =>
             `${category.product_count || 0} products · ${category.description || "No description"}`,

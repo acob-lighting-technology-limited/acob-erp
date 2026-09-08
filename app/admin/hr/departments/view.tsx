@@ -33,6 +33,7 @@ import { Switch } from "@/components/ui/switch"
 import { AlertTriangle, Building, Mail, Pencil, Plus, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { logger } from "@/lib/logger"
 import { formatWATDate } from "@/lib/utils/date"
@@ -641,7 +642,7 @@ export function DepartmentsPage({
       activeTab={activeTab}
       onTabChange={setActiveTab}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Departments"
@@ -675,7 +676,7 @@ export function DepartmentsPage({
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Department>
@@ -748,7 +749,6 @@ export function DepartmentsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (d) => (d.is_active ? "bg-emerald-500" : "bg-slate-400"),
           title: (d) => d.name,
           subtitle: (d) =>
             `${d.department_code || "No code"} · ${d.employee_count || 0} employees · ${d.email || "No email"}`,

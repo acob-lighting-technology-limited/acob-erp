@@ -1,28 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/reports/official-exports",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/hr/leave/sla/reminders",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/attendance/mark-incomplete",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/pms/ensure-review-cycle",
-      "schedule": "30 0 * * *"
-    },
-    {
-      "path": "/api/cron/tasks/expire-overdue",
-      "schedule": "15 1 * * *"
-    },
-    {
-      "path": "/api/cron/tasks/reminders",
-      "schedule": "0 7 * * 1-5"
-    }
-  ]
+  "crons": []
 }

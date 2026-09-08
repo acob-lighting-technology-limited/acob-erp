@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { GoalsContent } from "./goals-content"
+import { getDepartmentShortCode } from "@/shared/departments"
 
 import { logger } from "@/lib/logger"
 
@@ -152,7 +153,11 @@ export default async function GoalsPage() {
       cycles={goalsData.cycles}
       canCreateGoal={false}
       summaryCards={[
-        { label: "Department", value: goalsData.department || "-" },
+        {
+          label: "Department",
+          value: goalsData.department ? getDepartmentShortCode(goalsData.department) : "-",
+          tooltip: goalsData.department || undefined,
+        },
         { label: "Total Goals", value: goalsData.goals.length },
         {
           label: "Approved Goals",

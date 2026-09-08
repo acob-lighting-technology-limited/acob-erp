@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
 
@@ -484,7 +485,7 @@ export default function AdminPmsCbtExtraQuestionPage() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Selected Cycle"
@@ -516,9 +517,8 @@ export default function AdminPmsCbtExtraQuestionPage() {
             icon={Brain}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<CbtQuestion>
@@ -589,7 +589,6 @@ export default function AdminPmsCbtExtraQuestionPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (q) => (q.is_active === false ? "bg-slate-400" : "bg-emerald-500"),
           title: (q) => q.prompt,
           subtitle: (q) =>
             `${cycleNameById.get(q.review_cycle_id || "") || "No cycle"} · Targets: ${q.targeted_emails?.length || 0}`,

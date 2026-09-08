@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import {
   Users,
   Clock,
@@ -437,7 +438,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
 
   return (
     <>
-      <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
+      <StatGrid className="mb-4">
         <StatCard
           variant="compact"
           title="Present"
@@ -445,15 +446,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
           icon={Users}
           iconBgColor="bg-blue-500/10"
           iconColor="text-blue-500"
-        />
-        <StatCard
-          variant="compact"
-          title="Early"
-          value={stats.early}
-          icon={Users}
-          iconBgColor="bg-green-500/10"
-          iconColor="text-green-500"
-          className="hidden sm:block"
         />
         <StatCard
           variant="compact"
@@ -465,22 +457,29 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         />
         <StatCard
           variant="compact"
-          title="Incomplete"
-          value={stats.incomplete}
-          icon={AlertCircle}
-          iconBgColor="bg-cyan-500/10"
-          iconColor="text-cyan-500"
-          className="hidden sm:block"
-        />
-        <StatCard
-          variant="compact"
           title="Absent"
           value={stats.absent}
           icon={AlertCircle}
           iconBgColor="bg-red-500/10"
           iconColor="text-red-500"
         />
-      </div>
+        <StatCard
+          variant="compact"
+          title="Early"
+          value={stats.early}
+          icon={Users}
+          iconBgColor="bg-green-500/10"
+          iconColor="text-green-500"
+        />
+        <StatCard
+          variant="compact"
+          title="Incomplete"
+          value={stats.incomplete}
+          icon={AlertCircle}
+          iconBgColor="bg-cyan-500/10"
+          iconColor="text-cyan-500"
+        />
+      </StatGrid>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
@@ -531,14 +530,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (r) =>
-            r.status === "present" || r.status === "early"
-              ? "bg-emerald-500"
-              : r.status === "late"
-                ? "bg-amber-500"
-                : r.status === "absent"
-                  ? "bg-red-500"
-                  : "bg-blue-500",
           title: (r) => r.user_name,
           subtitle: (r) => `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)}`,
           trailing: (r) => (

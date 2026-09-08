@@ -13,6 +13,7 @@ import { CalendarDays, Download, FileBarChart, FileSpreadsheet, Plus } from "luc
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import {
   exportAllToPPTX,
   autoNumberLines,
@@ -399,7 +400,7 @@ export function WeeklyReportsContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Reports"
@@ -432,7 +433,7 @@ export function WeeklyReportsContent({
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<WeeklyReport>

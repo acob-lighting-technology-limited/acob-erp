@@ -5,6 +5,7 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function Loading() {
   return (
     <TablePageSkeleton
+      tabs={3}
       filters={3}
       rows={9}
       showStats

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -355,7 +356,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
   const totalDeductions = rows.reduce((acc, r) => acc + r.breakdown.totalDeductions, 0)
 
   const stats = (
-    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+    <StatGrid>
       <StatCard
         variant="compact"
         title="Cumulative Gross Pay"
@@ -388,7 +389,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
         iconBgColor="bg-red-500/10"
         iconColor="text-red-500"
       />
-    </div>
+    </StatGrid>
   )
 
   const periodOptions = initialData.periodOptions ?? []
@@ -666,7 +667,6 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-emerald-500",
           title: (r) => formatEmployeeName(r),
           subtitle: (r) =>
             `${r.department || "General"} · Gross: ${money(r.breakdown.monthlyGross)} · Net: ${money(r.breakdown.netPay)}`,

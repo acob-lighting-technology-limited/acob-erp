@@ -18,6 +18,7 @@ import { formatName } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { RecentActivityFeed } from "@/components/admin/recent-activity-feed"
 import {
   AdminActivityTabs,
@@ -334,7 +335,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
       />
 
       <Section title="Core KPIs" description="Current operational totals for this department.">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:grid-cols-5">
+        <StatGrid>
           <StatCard
             title="Team Members"
             value={employeeStats.count || 0}
@@ -375,7 +376,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             iconBgColor="bg-cyan-100 dark:bg-cyan-900/30"
             iconColor="text-cyan-600 dark:text-cyan-400"
           />
-        </div>
+        </StatGrid>
       </Section>
 
       <RecentActivityFeed activity={recentActivity} showViewAll={false} />

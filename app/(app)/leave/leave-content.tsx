@@ -37,6 +37,7 @@ import type { LeaveCalendarData, LeaveRelieverDebug, LeaveReviewHistoryItem } fr
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
@@ -793,7 +794,7 @@ export function LeaveContent({
       spacing="tight"
       actionsPlacement="inline-always"
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Taken (Days)"
@@ -802,25 +803,10 @@ export function LeaveContent({
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
           />
-          <StatCard
-            variant="compact"
-            title="Ongoing Requests"
-            value={stats.pending}
-            icon={Clock}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-            className={stats.waitingReviews > 0 ? "hidden sm:block" : undefined}
-          />
-          <StatCard
-            variant="compact"
-            title="Available Balances"
-            value={stats.availableBalances}
-            icon={Wallet}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-          />
           {/* Only for people who approve something — nobody else should be told
-              they have zero approvals to make. Matches the Pending Reviews tab. */}
+              they have zero approvals to make. Matches the Pending Reviews tab.
+              Second in source order so a phone keeps the one card that asks the
+              reader to act; Ongoing Requests drops instead, as it did before. */}
           {stats.waitingReviews > 0 && (
             <StatCard
               variant="compact"
@@ -831,7 +817,23 @@ export function LeaveContent({
               iconColor="text-violet-500"
             />
           )}
-        </div>
+          <StatCard
+            variant="compact"
+            title="Available Balances"
+            value={stats.availableBalances}
+            icon={Wallet}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Ongoing Requests"
+            value={stats.pending}
+            icon={Clock}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+        </StatGrid>
       }
       actions={
         <div className="flex items-center gap-2">
@@ -903,11 +905,11 @@ export function LeaveContent({
             title: (r) =>
               r.isIncomingReview
                 ? r.user?.full_name || "Employee Request"
-                : leaveTypeMap.get(r.leave_type_id)?.name || "Leave Request",
+                : leaveTypeMap.get(r.leave_type_id)?.name || "—",
             subtitle: (r) => (
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
                 <Badge variant="outline" className="text-[10px] font-medium">
-                  {leaveTypeMap.get(r.leave_type_id)?.name || "Leave"}
+                  {leaveTypeMap.get(r.leave_type_id)?.name || "—"}
                 </Badge>
                 <span className="inline-flex items-center gap-1">
                   <CalendarDays className="text-muted-foreground/70 h-3.5 w-3.5" />

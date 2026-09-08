@@ -23,6 +23,7 @@ import type { Task, TaskUserProfile } from "@/types/task"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
@@ -347,16 +348,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       backLink={{ href: "/profile", label: "Back to Home" }}
       spacing="tight"
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending"
@@ -373,26 +365,10 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             iconBgColor="bg-sky-500/10"
             iconColor="text-sky-500"
           />
-          <StatCard
-            variant="compact"
-            title="Submitted"
-            value={stats.submitted}
-            icon={Send}
-            iconBgColor="bg-purple-500/10"
-            iconColor="text-purple-500"
-            className="hidden sm:block"
-          />
-          <StatCard
-            variant="compact"
-            title="Completed"
-            value={stats.completed}
-            icon={CheckCircle2}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-            className={stats.overdue > 0 ? "hidden sm:block" : undefined}
-          />
           {/* Only when there is something to answer for — a permanent "Overdue 0"
-              is noise, and the card is the page's one alarm. */}
+              is noise, and the card is the page's one alarm. Third in source order
+              so StatGrid keeps it on a phone; when it is absent Completed takes
+              the slot, which is what the old hand-written classes did. */}
           {stats.overdue > 0 && (
             <StatCard
               variant="compact"
@@ -403,7 +379,31 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               iconColor="text-rose-500"
             />
           )}
-        </div>
+          <StatCard
+            variant="compact"
+            title="Completed"
+            value={stats.completed}
+            icon={CheckCircle2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Total Tasks"
+            value={stats.total}
+            icon={ClipboardList}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Submitted"
+            value={stats.submitted}
+            icon={Send}
+            iconBgColor="bg-purple-500/10"
+            iconColor="text-purple-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<Task>
@@ -428,8 +428,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         mobileRow={{
           // Overdue outranks priority: a late task needs answering whatever its
           // priority was when it was set.
-          accentClass: (t) =>
-            isTaskOverdue(t) ? "bg-rose-500" : ["high", "urgent"].includes(t.priority) ? "bg-amber-500" : undefined,
           title: (t) => t.title,
           subtitle: (t) =>
             [

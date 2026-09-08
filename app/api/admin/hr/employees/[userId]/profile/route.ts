@@ -7,6 +7,7 @@ import { formValidation } from "@/lib/validation"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
+import { normalizeDateToISO } from "@/lib/utils/date"
 import type { Database } from "@/types/database"
 
 const log = logger("admin-hr-employee-profile")
@@ -68,6 +69,7 @@ const UpdateEmployeeProfileSchema = z.object({
   birthday: z.string().nullable().optional(),
   birth_year: z.union([z.string(), z.number()]).nullable().optional(),
   employment_date: z.string().nullable().optional(),
+  confirmation_date: z.string().nullable().optional(),
   job_description: z.string().nullable().optional(),
   attendance_exempt: z.boolean().optional(),
 })
@@ -156,7 +158,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     bank_account_name: body.bank_account_name || null,
     birthday: body.birthday || null,
     birth_year: body.birth_year ? Number(body.birth_year) : null,
-    employment_date: body.employment_date || null,
+    employment_date: normalizeDateToISO(body.employment_date),
+    confirmation_date: normalizeDateToISO(body.confirmation_date),
     job_description: body.job_description || null,
   }
 

@@ -5,6 +5,7 @@ import { ShieldCheck } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 
 import type { ReviewCycleOption } from "../_lib"
 import { useCycleUrlFilters } from "../_components/cycle-selector"
@@ -100,7 +101,7 @@ export function BehaviourContent({
       spacing="tight"
       actions={headerActions}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Competencies"
@@ -125,7 +126,7 @@ export function BehaviourContent({
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<BehaviourRow>

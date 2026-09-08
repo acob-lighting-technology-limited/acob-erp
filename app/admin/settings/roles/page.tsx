@@ -18,6 +18,7 @@ import { DepartmentLeadsManager } from "@/components/admin/department-leads-mana
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ASSIGNABLE_ROLES } from "@/lib/role-management"
@@ -284,7 +285,7 @@ export default function RolesPage() {
       icon={Shield}
       backLink={{ href: "/admin/settings", label: "Back to Settings" }}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Roles"
@@ -316,9 +317,8 @@ export default function RolesPage() {
             icon={Shield}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
       actions={
         <RoleFormDialog
@@ -395,7 +395,6 @@ export default function RolesPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (role) => (role.is_system ? "bg-rose-500" : "bg-emerald-500"),
           title: (role) => role.name.replace(/_/g, " "),
           subtitle: (role) => `${role.user_count || 0} users · ${role.permissions?.length || 0} permissions`,
           trailing: (role) => (

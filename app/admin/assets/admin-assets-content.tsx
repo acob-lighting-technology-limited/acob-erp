@@ -32,6 +32,7 @@ import {
   FileText,
 } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 
@@ -1498,7 +1499,7 @@ export function AdminAssetsContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Assets"
@@ -1506,6 +1507,22 @@ export function AdminAssetsContent({
             icon={Package}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Open Issues"
+            value={stats.unresolvedIssues}
+            icon={AlertCircle}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Maintenance"
+            value={stats.maintenance}
+            icon={Wrench}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
           />
           <StatCard
             variant="compact"
@@ -1523,25 +1540,7 @@ export function AdminAssetsContent({
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-          <StatCard
-            variant="compact"
-            title="Maintenance"
-            value={stats.maintenance}
-            icon={Wrench}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-            className="hidden sm:block"
-          />
-          <StatCard
-            variant="compact"
-            title="Open Issues"
-            value={stats.unresolvedIssues}
-            icon={AlertCircle}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
-            className="hidden sm:block"
-          />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Asset>
@@ -1602,14 +1601,6 @@ export function AdminAssetsContent({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (asset) =>
-            asset.deleted_at
-              ? "bg-slate-400"
-              : asset.status === "maintenance" || (asset.unresolved_issues_count || 0) > 0
-                ? "bg-rose-500"
-                : asset.status === "assigned"
-                  ? "bg-blue-500"
-                  : "bg-emerald-500",
           title: (asset) =>
             `${asset.unique_code} · ${asset.asset_model || ASSET_TYPE_MAP[asset.asset_type]?.label || asset.asset_type}`,
           subtitle: (asset) =>

@@ -9,6 +9,7 @@ import {
   type DataTableTab,
 } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileCheck2, Clock, CheckCircle2, AlertCircle, Eye, RefreshCw, Siren, Wallet, Plus } from "lucide-react"
@@ -376,16 +377,7 @@ export default function AdminRequisitionsPage() {
       activeTab={tab}
       onTabChange={setTab}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-5">
-          <StatCard
-            variant="compact"
-            title="Total Requisitions"
-            value={totalCount}
-            icon={FileCheck2}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending Stage"
@@ -409,7 +401,6 @@ export default function AdminRequisitionsPage() {
             icon={Siren}
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -419,7 +410,15 @@ export default function AdminRequisitionsPage() {
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Total Requisitions"
+            value={totalCount}
+            icon={FileCheck2}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
       actions={
         tab === "funding" ? (
@@ -467,14 +466,6 @@ export default function AdminRequisitionsPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.status === "rejected"
-                ? "bg-rose-500"
-                : r.status === "approved"
-                  ? "bg-emerald-500"
-                  : r.is_emergency
-                    ? "bg-red-500"
-                    : "bg-amber-500",
             title: (r) => `${r.requisition_number} · ₦${Number(r.amount).toLocaleString()}`,
             subtitle: (r) => `${r.project_name} · ${r.requester?.full_name || "Staff"} · ${r.department}`,
             trailing: (r) => (
@@ -526,7 +517,6 @@ export default function AdminRequisitionsPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (c) => (c.is_active ? "bg-emerald-500" : "bg-slate-400"),
             title: (c) => c.name,
             subtitle: (c) => `${c.code} · ${c.description || "No description"}`,
             trailing: (c) => (

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { Bug, AlertTriangle, ShieldAlert } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
 
 export interface UiErrorRow {
@@ -100,11 +101,11 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
       icon={Bug}
       backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard variant="compact" title="Total Captured" value={stats.total} icon={Bug} />
           <StatCard variant="compact" title="Last 24h" value={stats.last24h} icon={AlertTriangle} />
           <StatCard variant="compact" title="Boundary Catches" value={stats.boundaries} icon={ShieldAlert} />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<UiErrorRow>
@@ -126,7 +127,6 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-red-500",
           title: (r) => r.message,
           subtitle: (r) => `${r.source} · ${r.route || "-"} · ${formatWATDateTime(r.created_at)}`,
           trailing: (r) => (

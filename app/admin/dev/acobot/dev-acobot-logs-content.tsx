@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Bot, Database, Download, Globe, MessageSquare, RefreshCw, Users } from "lucide-react"
 
 type AcobotSource = "erp" | "website"
@@ -247,7 +248,7 @@ export function DevAcobotLogsContent() {
   )
 
   const statsRow = (
-    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+    <StatGrid>
       <StatCard
         variant="compact"
         title="Conversations"
@@ -280,7 +281,7 @@ export function DevAcobotLogsContent() {
         iconBgColor="bg-amber-500/10"
         iconColor="text-amber-500"
       />
-    </div>
+    </StatGrid>
   )
 
   return (
@@ -354,7 +355,6 @@ export function DevAcobotLogsContent() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) => (row.had_context ? "bg-violet-500" : "bg-blue-500"),
           title: (row) => row.question,
           subtitle: (row) => `${isWebsite ? "Visitor" : row.full_name || "Unknown"} · ${formatWATDate(row.created_at)}`,
           trailing: (row) =>
