@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { CorrespondenceRecord } from "@/types/correspondence"
+import { getDepartmentShortCode } from "@/shared/departments"
 
 interface CorrespondenceTableProps {
   records: CorrespondenceRecord[]
@@ -53,7 +54,7 @@ export function CorrespondenceTable({ records, dispatchingId, onUpdateStatus, on
               <TableHead className="w-14">S/N</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Department</TableHead>
+              <TableHead>Dept</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Subject</TableHead>
               <TableHead>Actions</TableHead>
@@ -72,7 +73,11 @@ export function CorrespondenceTable({ records, dispatchingId, onUpdateStatus, on
                 <TableCell>
                   <Badge variant="outline">{record.letter_type || "external"}</Badge>
                 </TableCell>
-                <TableCell>{record.department_name || record.assigned_department_name || "-"}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="font-mono text-[11px]">
+                    {getDepartmentShortCode(record.department_name || record.assigned_department_name)}
+                  </Badge>
+                </TableCell>
                 <TableCell>
                   <Badge>{record.status}</Badge>
                 </TableCell>

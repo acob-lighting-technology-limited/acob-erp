@@ -6,15 +6,27 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
-import { Building2, CheckCircle, Clock, FileText, ListFilter, ShieldCheck, Download } from "lucide-react"
+import {
+  Building2,
+  Calendar,
+  CalendarClock,
+  CheckCircle,
+  CircleDot,
+  Clock,
+  Download,
+  FileText,
+  ListFilter,
+  ShieldCheck,
+  User,
+} from "lucide-react"
 import type { CorrespondenceRecord, CorrespondenceStatus } from "@/types/correspondence"
-import { getCanonicalDepartmentOrder } from "@/shared/departments"
+import { getCanonicalDepartmentOrder, getDepartmentShortCode } from "@/shared/departments"
 import { useDepartments } from "@/hooks/use-departments"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { formatName } from "@/lib/utils"
+import { cn, formatName } from "@/lib/utils"
 import { logger } from "@/lib/logger"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { apiFetch } from "@/lib/api-client"
@@ -338,6 +350,23 @@ export function AdminReferenceGeneratorContent({
       render: (r) => <Badge variant="outline">{r.letter_type || "external"}</Badge>,
     },
     {
+      key: "department",
+      label: "Dept",
+      sortable: true,
+      initialWidth: 90,
+      hideOnMobile: true,
+      accessor: (r) => getDepartmentShortCode(r.department_name || r.assigned_department_name),
+      render: (r) => (
+        <Badge
+          variant="secondary"
+          className="font-mono text-[11px]"
+          title={r.department_name || r.assigned_department_name || undefined}
+        >
+          {getDepartmentShortCode(r.department_name || r.assigned_department_name)}
+        </Badge>
+      ),
+    },
+    {
       key: "status",
       label: "Status",
       sortable: true,
@@ -578,12 +607,124 @@ export function AdminReferenceGeneratorContent({
         mobileRow={{
           title: (r) => `${r.reference_number} · ${r.subject}`,
           subtitle: (r) =>
-            `${r.department_name || r.assigned_department_name || "No dept"} · ${r.recipient_name || "No recipient"} · ${formatWATDate(r.created_at)}`,
+            `${getDepartmentShortCode(r.department_name || r.assigned_department_name)} · ${r.recipient_name || "No recipient"} · ${formatWATDate(r.created_at)}`,
           trailing: (r) => (
             <Badge variant="outline" className={`text-[10px] capitalize ${statusBadgeClass(r.status)}`}>
               {statusLabel(r.status)}
             </Badge>
           ),
+          detail: {
+            title: (r) => r.reference_number || "Reference Pending",
+            subtitle: (r) => (
+              <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
+                <Badge variant="outline" className="text-[10px] font-medium uppercase">
+                  {r.letter_type || "external"}
+                </Badge>
+                {(r.department_name || r.assigned_department_name) && (
+                  <span className="inline-flex items-center gap-1">
+                    <Building2 className="text-muted-foreground/70 h-3.5 w-3.5" />
+                    <span>
+                      {getDepartmentShortCode(r.department_name || r.assigned_department_name)}
+                      {" · "}
+                      {r.department_name || r.assigned_department_name}
+                    </span>
+                  </span>
+                )}
+              </div>
+            ),
+            badges: (r) => (
+              <Badge className={cn("text-[10px]", statusBadgeClass(r.status))}>{statusLabel(r.status)}</Badge>
+            ),
+            fields: (r) => [
+              {
+                icon: FileText,
+                label: "Title / Subject",
+                value: r.subject,
+                fullWidth: true,
+                copyable: true,
+              },
+              {
+                icon: Building2,
+                label: "Department",
+                value:
+                  r.department_name || r.assigned_department_name
+                    ? `${getDepartmentShortCode(r.department_name || r.assigned_department_name)} — ${r.department_name || r.assigned_department_name}`
+                    : "—",
+                fullWidth: true,
+              },
+              {
+                icon: Calendar,
+                label: "Date",
+                value: r.created_at
+                  ? formatWATDate(r.created_at, { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+                  : "—",
+              },
+              {
+                icon: CalendarClock,
+                label: "Due Date",
+                value: r.due_date || "—",
+                muted: !r.due_date,
+              },
+              {
+                icon: User,
+                label: "Recipient",
+                value: r.recipient_name
+                  ? `${r.recipient_name}${r.recipient_code ? ` (${r.recipient_code})` : ""}`
+                  : "No recipient",
+                fullWidth: Boolean(r.recipient_name && r.recipient_name.length > 25),
+              },
+              {
+                icon: User,
+                label: "Requested by",
+                value: r.sender_name || "—",
+              },
+              ...(r.created_by_name && r.created_by_name !== r.sender_name
+                ? [
+                    {
+                      icon: User,
+                      label: "Created by",
+                      value: r.created_by_name,
+                    },
+                  ]
+                : []),
+              {
+                icon: CircleDot,
+                label: "Action Required",
+                value: r.action_required ? "Yes" : "No",
+              },
+              ...((r.metadata as Record<string, string> | null)?.notes
+                ? [
+                    {
+                      icon: FileText,
+                      label: "Notes",
+                      value: (r.metadata as Record<string, string>).notes,
+                      copyable: true,
+                      fullWidth: true,
+                    },
+                  ]
+                : []),
+            ],
+            actions: (r) => [
+              ...(r.status === "under_review" && loadingRecordId !== r.id
+                ? [
+                    {
+                      label: "Approve",
+                      onClick: () => decide(r.id, "approved"),
+                    },
+                    {
+                      label: "Reject",
+                      variant: "destructive" as const,
+                      onClick: () => decide(r.id, "rejected"),
+                    },
+                    {
+                      label: "Return for correction",
+                      variant: "outline" as const,
+                      onClick: () => decide(r.id, "returned_for_correction"),
+                    },
+                  ]
+                : []),
+            ],
+          },
         }}
         cardRenderer={(r) => (
           <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
@@ -599,7 +740,9 @@ export function AdminReferenceGeneratorContent({
             <div className="text-muted-foreground space-y-1 border-t pt-2 text-xs">
               <p>Recipient: {r.recipient_name || "—"}</p>
               <div className="flex items-center justify-between text-[10px]">
-                <span>{r.department_name || r.assigned_department_name || "—"}</span>
+                <Badge variant="secondary" className="h-4 px-1 py-0 font-mono text-[10px]">
+                  {getDepartmentShortCode(r.department_name || r.assigned_department_name)}
+                </Badge>
                 <span>{formatWATDate(r.created_at)}</span>
               </div>
             </div>
