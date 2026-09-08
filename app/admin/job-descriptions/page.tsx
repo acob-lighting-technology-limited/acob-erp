@@ -9,7 +9,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Briefcase, User, Calendar, CheckCircle, XCircle, Eye, Building2, UserCircle2 } from "lucide-react"
+import { Briefcase, User, CheckCircle, XCircle, Eye, Building2, UserCircle2 } from "lucide-react"
 import type { UserRole } from "@/types/database"
 import { JobDescriptionDialog } from "./_components/job-description-dialog"
 
@@ -59,20 +59,14 @@ export default function AdminJobDescriptionsPage() {
 
   const profiles = useMemo(() => data?.profiles ?? [], [data?.profiles])
 
-  const stats = useMemo(() => {
-    const now = new Date()
-    return {
+  const stats = useMemo(
+    () => ({
       total: profiles.length,
       completed: profiles.filter((p) => p.job_description).length,
       pending: profiles.filter((p) => !p.job_description).length,
-      thisMonth: profiles.filter(
-        (p) =>
-          p.job_description_updated_at &&
-          new Date(p.job_description_updated_at).getMonth() === now.getMonth() &&
-          new Date(p.job_description_updated_at).getFullYear() === now.getFullYear()
-      ).length,
-    }
-  }, [profiles])
+    }),
+    [profiles]
+  )
 
   const columns: DataTableColumn<Profile>[] = useMemo(
     () => [
@@ -189,7 +183,7 @@ export default function AdminJobDescriptionsPage() {
       icon={Briefcase}
       backLink={{ href: "/admin", label: "Back to Admin" }}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <StatCard
             variant="compact"
             title="Total Staff"
@@ -213,14 +207,6 @@ export default function AdminJobDescriptionsPage() {
             icon={XCircle}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Updated Recently"
-            value={stats.thisMonth}
-            icon={Calendar}
-            iconBgColor="bg-purple-500/10"
-            iconColor="text-purple-500"
           />
         </div>
       }
@@ -275,8 +261,13 @@ export default function AdminJobDescriptionsPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: (r) => (
+            <span className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold">
+              {r.first_name.charAt(0)}
+            </span>
+          ),
           title: (r) => `${r.first_name} ${r.last_name}`,
-          subtitle: (r) => `${r.department} · ${r.designation || "No designation"} · ${r.company_email}`,
+          subtitle: (r) => [r.department, r.designation].filter(Boolean).join(" · ") || r.company_email,
           trailing: (r) =>
             r.job_description ? (
               <Badge variant="outline" className="border-transparent bg-emerald-500/10 text-[9px] text-emerald-500">
