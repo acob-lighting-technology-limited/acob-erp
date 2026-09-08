@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 import { CreateReviewDialog } from "../../../performance/_components/create-review-dialog"
@@ -577,7 +578,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
       activeTab={mode}
       onTabChange={handleTabChange}
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total"
@@ -610,7 +611,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
           />
-        </div>
+        </StatGrid>
       }
       actions={
         <div className="flex flex-wrap items-center gap-2">

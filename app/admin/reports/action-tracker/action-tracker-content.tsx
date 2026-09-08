@@ -23,6 +23,7 @@ import {
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
@@ -793,7 +794,7 @@ export function ActionTrackerContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-5">
+        <StatGrid>
           <StatCard
             variant="compact"
             title={activeTab === "directives" ? "Total Directives" : "Total Action Points"}
@@ -825,7 +826,6 @@ export function ActionTrackerContent({
             icon={Clock}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -834,9 +834,8 @@ export function ActionTrackerContent({
             icon={Clock}
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       {activeTab === "weekly" ? (

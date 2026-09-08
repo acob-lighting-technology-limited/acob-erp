@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cn } from "@/lib/utils"
 import {
@@ -371,7 +372,7 @@ export function OnboardingContent() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Profiles"
@@ -396,7 +397,7 @@ export function OnboardingContent() {
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <div className="space-y-4">

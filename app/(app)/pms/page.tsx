@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { getCurrentUserPmsData } from "./_lib"
 import { CycleSelector } from "./_components/cycle-selector"
@@ -128,7 +129,7 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
         actions={<CycleSelector cycles={cycles} activeCycleId={activeCycleId} />}
       />
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
+      <StatGrid>
         <StatCard
           variant="compact"
           title="Overall PMS"
@@ -156,7 +157,6 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
           value={formatPercent(score.cbt_score)}
           icon={Brain}
           description="Learning score in PMS"
-          className="hidden sm:block"
         />
         <StatCard
           variant="compact"
@@ -164,9 +164,8 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
           value={formatPercent(score.behaviour_score)}
           icon={ShieldCheck}
           description="Manager and peer feedback blend"
-          className="hidden sm:block"
         />
-      </div>
+      </StatGrid>
 
       <Section title="Performance Areas" description="Open each PMS area to see the live score details behind it.">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">

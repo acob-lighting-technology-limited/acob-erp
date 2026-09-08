@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Globe, ShieldCheck, Users, Clock, Download, Building2, AlertTriangle, ShieldAlert } from "lucide-react"
@@ -514,7 +515,7 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
         </Button>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Visits"
@@ -525,11 +526,11 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
           />
           <StatCard
             variant="compact"
-            title="Unique Domains"
-            value={uniqueDomains}
-            icon={ShieldCheck}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
+            title="Flagged for Review"
+            value={reviewCount}
+            icon={AlertTriangle}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
           />
           <StatCard
             variant="compact"
@@ -541,11 +542,11 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
           />
           <StatCard
             variant="compact"
-            title="Flagged for Review"
-            value={reviewCount}
-            icon={AlertTriangle}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
+            title="Unique Domains"
+            value={uniqueDomains}
+            icon={ShieldCheck}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
           />
           <StatCard
             variant="compact"
@@ -559,7 +560,7 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<NetworkActivityRecord>

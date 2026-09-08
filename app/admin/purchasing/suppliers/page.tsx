@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { SupplierFormDialog } from "./_components/supplier-form-dialog"
@@ -207,7 +208,7 @@ export default function SuppliersPage() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Suppliers"
@@ -239,9 +240,8 @@ export default function SuppliersPage() {
             icon={Mail}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Supplier>

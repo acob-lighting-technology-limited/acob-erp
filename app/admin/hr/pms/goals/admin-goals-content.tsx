@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import {
   DataTablePage,
   DataTable,
@@ -266,7 +267,7 @@ export function AdminGoalsContent({
         ) : undefined
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard variant="compact" title="Total Goals" value={goals.length} icon={Target} />
           <StatCard
             variant="compact"
@@ -284,7 +285,7 @@ export function AdminGoalsContent({
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       {tab === "department" ? (

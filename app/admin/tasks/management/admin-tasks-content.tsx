@@ -31,6 +31,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
@@ -515,16 +516,7 @@ export function AdminTasksContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending"
@@ -548,7 +540,6 @@ export function AdminTasksContent({
             icon={Send}
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -558,7 +549,15 @@ export function AdminTasksContent({
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Total Tasks"
+            value={stats.total}
+            icon={ClipboardList}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<Task>

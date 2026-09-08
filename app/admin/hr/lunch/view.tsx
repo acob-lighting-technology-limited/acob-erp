@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { DataTablePage, DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -1306,7 +1307,7 @@ export function LunchRegisterPage({
       onTabChange={(t) => setActiveTab(t as LunchTab)}
       stats={
         activeTab === "summary" ? (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Total Meals Registered"
@@ -1314,15 +1315,6 @@ export function LunchRegisterPage({
               icon={Utensils}
               iconBgColor="bg-blue-500/10"
               iconColor="text-blue-500"
-            />
-            <StatCard
-              variant="compact"
-              title="Meal Cost (Unit)"
-              value={`₦${cost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-              icon={Settings}
-              iconBgColor="bg-violet-500/10"
-              iconColor="text-violet-500"
-              className="hidden sm:block"
             />
             <StatCard
               variant="compact"
@@ -1340,7 +1332,15 @@ export function LunchRegisterPage({
               iconBgColor="bg-emerald-500/10"
               iconColor="text-emerald-500"
             />
-          </div>
+            <StatCard
+              variant="compact"
+              title="Meal Cost (Unit)"
+              value={`₦${cost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+              icon={Settings}
+              iconBgColor="bg-violet-500/10"
+              iconColor="text-violet-500"
+            />
+          </StatGrid>
         ) : undefined
       }
       actions={
@@ -1482,7 +1482,7 @@ export function LunchRegisterPage({
     >
       {activeTab === "menus" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Menus Published"
@@ -1516,7 +1516,7 @@ export function LunchRegisterPage({
               iconBgColor="bg-violet-500/10"
               iconColor="text-violet-500"
             />
-          </div>
+          </StatGrid>
 
           <DataTable<AdminLunchMenu>
             data={menus}
@@ -1680,7 +1680,7 @@ export function LunchRegisterPage({
       {activeTab === "daily" && (
         <div className="space-y-4">
           {/* Daily Stats Cards (Always Visible) */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Total Meals Registered"
@@ -1713,7 +1713,7 @@ export function LunchRegisterPage({
               iconBgColor="bg-emerald-500/10"
               iconColor="text-emerald-500"
             />
-          </div>
+          </StatGrid>
 
           {/* Date Navigator (Always Visible) */}
           <div className="flex flex-wrap items-center gap-3">

@@ -9,6 +9,7 @@ import { MessageSquare, AlertCircle, Clock, XCircle, Eye, ShieldCheck, Mail, Use
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FeedbackDetailDialog } from "@/components/feedback/feedback-detail-dialog"
@@ -267,16 +268,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
       activeTab={hasLeadFeedback ? activeTab : undefined}
       onTabChange={(tab) => setActiveTab(tab as "general" | "leads")}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
-          <StatCard
-            variant="compact"
-            title="Total"
-            value={initialStats.total}
-            icon={MessageSquare}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Open"
@@ -308,9 +300,16 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
             icon={XCircle}
             iconBgColor="bg-gray-500/10"
             iconColor="text-gray-500"
-            className="hidden sm:block"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Total"
+            value={initialStats.total}
+            icon={MessageSquare}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<FeedbackRecord>

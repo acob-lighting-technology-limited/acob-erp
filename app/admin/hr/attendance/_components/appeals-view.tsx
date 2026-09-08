@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, CheckCircle2, XCircle, FileQuestion } from "lucide-react"
@@ -183,7 +184,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
   return (
     <>
       {/* Stats */}
-      <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+      <StatGrid className="mb-4">
         <StatCard
           variant="compact"
           title="Total Pending"
@@ -208,7 +209,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           iconBgColor="bg-red-500/10"
           iconColor="text-red-500"
         />
-      </div>
+      </StatGrid>
 
       <DataTable<AppealRow>
         data={appeals}

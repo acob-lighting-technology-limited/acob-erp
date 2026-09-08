@@ -9,6 +9,7 @@ import {
   type DataTableTab,
 } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Plus, FileCheck2, Clock, CheckCircle2, AlertCircle, RefreshCw, Siren, Wallet, Building2 } from "lucide-react"
 import type { Requisition } from "@/lib/requisitions/types"
@@ -251,16 +252,7 @@ export default function RequisitionListPage() {
       spacing="tight"
       actionsPlacement="inline-always"
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
-          <StatCard
-            variant="compact"
-            title="Total Requisitions"
-            value={totalCount}
-            icon={FileCheck2}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending Stage"
@@ -285,7 +277,15 @@ export default function RequisitionListPage() {
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Total Requisitions"
+            value={totalCount}
+            icon={FileCheck2}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
       actions={
         <div className="flex items-center gap-2">

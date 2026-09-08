@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
 import { useDepartments } from "@/hooks/use-departments"
@@ -486,7 +487,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Selected Cycle"
@@ -519,7 +520,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<CbtQuestion>

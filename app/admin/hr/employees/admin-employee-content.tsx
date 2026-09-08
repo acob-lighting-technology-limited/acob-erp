@@ -65,6 +65,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
 
@@ -1050,7 +1051,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Staff"
@@ -1082,9 +1083,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             icon={Users}
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Employee>

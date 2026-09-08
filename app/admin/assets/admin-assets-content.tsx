@@ -32,6 +32,7 @@ import {
   FileText,
 } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 
@@ -1498,7 +1499,7 @@ export function AdminAssetsContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Assets"
@@ -1530,7 +1531,6 @@ export function AdminAssetsContent({
             icon={Wrench}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
-            className="hidden sm:block"
           />
           <StatCard
             variant="compact"
@@ -1539,9 +1539,8 @@ export function AdminAssetsContent({
             icon={AlertCircle}
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Asset>

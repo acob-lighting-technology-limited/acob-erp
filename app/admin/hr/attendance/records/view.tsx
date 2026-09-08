@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import {
   Clock,
   Calendar,
@@ -383,7 +384,7 @@ export function AdminAttendanceRecordsPage({
           </Button>
         }
         stats={
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <StatGrid>
             <StatCard variant="compact" title="Total Records" value={records.length} icon={Calendar} />
             <StatCard
               variant="compact"
@@ -394,7 +395,7 @@ export function AdminAttendanceRecordsPage({
               iconColor="text-orange-500"
             />
             <StatCard variant="compact" title="Total Hours" value={totalHours.toFixed(1)} icon={Clock} />
-          </div>
+          </StatGrid>
         }
       >
         <div className="grid grid-cols-1 gap-4 rounded-xl border p-4 md:grid-cols-3">

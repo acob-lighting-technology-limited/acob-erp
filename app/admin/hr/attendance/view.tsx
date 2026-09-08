@@ -15,6 +15,7 @@ import { AttendanceReportDialog } from "./_components/attendance-report-dialog"
 import { AttendanceExportDialog } from "./_components/attendance-export-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -1078,7 +1079,7 @@ export function AttendanceReportsPage({
       }
       stats={
         activeTab === "summary" ? (
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Employees"
@@ -1103,7 +1104,7 @@ export function AttendanceReportsPage({
               iconBgColor="bg-amber-500/10"
               iconColor="text-amber-500"
             />
-          </div>
+          </StatGrid>
         ) : undefined
       }
     >

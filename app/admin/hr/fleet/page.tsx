@@ -10,6 +10,7 @@ import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle, Box } from "luc
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import {
   DataTablePage,
@@ -373,7 +374,7 @@ export default function AdminFleetPage() {
       activeTab={tab}
       onTabChange={setTab}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Pending Review"
@@ -398,7 +399,7 @@ export default function AdminFleetPage() {
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
           />
-        </div>
+        </StatGrid>
       }
       actions={
         tab === "resources" ? (

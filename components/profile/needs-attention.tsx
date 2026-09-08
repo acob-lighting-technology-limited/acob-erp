@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { AlertTriangle, CalendarClock, FileCode2, Ticket, Wallet } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { Task, LeaveItem, HelpDeskItem, CorrespondenceItem, PaymentItem } from "@/app/(app)/profile/page"
 import { countOverdueTasks, isOpenCorrespondence, isOpenTicket, isPendingPayment } from "./work-items"
@@ -42,7 +43,7 @@ export function NeedsAttention({
   const duePayments = payments.filter(isPendingPayment).length
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <StatGrid>
       <AttentionTile href="/tasks" hint="Open tasks past their due date">
         <StatCard
           title="Overdue Tasks"
@@ -93,6 +94,6 @@ export function NeedsAttention({
           description={openCorrespondence > 0 ? "Open items" : "Nothing open"}
         />
       </AttentionTile>
-    </div>
+    </StatGrid>
   )
 }

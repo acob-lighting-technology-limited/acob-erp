@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -673,7 +674,7 @@ export function PmsMetricTabsPage({
       activeTab={tab}
       onTabChange={(value) => setTab(value as TabKey)}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Records"
@@ -698,7 +699,7 @@ export function PmsMetricTabsPage({
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+        </StatGrid>
       }
       actions={
         <div className="flex flex-wrap items-center gap-2">

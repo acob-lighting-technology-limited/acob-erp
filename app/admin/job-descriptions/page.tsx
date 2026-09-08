@@ -7,6 +7,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Briefcase, User, CheckCircle, XCircle, Eye, Building2, UserCircle2 } from "lucide-react"
@@ -183,7 +184,7 @@ export default function AdminJobDescriptionsPage() {
       icon={Briefcase}
       backLink={{ href: "/admin", label: "Back to Admin" }}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Staff"
@@ -208,7 +209,7 @@ export default function AdminJobDescriptionsPage() {
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Profile>

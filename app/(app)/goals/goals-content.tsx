@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import type { Goal } from "./page"
 import { apiFetch } from "@/lib/api-client"
@@ -233,7 +234,7 @@ export function GoalsContent({
       }
       stats={
         summaryCards.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <StatGrid>
             {summaryCards.map((card, index) => (
               <StatCard
                 key={card.label}
@@ -247,7 +248,7 @@ export function GoalsContent({
                 iconColor={index === 0 ? "text-blue-500" : index === 1 ? "text-emerald-500" : "text-amber-500"}
               />
             ))}
-          </div>
+          </StatGrid>
         ) : undefined
       }
     >

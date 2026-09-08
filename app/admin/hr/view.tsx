@@ -18,6 +18,7 @@ import {
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -79,7 +80,7 @@ export function HRAdminDashboard({
       <PageHeader title={title} description={description} icon={Users} backLink={backLink} />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-6">
+      <StatGrid>
         <StatCard
           title="Pending Leave"
           value={stats.pendingLeaveRequests}
@@ -116,7 +117,7 @@ export function HRAdminDashboard({
           icon={MapPin}
           description="Active rooms and offices"
         />
-      </div>
+      </StatGrid>
 
       {/* Admin Actions */}
       <Section title="HR Management">

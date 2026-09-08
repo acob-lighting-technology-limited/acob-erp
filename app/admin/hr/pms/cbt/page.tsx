@@ -12,6 +12,7 @@ import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import {
   AlertDialog,
@@ -756,7 +757,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Rows"
@@ -788,9 +789,8 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             icon={Brain}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       {tab === "individual" ? (

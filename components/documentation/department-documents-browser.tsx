@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -1433,7 +1434,7 @@ export function DepartmentDocumentsBrowser({
         }
       />
 
-      <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+      <StatGrid className="mb-4">
         <StatCard
           variant="compact"
           title="Files"
@@ -1458,7 +1459,7 @@ export function DepartmentDocumentsBrowser({
           iconBgColor="bg-violet-500/10"
           iconColor="text-violet-500"
         />
-      </div>
+      </StatGrid>
 
       <Card
         className={isDragActive ? "border-primary bg-primary/5" : ""}

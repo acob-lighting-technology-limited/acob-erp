@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { UserCheck, Upload, Trash2, Camera, CheckCircle2, XCircle, AlertCircle, Users } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
@@ -263,7 +264,7 @@ export default function RemoteAccessPage() {
         icon={UserCheck}
         backLink={{ href: "/admin/hr/attendance", label: "Back to Attendance" }}
         stats={
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Total Employees"
@@ -297,7 +298,7 @@ export default function RemoteAccessPage() {
               iconColor="text-purple-500"
               className="hidden sm:block"
             />
-          </div>
+          </StatGrid>
         }
       >
         <DataTable<EmployeeRemoteAccess>

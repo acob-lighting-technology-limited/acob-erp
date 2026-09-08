@@ -11,6 +11,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Headset, Play, CheckCircle2, LifeBuoy, MessageSquare, ShieldCheck, Star, Building2 } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { PendingApprovalsCard } from "@/components/help-desk/pending-approvals-card"
 import { CreateTicketDialog, type CreateTicketForm } from "@/components/help-desk/create-ticket-dialog"
 import type { HelpDeskTicket, HelpDeskContentProps } from "@/components/help-desk/help-desk-types"
@@ -574,7 +575,7 @@ export function HelpDeskContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Open Tickets"
@@ -612,7 +613,7 @@ export function HelpDeskContent({
             iconColor="text-violet-500"
             className={pendingReviewCount > 0 ? "hidden sm:block" : undefined}
           />
-        </div>
+        </StatGrid>
       }
     >
       {pendingReviewCount > 0 && (

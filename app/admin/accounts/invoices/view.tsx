@@ -9,6 +9,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
@@ -257,24 +258,7 @@ export function InvoicesPage({
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
-          <StatCard
-            variant="compact"
-            title="Total Invoices"
-            value={stats.total}
-            icon={FileText}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-            className="hidden sm:block"
-          />
-          <StatCard
-            variant="compact"
-            title="Drafts"
-            value={stats.draft}
-            icon={FileClock}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Collected"
@@ -291,7 +275,23 @@ export function InvoicesPage({
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="Drafts"
+            value={stats.draft}
+            icon={FileClock}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Total Invoices"
+            value={stats.total}
+            icon={FileText}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+        </StatGrid>
       }
     >
       <DataTable<Invoice>

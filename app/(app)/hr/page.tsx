@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { getCurrentUserHrData } from "./_lib"
 
@@ -86,7 +87,7 @@ export default async function HrPage() {
         backLink={{ href: "/profile", label: "Back to Dashboard" }}
       />
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
+      <StatGrid>
         <StatCard
           variant="compact"
           title="Today's Attendance"
@@ -120,7 +121,6 @@ export default async function HrPage() {
           description={
             lunch.hasVoted ? "Meal preference logged" : lunch.hasMenuToday ? "Vote pending" : "No menu scheduled"
           }
-          className="hidden sm:block"
         />
         <StatCard
           variant="compact"
@@ -128,9 +128,8 @@ export default async function HrPage() {
           value={bookings.activeCount}
           icon={Car}
           description="Active or upcoming reservations"
-          className="hidden sm:block"
         />
-      </div>
+      </StatGrid>
 
       <Section title="HR Areas" description="Select an area below to view your records or submit new requests.">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-2">

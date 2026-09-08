@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { LeaveDetailDialog } from "./_components/leave-detail-dialog"
 import { AddLeaveDialog } from "./_components/add-leave-dialog"
@@ -615,7 +616,7 @@ export function LeaveApprovePage({
         }
         stats={
           activeTab === "calendar" ? (
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <StatGrid>
               <StatCard
                 variant="compact"
                 title="On Leave"
@@ -640,9 +641,9 @@ export function LeaveApprovePage({
                 iconBgColor="bg-amber-500/10"
                 iconColor="text-amber-500"
               />
-            </div>
+            </StatGrid>
           ) : (
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <StatGrid>
               <StatCard
                 variant="compact"
                 title="Total"
@@ -667,7 +668,7 @@ export function LeaveApprovePage({
                 iconBgColor="bg-amber-500/10"
                 iconColor="text-amber-500"
               />
-            </div>
+            </StatGrid>
           )
         }
         tabs={dynamicTabs}

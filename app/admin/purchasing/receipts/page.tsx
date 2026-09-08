@@ -7,6 +7,7 @@ import { CalendarDays, Package, PackageCheck, ReceiptText, ShoppingBag } from "l
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 
@@ -184,7 +185,7 @@ export default function ReceiptsPage() {
       icon={Package}
       backLink={{ href: "/admin/purchasing", label: "Back to Purchasing" }}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Receipts"
@@ -216,9 +217,8 @@ export default function ReceiptsPage() {
             icon={CalendarDays}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Receipt>

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { exportPmsRowsToExcel } from "@/lib/pms/export"
 import { toLocalISODate } from "@/lib/utils/date"
@@ -343,7 +344,7 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Employees"
@@ -362,24 +363,24 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
           />
           <StatCard
             variant="compact"
-            title="High Performers"
-            value={highPerformers}
-            icon={TrendingUp}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
             title="At Risk"
             value={atRisk}
             icon={TrendingDown}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+          <StatCard
+            variant="compact"
+            title="High Performers"
+            value={highPerformers}
+            icon={TrendingUp}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+        </StatGrid>
       }
     >
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+      <StatGrid className="mb-4">
         <StatCard variant="compact" title="Active Cycles" value={activeCycles} icon={BarChart3} />
         <StatCard
           variant="compact"
@@ -399,7 +400,7 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
           value={rows.filter((row) => row.status === "submitted").length}
           icon={TrendingUp}
         />
-      </div>
+      </StatGrid>
 
       <DataTable<AnalyticsRow>
         data={rows}

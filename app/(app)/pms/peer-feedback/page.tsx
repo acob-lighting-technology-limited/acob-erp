@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
@@ -267,7 +268,7 @@ export default function PeerFeedbackPage() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard variant="compact" title="Given by You" value={myFeedback.length} icon={Send} />
           <StatCard variant="compact" title="Received" value={receivedFeedback.length} icon={Users} />
           <StatCard
@@ -276,7 +277,7 @@ export default function PeerFeedbackPage() {
             value={avgReceived !== null ? `${avgReceived}%` : "-"}
             icon={MessageSquare}
           />
-        </div>
+        </StatGrid>
       }
     >
       {activeTab === "given" ? (

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Users, Shield, UserPlus, Pencil } from "lucide-react"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { useSearchParams } from "next/navigation"
 import { logger } from "@/lib/logger"
 import { isValidRole } from "./_lib/role-helpers"
@@ -260,7 +261,7 @@ export default function UsersPage() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Users"
@@ -285,7 +286,7 @@ export default function UsersPage() {
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<User>

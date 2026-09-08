@@ -11,6 +11,7 @@ import { CalendarDays, Download, FileBarChart, FileSpreadsheet, Pencil, Plus } f
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import {
   autoNumberLines,
   exportAllToPPTX,
@@ -526,7 +527,7 @@ export default function WeeklyReportsPortal() {
         </div>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Reports"
@@ -558,9 +559,8 @@ export default function WeeklyReportsPortal() {
             icon={Download}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<WeeklyReport>

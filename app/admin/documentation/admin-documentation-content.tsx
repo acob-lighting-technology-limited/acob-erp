@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { FileText, List, Eye, User, FolderOpen, Calendar } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
@@ -211,7 +212,7 @@ export function AdminDocumentationContent({
       onTabChange={handleTabChange}
       stats={
         activeTab === "knowledge-docs" ? (
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Total Docs"
@@ -244,7 +245,7 @@ export function AdminDocumentationContent({
               iconBgColor="bg-violet-500/10"
               iconColor="text-violet-500"
             />
-          </div>
+          </StatGrid>
         ) : null
       }
     >

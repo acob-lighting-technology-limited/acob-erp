@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Download, RefreshCw, ScrollText, ShieldCheck, UserCheck, Wifi } from "lucide-react"
 import {
@@ -772,7 +773,7 @@ export function DevLoginLogsContent() {
       }
     >
       <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Events"
@@ -805,7 +806,7 @@ export function DevLoginLogsContent() {
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
 
         {/* Control Panel (Filters and Actions) */}
         <div className="bg-card flex flex-wrap items-center justify-between gap-4 rounded-xl border-2 p-4 shadow-sm">

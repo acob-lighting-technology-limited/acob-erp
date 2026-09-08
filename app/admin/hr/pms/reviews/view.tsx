@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Card, CardContent } from "@/components/ui/card"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
@@ -844,7 +845,7 @@ export function AdminPmsReviewsPage({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title={tab === "individual" ? "Total Reviews" : tab === "department" ? "Departments" : "Cycles"}
@@ -877,7 +878,7 @@ export function AdminPmsReviewsPage({
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       {/* ── Calibration tab ──────────────────────────────────────────────── */}

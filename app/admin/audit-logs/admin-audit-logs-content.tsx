@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AuditLogDetailPanel } from "@/components/audit/AuditLogDetailPanel"
@@ -235,7 +236,7 @@ export function AdminAuditLogsContent({
         </div>
       }
       stats={
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total logs"
@@ -268,7 +269,7 @@ export function AdminAuditLogsContent({
             iconBgColor="bg-red-500/10"
             iconColor="text-red-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<AuditLog>

@@ -7,6 +7,7 @@ import { AlertCircle, CalendarDays, Download, FileText, RefreshCw, Users } from 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
@@ -163,7 +164,7 @@ export function MeetingRecordsContent() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title={isTranscript ? "Transcripts" : "Attendance Reports"}
@@ -188,7 +189,7 @@ export function MeetingRecordsContent() {
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <MeetingSyncModal open={syncOpen} onOpenChange={setSyncOpen} />

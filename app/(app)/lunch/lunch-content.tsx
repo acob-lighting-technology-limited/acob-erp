@@ -17,6 +17,7 @@ import {
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { EmptyState } from "@/components/ui/patterns"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -460,7 +461,7 @@ export function LunchContent({ initialData, currentUserId }: LunchContentProps) 
       onTabChange={setActiveTab}
       stats={
         activeTab === "poll" ? (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+          <StatGrid>
             <StatCard
               variant="compact"
               title="Your Choice"
@@ -485,19 +486,17 @@ export function LunchContent({ initialData, currentUserId }: LunchContentProps) 
               iconBgColor="bg-amber-500/10"
               iconColor="text-amber-500"
             />
-            <div className="hidden sm:block">
-              <StatCard
-                variant="compact"
-                title="Deduction / Meal"
-                value={naira(data.pricing.employee_deduction)}
-                icon={Wallet}
-                iconBgColor="bg-violet-500/10"
-                iconColor="text-violet-500"
-              />
-            </div>
-          </div>
+            <StatCard
+              variant="compact"
+              title="Deduction / Meal"
+              value={naira(data.pricing.employee_deduction)}
+              icon={Wallet}
+              iconBgColor="bg-violet-500/10"
+              iconColor="text-violet-500"
+            />
+          </StatGrid>
         ) : (
-          <div className="grid max-w-xl grid-cols-2 gap-2 sm:gap-3">
+          <StatGrid className="max-w-xl">
             <StatCard
               variant="compact"
               title="Total Deduction"
@@ -514,7 +513,7 @@ export function LunchContent({ initialData, currentUserId }: LunchContentProps) 
               iconBgColor="bg-blue-500/10"
               iconColor="text-blue-500"
             />
-          </div>
+          </StatGrid>
         )
       }
     >

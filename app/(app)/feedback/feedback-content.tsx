@@ -22,6 +22,7 @@ import { FeedbackEditModal } from "@/components/feedback-edit-modal"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import type { Feedback } from "./page"
 import { writeAuditLogClient } from "@/lib/audit/client"
 import { logger } from "@/lib/logger"
@@ -203,7 +204,7 @@ export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total"
@@ -228,7 +229,7 @@ export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<Feedback>

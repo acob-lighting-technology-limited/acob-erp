@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { IconFill } from "@/components/ui/icon-fill"
 import { cn } from "@/lib/utils"
 import { getAdminPmsData } from "./_lib"
@@ -176,7 +177,7 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
         actions={<CycleSelector cycles={cycles} activeCycleId={activeCycleId} />}
       />
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-5">
+      <StatGrid>
         <StatCard
           title="Avg PMS"
           value={formatPercent(summary.overallPms)}
@@ -207,7 +208,7 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
           icon={CheckCircle2}
           description="Approved goals in scope"
         />
-      </div>
+      </StatGrid>
 
       <Section
         title="PMS Areas"

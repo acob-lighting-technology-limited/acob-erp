@@ -8,6 +8,7 @@ import { Package, Boxes, Warehouse, ArrowUpDown, AlertTriangle, TrendingUp } fro
 import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { IconFill } from "@/components/ui/icon-fill"
 
 async function fetchInventoryStats(): Promise<InventoryStats> {
@@ -46,20 +47,13 @@ export default function InventoryDashboard() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-4">
+      <StatGrid>
         <StatCard
           title="Total Products"
           value={stats.totalProducts}
           icon={Package}
           description={`In ${stats.totalCategories} categories`}
         />
-        <StatCard
-          title="Inventory Value"
-          value={formatCurrency(stats.totalValue)}
-          icon={TrendingUp}
-          description="Total stock value"
-        />
-        <StatCard title="Warehouses" value={stats.totalWarehouses} icon={Warehouse} description="Storage locations" />
         <StatCard
           title="Low Stock"
           value={stats.lowStockItems}
@@ -68,7 +62,14 @@ export default function InventoryDashboard() {
           iconColor="text-orange-600 dark:text-orange-400"
           description="Items need reorder"
         />
-      </div>
+        <StatCard
+          title="Inventory Value"
+          value={formatCurrency(stats.totalValue)}
+          icon={TrendingUp}
+          description="Total stock value"
+        />
+        <StatCard title="Warehouses" value={stats.totalWarehouses} icon={Warehouse} description="Storage locations" />
+      </StatGrid>
 
       {/* Module Cards */}
       <Section title="Inventory Management">

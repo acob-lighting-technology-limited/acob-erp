@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Boxes, ClipboardList, Package2 } from 
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 
@@ -232,7 +233,7 @@ export default function MovementsPage() {
       icon={Boxes}
       backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-4">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Total Movements"
@@ -264,9 +265,8 @@ export default function MovementsPage() {
             icon={ClipboardList}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
-            className="hidden sm:block"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<StockMovement>

@@ -8,6 +8,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { formatWATDateTime } from "@/lib/utils/date"
 
@@ -148,7 +149,7 @@ export default function AdminPmsCbtExtraScoresPage() {
         </Button>
       }
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Responses"
@@ -173,7 +174,7 @@ export default function AdminPmsCbtExtraScoresPage() {
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<BonusScoreRow>

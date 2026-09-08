@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -377,7 +378,7 @@ export function DirectoryContent() {
       // where there is room. `compact` keeps them to a slim band rather than the
       // full-height cards that used to push search off a small screen.
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title={activeTab === "contract" ? "Contract Staff" : "Colleagues"}
@@ -424,10 +425,9 @@ export function DirectoryContent() {
               icon={MapPin}
               iconBgColor="bg-amber-500/10"
               iconColor="text-amber-500"
-              className="hidden sm:block"
             />
           )}
-        </div>
+        </StatGrid>
       }
       spacing="tight"
       actionsPlacement="inline-always"

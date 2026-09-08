@@ -458,15 +458,37 @@ const filters: DataTableFilter<MyRow>[] = [
 
 ### Stats cards — required on every table page
 
+Always wrap `StatCard`s in `StatGrid`. Never hand-write the grid `<div>`.
+
 ```tsx
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 
-<div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
+<StatGrid>
   <StatCard title="Total"   value={total}   icon={Users}      iconBgColor="bg-blue-500/10"    iconColor="text-blue-500" />
   <StatCard title="Active"  value={active}  icon={Check}      iconBgColor="bg-emerald-500/10" iconColor="text-emerald-500" />
   <StatCard title="Pending" value={pending} icon={Clock}      iconBgColor="bg-amber-500/10"   iconColor="text-amber-500" />
-</div>
+</StatGrid>
 ```
+
+**The mobile rule `StatGrid` enforces: one row, three cards maximum.** Columns
+are `min(cardCount, 3)` below `sm`; a fourth card and beyond is hidden on phones
+and returns from `sm` up. A stats band must never cost a phone two rows before
+the data starts.
+
+**Priority is source order.** The first three children are the ones a phone
+keeps. There is deliberately no `priority` prop — a page that wants a different
+card on mobile **reorders its JSX**, so the code reads in the same order the
+reader sees.
+
+This matters more than it looks. Pages naturally list metrics in workflow order
+(`Total → In Progress → Submitted → Overdue`), which puts the exception state
+last — exactly the card someone opened the page to check. If a later card is the
+actionable one (`Overdue`, `SLA Breached`, `Low Stock`, `Absent`), move it into
+the first three.
+
+A page with more than six stat cards is a design problem, not a layout one —
+cut it down rather than reaching for a wider grid.
 
 ### Tabs — when to use
 
@@ -518,9 +540,12 @@ table or filter bar. Use `ExportOptionsDialog` from
 - ❌ Fewer than 2 filter options on any table page
 - ❌ A table page with no metrics at all — supply `stats` (StatCards), `statBadges`,
   or both. Prefer `statBadges` with `statBadgeStyle="line"` on lookup and record
-  pages: four cards fill a phone screen before any data. Pass both only when the
-  cards genuinely earn a desktop band; they then render `md`-and-up while the line
-  covers mobile.
+  pages: even a `StatGrid` row of three costs a phone height it could spend on
+  data. Pass both only when the cards genuinely earn a desktop band; they then
+  render `md`-and-up while the line covers mobile.
+- ❌ A hand-written grid `<div>` wrapping `StatCard`s — use `StatGrid`, which owns
+  the one-row / three-card mobile rule. A bare `grid-cols-2` or `grid-cols-3`
+  wrapper is what put a second row of metrics on 82 phone screens.
 - ❌ A table page without `DataTablePage` as the root wrapper
 
 ### The one exception to inline filter state — controlled filters
@@ -590,7 +615,6 @@ see the columns.
 
 Pages that supply `mobileRow` **without** `contactsView` are unchanged: there is no
 separate List mode there, so the row list still stands in for the table below `md`.
-
 `defaultViewMode` takes either a mode or `{ mobile, desktop }`. Records pages with
 many columns want `{ mobile: "contacts", desktop: "list" }` — the row list where
 the columns will not fit, the table where they will. A lookup page passes a plain

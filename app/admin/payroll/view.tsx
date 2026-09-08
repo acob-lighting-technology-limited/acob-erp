@@ -7,6 +7,7 @@ import { DataTablePage, DataTable } from "@/components/ui/data-table"
 import type { DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import type { PayrollBreakdown } from "@/lib/hr/payroll-utils"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -305,7 +306,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
   }
 
   const stats = (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <StatGrid>
       <StatCard
         variant="compact"
         title="Total Payslips Issued"
@@ -330,7 +331,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
         iconBgColor="bg-amber-500/10"
         iconColor="text-amber-500"
       />
-    </div>
+    </StatGrid>
   )
 
   const actions = initialData.isAdmin ? (

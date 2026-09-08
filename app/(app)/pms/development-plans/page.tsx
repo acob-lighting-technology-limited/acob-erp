@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
@@ -242,7 +243,7 @@ export default function DevelopmentPlansPage() {
       backLink={{ href: "/pms", label: "Back to PMS" }}
       spacing="tight"
       stats={
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <StatGrid>
           <StatCard
             variant="compact"
             title="Active Plans"
@@ -264,7 +265,7 @@ export default function DevelopmentPlansPage() {
             icon={Clock}
             description="Across all plans"
           />
-        </div>
+        </StatGrid>
       }
     >
       <DataTable<DevelopmentPlan>
