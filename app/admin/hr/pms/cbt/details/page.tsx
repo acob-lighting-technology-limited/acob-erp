@@ -255,7 +255,6 @@ export default function CbtDetailsLogPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) => (row.status === "submitted" ? "bg-emerald-500" : "bg-amber-500"),
           title: (row) => (row.profiles ? `${row.profiles.first_name} ${row.profiles.last_name}` : row.company_email),
           subtitle: (row) =>
             `${row.profiles?.department || "No dept"} · ${row.review_cycles?.name || "No cycle"}${

@@ -988,7 +988,6 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-blue-500",
             title: (r) => r.department,
             subtitle: (r) => `${r.cycle} · Reviews: ${r.submitted}/${r.reviews} · Avg: ${r.final}`,
             trailing: (r) => <span className="text-xs font-semibold">{r.final}</span>,
@@ -1073,7 +1072,6 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-purple-500",
             title: (r) => r.cycle,
             subtitle: (r) => `${r.review_type} · ${r.reviews} staff · Completed: ${r.completed}`,
             trailing: (r) => (

@@ -748,7 +748,6 @@ export function DepartmentsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (d) => (d.is_active ? "bg-emerald-500" : "bg-slate-400"),
           title: (d) => d.name,
           subtitle: (d) =>
             `${d.department_code || "No code"} · ${d.employee_count || 0} employees · ${d.email || "No email"}`,

@@ -103,11 +103,22 @@ export function TablePageSkeleton({
 
         {/* ── 2. Tabs (optional) ── */}
         {tabs && tabs > 0 ? (
-          <div className={tabs === 2 ? "grid grid-cols-2 gap-1 sm:flex" : "flex gap-1"}>
+          <div
+            className={
+              tabs >= 2 && tabs <= 4
+                ? cn(
+                    "grid gap-1 sm:flex",
+                    tabs === 2 && "grid-cols-2",
+                    tabs === 3 && "grid-cols-3",
+                    tabs === 4 && "grid-cols-4"
+                  )
+                : "flex gap-1"
+            }
+          >
             {Array.from({ length: tabs }).map((_, i) => (
               <SkeletonLine
                 key={`tab-${i}`}
-                className={tabs === 2 ? "h-9 w-full rounded-md sm:w-20" : "h-9 w-20 rounded-md"}
+                className={tabs >= 2 && tabs <= 4 ? "h-9 w-full rounded-md sm:w-20" : "h-9 w-20 rounded-md"}
               />
             ))}
           </div>

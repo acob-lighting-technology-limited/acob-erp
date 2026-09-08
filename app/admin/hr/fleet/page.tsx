@@ -464,8 +464,6 @@ export default function AdminFleetPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) =>
-              r.status === "rejected" ? "bg-rose-500" : r.status === "approved" ? "bg-emerald-500" : "bg-amber-500",
             title: (r) => `${r.resource?.name || "Resource"} · ${r.requester?.full_name || "Employee"}`,
             subtitle: (r) => `${formatDateTime(r.start_at)} - ${formatDateTime(r.end_at)} · ${r.reason || "No reason"}`,
             trailing: (r) => (
@@ -535,7 +533,6 @@ export default function AdminFleetPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (r) => (r.is_active ? "bg-emerald-500" : "bg-slate-400"),
             title: (r) => r.name,
             subtitle: (r) => `${r.resource_type} · ${r.description || "No description"}`,
             trailing: (r) => (

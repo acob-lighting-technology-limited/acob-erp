@@ -826,7 +826,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (row) => (typeof row.cbt_score === "number" ? "bg-emerald-500" : "bg-amber-500"),
             title: (row) => row.employee,
             subtitle: (row) =>
               `${row.department} · ${formatCycleName(row.cycle)} · Score: ${scoreLabel(row.cbt_score)}`,
@@ -881,7 +880,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-blue-500",
             title: (row) => row.department,
             subtitle: (row) =>
               `${formatCycleName(row.cycle)} · ${row.scores_recorded}/${row.total_employees} completed`,
@@ -931,7 +929,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-purple-500",
             title: (row) => formatCycleName(row.cycle),
             subtitle: (row) =>
               `${row.review_type} · ${row.questions} questions · Avg: ${scoreLabel(row.average_score)}`,

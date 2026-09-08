@@ -429,14 +429,6 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (cycle) =>
-            cycle.status === "active"
-              ? "bg-emerald-500"
-              : cycle.status === "closed"
-                ? "bg-blue-500"
-                : cycle.status === "locked"
-                  ? "bg-slate-500"
-                  : "bg-amber-500",
           title: (cycle) => cycle.name,
           subtitle: (cycle) =>
             `${cycle.review_type.replace(/_/g, " ")} · ${formatDate(cycle.start_date)} - ${formatDate(cycle.end_date)}`,

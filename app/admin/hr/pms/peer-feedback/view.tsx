@@ -376,7 +376,6 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) => (row.score >= 70 ? "bg-emerald-500" : "bg-amber-500"),
           title: (row) => `${formatName(row.subject)} (by ${formatName(row.reviewer)})`,
           subtitle: (row) =>
             `${row.subject?.department || "No dept"} · ${cycleNameMap.get(row.review_cycle_id) || "No cycle"} · Score: ${row.score}%`,

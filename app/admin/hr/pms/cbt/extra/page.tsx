@@ -589,7 +589,6 @@ export default function AdminPmsCbtExtraQuestionPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (q) => (q.is_active === false ? "bg-slate-400" : "bg-emerald-500"),
           title: (q) => q.prompt,
           subtitle: (q) =>
             `${cycleNameById.get(q.review_cycle_id || "") || "No cycle"} · Targets: ${q.targeted_emails?.length || 0}`,

@@ -592,7 +592,6 @@ export function OfficeLocationsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (location) => (location.is_active ? "bg-emerald-500" : "bg-slate-400"),
           title: (location) => location.name,
           subtitle: (location) =>
             `${OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type} · ${location.department || "All Departments"} · ${location.employee_count || 0} employees`,

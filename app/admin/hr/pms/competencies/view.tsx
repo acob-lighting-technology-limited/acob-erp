@@ -491,7 +491,6 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (c) => (c.is_active ? "bg-emerald-500" : "bg-slate-400"),
           title: (c) => c.label,
           subtitle: (c) => `${CATEGORY_LABELS[c.category] || c.category} · ${c.key}`,
           trailing: (c) => (

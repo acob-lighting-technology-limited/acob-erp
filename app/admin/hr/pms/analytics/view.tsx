@@ -449,8 +449,6 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            (row.final ?? 0) >= 80 ? "bg-emerald-500" : (row.final ?? 0) >= 60 ? "bg-amber-500" : "bg-red-500",
           title: (row) => row.employee,
           subtitle: (row) => `${row.department} · ${row.cycle} · Final: ${row.final !== null ? `${row.final}%` : "-"}`,
           trailing: (row) => {

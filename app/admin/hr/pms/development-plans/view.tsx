@@ -582,14 +582,6 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (plan) =>
-            plan.status === "completed"
-              ? "bg-emerald-500"
-              : plan.status === "active"
-                ? "bg-blue-500"
-                : plan.status === "cancelled"
-                  ? "bg-red-500"
-                  : "bg-amber-500",
           title: (plan) => `${formatName(plan.user)} · ${plan.title}`,
           subtitle: (plan) =>
             `${plan.user?.department || "No dept"} · ${FOCUS_LABELS[plan.focus_area] || plan.focus_area} · Progress: ${plan.progress_pct}%`,

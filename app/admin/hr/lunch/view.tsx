@@ -1540,7 +1540,6 @@ export function LunchRegisterPage({
             stickyToolbar
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
-              accentClass: (row) => getMenuStatusInfo(row).accentClass,
               title: (row) => formatWATDate(row.date),
               subtitle: (row) => `${row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}`,
               trailing: (row) => {

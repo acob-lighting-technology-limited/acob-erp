@@ -50,10 +50,17 @@ export function DataTablePage({
       {tabs && tabs.length > 0 && activeTab && onTabChange && (
         <div className="mb-4">
           <Tabs value={activeTab} onValueChange={onTabChange}>
-            {tabs.length === 2 ? (
-              <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+            {tabs.length <= 4 ? (
+              <TabsList
+                className={cn(
+                  "grid w-full sm:inline-flex sm:w-auto",
+                  tabs.length === 2 && "grid-cols-2",
+                  tabs.length === 3 && "grid-cols-3",
+                  tabs.length === 4 && "grid-cols-4"
+                )}
+              >
                 {tabs.map((tab) => (
-                  <TabsTrigger key={tab.key} value={tab.key} className="truncate">
+                  <TabsTrigger key={tab.key} value={tab.key} className="truncate px-2">
                     {tab.icon && <tab.icon className="mr-1.5 h-4 w-4 shrink-0" />}
                     <span className="truncate">{tab.label}</span>
                   </TabsTrigger>
@@ -78,10 +85,17 @@ export function DataTablePage({
       {secondaryTabs && secondaryTabs.length > 0 && secondaryActiveTab && onSecondaryTabChange && (
         <div className="mb-4">
           <Tabs value={secondaryActiveTab} onValueChange={onSecondaryTabChange}>
-            {secondaryTabs.length === 2 ? (
-              <TabsList className="grid w-full grid-cols-2 sm:inline-flex sm:w-auto">
+            {secondaryTabs.length <= 4 ? (
+              <TabsList
+                className={cn(
+                  "grid w-full sm:inline-flex sm:w-auto",
+                  secondaryTabs.length === 2 && "grid-cols-2",
+                  secondaryTabs.length === 3 && "grid-cols-3",
+                  secondaryTabs.length === 4 && "grid-cols-4"
+                )}
+              >
                 {secondaryTabs.map((tab) => (
-                  <TabsTrigger key={tab.key} value={tab.key} className="truncate">
+                  <TabsTrigger key={tab.key} value={tab.key} className="truncate px-2">
                     {tab.icon && <tab.icon className="mr-1.5 h-4 w-4 shrink-0" />}
                     <span className="truncate">{tab.label}</span>
                   </TabsTrigger>

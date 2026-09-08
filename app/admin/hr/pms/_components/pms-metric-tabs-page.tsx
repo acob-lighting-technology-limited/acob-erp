@@ -805,7 +805,6 @@ export function PmsMetricTabsPage({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: () => "bg-blue-500",
           title: (row) => asString(row.employee || row.department || row.cycle),
           subtitle: (row) => {
             if (tab === "individual") {

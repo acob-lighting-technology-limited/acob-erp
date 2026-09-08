@@ -751,7 +751,6 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-blue-500",
             title: (r) => r.department,
             subtitle: (r) => `Reviews: ${r.submitted}/${r.reviews} · Avg Final: ${r.final}`,
             trailing: (r) => <span className="text-xs font-semibold">{r.final}</span>,
@@ -805,7 +804,6 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: () => "bg-purple-500",
             title: (r) => r.cycle,
             subtitle: (r) => `${r.review_type} · ${r.employee_count} staff · Completed: ${r.completed}`,
             trailing: (r) => (

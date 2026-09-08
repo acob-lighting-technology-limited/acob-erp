@@ -248,8 +248,6 @@ export default function AdminPmsCbtExtraScoresPage() {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          accentClass: (row) =>
-            row.bonus_score === 100 ? "bg-emerald-500" : row.bonus_score !== null ? "bg-amber-500" : "bg-slate-400",
           title: (row) => row.employee,
           subtitle: (row) =>
             `${row.department} · ${row.cycle} · Bonus: ${row.bonus_score !== null ? `${row.bonus_score}%` : "None"}`,

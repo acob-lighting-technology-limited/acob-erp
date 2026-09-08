@@ -295,7 +295,6 @@ export default function SiteLocationsPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            accentClass: (s) => (s.is_active ? "bg-emerald-500" : "bg-slate-400"),
             title: (s) => s.name,
             subtitle: (s) => `${s.address || "No address"} · Radius: ${s.radius_metres}m`,
             trailing: (s) => (
