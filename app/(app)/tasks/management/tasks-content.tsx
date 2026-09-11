@@ -204,17 +204,12 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     },
     {
       key: "title",
-      label: "Task",
+      label: "Task Title",
       sortable: true,
       resizable: true,
       initialWidth: 300,
       accessor: (t) => t.title,
-      render: (t) => (
-        <div className="flex flex-col">
-          <span className="line-clamp-1 font-medium">{t.title}</span>
-          {t.goal_title && <span className="text-muted-foreground line-clamp-1 text-[10px]">{t.goal_title}</span>}
-        </div>
-      ),
+      render: (t) => <span className="line-clamp-1 font-medium">{t.title}</span>,
     },
     {
       key: "goal",

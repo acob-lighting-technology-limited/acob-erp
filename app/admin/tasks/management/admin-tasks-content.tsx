@@ -373,25 +373,25 @@ export function AdminTasksContent({
       },
       {
         key: "title",
-        label: "Task Title & Department",
+        label: "Task Title",
         sortable: true,
         resizable: true,
         initialWidth: 260,
         accessor: (r) => r.title,
-        render: (r) => (
-          <div className="flex flex-col">
-            <span className="text-foreground font-medium">{r.title}</span>
-            <span className="text-muted-foreground text-[10px] uppercase">{r.department || "General"}</span>
-          </div>
-        ),
+        render: (r) => <span className="text-foreground font-medium">{r.title}</span>,
       },
       {
         key: "assigned_to",
-        label: "Assignee",
+        label: "Assignee & Department",
         resizable: true,
-        initialWidth: 180,
-        accessor: (r) => workflowOwnerLabel(r),
-        render: (r) => <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>,
+        initialWidth: 200,
+        accessor: (r) => `${workflowOwnerLabel(r)} ${r.department || ""}`,
+        render: (r) => (
+          <div className="flex flex-col">
+            <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>
+            <span className="text-muted-foreground text-[10px] uppercase">{r.department || "General"}</span>
+          </div>
+        ),
       },
       {
         key: "weight",
@@ -593,7 +593,7 @@ export function AdminTasksContent({
         onRetry={loadData}
         searchPlaceholder="Search task title, description, or assigned user..."
         searchFn={(r, q) =>
-          `${r.title} ${r.description || ""} ${workflowOwnerLabel(r)} ${r.work_item_number || ""}`
+          `${r.title} ${r.description || ""} ${workflowOwnerLabel(r)} ${r.department || ""} ${r.work_item_number || ""}`
             .toLowerCase()
             .includes(q.toLowerCase())
         }
