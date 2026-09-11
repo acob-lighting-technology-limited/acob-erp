@@ -434,7 +434,7 @@ export function AdminTasksContent({
           ) : r.kpi_measure ? (
             <span className="line-clamp-1 text-xs font-medium">{r.kpi_measure}</span>
           ) : (
-            <span className="text-muted-foreground text-xs italic">Operational Task</span>
+            <span className="text-muted-foreground text-xs">—</span>
           ),
       },
       {

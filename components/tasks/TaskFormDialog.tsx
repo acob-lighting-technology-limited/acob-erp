@@ -131,7 +131,6 @@ export function TaskFormDialog({
   lockedPlanId = null,
   lockedPlanName = null,
 }: TaskFormDialogProps) {
-  const [goalOptions, setGoalOptions] = useState<GoalOption[]>(initialGoals)
   const [kpiOptions, setKpiOptions] = useState<KpiOption[]>([])
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([])
   const [isMultiAssign, setIsMultiAssign] = useState(false)
@@ -200,15 +199,6 @@ export function TaskFormDialog({
     }
   }, [isOpen, reset, selectedTask?.id, taskForm, lockedProjectId, lockedPlanId])
 
-  // The contract locks down as work proceeds. A task's weight and dates and
-  // who it's assigned to are what was agreed at the start; changing them
-  // silently after the fact rewrites the terms someone is being scored
-  // against. Deliberate changes still happen — through Reassign and Extend
-  // Deadline in the review decision dialog, which are audited — this form
-  // just stops being the back door for it.
-  //   pending                          → everything editable
-  //   in_progress / unable_to_complete → assignee, weight, dates locked
-  //   anything else                    → the whole form is locked
   const lockLevel = !selectedTask
     ? "none"
     : selectedTask.status === "pending"
@@ -219,35 +209,11 @@ export function TaskFormDialog({
 
   const assignedTo = watch("assigned_to")
   const departmentValue = watch("department")
-  const goalId = watch("goal_id")
   const kpiId = watch("kpi_id")
   const projectId = watch("project_id")
   const weightValue = watch("weight")
   const titleValue = watch("title")
-  const priorityValue = watch("priority")
   const statusValue = watch("status")
-
-  // Fetch available goals based on target department
-  useEffect(() => {
-    const targetDepartment =
-      departmentValue ||
-      scopedAssignableEmployees.find((e) => e.id === assignedTo)?.department ||
-      scopedAssignableDepartments[0] ||
-      ""
-
-    const query = targetDepartment ? `?department=${encodeURIComponent(targetDepartment)}` : ""
-
-    fetch(`/api/hr/performance/goals${query}`)
-      .then((res) => res.json())
-      .then((payload) => {
-        const activeGoals = (payload.data ?? []).map((g: { id: string; title: string }) => ({
-          id: g.id,
-          title: g.title,
-        }))
-        setGoalOptions(activeGoals)
-      })
-      .catch(() => setGoalOptions(initialGoals))
-  }, [assignedTo, departmentValue, scopedAssignableDepartments, scopedAssignableEmployees, initialGoals])
 
   // Corporate KPIs a task may be tagged to: only the ones the target
   // department is CORE or SUPPORT on, per the RACI grid — not all 61.
@@ -344,7 +310,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || (values.project_id === "__none__" ? "" : (values.project_id ?? "")),
       plan_id: lockedPlanId || (values.plan_id ?? ""),
       weight: values.weight ?? TASK_WEIGHT_DEFAULT,
-      goal_id: values.goal_id === "__none__" ? "" : (values.goal_id ?? ""),
+      goal_id: "",
       kpi_id: values.kpi_id === "__none__" ? "" : (values.kpi_id ?? ""),
       task_start_date: values.task_start_date ?? "",
       task_end_date: values.task_end_date ?? "",
@@ -373,9 +339,9 @@ export function TaskFormDialog({
                     "Assign tasks to a single person or multiple team members. When assigning to multiple people, individual task copies are created so each person is tracked independently.",
                 },
                 {
-                  label: "Goal Alignment",
+                  label: "Corporate KPI Alignment",
                   value:
-                    "Linking to a strategic goal is optional. Linked tasks drive that goal's KPI progress, while unlinked tasks track operational execution.",
+                    "Linking to a Corporate KPI is optional. Linked tasks drive departmental scorecard progress, while unlinked tasks track routine work.",
                 },
                 {
                   label: "Review Workflow",
@@ -387,8 +353,8 @@ export function TaskFormDialog({
           </div>
           <DialogDescription>
             {selectedTask
-              ? "Update task details, due dates, or linked goal."
-              : "Assign an operational or goal-linked task to team members."}
+              ? "Update task details, due dates, or linked Corporate KPI."
+              : "Assign a task with optional Corporate KPI alignment to team members."}
           </DialogDescription>
           {assignmentAuthorityLabel ? (
             <p className="text-muted-foreground text-xs">{assignmentAuthorityLabel}</p>
@@ -560,7 +526,7 @@ export function TaskFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">
-                  <span className="text-muted-foreground italic">None (Operational Task)</span>
+                  <span className="text-muted-foreground italic">None (No Corporate KPI)</span>
                 </SelectItem>
                 {sortedKpis.length === 0 ? (
                   <div className="text-muted-foreground px-2 py-1.5 text-xs">
@@ -603,7 +569,7 @@ export function TaskFormDialog({
               </div>
             )}
             <p className="text-muted-foreground text-[11px]">
-              Which corporate target this work serves. Only choose &ldquo;None (Operational Task)&rdquo; if this task
+              Which corporate target this work serves. Only choose &ldquo;None (No Corporate KPI)&rdquo; if this task
               does not link to any departmental KPI.
             </p>
           </div>

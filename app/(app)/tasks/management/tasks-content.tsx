@@ -225,7 +225,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         ) : t.kpi_measure ? (
           <span className="text-foreground line-clamp-1 text-xs font-medium">{t.kpi_measure}</span>
         ) : (
-          <span className="text-muted-foreground text-xs italic">Operational Task</span>
+          <span className="text-muted-foreground text-xs">—</span>
         ),
       hideOnMobile: true,
     },
@@ -487,7 +487,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               </div>
               <div className="flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t.goal_title || t.kpi_measure || "Operational Task"}</span>
+                <span className="truncate">{t.goal_title || t.kpi_measure || "—"}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

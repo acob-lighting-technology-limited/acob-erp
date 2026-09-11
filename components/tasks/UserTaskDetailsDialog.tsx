@@ -183,7 +183,7 @@ export function UserTaskDetailsDialog({
                   {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
                 </DetailField>
                 <DetailField icon={Target} label="Strategic goal">
-                  {selectedTask.goal_title || <span className="text-muted-foreground">None (Operational task)</span>}
+                  {selectedTask.goal_title || <span className="text-muted-foreground">—</span>}
                 </DetailField>
                 <DetailField icon={Target} label="Corporate KPI">
                   {selectedTask.kpi_measure ? (
@@ -194,7 +194,7 @@ export function UserTaskDetailsDialog({
                       )}
                     </div>
                   ) : (
-                    <span className="text-muted-foreground">None (Operational task)</span>
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </DetailField>
                 <DetailField icon={Gauge} label="Weight">
