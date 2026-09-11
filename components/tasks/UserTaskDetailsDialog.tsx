@@ -21,7 +21,7 @@ import type { Task } from "@/types/task"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { formatWATDateTime, formatWATDate } from "@/lib/utils/date"
 import { formatFullName } from "@/lib/utils"
-import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT, TASK_WEIGHT_LABELS } from "@/lib/tasks/scoring"
+import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import {
   DetailActionBar,
   DetailCallout,
@@ -189,8 +189,7 @@ export function UserTaskDetailsDialog({
                   {selectedTask.kpi_measure || <span className="text-muted-foreground">Not linked</span>}
                 </DetailField>
                 <DetailField icon={Gauge} label="Weight">
-                  {selectedTask.weight ?? TASK_WEIGHT_DEFAULT} —{" "}
-                  {TASK_WEIGHT_LABELS[selectedTask.weight ?? TASK_WEIGHT_DEFAULT]}
+                  {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
                 </DetailField>
                 <DetailField icon={Star} label="Rating">
                   {selectedTask.rating ? (

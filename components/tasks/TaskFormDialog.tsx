@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { formatFullName } from "@/lib/utils"
-import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_LABELS, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
+import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
 
 interface GoalOption {
@@ -698,7 +698,6 @@ export function TaskFormDialog({
                   (value) => (
                     <SelectItem key={value} value={String(value)}>
                       {value}
-                      {TASK_WEIGHT_LABELS[value] ? ` — ${TASK_WEIGHT_LABELS[value]}` : ""}
                     </SelectItem>
                   )
                 )}
