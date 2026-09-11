@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   CalendarDays,
   Target,
+  Scale,
 } from "lucide-react"
 
 import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
@@ -425,7 +426,9 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
           subtitle: (t) =>
             [
               t.work_item_number || null,
+              `Weight ${t.weight ?? TASK_WEIGHT_DEFAULT}`,
               t.due_date ? `Due ${formatWATDate(t.due_date)}` : "No deadline",
+              t.kpi_measure || t.goal_title || null,
               (t.comment_count || 0) > 0 ? `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"}` : null,
             ]
               .filter(Boolean)
@@ -437,15 +440,24 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             badges: (t) => (
               <>
                 <TaskStatusPill status={t.status} />
-                <Badge variant="outline" className="text-[10px] capitalize">
-                  {t.priority}
+                <Badge
+                  variant="outline"
+                  className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(t.weight))}
+                >
+                  Weight {t.weight ?? TASK_WEIGHT_DEFAULT}
                 </Badge>
               </>
             ),
             fields: (t) => [
               { label: "Item #", value: t.work_item_number || "-", copyable: true },
               { label: "Status", value: t.status.replace(/_/g, " ") },
-              { label: "Priority", value: t.priority },
+              { label: "Task Weight", value: `${t.weight ?? TASK_WEIGHT_DEFAULT} (compulsory)` },
+              {
+                label: "Corporate KPI",
+                value: t.kpi_measure ? `${t.kpi_measure}${t.kpi_pillar ? ` (🎯 ${t.kpi_pillar})` : ""}` : "—",
+              },
+              { label: "Strategic Goal", value: t.goal_title || "—" },
+              { label: "Start Date", value: t.task_start_date ? formatWATDate(t.task_start_date) : "—" },
               { label: "Due Date", value: t.due_date ? formatWATDate(t.due_date) : "No deadline" },
               {
                 label: "Assignee",
@@ -480,11 +492,11 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               </div>
               <div className="flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t.goal_title || t.kpi_measure || "—"}</span>
+                <span className="truncate">{t.kpi_measure || t.goal_title || "—"}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                <span className="capitalize">{t.priority} priority</span>
+                <Scale className="h-3.5 w-3.5 shrink-0" />
+                <span>Weight {t.weight ?? TASK_WEIGHT_DEFAULT}</span>
               </div>
             </div>
           </div>

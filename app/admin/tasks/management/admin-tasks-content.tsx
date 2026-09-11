@@ -697,8 +697,16 @@ export function AdminTasksContent({
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
           title: (r) => r.title,
-          subtitle: (r) =>
-            `${r.work_item_number || "Task"} · ${workflowOwnerLabel(r)} · Due ${r.due_date ? formatWATDate(r.due_date) : "No deadline"}`,
+          subtitle: (r) => {
+            const parts = [
+              r.work_item_number || null,
+              workflowOwnerLabel(r),
+              `Weight ${r.weight ?? TASK_WEIGHT_DEFAULT}`,
+              r.due_date ? `Due ${formatWATDate(r.due_date)}` : "No deadline",
+              r.kpi_measure || r.goal_title || null,
+            ].filter(Boolean)
+            return parts.join(" · ")
+          },
           trailing: (r) => <AdminTaskStatusBadge status={r.status} className="text-[10px]" />,
           detail: {
             title: (r) => r.title,
@@ -707,21 +715,25 @@ export function AdminTasksContent({
               <>
                 <AdminTaskStatusBadge status={r.status} className="text-[10px]" />
                 <Badge
-                  className={
-                    r.priority === "urgent" || r.priority === "high"
-                      ? "bg-red-500/10 text-red-500"
-                      : "bg-blue-500/10 text-blue-500"
-                  }
+                  variant="outline"
+                  className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(r.weight))}
                 >
-                  {formatName(r.priority)}
+                  Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
                 </Badge>
               </>
             ),
             fields: (r) => [
               { label: "Item #", value: r.work_item_number || "-", copyable: true },
               { label: "Owner", value: workflowOwnerLabel(r) },
-              { label: "Priority", value: formatName(r.priority) },
+              { label: "Department", value: r.department || "-" },
               { label: "Status", value: formatName(r.status) },
+              { label: "Task Weight", value: `${r.weight ?? TASK_WEIGHT_DEFAULT} (compulsory)` },
+              {
+                label: "Corporate KPI",
+                value: r.kpi_measure ? `${r.kpi_measure}${r.kpi_pillar ? ` (🎯 ${r.kpi_pillar})` : ""}` : "—",
+              },
+              { label: "Strategic Goal", value: r.goal_title || "—" },
+              { label: "Start Date", value: r.task_start_date ? formatWATDate(r.task_start_date) : "—" },
               { label: "Due Date", value: r.due_date ? formatWATDate(r.due_date) : "No deadline" },
               { label: "Description", value: r.description || null, fullWidth: true },
             ],
@@ -738,19 +750,17 @@ export function AdminTasksContent({
             <div className="flex items-start justify-between">
               <span className="text-muted-foreground font-mono text-[10px]">{r.work_item_number}</span>
               <Badge
-                className={
-                  r.priority === "urgent" || r.priority === "high"
-                    ? "bg-red-500/10 text-red-500"
-                    : "bg-blue-500/10 text-blue-500"
-                }
+                variant="outline"
+                className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(r.weight))}
               >
-                {formatName(r.priority)}
+                Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
               </Badge>
             </div>
             <div>
               <h4 className="line-clamp-1 text-sm font-semibold">{r.title}</h4>
               <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{r.description}</p>
             </div>
+            {r.kpi_measure && <div className="text-muted-foreground line-clamp-1 text-[11px]">🎯 {r.kpi_measure}</div>}
             <div className="flex items-center justify-between border-t pt-2">
               <div className="flex items-center gap-1.5">
                 <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>

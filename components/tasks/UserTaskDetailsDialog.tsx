@@ -115,10 +115,10 @@ export function UserTaskDetailsDialog({
               )
             })()}
             <Badge
-              variant={["high", "urgent"].includes(selectedTask.priority) ? "destructive" : "outline"}
-              className="text-[11px] capitalize"
+              variant="outline"
+              className={cn("font-mono text-[11px] font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
             >
-              {selectedTask.priority}
+              Weight {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
             </Badge>
             {isOverdue && (
               <Badge variant="destructive" className="gap-1 text-[11px]">
