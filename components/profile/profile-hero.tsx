@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Pencil, Mail, Phone, Cake, Home, Camera, Trash2, Loader2 } from "lucide-react"
 import { formatName, cn } from "@/lib/utils"
-import { formatWATDate, formatBirthdayLabel, toLocalISODate } from "@/lib/utils/date"
+import { formatWATDate, formatBirthdayLabel, toLocalISODate, formatDDMMYYYY } from "@/lib/utils/date"
 import { getRoleBadgeColor, getRoleDisplayName } from "@/lib/permissions"
 import { apiFetch } from "@/lib/api-client"
 import type { UserRole } from "@/types/database"
@@ -197,21 +197,20 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
   }
 
   const tenure = getTenureLabel(profile.employment_date)
-  const joinedDate = profile.employment_date
-    ? formatWATDate(new Date(profile.employment_date), { day: "numeric", month: "short", year: "numeric" })
-    : null
+  const employmentDate = profile.employment_date ? formatDDMMYYYY(profile.employment_date) : null
+  const confirmationDate = profile.confirmation_date ? formatDDMMYYYY(profile.confirmation_date) : null
 
   const birthdayLabel = formatBirthdayLabel(profile.birthday)
 
   const desigAndDept = [profile.designation, profile.department].filter(Boolean).join(" · ")
-  const joinedInfo = joinedDate ? `Joined ${joinedDate}${tenure ? ` · ${tenure}` : ""}` : null
-  const confirmationInfo = profile.confirmation_date
-    ? `Confirmed ${formatWATDate(new Date(profile.confirmation_date), { day: "numeric", month: "short", year: "numeric" })}`
+  const employmentInfo = employmentDate ? `Employment Date: ${employmentDate}${tenure ? ` · ${tenure}` : ""}` : null
+  const confirmationInfo = confirmationDate
+    ? `Confirmation Date: ${confirmationDate}`
     : profile.employment_date
       ? "Probation (Pending Confirmation)"
       : null
 
-  const identityLine = [profile.designation, profile.department, joinedInfo, confirmationInfo].filter(Boolean)
+  const identityLine = [profile.designation, profile.department, employmentInfo, confirmationInfo].filter(Boolean)
 
   const renderAvatar = (sizeClass: string) => (
     <div className="group relative shrink-0">
@@ -292,11 +291,13 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
           </div>
 
           {/* Full-width identity details */}
-          {(desigAndDept || joinedInfo || confirmationInfo) && (
+          {(desigAndDept || employmentInfo || confirmationInfo) && (
             <div className="space-y-0.5 pt-0.5 text-xs">
               {desigAndDept && <p className="text-foreground/90 text-sm font-medium">{desigAndDept}</p>}
-              {(joinedInfo || confirmationInfo) && (
-                <p className="text-muted-foreground">{[joinedInfo, confirmationInfo].filter(Boolean).join(" · ")}</p>
+              {(employmentInfo || confirmationInfo) && (
+                <p className="text-muted-foreground">
+                  {[employmentInfo, confirmationInfo].filter(Boolean).join(" · ")}
+                </p>
               )}
             </div>
           )}
