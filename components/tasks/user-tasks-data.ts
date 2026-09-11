@@ -83,20 +83,28 @@ export async function loadUserTasks(
 
   const userIds = new Set<string>()
   const goalIds = new Set<string>()
+  const kpiIds = new Set<string>()
   for (const task of uniqueTasks) {
     if (task.assigned_by) userIds.add(task.assigned_by)
     if (task.assigned_to) userIds.add(task.assigned_to)
     if (task.created_by) userIds.add(task.created_by)
     if (task.reviewed_by) userIds.add(task.reviewed_by)
     if (task.goal_id) goalIds.add(task.goal_id)
+    if (task.kpi_id) kpiIds.add(task.kpi_id)
   }
 
-  const [profilesRes, goalsRes, commentsRes, userCompletionsRes] = await Promise.all([
+  const [profilesRes, goalsRes, kpisRes, commentsRes, userCompletionsRes] = await Promise.all([
     userIds.size > 0
       ? supabase.from("profiles").select("id, first_name, last_name, department").in("id", Array.from(userIds))
       : { data: [] },
     goalIds.size > 0
       ? supabase.from("goals_objectives").select("id, title").in("id", Array.from(goalIds))
+      : { data: [] },
+    kpiIds.size > 0
+      ? supabase
+          .from("corporate_kpis")
+          .select("id, measure, strategic_objective, strategic_priority")
+          .in("id", Array.from(kpiIds))
       : { data: [] },
     taskIds.length > 0
       ? supabase.from("task_updates").select("task_id").in("task_id", taskIds).eq("update_type", "comment")
@@ -112,6 +120,8 @@ export async function loadUserTasks(
   const goalMap = new Map<string, string>(
     ((goalsRes.data || []) as Array<{ id: string; title: string }>).map((g) => [g.id, g.title])
   )
+  type KpiInfo = { id: string; measure: string; strategic_objective: string; strategic_priority: string }
+  const kpiMap = new Map<string, KpiInfo>(((kpisRes.data || []) as KpiInfo[]).map((k) => [k.id, k]))
   const completedTaskIds = new Set(
     (userCompletionsRes.data || []).map((row: { task_id?: string | null }) => String(row?.task_id || ""))
   )
@@ -149,6 +159,17 @@ export async function loadUserTasks(
     if (task.created_by) taskData.created_by_user = profileMap.get(task.created_by)
     if (task.reviewed_by) taskData.reviewed_by_user = profileMap.get(task.reviewed_by)
     if (task.goal_id) taskData.goal_title = goalMap.get(task.goal_id) || null
+    if (task.kpi_id) {
+      const kpi = kpiMap.get(task.kpi_id)
+      if (kpi) {
+        taskData.kpi_measure = kpi.measure
+        taskData.kpi_pillar = kpi.strategic_priority
+        taskData.kpi_objective = kpi.strategic_objective
+        if (!taskData.goal_title) {
+          taskData.goal_title = kpi.strategic_objective
+        }
+      }
+    }
     taskData.user_completed = task.status === "completed" || completedTaskIds.has(task.id)
 
     return taskData

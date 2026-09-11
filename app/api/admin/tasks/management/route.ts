@@ -46,16 +46,44 @@ export async function GET() {
   }))
 
   const goalIds = Array.from(new Set(enriched.map((task) => task.goal_id).filter(Boolean))) as string[]
+  const kpiIds = Array.from(new Set(enriched.map((task) => task.kpi_id).filter(Boolean))) as string[]
+
   let goalMap = new Map<string, string>()
-  if (goalIds.length > 0) {
-    const { data: goals } = await db.from("goals_objectives").select("id, title").in("id", goalIds)
-    goalMap = new Map(((goals ?? []) as { id: string; title: string }[]).map((g) => [g.id, g.title]))
+  type KpiInfo = { id: string; measure: string; strategic_objective: string; strategic_priority: string }
+  let kpiMap = new Map<string, KpiInfo>()
+
+  const [goalsRes, kpisRes] = await Promise.all([
+    goalIds.length > 0 ? db.from("goals_objectives").select("id, title").in("id", goalIds) : { data: [] },
+    kpiIds.length > 0
+      ? db.from("corporate_kpis").select("id, measure, strategic_objective, strategic_priority").in("id", kpiIds)
+      : { data: [] },
+  ])
+
+  if (goalsRes.data) {
+    goalMap = new Map((goalsRes.data as { id: string; title: string }[]).map((g) => [g.id, g.title]))
+  }
+  if (kpisRes.data) {
+    kpiMap = new Map((kpisRes.data as KpiInfo[]).map((k) => [k.id, k]))
   }
 
-  const result = enriched.map((task) => ({
-    ...task,
-    goal_title: task.goal_id ? (goalMap.get(task.goal_id) ?? null) : null,
-  }))
+  const result = enriched.map((task) => {
+    const copy = {
+      ...task,
+      goal_title: task.goal_id ? (goalMap.get(task.goal_id) ?? null) : null,
+    }
+    if (task.kpi_id) {
+      const kpi = kpiMap.get(task.kpi_id)
+      if (kpi) {
+        copy.kpi_measure = kpi.measure
+        copy.kpi_pillar = kpi.strategic_priority
+        copy.kpi_objective = kpi.strategic_objective
+        if (!copy.goal_title) {
+          copy.goal_title = kpi.strategic_objective
+        }
+      }
+    }
+    return copy
+  })
 
   return NextResponse.json({ data: result })
 }

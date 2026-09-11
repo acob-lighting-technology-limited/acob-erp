@@ -58,6 +58,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
 
   const profileIds = new Set<string>()
   const goalIds = new Set<string>()
+  const kpiIds = new Set<string>()
 
   rawTasks.forEach((t) => {
     if (t.assigned_to) profileIds.add(t.assigned_to)
@@ -65,14 +66,21 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     if (t.created_by) profileIds.add(t.created_by)
     if (t.reviewed_by) profileIds.add(t.reviewed_by)
     if (t.goal_id) goalIds.add(t.goal_id)
+    if (t.kpi_id) kpiIds.add(t.kpi_id)
   })
 
-  const [profilesRes, goalsRes] = await Promise.all([
+  const [profilesRes, goalsRes, kpisRes] = await Promise.all([
     profileIds.size > 0
       ? dataClient.from("profiles").select("id, first_name, last_name, department").in("id", Array.from(profileIds))
       : { data: [] },
     goalIds.size > 0
       ? dataClient.from("goals_objectives").select("id, title").in("id", Array.from(goalIds))
+      : { data: [] },
+    kpiIds.size > 0
+      ? dataClient
+          .from("corporate_kpis")
+          .select("id, measure, strategic_objective, strategic_priority")
+          .in("id", Array.from(kpiIds))
       : { data: [] },
   ])
 
@@ -82,6 +90,8 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
   const goalMap = new Map<string, string>(
     ((goalsRes.data || []) as Array<{ id: string; title: string }>).map((g) => [g.id, g.title])
   )
+  type KpiInfo = { id: string; measure: string; strategic_objective: string; strategic_priority: string }
+  const kpiMap = new Map<string, KpiInfo>(((kpisRes.data || []) as KpiInfo[]).map((k) => [k.id, k]))
 
   const tasksWithUsers = rawTasks.map((task) => {
     const copy: Task = { ...task }
@@ -90,6 +100,17 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     if (task.created_by) copy.created_by_user = profileMap.get(task.created_by)
     if (task.reviewed_by) copy.reviewed_by_user = profileMap.get(task.reviewed_by)
     if (task.goal_id) copy.goal_title = goalMap.get(task.goal_id) || null
+    if (task.kpi_id) {
+      const kpi = kpiMap.get(task.kpi_id)
+      if (kpi) {
+        copy.kpi_measure = kpi.measure
+        copy.kpi_pillar = kpi.strategic_priority
+        copy.kpi_objective = kpi.strategic_objective
+        if (!copy.goal_title) {
+          copy.goal_title = kpi.strategic_objective
+        }
+      }
+    }
     return copy
   })
 
