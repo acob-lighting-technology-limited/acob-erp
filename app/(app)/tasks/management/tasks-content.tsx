@@ -19,6 +19,7 @@ import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import { Button } from "@/components/ui/button"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
+import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import type { Task, TaskUserProfile } from "@/types/task"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -60,18 +61,10 @@ interface TasksContentProps {
  * already the tap target and an inline control inside it would fight for taps.
  * The editable `TaskStatusControl` lives in the table cell and the detail sheet. */
 function TaskStatusPill({ status }: { status: string }) {
+  const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
   return (
-    <Badge
-      variant={
-        status === "completed"
-          ? "default"
-          : ["failed", "cancelled", "unable_to_complete"].includes(status)
-            ? "destructive"
-            : "outline"
-      }
-      className="text-[10px] whitespace-nowrap capitalize"
-    >
-      {formatName(status)}
+    <Badge variant={cfg.badgeVariant} className={cn("text-[10px] whitespace-nowrap capitalize", cfg.color)}>
+      {cfg.label}
     </Badge>
   )
 }

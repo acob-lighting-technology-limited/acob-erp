@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import type { Task } from "@/types/task"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
+import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { formatWATDateTime, formatWATDate } from "@/lib/utils/date"
 import { cn, formatFullName } from "@/lib/utils"
 import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
@@ -105,6 +106,14 @@ export function UserTaskDetailsDialog({
                 {selectedTask.work_item_number}
               </Badge>
             )}
+            {(() => {
+              const cfg = TASK_STATUS_CONFIG[selectedTask.status as TaskStatus] || TASK_STATUS_CONFIG.pending
+              return (
+                <Badge variant={cfg.badgeVariant} className={cn("text-[11px] capitalize", cfg.color)}>
+                  {cfg.label}
+                </Badge>
+              )
+            })()}
             <Badge
               variant={["high", "urgent"].includes(selectedTask.priority) ? "destructive" : "outline"}
               className="text-[11px] capitalize"

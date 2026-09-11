@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { apiFetch } from "@/lib/api-client"
-import { formatFullName } from "@/lib/utils"
+import { cn, formatFullName } from "@/lib/utils"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT, computeProjectProgress } from "@/lib/tasks/scoring"
@@ -305,7 +305,7 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
             <Star className="h-3 w-3" />
             {task.rating ? `${task.rating}/5` : "unrated"}
           </Badge>
-          <Badge variant={config?.badgeVariant ?? "outline"} className="text-[10px] capitalize">
+          <Badge variant={config?.badgeVariant ?? "outline"} className={cn("text-[10px] capitalize", config?.color)}>
             {config?.label ?? task.status.replaceAll("_", " ")}
           </Badge>
           <Button

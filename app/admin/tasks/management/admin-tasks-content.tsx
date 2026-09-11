@@ -412,7 +412,7 @@ export function AdminTasksContent({
         render: (r) => {
           const cfg = TASK_STATUS_CONFIG[r.status as TaskStatus] || TASK_STATUS_CONFIG.pending
           return (
-            <Badge variant={cfg.badgeVariant} className={`text-[11px] capitalize ${cfg.color}`}>
+            <Badge variant={cfg.badgeVariant} className={cn("text-[11px] capitalize", cfg.color)}>
               {cfg.label}
             </Badge>
           )
@@ -759,9 +759,14 @@ export function AdminTasksContent({
               <div className="flex items-center gap-1.5">
                 <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>
               </div>
-              <Badge variant="outline" className="text-[10px]">
-                {formatName(r.status)}
-              </Badge>
+              {(() => {
+                const cfg = TASK_STATUS_CONFIG[r.status as TaskStatus] || TASK_STATUS_CONFIG.pending
+                return (
+                  <Badge variant={cfg.badgeVariant} className={cn("text-[10px] capitalize", cfg.color)}>
+                    {cfg.label}
+                  </Badge>
+                )
+              })()}
             </div>
           </div>
         )}
