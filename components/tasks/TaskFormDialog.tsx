@@ -49,6 +49,7 @@ interface KpiOption {
   id: string
   measure: string
   perspective: string
+  strategic_priority?: string
   strategic_objective: string
   role: "core" | "support"
 }
@@ -268,6 +269,16 @@ export function TaskFormDialog({
       .catch(() => setKpiOptions([]))
   }, [assignedTo, departmentValue, scopedAssignableDepartments, scopedAssignableEmployees])
 
+  const selectedKpi = useMemo(() => kpiOptions.find((k) => k.id === kpiId), [kpiOptions, kpiId])
+
+  const sortedKpis = useMemo(() => {
+    return [...kpiOptions].sort((a, b) => {
+      if (a.role === "core" && b.role !== "core") return -1
+      if (a.role !== "core" && b.role === "core") return 1
+      return a.measure.localeCompare(b.measure)
+    })
+  }, [kpiOptions])
+
   // Projects are optional on a task, so a failed load must never block saving.
   useEffect(() => {
     if (!isOpen || lockedProjectId) return
@@ -429,20 +440,6 @@ export function TaskFormDialog({
               dropdown that enforces the mandatory rating on approval. This form
               used to offer "Completed" directly with no rating collected,
               which bypassed that rule completely. */}
-          <div>
-            <Label className="text-xs font-semibold">Priority</Label>
-            <Select value={priorityValue} onValueChange={(val) => setValue("priority", val)}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           {/* Assignment Section */}
           <div className="bg-muted/20 space-y-3 rounded-lg border p-3.5">
@@ -563,73 +560,51 @@ export function TaskFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">
-                  <span className="text-muted-foreground italic">None</span>
+                  <span className="text-muted-foreground italic">None (Operational Task)</span>
                 </SelectItem>
-                {kpiOptions.length === 0 ? (
+                {sortedKpis.length === 0 ? (
                   <div className="text-muted-foreground px-2 py-1.5 text-xs">
                     No corporate KPIs are assigned to this department yet.
                   </div>
                 ) : (
-                  Object.entries(
-                    kpiOptions.reduce<Record<string, KpiOption[]>>((groups, kpi) => {
-                      const key = `${kpi.perspective} · ${kpi.strategic_objective}`
-                      groups[key] = groups[key] || []
-                      groups[key].push(kpi)
-                      return groups
-                    }, {})
-                  ).map(([objective, kpisInGroup]) => (
-                    <SelectGroup key={objective}>
-                      <SelectLabel className="text-[10px]">{objective}</SelectLabel>
-                      {kpisInGroup.map((kpi) => (
-                        <SelectItem key={kpi.id} value={kpi.id}>
-                          {kpi.measure}
-                          {kpi.role === "support" ? " (support)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
+                  sortedKpis.map((kpi) => (
+                    <SelectItem key={kpi.id} value={kpi.id}>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className={
+                            kpi.role === "core"
+                              ? "border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                              : "border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
+                          }
+                        >
+                          {kpi.role.toUpperCase()}
+                        </Badge>
+                        <span className="line-clamp-1">{kpi.measure}</span>
+                      </div>
+                    </SelectItem>
                   ))
                 )}
               </SelectContent>
             </Select>
+            {selectedKpi && (
+              <div className="bg-muted/40 border-muted-foreground/20 text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-2.5 py-1.5 text-xs">
+                {selectedKpi.strategic_priority && (
+                  <span className="text-foreground font-medium">
+                    🎯 Pillar: <span className="font-normal">{selectedKpi.strategic_priority}</span>
+                  </span>
+                )}
+                {selectedKpi.strategic_priority && selectedKpi.strategic_objective && <span>·</span>}
+                {selectedKpi.strategic_objective && (
+                  <span className="text-foreground font-medium">
+                    Goal: <span className="font-normal">{selectedKpi.strategic_objective}</span>
+                  </span>
+                )}
+              </div>
+            )}
             <p className="text-muted-foreground text-[11px]">
-              Which corporate target this work serves — a label for the department&apos;s scorecard, not a score. Only
-              the department&apos;s own KPI attainment (actual vs. target) is scored; this task&apos;s weight and rating
-              still decide the assignee&apos;s own KPI score, whether or not it is tagged here.
-            </p>
-          </div>
-
-          {/* Goal Linking Section */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="goal_id" className="flex items-center gap-1.5 text-xs font-semibold">
-                <Target className="text-primary h-3.5 w-3.5" />
-                Department Goal (Optional)
-              </Label>
-              <Badge variant="secondary" className="text-[10px]">
-                Optional
-              </Badge>
-            </div>
-            <Select
-              value={goalId || "__none__"}
-              onValueChange={(val) => setValue("goal_id", val === "__none__" ? "" : val)}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a goal (Optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">
-                  <span className="text-muted-foreground italic">None (Ad-Hoc / Operational Task)</span>
-                </SelectItem>
-                {goalOptions.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>
-                    {g.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-[11px]">
-              Grouping only. Every task counts toward the assignee&apos;s KPI score through its weight, whether or not
-              it is linked to a goal.
+              Which corporate target this work serves. Only choose &ldquo;None (Operational Task)&rdquo; if this task
+              does not link to any departmental KPI.
             </p>
           </div>
 

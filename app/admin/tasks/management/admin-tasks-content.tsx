@@ -394,21 +394,13 @@ export function AdminTasksContent({
         render: (r) => <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>,
       },
       {
-        key: "priority",
-        label: "Priority",
+        key: "weight",
+        label: "Weight",
         sortable: true,
-        accessor: (r) => r.priority,
+        accessor: (r) => r.weight ?? TASK_WEIGHT_DEFAULT,
         render: (r) => (
-          <Badge
-            className={
-              r.priority === "urgent" || r.priority === "high"
-                ? "border-red-200 bg-red-500/10 text-red-500"
-                : r.priority === "medium"
-                  ? "border-amber-200 bg-amber-500/10 text-amber-500"
-                  : "border-blue-200 bg-blue-500/10 text-blue-500"
-            }
-          >
-            {formatName(r.priority)}
+          <Badge variant="outline" className="font-mono text-xs">
+            {r.weight ?? TASK_WEIGHT_DEFAULT}
           </Badge>
         ),
       },
@@ -474,9 +466,36 @@ export function AdminTasksContent({
         options: STATUS_OPTIONS,
       },
       {
-        key: "priority",
-        label: "Priority",
-        options: PRIORITY_OPTIONS,
+        key: "weight",
+        label: "Weight",
+        options: [
+          { value: "1", label: "Weight 1" },
+          { value: "2", label: "Weight 2" },
+          { value: "3", label: "Weight 3" },
+          { value: "4", label: "Weight 4" },
+          { value: "5", label: "Weight 5" },
+        ],
+        mode: "custom",
+        filterFn: (row, vals) => {
+          if (vals.length === 0) return true
+          return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
+        },
+      },
+      {
+        key: "kpi_status",
+        label: "Corporate KPI",
+        options: [
+          { value: "needs_kpi", label: "Needs KPI" },
+          { value: "linked", label: "Linked to KPI" },
+        ],
+        mode: "custom",
+        filterFn: (row, vals) => {
+          if (vals.length === 0) return true
+          const hasKpi = Boolean(row.kpi_id)
+          if (vals.includes("needs_kpi") && !hasKpi) return true
+          if (vals.includes("linked") && hasKpi) return true
+          return false
+        },
       },
       {
         key: "department",
@@ -519,6 +538,14 @@ export function AdminTasksContent({
         <StatGrid>
           <StatCard
             variant="compact"
+            title="Total Tasks"
+            value={stats.total}
+            icon={ClipboardList}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            variant="compact"
             title="Pending"
             value={stats.pending}
             icon={Clock}
@@ -548,14 +575,6 @@ export function AdminTasksContent({
             icon={CheckCircle2}
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
           />
         </StatGrid>
       }

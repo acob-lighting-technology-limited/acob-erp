@@ -19,6 +19,7 @@ import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import { Button } from "@/components/ui/button"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
+import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import type { Task, TaskUserProfile } from "@/types/task"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -229,16 +230,13 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       hideOnMobile: true,
     },
     {
-      key: "priority",
-      label: "Priority",
+      key: "weight",
+      label: "Weight",
       sortable: true,
-      accessor: (t) => t.priority,
+      accessor: (t) => t.weight ?? TASK_WEIGHT_DEFAULT,
       render: (t) => (
-        <Badge
-          variant={t.priority === "high" || t.priority === "urgent" ? "destructive" : "outline"}
-          className="text-[11px] capitalize"
-        >
-          {t.priority}
+        <Badge variant="outline" className="font-mono text-xs">
+          {t.weight ?? TASK_WEIGHT_DEFAULT}
         </Badge>
       ),
     },
@@ -329,14 +327,20 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       ],
     },
     {
-      key: "priority",
-      label: "Priority",
+      key: "weight",
+      label: "Weight",
       options: [
-        { value: "low", label: "Low" },
-        { value: "medium", label: "Medium" },
-        { value: "high", label: "High" },
-        { value: "urgent", label: "Urgent" },
+        { value: "1", label: "Weight 1" },
+        { value: "2", label: "Weight 2" },
+        { value: "3", label: "Weight 3" },
+        { value: "4", label: "Weight 4" },
+        { value: "5", label: "Weight 5" },
       ],
+      mode: "custom",
+      filterFn: (row, vals) => {
+        if (vals.length === 0) return true
+        return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
+      },
     },
   ]
 
@@ -349,6 +353,14 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       spacing="tight"
       stats={
         <StatGrid>
+          <StatCard
+            variant="compact"
+            title="Total Tasks"
+            value={stats.total}
+            icon={ClipboardList}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
           <StatCard
             variant="compact"
             title="Pending"
@@ -365,10 +377,22 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             iconBgColor="bg-sky-500/10"
             iconColor="text-sky-500"
           />
-          {/* Only when there is something to answer for — a permanent "Overdue 0"
-              is noise, and the card is the page's one alarm. Third in source order
-              so StatGrid keeps it on a phone; when it is absent Completed takes
-              the slot, which is what the old hand-written classes did. */}
+          <StatCard
+            variant="compact"
+            title="Submitted"
+            value={stats.submitted}
+            icon={Send}
+            iconBgColor="bg-purple-500/10"
+            iconColor="text-purple-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Completed"
+            value={stats.completed}
+            icon={CheckCircle2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
           {stats.overdue > 0 && (
             <StatCard
               variant="compact"
@@ -379,30 +403,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               iconColor="text-rose-500"
             />
           )}
-          <StatCard
-            variant="compact"
-            title="Completed"
-            value={stats.completed}
-            icon={CheckCircle2}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Submitted"
-            value={stats.submitted}
-            icon={Send}
-            iconBgColor="bg-purple-500/10"
-            iconColor="text-purple-500"
-          />
         </StatGrid>
       }
     >

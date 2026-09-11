@@ -12,6 +12,7 @@ type KpiAssignmentRow = {
     id: string
     source_sn: number
     perspective: string
+    strategic_priority: string
     strategic_objective: string
     measure: string
     target_text: string
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     .from("kpi_assignments")
     .select(
       `role, corporate_kpis!inner (
-        id, source_sn, perspective, strategic_objective, measure, target_text
+        id, source_sn, perspective, strategic_priority, strategic_objective, measure, target_text
       )`
     )
     .eq("department", department)
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
     .map((row) => ({
       id: row.corporate_kpis!.id,
       perspective: row.corporate_kpis!.perspective,
+      strategic_priority: row.corporate_kpis!.strategic_priority,
       strategic_objective: row.corporate_kpis!.strategic_objective,
       measure: row.corporate_kpis!.measure,
       target_text: row.corporate_kpis!.target_text,
