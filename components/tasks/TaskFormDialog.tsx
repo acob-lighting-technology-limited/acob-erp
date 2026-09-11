@@ -278,21 +278,6 @@ export function TaskFormDialog({
     })
   }
 
-  const handleSelectAllDepartment = (deptName?: string) => {
-    const targetDept = deptName || departmentValue || scopedAssignableDepartments[0]
-    const deptMembers = scopedAssignableEmployees
-      .filter((e) => !targetDept || e.department === targetDept)
-      .map((e) => e.id)
-
-    setSelectedUserIds(deptMembers)
-    setIsMultiAssign(true)
-  }
-
-  const handleClearAllAssignees = () => {
-    setSelectedUserIds([])
-    setValue("assigned_to", "")
-  }
-
   function buildTaskFormState(): TaskFormState {
     const values = getValues()
     const targetUsers = isMultiAssign ? selectedUserIds : values.assigned_to ? [values.assigned_to] : []
@@ -325,7 +310,7 @@ export function TaskFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-full max-w-2xl min-w-0 overflow-x-hidden overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle>{selectedTask ? "Edit Task" : "Create New Task"}</DialogTitle>
@@ -374,7 +359,7 @@ export function TaskFormDialog({
           </div>
         )}
 
-        <fieldset disabled={lockLevel === "full"} className="space-y-4 py-2 text-sm">
+        <fieldset disabled={lockLevel === "full"} className="w-full min-w-0 space-y-4 py-2 text-sm">
           <div>
             <Label htmlFor="title" className="text-xs font-semibold">
               Task Title *
@@ -416,24 +401,6 @@ export function TaskFormDialog({
               </Label>
               {!selectedTask && (
                 <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => handleSelectAllDepartment()}
-                  >
-                    Select All in Dept
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground h-6 px-2 text-xs"
-                    onClick={handleClearAllAssignees}
-                  >
-                    Clear
-                  </Button>
                   <Button
                     type="button"
                     variant={isMultiAssign ? "secondary" : "outline"}
@@ -507,7 +474,7 @@ export function TaskFormDialog({
           </div>
 
           {/* Corporate KPI Linking Section */}
-          <div className="space-y-1.5">
+          <div className="w-full min-w-0 space-y-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="kpi_id" className="flex items-center gap-1.5 text-xs font-semibold">
                 <Target className="text-primary h-3.5 w-3.5" />
@@ -515,7 +482,7 @@ export function TaskFormDialog({
               </Label>
             </div>
             <Select value={kpiId || ""} onValueChange={(val) => setValue("kpi_id", val)}>
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className="mt-1 w-full max-w-full min-w-0 overflow-hidden">
                 <SelectValue placeholder="Select a Corporate KPI" />
               </SelectTrigger>
               <SelectContent>
@@ -535,7 +502,7 @@ export function TaskFormDialog({
               </SelectContent>
             </Select>
             {selectedKpi && (
-              <div className="bg-muted/40 border-muted-foreground/20 text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-2.5 py-1.5 text-xs">
+              <div className="bg-muted/40 border-muted-foreground/20 text-muted-foreground mt-1.5 flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-2.5 py-1.5 text-xs break-words">
                 {selectedKpi.strategic_priority && (
                   <span className="text-foreground font-medium">
                     🎯 Pillar: <span className="font-normal">{selectedKpi.strategic_priority}</span>
