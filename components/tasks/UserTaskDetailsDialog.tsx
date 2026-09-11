@@ -20,8 +20,8 @@ import {
 import type { Task } from "@/types/task"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { formatWATDateTime, formatWATDate } from "@/lib/utils/date"
-import { formatFullName } from "@/lib/utils"
-import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
+import { cn, formatFullName } from "@/lib/utils"
+import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import {
   DetailActionBar,
   DetailCallout,
@@ -183,13 +183,27 @@ export function UserTaskDetailsDialog({
                   {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
                 </DetailField>
                 <DetailField icon={Target} label="Strategic goal">
-                  {selectedTask.goal_title || <span className="text-muted-foreground">Ad-hoc / operational</span>}
+                  {selectedTask.goal_title || <span className="text-muted-foreground">None (Operational task)</span>}
                 </DetailField>
                 <DetailField icon={Target} label="Corporate KPI">
-                  {selectedTask.kpi_measure || <span className="text-muted-foreground">Not linked</span>}
+                  {selectedTask.kpi_measure ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium">{selectedTask.kpi_measure}</span>
+                      {selectedTask.kpi_pillar && (
+                        <span className="text-muted-foreground text-[11px]">🎯 {selectedTask.kpi_pillar}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">None (Operational task)</span>
+                  )}
                 </DetailField>
                 <DetailField icon={Gauge} label="Weight">
-                  {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+                  <Badge
+                    variant="outline"
+                    className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
+                  >
+                    Weight {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+                  </Badge>
                 </DetailField>
                 <DetailField icon={Star} label="Rating">
                   {selectedTask.rating ? (

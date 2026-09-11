@@ -19,14 +19,14 @@ import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import { Button } from "@/components/ui/button"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
-import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
+import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import type { Task, TaskUserProfile } from "@/types/task"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import { formatName, formatFullName } from "@/lib/utils"
+import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
@@ -220,12 +220,17 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       key: "goal",
       label: "Strategic Goal",
       sortable: true,
-      accessor: (t) => t.goal_title || "",
+      accessor: (t) => t.goal_title || t.kpi_measure || "",
       render: (t) =>
         t.goal_title ? (
-          <span className="text-foreground line-clamp-1 text-xs font-medium">{t.goal_title}</span>
+          <div className="flex flex-col">
+            <span className="text-foreground line-clamp-1 text-xs font-medium">{t.goal_title}</span>
+            {t.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-[10px]">{t.kpi_measure}</span>}
+          </div>
+        ) : t.kpi_measure ? (
+          <span className="text-foreground line-clamp-1 text-xs font-medium">{t.kpi_measure}</span>
         ) : (
-          <span className="text-muted-foreground text-xs italic">Ad-Hoc / Operational</span>
+          <span className="text-muted-foreground text-xs italic">Operational Task</span>
         ),
       hideOnMobile: true,
     },
@@ -235,8 +240,8 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       sortable: true,
       accessor: (t) => t.weight ?? TASK_WEIGHT_DEFAULT,
       render: (t) => (
-        <Badge variant="outline" className="font-mono text-xs">
-          {t.weight ?? TASK_WEIGHT_DEFAULT}
+        <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}>
+          Weight {t.weight ?? TASK_WEIGHT_DEFAULT}
         </Badge>
       ),
     },
@@ -487,7 +492,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               </div>
               <div className="flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t.goal_title || "Ad-Hoc / Operational"}</span>
+                <span className="truncate">{t.goal_title || t.kpi_measure || "Operational Task"}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

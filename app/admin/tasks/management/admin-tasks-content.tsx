@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
-import { formatName, formatFullName } from "@/lib/utils"
+import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
+import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import {
   ClipboardList,
@@ -399,8 +399,8 @@ export function AdminTasksContent({
         sortable: true,
         accessor: (r) => r.weight ?? TASK_WEIGHT_DEFAULT,
         render: (r) => (
-          <Badge variant="outline" className="font-mono text-xs">
-            {r.weight ?? TASK_WEIGHT_DEFAULT}
+          <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(r.weight))}>
+            Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
           </Badge>
         ),
       },
@@ -422,14 +422,19 @@ export function AdminTasksContent({
         key: "goal_title",
         label: "Strategic Goal",
         resizable: true,
-        initialWidth: 200,
+        initialWidth: 220,
         hideOnMobile: true,
-        accessor: (r) => r.goal_title || goals.find((goal) => goal.id === r.goal_id)?.title || "",
+        accessor: (r) => r.goal_title || r.kpi_measure || "",
         render: (r) =>
           r.goal_title ? (
-            <span className="line-clamp-1 text-xs font-medium">{r.goal_title}</span>
+            <div className="flex flex-col">
+              <span className="line-clamp-1 text-xs font-medium">{r.goal_title}</span>
+              {r.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-[10px]">{r.kpi_measure}</span>}
+            </div>
+          ) : r.kpi_measure ? (
+            <span className="line-clamp-1 text-xs font-medium">{r.kpi_measure}</span>
           ) : (
-            <span className="text-muted-foreground text-xs italic">Ad-Hoc / Operational</span>
+            <span className="text-muted-foreground text-xs italic">Operational Task</span>
           ),
       },
       {
@@ -455,7 +460,7 @@ export function AdminTasksContent({
         },
       },
     ],
-    [goals, workflowOwnerLabel]
+    [workflowOwnerLabel]
   )
 
   const filters: DataTableFilter<Task>[] = useMemo(
