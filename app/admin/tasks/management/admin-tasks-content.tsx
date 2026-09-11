@@ -400,7 +400,7 @@ export function AdminTasksContent({
         accessor: (r) => r.weight ?? TASK_WEIGHT_DEFAULT,
         render: (r) => (
           <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(r.weight))}>
-            Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
+            {r.weight ?? TASK_WEIGHT_DEFAULT}
           </Badge>
         ),
       },
@@ -507,18 +507,8 @@ export function AdminTasksContent({
         label: "Department",
         options: departmentOptions.map((d) => ({ value: d, label: d })),
       },
-      {
-        key: "goal_id",
-        label: "Goal",
-        options: goals.map((g) => ({ value: g.id, label: g.title })),
-        mode: "custom",
-        filterFn: (row, vals) => {
-          if (vals.length === 0) return true
-          return vals.includes(row.goal_id || "")
-        },
-      },
     ],
-    [departmentOptions, goals]
+    [departmentOptions]
   )
 
   return (
@@ -823,17 +813,18 @@ export function AdminTasksContent({
               </p>
             </div>
             <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">2. Strategic Goal Linking (Optional)</p>
+              <p className="text-foreground font-semibold">2. Corporate KPI Alignment</p>
               <p className="text-muted-foreground">
-                Tasks can be created with or without linking to strategic goals. Goal-linked tasks feed into the goal
-                achievement formula for performance reviews.
+                Every task is linked to an approved departmental Corporate KPI. The associated Strategic Goal and Pillar
+                are automatically aligned and feed directly into performance reviews and scorecard progress.
               </p>
             </div>
             <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">3. Lead Review & Status Progression</p>
+              <p className="text-foreground font-semibold">3. Lead Review & Weight Scoring</p>
               <p className="text-muted-foreground">
-                Submitted tasks require lead/admin approval to reach Completed status and award KPI points. Blocked
-                tasks can be reassigned (neutral for KPI), granted extensions, or marked failed.
+                Submitted tasks require lead/admin approval to reach Completed status and award KPI points based on task
+                weight (1–5) and review rating. Blocked tasks can be reassigned (neutral for KPI), granted extensions,
+                or marked failed.
               </p>
             </div>
           </div>

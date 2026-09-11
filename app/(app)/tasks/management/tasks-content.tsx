@@ -236,7 +236,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       accessor: (t) => t.weight ?? TASK_WEIGHT_DEFAULT,
       render: (t) => (
         <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}>
-          Weight {t.weight ?? TASK_WEIGHT_DEFAULT}
+          {t.weight ?? TASK_WEIGHT_DEFAULT}
         </Badge>
       ),
     },

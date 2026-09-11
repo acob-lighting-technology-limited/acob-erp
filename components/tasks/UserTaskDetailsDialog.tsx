@@ -202,7 +202,7 @@ export function UserTaskDetailsDialog({
                     variant="outline"
                     className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
                   >
-                    Weight {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+                    {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
                   </Badge>
                 </DetailField>
                 <DetailField icon={Star} label="Rating">
