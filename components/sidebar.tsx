@@ -45,6 +45,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
+import type { DeptConsole } from "@/lib/dept/consoles"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { useSidebar } from "./sidebar-context"
 
@@ -65,8 +66,8 @@ interface SidebarProps {
     lead_departments?: string[]
   }
   canAccessAdmin?: boolean
-  /** Href for the dept console — shown for pure leads (non-admin dept leads). */
-  deptConsoleHref?: string
+  /** Dept consoles this lead may open — shown for pure leads (non-admin dept leads). */
+  deptConsoles?: DeptConsole[]
 }
 
 type NavSubChild = { name: string; href: string }
@@ -187,7 +188,7 @@ const NAV_ROUTE_ALIASES: Record<string, string[]> = {
   "/tools": ["/feedback"],
 }
 
-export function Sidebar({ user, profile, canAccessAdmin, deptConsoleHref }: SidebarProps) {
+export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [] }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -559,14 +560,14 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoleHref }: Side
                 </Link>
               </DropdownMenuItem>
             )}
-            {deptConsoleHref && (
-              <DropdownMenuItem asChild>
-                <Link href={deptConsoleHref} className="flex w-full items-center gap-2">
+            {deptConsoles.map((console) => (
+              <DropdownMenuItem key={console.id} asChild>
+                <Link href={console.href} className="flex w-full items-center gap-2">
                   <ShieldCheck className="h-4 w-4" />
-                  Go to Dept
+                  {deptConsoles.length > 1 ? console.name : "Go to Dept"}
                 </Link>
               </DropdownMenuItem>
-            )}
+            ))}
             <DropdownMenuItem onClick={() => setShowLogoutConfirm(true)} className="flex items-center gap-2">
               <LogOut className="h-4 w-4" />
               Logout

@@ -5,9 +5,11 @@ import { SidebarContent } from "@/components/sidebar-content"
 import { AcoBot } from "@/components/acobot/acobot"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
-import { normalizeDepartmentName } from "@/shared/departments"
+import { resolveDeptConsoles } from "@/lib/dept/consoles"
 import { redirect } from "next/navigation"
 import type { ClientAdminScope } from "@/components/admin-scope-context"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/database"
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -45,20 +47,10 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
     isAdminLike: scope.isAdminLike,
   }
 
-  // Compute dept console href for admin+lead users so "Dept Console" appears
-  // in the admin sidebar dropdown — mirrors the same logic in app-layout.tsx.
-  let deptConsoleHref: string | undefined
-  if (profile.is_department_lead) {
-    const leadDepts: string[] = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
-    const primaryDeptName = leadDepts[0] ?? profile.department
-    if (primaryDeptName) {
-      const normalized = normalizeDepartmentName(primaryDeptName)
-      const { data: deptRow } = await supabase.from("departments").select("id").eq("name", normalized).single()
-      if (deptRow?.id) {
-        deptConsoleHref = `/dept/${deptRow.id}`
-      }
-    }
-  }
+  // Resolve dept consoles for admin+lead users so "Go to Dept" appears in the
+  // admin sidebar dropdown — mirrors the same logic in app-layout.tsx. A lead
+  // may hold several departments, so every one of them is listed.
+  const deptConsoles = await resolveDeptConsoles(supabase as SupabaseClient<Database>, profile)
 
   // "lead" scope visuals apply when the user's view is dept-restricted:
   // either an admin who has toggled into lead mode, OR a pure lead (non-admin
@@ -67,12 +59,7 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="admin-shell flex min-h-screen" data-scope={isRestrictedView ? "lead" : "global"}>
-      <AdminSidebar
-        user={userData}
-        profile={profile}
-        adminScopeMode={scope.scopeMode}
-        deptConsoleHref={deptConsoleHref}
-      />
+      <AdminSidebar user={userData} profile={profile} adminScopeMode={scope.scopeMode} deptConsoles={deptConsoles} />
       <SidebarContent>
         <div className="min-h-screen bg-[var(--admin-content-bg)] pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">
           <AdminContextRibbon

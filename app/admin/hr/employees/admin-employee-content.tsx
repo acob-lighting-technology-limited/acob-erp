@@ -140,9 +140,15 @@ interface AdminEmployeeContentProps {
   userProfile: UserProfile
 }
 
-function deriveLeadDepartments(department: string, isDepartmentLead: boolean): string[] {
-  const canonical = normalizeDepartmentName(department)
-  return isDepartmentLead && canonical ? [canonical] : []
+/**
+ * Normalise the departments a lead holds. A lead may hold several, so the
+ * selection is preserved; the home department is only used as a fallback when
+ * nothing has been chosen yet.
+ */
+function deriveLeadDepartments(department: string, isDepartmentLead: boolean, selected?: string[] | null): string[] {
+  if (!isDepartmentLead) return []
+  const source = selected?.length ? selected : [department]
+  return Array.from(new Set(source.map((name) => normalizeDepartmentName(name)).filter(Boolean)))
 }
 
 const AVATAR_SIZES = {
@@ -373,7 +379,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             department: normalizedDepartment,
             office_location: fullProfile.office_location || "",
             designation: fullProfile.designation || "",
-            lead_departments: deriveLeadDepartments(normalizedDepartment, isDepartmentLead),
+            lead_departments: deriveLeadDepartments(
+              normalizedDepartment,
+              isDepartmentLead,
+              Array.isArray(fullProfile.lead_departments) ? fullProfile.lead_departments : null
+            ),
             employee_number: fullProfile.employee_number || "",
             first_name: fullProfile.first_name || "",
             last_name: fullProfile.last_name || "",
@@ -591,7 +601,15 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       // 4. Update general profile fields
       const canonicalDepartment = normalizeDepartmentName(editForm.department)
-      const leadDepartments = deriveLeadDepartments(canonicalDepartment, editForm.is_department_lead)
+      const leadDepartments = deriveLeadDepartments(
+        canonicalDepartment,
+        editForm.is_department_lead,
+        editForm.lead_departments
+      )
+
+      if (editForm.is_department_lead && leadDepartments.length === 0) {
+        throw new Error("A department lead must lead at least one department")
+      }
 
       let departmentId: string | null = null
       if (canonicalDepartment) {

@@ -50,6 +50,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
+import type { DeptConsole } from "@/lib/dept/consoles"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion } from "framer-motion"
 import { normalizeDepartmentName } from "@/shared/departments"
@@ -87,10 +88,10 @@ interface AdminSidebarProps {
    */
   deptId?: string
   /**
-   * When set (admin shell only), a "Go to Dept" link is shown in the account
-   * dropdown for admin+lead users so they can jump to their dept shell.
+   * Admin shell only: the dept consoles this lead may open. Each is listed in
+   * the account dropdown so an admin+lead can jump to any dept shell they hold.
    */
-  deptConsoleHref?: string
+  deptConsoles?: DeptConsole[]
 }
 
 /**
@@ -545,7 +546,13 @@ function getItemMatchScore(item: NavItem, pathname: string, deptId?: string): nu
   return best
 }
 
-export function AdminSidebar({ user, profile, adminScopeMode = "global", deptId, deptConsoleHref }: AdminSidebarProps) {
+export function AdminSidebar({
+  user,
+  profile,
+  adminScopeMode = "global",
+  deptId,
+  deptConsoles = [],
+}: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -1016,17 +1023,20 @@ export function AdminSidebar({ user, profile, adminScopeMode = "global", deptId,
                 Settings
               </Link>
             </DropdownMenuItem>
-            {!deptId && deptConsoleHref && (
-              <DropdownMenuItem
-                asChild
-                className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
-              >
-                <Link href={deptConsoleHref} className="flex w-full items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Go to Dept
-                </Link>
-              </DropdownMenuItem>
-            )}
+            {deptConsoles
+              .filter((console) => console.id !== deptId)
+              .map((console) => (
+                <DropdownMenuItem
+                  key={console.id}
+                  asChild
+                  className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
+                >
+                  <Link href={console.href} className="flex w-full items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    {deptConsoles.length > 1 ? console.name : "Go to Dept"}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
             {deptId && isAdminLikeUser && (
               <DropdownMenuItem
                 asChild
