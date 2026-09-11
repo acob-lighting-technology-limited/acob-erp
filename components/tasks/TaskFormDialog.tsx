@@ -64,7 +64,7 @@ const taskFormSchema = z.object({
   due_date: z.string().optional(),
   assignment_type: z.enum(["individual", "multiple", "department"]).default("individual"),
   goal_id: z.string().optional().nullable(),
-  kpi_id: z.string().optional().nullable(),
+  kpi_id: z.string().min(1, "Corporate KPI is required"),
   project_id: z.string().optional().nullable(),
   plan_id: z.string().optional().nullable(),
   // Compulsory: this is the denominator of the assignee's KPI score.
@@ -511,23 +511,14 @@ export function TaskFormDialog({
             <div className="flex items-center justify-between">
               <Label htmlFor="kpi_id" className="flex items-center gap-1.5 text-xs font-semibold">
                 <Target className="text-primary h-3.5 w-3.5" />
-                Corporate KPI (Optional)
+                Corporate KPI <span className="text-destructive">*</span>
               </Label>
-              <Badge variant="secondary" className="text-[10px]">
-                Optional
-              </Badge>
             </div>
-            <Select
-              value={kpiId || "__none__"}
-              onValueChange={(val) => setValue("kpi_id", val === "__none__" ? "" : val)}
-            >
+            <Select value={kpiId || ""} onValueChange={(val) => setValue("kpi_id", val)}>
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a corporate KPI (Optional)" />
+                <SelectValue placeholder="Select a Corporate KPI" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">
-                  <span className="text-muted-foreground italic">None (No Corporate KPI)</span>
-                </SelectItem>
                 {sortedKpis.length === 0 ? (
                   <div className="text-muted-foreground px-2 py-1.5 text-xs">
                     No corporate KPIs are assigned to this department yet.
@@ -535,19 +526,9 @@ export function TaskFormDialog({
                 ) : (
                   sortedKpis.map((kpi) => (
                     <SelectItem key={kpi.id} value={kpi.id}>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={
-                            kpi.role === "core"
-                              ? "border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
-                              : "border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
-                          }
-                        >
-                          {kpi.role.toUpperCase()}
-                        </Badge>
-                        <span className="line-clamp-1">{kpi.measure}</span>
-                      </div>
+                      <span className="line-clamp-1">
+                        {kpi.measure} ({kpi.role === "core" ? "Core" : "Support"})
+                      </span>
                     </SelectItem>
                   ))
                 )}
@@ -569,8 +550,7 @@ export function TaskFormDialog({
               </div>
             )}
             <p className="text-muted-foreground text-[11px]">
-              Which corporate target this work serves. Only choose &ldquo;None (No Corporate KPI)&rdquo; if this task
-              does not link to any departmental KPI.
+              Which corporate target this work serves. Every task must link to a Corporate KPI.
             </p>
           </div>
 
