@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import { cn, formatName, formatFullName } from "@/lib/utils"
-import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
+import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
 import {
   ClipboardList,
   Plus,
@@ -169,7 +169,7 @@ export function AdminTasksContent({
     if (!initialGoalId || consumedInitialGoalIdRef.current === initialGoalId) return
     consumedInitialGoalIdRef.current = initialGoalId
     setSelectedTask(null)
-    setTaskForm({ ...INITIAL_TASK_FORM, goal_id: initialGoalId })
+    setTaskForm({ ...INITIAL_TASK_FORM, goal_id: initialGoalId, task_start_date: toLocalISODate() })
     setIsTaskDialogOpen(true)
   }, [initialGoalId])
 
@@ -218,7 +218,7 @@ export function AdminTasksContent({
       })
     } else {
       setSelectedTask(null)
-      setTaskForm(INITIAL_TASK_FORM)
+      setTaskForm({ ...INITIAL_TASK_FORM, task_start_date: toLocalISODate() })
     }
     setIsTaskDialogOpen(true)
   }

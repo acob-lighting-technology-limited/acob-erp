@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { apiFetch } from "@/lib/api-client"
 import { formatFullName } from "@/lib/utils"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT, computeProjectProgress } from "@/lib/tasks/scoring"
 import { TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
@@ -222,7 +222,12 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
 
   function openTaskDialog(plan: Plan | null) {
     setEditingTask(null)
-    setTaskForm({ ...EMPTY_TASK_FORM, project_id: project.id, plan_id: plan?.id ?? "" })
+    setTaskForm({
+      ...EMPTY_TASK_FORM,
+      project_id: project.id,
+      plan_id: plan?.id ?? "",
+      task_start_date: toLocalISODate(),
+    })
     setTaskDialogPlan(plan)
     setIsTaskDialogOpen(true)
   }

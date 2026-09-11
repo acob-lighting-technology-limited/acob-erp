@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { formatFullName } from "@/lib/utils"
+import { toLocalISODate } from "@/lib/utils/date"
 import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
 
@@ -152,7 +153,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || taskForm.project_id,
       plan_id: lockedPlanId || taskForm.plan_id,
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
-      task_start_date: taskForm.task_start_date,
+      task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
       task_end_date: taskForm.task_end_date,
     },
   })
@@ -183,7 +184,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || taskForm.project_id || "",
       plan_id: lockedPlanId || taskForm.plan_id || "",
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
-      task_start_date: taskForm.task_start_date || "",
+      task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
       task_end_date: taskForm.task_end_date || "",
     })
 
@@ -197,7 +198,7 @@ export function TaskFormDialog({
       setIsMultiAssign(false)
       setSelectedUserIds([])
     }
-  }, [isOpen, reset, selectedTask?.id, taskForm, lockedProjectId, lockedPlanId])
+  }, [isOpen, reset, selectedTask, taskForm, lockedProjectId, lockedPlanId])
 
   const lockLevel = !selectedTask
     ? "none"
@@ -473,6 +474,41 @@ export function TaskFormDialog({
             )}
           </div>
 
+          {/* Weight — compulsory */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="weight" className="flex items-center gap-1.5 text-xs font-semibold">
+                <Scale className="text-primary h-3.5 w-3.5" />
+                Task Weight
+              </Label>
+              <Badge variant="outline" className="text-[10px]">
+                Required
+              </Badge>
+            </div>
+            <Select
+              value={String(weightValue ?? TASK_WEIGHT_DEFAULT)}
+              onValueChange={(val) => setValue("weight", Number(val))}
+              disabled={lockLevel !== "none"}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select a weight" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: TASK_WEIGHT_MAX - TASK_WEIGHT_MIN + 1 }, (_, i) => TASK_WEIGHT_MIN + i).map(
+                  (value) => (
+                    <SelectItem key={value} value={String(value)}>
+                      {value}
+                    </SelectItem>
+                  )
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-[11px]">
+              How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
+              much as a weight-2 one. Weights do not need to add up to anything.
+            </p>
+          </div>
+
           {/* Corporate KPI Linking Section */}
           <div className="w-full min-w-0 space-y-1.5">
             <div className="flex items-center justify-between">
@@ -559,41 +595,6 @@ export function TaskFormDialog({
             )}
             <p className="text-muted-foreground text-[11px]">
               A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
-            </p>
-          </div>
-
-          {/* Weight — compulsory */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="weight" className="flex items-center gap-1.5 text-xs font-semibold">
-                <Scale className="text-primary h-3.5 w-3.5" />
-                Task Weight
-              </Label>
-              <Badge variant="outline" className="text-[10px]">
-                Required
-              </Badge>
-            </div>
-            <Select
-              value={String(weightValue ?? TASK_WEIGHT_DEFAULT)}
-              onValueChange={(val) => setValue("weight", Number(val))}
-              disabled={lockLevel !== "none"}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a weight" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: TASK_WEIGHT_MAX - TASK_WEIGHT_MIN + 1 }, (_, i) => TASK_WEIGHT_MIN + i).map(
-                  (value) => (
-                    <SelectItem key={value} value={String(value)}>
-                      {value}
-                    </SelectItem>
-                  )
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-[11px]">
-              How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
-              much as a weight-2 one. Weights do not need to add up to anything.
             </p>
           </div>
 
