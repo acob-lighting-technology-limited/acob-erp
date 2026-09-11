@@ -84,6 +84,15 @@ interface AdminTasksContentProps {
   initialGoalId?: string
 }
 
+function AdminTaskStatusBadge({ status, className }: { status: string; className?: string }) {
+  const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
+  return (
+    <Badge variant={cfg.badgeVariant} className={cn("text-[11px] whitespace-nowrap capitalize", cfg.color, className)}>
+      {cfg.label}
+    </Badge>
+  )
+}
+
 const INITIAL_TASK_FORM: TaskFormState = {
   title: "",
   description: "",
@@ -409,14 +418,7 @@ export function AdminTasksContent({
         label: "Status",
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => {
-          const cfg = TASK_STATUS_CONFIG[r.status as TaskStatus] || TASK_STATUS_CONFIG.pending
-          return (
-            <Badge variant={cfg.badgeVariant} className={cn("text-[11px] capitalize", cfg.color)}>
-              {cfg.label}
-            </Badge>
-          )
-        },
+        render: (r) => <AdminTaskStatusBadge status={r.status} />,
       },
       {
         key: "goal_title",
@@ -697,19 +699,13 @@ export function AdminTasksContent({
           title: (r) => r.title,
           subtitle: (r) =>
             `${r.work_item_number || "Task"} · ${workflowOwnerLabel(r)} · Due ${r.due_date ? formatWATDate(r.due_date) : "No deadline"}`,
-          trailing: (r) => (
-            <Badge variant="outline" className="text-[10px]">
-              {formatName(r.status)}
-            </Badge>
-          ),
+          trailing: (r) => <AdminTaskStatusBadge status={r.status} className="text-[10px]" />,
           detail: {
             title: (r) => r.title,
             subtitle: (r) => r.work_item_number || undefined,
             badges: (r) => (
               <>
-                <Badge variant="outline" className="text-[10px]">
-                  {formatName(r.status)}
-                </Badge>
+                <AdminTaskStatusBadge status={r.status} className="text-[10px]" />
                 <Badge
                   className={
                     r.priority === "urgent" || r.priority === "high"
@@ -759,14 +755,7 @@ export function AdminTasksContent({
               <div className="flex items-center gap-1.5">
                 <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>
               </div>
-              {(() => {
-                const cfg = TASK_STATUS_CONFIG[r.status as TaskStatus] || TASK_STATUS_CONFIG.pending
-                return (
-                  <Badge variant={cfg.badgeVariant} className={cn("text-[10px] capitalize", cfg.color)}>
-                    {cfg.label}
-                  </Badge>
-                )
-              })()}
+              <AdminTaskStatusBadge status={r.status} className="text-[10px]" />
             </div>
           </div>
         )}
