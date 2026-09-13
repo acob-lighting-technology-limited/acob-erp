@@ -392,9 +392,9 @@ export async function GET(request: NextRequest) {
       const id = String(d.id)
       const href =
         tier === "admin"
-          ? `/admin/documentation/internal?docId=${id}`
+          ? `/admin/documentation/personal?docId=${id}`
           : tier === "lead"
-            ? `/dept/${scope.primaryDeptId}/documentation/internal`
+            ? `/dept/${scope.primaryDeptId}/documentation/personal`
             : `/documentation`
       results.push({
         id,

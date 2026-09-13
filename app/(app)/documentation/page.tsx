@@ -36,12 +36,12 @@ export default async function DocumentationPage() {
 
   const docSections = [
     {
-      title: "Internal Documentation",
-      description: "Create and manage your internal work documentation and knowledge base.",
-      href: "/documentation/internal",
+      title: "Personal Documentation",
+      description: "Create and manage your own work documentation.",
+      href: "/documentation/personal",
       icon: FileText,
       tag: `${docsData.docs.length} Docs`,
-      subLabel: "Internal knowledge base",
+      subLabel: "Your work docs",
       enabled: true,
       color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
       fill: "bg-blue-500",
@@ -71,7 +71,7 @@ export default async function DocumentationPage() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Documentation"
-        description="Access internal knowledge docs and department file repository"
+        description="Access your personal work docs and department file repository"
         icon={FileText}
         backLink={{ href: "/profile", label: "Back to Dashboard" }}
       />
