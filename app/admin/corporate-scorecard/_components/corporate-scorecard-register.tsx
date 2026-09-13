@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
-import { BarChart3, ClipboardList, Layers, Target, Trash2, UserCog, Users } from "lucide-react"
+import { BarChart3, ClipboardList, Edit, Layers, Plus, Target, Trash2, UserCog, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
+import { CreateKpiDialog, EditKpiDialog, ArchiveKpiDialog, PERSPECTIVES } from "./kpi-dialogs"
 
 type Assignment = { id: string; department: string; role: "core" | "support" }
 
@@ -39,17 +40,18 @@ type RegisterRow = {
   assignments: Assignment[]
 }
 
-const PERSPECTIVES = ["Financial", "Customer", "Internal Process", "Organizational Capacity"]
-
 /**
- * The read-only master register: what the 2026 plan says, and who owns it.
+ * The master register: what the 2026 plan says, and who owns it.
  * "How we're doing against it" lives on each department's own cascade page —
- * this view is the plan, not the progress.
+ * this view is the plan, with administrative CRUD to add, edit, and archive KPIs.
  */
 export function CorporateScorecardRegister() {
   const queryClient = useQueryClient()
   const queryKey = ["corporate-scorecard-register"]
   const [managingRow, setManagingRow] = useState<RegisterRow | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [editingRow, setEditingRow] = useState<RegisterRow | null>(null)
+  const [archivingRow, setArchivingRow] = useState<RegisterRow | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery<{ data: RegisterRow[] }>({
     queryKey,
@@ -74,6 +76,16 @@ export function CorporateScorecardRegister() {
       .map((value) => ({ value, label: value }))
   }, [rows])
 
+  const pillarOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const row of rows) {
+      if (row.strategic_priority) set.add(row.strategic_priority)
+    }
+    return Array.from(set)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ value, label: value }))
+  }, [rows])
+
   const stats = useMemo(() => {
     const byPerspective = new Map<string, number>()
     for (const row of rows) byPerspective.set(row.perspective, (byPerspective.get(row.perspective) || 0) + 1)
@@ -92,7 +104,7 @@ export function CorporateScorecardRegister() {
       },
       {
         key: "measure",
-        label: "KPI",
+        label: "KPI & Pillar",
         sortable: true,
         resizable: true,
         initialWidth: 340,
@@ -100,7 +112,9 @@ export function CorporateScorecardRegister() {
         render: (r) => (
           <div className="flex flex-col">
             <span className="line-clamp-2 font-medium">{r.measure}</span>
-            <span className="text-muted-foreground text-[11px]">{r.strategic_objective}</span>
+            <span className="text-muted-foreground text-[11px]">
+              <span className="text-foreground/80 font-semibold">{r.strategic_priority}</span> · {r.strategic_objective}
+            </span>
           </div>
         ),
       },
@@ -148,6 +162,11 @@ export function CorporateScorecardRegister() {
         options: PERSPECTIVES.map((value) => ({ value, label: value })),
       },
       {
+        key: "strategic_priority",
+        label: "Strategic Pillar",
+        options: pillarOptions,
+      },
+      {
         key: "department",
         label: "Department",
         options: departmentOptions,
@@ -156,24 +175,28 @@ export function CorporateScorecardRegister() {
           selected.some((dept) => row.core_departments.includes(dept) || row.support_departments.includes(dept)),
       },
     ],
-    [departmentOptions]
+    [departmentOptions, pillarOptions]
   )
 
   return (
     <DataTablePage
       title="Corporate Scorecard"
-      description="The 2026 strategic plan's 61 KPIs and which departments own them. This is the plan — a department's own progress lives on its cascade page."
+      description="The 2026 strategic plan's master corporate KPIs and which departments own them. Use Add Corporate KPI to register new strategic measures."
       icon={Target}
       backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Corporate KPI
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/admin/corporate-scorecard/departments">
               <Layers className="mr-2 h-4 w-4" />
               Department Cascade
             </Link>
           </Button>
-          <Button asChild size="sm">
+          <Button asChild variant="outline" size="sm">
             <Link href="/admin/corporate-scorecard/summary">
               <BarChart3 className="mr-2 h-4 w-4" />
               MD Summary
@@ -222,7 +245,11 @@ export function CorporateScorecardRegister() {
         emptyTitle="No KPIs Found"
         emptyDescription="The corporate scorecard hasn't been imported yet."
         emptyIcon={Target}
-        rowActions={[{ label: "Manage Departments", icon: UserCog, onClick: (r) => setManagingRow(r) }]}
+        rowActions={[
+          { label: "Edit KPI", icon: Edit, onClick: (r) => setEditingRow(r) },
+          { label: "Manage Departments", icon: UserCog, onClick: (r) => setManagingRow(r) },
+          { label: "Archive KPI", icon: Trash2, onClick: (r) => setArchivingRow(r), variant: "destructive" },
+        ]}
         expandable={{
           render: (r) => (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -267,12 +294,12 @@ export function CorporateScorecardRegister() {
               {r.core_departments.length} depts
             </Badge>
           ),
-          onSelect: (r) => setManagingRow(r),
+          onSelect: (r) => setEditingRow(r),
         }}
         cardRenderer={(r) => (
           <div
             className="bg-card cursor-pointer space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md"
-            onClick={() => setManagingRow(r)}
+            onClick={() => setEditingRow(r)}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -284,9 +311,30 @@ export function CorporateScorecardRegister() {
             <p className="text-muted-foreground line-clamp-2 text-xs">{r.strategic_objective}</p>
             <div className="flex items-center justify-between border-t pt-2 text-[10px]">
               <span>Target: {r.target_text}</span>
-              <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setManagingRow(r)}>
-                <UserCog className="mr-1 h-3 w-3" /> Manage
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[10px]"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEditingRow(r)
+                  }}
+                >
+                  <Edit className="mr-1 h-3 w-3" /> Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[10px]"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setManagingRow(r)
+                  }}
+                >
+                  <UserCog className="mr-1 h-3 w-3" /> Manage
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -296,6 +344,24 @@ export function CorporateScorecardRegister() {
       <ManageDepartmentsDialog
         row={rows.find((r) => r.id === managingRow?.id) ?? managingRow}
         onOpenChange={(open) => !open && setManagingRow(null)}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey })}
+      />
+
+      <CreateKpiDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey })}
+      />
+
+      <EditKpiDialog
+        row={rows.find((r) => r.id === editingRow?.id) ?? editingRow}
+        onOpenChange={(open) => !open && setEditingRow(null)}
+        onChanged={() => void queryClient.invalidateQueries({ queryKey })}
+      />
+
+      <ArchiveKpiDialog
+        row={rows.find((r) => r.id === archivingRow?.id) ?? archivingRow}
+        onOpenChange={(open) => !open && setArchivingRow(null)}
         onChanged={() => void queryClient.invalidateQueries({ queryKey })}
       />
     </DataTablePage>
