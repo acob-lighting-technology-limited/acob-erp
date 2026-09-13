@@ -250,8 +250,8 @@ export function DepartmentCascadeContent({
 
   return (
     <DataTablePage
-      title="Department Cascade"
-      description="This department's KPIs, its own confirmed targets, and recorded progress against them."
+      title="Department KPIs"
+      description="Each department's assigned KPIs, confirmed targets, proposed action plans, and recorded actual progress against the 2026 plan."
       icon={Target}
       backLink={backLink || { href: "/admin/corporate-scorecard", label: "Back to Register" }}
       actions={

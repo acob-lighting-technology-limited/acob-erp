@@ -17,23 +17,8 @@ export default async function DepartmentCascadePage({
   searchParams: Promise<{ department?: string }>
 }) {
   const { department } = await searchParams
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) redirect("/auth/login")
-
-  const scope = await resolveAdminScope(supabase as DbClient, user.id)
-  if (!scope) redirect("/profile")
-
-  const { data: departmentRows } = await supabase.from("departments").select("name").eq("is_active", true).order("name")
-
-  return (
-    <DepartmentCascadeContent
-      departments={(departmentRows || []).map((d) => d.name)}
-      initialDepartment={department || null}
-    />
-  )
+  if (department) {
+    redirect(`/admin/corporate-scorecard?tab=department&department=${encodeURIComponent(department)}`)
+  }
+  redirect("/admin/corporate-scorecard?tab=department")
 }

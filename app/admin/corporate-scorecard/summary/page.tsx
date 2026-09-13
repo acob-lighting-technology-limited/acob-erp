@@ -12,16 +12,5 @@ export const metadata: Metadata = {
 type DbClient = Awaited<ReturnType<typeof createClient>>
 
 export default async function ScorecardSummaryPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) redirect("/auth/login")
-
-  const scope = await resolveAdminScope(supabase as DbClient, user.id)
-  if (!scope) redirect("/profile")
-
-  return <ScorecardSummaryContent />
+  redirect("/admin/corporate-scorecard?tab=summary")
 }

@@ -51,7 +51,11 @@ function ragBadge(status: RagStatus | null) {
  * shared formula (lib/corporate-scorecard/attainment) every other scorecard
  * screen uses, so this page can never disagree with a department's own.
  */
-export function ScorecardSummaryContent() {
+export function ScorecardSummaryContent({
+  onSelectDepartment,
+}: {
+  onSelectDepartment?: (dept: string) => void
+} = {}) {
   const router = useRouter()
 
   const { data, isLoading, error, refetch } = useQuery<SummaryResponse>({
@@ -165,10 +169,12 @@ export function ScorecardSummaryContent() {
         emptyIcon={BarChart3}
         rowActions={[
           {
-            label: "View Cascade",
+            label: "View Department KPIs",
             icon: Eye,
-            onClick: (r) =>
-              router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`),
+            onClick: (r) => {
+              if (onSelectDepartment) onSelectDepartment(r.department)
+              else router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
+            },
           },
         ]}
         viewToggle
@@ -180,15 +186,18 @@ export function ScorecardSummaryContent() {
           subtitle: (r) =>
             `CORE KPIs: ${r.coreKpiCount} · Attainment: ${r.attainmentPct != null ? `${r.attainmentPct}%` : "No data"}`,
           trailing: (r) => ragBadge(r.status),
-          onSelect: (r) =>
-            router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`),
+          onSelect: (r) => {
+            if (onSelectDepartment) onSelectDepartment(r.department)
+            else router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
+          },
         }}
         cardRenderer={(r) => (
           <div
             className="bg-card cursor-pointer space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md"
-            onClick={() =>
-              router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
-            }
+            onClick={() => {
+              if (onSelectDepartment) onSelectDepartment(r.department)
+              else router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
+            }}
           >
             <div className="flex items-start justify-between">
               <div>

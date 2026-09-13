@@ -185,24 +185,10 @@ export function CorporateScorecardRegister() {
       icon={Target}
       backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Corporate KPI
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/admin/corporate-scorecard/departments">
-              <Layers className="mr-2 h-4 w-4" />
-              Department Cascade
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/admin/corporate-scorecard/summary">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              MD Summary
-            </Link>
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Corporate KPI
+        </Button>
       }
       stats={
         <StatGrid>
