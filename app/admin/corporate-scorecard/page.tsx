@@ -1,40 +1,14 @@
 import { redirect } from "next/navigation"
-import type { Metadata } from "next"
-import { createClient } from "@/lib/supabase/server"
-import { resolveAdminScope } from "@/lib/admin/rbac"
-import { UnifiedScorecardHub } from "./_components/unified-scorecard-hub"
-
-export const metadata: Metadata = {
-  title: "Corporate Scorecard | Matrix",
-  description: "The 2026 strategic plan's corporate KPIs, department execution, and executive summary.",
-}
-
-type DbClient = Awaited<ReturnType<typeof createClient>>
 
 export default async function CorporateScorecardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: "register" | "department" | "summary"; department?: string }>
+  searchParams: Promise<{ tab?: string; department?: string }>
 }) {
-  const { tab, department } = await searchParams
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) redirect("/auth/login")
-
-  const scope = await resolveAdminScope(supabase as DbClient, user.id)
-  if (!scope) redirect("/profile")
-
-  const { data: departmentRows } = await supabase.from("departments").select("name").eq("is_active", true).order("name")
-
-  return (
-    <UnifiedScorecardHub
-      departments={(departmentRows || []).map((d) => d.name)}
-      initialDepartment={department || null}
-      initialTab={tab || "register"}
-    />
-  )
+  const params = await searchParams
+  const query = new URLSearchParams()
+  if (params.tab) query.set("tab", params.tab)
+  if (params.department) query.set("department", params.department)
+  const qs = query.toString()
+  redirect(`/admin/corporate-services/scorecard${qs ? `?${qs}` : ""}`)
 }

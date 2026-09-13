@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { BarChart3, Building2, ClipboardList } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CorporateScorecardRegister } from "./corporate-scorecard-register"
@@ -22,6 +22,7 @@ export function UnifiedScorecardHub({
   initialTab = "register",
 }: UnifiedScorecardHubProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab") as TabKey | null
   const deptParam = searchParams.get("department")
@@ -40,7 +41,7 @@ export function UnifiedScorecardHub({
     if (selectedDepartment && nextTab === "department") {
       params.set("department", selectedDepartment)
     }
-    router.replace(`/admin/corporate-scorecard?${params.toString()}`, { scroll: false })
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   function handleSelectDepartmentFromSummary(dept: string) {
@@ -49,7 +50,7 @@ export function UnifiedScorecardHub({
     const params = new URLSearchParams()
     params.set("tab", "department")
     params.set("department", dept)
-    router.replace(`/admin/corporate-scorecard?${params.toString()}`, { scroll: false })
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   return (

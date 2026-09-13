@@ -28,6 +28,7 @@ export type AdminRouteKeyV2 =
   | "correspondence.main"
   | "dev.main"
   | "documentation.main"
+  | "events.main"
   | "feedback.main"
   | "finance.main"
   | "helpdesk.main"
@@ -83,6 +84,7 @@ export const GRANTABLE_ADMIN_ROUTES: AdminRouteKeyV2[] = [
   "communications.meetings",
   "correspondence.main",
   "documentation.main",
+  "events.main",
   "feedback.main",
   "helpdesk.main",
   "notifications.main",
@@ -155,6 +157,7 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/assets")) return "assets.main"
   if (pathname.startsWith("/admin/correspondence")) return "correspondence.main"
   if (pathname.startsWith("/admin/documentation")) return "documentation.main"
+  if (pathname.startsWith("/admin/events")) return "events.main"
   if (pathname.startsWith("/admin/feedback")) return "feedback.main"
   if (pathname.startsWith("/admin/accounts")) return "accounts.main"
   if (pathname.startsWith("/admin/finance")) return "accounts.main"
@@ -178,7 +181,8 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/job-descriptions")) return "jobdescriptions.main"
   if (pathname.startsWith("/admin/notifications")) return "notifications.main"
   if (pathname.startsWith("/admin/purchasing")) return "purchasing.main"
-  if (pathname.startsWith("/admin/corporate-scorecard")) return "scorecard.main"
+  if (pathname.startsWith("/admin/corporate-scorecard") || pathname.startsWith("/admin/corporate-services"))
+    return "scorecard.main"
   if (pathname.startsWith("/admin/portfolios")) return "portfolios.main"
   // The Projects console lives at the singular /admin/project — the sidebar
   // labels it "Projects" but the route was never pluralised.
@@ -240,6 +244,10 @@ export function getRoutePolicyV2(route: AdminRouteKeyV2): RoutePolicyV2 {
     case "correspondence.main":
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
     case "documentation.main":
+      return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
+    case "events.main":
+      // Company events. Department leads manage their own team's events here;
+      // what each person may actually see or edit is enforced by RLS on events.
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
     case "feedback.main":
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
