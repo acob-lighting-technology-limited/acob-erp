@@ -177,6 +177,10 @@ export const QUERY_KEYS = {
   // Communications
   adminReminderSchedules: (mode: string) => ["admin-reminder-schedules", mode],
 
+  // Events calendar
+  events: (range?: Record<string, unknown>) => (range ? ["events", range] : ["events"]),
+  eventOptions: () => ["event-options"],
+
   // Security
   adminSecurityEmployees: () => ["admin-security-employees"],
   adminSecurityNetworkActivity: (filters?: Record<string, unknown>) =>

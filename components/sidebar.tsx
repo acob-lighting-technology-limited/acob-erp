@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import {
+  CalendarDays,
   ChevronsUpDown,
   ChevronRight,
   ClipboardList,
@@ -86,6 +87,7 @@ const navigationSections: NavSectionDef[] = [
     items: [
       { name: "Dashboard", href: "/profile", icon: LayoutDashboard },
       { name: "Directory", href: "/directory", icon: Users },
+      { name: "Calendar", href: "/calendar", icon: CalendarDays },
     ],
   },
   {

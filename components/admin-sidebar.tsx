@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Bell,
+  CalendarDays,
   ChevronsUpDown,
   ChevronRight,
   LayoutDashboard,
@@ -378,6 +379,13 @@ const adminNavigation: NavItem[] = [
     name: "Help Desk",
     href: "/admin/help-desk",
     icon: Ticket,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "operations",
+    name: "Events",
+    href: "/admin/events",
+    icon: CalendarDays,
     roles: ["developer", "super_admin", "admin"],
   },
   {
