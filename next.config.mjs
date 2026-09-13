@@ -146,6 +146,21 @@ const nextConfig = {
         destination: "/dept/:dept_id/accounts/:path*",
         permanent: true,
       },
+      {
+        source: "/documentation/internal",
+        destination: "/documentation/personal",
+        permanent: true,
+      },
+      {
+        source: "/admin/documentation/internal",
+        destination: "/admin/documentation/personal",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/documentation/internal",
+        destination: "/dept/:dept_id/documentation/personal",
+        permanent: true,
+      },
     ]
   },
 

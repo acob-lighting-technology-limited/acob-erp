@@ -22,7 +22,7 @@ export function DocumentationSections({
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Documentation"
-        description="Manage internal writeups and department file repository"
+        description="Manage staff personal docs and department file repository"
         icon={FileText}
         backLink={backLink}
       />
@@ -38,13 +38,13 @@ export function DocumentationSections({
                   className="h-8 w-8 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-600 transition-transform duration-200 group-hover:scale-105 dark:text-blue-400"
                   iconClassName="h-4 w-4"
                 />
-                <span className="transition-colors group-hover:text-blue-500">Internal Documentation</span>
+                <span className="transition-colors group-hover:text-blue-500">Personal Documentation</span>
               </CardTitle>
               <CardDescription>Knowledge docs, writeups, and employee-created documentation.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href={`${basePath}/internal`}>
-                <Button className="w-full">Open Internal Docs ({documentationCount})</Button>
+              <Link href={`${basePath}/personal`}>
+                <Button className="w-full">Open Personal Docs ({documentationCount})</Button>
               </Link>
             </CardContent>
           </Card>

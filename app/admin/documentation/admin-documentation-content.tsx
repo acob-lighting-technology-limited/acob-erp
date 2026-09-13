@@ -195,7 +195,7 @@ export function AdminDocumentationContent({
 
   const TABS: DataTableTab[] = useMemo(
     () => [
-      { key: "knowledge-docs", label: "Internal Documentation", icon: FileText },
+      { key: "knowledge-docs", label: "Personal Documentation", icon: FileText },
       { key: "department-documents", label: "Department Documents", icon: List },
     ],
     []
@@ -204,7 +204,7 @@ export function AdminDocumentationContent({
   return (
     <DataTablePage
       title="Employee Documentation"
-      description="Manage and view all internal writeups, knowledge base articles, and departmental files."
+      description="Manage and view staff personal work docs and departmental files."
       icon={FileText}
       backLink={{ href: backLinkHref, label: backLinkLabel }}
       tabs={hideTabList ? undefined : TABS}

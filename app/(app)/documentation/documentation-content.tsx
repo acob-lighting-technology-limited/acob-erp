@@ -281,7 +281,7 @@ export function DocumentationContent({
       {!hideTabList && (
         <div className="mb-4">
           <TabsList className="grid w-full max-w-lg grid-cols-2">
-            <TabsTrigger value="knowledge-docs">Internal Documentation</TabsTrigger>
+            <TabsTrigger value="knowledge-docs">Personal Documentation</TabsTrigger>
             <TabsTrigger value="department-documents">Department Documents</TabsTrigger>
           </TabsList>
         </div>

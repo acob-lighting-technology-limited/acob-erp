@@ -76,7 +76,7 @@ export function EmployeeDetailTabs({
   taskLinkBase = "/admin/tasks",
   deviceLinkBase = "/admin/devices",
   assetLinkBase = "/admin/assets",
-  docLinkBase = "/admin/documentation/internal",
+  docLinkBase = "/admin/documentation/personal",
   feedbackLinkBase = "/admin/feedback",
   auditLinkBase = "/admin/audit-logs",
 }: EmployeeDetailTabsProps) {

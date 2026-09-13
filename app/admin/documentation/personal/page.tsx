@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { AdminDocumentationContent } from "../admin-documentation-content"
 import { getAdminDocumentationData, type AdminDocumentationDataResult } from "../data"
 
-export default async function AdminInternalDocumentationPage() {
+export default async function AdminPersonalDocumentationPage() {
   const data = await getAdminDocumentationData()
 
   if ("redirect" in data && data.redirect) {
