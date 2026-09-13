@@ -14,6 +14,7 @@ const KIND_CLASSES: Record<MdDeskQueueKind, string> = {
   leave: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   requisition: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   correspondence: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  task_rating: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
 }
 
 /** Existing report screens the MD reads; MD's Desk links to them rather than copying them. */

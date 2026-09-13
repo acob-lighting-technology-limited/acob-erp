@@ -79,4 +79,6 @@ export interface TaskUserProfile {
   role?: string | null
   is_department_lead?: boolean | null
   lead_departments?: string[] | null
+  /** Head of Executive Management; the only person who may rate their own tasks. */
+  is_md?: boolean
 }

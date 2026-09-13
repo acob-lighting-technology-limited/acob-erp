@@ -23,7 +23,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase)
 
-  const { data: authData } = await supabase.auth.getUser()
+  const [{ data: authData }, { data: isMd }] = await Promise.all([supabase.auth.getUser(), supabase.rpc("is_md")])
   const userId = authData.user?.id ?? scope.userId
 
   const deptName = normalizeDepartmentName(scope.deptName)
@@ -37,6 +37,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     lead_departments: expandedDepts,
     managed_departments: expandedDepts,
     is_global_task_assigner: false,
+    is_md: isMd === true,
   }
 
   const [tasksResult, employeeResult] = await Promise.all([

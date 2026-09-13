@@ -1,8 +1,11 @@
 import "server-only"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import type { EventsSession } from "@/lib/events/server"
 import type { MdDeskDelegate, MdDeskQueue, MdDeskQueueItem } from "@/lib/md-desk/types"
+import { isAdminLikeRole } from "@/lib/admin/rbac"
+import { isLeadForTaskDepartment } from "@/lib/tasks/rating-authority"
 
 const log = logger("md-desk")
 
@@ -52,9 +55,80 @@ async function resolveNames(session: EventsSession, ids: string[]): Promise<Map<
   return map
 }
 
+type SubmittedTaskRow = {
+  id: string
+  title: string | null
+  work_item_number: string | null
+  department: string | null
+  assigned_to: string | null
+  assigned_by: string | null
+  project_id: string | null
+  updated_at: string | null
+  created_at: string
+}
+
+type ReviewerProfileRow = {
+  id: string
+  role: string | null
+  department: string | null
+  is_department_lead: boolean | null
+  lead_departments: string[] | null
+}
+
 /**
- * Items currently waiting on the MD's decision across leave, requisitions and
- * correspondence. Callers must check `isMember` first: this reads with the
+ * Submitted tasks a reviewer assigned to themselves. Nobody rates their own
+ * task, and such a task has no other reviewer, so it waits on the MD. A
+ * self-assigned task whose assignee is not a reviewer (e.g. a weekly-report
+ * item an employee logged) still goes to their lead and is not listed here.
+ */
+async function loadSelfAssignedTasksAwaitingMd(db: SupabaseClient, mdId: string | null): Promise<SubmittedTaskRow[]> {
+  const { data, error } = await db
+    .from("tasks")
+    .select("id, title, work_item_number, department, assigned_to, assigned_by, project_id, updated_at, created_at")
+    .eq("status", "submitted_for_review")
+    .eq("is_archived", false)
+    .not("assigned_to", "is", null)
+    .order("updated_at", { ascending: true })
+  if (error) {
+    log.error({ err: error.message }, "Failed to load MD task rating queue")
+    return []
+  }
+
+  const selfAssigned = ((data ?? []) as SubmittedTaskRow[]).filter(
+    (t) => t.assigned_to && t.assigned_to === t.assigned_by && t.assigned_to !== mdId
+  )
+  if (!selfAssigned.length) return []
+
+  const assigneeIds = Array.from(new Set(selfAssigned.map((t) => t.assigned_to as string)))
+  const projectIds = Array.from(new Set(selfAssigned.map((t) => t.project_id).filter(Boolean) as string[]))
+  const [profilesRes, projectsRes] = await Promise.all([
+    db.from("profiles").select("id, role, department, is_department_lead, lead_departments").in("id", assigneeIds),
+    projectIds.length
+      ? db.from("projects").select("id, project_manager_id").in("id", projectIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  if (profilesRes.error) log.error({ err: profilesRes.error.message }, "Failed to load task assignee profiles")
+  if (projectsRes.error) log.error({ err: projectsRes.error.message }, "Failed to load task projects")
+
+  const profileById = new Map(((profilesRes.data ?? []) as ReviewerProfileRow[]).map((p) => [p.id, p]))
+  const managerByProject = new Map(
+    ((projectsRes.data ?? []) as { id: string; project_manager_id: string | null }[]).map((p) => [
+      p.id,
+      p.project_manager_id,
+    ])
+  )
+
+  return selfAssigned.filter((t) => {
+    const profile = profileById.get(t.assigned_to as string)
+    if (isAdminLikeRole(profile?.role)) return true
+    if (isLeadForTaskDepartment(profile, t.department)) return true
+    return Boolean(t.project_id) && managerByProject.get(t.project_id as string) === t.assigned_to
+  })
+}
+
+/**
+ * Items currently waiting on the MD's decision across leave, requisitions,
+ * correspondence and task ratings. Callers must check `isMember` first: this reads with the
  * service role because the underlying tables are scoped to the approver, and a
  * delegate (the PA) is not the approver. Only summary fields are returned — no
  * leave reasons, amounts-in-words or letter bodies.
@@ -69,7 +143,7 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
     .maybeSingle()
   const mdId = (mdDept?.department_head_id as string | null) ?? null
 
-  const [leaveRes, reqRes, corrRes] = await Promise.all([
+  const [leaveRes, reqRes, corrRes, selfTasks] = await Promise.all([
     mdId
       ? db
           .from("leave_requests")
@@ -90,6 +164,7 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
       .eq("approval_stage", "exec_review")
       .eq("status", "pending")
       .order("created_at", { ascending: true }),
+    loadSelfAssignedTasksAwaitingMd(db, mdId),
   ])
 
   if (leaveRes.error) log.error({ err: leaveRes.error.message }, "Failed to load MD leave queue")
@@ -145,6 +220,7 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
     ...leaves.map((l) => l.user_id),
     ...reqs.map((r) => r.user_id),
     ...[...recordById.values()].map((r) => r.originator_id || ""),
+    ...selfTasks.map((t) => t.assigned_to || ""),
   ])
 
   const items: MdDeskQueueItem[] = [
@@ -188,6 +264,17 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
         },
       ]
     }),
+    ...selfTasks.map((t) => ({
+      id: `task_rating-${t.id}`,
+      kind: "task_rating" as const,
+      title: `Rate task · ${t.title || "Untitled task"}`,
+      detail: t.work_item_number,
+      requester: displayName(names.get(t.assigned_to as string)),
+      department: t.department,
+      waiting_since: t.updated_at || t.created_at,
+      href: "/admin/tasks",
+      urgent: false,
+    })),
   ].sort((x, y) => Number(y.urgent) - Number(x.urgent) || x.waiting_since.localeCompare(y.waiting_since))
 
   return {
@@ -196,6 +283,7 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
       leave: leaves.length,
       requisition: reqs.length,
       correspondence: items.filter((i) => i.kind === "correspondence").length,
+      task_rating: selfTasks.length,
     },
   }
 }

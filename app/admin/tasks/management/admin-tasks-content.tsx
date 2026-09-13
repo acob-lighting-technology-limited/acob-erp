@@ -27,6 +27,7 @@ import { TaskFormDialog } from "@/components/tasks/TaskFormDialog"
 import type { TaskFormState } from "@/components/tasks/TaskFormDialog"
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog"
 import { TaskReviewDecisionDialog } from "@/components/tasks/TaskReviewDecisionDialog"
+import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -68,6 +69,8 @@ export interface UserProfile {
   lead_departments?: string[]
   managed_departments?: string[]
   is_global_task_assigner?: boolean
+  /** Head of Executive Management; the only person who may rate their own tasks. */
+  is_md?: boolean
 }
 
 interface GoalFilterOption {
@@ -789,6 +792,16 @@ export function AdminTasksContent({
         onOpenChange={setIsReviewDialogOpen}
         task={reviewTask}
         assignableEmployees={assignableEmployees}
+        ratingBlockedReason={
+          reviewTask &&
+          isSelfRatingBlocked({
+            userId: userProfile.id,
+            assigneeIds: [reviewTask.assigned_to],
+            isMd: userProfile.is_md === true,
+          })
+            ? SELF_RATING_BLOCKED_REASON
+            : null
+        }
         onSuccess={loadData}
       />
 

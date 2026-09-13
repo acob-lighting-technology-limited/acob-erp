@@ -9,6 +9,7 @@ import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
 import { TASK_STATUSES, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_RATING_MAX, TASK_RATING_MIN, isValidRating } from "@/lib/tasks/scoring"
+import { SELF_RATING_BLOCKED_REASON, isLeadForTaskDepartment, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 
 const log = logger("tasks-status-route")
 
@@ -65,12 +66,6 @@ type ProfileRecord = {
 
 function isAdminProfile(scope: AdminScope | null) {
   return scope?.isAdminLike === true && scope.scopeMode !== "lead"
-}
-
-function isLeadForTask(profile: ProfileRecord | null, taskDepartment: string | null | undefined) {
-  if (!profile?.is_department_lead || !taskDepartment) return false
-  const leadDepartments = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
-  return profile.department === taskDepartment || leadDepartments.includes(taskDepartment)
 }
 
 export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -132,18 +127,20 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return apiError("Task not found", ApiErrorCode.NOT_FOUND, 404)
     }
 
-    const [{ data: profile }, { data: assignments }] = await Promise.all([
+    const [{ data: profile }, { data: assignments }, { data: isMdResult }] = await Promise.all([
       supabase
         .from("profiles")
         .select("id, role, department, is_department_lead, lead_departments")
         .eq("id", user.id)
         .single<ProfileRecord>(),
       supabase.from("task_assignments").select("user_id").eq("task_id", task.id).eq("user_id", user.id).limit(1),
+      supabase.rpc("is_md"),
     ])
+    const isMd = isMdResult === true
 
     const taskScope = await getRequestScope()
     const isAdmin = isAdminProfile(taskScope)
-    const isLead = isLeadForTask(profile ?? null, task.department)
+    const isLead = isLeadForTaskDepartment(profile ?? null, task.department)
     const isLeadOrAdmin = isAdmin || isLead
 
     // A project task is rated by the manager of the project it belongs to; a
@@ -163,6 +160,12 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const canReview = isLeadOrAdmin || isProjectManager
     const isAssignee = task.assigned_to === user.id || Boolean(assignments && assignments.length > 0)
     const isAssigner = task.assigned_by === user.id
+    // A reviewer who is also an assignee cannot judge their own work; the MD does.
+    const selfRatingBlocked = isSelfRatingBlocked({
+      userId: user.id,
+      assigneeIds: isAssignee ? [user.id] : [],
+      isMd,
+    })
 
     if (!isAssignee && !isAssigner && !canReview) {
       return apiError("Forbidden: You do not have permission to update this task", ApiErrorCode.FORBIDDEN, 403)
@@ -207,6 +210,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           ApiErrorCode.FORBIDDEN,
           403
         )
+      }
+
+      if (selfRatingBlocked) {
+        return apiError(SELF_RATING_BLOCKED_REASON, ApiErrorCode.FORBIDDEN, 403)
       }
 
       if (!isValidRating(parsed.data.rating)) {
@@ -353,12 +360,23 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     // Submitted work goes to whoever can actually approve and rate it: the
     // project manager for project tasks, the assigning lead otherwise. Both
     // are told when they are different people, since the lead still owns the
-    // assignee's workload even when a PM owns the rating.
+    // assignee's workload even when a PM owns the rating. A reviewer's own
+    // task leaves no one else on that list, so it goes to the MD.
     if (nextStatus === "submitted_for_review") {
       const reviewers = new Set<string>()
       if (projectManagerId) reviewers.add(projectManagerId)
       if (task.assigned_by) reviewers.add(task.assigned_by)
       reviewers.delete(user.id)
+
+      if (reviewers.size === 0 && selfRatingBlocked && canReview) {
+        const { data: mdDept } = await supabase
+          .from("departments")
+          .select("department_head_id")
+          .eq("department_code", "MD")
+          .maybeSingle<{ department_head_id: string | null }>()
+        if (mdDept?.department_head_id) reviewers.add(mdDept.department_head_id)
+        else log.warn({ taskId: task.id }, "No MD found to review a self-assigned task")
+      }
 
       for (const reviewerId of reviewers) {
         try {

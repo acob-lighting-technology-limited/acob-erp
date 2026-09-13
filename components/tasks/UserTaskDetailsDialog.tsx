@@ -50,6 +50,8 @@ interface UserTaskDetailsDialogProps {
   taskUpdates: TaskUpdate[]
   /** True when this user may approve, rate, reject or reassign the task. */
   canReview?: boolean
+  /** Why this user may not approve and rate the task, when they may not. */
+  ratingBlockedReason?: string | null
   /** Called after a status change so the list behind the dialog refreshes. */
   onChanged?: () => void | Promise<void>
   /** Posts a comment and refreshes taskUpdates. */
@@ -63,6 +65,7 @@ export function UserTaskDetailsDialog({
   selectedTask,
   taskUpdates,
   canReview = false,
+  ratingBlockedReason = null,
   onChanged,
   onAddComment,
   isPostingComment = false,
@@ -147,7 +150,12 @@ export function UserTaskDetailsDialog({
         {/* Moving a task forward is why this dialog gets opened, so it sits above
             the scroll rather than inside a tab you have to find. */}
         <DetailActionBar label="Move this task to">
-          <TaskStatusControl task={selectedTask} canReview={canReview} onChanged={() => onChanged?.()} />
+          <TaskStatusControl
+            task={selectedTask}
+            canReview={canReview}
+            ratingBlockedReason={ratingBlockedReason}
+            onChanged={() => onChanged?.()}
+          />
         </DetailActionBar>
 
         <div className="min-h-0 flex-1 overflow-y-auto">

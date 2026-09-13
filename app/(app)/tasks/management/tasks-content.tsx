@@ -23,6 +23,7 @@ import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import type { Task, TaskUserProfile } from "@/types/task"
+import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -95,6 +96,11 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     const scope = [userProfile.department, ...leadDepartments].filter(Boolean) as string[]
     return Boolean(task.department && scope.includes(task.department))
   }
+
+  const ratingBlockedReasonFor = (task: Task) =>
+    isSelfRatingBlocked({ userId, assigneeIds: [task.assigned_to], isMd: userProfile?.is_md === true })
+      ? SELF_RATING_BLOCKED_REASON
+      : null
 
   const stats = useMemo(
     () => ({
@@ -243,7 +249,13 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       // three states was the slowest part of the whole workflow.
       render: (t) => (
         <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          <TaskStatusControl task={t} canReview={canReviewTask(t)} onChanged={() => void loadTasks()} size="sm" />
+          <TaskStatusControl
+            task={t}
+            canReview={canReviewTask(t)}
+            ratingBlockedReason={ratingBlockedReasonFor(t)}
+            onChanged={() => void loadTasks()}
+            size="sm"
+          />
         </div>
       ),
     },
@@ -514,6 +526,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         selectedTask={selectedTask}
         taskUpdates={taskUpdates}
         canReview={selectedTask ? canReviewTask(selectedTask) : false}
+        ratingBlockedReason={selectedTask ? ratingBlockedReasonFor(selectedTask) : null}
         onChanged={async () => {
           const loaded = await loadTasks()
           if (loaded && selectedTask) {

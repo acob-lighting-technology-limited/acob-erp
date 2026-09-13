@@ -40,11 +40,14 @@ async function getAdminTasksData() {
   }
 
   // 2. Fetch user profile with role info
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, role, department, is_department_lead, lead_departments")
-    .eq("id", user.id)
-    .single()
+  const [{ data: profile }, { data: isMd }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, role, department, is_department_lead, lead_departments")
+      .eq("id", user.id)
+      .single(),
+    supabase.rpc("is_md"),
+  ])
 
   const departmentScope = getScopedDepartments(scope)
   const isGlobalTaskAssigner = scope.isAdminLike === true && scope.scopeMode !== "lead"
@@ -58,6 +61,7 @@ async function getAdminTasksData() {
     lead_departments: profile?.lead_departments || [],
     managed_departments: isGlobalTaskAssigner ? [] : (departmentScope ?? profile?.lead_departments ?? []),
     is_global_task_assigner: isGlobalTaskAssigner,
+    is_md: isMd === true,
   }
 
   const dataClient = getServiceRoleClientOrFallback(supabase)

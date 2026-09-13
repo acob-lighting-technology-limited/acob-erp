@@ -1,9 +1,10 @@
-export type MdDeskQueueKind = "leave" | "requisition" | "correspondence"
+export type MdDeskQueueKind = "leave" | "requisition" | "correspondence" | "task_rating"
 
 export const MD_DESK_QUEUE_LABELS: Record<MdDeskQueueKind, string> = {
   leave: "Leave",
   requisition: "Requisition",
   correspondence: "Correspondence",
+  task_rating: "Task rating",
 }
 
 export type MdDeskQueueItem = {
