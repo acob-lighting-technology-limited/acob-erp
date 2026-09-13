@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Bell,
+  Briefcase,
   CalendarDays,
   ChevronsUpDown,
   ChevronRight,
@@ -93,6 +94,8 @@ interface AdminSidebarProps {
    * the account dropdown so an admin+lead can jump to any dept shell they hold.
    */
   deptConsoles?: DeptConsole[]
+  /** Admin shell only: the viewer is the MD or an MD's Desk delegate. */
+  showMdDesk?: boolean
 }
 
 /**
@@ -257,6 +260,14 @@ const adminNavigation: NavItem[] = [
     name: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    // Shown only to the MD and their delegates (showMdDesk); the page re-checks.
+    section: "overview",
+    name: "MD's Desk",
+    href: "/admin/md-desk",
+    icon: Briefcase,
     roles: ["developer", "super_admin", "admin"],
   },
   {
@@ -560,6 +571,7 @@ export function AdminSidebar({
   adminScopeMode = "global",
   deptId,
   deptConsoles = [],
+  showMdDesk = false,
 }: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
@@ -712,6 +724,7 @@ export function AdminSidebar({
   const filteredNavigation = deptId
     ? activeNavigation
     : activeNavigation.reduce<NavItem[]>((acc, item) => {
+        if (item.href === "/admin/md-desk" && !showMdDesk) return acc
         const children = filterNavChildren(item.children)
         const selfAllowed = canAccessRoute(item.roles, item.href)
         if (!selfAllowed && !children) return acc

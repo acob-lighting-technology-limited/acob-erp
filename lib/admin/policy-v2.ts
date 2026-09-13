@@ -29,6 +29,7 @@ export type AdminRouteKeyV2 =
   | "dev.main"
   | "documentation.main"
   | "events.main"
+  | "mddesk.main"
   | "feedback.main"
   | "finance.main"
   | "helpdesk.main"
@@ -158,6 +159,7 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/correspondence")) return "correspondence.main"
   if (pathname.startsWith("/admin/documentation")) return "documentation.main"
   if (pathname.startsWith("/admin/events")) return "events.main"
+  if (pathname.startsWith("/admin/md-desk")) return "mddesk.main"
   if (pathname.startsWith("/admin/feedback")) return "feedback.main"
   if (pathname.startsWith("/admin/accounts")) return "accounts.main"
   if (pathname.startsWith("/admin/finance")) return "accounts.main"
@@ -245,6 +247,10 @@ export function getRoutePolicyV2(route: AdminRouteKeyV2): RoutePolicyV2 {
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
     case "documentation.main":
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
+    case "mddesk.main":
+      // MD's Desk is membership-gated (the MD + md_desk_delegates), not grant-gated:
+      // the page and sidebar check is_md_desk_member, and RLS guards the data.
+      return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
     case "events.main":
       // Company events. Department leads manage their own team's events here;
       // what each person may actually see or edit is enforced by RLS on events.
@@ -314,6 +320,8 @@ export function canAccessRouteV2(context: AccessContextV2, route: AdminRouteKeyV
     }
     // Dashboard is always accessible to any admin-like role
     if (route === "admin.dashboard") return true
+    // Membership-gated, not grantable — see getRoutePolicyV2("mddesk.main").
+    if (route === "mddesk.main") return true
     // Accounts and Finance map to each other so existing grants stay valid
     if (route === "accounts.main" || route === "finance.main") {
       return adminHasRoute(context, "accounts.main") || adminHasRoute(context, "finance.main")

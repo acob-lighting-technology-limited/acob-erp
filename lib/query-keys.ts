@@ -180,6 +180,8 @@ export const QUERY_KEYS = {
   // Events calendar
   events: (range?: Record<string, unknown>) => (range ? ["events", range] : ["events"]),
   eventOptions: () => ["event-options"],
+  mdDeskOverview: () => ["md-desk-overview"],
+  mdDeskDelegates: () => ["md-desk-delegates"],
 
   // Security
   adminSecurityEmployees: () => ["admin-security-employees"],

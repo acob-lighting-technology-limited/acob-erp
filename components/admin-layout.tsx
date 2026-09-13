@@ -51,6 +51,7 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   // admin sidebar dropdown — mirrors the same logic in app-layout.tsx. A lead
   // may hold several departments, so every one of them is listed.
   const deptConsoles = await resolveDeptConsoles(supabase as SupabaseClient<Database>, profile)
+  const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
 
   // "lead" scope visuals apply when the user's view is dept-restricted:
   // either an admin who has toggled into lead mode, OR a pure lead (non-admin
@@ -59,7 +60,13 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="admin-shell flex min-h-screen" data-scope={isRestrictedView ? "lead" : "global"}>
-      <AdminSidebar user={userData} profile={profile} adminScopeMode={scope.scopeMode} deptConsoles={deptConsoles} />
+      <AdminSidebar
+        user={userData}
+        profile={profile}
+        adminScopeMode={scope.scopeMode}
+        deptConsoles={deptConsoles}
+        showMdDesk={isMdDeskMember === true}
+      />
       <SidebarContent>
         <div className="min-h-screen bg-[var(--admin-content-bg)] pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">
           <AdminContextRibbon

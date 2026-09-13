@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import {
+  Briefcase,
   CalendarDays,
   ChevronsUpDown,
   ChevronRight,
@@ -69,6 +70,8 @@ interface SidebarProps {
   canAccessAdmin?: boolean
   /** Dept consoles this lead may open — shown for pure leads (non-admin dept leads). */
   deptConsoles?: DeptConsole[]
+  /** The viewer is the MD or an MD's Desk delegate. */
+  showMdDesk?: boolean
 }
 
 type NavSubChild = { name: string; href: string }
@@ -190,7 +193,7 @@ const NAV_ROUTE_ALIASES: Record<string, string[]> = {
   "/tools": ["/feedback"],
 }
 
-export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [] }: SidebarProps) {
+export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -319,6 +322,15 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [] }: Si
     : null
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
+  // MD's Desk is membership-gated, so it is added per viewer rather than listed statically.
+  const visibleSections: NavSectionDef[] = showMdDesk
+    ? navigationSections.map((section) =>
+        section.key === "workspace"
+          ? { ...section, items: [...section.items, { name: "MD's Desk", href: "/md-desk", icon: Briefcase }] }
+          : section
+      )
+    : navigationSections
+
   const labelCls = cn(
     "min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out",
     isCollapsed ? "max-w-0 opacity-0" : "max-w-full opacity-100"
@@ -329,7 +341,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [] }: Si
       <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")} />
 
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
-        {navigationSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.key} className="space-y-0.5">
             {isCollapsed ? (
               section.key !== "workspace" && <div className="mx-1.5 my-1.5 border-t" />

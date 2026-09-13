@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import {
   CalendarDays,
   CalendarRange,
@@ -34,7 +34,7 @@ import {
 import { DeleteEventDialog } from "./delete-event-dialog"
 import { EventStatusBadge, EventTypeBadge, MdInvolvementBadge } from "./event-badges"
 import { EventDetailSheet } from "./event-detail-sheet"
-import { EventFormDialog } from "./event-form-dialog"
+import { EventFormDialog, type EventFormDefaults } from "./event-form-dialog"
 import { EventMonthCalendar } from "./event-month-calendar"
 import { monthGridRange, useEventOptions, useEvents } from "./use-events"
 
@@ -54,6 +54,10 @@ export type EventsWorkspaceProps = {
   tabs: TabKey[]
   /** Management surfaces show drafts and the MD-involvement filter. */
   variant: "staff" | "manage"
+  /** Page-specific tabs (e.g. MD's Desk overview), rendered before the built-in ones. */
+  extraTabs?: { key: string; label: string; icon: LucideIcon; render: () => ReactNode }[]
+  /** Prefills for the New event form. */
+  formDefaults?: EventFormDefaults
 }
 
 const TAB_LABELS: Record<TabKey, { label: string; icon: LucideIcon }> = {
@@ -83,8 +87,11 @@ export function EventsWorkspace({
   scope = "all",
   tabs,
   variant,
+  extraTabs = [],
+  formDefaults,
 }: EventsWorkspaceProps) {
-  const [tab, setTab] = useState<TabKey>(tabs[0])
+  const [tab, setTab] = useState<string>(extraTabs[0]?.key ?? tabs[0])
+  const activeExtra = extraTabs.find((t) => t.key === tab) ?? null
   const [nowMs] = useState(() => Date.now())
   const [month, setMonth] = useState(() => {
     const [y, m] = toLocalISODate().split("-").map(Number)
@@ -314,7 +321,10 @@ export function EventsWorkspace({
       </StatGrid>
     )
 
-  const tabDefs: DataTableTab[] = tabs.map((key) => ({ key, label: TAB_LABELS[key].label, icon: TAB_LABELS[key].icon }))
+  const tabDefs: DataTableTab[] = [
+    ...extraTabs.map(({ key, label, icon: tabIcon }) => ({ key, label, icon: tabIcon })),
+    ...tabs.map((key) => ({ key, label: TAB_LABELS[key].label, icon: TAB_LABELS[key].icon })),
+  ]
   const error = eventsQuery.error instanceof Error ? eventsQuery.error.message : null
 
   return (
@@ -325,7 +335,7 @@ export function EventsWorkspace({
       backLink={backLink}
       tabs={tabDefs}
       activeTab={tab}
-      onTabChange={(key) => setTab(key as TabKey)}
+      onTabChange={setTab}
       stats={statCards}
       actions={
         canCreate ? (
@@ -336,7 +346,9 @@ export function EventsWorkspace({
         ) : undefined
       }
     >
-      {tab === "calendar" ? (
+      {activeExtra ? (
+        activeExtra.render()
+      ) : tab === "calendar" ? (
         <div className="space-y-2">
           {error && (
             <div className="border-destructive/40 text-destructive flex items-center justify-between gap-2 rounded-lg border p-3 text-sm">
@@ -383,7 +395,13 @@ export function EventsWorkspace({
         onEdit={openEdit}
         onDelete={openDelete}
       />
-      <EventFormDialog open={formOpen} onOpenChange={setFormOpen} event={editing} options={optionsQuery.data} />
+      <EventFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        event={editing}
+        options={optionsQuery.data}
+        defaults={formDefaults}
+      />
       <DeleteEventDialog event={deleting} onOpenChange={(open) => !open && setDeleting(null)} />
     </DataTablePage>
   )

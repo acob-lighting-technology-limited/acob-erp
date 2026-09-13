@@ -30,6 +30,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
   // admin+lead. Both surfaces are useful independently: admin = global ops,
   // dept = scoped view. A lead may hold several departments.
   const deptConsoles = await resolveDeptConsoles(typedSupabase, profile)
+  const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
 
   const userData = {
     email: data.user.email,
@@ -43,6 +44,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
         profile={profile || undefined}
         canAccessAdmin={canAccessAdmin}
         deptConsoles={deptConsoles}
+        showMdDesk={isMdDeskMember === true}
       />
       <SidebarContent>
         <div className="pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">{children}</div>
