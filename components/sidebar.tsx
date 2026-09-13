@@ -160,6 +160,8 @@ const navigationSections: NavSectionDef[] = [
         href: "/documentation",
         icon: FileText,
         children: [
+          { name: "Policies", href: "/documentation/policies" },
+          { name: "SOPs", href: "/documentation/sops" },
           { name: "Personal", href: "/documentation/personal" },
           { name: "Department", href: "/documentation/department" },
         ],

@@ -22,7 +22,7 @@ function formatDateForFolder(value?: string | null): string {
   return `${day}-${month}-${year}`
 }
 
-function sanitizeSegment(value: string, fallback: string): string {
+export function sanitizeSegment(value: string, fallback: string): string {
   const sanitized = value
     .replace(/[~"#%&*:<>?/\\{|}]/g, " ")
     .replace(/\s+/g, " ")
@@ -45,7 +45,11 @@ export function buildEmployeeFolderName(fullName?: string | null, fallback = "Un
   return sanitizeSegment(String(fullName || ""), fallback)
 }
 
-export function buildDocumentationFolderName(title: string, createdAt: string | null | undefined, documentId: string): string {
+export function buildDocumentationFolderName(
+  title: string,
+  createdAt: string | null | undefined,
+  documentId: string
+): string {
   const safeTitle = sanitizeSegment(title, "Documentation")
   return `${safeTitle}-${formatDateForFolder(createdAt)}-${documentId}`
 }
