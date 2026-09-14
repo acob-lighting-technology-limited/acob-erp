@@ -238,6 +238,21 @@ export function TaskFormDialog({
 
   const selectedKpi = useMemo(() => kpiOptions.find((k) => k.id === kpiId), [kpiOptions, kpiId])
 
+  useEffect(() => {
+    if (!kpiId || !selectedKpi) return
+    if (initialGoals && initialGoals.length > 0) {
+      const match = initialGoals.find(
+        (g) =>
+          g.title.toLowerCase() === selectedKpi.strategic_objective.toLowerCase() ||
+          g.title.toLowerCase().includes(selectedKpi.strategic_objective.toLowerCase()) ||
+          selectedKpi.strategic_objective.toLowerCase().includes(g.title.toLowerCase())
+      )
+      if (match) {
+        setValue("goal_id", match.id)
+      }
+    }
+  }, [kpiId, selectedKpi, initialGoals, setValue])
+
   const sortedKpis = useMemo(() => {
     return [...kpiOptions].sort((a, b) => {
       if (a.role === "core" && b.role !== "core") return -1
@@ -282,6 +297,16 @@ export function TaskFormDialog({
   function buildTaskFormState(): TaskFormState {
     const values = getValues()
     const targetUsers = isMultiAssign ? selectedUserIds : values.assigned_to ? [values.assigned_to] : []
+    const matchingGoalId = selectedKpi
+      ? initialGoals.find(
+          (g) =>
+            g.title.toLowerCase() === selectedKpi.strategic_objective.toLowerCase() ||
+            g.title.toLowerCase().includes(selectedKpi.strategic_objective.toLowerCase()) ||
+            selectedKpi.strategic_objective.toLowerCase().includes(g.title.toLowerCase())
+        )?.id ||
+        values.goal_id ||
+        ""
+      : values.goal_id || ""
 
     return {
       title: values.title ?? "",
@@ -296,7 +321,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || (values.project_id === "__none__" ? "" : (values.project_id ?? "")),
       plan_id: lockedPlanId || (values.plan_id ?? ""),
       weight: values.weight ?? TASK_WEIGHT_DEFAULT,
-      goal_id: "",
+      goal_id: matchingGoalId,
       kpi_id: values.kpi_id === "__none__" ? "" : (values.kpi_id ?? ""),
       task_start_date: values.task_start_date ?? "",
       task_end_date: values.task_end_date ?? "",
@@ -317,7 +342,7 @@ export function TaskFormDialog({
             <DialogTitle>{selectedTask ? "Edit Task" : "Create New Task"}</DialogTitle>
             <ItemInfoButton
               title="Task & KPI Guide"
-              summary="Direct individual accountability with optional strategic goal linking."
+              summary="Direct individual accountability with mandatory Corporate KPI alignment."
               details={[
                 {
                   label: "Direct Assignment",
@@ -327,7 +352,7 @@ export function TaskFormDialog({
                 {
                   label: "Corporate KPI Alignment",
                   value:
-                    "Linking to a Corporate KPI is optional. Linked tasks drive departmental scorecard progress, while unlinked tasks track routine work.",
+                    "Every task must link to an approved Corporate KPI. The associated Department Goal and Strategic Pillar are automatically selected and aligned.",
                 },
                 {
                   label: "Review Workflow",
@@ -340,7 +365,7 @@ export function TaskFormDialog({
           <DialogDescription>
             {selectedTask
               ? "Update task details, due dates, or linked Corporate KPI."
-              : "Assign a task with optional Corporate KPI alignment to team members."}
+              : "Assign a task with Corporate KPI alignment to team members."}
           </DialogDescription>
           {assignmentAuthorityLabel ? (
             <p className="text-muted-foreground text-xs">{assignmentAuthorityLabel}</p>
@@ -538,22 +563,32 @@ export function TaskFormDialog({
               </SelectContent>
             </Select>
             {selectedKpi && (
-              <div className="bg-muted/40 border-muted-foreground/20 text-muted-foreground mt-1.5 flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-md border px-2.5 py-1.5 text-xs break-words">
+              <div className="bg-muted/30 border-muted-foreground/20 mt-2 space-y-1.5 rounded-md border p-2.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
+                    <Target className="text-primary h-3.5 w-3.5" />
+                    Department Goal
+                  </Label>
+                  <Badge variant="secondary" className="text-[10px] font-normal">
+                    Auto-selected from KPI
+                  </Badge>
+                </div>
+                <Input
+                  value={selectedKpi.strategic_objective || "—"}
+                  disabled
+                  readOnly
+                  className="bg-background/80 text-foreground h-8 cursor-not-allowed text-xs font-medium"
+                />
                 {selectedKpi.strategic_priority && (
-                  <span className="text-foreground font-medium">
-                    🎯 Pillar: <span className="font-normal">{selectedKpi.strategic_priority}</span>
-                  </span>
-                )}
-                {selectedKpi.strategic_priority && selectedKpi.strategic_objective && <span>·</span>}
-                {selectedKpi.strategic_objective && (
-                  <span className="text-foreground font-medium">
-                    Goal: <span className="font-normal">{selectedKpi.strategic_objective}</span>
-                  </span>
+                  <p className="text-muted-foreground text-[11px]">
+                    🎯 Strategic Pillar:{" "}
+                    <span className="text-foreground font-medium">{selectedKpi.strategic_priority}</span>
+                  </p>
                 )}
               </div>
             )}
             <p className="text-muted-foreground text-[11px]">
-              Which corporate target this work serves. Every task must link to a Corporate KPI.
+              Which corporate target this work serves. Every task must link to an approved Corporate KPI.
             </p>
           </div>
 

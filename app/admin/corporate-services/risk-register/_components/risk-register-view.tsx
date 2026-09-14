@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Pencil, ShieldAlert } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Clock, Download, ExternalLink, Pencil, ShieldAlert } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -11,6 +11,8 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
+import { toLocalISODate } from "@/lib/utils/date"
+import { AddRiskDialog } from "./add-risk-dialog"
 import { EditRiskDialog, type RiskItem } from "./edit-risk-dialog"
 import { RiskCard } from "./risk-card"
 import { apiFetch } from "@/lib/api-client"
@@ -27,6 +29,7 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
 
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isAddOpen, setIsAddOpen] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery<{ data: RiskItem[] }>({
     queryKey,
@@ -56,6 +59,13 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
       return {
         data: old.data.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
       }
+    })
+  }
+
+  function handleRiskAdded(newRisk: RiskItem) {
+    queryClient.setQueryData<{ data: RiskItem[] }>(queryKey, (old) => {
+      if (!old) return { data: [newRisk] }
+      return { data: [newRisk, ...old.data] }
     })
   }
 
@@ -241,45 +251,82 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
     },
   ]
 
+  const handleExportCsv = () => {
+    if (risks.length === 0) return
+    const headers = ["Title", "Department", "Category", "Severity", "Status", "Mitigation Plan", "Contingency Plan"]
+    const lines = risks.map((r) => [
+      `"${(r.title || "").replace(/"/g, '""')}"`,
+      `"${r.department || "Enterprise"}"`,
+      `"${r.category}"`,
+      `"${r.severity}"`,
+      `"${r.status}"`,
+      `"${(r.mitigation_plan || "").replace(/"/g, '""')}"`,
+      `"${(r.contingency_plan || "").replace(/"/g, '""')}"`,
+    ])
+    const csvContent = [headers.join(","), ...lines.map((l) => l.join(","))].join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.setAttribute("href", url)
+    link.setAttribute("download", `risk-register-${toLocalISODate()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <DataTablePage
       title="Risk Register"
       description="Enterprise and departmental risk matrix, tracking operational challenges and strategic mitigations."
       icon={ShieldAlert}
       backLink={{ href: "/admin/corporate-services/scorecard", label: "Back to Scorecard" }}
+      actions={
+        <div className="flex items-center gap-2">
+          {risks.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleExportCsv}>
+              <Download className="mr-1.5 h-4 w-4" aria-hidden />
+              Export
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setIsAddOpen(true)}>
+            <ShieldAlert className="mr-1.5 h-4 w-4" /> Add Risk
+          </Button>
+        </div>
+      }
       stats={
         <StatGrid>
           <StatCard
+            variant="compact"
             title="Total Tracked Risks"
             value={totalRisks}
             icon={ShieldAlert}
             iconBgColor="bg-slate-500/10"
             iconColor="text-slate-600 dark:text-slate-400"
-            description="All operational challenges & risks"
           />
           <StatCard
+            variant="compact"
             title="Critical & High"
             value={criticalHighCount}
             icon={AlertTriangle}
             iconBgColor="bg-rose-500/10"
             iconColor="text-rose-600 dark:text-rose-400"
-            description="Requires executive mitigation"
           />
           <StatCard
+            variant="compact"
             title="In Mitigation"
             value={mitigatingCount}
             icon={Clock}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-600 dark:text-blue-400"
-            description="Action plans currently underway"
           />
           <StatCard
+            variant="compact"
             title="Resolved / Closed"
             value={resolvedCount}
             icon={CheckCircle2}
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-600 dark:text-emerald-400"
-            description="Successfully managed risks"
           />
         </StatGrid>
       }
@@ -300,7 +347,65 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
         onRetry={refetch}
         pagination={{ pageSize: 25 }}
         viewToggle
+        contactsView
+        stickyToolbar
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         cardRenderer={(risk) => <RiskCard risk={risk} onEdit={() => handleOpenEdit(risk)} />}
+        mobileRow={{
+          title: (r) => r.title,
+          subtitle: (r) => {
+            const parts = [
+              r.department || "Enterprise",
+              r.category,
+              r.report_id && r.week_number ? `Week ${r.week_number}` : null,
+            ].filter(Boolean)
+            return parts.join(" · ")
+          },
+          trailing: (r) => (
+            <div className="flex items-center gap-1">
+              <Badge variant="outline" className="text-[10px] font-medium capitalize">
+                {r.severity}
+              </Badge>
+              <Badge variant="outline" className="text-[10px] font-medium capitalize">
+                {r.status}
+              </Badge>
+            </div>
+          ),
+          onSelect: (r) => handleOpenEdit(r),
+          detail: {
+            title: (r) => r.title,
+            subtitle: (r) => r.department || "Enterprise",
+            badges: (r) => (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" className="text-[10px] capitalize">
+                  {r.severity}
+                </Badge>
+                <Badge variant="outline" className="text-[10px] capitalize">
+                  {r.status}
+                </Badge>
+                <Badge variant="secondary" className="text-[10px] capitalize">
+                  {r.category}
+                </Badge>
+              </div>
+            ),
+            fields: (r) => [
+              { label: "Department", value: r.department || "Enterprise" },
+              { label: "Category", value: r.category },
+              { label: "Severity", value: r.severity },
+              { label: "Status", value: r.status },
+              { label: "Mitigation Plan", value: r.mitigation_plan || "None recorded", fullWidth: true },
+              { label: "Contingency Plan", value: r.contingency_plan || "None recorded", fullWidth: true },
+            ],
+            actions: (r) => [
+              {
+                label: "Edit",
+                icon: Pencil,
+                onClick: () => handleOpenEdit(r),
+              },
+            ],
+          },
+        }}
+        urlSync
         expandable={{
           render: (r) => (
             <div className="bg-muted/20 space-y-3 border-t p-4 text-sm">
@@ -356,6 +461,14 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
         onOpenChange={setIsEditOpen}
         employees={employees}
         onRiskUpdated={handleRiskSaved}
+      />
+
+      <AddRiskDialog
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        departments={departments}
+        employees={employees}
+        onRiskAdded={handleRiskAdded}
       />
     </DataTablePage>
   )

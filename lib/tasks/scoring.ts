@@ -27,14 +27,7 @@ export const TASK_RATING_MAX = 5
  *  neither credit nor failure for this employee. */
 const EXCLUDED_STATUSES = new Set(["reassigned", "cancelled"])
 
-/** Plain names for the weight scale, so a lead is not guessing what "3" means. */
-export const TASK_WEIGHT_LABELS: Record<number, string> = {
-  1: "minor",
-  2: "small",
-  3: "normal",
-  4: "significant",
-  5: "critical",
-}
+/** Task weights are strictly numeric (1–5) and must never display descriptive text labels. */
 
 export const TASK_RATING_LABELS: Record<number, string> = {
   1: "Poor",

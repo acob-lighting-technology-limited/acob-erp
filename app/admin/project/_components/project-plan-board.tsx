@@ -3,9 +3,21 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus, Loader2, Trash2, FolderTree, Scale, Star, Pencil, ChevronDown, ChevronRight } from "lucide-react"
+import {
+  Plus,
+  Loader2,
+  Trash2,
+  FolderTree,
+  Scale,
+  Star,
+  Pencil,
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { apiFetch } from "@/lib/api-client"
@@ -378,16 +390,28 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
               </p>
             </div>
             {plan && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-muted-foreground hover:text-destructive h-7 w-7 p-0"
-                onClick={() => deletePlan.mutate(plan.id)}
-                disabled={deletePlan.isPending}
-                aria-label={`Delete ${plan.name}`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+                    aria-label={`Options for ${plan.name}`}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                    onClick={() => deletePlan.mutate(plan.id)}
+                    disabled={deletePlan.isPending}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete plan
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>
@@ -397,10 +421,34 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
             {plan && (
               <div className="bg-background/50 flex items-center justify-between border-b px-3 py-2">
                 <span className="text-muted-foreground text-xs font-medium">Tasks in {title}</span>
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Task
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Task
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+                        aria-label={`Options for ${plan.name}`}
+                      >
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                        onClick={() => deletePlan.mutate(plan.id)}
+                        disabled={deletePlan.isPending}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete plan
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             )}
 
