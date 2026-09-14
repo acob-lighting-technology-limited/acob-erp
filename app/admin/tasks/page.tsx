@@ -181,7 +181,13 @@ async function getAdminTasksData() {
   if (departmentScope && departmentScope.length > 0) {
     goalsQuery = goalsQuery.in("department", departmentScope)
   }
-  const { data: goalRowsRaw } = await goalsQuery.order("title", { ascending: true })
+  const [{ data: goalRowsRaw }, { data: cyclesRaw }] = await Promise.all([
+    goalsQuery.order("title", { ascending: true }),
+    dataClient
+      .from("review_cycles")
+      .select("id, name, review_type, start_date, end_date, status")
+      .order("start_date", { ascending: false }),
+  ])
   const goalRows = ((goalRowsRaw || []) as GoalRow[]).map((goal) => ({
     id: goal.id,
     title: goal.title,
@@ -192,6 +198,14 @@ async function getAdminTasksData() {
     employee: (employeeResult.data || []) as employee[],
     departments,
     goals: goalRows,
+    cycles: (cyclesRaw || []) as Array<{
+      id: string
+      name: string
+      review_type: string | null
+      start_date: string | null
+      end_date: string | null
+      status?: string | null
+    }>,
     userProfile,
   }
 }
@@ -210,6 +224,7 @@ export default async function AdminTasksPage(props: { searchParams?: Promise<{ g
       initialemployee={data.employee}
       initialDepartments={data.departments}
       initialGoals={data.goals}
+      initialReviewCycles={data.cycles}
       userProfile={data.userProfile}
       initialGoalId={searchParams?.goal_id || ""}
     />
