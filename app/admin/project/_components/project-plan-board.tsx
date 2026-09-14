@@ -17,8 +17,18 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { apiFetch } from "@/lib/api-client"
 import { cn, formatFullName } from "@/lib/utils"
@@ -88,7 +98,8 @@ const EMPTY_TASK_FORM: TaskFormState = {
  */
 export function ProjectPlanBoard({ project, profiles }: { project: Project; profiles: employee[] }) {
   const queryClient = useQueryClient()
-  const [newPlanName, setNewPlanName] = useState("")
+  const [isAddPlanOpen, setIsAddPlanOpen] = useState(false)
+  const [planForm, setPlanForm] = useState({ name: "", description: "" })
   const [taskDialogPlan, setTaskDialogPlan] = useState<Plan | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
@@ -127,11 +138,11 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
   })
 
   const addPlan = useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async ({ name, description }: { name: string; description?: string }) => {
       const res = await apiFetch(`/api/projects/${project.id}/plans`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, sort_order: plans.length }),
+        body: JSON.stringify({ name, description: description || null, sort_order: plans.length }),
       })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to add plan")
@@ -139,7 +150,8 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
     },
     onSuccess: () => {
       toast.success("Implementation plan added")
-      setNewPlanName("")
+      setPlanForm({ name: "", description: "" })
+      setIsAddPlanOpen(false)
       void queryClient.invalidateQueries({ queryKey: plansKey })
     },
     onError: (err: Error) => toast.error(err.message),
@@ -475,26 +487,22 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
 
   return (
     <div className="space-y-3 p-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          value={newPlanName}
-          onChange={(e) => setNewPlanName(e.target.value)}
-          placeholder="New implementation plan (e.g. Civil Works)"
-          className="h-9 max-w-xs text-sm"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && newPlanName.trim()) addPlan.mutate(newPlanName.trim())
-          }}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        <div>
+          <h4 className="text-foreground text-sm font-semibold">Implementation Plans</h4>
+          <p className="text-muted-foreground text-xs">
+            Break this project into structured phases or execution workstreams.
+          </p>
+        </div>
         <Button
           size="sm"
-          onClick={() => newPlanName.trim() && addPlan.mutate(newPlanName.trim())}
-          disabled={addPlan.isPending || !newPlanName.trim()}
+          onClick={() => {
+            setPlanForm({ name: "", description: "" })
+            setIsAddPlanOpen(true)
+          }}
+          className="gap-1.5 text-xs"
         >
-          {addPlan.isPending ? (
-            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Plus className="mr-1 h-3.5 w-3.5" />
-          )}
+          <Plus className="h-3.5 w-3.5" />
           Add Plan
         </Button>
       </div>
@@ -515,6 +523,70 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
           )}
         </div>
       )}
+
+      <Dialog open={isAddPlanOpen} onOpenChange={setIsAddPlanOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!planForm.name.trim()) return
+              addPlan.mutate({
+                name: planForm.name.trim(),
+                description: planForm.description.trim() || undefined,
+              })
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Add Implementation Plan</DialogTitle>
+              <DialogDescription>Create a new plan phase or workstream for {project.project_name}.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="plan-name" className="text-xs font-medium">
+                  Plan Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="plan-name"
+                  value={planForm.name}
+                  onChange={(e) => setPlanForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Civil Works, Electrical Rough-in, Procurement"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="plan-description" className="text-xs font-medium">
+                  Description <span className="text-muted-foreground">(Optional)</span>
+                </Label>
+                <Textarea
+                  id="plan-description"
+                  value={planForm.description}
+                  onChange={(e) => setPlanForm((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Summary of scope, milestones, or deliverables for this plan..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddPlanOpen(false)}
+                disabled={addPlan.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addPlan.isPending || !planForm.name.trim()}>
+                {addPlan.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Plan
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <TaskFormDialog
         isOpen={isTaskDialogOpen}
