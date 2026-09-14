@@ -185,7 +185,13 @@ export async function GET(request: NextRequest) {
         preview,
         employeeOptions: profiles
           .filter((profile) => Boolean((profile.company_email || profile.additional_email || "").trim()))
-          .map((profile) => ({ id: profile.id, full_name: profile.full_name, department: profile.department })),
+          .map((profile) => ({
+            id: profile.id,
+            full_name: profile.full_name,
+            department: profile.department,
+            is_department_lead: Boolean(profile.is_department_lead),
+            lead_departments: profile.lead_departments ?? [],
+          })),
       },
     })
   } catch (error) {

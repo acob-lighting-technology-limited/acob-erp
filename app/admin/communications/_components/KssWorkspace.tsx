@@ -41,6 +41,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { getOfficeWeekFromDate, getOfficeWeekMonday } from "@/lib/meeting-week"
 import { toLocalISODate, formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
+import { isSameDepartment } from "@/shared/departments"
 
 type RotationSettings = {
   departments: string[]
@@ -71,7 +72,13 @@ type RotationPayload = {
   skips: SkipRow[]
   departmentOptions: string[]
   preview: SessionRow[]
-  employeeOptions: Array<{ id: string; full_name: string | null; department: string | null }>
+  employeeOptions: Array<{
+    id: string
+    full_name: string | null
+    department: string | null
+    is_department_lead: boolean
+    lead_departments: string[]
+  }>
 }
 
 /** The General Weekly Meeting always starts at 8:30 AM. */
@@ -252,6 +259,21 @@ export function KssWorkspace() {
   }))
   const addableDepartments = data.departmentOptions.filter((name) => !draft.departments.includes(name))
   const sent = selected?.heads_up?.outcome === "sent" ? selected.heads_up : null
+
+  // Recomputed from the unsaved draft so the summary follows every change;
+  // mirrors send-kss-heads-up (department members and its leads, plus extras).
+  const recipients = selected?.department
+    ? data.employeeOptions
+        .filter((employee) => {
+          const department = selected.department as string
+          const inDepartment =
+            isSameDepartment(employee.department, department) ||
+            (employee.is_department_lead &&
+              employee.lead_departments.some((managed) => isSameDepartment(managed, department)))
+          return draft.extra_recipient_ids.includes(employee.id) || (draft.include_department_members && inDepartment)
+        })
+        .map((employee) => employee.full_name || "Unnamed")
+    : []
 
   return (
     <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start">
@@ -589,12 +611,12 @@ export function KssWorkspace() {
               <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Recipients</div>
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-orange-600" />
-                <span className="text-2xl font-bold">{selected?.recipients.length ?? 0}</span>
+                <span className="text-2xl font-bold">{recipients.length}</span>
                 <span className="text-muted-foreground text-sm">people</span>
               </div>
-              {selected && selected.recipients.length > 0 && (
+              {recipients.length > 0 && (
                 <div className="mt-2 max-h-[160px] space-y-0.5 overflow-y-auto rounded-md border p-2 text-xs">
-                  {selected.recipients.map((name, index) => (
+                  {recipients.map((name, index) => (
                     <div key={`${name}-${index}`} className="truncate">
                       {name}
                     </div>
@@ -650,7 +672,7 @@ export function KssWorkspace() {
             <Button
               className="w-full bg-orange-600 text-white hover:bg-orange-700"
               size="lg"
-              disabled={!selected || selected.recipients.length === 0 || isSending || isDirty}
+              disabled={!selected || recipients.length === 0 || isSending || isDirty}
               onClick={() => setConfirmOpen(true)}
             >
               <Send className="mr-2 h-4 w-4" />
@@ -664,7 +686,7 @@ export function KssWorkspace() {
               </p>
             ) : (
               selected &&
-              selected.recipients.length === 0 && (
+              recipients.length === 0 && (
                 <p className="text-destructive text-center text-xs">
                   <AlertCircle className="mr-1 inline h-3 w-3" />
                   No recipients selected
@@ -681,7 +703,7 @@ export function KssWorkspace() {
             <AlertDialogTitle>Send the heads-up?</AlertDialogTitle>
             <AlertDialogDescription>
               {selected
-                ? `${selected.department}, ${formatWATDate(selected.date)}. ${selected.recipients.length} people will be emailed.${sent ? " It was already sent once for this session." : ""}`
+                ? `${selected.department}, ${formatWATDate(selected.date)}. ${recipients.length} people will be emailed.${sent ? " It was already sent once for this session." : ""}`
                 : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
