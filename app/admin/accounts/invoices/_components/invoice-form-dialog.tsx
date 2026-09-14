@@ -40,6 +40,9 @@ export interface InvoiceFormValue {
   terms: string | null
 }
 
+// Stable default: a fresh [] each render changes hook deps and can loop effects.
+const EMPTY_ITEMS: InvoiceItemFormValue[] = []
+
 interface InvoiceFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -57,7 +60,7 @@ export function InvoiceFormDialog({
   onOpenChange,
   queryClient,
   invoice = null,
-  initialItems = [],
+  initialItems = EMPTY_ITEMS,
 }: InvoiceFormDialogProps) {
   const router = useRouter()
   const isEditing = Boolean(invoice?.id)
