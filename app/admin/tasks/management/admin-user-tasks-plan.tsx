@@ -562,6 +562,76 @@ export function AdminUserTasksPlan({
         emptyTitle="No Employees Found"
         emptyDescription="No employees match the current filters or department scope."
         emptyIcon={Users}
+        viewToggle
+        contactsView
+        stickyToolbar
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        mobileRow={{
+          title: (r) => r.name,
+          subtitle: (r) =>
+            `${r.department} · ${r.totalTasks} tasks · ${r.totalWeight} pts · Rate: ${r.completionRate}%`,
+          trailing: (r) => (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              {r.avgRating !== null ? `★ ${r.avgRating}` : "Unrated"}
+            </Badge>
+          ),
+          detail: {
+            title: (r) => r.name,
+            subtitle: (r) => `${r.department} · ${r.email}`,
+            badges: (r) => (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline" className="text-[10px]">
+                  {r.totalTasks} tasks
+                </Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  {r.totalWeight} weight pts
+                </Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  {r.completionRate}% completed
+                </Badge>
+              </div>
+            ),
+            fields: (r) => [
+              { label: "Employee", value: r.name },
+              { label: "Department", value: r.department },
+              { label: "Email", value: r.email },
+              { label: "Total Tasks", value: String(r.totalTasks) },
+              { label: "Completed", value: String(r.completedCount) },
+              { label: "In Progress", value: String(r.inProgressCount) },
+              { label: "Pending", value: String(r.pendingCount) },
+              { label: "Total Weight Points", value: `${r.totalWeight} pts` },
+              { label: "Average Rating", value: r.avgRating !== null ? `${r.avgRating} / 5` : "Unrated" },
+              { label: "Attainment Rate", value: `${r.completionRate}%` },
+            ],
+          },
+        }}
+        cardRenderer={(r) => (
+          <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-semibold">{r.name}</p>
+                <p className="text-muted-foreground text-[11px]">{r.department}</p>
+              </div>
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {r.avgRating !== null ? `★ ${r.avgRating}` : "Unrated"}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-3 gap-2 border-t pt-2 text-center text-[10px]">
+              <div className="bg-muted/30 rounded p-1">
+                <span className="text-muted-foreground block">Tasks</span>
+                <span className="font-semibold">{r.totalTasks}</span>
+              </div>
+              <div className="bg-muted/30 rounded p-1">
+                <span className="text-muted-foreground block">Weight</span>
+                <span className="font-semibold">{r.totalWeight}</span>
+              </div>
+              <div className="bg-muted/30 rounded p-1">
+                <span className="text-muted-foreground block">Rate</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">{r.completionRate}%</span>
+              </div>
+            </div>
+          </div>
+        )}
         expandable={{
           canExpand: (row) => row.tasks.length > 0,
           render: (row) => (
