@@ -201,7 +201,9 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       icon: FileText,
       roles: [],
       children: [
-        { name: "Internal", href: `${base}/documentation/internal` },
+        { name: "Policies", href: `${base}/documentation/policies` },
+        { name: "SOPs", href: `${base}/documentation/sops` },
+        { name: "Personal", href: `${base}/documentation/personal` },
         { name: "Department", href: `${base}/documentation/department` },
       ],
     },
@@ -445,7 +447,9 @@ const adminNavigation: NavItem[] = [
     icon: FileText,
     roles: ["developer", "super_admin", "admin"],
     children: [
-      { name: "Internal", href: "/admin/documentation/internal" },
+      { name: "Policies", href: "/admin/documentation/policies" },
+      { name: "SOPs", href: "/admin/documentation/sops" },
+      { name: "Personal", href: "/admin/documentation/personal" },
       { name: "Department", href: "/admin/documentation/department" },
     ],
   },

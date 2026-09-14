@@ -19,7 +19,7 @@ import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 
-const log = logger("internal-documentation-content")
+const log = logger("personal-documentation-content")
 
 interface Documentation {
   id: string
@@ -38,7 +38,7 @@ interface Documentation {
   updated_at: string
 }
 
-interface InternalDocumentationContentProps {
+interface PersonalDocumentationContentProps {
   initialDocs: Documentation[]
   userId: string
 }
@@ -53,7 +53,7 @@ function getStatusColor(isDraft: boolean) {
     : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
 }
 
-export function InternalDocumentationContent({ initialDocs, userId }: InternalDocumentationContentProps) {
+export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDocumentationContentProps) {
   const [docs, setDocs] = useState<Documentation[]>(initialDocs)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -361,7 +361,7 @@ export function InternalDocumentationContent({ initialDocs, userId }: InternalDo
 
   return (
     <DataTablePage
-      title="Internal Documentation"
+      title="Personal Documentation"
       description="Create and manage your work documentation."
       icon={FileText}
       backLink={{ href: "/documentation", label: "Back to Documentation" }}

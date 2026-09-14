@@ -3,8 +3,11 @@ import { redirect } from "next/navigation"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
-import { ChevronRight, FileText, FolderOpen } from "lucide-react"
+import { ChevronRight, FileText, FolderOpen, ListChecks, ScrollText } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getControlledDocSummary } from "@/lib/documentation/controlled-summary"
 import { getDocumentationData } from "./data"
 import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
 
@@ -31,17 +34,55 @@ export default async function DocumentationPage() {
 
   const docsData = data as {
     docs: Documentation[]
+    userId: string
     departmentDocs: { enabled: boolean }
   }
 
+  const supabase = await createClient()
+  const summary = await getControlledDocSummary(getServiceRoleClientOrFallback(supabase), docsData.userId)
+  const pendingPolicies = summary.policiesPendingAcknowledgement
+
   const docSections = [
     {
-      title: "Internal Documentation",
-      description: "Create and manage your internal work documentation and knowledge base.",
-      href: "/documentation/internal",
+      title: "Company Policies",
+      description: "The rules that apply to everyone. Read each one and acknowledge it.",
+      href: "/documentation/policies",
+      icon: ScrollText,
+      tag: pendingPolicies > 0 ? `${pendingPolicies} to acknowledge` : `${summary.policies} Policies`,
+      subLabel:
+        pendingPolicies > 0 ? "Action needed" : summary.policies > 0 ? "All acknowledged" : "None published yet",
+      enabled: true,
+      color:
+        pendingPolicies > 0
+          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+          : "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+      fill: pendingPolicies > 0 ? "bg-amber-500" : "bg-violet-500",
+      hoverBorder:
+        pendingPolicies > 0
+          ? "hover:border-amber-500/60 dark:hover:border-amber-400/60"
+          : "hover:border-violet-500/60 dark:hover:border-violet-400/60",
+      hoverText: pendingPolicies > 0 ? "group-hover:text-amber-500" : "group-hover:text-violet-500",
+    },
+    {
+      title: "Standard Operating Procedures",
+      description: "Step-by-step procedures for company-wide tasks and your department's work.",
+      href: "/documentation/sops",
+      icon: ListChecks,
+      tag: `${summary.sops} SOPs`,
+      subLabel: "How we do things",
+      enabled: true,
+      color: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+      fill: "bg-sky-500",
+      hoverBorder: "hover:border-sky-500/60 dark:hover:border-sky-400/60",
+      hoverText: "group-hover:text-sky-500",
+    },
+    {
+      title: "Personal Documentation",
+      description: "Create and manage your own work documentation.",
+      href: "/documentation/personal",
       icon: FileText,
       tag: `${docsData.docs.length} Docs`,
-      subLabel: "Internal knowledge base",
+      subLabel: "Your work docs",
       enabled: true,
       color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
       fill: "bg-blue-500",
@@ -71,7 +112,7 @@ export default async function DocumentationPage() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Documentation"
-        description="Access internal knowledge docs and department file repository"
+        description="Company policies, SOPs, your personal work docs, and department files"
         icon={FileText}
         backLink={{ href: "/profile", label: "Back to Dashboard" }}
       />

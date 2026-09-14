@@ -11,7 +11,7 @@ interface Props {
   params: Promise<{ dept_id: string }>
 }
 
-export default async function DeptInternalDocumentationPage({ params }: Props) {
+export default async function DeptPersonalDocumentationPage({ params }: Props) {
   const { dept_id } = await params
   const scope = await requireDeptScope(dept_id)
 
