@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { BarChart3, Eye, TrendingUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableTab } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -44,6 +44,13 @@ function ragBadge(status: RagStatus | null) {
   return <span className="text-muted-foreground text-xs">No data</span>
 }
 
+export interface ScorecardSummaryContentProps {
+  onSelectDepartment?: (dept: string) => void
+  tabs?: DataTableTab[]
+  activeTab?: string
+  onTabChange?: (tab: string) => void
+}
+
 /**
  * The MD view: how the company is doing against the 2026 plan, rolled up
  * KPI → objective → perspective → company (equal-weighted at every level),
@@ -53,9 +60,10 @@ function ragBadge(status: RagStatus | null) {
  */
 export function ScorecardSummaryContent({
   onSelectDepartment,
-}: {
-  onSelectDepartment?: (dept: string) => void
-} = {}) {
+  tabs,
+  activeTab,
+  onTabChange,
+}: ScorecardSummaryContentProps = {}) {
   const router = useRouter()
 
   const { data, isLoading, error, refetch } = useQuery<SummaryResponse>({
@@ -126,10 +134,13 @@ export function ScorecardSummaryContent({
 
   return (
     <DataTablePage
-      title="Scorecard Summary"
+      title={tabs ? "Corporate Scorecard" : "Scorecard Summary"}
       description="Company-wide attainment against the 2026 plan. Departments are scored on CORE ownership only."
       icon={BarChart3}
-      backLink={{ href: "/admin/corporate-scorecard", label: "Back to Register" }}
+      backLink={{ href: "/admin", label: "Back to Admin" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={onTabChange}
       stats={
         <div className="space-y-4">
           <StatGrid>

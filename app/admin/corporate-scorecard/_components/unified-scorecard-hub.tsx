@@ -3,12 +3,18 @@
 import { useState } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { BarChart3, Building2, ClipboardList } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import type { DataTableTab } from "@/components/ui/data-table"
 import { CorporateScorecardRegister } from "./corporate-scorecard-register"
 import { DepartmentCascadeContent } from "./department-cascade-content"
 import { ScorecardSummaryContent } from "./scorecard-summary-content"
 
 type TabKey = "register" | "department" | "summary"
+
+export const SCORECARD_TABS: DataTableTab[] = [
+  { key: "register", label: "Master KPI Register", icon: ClipboardList },
+  { key: "department", label: "Department KPIs", icon: Building2 },
+  { key: "summary", label: "Executive Summary", icon: BarChart3 },
+]
 
 interface UnifiedScorecardHubProps {
   departments: string[]
@@ -34,11 +40,12 @@ export function UnifiedScorecardHub({
     deptParam || initialDepartment || departments[0] || null
   )
 
-  function handleTabChange(nextTab: TabKey) {
-    setActiveTab(nextTab)
+  function handleTabChange(nextTab: string) {
+    const tabKey = nextTab as TabKey
+    setActiveTab(tabKey)
     const params = new URLSearchParams(searchParams.toString())
-    params.set("tab", nextTab)
-    if (selectedDepartment && nextTab === "department") {
+    params.set("tab", tabKey)
+    if (selectedDepartment && tabKey === "department") {
       params.set("department", selectedDepartment)
     }
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
@@ -54,55 +61,30 @@ export function UnifiedScorecardHub({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Consolidated Strategy & Scorecard Navigation Header */}
-      <div className="bg-card/60 border-b backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant={activeTab === "register" ? "default" : "outline"}
-              onClick={() => handleTabChange("register")}
-            >
-              <ClipboardList className="mr-1.5 h-4 w-4" />
-              Master KPI Register
-            </Button>
-            <Button
-              size="sm"
-              variant={activeTab === "department" ? "default" : "outline"}
-              onClick={() => handleTabChange("department")}
-            >
-              <Building2 className="mr-1.5 h-4 w-4" />
-              Department KPIs
-            </Button>
-            <Button
-              size="sm"
-              variant={activeTab === "summary" ? "default" : "outline"}
-              onClick={() => handleTabChange("summary")}
-            >
-              <BarChart3 className="mr-1.5 h-4 w-4" />
-              Executive Summary
-            </Button>
-          </div>
-          <span className="text-muted-foreground hidden text-xs md:inline-block">
-            {activeTab === "register" && "All 61 master strategic KPIs, pillars, and RACI ownership"}
-            {activeTab === "department" && "Department quotas, confirmed targets, actions, and progress actuals"}
-            {activeTab === "summary" && "Executive rollup by the 4 BSC perspectives and company attainment"}
-          </span>
-        </div>
-      </div>
-
-      {activeTab === "register" && <CorporateScorecardRegister />}
+    <>
+      {activeTab === "register" && (
+        <CorporateScorecardRegister tabs={SCORECARD_TABS} activeTab={activeTab} onTabChange={handleTabChange} />
+      )}
 
       {activeTab === "department" && (
         <DepartmentCascadeContent
           departments={departments}
           initialDepartment={selectedDepartment}
           backLink={{ href: "/admin", label: "Back to Admin" }}
+          tabs={SCORECARD_TABS}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
         />
       )}
 
-      {activeTab === "summary" && <ScorecardSummaryContent onSelectDepartment={handleSelectDepartmentFromSummary} />}
-    </div>
+      {activeTab === "summary" && (
+        <ScorecardSummaryContent
+          onSelectDepartment={handleSelectDepartmentFromSummary}
+          tabs={SCORECARD_TABS}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
+      )}
+    </>
   )
 }

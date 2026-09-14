@@ -7,7 +7,7 @@ import { ClipboardEdit, PlusCircle, Target } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import {
   Dialog,
   DialogContent,
@@ -70,19 +70,27 @@ function ragBadge(status: RagStatus | null) {
  * visibility, per the agreed rule that a department is not judged on work it
  * merely contributes to.
  */
+export interface DepartmentCascadeContentProps {
+  departments: string[]
+  initialDepartment: string | null
+  lockedDepartment?: string
+  backLink?: { href: string; label: string }
+  isReadOnly?: boolean
+  tabs?: DataTableTab[]
+  activeTab?: string
+  onTabChange?: (tab: string) => void
+}
+
 export function DepartmentCascadeContent({
   departments,
   initialDepartment,
   lockedDepartment,
   backLink,
   isReadOnly,
-}: {
-  departments: string[]
-  initialDepartment: string | null
-  lockedDepartment?: string
-  backLink?: { href: string; label: string }
-  isReadOnly?: boolean
-}) {
+  tabs,
+  activeTab,
+  onTabChange,
+}: DepartmentCascadeContentProps) {
   const queryClient = useQueryClient()
   const activeDepartment = lockedDepartment || initialDepartment || departments[0] || ""
   const [department, setDepartment] = useState(activeDepartment)
@@ -250,10 +258,13 @@ export function DepartmentCascadeContent({
 
   return (
     <DataTablePage
-      title="Department KPIs"
+      title={tabs ? "Corporate Scorecard" : "Department KPIs"}
       description="Each department's assigned KPIs, confirmed targets, proposed action plans, and recorded actual progress against the 2026 plan."
       icon={Target}
-      backLink={backLink || { href: "/admin/corporate-scorecard", label: "Back to Register" }}
+      backLink={backLink || { href: "/admin", label: "Back to Admin" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={onTabChange}
       actions={
         lockedDepartment ? (
           <div className="flex items-center gap-2">

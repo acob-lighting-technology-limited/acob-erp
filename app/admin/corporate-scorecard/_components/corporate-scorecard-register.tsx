@@ -8,7 +8,7 @@ import { BarChart3, ClipboardList, Edit, Layers, Plus, Target, Trash2, UserCog, 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import {
   Dialog,
   DialogContent,
@@ -40,12 +40,18 @@ type RegisterRow = {
   assignments: Assignment[]
 }
 
+export interface CorporateScorecardRegisterProps {
+  tabs?: DataTableTab[]
+  activeTab?: string
+  onTabChange?: (tab: string) => void
+}
+
 /**
  * The master register: what the 2026 plan says, and who owns it.
  * "How we're doing against it" lives on each department's own cascade page —
  * this view is the plan, with administrative CRUD to add, edit, and archive KPIs.
  */
-export function CorporateScorecardRegister() {
+export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: CorporateScorecardRegisterProps = {}) {
   const queryClient = useQueryClient()
   const queryKey = ["corporate-scorecard-register"]
   const [managingRow, setManagingRow] = useState<RegisterRow | null>(null)
@@ -94,14 +100,6 @@ export function CorporateScorecardRegister() {
 
   const columns = useMemo<DataTableColumn<RegisterRow>[]>(
     () => [
-      {
-        key: "source_sn",
-        label: "S/N",
-        sortable: true,
-        accessor: (r) => r.source_sn,
-        render: (r) => <span className="text-muted-foreground font-mono text-xs">{r.source_sn}</span>,
-        hideOnMobile: true,
-      },
       {
         key: "measure",
         label: "KPI & Pillar",
@@ -184,6 +182,9 @@ export function CorporateScorecardRegister() {
       description="The 2026 strategic plan's master corporate KPIs and which departments own them. Use Add Corporate KPI to register new strategic measures."
       icon={Target}
       backLink={{ href: "/admin", label: "Back to Admin" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={onTabChange}
       actions={
         <Button size="sm" onClick={() => setIsCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
