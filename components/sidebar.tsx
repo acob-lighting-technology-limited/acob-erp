@@ -144,6 +144,15 @@ const navigationSections: NavSectionDef[] = [
           { name: "Projects", href: "/project" },
         ],
       },
+      {
+        name: "Corporate Services",
+        href: "/admin/corporate-services/scorecard",
+        icon: Briefcase,
+        children: [
+          { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
+          { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
+        ],
+      },
     ],
   },
   {

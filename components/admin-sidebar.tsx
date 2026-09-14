@@ -315,14 +315,13 @@ const adminNavigation: NavItem[] = [
   },
   {
     section: "management",
-    name: "Corporate Scorecard",
-    href: "/admin/corporate-scorecard",
-    icon: Target,
+    name: "Corporate Services",
+    href: "/admin/corporate-services/scorecard",
+    icon: Briefcase,
     roles: ["developer", "super_admin", "admin"],
     children: [
-      { name: "Register", href: "/admin/corporate-scorecard" },
-      { name: "Department Cascade", href: "/admin/corporate-scorecard/departments" },
-      { name: "Summary", href: "/admin/corporate-scorecard/summary" },
+      { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
+      { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
     ],
   },
   {
@@ -528,6 +527,8 @@ const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
   // Accounts — legacy /admin/finance and /admin/payments/* redirect into accounts.
   "/admin/accounts": ["/admin/finance", "/admin/payments"],
   "/admin/finance": ["/admin/payments"],
+  // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
+  "/admin/corporate-services/scorecard": ["/admin/corporate-scorecard"],
   // Tools — feedback is surfaced through tools.
   "/admin/tools": ["/admin/feedback"],
 }
