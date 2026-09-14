@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { PageWrapper, PageHeader } from "@/components/layout"
-import { KssRotationCard } from "@/app/admin/communications/_components/KssRotationCard"
+import { KssWorkspace } from "@/app/admin/communications/_components/KssWorkspace"
 
 export default async function CommunicationsMeetingsKssPage() {
   const supabase = await createClient()
@@ -26,13 +26,11 @@ export default async function CommunicationsMeetingsKssPage() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Knowledge Sharing"
-        description="Who presents each week, and the heads-up email that tells them."
+        description="Presenting department rotation and the heads-up email to the next department."
         icon={BookOpen}
         backLink={{ href: "/admin/communications/meetings", label: "Back" }}
       />
-      <div className="max-w-3xl">
-        <KssRotationCard />
-      </div>
+      <KssWorkspace />
     </PageWrapper>
   )
 }
