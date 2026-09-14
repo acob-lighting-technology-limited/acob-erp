@@ -52,7 +52,7 @@ export function RiskCard({ risk, onEdit }: RiskCardProps) {
                 severityColors[risk.severity] || severityColors.medium
               )}
             >
-              {risk.severity} ({score}/25)
+              {risk.severity || "medium"}
             </Badge>
             <Badge
               variant="outline"
@@ -99,7 +99,7 @@ export function RiskCard({ risk, onEdit }: RiskCardProps) {
           <span className="max-w-[120px] truncate">{ownerName || "Unassigned"}</span>
         </div>
         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onEdit}>
-          <Pencil className="mr-1 h-3 w-3" /> Assess
+          <Pencil className="mr-1 h-3 w-3" /> Edit
         </Button>
       </CardFooter>
     </Card>

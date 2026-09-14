@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -57,58 +56,25 @@ interface EditRiskDialogProps {
 }
 
 export function EditRiskDialog({ risk, open, onOpenChange, employees, onRiskUpdated }: EditRiskDialogProps) {
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [category, setCategory] = useState("operational")
   const [severity, setSeverity] = useState<"low" | "medium" | "high" | "critical">("medium")
-  const [likelihood, setLikelihood] = useState(2)
-  const [impact, setImpact] = useState(2)
+  const [status, setStatus] = useState<"open" | "mitigating" | "resolved" | "closed">("open")
+  const [ownerId, setOwnerId] = useState<string>("unassigned")
   const [mitigationPlan, setMitigationPlan] = useState("")
   const [contingencyPlan, setContingencyPlan] = useState("")
-  const [ownerId, setOwnerId] = useState<string>("unassigned")
-  const [status, setStatus] = useState<"open" | "mitigating" | "resolved" | "closed">("open")
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (risk) {
-      setTitle(risk.title || "")
-      setDescription(risk.description || "")
-      setCategory(risk.category || "operational")
       setSeverity(risk.severity || "medium")
-      setLikelihood(risk.likelihood || 2)
-      setImpact(risk.impact || 2)
+      setStatus(risk.status || "open")
+      setOwnerId(risk.owner_id || "unassigned")
       setMitigationPlan(risk.mitigation_plan || "")
       setContingencyPlan(risk.contingency_plan || "")
-      setOwnerId(risk.owner_id || "unassigned")
-      setStatus(risk.status || "open")
     }
   }, [risk])
 
-  // Automatically recalculate severity when likelihood or impact changes
-  function handleLikelihoodChange(val: number) {
-    setLikelihood(val)
-    updateSeverityFromScore(val, impact)
-  }
-
-  function handleImpactChange(val: number) {
-    setImpact(val)
-    updateSeverityFromScore(likelihood, val)
-  }
-
-  function updateSeverityFromScore(l: number, i: number) {
-    const score = l * i
-    if (score >= 15) setSeverity("critical")
-    else if (score >= 9) setSeverity("high")
-    else if (score >= 4) setSeverity("medium")
-    else setSeverity("low")
-  }
-
   async function handleSave() {
     if (!risk) return
-    if (!title.trim()) {
-      toast.error("Risk title is required")
-      return
-    }
 
     setIsSaving(true)
     try {
@@ -116,16 +82,11 @@ export function EditRiskDialog({ risk, open, onOpenChange, employees, onRiskUpda
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          category,
           severity,
-          likelihood,
-          impact,
+          status,
+          owner_id: ownerId === "unassigned" ? null : ownerId,
           mitigation_plan: mitigationPlan.trim() || null,
           contingency_plan: contingencyPlan.trim() || null,
-          owner_id: ownerId === "unassigned" ? null : ownerId,
-          status,
         }),
       })
 
@@ -146,19 +107,15 @@ export function EditRiskDialog({ risk, open, onOpenChange, employees, onRiskUpda
     }
   }
 
-  const riskScore = likelihood * impact
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-rose-500" />
-            <DialogTitle>Risk Assessment & Mitigation</DialogTitle>
+            <DialogTitle>Edit Risk Details</DialogTitle>
           </div>
-          <DialogDescription>
-            Configure risk parameters, assign ownership, and record mitigation actions.
-          </DialogDescription>
+          <DialogDescription>Update risk severity, status, assigned owner, and mitigation actions.</DialogDescription>
         </DialogHeader>
 
         {risk && (
@@ -186,116 +143,53 @@ export function EditRiskDialog({ risk, open, onOpenChange, employees, onRiskUpda
               )}
             </div>
 
-            {/* Title */}
+            {/* Read-only Challenge / Risk Description */}
             <div className="space-y-1.5">
-              <Label htmlFor="risk-title">Risk / Challenge Description</Label>
-              <Textarea
-                id="risk-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                rows={2}
-                className="resize-none"
-              />
+              <Label>Challenge / Risk Description</Label>
+              <div className="bg-muted/40 text-foreground rounded-lg border p-3 text-sm leading-relaxed">
+                {risk.title}
+              </div>
+              <p className="text-muted-foreground text-[11px]">
+                This challenge originates directly from weekly reports and cannot be edited here.
+              </p>
             </div>
 
-            {/* Category & Status */}
+            {/* Severity & Status Direct Selectors */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="risk-category">Category</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger id="risk-category">
-                    <SelectValue placeholder="Select category" />
+                <Label htmlFor="risk-severity">Severity</Label>
+                <Select
+                  value={severity}
+                  onValueChange={(val) => setSeverity(val as "low" | "medium" | "high" | "critical")}
+                >
+                  <SelectTrigger id="risk-severity">
+                    <SelectValue placeholder="Select severity" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="operational">Operational</SelectItem>
-                    <SelectItem value="financial">Financial</SelectItem>
-                    <SelectItem value="strategic">Strategic</SelectItem>
-                    <SelectItem value="compliance">Compliance & Legal</SelectItem>
-                    <SelectItem value="technical">Technical / Engineering</SelectItem>
-                    <SelectItem value="health_safety">Health & Safety</SelectItem>
-                    <SelectItem value="reputational">Reputational</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium (Default)</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="risk-status">Status</Label>
-                <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+                <Select
+                  value={status}
+                  onValueChange={(val) => setStatus(val as "open" | "mitigating" | "resolved" | "closed")}
+                >
                   <SelectTrigger id="risk-status">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="open">Open (Unmitigated)</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
                     <SelectItem value="mitigating">Mitigating (In Progress)</SelectItem>
                     <SelectItem value="resolved">Resolved</SelectItem>
                     <SelectItem value="closed">Closed / Archived</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-
-            {/* Matrix: Likelihood & Impact & Severity */}
-            <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                  Risk Severity Matrix
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-xs">Score: {riskScore}/25</span>
-                  <Badge
-                    className={
-                      severity === "critical"
-                        ? "bg-rose-600 text-white"
-                        : severity === "high"
-                          ? "bg-orange-500 text-white"
-                          : severity === "medium"
-                            ? "bg-amber-500 text-white"
-                            : "bg-slate-500 text-white"
-                    }
-                  >
-                    {severity.toUpperCase()}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <Label>Likelihood (1–5)</Label>
-                    <span className="font-semibold">{likelihood} / 5</span>
-                  </div>
-                  <Select value={String(likelihood)} onValueChange={(val) => handleLikelihoodChange(Number(val))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 - Rare</SelectItem>
-                      <SelectItem value="2">2 - Unlikely</SelectItem>
-                      <SelectItem value="3">3 - Possible</SelectItem>
-                      <SelectItem value="4">4 - Likely</SelectItem>
-                      <SelectItem value="5">5 - Almost Certain</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <Label>Impact / Consequence (1–5)</Label>
-                    <span className="font-semibold">{impact} / 5</span>
-                  </div>
-                  <Select value={String(impact)} onValueChange={(val) => handleImpactChange(Number(val))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 - Insignificant</SelectItem>
-                      <SelectItem value="2">2 - Minor</SelectItem>
-                      <SelectItem value="3">3 - Moderate</SelectItem>
-                      <SelectItem value="4">4 - Major</SelectItem>
-                      <SelectItem value="5">5 - Catastrophic</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             </div>
 

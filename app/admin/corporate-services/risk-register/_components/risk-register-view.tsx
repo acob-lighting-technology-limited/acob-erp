@@ -3,16 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  Pencil,
-  Plus,
-  ShieldAlert,
-  SlidersHorizontal,
-} from "lucide-react"
+import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Pencil, ShieldAlert } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -21,7 +12,6 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { EditRiskDialog, type RiskItem } from "./edit-risk-dialog"
-import { AddRiskDialog } from "./add-risk-dialog"
 import { RiskCard } from "./risk-card"
 
 interface RiskRegisterViewProps {
@@ -36,7 +26,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
 
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isAddOpen, setIsAddOpen] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery<{ data: RiskItem[] }>({
     queryKey,
@@ -65,15 +54,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
       if (!old) return { data: [updated] }
       return {
         data: old.data.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
-      }
-    })
-  }
-
-  function handleRiskAdded(newRisk: RiskItem) {
-    queryClient.setQueryData<{ data: RiskItem[] }>(queryKey, (old) => {
-      if (!old) return { data: [newRisk] }
-      return {
-        data: [newRisk, ...old.data],
       }
     })
   }
@@ -122,7 +102,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
       sortable: true,
       accessor: (r) => r.severity,
       render: (r) => {
-        const score = (r.likelihood || 2) * (r.impact || 2)
         const colors = {
           critical: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/50",
           high: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-900/50",
@@ -130,15 +109,12 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
           low: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50",
         }
         return (
-          <div className="flex items-center gap-1.5">
-            <Badge
-              variant="outline"
-              className={cn("text-xs font-semibold capitalize", colors[r.severity] || colors.medium)}
-            >
-              {r.severity}
-            </Badge>
-            <span className="text-muted-foreground font-mono text-[11px]">({score})</span>
-          </div>
+          <Badge
+            variant="outline"
+            className={cn("text-xs font-semibold capitalize", colors[r.severity] || colors.medium)}
+          >
+            {r.severity || "medium"}
+          </Badge>
         )
       },
     },
@@ -210,7 +186,7 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
           className="text-muted-foreground hover:text-foreground h-8 px-2 text-xs"
           onClick={() => handleOpenEdit(r)}
         >
-          <Pencil className="mr-1 h-3.5 w-3.5" /> Assess / Edit
+          <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
         </Button>
       ),
     },
@@ -270,11 +246,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
       description="Enterprise and departmental risk matrix, tracking operational challenges and strategic mitigations."
       icon={ShieldAlert}
       backLink={{ href: "/admin/corporate-services/scorecard", label: "Back to Scorecard" }}
-      actions={
-        <Button size="sm" onClick={() => setIsAddOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> Add Risk
-        </Button>
-      }
       stats={
         <StatGrid>
           <StatCard
@@ -334,7 +305,7 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
             <div className="bg-muted/20 space-y-3 border-t p-4 text-sm">
               <div>
                 <span className="text-muted-foreground text-xs font-semibold uppercase">
-                  Full Risk / Challenge Detail
+                  Full Challenge / Risk Detail
                 </span>
                 <p className="text-foreground mt-1">{r.title}</p>
                 {r.description && <p className="text-muted-foreground mt-1 text-xs">{r.description}</p>}
@@ -346,7 +317,7 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
                   <p className="text-foreground mt-1 text-xs">
                     {r.mitigation_plan || (
                       <span className="text-muted-foreground italic">
-                        No mitigation plan recorded yet. Click Assess to assign an owner and plan.
+                        No mitigation plan recorded yet. Click Edit to assign an owner and plan.
                       </span>
                     )}
                   </p>
@@ -361,19 +332,8 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
                 </div>
               </div>
 
-              <div className="text-muted-foreground flex flex-wrap items-center justify-between border-t pt-2 text-xs">
-                <div className="flex items-center gap-3">
-                  <span>
-                    Likelihood: <strong className="text-foreground">{r.likelihood || 2}/5</strong>
-                  </span>
-                  <span>
-                    Impact: <strong className="text-foreground">{r.impact || 2}/5</strong>
-                  </span>
-                  <span>
-                    Risk Score: <strong className="text-foreground">{(r.likelihood || 2) * (r.impact || 2)}/25</strong>
-                  </span>
-                </div>
-                {r.report_id && (
+              {r.report_id && (
+                <div className="border-t pt-2 text-xs">
                   <Link
                     href={`/admin/reports/general-meeting/weekly-reports?week=${r.week_number}&year=${r.year}&dept=${r.department}`}
                     target="_blank"
@@ -382,8 +342,8 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
                     <ExternalLink className="h-3.5 w-3.5" /> View Original Weekly Report (Week {r.week_number}, {r.year}
                     )
                   </Link>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ),
         }}
@@ -395,14 +355,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
         onOpenChange={setIsEditOpen}
         employees={employees}
         onRiskUpdated={handleRiskSaved}
-      />
-
-      <AddRiskDialog
-        open={isAddOpen}
-        onOpenChange={setIsAddOpen}
-        departments={departments}
-        employees={employees}
-        onRiskAdded={handleRiskAdded}
       />
     </DataTablePage>
   )
