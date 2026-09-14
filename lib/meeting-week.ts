@@ -46,8 +46,15 @@ export function getOfficeWeekFromDate(date: Date): { week: number; year: number 
     yearStart = getOfficeYearStart(year)
   }
 
-  const diffMs = input.getTime() - yearStart.getTime()
-  const week = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1
+  // Count whole calendar days, not milliseconds: across a daylight-saving change
+  // local midnights are 23 or 25 hours apart, which put September dates a week
+  // early for anyone whose machine observes DST.
+  const diffDays = Math.round(
+    (Date.UTC(input.getFullYear(), input.getMonth(), input.getDate()) -
+      Date.UTC(yearStart.getFullYear(), yearStart.getMonth(), yearStart.getDate())) /
+      (24 * 60 * 60 * 1000)
+  )
+  const week = Math.floor(diffDays / 7) + 1
 
   return { week, year }
 }
