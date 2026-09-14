@@ -44,7 +44,7 @@ USING (
   OR EXISTS (
     SELECT 1 FROM public.profiles p
     WHERE p.id = auth.uid()
-      AND (p.role = 'lead' OR p.department = risk_register.department)
+      AND (p.is_department_lead = true OR p.department = risk_register.department)
   )
 );
 
@@ -56,7 +56,7 @@ WITH CHECK (
   OR EXISTS (
     SELECT 1 FROM public.profiles p
     WHERE p.id = auth.uid()
-      AND p.role = 'lead'
+      AND p.is_department_lead = true
       AND (p.department = risk_register.department OR risk_register.department IS NULL)
   )
 );
@@ -70,7 +70,7 @@ USING (
     SELECT 1 FROM public.profiles p
     WHERE p.id = auth.uid()
       AND (
-        p.role = 'lead' AND p.department = risk_register.department
+        p.is_department_lead = true AND p.department = risk_register.department
         OR risk_register.owner_id = auth.uid()
       )
   )
@@ -81,7 +81,7 @@ WITH CHECK (
     SELECT 1 FROM public.profiles p
     WHERE p.id = auth.uid()
       AND (
-        p.role = 'lead' AND p.department = risk_register.department
+        p.is_department_lead = true AND p.department = risk_register.department
         OR risk_register.owner_id = auth.uid()
       )
   )
@@ -121,7 +121,7 @@ INSERT INTO public.risk_register (
 )
 SELECT
   regexp_replace(trim(raw_line), '^(?:[0-9]+[.)]|[-*•])\s*', '') AS title,
-  wr.department,
+  CASE WHEN EXISTS (SELECT 1 FROM public.departments d WHERE d.name = wr.department) THEN wr.department ELSE NULL END AS department,
   wr.week_number,
   wr.year,
   'operational' AS category,
