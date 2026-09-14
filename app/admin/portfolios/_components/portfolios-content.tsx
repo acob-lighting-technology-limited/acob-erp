@@ -1,9 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { AlertTriangle, FolderGit2, FolderKanban, Layers, Plus, RefreshCw } from "lucide-react"
+import { AlertTriangle, ExternalLink, FolderGit2, FolderKanban, Layers, Plus, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -91,7 +92,13 @@ function PortfolioProjects({ projects }: { projects: ProjectHealthRow[] }) {
           {projects.map((project) => (
             <tr key={project.id} className="border-t">
               <td className="px-3 py-2 font-medium">
-                {project.project_name}
+                <Link
+                  href={`/project?search=${encodeURIComponent(project.project_name)}`}
+                  className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors hover:underline"
+                >
+                  {project.project_name}
+                  <ExternalLink className="text-muted-foreground h-3 w-3 opacity-70" />
+                </Link>
                 <span className="text-muted-foreground ml-2 text-xs">
                   {project.taskCount} task{project.taskCount === 1 ? "" : "s"}
                 </span>

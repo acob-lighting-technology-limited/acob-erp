@@ -26,6 +26,7 @@ import {
   Users,
   Wrench,
   FolderKanban,
+  Layers,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -135,9 +136,9 @@ const navigationSections: NavSectionDef[] = [
         ],
       },
       {
-        name: "Projects",
-        href: "/project",
-        icon: FolderKanban,
+        name: "Portfolios",
+        href: "/portfolios",
+        icon: Layers,
         children: [
           { name: "Portfolios", href: "/portfolios" },
           { name: "Projects", href: "/project" },

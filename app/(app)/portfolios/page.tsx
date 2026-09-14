@@ -18,13 +18,7 @@ export default async function AppPortfoliosPage() {
 
   if (error || !user) redirect("/auth/login")
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, is_department_lead")
-    .eq("id", user.id)
-    .single()
-
-  const isAdmin = isAdminLikeRole(profile?.role)
-
-  return <PortfoliosContent isAdmin={isAdmin} />
+  // The app workspace route is strictly read-only overview.
+  // Portfolio CRUD is reserved for the admin console (/admin/portfolios).
+  return <PortfoliosContent isAdmin={false} />
 }
