@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus, Loader2, Trash2, FolderTree, Scale, Star, Pencil } from "lucide-react"
+import { Plus, Loader2, Trash2, FolderTree, Scale, Star, Pencil, ChevronDown, ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -82,6 +82,14 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
   const [taskForm, setTaskForm] = useState<TaskFormState>(EMPTY_TASK_FORM)
   const [isSavingTask, setIsSavingTask] = useState(false)
+  const [expandedPlans, setExpandedPlans] = useState<Record<string, boolean>>({})
+
+  const togglePlan = (id: string) => {
+    setExpandedPlans((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
+  }
 
   const plansKey = ["project-plans", project.id]
   const tasksKey = ["project-tasks", project.id]
@@ -328,18 +336,41 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
   function renderGroup(key: string, title: string, description: string | null, plan: Plan | null) {
     const groupTasks = tasksByPlan.get(key) || []
     const progress = computeProjectProgress(groupTasks)
+    const isExpanded = Boolean(expandedPlans[key])
 
     return (
-      <div key={key || "ungrouped"} className="bg-background rounded-lg border">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 font-semibold">
-              <FolderTree className="text-muted-foreground h-4 w-4" />
-              {title}
-            </p>
-            {description && <p className="text-muted-foreground text-xs">{description}</p>}
+      <div key={key || "ungrouped"} className="bg-background overflow-hidden rounded-lg border transition-all">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => togglePlan(key)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              togglePlan(key)
+            }
+          }}
+          className="hover:bg-muted/40 flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2.5 transition-colors"
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            {isExpanded ? (
+              <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
+            ) : (
+              <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+            )}
+            <FolderTree className="text-muted-foreground h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-sm font-semibold">{title}</span>
+                <Badge variant="secondary" className="h-4 px-1.5 py-0 text-[10px] font-normal">
+                  {groupTasks.length} {groupTasks.length === 1 ? "task" : "tasks"}
+                </Badge>
+              </div>
+              {description && <p className="text-muted-foreground max-w-md truncate text-xs">{description}</p>}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex shrink-0 items-center gap-3" onClick={(e) => e.stopPropagation()}>
             <div className="w-28">
               <Progress value={progress.deliveryPct ?? 0} className="h-1.5" />
               <p className="text-muted-foreground mt-1 text-[10px]">
@@ -347,29 +378,46 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
               </p>
             </div>
             {plan && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => openTaskDialog(plan)}>
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Task
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => deletePlan.mutate(plan.id)}
-                  disabled={deletePlan.isPending}
-                  aria-label={`Delete ${plan.name}`}
-                >
-                  <Trash2 className="text-destructive h-3.5 w-3.5" />
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground hover:text-destructive h-7 w-7 p-0"
+                onClick={() => deletePlan.mutate(plan.id)}
+                disabled={deletePlan.isPending}
+                aria-label={`Delete ${plan.name}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             )}
           </div>
         </div>
 
-        {groupTasks.length === 0 ? (
-          <p className="text-muted-foreground border-t px-3 py-3 text-xs">No tasks in this plan yet.</p>
-        ) : (
-          groupTasks.map((task, idx) => renderTaskRow(task, idx))
+        {isExpanded && (
+          <div className="bg-muted/10 border-t">
+            {plan && (
+              <div className="bg-background/50 flex items-center justify-between border-b px-3 py-2">
+                <span className="text-muted-foreground text-xs font-medium">Tasks in {title}</span>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Task
+                </Button>
+              </div>
+            )}
+
+            {groupTasks.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <p className="text-muted-foreground mb-2 text-xs">No tasks in this plan yet.</p>
+                {plan && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Add First Task
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div>{groupTasks.map((task, idx) => renderTaskRow(task, idx))}</div>
+            )}
+          </div>
         )}
       </div>
     )
@@ -400,10 +448,6 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
             <Plus className="mr-1 h-3.5 w-3.5" />
           )}
           Add Plan
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => openTaskDialog(null)}>
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Task (no plan)
         </Button>
       </div>
 
