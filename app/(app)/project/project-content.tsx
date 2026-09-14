@@ -23,7 +23,6 @@ import {
 import { ProjectTaskViewer } from "./_components/project-task-viewer"
 import { computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
 import { toLocalISODate } from "@/lib/utils/date"
-import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
@@ -59,6 +58,7 @@ export interface ProjectContentProps {
     role: string
     is_department_lead: boolean
     department: string | null
+    isAdmin?: boolean
   }
   profiles?: employee[]
 }
@@ -78,7 +78,9 @@ export function ProjectContent({ currentUser, profiles = [] }: ProjectContentPro
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
 
-  const isAdmin = currentUser ? isAdminLikeRole(currentUser.role) : false
+  const isAdmin =
+    currentUser?.isAdmin ??
+    (currentUser ? ["developer", "super_admin", "admin"].includes((currentUser.role || "").toLowerCase()) : false)
   const isLead = Boolean(currentUser?.is_department_lead)
   const canCreate = isAdmin || isLead
   const canManage = (p: ProjectRow) =>

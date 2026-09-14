@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { ProjectContent } from "./project-content"
 import type { Metadata } from "next"
 
@@ -54,6 +55,7 @@ export default async function ProjectsPage() {
     role: profile?.role || "employee",
     is_department_lead: Boolean(profile?.is_department_lead),
     department: profile?.department || null,
+    isAdmin: isAdminLikeRole(profile?.role),
   }
 
   return <ProjectContent currentUser={currentUser} profiles={assignableEmployees} />
