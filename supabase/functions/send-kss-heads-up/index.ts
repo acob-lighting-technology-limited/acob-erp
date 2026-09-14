@@ -95,7 +95,7 @@ function buildHtml(params: { department: string; meetingDateLabel: string; recip
     '<div style="font-size:20px;font-weight:700;color:#111827;margin:0 0 6px;">Upcoming Knowledge Sharing Session</div>' +
     `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">Dear ${name},</p>` +
     `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">The <strong>${department}</strong> department is scheduled to present the Knowledge Sharing Session at the General Weekly Meeting on <strong>${dateLabel}</strong> at <strong>${MEETING_TIME}</strong>.</p>` +
-    '<p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0;">You are receiving this because you are in the presenting department or on the leadership team.</p>' +
+    '<p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0;">You are receiving this because you are in the presenting department or on the management team.</p>' +
     "</div>" +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="${darkLock}border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">` +
     `<tr><td align="center" style="padding:20px;${darkLock}font-size:11px;color:#d1d5db;">` +
