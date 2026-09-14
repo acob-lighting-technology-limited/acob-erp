@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { ArrowDown, ArrowUp, Plus, RotateCcw, Send, Trash2, Users } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArrowDown, ArrowUp, Plus, Send, Trash2, Users } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -221,14 +221,7 @@ export function KssRotationCard() {
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <RotateCcw className="h-5 w-5 text-green-600" />
-          Knowledge Sharing Rotation
-        </CardTitle>
-        <CardDescription>Who presents each week, and the heads-up email that tells them.</CardDescription>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         {isLoading && <p className="text-muted-foreground text-sm">Loading…</p>}
         {error && <p className="text-destructive text-sm">{(error as Error).message}</p>}
 

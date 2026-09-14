@@ -18,13 +18,10 @@ import {
 } from "./composer-utils"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { MeetingReminderForm } from "./MeetingReminderForm"
-import { KssRotationCard } from "./KssRotationCard"
-import { KnowledgeSessionForm } from "./KnowledgeSessionForm"
 import { BroadcastForm } from "./BroadcastForm"
 import { RecipientSelector } from "./RecipientSelector"
 import { SchedulingOptions } from "./SchedulingOptions"
 import { SendSummary } from "./SendSummary"
-import { ReminderTypeSelector } from "./ReminderTypeSelector"
 import { getCurrentOfficeWeek, getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 import { apiFetch } from "@/lib/api-client"
@@ -950,7 +947,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         description={
           mode === "communications"
             ? "Send branded department-level broadcast emails to selected recipients."
-            : "Send meeting reminders and knowledge-sharing alerts to selected recipients."
+            : "Send the general meeting reminder to selected recipients."
         }
         icon={Megaphone}
         backLink={{
@@ -962,14 +959,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Reminder Type selector (meetings mode only) */}
-          {mode !== "communications" && (
-            <ReminderTypeSelector reminderType={reminderType} setReminderType={setReminderType} />
-          )}
-
-          {/* The rotation drives the KSS department, so it leads the KSS tab. */}
-          {mode !== "communications" && reminderType === "knowledge_sharing" && <KssRotationCard />}
-
           {/* Details Card */}
           <Card>
             <CardHeader className="pb-3">
@@ -1022,15 +1011,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   departmentOptions={departmentOptions}
                   presenterOptions={presenterOptions}
                   meetingPreparedByOptions={meetingPreparedByOptions}
-                />
-              ) : reminderType === "knowledge_sharing" ? (
-                <KnowledgeSessionForm
-                  sessionDate={sessionDate}
-                  setSessionDate={setSessionDate}
-                  sessionTime={sessionTime}
-                  setSessionTime={setSessionTime}
-                  duration={duration}
-                  setDuration={setDuration}
                 />
               ) : (
                 <BroadcastForm
