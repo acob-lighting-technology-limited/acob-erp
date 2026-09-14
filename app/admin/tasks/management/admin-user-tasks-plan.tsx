@@ -1,25 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import {
-  Calendar,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Filter,
-  Layers,
-  Search,
-  Star,
-  TrendingUp,
-  User,
-  Users,
-  AlertTriangle,
-  RotateCcw,
-} from "lucide-react"
-import * as PopoverPrimitive from "@radix-ui/react-popover"
+import { useMemo, useState } from "react"
+import { Calendar, CheckCircle2, Layers, Star, TrendingUp, Users, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable } from "@/components/ui/data-table"
@@ -36,8 +20,6 @@ import {
 } from "@/lib/tasks/scoring"
 import type { Task, employee, UserProfile } from "./admin-tasks-content"
 import { AdminTaskStatusBadge } from "./admin-tasks-content"
-
-export type PeriodFilterMode = "all" | "custom" | "day" | "week" | "month" | "cycle" | "year"
 
 export interface ReviewCycleOption {
   id: string
@@ -103,256 +85,6 @@ function isTaskAssignedToUser(task: Task, user: employee): boolean {
   return false
 }
 
-function PeriodFilterControl({
-  periodMode,
-  onPeriodModeChange,
-  selectedDay,
-  onDayChange,
-  selectedWeek,
-  onWeekChange,
-  selectedWeekYear,
-  onWeekYearChange,
-  selectedMonth,
-  onMonthChange,
-  selectedCycleId,
-  onCycleIdChange,
-  selectedYear,
-  onYearChange,
-  customStartDate,
-  onCustomStartDateChange,
-  customEndDate,
-  onCustomEndDateChange,
-  weekOptions,
-  yearOptions,
-  cycles,
-  description,
-  selectedValues,
-  onClear,
-}: {
-  periodMode: PeriodFilterMode
-  onPeriodModeChange: (mode: PeriodFilterMode) => void
-  selectedDay: string
-  onDayChange: (day: string) => void
-  selectedWeek: number
-  onWeekChange: (week: number) => void
-  selectedWeekYear: number
-  onWeekYearChange: (year: number) => void
-  selectedMonth: string
-  onMonthChange: (month: string) => void
-  selectedCycleId: string
-  onCycleIdChange: (cycleId: string) => void
-  selectedYear: number
-  onYearChange: (year: number) => void
-  customStartDate: string
-  onCustomStartDateChange: (date: string) => void
-  customEndDate: string
-  onCustomEndDateChange: (date: string) => void
-  weekOptions: number[]
-  yearOptions: number[]
-  cycles: ReviewCycleOption[]
-  description: string
-  selectedValues: string[]
-  onClear: () => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    if (selectedValues.length === 0 && periodMode !== "all") {
-      onPeriodModeChange("all")
-    }
-  }, [selectedValues, periodMode, onPeriodModeChange])
-
-  return (
-    <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
-      <PopoverPrimitive.Trigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "border-input ring-offset-background hover:bg-muted/50 focus:ring-ring flex h-9 w-full items-center justify-between rounded-lg border bg-transparent px-3 text-xs shadow-xs focus:ring-1 focus:outline-none",
-            periodMode !== "all" ? "text-foreground font-medium" : "text-muted-foreground"
-          )}
-        >
-          <span className="flex min-w-0 items-center gap-1.5 truncate">
-            <Calendar className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{periodMode === "all" ? "All Time" : description}</span>
-          </span>
-          <ChevronDown className="text-muted-foreground ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
-        </button>
-      </PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content
-          align="start"
-          sideOffset={4}
-          className={cn(
-            "bg-popover text-popover-foreground z-50 w-80 space-y-3 rounded-lg border p-3.5 shadow-md outline-none",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
-          )}
-        >
-          <div className="flex items-center justify-between border-b pb-2">
-            <div className="flex items-center gap-1.5">
-              <Calendar className="text-primary h-3.5 w-3.5" />
-              <span className="text-xs font-semibold">Time Period Filter</span>
-            </div>
-            {periodMode !== "all" && (
-              <button
-                type="button"
-                onClick={() => {
-                  onPeriodModeChange("all")
-                  onClear()
-                }}
-                className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px]"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Reset
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-muted-foreground block text-[11px] font-medium">Period Mode</label>
-            <select
-              value={periodMode}
-              onChange={(e) => onPeriodModeChange(e.target.value as PeriodFilterMode)}
-              className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
-            >
-              <option value="all">All Time</option>
-              <option value="day">Specific Day</option>
-              <option value="week">Week</option>
-              <option value="month">Month</option>
-              <option value="cycle">PMS Review Cycle</option>
-              <option value="year">Year</option>
-              <option value="custom">Custom Date Range</option>
-            </select>
-          </div>
-
-          {periodMode === "day" && (
-            <div className="space-y-1">
-              <label className="text-muted-foreground block text-[11px] font-medium">Select Date</label>
-              <Input
-                type="date"
-                value={selectedDay}
-                onChange={(e) => onDayChange(e.target.value)}
-                className="h-8 text-xs"
-              />
-            </div>
-          )}
-
-          {periodMode === "week" && (
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-muted-foreground block text-[11px] font-medium">Office Week</label>
-                <select
-                  value={String(selectedWeek)}
-                  onChange={(e) => onWeekChange(Number(e.target.value))}
-                  className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
-                >
-                  {weekOptions.map((w) => (
-                    <option key={w} value={String(w)}>
-                      Week {w}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-muted-foreground block text-[11px] font-medium">Year</label>
-                <select
-                  value={String(selectedWeekYear)}
-                  onChange={(e) => onWeekYearChange(Number(e.target.value))}
-                  className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
-                >
-                  {yearOptions.map((y) => (
-                    <option key={y} value={String(y)}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {periodMode === "month" && (
-            <div className="space-y-1">
-              <label className="text-muted-foreground block text-[11px] font-medium">Select Month</label>
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => onMonthChange(e.target.value)}
-                className="h-8 text-xs"
-              />
-            </div>
-          )}
-
-          {periodMode === "cycle" && (
-            <div className="space-y-1">
-              <label className="text-muted-foreground block text-[11px] font-medium">Select Review Cycle</label>
-              <select
-                value={selectedCycleId}
-                onChange={(e) => onCycleIdChange(e.target.value)}
-                className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
-              >
-                {cycles.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.review_type ? `(${c.review_type})` : ""}
-                    {c.status === "active" ? " • Active" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {periodMode === "year" && (
-            <div className="space-y-1">
-              <label className="text-muted-foreground block text-[11px] font-medium">Select Year</label>
-              <select
-                value={String(selectedYear)}
-                onChange={(e) => onYearChange(Number(e.target.value))}
-                className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
-              >
-                {yearOptions.map((y) => (
-                  <option key={y} value={String(y)}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {periodMode === "custom" && (
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-muted-foreground block text-[11px] font-medium">Start Date</label>
-                <Input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => onCustomStartDateChange(e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-muted-foreground block text-[11px] font-medium">End Date</label>
-                <Input
-                  type="date"
-                  value={customEndDate}
-                  min={customStartDate}
-                  onChange={(e) => onCustomEndDateChange(e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[11px]">
-            <span>Active window:</span>
-            <Badge variant="secondary" className="text-[10px] font-normal">
-              {description}
-            </Badge>
-          </div>
-        </PopoverPrimitive.Content>
-      </PopoverPrimitive.Portal>
-    </PopoverPrimitive.Root>
-  )
-}
-
 export function AdminUserTasksPlan({
   tasks,
   employees,
@@ -365,50 +97,118 @@ export function AdminUserTasksPlan({
   const currentWeekInfo = useMemo(() => getCurrentOfficeWeek(), [])
   const currentYear = new Date().getFullYear()
 
-  // Period filter states
-  const [periodMode, setPeriodMode] = useState<PeriodFilterMode>("all")
-  const [customStartDate, setCustomStartDate] = useState("")
-  const [customEndDate, setCustomEndDate] = useState("")
-  const [selectedDay, setSelectedDay] = useState(toLocalISODate())
-  const [selectedWeek, setSelectedWeek] = useState(currentWeekInfo.week)
-  const [selectedWeekYear, setSelectedWeekYear] = useState(currentWeekInfo.year)
-  const [selectedMonth, setSelectedMonth] = useState(toLocalYearMonth())
-  const [selectedCycleId, setSelectedCycleId] = useState(cycles[0]?.id || "")
-  const [selectedYear, setSelectedYear] = useState(currentYear)
+  // Period filter state — driven directly by DataTable's single-select filter
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("this_week")
 
-  const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
-  const yearOptions = useMemo(() => [currentYear - 2, currentYear - 1, currentYear, currentYear + 1], [currentYear])
+  // Options for the Time Period filter dropdown
+  const periodOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [
+      { value: "this_week", label: `This Week (W${currentWeekInfo.week})` },
+      { value: "last_week", label: `Last Week (W${currentWeekInfo.week > 1 ? currentWeekInfo.week - 1 : 52})` },
+      { value: "today", label: "Today" },
+      { value: "this_month", label: "This Month" },
+      { value: "last_month", label: "Last Month" },
+      { value: "this_year", label: `This Year (${currentYear})` },
+      { value: "last_year", label: `Last Year (${currentYear - 1})` },
+    ]
+
+    if (cycles && cycles.length > 0) {
+      for (const cycle of cycles) {
+        opts.push({
+          value: `cycle_${cycle.id}`,
+          label: `Cycle: ${cycle.name}`,
+        })
+      }
+    }
+
+    for (let w = currentWeekInfo.week - 2; w >= Math.max(1, currentWeekInfo.week - 8); w--) {
+      opts.push({
+        value: `week_${w}`,
+        label: `Week ${w}, ${currentYear}`,
+      })
+    }
+
+    return opts
+  }, [currentWeekInfo, currentYear, cycles])
 
   // Resolve active date bounds [startIso, endIso]
   const dateBounds = useMemo<{ start: string; end: string; description: string }>(() => {
-    if (periodMode === "day") {
-      return {
-        start: selectedDay,
-        end: selectedDay,
-        description: selectedDay ? formatWATDate(selectedDay) : "Specific Day",
-      }
-    }
-    if (periodMode === "week") {
-      const monday = getOfficeWeekMonday(selectedWeek, selectedWeekYear)
+    if (selectedPeriod === "this_week") {
+      const monday = getOfficeWeekMonday(currentWeekInfo.week, currentWeekInfo.year)
       const sunday = addDaysToDate(monday, 6)
       const start = toLocalISODate(monday)
       const end = toLocalISODate(sunday)
       return {
         start,
         end,
-        description: `Week ${selectedWeek}, ${selectedWeekYear} (${formatWATDate(start)} – ${formatWATDate(end)})`,
+        description: `This Week (W${currentWeekInfo.week}: ${formatWATDate(start)} – ${formatWATDate(end)})`,
       }
     }
-    if (periodMode === "month") {
-      const bounds = monthBounds(selectedMonth)
+
+    if (selectedPeriod === "last_week") {
+      const lastWeekNum = currentWeekInfo.week > 1 ? currentWeekInfo.week - 1 : 52
+      const lastWeekYear = currentWeekInfo.week > 1 ? currentWeekInfo.year : currentWeekInfo.year - 1
+      const monday = getOfficeWeekMonday(lastWeekNum, lastWeekYear)
+      const sunday = addDaysToDate(monday, 6)
+      const start = toLocalISODate(monday)
+      const end = toLocalISODate(sunday)
+      return {
+        start,
+        end,
+        description: `Last Week (W${lastWeekNum}: ${formatWATDate(start)} – ${formatWATDate(end)})`,
+      }
+    }
+
+    if (selectedPeriod === "today") {
+      const today = toLocalISODate()
+      return {
+        start: today,
+        end: today,
+        description: `Today (${formatWATDate(today)})`,
+      }
+    }
+
+    if (selectedPeriod === "this_month") {
+      const monthStr = toLocalYearMonth()
+      const bounds = monthBounds(monthStr)
       return {
         start: bounds.start,
         end: bounds.end,
-        description: selectedMonth,
+        description: `This Month (${monthStr})`,
       }
     }
-    if (periodMode === "cycle") {
-      const cycle = cycles.find((c) => c.id === selectedCycleId)
+
+    if (selectedPeriod === "last_month") {
+      const now = new Date()
+      const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`
+      const bounds = monthBounds(lastMonthStr)
+      return {
+        start: bounds.start,
+        end: bounds.end,
+        description: `Last Month (${lastMonthStr})`,
+      }
+    }
+
+    if (selectedPeriod === "this_year") {
+      return {
+        start: `${currentYear}-01-01`,
+        end: `${currentYear}-12-31`,
+        description: `Year ${currentYear}`,
+      }
+    }
+
+    if (selectedPeriod === "last_year") {
+      return {
+        start: `${currentYear - 1}-01-01`,
+        end: `${currentYear - 1}-12-31`,
+        description: `Year ${currentYear - 1}`,
+      }
+    }
+
+    if (selectedPeriod.startsWith("cycle_")) {
+      const cycleId = selectedPeriod.replace("cycle_", "")
+      const cycle = cycles.find((c) => c.id === cycleId)
       const start = cycle?.start_date ? cycle.start_date.slice(0, 10) : ""
       const end = cycle?.end_date ? cycle.end_date.slice(0, 10) : ""
       return {
@@ -417,38 +217,24 @@ export function AdminUserTasksPlan({
         description: cycle ? `${cycle.name} (${cycle.review_type || "Cycle"})` : "Review Cycle",
       }
     }
-    if (periodMode === "year") {
-      const start = `${selectedYear}-01-01`
-      const end = `${selectedYear}-12-31`
-      return {
-        start,
-        end,
-        description: `Year ${selectedYear}`,
+
+    if (selectedPeriod.startsWith("week_")) {
+      const weekNum = parseInt(selectedPeriod.replace("week_", ""), 10)
+      if (!isNaN(weekNum)) {
+        const monday = getOfficeWeekMonday(weekNum, currentYear)
+        const sunday = addDaysToDate(monday, 6)
+        const start = toLocalISODate(monday)
+        const end = toLocalISODate(sunday)
+        return {
+          start,
+          end,
+          description: `Week ${weekNum}, ${currentYear} (${formatWATDate(start)} – ${formatWATDate(end)})`,
+        }
       }
     }
-    if (periodMode === "custom") {
-      return {
-        start: customStartDate,
-        end: customEndDate,
-        description:
-          customStartDate && customEndDate
-            ? `${formatWATDate(customStartDate)} – ${formatWATDate(customEndDate)}`
-            : "Custom Date Range",
-      }
-    }
+
     return { start: "", end: "", description: "All Time" }
-  }, [
-    periodMode,
-    selectedDay,
-    selectedWeek,
-    selectedWeekYear,
-    selectedMonth,
-    selectedCycleId,
-    selectedYear,
-    customStartDate,
-    customEndDate,
-    cycles,
-  ])
+  }, [selectedPeriod, currentWeekInfo, currentYear, cycles])
 
   // Filter tasks strictly by the date window
   const filteredTasks = useMemo(() => {
@@ -671,7 +457,6 @@ export function AdminUserTasksPlan({
     []
   )
 
-  // Filters
   const filters = useMemo<DataTableFilter<UserPlanRow>[]>(() => {
     return [
       {
@@ -682,70 +467,12 @@ export function AdminUserTasksPlan({
       {
         key: "period",
         label: "Time Period",
-        defaultValues: ["week"],
-        options: [
-          {
-            value: periodMode,
-            label: dateBounds.description,
-          },
-        ],
+        multi: false,
+        placeholder: "All Time",
+        defaultValues: ["this_week"],
+        options: periodOptions,
         mode: "custom",
         filterFn: () => true,
-        render: (selectedValues, onChange) => (
-          <PeriodFilterControl
-            periodMode={periodMode}
-            onPeriodModeChange={(mode) => {
-              setPeriodMode(mode)
-              onChange(mode === "all" ? [] : [mode])
-            }}
-            selectedDay={selectedDay}
-            onDayChange={(day) => {
-              setSelectedDay(day)
-              onChange([periodMode])
-            }}
-            selectedWeek={selectedWeek}
-            onWeekChange={(week) => {
-              setSelectedWeek(week)
-              onChange([periodMode])
-            }}
-            selectedWeekYear={selectedWeekYear}
-            onWeekYearChange={(year) => {
-              setSelectedWeekYear(year)
-              onChange([periodMode])
-            }}
-            selectedMonth={selectedMonth}
-            onMonthChange={(month) => {
-              setSelectedMonth(month)
-              onChange([periodMode])
-            }}
-            selectedCycleId={selectedCycleId}
-            onCycleIdChange={(cycleId) => {
-              setSelectedCycleId(cycleId)
-              onChange([periodMode])
-            }}
-            selectedYear={selectedYear}
-            onYearChange={(year) => {
-              setSelectedYear(year)
-              onChange([periodMode])
-            }}
-            customStartDate={customStartDate}
-            onCustomStartDateChange={(date) => {
-              setCustomStartDate(date)
-              onChange([periodMode])
-            }}
-            customEndDate={customEndDate}
-            onCustomEndDateChange={(date) => {
-              setCustomEndDate(date)
-              onChange([periodMode])
-            }}
-            weekOptions={weekOptions}
-            yearOptions={yearOptions}
-            cycles={cycles}
-            description={dateBounds.description}
-            selectedValues={selectedValues}
-            onClear={() => onChange([])}
-          />
-        ),
       },
       {
         key: "activity",
@@ -763,22 +490,12 @@ export function AdminUserTasksPlan({
         },
       },
     ]
-  }, [
-    departments,
-    periodMode,
-    dateBounds.description,
-    selectedDay,
-    selectedWeek,
-    selectedWeekYear,
-    selectedMonth,
-    selectedCycleId,
-    selectedYear,
-    customStartDate,
-    customEndDate,
-    weekOptions,
-    yearOptions,
-    cycles,
-  ])
+  }, [departments, periodOptions])
+
+  const handlePeriodFilterChange = (fv: Record<string, string[]>) => {
+    const p = fv["period"]?.[0] || "all"
+    setSelectedPeriod(p)
+  }
 
   return (
     <div className="space-y-4">
@@ -840,6 +557,8 @@ export function AdminUserTasksPlan({
         searchPlaceholder="Search employee name, email, or department..."
         searchFn={(r, q) => `${r.name} ${r.email} ${r.department}`.toLowerCase().includes(q.toLowerCase())}
         filters={filters}
+        onFilterChange={handlePeriodFilterChange}
+        onFilterValuesChange={handlePeriodFilterChange}
         emptyTitle="No Employees Found"
         emptyDescription="No employees match the current filters or department scope."
         emptyIcon={Users}
