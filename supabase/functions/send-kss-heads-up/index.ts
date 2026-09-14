@@ -34,6 +34,25 @@ type ProfileRow = {
 
 type Recipient = { userId: string; email: string; name: string }
 
+/**
+ * True when the bearer is a service-role JWT. The Supabase gateway verifies the
+ * signature before the function runs (verify_jwt), so the role claim can be read
+ * directly. The runtime env key may be a newer non-JWT secret, so an exact string
+ * comparison against it is not reliable.
+ */
+function isServiceRoleBearer(bearer: string): boolean {
+  if (!bearer) return false
+  if (SUPABASE_SERVICE_ROLE_KEY && bearer === SUPABASE_SERVICE_ROLE_KEY) return true
+  const payload = bearer.split(".")[1]
+  if (!payload) return false
+  try {
+    const decoded = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/"))) as { role?: string }
+    return decoded.role === "service_role"
+  } catch {
+    return false
+  }
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } })
 }
@@ -112,7 +131,7 @@ serve(async (req) => {
     // Service-role callers only, so the public anon key cannot use it as a relay.
     const previewTo = typeof body.previewTo === "string" ? body.previewTo.trim() : ""
     const bearer = (req.headers.get("Authorization") || "").replace(/^Bearers+/i, "").trim()
-    if (previewTo && (!SUPABASE_SERVICE_ROLE_KEY || bearer !== SUPABASE_SERVICE_ROLE_KEY)) {
+    if (previewTo && !isServiceRoleBearer(bearer)) {
       return json({ error: "Preview requires the service role" }, 403)
     }
 
