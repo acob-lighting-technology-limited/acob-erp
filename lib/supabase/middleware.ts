@@ -21,6 +21,15 @@ interface MaintenanceCache {
 }
 let _maintenanceCache: MaintenanceCache | null = null
 
+// Called by pg_cron via public.call_app_endpoint with no session. Each handler
+// authenticates itself against CRON_SECRET; redirecting them to /auth/login
+// meant no scheduled job had ever reached its handler.
+const CRON_ROUTE_PREFIXES = ["/api/cron/", "/api/hr/leave/sla/reminders", "/api/reports/official-exports"]
+
+function isCronRoute(pathname: string): boolean {
+  return CRON_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+}
+
 function randomHex(bytes: number): string {
   const buffer = new Uint8Array(bytes)
   globalThis.crypto.getRandomValues(buffer)
@@ -320,7 +329,8 @@ export async function updateSession(request: NextRequest) {
     !pathname.startsWith("/employee/new") &&
     !pathname.startsWith("/api/public") &&
     !pathname.startsWith("/api/devices") &&
-    !pathname.startsWith("/api/ingest/network-activity")
+    !pathname.startsWith("/api/ingest/network-activity") &&
+    !isCronRoute(pathname)
   ) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"

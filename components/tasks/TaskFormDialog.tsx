@@ -95,6 +95,9 @@ export interface TaskFormState {
   task_end_date: string
 }
 
+// Stable default: a fresh [] each render changes hook deps and can loop effects.
+const EMPTY_GOALS: GoalOption[] = []
+
 interface TaskFormDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
@@ -125,7 +128,7 @@ export function TaskFormDialog({
   isSaving,
   scopedAssignableEmployees,
   scopedAssignableDepartments,
-  initialGoals = [],
+  initialGoals = EMPTY_GOALS,
   assignmentAuthorityLabel,
   lockedProjectId = null,
   lockedProjectName = null,

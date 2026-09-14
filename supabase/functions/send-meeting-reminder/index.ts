@@ -54,6 +54,8 @@ type ReminderRequestBody = {
   knowledgeSharingPresenter?: KnowledgePresenter
   kssRosterStatus?: string
   requestedByUserId?: string
+  /** Set only by process_reminder_schedules(); absent for manual sends. */
+  scheduleId?: string
 }
 
 type DeliveryResult = {
@@ -727,6 +729,23 @@ serve(async (req) => {
     )
 
     const successfulResults = results.filter((result) => result.success)
+
+    // The scheduler books a retry before calling us, because pg_net cannot see
+    // our result. Confirm delivery first — before notifications and audit, which
+    // can fail independently — so a sent reminder is never sent twice. A partial
+    // success still counts: retrying would re-mail everyone who already got it.
+    if (body.scheduleId && successfulResults.length > 0) {
+      // Retried: if this call is lost, the scheduler re-sends in 10 minutes.
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { error: markError } = await supabase.rpc("mark_reminder_schedule_sent", {
+          p_schedule_id: body.scheduleId,
+        })
+        if (!markError) break
+        console.error(`[meeting-reminder] Failed to mark schedule sent (attempt ${attempt}):`, markError.message)
+        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 2000))
+      }
+    }
+
     try {
       await createInAppMeetingNotifications({
         supabase,

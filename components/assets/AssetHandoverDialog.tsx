@@ -49,6 +49,9 @@ type ExtendedAssignment = {
   }
 }
 
+// Stable default: a fresh [] each render changes hook deps and can loop effects.
+const EMPTY_EMPLOYEES: ExtendedEmployee[] = []
+
 interface AssetHandoverDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -62,7 +65,7 @@ export function AssetHandoverDialog({
   onOpenChange,
   asset,
   userProfile,
-  employees = [],
+  employees = EMPTY_EMPLOYEES,
 }: AssetHandoverDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [formData, setFormData] = useState<HandoverPolicyData>({

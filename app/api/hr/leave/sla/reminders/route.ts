@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { notifyUsers } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -71,14 +72,18 @@ export async function PATCH() {
       }
     }
 
-    const { data: slaPolicies } = await supabase
+    // Authorized above; read and write as the service role. The cron caller has
+    // no session, so the cookie client would see zero leave requests under RLS.
+    const db = getServiceRoleClientOrFallback(supabase)
+
+    const { data: slaPolicies } = await db
       .from("approval_sla_policies")
       .select("stage, due_hours, reminder_hours_before, escalate_to_role")
       .eq("is_active", true)
 
     const policyMap = new Map(((slaPolicies || []) as SlaPolicyRow[]).map((item) => [item.stage, item] as const))
 
-    const { data: pendingRequests, error } = await supabase
+    const { data: pendingRequests, error } = await db
       .from("leave_requests")
       .select("id, user_id, status, start_date, current_stage_code, current_approver_user_id, created_at")
       .in("status", ["pending", "pending_evidence"])
@@ -95,7 +100,7 @@ export async function PATCH() {
       if (request.start_date && request.start_date <= today) {
         const expiryReason = `Auto-lapsed: no final approval before leave start date (${request.start_date}).`
 
-        const { error: expireError } = await supabase
+        const { error: expireError } = await db
           .from("leave_requests")
           .update({
             status: "cancelled",
@@ -111,7 +116,7 @@ export async function PATCH() {
           const recipientIds = [request.user_id, request.current_approver_user_id].filter(Boolean) as string[]
           if (recipientIds.length > 0) {
             const uniqueRecipients = Array.from(new Set(recipientIds))
-            await notifyUsers(supabase, {
+            await notifyUsers(db, {
               userIds: uniqueRecipients,
               title: "Leave request lapsed",
               message: `Leave request ${request.id} was automatically lapsed because it was not fully approved before start date.`,
@@ -137,7 +142,7 @@ export async function PATCH() {
       const reminderAt = dueAt - policy.reminder_hours_before * 60 * 60 * 1000
 
       if (now >= reminderAt && now < dueAt) {
-        await notifyUsers(supabase, {
+        await notifyUsers(db, {
           userIds: [request.current_approver_user_id],
           title: "Leave approval SLA reminder",
           message: `Leave request ${request.id} is due soon. Please review before SLA breach.`,
@@ -149,14 +154,11 @@ export async function PATCH() {
       }
 
       if (now >= dueAt && policy.escalate_to_role) {
-        const { data: escalatedUsers } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("role", policy.escalate_to_role)
+        const { data: escalatedUsers } = await db.from("profiles").select("id").eq("role", policy.escalate_to_role)
 
         const escalateRecipients = ((escalatedUsers || []) as ProfileIdRow[]).map((row) => row.id)
         if (escalateRecipients.length) {
-          await notifyUsers(supabase, {
+          await notifyUsers(db, {
             userIds: escalateRecipients,
             title: "Leave approval SLA breached",
             message: `Leave request ${request.id} has breached SLA at ${request.current_stage_code}.`,

@@ -125,6 +125,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Keyed by user, not IP: the office shares one egress IP. A render loop in
+    // TaskFormDialog once hit this ~3x/sec for 9 hours with nothing to stop it.
+    const rl = await rateLimit(`hr-performance-goals-read:${user.id}`, { limit: 60, windowSec: 60 })
+    if (!rl.allowed)
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later.", code: "RATE_LIMITED" },
+        { status: 429 }
+      )
+
     const { searchParams } = request.nextUrl
     const userId = searchParams.get("user_id")
     const department = searchParams.get("department")

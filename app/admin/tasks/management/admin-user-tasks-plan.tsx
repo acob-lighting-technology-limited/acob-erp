@@ -50,6 +50,9 @@ export interface UserPlanRow {
   tasks: Task[]
 }
 
+// Stable default: a fresh [] each render changes hook deps and can loop effects.
+const EMPTY_CYCLES: ReviewCycleOption[] = []
+
 interface AdminUserTasksPlanProps {
   tasks: Task[]
   employees: employee[]
@@ -89,7 +92,7 @@ export function AdminUserTasksPlan({
   tasks,
   employees,
   departments,
-  cycles = [],
+  cycles = EMPTY_CYCLES,
   userProfile: _userProfile,
   onOpenTaskDialog,
   onOpenReviewDialog,
