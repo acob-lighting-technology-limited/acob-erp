@@ -249,6 +249,9 @@ function buildMeetingReminderHtml(
   if (kssAgendaIndex >= 0 && presenterDisplayText) {
     const departmentSuffix = !isGuestPresenter && kssDepartmentLabel ? ` (${kssDepartmentLabel})` : ""
     agendaRows[kssAgendaIndex] = `${agendaRows[kssAgendaIndex]} - ${presenterDisplayText}${departmentSuffix}`
+  } else if (kssAgendaIndex >= 0 && kssDepartmentLabel) {
+    // The rotation always knows the department even when no presenter has been named.
+    agendaRows[kssAgendaIndex] = `${agendaRows[kssAgendaIndex]} - ${kssDepartmentLabel}`
   }
 
   let agendaHtml = ""

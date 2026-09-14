@@ -18,6 +18,7 @@ import {
 } from "./composer-utils"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { MeetingReminderForm } from "./MeetingReminderForm"
+import { KssRotationCard } from "./KssRotationCard"
 import { KnowledgeSessionForm } from "./KnowledgeSessionForm"
 import { BroadcastForm } from "./BroadcastForm"
 import { RecipientSelector } from "./RecipientSelector"
@@ -420,10 +421,18 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
         const roster = Array.isArray(payload?.data) ? payload.data : []
         const picked = roster.find((entry: { is_active?: boolean }) => entry?.is_active !== false) ?? roster[0]
-        if (!picked || cancelled) {
-          setKnowledgeDepartment("none")
+        if (cancelled) return
+        if (!picked) {
+          // No roster entry: the rotation still knows which department presents.
           setKnowledgePresenterId("none")
           setKnowledgePresenterName("")
+          const rotationRes = await apiFetch(
+            `/api/admin/communications/kss-rotation?week=${officeWeek.week}&year=${officeWeek.year}`
+          )
+          const rotation = await rotationRes.json().catch(() => null)
+          const department = rotationRes.ok ? rotation?.data?.department : null
+          if (cancelled) return
+          setKnowledgeDepartment(typeof department === "string" && department.trim() ? department : "none")
           return
         }
 
@@ -1098,6 +1107,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
               />
             </CardContent>
           </Card>
+
+          {mode !== "communications" && <KssRotationCard />}
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
