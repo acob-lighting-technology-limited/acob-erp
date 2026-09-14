@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           id,
           first_name,
           last_name,
-          email
+          email:company_email
         )
       `
       )

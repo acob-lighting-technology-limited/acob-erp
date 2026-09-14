@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
           id,
           first_name,
           last_name,
-          email
+          email:company_email
         )
       `
       )
@@ -101,6 +101,10 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
+    if (error) {
+      log.error({ err: error.message }, "Error fetching risk_register")
+    }
+
     // If risk_register has persisted data, return it
     if (!error && data && data.length > 0) {
       return NextResponse.json({ data })
@@ -122,7 +126,7 @@ export async function GET(request: NextRequest) {
           id,
           first_name,
           last_name,
-          email
+          email:company_email
         )
       `
       )

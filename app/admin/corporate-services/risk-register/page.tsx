@@ -25,7 +25,11 @@ export default async function RiskRegisterPage() {
 
   const [departmentsRes, profilesRes] = await Promise.all([
     supabase.from("departments").select("name").eq("is_active", true).order("name"),
-    supabase.from("profiles").select("id, first_name, last_name, email").eq("is_active", true).order("first_name"),
+    supabase
+      .from("profiles")
+      .select("id, first_name, last_name, email:company_email")
+      .eq("employment_status", "active")
+      .order("first_name"),
   ])
 
   const departments = (departmentsRes.data || []).map((d) => d.name)

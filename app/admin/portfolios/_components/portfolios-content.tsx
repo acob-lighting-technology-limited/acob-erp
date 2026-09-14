@@ -144,6 +144,7 @@ interface PortfoliosContentProps {
 export function PortfoliosContent({ isAdmin = true }: PortfoliosContentProps = {}) {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<string>("portfolios")
+  const [focusedPortfolioId, setFocusedPortfolioId] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editing, setEditing] = useState<Portfolio | null>(null)
 
@@ -342,7 +343,12 @@ export function PortfoliosContent({ isAdmin = true }: PortfoliosContentProps = {
       }
     >
       {activeTab === "analytics" ? (
-        <PortfolioAnalytics rows={rows} unassigned={data?.unassigned} />
+        <PortfolioAnalytics
+          rows={rows}
+          unassigned={data?.unassigned}
+          focusedPortfolioId={focusedPortfolioId}
+          onFocusPortfolio={setFocusedPortfolioId}
+        />
       ) : (
         <DataTable<Portfolio>
           data={rows}
@@ -393,7 +399,17 @@ export function PortfoliosContent({ isAdmin = true }: PortfoliosContentProps = {
               </div>
             </div>
           )}
-          rowActions={isAdmin ? [{ label: "Edit Portfolio", onClick: (r) => setEditing(r) }] : undefined}
+          rowActions={[
+            {
+              label: "View Analytics",
+              icon: BarChart3,
+              onClick: (r) => {
+                setFocusedPortfolioId(r.id)
+                setActiveTab("analytics")
+              },
+            },
+            ...(isAdmin ? [{ label: "Edit Portfolio", onClick: (r: Portfolio) => setEditing(r) }] : []),
+          ]}
           expandable={{
             render: (r) => (
               <div className="bg-muted/20 rounded-lg border p-2">
