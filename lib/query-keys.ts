@@ -176,6 +176,7 @@ export const QUERY_KEYS = {
 
   // Communications
   adminReminderSchedules: (mode: string) => ["admin-reminder-schedules", mode],
+  adminKssRotation: () => ["admin-kss-rotation"],
 
   // Events calendar
   events: (range?: Record<string, unknown>) => (range ? ["events", range] : ["events"]),
