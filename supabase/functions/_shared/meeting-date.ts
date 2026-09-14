@@ -125,14 +125,21 @@ export async function resolveEffectiveMeetingDateIso(
   week: number,
   year: number
 ): Promise<string> {
-  const { data, error } = await supabase.rpc("weekly_report_effective_meeting_date", {
-    p_week: week,
-    p_year: year,
-  })
+  // Retried because the REST gateway returns brief 504s; one on 13 Sep 2026
+  // killed that Sunday's meeting reminder before a single email was sent.
+  const retryDelaysMs = [1000, 3000]
+  for (let attempt = 0; ; attempt++) {
+    const { data, error } = await supabase.rpc("weekly_report_effective_meeting_date", {
+      p_week: week,
+      p_year: year,
+    })
 
-  if (error) {
-    throw new Error(error.message)
+    if (!error) return toIsoDateString(String(data))
+    if (attempt >= retryDelaysMs.length) throw new Error(error.message)
+
+    console.warn(
+      `[meeting-date] weekly_report_effective_meeting_date failed (attempt ${attempt + 1}), retrying: ${error.message}`
+    )
+    await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[attempt]))
   }
-
-  return toIsoDateString(String(data))
 }
