@@ -967,6 +967,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             <ReminderTypeSelector reminderType={reminderType} setReminderType={setReminderType} />
           )}
 
+          {/* The rotation drives the KSS department, so it leads the KSS tab. */}
+          {mode !== "communications" && reminderType === "knowledge_sharing" && <KssRotationCard />}
+
           {/* Details Card */}
           <Card>
             <CardHeader className="pb-3">
@@ -1107,8 +1110,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
               />
             </CardContent>
           </Card>
-
-          {mode !== "communications" && <KssRotationCard />}
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
