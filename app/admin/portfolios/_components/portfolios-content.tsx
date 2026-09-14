@@ -1,19 +1,21 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { AlertTriangle, FolderGit2, FolderKanban, Layers, Plus, RefreshCw } from "lucide-react"
+import { AlertTriangle, BarChart3, ExternalLink, FolderGit2, FolderKanban, Layers, Plus, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { PROJECT_HEALTH_LABELS, type ProjectHealthStatus } from "@/lib/projects/health"
 import { PortfolioDialog } from "./portfolio-dialog"
+import { PortfolioAnalytics } from "./portfolio-analytics"
 
 type ProjectHealthRow = {
   id: string
@@ -91,7 +93,13 @@ function PortfolioProjects({ projects }: { projects: ProjectHealthRow[] }) {
           {projects.map((project) => (
             <tr key={project.id} className="border-t">
               <td className="px-3 py-2 font-medium">
-                {project.project_name}
+                <Link
+                  href={`/projects?search=${encodeURIComponent(project.project_name)}`}
+                  className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors hover:underline"
+                >
+                  {project.project_name}
+                  <ExternalLink className="text-muted-foreground h-3 w-3 opacity-70" />
+                </Link>
                 <span className="text-muted-foreground ml-2 text-xs">
                   {project.taskCount} task{project.taskCount === 1 ? "" : "s"}
                 </span>
@@ -129,10 +137,24 @@ function PortfolioProjects({ projects }: { projects: ProjectHealthRow[] }) {
   )
 }
 
-export function PortfoliosContent() {
+interface PortfoliosContentProps {
+  isAdmin?: boolean
+}
+
+export function PortfoliosContent({ isAdmin = true }: PortfoliosContentProps = {}) {
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<string>("portfolios")
+  const [focusedPortfolioId, setFocusedPortfolioId] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editing, setEditing] = useState<Portfolio | null>(null)
+
+  const tabs = useMemo<DataTableTab[]>(
+    () => [
+      { key: "portfolios", label: "Portfolios", icon: Layers },
+      { key: "analytics", label: "Analytics", icon: BarChart3 },
+    ],
+    []
+  )
 
   const { data, isLoading, error, refetch } = useQuery<{ data: Portfolio[]; unassigned: Portfolio["rollup"] }>({
     queryKey: ["portfolios"],
@@ -259,7 +281,10 @@ export function PortfoliosContent() {
       title="Project Portfolios"
       description="Programmes and client groupings, each holding its own projects. Progress is derived from project tasks."
       icon={Layers}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
+      backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/projects", label: "Back to Projects" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -271,11 +296,13 @@ export function PortfoliosContent() {
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button size="sm" onClick={() => setIsAddOpen(true)}>
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Portfolio</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          {isAdmin && (
+            <Button size="sm" onClick={() => setIsAddOpen(true)}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Portfolio</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
         </div>
       }
       stats={
@@ -315,68 +342,87 @@ export function PortfoliosContent() {
         </StatGrid>
       }
     >
-      <DataTable<Portfolio>
-        data={rows}
-        columns={columns}
-        filters={filters}
-        getRowId={(r) => r.id}
-        searchPlaceholder="Search portfolio name or code..."
-        searchFn={(row, query) => {
-          const q = query.toLowerCase()
-          return (
-            row.name.toLowerCase().includes(q) ||
-            (row.code || "").toLowerCase().includes(q) ||
-            (row.description || "").toLowerCase().includes(q)
-          )
-        }}
-        isLoading={isLoading}
-        error={error instanceof Error ? error.message : null}
-        onRetry={refetch}
-        viewToggle
-        contactsView
-        stickyToolbar
-        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        mobileRow={{
-          title: (r) => (r.code ? `${r.code} — ${r.name}` : r.name),
-          subtitle: (r) =>
-            `${r.rollup.projectCount} projects · ${r.rollup.deliveryPct ?? 0}% delivery · ${r.rollup.overdueCount} overdue`,
-          trailing: (r) => (
-            <Badge variant="outline" className="text-[10px] capitalize">
-              {r.status.replaceAll("_", " ")}
-            </Badge>
-          ),
-          onSelect: (r) => setEditing(r),
-        }}
-        cardRenderer={(r) => (
-          <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-semibold">{r.code ? `${r.code} — ${r.name}` : r.name}</p>
-                {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
-              </div>
-              <Badge variant="outline" className="capitalize">
+      {activeTab === "analytics" ? (
+        <PortfolioAnalytics
+          rows={rows}
+          unassigned={data?.unassigned}
+          focusedPortfolioId={focusedPortfolioId}
+          onFocusPortfolio={setFocusedPortfolioId}
+        />
+      ) : (
+        <DataTable<Portfolio>
+          data={rows}
+          columns={columns}
+          filters={filters}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search portfolio name or code..."
+          searchFn={(row, query) => {
+            const q = query.toLowerCase()
+            return (
+              row.name.toLowerCase().includes(q) ||
+              (row.code || "").toLowerCase().includes(q) ||
+              (row.description || "").toLowerCase().includes(q)
+            )
+          }}
+          isLoading={isLoading}
+          error={error instanceof Error ? error.message : null}
+          onRetry={refetch}
+          viewToggle
+          contactsView
+          stickyToolbar
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            title: (r) => (r.code ? `${r.code} — ${r.name}` : r.name),
+            subtitle: (r) =>
+              `${r.rollup.projectCount} projects · ${r.rollup.deliveryPct ?? 0}% delivery · ${r.rollup.overdueCount} overdue`,
+            trailing: (r) => (
+              <Badge variant="outline" className="text-[10px] capitalize">
                 {r.status.replaceAll("_", " ")}
               </Badge>
+            ),
+            onSelect: isAdmin ? (r) => setEditing(r) : undefined,
+          }}
+          cardRenderer={(r) => (
+            <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold">{r.code ? `${r.code} — ${r.name}` : r.name}</p>
+                  {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
+                </div>
+                <Badge variant="outline" className="capitalize">
+                  {r.status.replaceAll("_", " ")}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between border-t pt-2 text-xs">
+                <span className="text-muted-foreground">{r.rollup.projectCount} projects</span>
+                <span className="text-muted-foreground">{r.rollup.deliveryPct ?? 0}% delivery</span>
+              </div>
             </div>
-            <div className="flex items-center justify-between border-t pt-2 text-xs">
-              <span className="text-muted-foreground">{r.rollup.projectCount} projects</span>
-              <span className="text-muted-foreground">{r.rollup.deliveryPct ?? 0}% delivery</span>
-            </div>
-          </div>
-        )}
-        rowActions={[{ label: "Edit Portfolio", onClick: (r) => setEditing(r) }]}
-        expandable={{
-          render: (r) => (
-            <div className="bg-muted/20 rounded-lg border p-2">
-              <PortfolioProjects projects={r.projects} />
-            </div>
-          ),
-        }}
-        emptyTitle="No Portfolios Yet"
-        emptyDescription="Create a portfolio to group related projects under one programme or client."
-        emptyIcon={Layers}
-        urlSync
-      />
+          )}
+          rowActions={[
+            {
+              label: "View Analytics",
+              icon: BarChart3,
+              onClick: (r) => {
+                setFocusedPortfolioId(r.id)
+                setActiveTab("analytics")
+              },
+            },
+            ...(isAdmin ? [{ label: "Edit Portfolio", onClick: (r: Portfolio) => setEditing(r) }] : []),
+          ]}
+          expandable={{
+            render: (r) => (
+              <div className="bg-muted/20 rounded-lg border p-2">
+                <PortfolioProjects projects={r.projects} />
+              </div>
+            ),
+          }}
+          emptyTitle="No Portfolios Yet"
+          emptyDescription="Create a portfolio to group related projects under one programme or client."
+          emptyIcon={Layers}
+          urlSync
+        />
+      )}
 
       <PortfolioDialog
         open={isAddOpen || editing !== null}

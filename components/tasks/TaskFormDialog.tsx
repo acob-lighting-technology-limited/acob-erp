@@ -32,7 +32,8 @@ import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { formatFullName } from "@/lib/utils"
-import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_LABELS, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
+import { toLocalISODate } from "@/lib/utils/date"
+import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
 
 interface GoalOption {
@@ -49,6 +50,7 @@ interface KpiOption {
   id: string
   measure: string
   perspective: string
+  strategic_priority?: string
   strategic_objective: string
   role: "core" | "support"
 }
@@ -63,7 +65,7 @@ const taskFormSchema = z.object({
   due_date: z.string().optional(),
   assignment_type: z.enum(["individual", "multiple", "department"]).default("individual"),
   goal_id: z.string().optional().nullable(),
-  kpi_id: z.string().optional().nullable(),
+  kpi_id: z.string().min(1, "Corporate KPI is required"),
   project_id: z.string().optional().nullable(),
   plan_id: z.string().optional().nullable(),
   // Compulsory: this is the denominator of the assignee's KPI score.
@@ -130,7 +132,6 @@ export function TaskFormDialog({
   lockedPlanId = null,
   lockedPlanName = null,
 }: TaskFormDialogProps) {
-  const [goalOptions, setGoalOptions] = useState<GoalOption[]>(initialGoals)
   const [kpiOptions, setKpiOptions] = useState<KpiOption[]>([])
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([])
   const [isMultiAssign, setIsMultiAssign] = useState(false)
@@ -152,7 +153,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || taskForm.project_id,
       plan_id: lockedPlanId || taskForm.plan_id,
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
-      task_start_date: taskForm.task_start_date,
+      task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
       task_end_date: taskForm.task_end_date,
     },
   })
@@ -183,7 +184,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || taskForm.project_id || "",
       plan_id: lockedPlanId || taskForm.plan_id || "",
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
-      task_start_date: taskForm.task_start_date || "",
+      task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
       task_end_date: taskForm.task_end_date || "",
     })
 
@@ -197,17 +198,8 @@ export function TaskFormDialog({
       setIsMultiAssign(false)
       setSelectedUserIds([])
     }
-  }, [isOpen, reset, selectedTask?.id, taskForm, lockedProjectId, lockedPlanId])
+  }, [isOpen, reset, selectedTask, taskForm, lockedProjectId, lockedPlanId])
 
-  // The contract locks down as work proceeds. A task's weight and dates and
-  // who it's assigned to are what was agreed at the start; changing them
-  // silently after the fact rewrites the terms someone is being scored
-  // against. Deliberate changes still happen — through Reassign and Extend
-  // Deadline in the review decision dialog, which are audited — this form
-  // just stops being the back door for it.
-  //   pending                          → everything editable
-  //   in_progress / unable_to_complete → assignee, weight, dates locked
-  //   anything else                    → the whole form is locked
   const lockLevel = !selectedTask
     ? "none"
     : selectedTask.status === "pending"
@@ -218,35 +210,11 @@ export function TaskFormDialog({
 
   const assignedTo = watch("assigned_to")
   const departmentValue = watch("department")
-  const goalId = watch("goal_id")
   const kpiId = watch("kpi_id")
   const projectId = watch("project_id")
   const weightValue = watch("weight")
   const titleValue = watch("title")
-  const priorityValue = watch("priority")
   const statusValue = watch("status")
-
-  // Fetch available goals based on target department
-  useEffect(() => {
-    const targetDepartment =
-      departmentValue ||
-      scopedAssignableEmployees.find((e) => e.id === assignedTo)?.department ||
-      scopedAssignableDepartments[0] ||
-      ""
-
-    const query = targetDepartment ? `?department=${encodeURIComponent(targetDepartment)}` : ""
-
-    fetch(`/api/hr/performance/goals${query}`)
-      .then((res) => res.json())
-      .then((payload) => {
-        const activeGoals = (payload.data ?? []).map((g: { id: string; title: string }) => ({
-          id: g.id,
-          title: g.title,
-        }))
-        setGoalOptions(activeGoals)
-      })
-      .catch(() => setGoalOptions(initialGoals))
-  }, [assignedTo, departmentValue, scopedAssignableDepartments, scopedAssignableEmployees, initialGoals])
 
   // Corporate KPIs a task may be tagged to: only the ones the target
   // department is CORE or SUPPORT on, per the RACI grid — not all 61.
@@ -267,6 +235,31 @@ export function TaskFormDialog({
       .then((payload) => setKpiOptions((payload.data ?? []) as KpiOption[]))
       .catch(() => setKpiOptions([]))
   }, [assignedTo, departmentValue, scopedAssignableDepartments, scopedAssignableEmployees])
+
+  const selectedKpi = useMemo(() => kpiOptions.find((k) => k.id === kpiId), [kpiOptions, kpiId])
+
+  useEffect(() => {
+    if (!kpiId || !selectedKpi) return
+    if (initialGoals && initialGoals.length > 0) {
+      const match = initialGoals.find(
+        (g) =>
+          g.title.toLowerCase() === selectedKpi.strategic_objective.toLowerCase() ||
+          g.title.toLowerCase().includes(selectedKpi.strategic_objective.toLowerCase()) ||
+          selectedKpi.strategic_objective.toLowerCase().includes(g.title.toLowerCase())
+      )
+      if (match) {
+        setValue("goal_id", match.id)
+      }
+    }
+  }, [kpiId, selectedKpi, initialGoals, setValue])
+
+  const sortedKpis = useMemo(() => {
+    return [...kpiOptions].sort((a, b) => {
+      if (a.role === "core" && b.role !== "core") return -1
+      if (a.role !== "core" && b.role === "core") return 1
+      return a.measure.localeCompare(b.measure)
+    })
+  }, [kpiOptions])
 
   // Projects are optional on a task, so a failed load must never block saving.
   useEffect(() => {
@@ -301,24 +294,19 @@ export function TaskFormDialog({
     })
   }
 
-  const handleSelectAllDepartment = (deptName?: string) => {
-    const targetDept = deptName || departmentValue || scopedAssignableDepartments[0]
-    const deptMembers = scopedAssignableEmployees
-      .filter((e) => !targetDept || e.department === targetDept)
-      .map((e) => e.id)
-
-    setSelectedUserIds(deptMembers)
-    setIsMultiAssign(true)
-  }
-
-  const handleClearAllAssignees = () => {
-    setSelectedUserIds([])
-    setValue("assigned_to", "")
-  }
-
   function buildTaskFormState(): TaskFormState {
     const values = getValues()
     const targetUsers = isMultiAssign ? selectedUserIds : values.assigned_to ? [values.assigned_to] : []
+    const matchingGoalId = selectedKpi
+      ? initialGoals.find(
+          (g) =>
+            g.title.toLowerCase() === selectedKpi.strategic_objective.toLowerCase() ||
+            g.title.toLowerCase().includes(selectedKpi.strategic_objective.toLowerCase()) ||
+            selectedKpi.strategic_objective.toLowerCase().includes(g.title.toLowerCase())
+        )?.id ||
+        values.goal_id ||
+        ""
+      : values.goal_id || ""
 
     return {
       title: values.title ?? "",
@@ -333,7 +321,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || (values.project_id === "__none__" ? "" : (values.project_id ?? "")),
       plan_id: lockedPlanId || (values.plan_id ?? ""),
       weight: values.weight ?? TASK_WEIGHT_DEFAULT,
-      goal_id: values.goal_id === "__none__" ? "" : (values.goal_id ?? ""),
+      goal_id: matchingGoalId,
       kpi_id: values.kpi_id === "__none__" ? "" : (values.kpi_id ?? ""),
       task_start_date: values.task_start_date ?? "",
       task_end_date: values.task_end_date ?? "",
@@ -348,13 +336,13 @@ export function TaskFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-full max-w-2xl min-w-0 overflow-x-hidden overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <DialogTitle>{selectedTask ? "Edit Task" : "Create New Task"}</DialogTitle>
             <ItemInfoButton
               title="Task & KPI Guide"
-              summary="Direct individual accountability with optional strategic goal linking."
+              summary="Direct individual accountability with mandatory Corporate KPI alignment."
               details={[
                 {
                   label: "Direct Assignment",
@@ -362,9 +350,9 @@ export function TaskFormDialog({
                     "Assign tasks to a single person or multiple team members. When assigning to multiple people, individual task copies are created so each person is tracked independently.",
                 },
                 {
-                  label: "Goal Alignment",
+                  label: "Corporate KPI Alignment",
                   value:
-                    "Linking to a strategic goal is optional. Linked tasks drive that goal's KPI progress, while unlinked tasks track operational execution.",
+                    "Every task must link to an approved Corporate KPI. The associated Department Goal and Strategic Pillar are automatically selected and aligned.",
                 },
                 {
                   label: "Review Workflow",
@@ -376,8 +364,8 @@ export function TaskFormDialog({
           </div>
           <DialogDescription>
             {selectedTask
-              ? "Update task details, due dates, or linked goal."
-              : "Assign an operational or goal-linked task to team members."}
+              ? "Update task details, due dates, or linked Corporate KPI."
+              : "Assign a task with Corporate KPI alignment to team members."}
           </DialogDescription>
           {assignmentAuthorityLabel ? (
             <p className="text-muted-foreground text-xs">{assignmentAuthorityLabel}</p>
@@ -397,7 +385,7 @@ export function TaskFormDialog({
           </div>
         )}
 
-        <fieldset disabled={lockLevel === "full"} className="space-y-4 py-2 text-sm">
+        <fieldset disabled={lockLevel === "full"} className="w-full min-w-0 space-y-4 py-2 text-sm">
           <div>
             <Label htmlFor="title" className="text-xs font-semibold">
               Task Title *
@@ -429,20 +417,6 @@ export function TaskFormDialog({
               dropdown that enforces the mandatory rating on approval. This form
               used to offer "Completed" directly with no rating collected,
               which bypassed that rule completely. */}
-          <div>
-            <Label className="text-xs font-semibold">Priority</Label>
-            <Select value={priorityValue} onValueChange={(val) => setValue("priority", val)}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           {/* Assignment Section */}
           <div className="bg-muted/20 space-y-3 rounded-lg border p-3.5">
@@ -453,24 +427,6 @@ export function TaskFormDialog({
               </Label>
               {!selectedTask && (
                 <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => handleSelectAllDepartment()}
-                  >
-                    Select All in Dept
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground h-6 px-2 text-xs"
-                    onClick={handleClearAllAssignees}
-                  >
-                    Clear
-                  </Button>
                   <Button
                     type="button"
                     variant={isMultiAssign ? "secondary" : "outline"}
@@ -543,93 +499,96 @@ export function TaskFormDialog({
             )}
           </div>
 
-          {/* Corporate KPI Linking Section */}
+          {/* Weight — compulsory */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="kpi_id" className="flex items-center gap-1.5 text-xs font-semibold">
-                <Target className="text-primary h-3.5 w-3.5" />
-                Corporate KPI (Optional)
+              <Label htmlFor="weight" className="flex items-center gap-1.5 text-xs font-semibold">
+                <Scale className="text-primary h-3.5 w-3.5" />
+                Task Weight
               </Label>
-              <Badge variant="secondary" className="text-[10px]">
-                Optional
+              <Badge variant="outline" className="text-[10px]">
+                Required
               </Badge>
             </div>
             <Select
-              value={kpiId || "__none__"}
-              onValueChange={(val) => setValue("kpi_id", val === "__none__" ? "" : val)}
+              value={String(weightValue ?? TASK_WEIGHT_DEFAULT)}
+              onValueChange={(val) => setValue("weight", Number(val))}
+              disabled={lockLevel !== "none"}
             >
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a corporate KPI (Optional)" />
+                <SelectValue placeholder="Select a weight" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">
-                  <span className="text-muted-foreground italic">None</span>
-                </SelectItem>
-                {kpiOptions.length === 0 ? (
-                  <div className="text-muted-foreground px-2 py-1.5 text-xs">
-                    No corporate KPIs are assigned to this department yet.
-                  </div>
-                ) : (
-                  Object.entries(
-                    kpiOptions.reduce<Record<string, KpiOption[]>>((groups, kpi) => {
-                      const key = `${kpi.perspective} · ${kpi.strategic_objective}`
-                      groups[key] = groups[key] || []
-                      groups[key].push(kpi)
-                      return groups
-                    }, {})
-                  ).map(([objective, kpisInGroup]) => (
-                    <SelectGroup key={objective}>
-                      <SelectLabel className="text-[10px]">{objective}</SelectLabel>
-                      {kpisInGroup.map((kpi) => (
-                        <SelectItem key={kpi.id} value={kpi.id}>
-                          {kpi.measure}
-                          {kpi.role === "support" ? " (support)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))
+                {Array.from({ length: TASK_WEIGHT_MAX - TASK_WEIGHT_MIN + 1 }, (_, i) => TASK_WEIGHT_MIN + i).map(
+                  (value) => (
+                    <SelectItem key={value} value={String(value)}>
+                      {value}
+                    </SelectItem>
+                  )
                 )}
               </SelectContent>
             </Select>
             <p className="text-muted-foreground text-[11px]">
-              Which corporate target this work serves — a label for the department&apos;s scorecard, not a score. Only
-              the department&apos;s own KPI attainment (actual vs. target) is scored; this task&apos;s weight and rating
-              still decide the assignee&apos;s own KPI score, whether or not it is tagged here.
+              How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
+              much as a weight-2 one. Weights do not need to add up to anything.
             </p>
           </div>
 
-          {/* Goal Linking Section */}
-          <div className="space-y-1.5">
+          {/* Corporate KPI Linking Section */}
+          <div className="w-full min-w-0 space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="goal_id" className="flex items-center gap-1.5 text-xs font-semibold">
+              <Label htmlFor="kpi_id" className="flex items-center gap-1.5 text-xs font-semibold">
                 <Target className="text-primary h-3.5 w-3.5" />
-                Department Goal (Optional)
+                Corporate KPI <span className="text-destructive">*</span>
               </Label>
-              <Badge variant="secondary" className="text-[10px]">
-                Optional
-              </Badge>
             </div>
-            <Select
-              value={goalId || "__none__"}
-              onValueChange={(val) => setValue("goal_id", val === "__none__" ? "" : val)}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a goal (Optional)" />
+            <Select value={kpiId || ""} onValueChange={(val) => setValue("kpi_id", val)}>
+              <SelectTrigger className="mt-1 w-full max-w-full min-w-0 overflow-hidden">
+                <SelectValue placeholder="Select a Corporate KPI" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">
-                  <span className="text-muted-foreground italic">None (Ad-Hoc / Operational Task)</span>
-                </SelectItem>
-                {goalOptions.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>
-                    {g.title}
-                  </SelectItem>
-                ))}
+                {sortedKpis.length === 0 ? (
+                  <div className="text-muted-foreground px-2 py-1.5 text-xs">
+                    No corporate KPIs are assigned to this department yet.
+                  </div>
+                ) : (
+                  sortedKpis.map((kpi) => (
+                    <SelectItem key={kpi.id} value={kpi.id}>
+                      <span className="line-clamp-1">
+                        {kpi.measure} ({kpi.role === "core" ? "Core" : "Support"})
+                      </span>
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
+            {selectedKpi && (
+              <div className="bg-muted/30 border-muted-foreground/20 mt-2 space-y-1.5 rounded-md border p-2.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
+                    <Target className="text-primary h-3.5 w-3.5" />
+                    Department Goal
+                  </Label>
+                  <Badge variant="secondary" className="text-[10px] font-normal">
+                    Auto-selected from KPI
+                  </Badge>
+                </div>
+                <Input
+                  value={selectedKpi.strategic_objective || "—"}
+                  disabled
+                  readOnly
+                  className="bg-background/80 text-foreground h-8 cursor-not-allowed text-xs font-medium"
+                />
+                {selectedKpi.strategic_priority && (
+                  <p className="text-muted-foreground text-[11px]">
+                    🎯 Strategic Pillar:{" "}
+                    <span className="text-foreground font-medium">{selectedKpi.strategic_priority}</span>
+                  </p>
+                )}
+              </div>
+            )}
             <p className="text-muted-foreground text-[11px]">
-              Grouping only. Every task counts toward the assignee&apos;s KPI score through its weight, whether or not
-              it is linked to a goal.
+              Which corporate target this work serves. Every task must link to an approved Corporate KPI.
             </p>
           </div>
 
@@ -671,42 +630,6 @@ export function TaskFormDialog({
             )}
             <p className="text-muted-foreground text-[11px]">
               A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
-            </p>
-          </div>
-
-          {/* Weight — compulsory */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="weight" className="flex items-center gap-1.5 text-xs font-semibold">
-                <Scale className="text-primary h-3.5 w-3.5" />
-                Task Weight
-              </Label>
-              <Badge variant="outline" className="text-[10px]">
-                Required
-              </Badge>
-            </div>
-            <Select
-              value={String(weightValue ?? TASK_WEIGHT_DEFAULT)}
-              onValueChange={(val) => setValue("weight", Number(val))}
-              disabled={lockLevel !== "none"}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select a weight" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: TASK_WEIGHT_MAX - TASK_WEIGHT_MIN + 1 }, (_, i) => TASK_WEIGHT_MIN + i).map(
-                  (value) => (
-                    <SelectItem key={value} value={String(value)}>
-                      {value}
-                      {TASK_WEIGHT_LABELS[value] ? ` — ${TASK_WEIGHT_LABELS[value]}` : ""}
-                    </SelectItem>
-                  )
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-muted-foreground text-[11px]">
-              How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
-              much as a weight-2 one. Weights do not need to add up to anything.
             </p>
           </div>
 

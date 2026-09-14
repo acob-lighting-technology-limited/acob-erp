@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
-import { formatName, formatFullName } from "@/lib/utils"
-import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
+import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
+import { cn, formatName, formatFullName } from "@/lib/utils"
+import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
 import {
   ClipboardList,
   Plus,
@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   AlertTriangle,
   Send,
+  Users,
+  FolderKanban,
 } from "lucide-react"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
@@ -27,9 +29,10 @@ import { TaskFormDialog } from "@/components/tasks/TaskFormDialog"
 import type { TaskFormState } from "@/components/tasks/TaskFormDialog"
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog"
 import { TaskReviewDecisionDialog } from "@/components/tasks/TaskReviewDecisionDialog"
+import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +47,7 @@ import {
 } from "./tasks-content-utils"
 import { filterAssignableTaskDepartments, filterAssignableTaskUsers } from "@/lib/tasks/assignment-scope"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
+import { AdminUserTasksPlan } from "./admin-user-tasks-plan"
 
 const log = logger("tasks-management-admin-tasks-content")
 
@@ -68,6 +72,17 @@ export interface UserProfile {
   lead_departments?: string[]
   managed_departments?: string[]
   is_global_task_assigner?: boolean
+  /** Head of Executive Management; the only person who may rate their own tasks. */
+  is_md?: boolean
+}
+
+interface ReviewCycleOption {
+  id: string
+  name: string
+  review_type: string | null
+  start_date: string | null
+  end_date: string | null
+  status?: string | null
 }
 
 interface GoalFilterOption {
@@ -80,8 +95,19 @@ interface AdminTasksContentProps {
   initialemployee: employee[]
   initialDepartments: string[]
   initialGoals?: GoalFilterOption[]
+  initialReviewCycles?: ReviewCycleOption[]
+  initialProjects?: Array<{ id: string; project_name: string }>
   userProfile: UserProfile
   initialGoalId?: string
+}
+
+export function AdminTaskStatusBadge({ status, className }: { status: string; className?: string }) {
+  const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
+  return (
+    <Badge variant={cfg.badgeVariant} className={cn("text-[11px] whitespace-nowrap capitalize", cfg.color, className)}>
+      {cfg.label}
+    </Badge>
+  )
 }
 
 const INITIAL_TASK_FORM: TaskFormState = {
@@ -121,14 +147,22 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ]
 
+const TASK_TABS: DataTableTab[] = [
+  { key: "tasks", label: "All Tasks", icon: ClipboardList },
+  { key: "user_plan", label: "User Task Plan", icon: Users },
+]
+
 export function AdminTasksContent({
   initialTasks,
   initialemployee,
   initialDepartments,
   initialGoals = [],
+  initialReviewCycles = [],
+  initialProjects = [],
   userProfile,
   initialGoalId = "",
 }: AdminTasksContentProps) {
+  const [activeTab, setActiveTab] = useState<"tasks" | "user_plan">("tasks")
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
   const assignerProfile = {
@@ -169,7 +203,7 @@ export function AdminTasksContent({
     if (!initialGoalId || consumedInitialGoalIdRef.current === initialGoalId) return
     consumedInitialGoalIdRef.current = initialGoalId
     setSelectedTask(null)
-    setTaskForm({ ...INITIAL_TASK_FORM, goal_id: initialGoalId })
+    setTaskForm({ ...INITIAL_TASK_FORM, goal_id: initialGoalId, task_start_date: toLocalISODate() })
     setIsTaskDialogOpen(true)
   }, [initialGoalId])
 
@@ -218,7 +252,7 @@ export function AdminTasksContent({
       })
     } else {
       setSelectedTask(null)
-      setTaskForm(INITIAL_TASK_FORM)
+      setTaskForm({ ...INITIAL_TASK_FORM, task_start_date: toLocalISODate() })
     }
     setIsTaskDialogOpen(true)
   }
@@ -373,42 +407,44 @@ export function AdminTasksContent({
       },
       {
         key: "title",
-        label: "Task Title & Department",
+        label: "Task Title",
         sortable: true,
         resizable: true,
         initialWidth: 260,
         accessor: (r) => r.title,
         render: (r) => (
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-0.5">
             <span className="text-foreground font-medium">{r.title}</span>
-            <span className="text-muted-foreground text-[10px] uppercase">{r.department || "General"}</span>
+            {r.project_name && (
+              <span className="text-primary/80 inline-flex items-center gap-1 text-[10px] font-medium">
+                <FolderKanban className="h-3 w-3 shrink-0" />
+                <span className="line-clamp-1">{r.project_name}</span>
+              </span>
+            )}
           </div>
         ),
       },
       {
         key: "assigned_to",
-        label: "Assignee",
+        label: "Assignee & Department",
         resizable: true,
-        initialWidth: 180,
-        accessor: (r) => workflowOwnerLabel(r),
-        render: (r) => <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>,
+        initialWidth: 200,
+        accessor: (r) => `${workflowOwnerLabel(r)} ${r.department || ""}`,
+        render: (r) => (
+          <div className="flex flex-col">
+            <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>
+            <span className="text-muted-foreground text-[10px] uppercase">{r.department || "General"}</span>
+          </div>
+        ),
       },
       {
-        key: "priority",
-        label: "Priority",
+        key: "weight",
+        label: "Weight",
         sortable: true,
-        accessor: (r) => r.priority,
+        accessor: (r) => r.weight ?? TASK_WEIGHT_DEFAULT,
         render: (r) => (
-          <Badge
-            className={
-              r.priority === "urgent" || r.priority === "high"
-                ? "border-red-200 bg-red-500/10 text-red-500"
-                : r.priority === "medium"
-                  ? "border-amber-200 bg-amber-500/10 text-amber-500"
-                  : "border-blue-200 bg-blue-500/10 text-blue-500"
-            }
-          >
-            {formatName(r.priority)}
+          <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(r.weight))}>
+            {r.weight ?? TASK_WEIGHT_DEFAULT}
           </Badge>
         ),
       },
@@ -417,27 +453,25 @@ export function AdminTasksContent({
         label: "Status",
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => {
-          const cfg = TASK_STATUS_CONFIG[r.status as TaskStatus] || TASK_STATUS_CONFIG.pending
-          return (
-            <Badge variant={cfg.badgeVariant} className={`text-[11px] capitalize ${cfg.color}`}>
-              {cfg.label}
-            </Badge>
-          )
-        },
+        render: (r) => <AdminTaskStatusBadge status={r.status} />,
       },
       {
         key: "goal_title",
         label: "Strategic Goal",
         resizable: true,
-        initialWidth: 200,
+        initialWidth: 220,
         hideOnMobile: true,
-        accessor: (r) => r.goal_title || goals.find((goal) => goal.id === r.goal_id)?.title || "",
+        accessor: (r) => r.goal_title || r.kpi_measure || "",
         render: (r) =>
           r.goal_title ? (
-            <span className="line-clamp-1 text-xs font-medium">{r.goal_title}</span>
+            <div className="flex flex-col">
+              <span className="line-clamp-1 text-xs font-medium">{r.goal_title}</span>
+              {r.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-[10px]">{r.kpi_measure}</span>}
+            </div>
+          ) : r.kpi_measure ? (
+            <span className="line-clamp-1 text-xs font-medium">{r.kpi_measure}</span>
           ) : (
-            <span className="text-muted-foreground text-xs italic">Ad-Hoc / Operational</span>
+            <span className="text-muted-foreground text-xs">—</span>
           ),
       },
       {
@@ -463,7 +497,7 @@ export function AdminTasksContent({
         },
       },
     ],
-    [goals, workflowOwnerLabel]
+    [workflowOwnerLabel]
   )
 
   const filters: DataTableFilter<Task>[] = useMemo(
@@ -474,35 +508,59 @@ export function AdminTasksContent({
         options: STATUS_OPTIONS,
       },
       {
-        key: "priority",
-        label: "Priority",
-        options: PRIORITY_OPTIONS,
+        key: "weight",
+        label: "Weight",
+        options: [
+          { value: "1", label: "Weight 1" },
+          { value: "2", label: "Weight 2" },
+          { value: "3", label: "Weight 3" },
+          { value: "4", label: "Weight 4" },
+          { value: "5", label: "Weight 5" },
+        ],
+        mode: "custom",
+        filterFn: (row, vals) => {
+          if (vals.length === 0) return true
+          return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
+        },
+      },
+      {
+        key: "kpi_status",
+        label: "Corporate KPI",
+        options: [
+          { value: "needs_kpi", label: "Needs KPI" },
+          { value: "linked", label: "Linked to KPI" },
+        ],
+        mode: "custom",
+        filterFn: (row, vals) => {
+          if (vals.length === 0) return true
+          const hasKpi = Boolean(row.kpi_id)
+          if (vals.includes("needs_kpi") && !hasKpi) return true
+          if (vals.includes("linked") && hasKpi) return true
+          return false
+        },
       },
       {
         key: "department",
         label: "Department",
         options: departmentOptions.map((d) => ({ value: d, label: d })),
       },
-      {
-        key: "goal_id",
-        label: "Goal",
-        options: goals.map((g) => ({ value: g.id, label: g.title })),
-        mode: "custom",
-        filterFn: (row, vals) => {
-          if (vals.length === 0) return true
-          return vals.includes(row.goal_id || "")
-        },
-      },
     ],
-    [departmentOptions, goals]
+    [departmentOptions]
   )
 
   return (
     <DataTablePage
-      title="Task Management"
-      description="Operational task tracking, multi-user assignment, and PMS review governance."
-      icon={ClipboardList}
+      title={activeTab === "user_plan" ? "User Task Plan & Workload" : "Task Management"}
+      description={
+        activeTab === "user_plan"
+          ? "User-level task workload, period filters, weight points, and appraisal ratings."
+          : "Operational task tracking, multi-user assignment, and PMS review governance."
+      }
+      icon={activeTab === "user_plan" ? Users : ClipboardList}
       backLink={{ href: "/admin", label: "Back to Admin" }}
+      tabs={TASK_TABS}
+      activeTab={activeTab}
+      onTabChange={(t) => setActiveTab(t as "tasks" | "user_plan")}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setIsWorkflowOpen(true)} className="h-8 gap-2">
@@ -516,242 +574,261 @@ export function AdminTasksContent({
         </div>
       }
       stats={
-        <StatGrid>
-          <StatCard
-            variant="compact"
-            title="Pending"
-            value={stats.pending}
-            icon={Clock}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="In Progress"
-            value={stats.inProgress}
-            icon={ArrowRight}
-            iconBgColor="bg-sky-500/10"
-            iconColor="text-sky-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Submitted"
-            value={stats.submitted}
-            icon={Send}
-            iconBgColor="bg-purple-500/10"
-            iconColor="text-purple-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Completed"
-            value={stats.completed}
-            icon={CheckCircle2}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
-        </StatGrid>
+        activeTab === "tasks" ? (
+          <StatGrid>
+            <StatCard
+              variant="compact"
+              title="Total Tasks"
+              value={stats.total}
+              icon={ClipboardList}
+              iconBgColor="bg-blue-500/10"
+              iconColor="text-blue-500"
+            />
+            <StatCard
+              variant="compact"
+              title="Pending"
+              value={stats.pending}
+              icon={Clock}
+              iconBgColor="bg-amber-500/10"
+              iconColor="text-amber-500"
+            />
+            <StatCard
+              variant="compact"
+              title="In Progress"
+              value={stats.inProgress}
+              icon={ArrowRight}
+              iconBgColor="bg-sky-500/10"
+              iconColor="text-sky-500"
+            />
+            <StatCard
+              variant="compact"
+              title="Submitted"
+              value={stats.submitted}
+              icon={Send}
+              iconBgColor="bg-purple-500/10"
+              iconColor="text-purple-500"
+            />
+            <StatCard
+              variant="compact"
+              title="Completed"
+              value={stats.completed}
+              icon={CheckCircle2}
+              iconBgColor="bg-emerald-500/10"
+              iconColor="text-emerald-500"
+            />
+          </StatGrid>
+        ) : undefined
       }
     >
-      <DataTable<Task>
-        data={tasks}
-        columns={columns}
-        getRowId={(r) => r.id}
-        pagination={{ pageSize: 50 }}
-        isLoading={isLoading}
-        onRetry={loadData}
-        searchPlaceholder="Search task title, description, or assigned user..."
-        searchFn={(r, q) =>
-          `${r.title} ${r.description || ""} ${workflowOwnerLabel(r)} ${r.work_item_number || ""}`
-            .toLowerCase()
-            .includes(q.toLowerCase())
-        }
-        filters={filters}
-        rowActions={[
-          {
-            label: "Review / Decision",
-            icon: ShieldCheck,
-            onClick: handleOpenReviewDialog,
-          },
-          { label: "Edit Task", icon: Pencil, onClick: handleOpenTaskDialog },
-          {
-            label: "Archive Task",
-            icon: Trash2,
-            variant: "destructive",
-            onClick: (r) => {
-              setTaskToDelete(r)
-              setIsDeleteDialogOpen(true)
+      {activeTab === "user_plan" ? (
+        <AdminUserTasksPlan
+          tasks={tasks}
+          employees={assignableEmployees}
+          departments={departmentOptions}
+          cycles={initialReviewCycles}
+          userProfile={userProfile}
+          onOpenTaskDialog={handleOpenTaskDialog}
+          onOpenReviewDialog={handleOpenReviewDialog}
+        />
+      ) : (
+        <DataTable<Task>
+          data={tasks}
+          columns={columns}
+          getRowId={(r) => r.id}
+          pagination={{ pageSize: 50 }}
+          isLoading={isLoading}
+          onRetry={loadData}
+          searchPlaceholder="Search task title, description, or assigned user..."
+          searchFn={(r, q) =>
+            `${r.title} ${r.description || ""} ${workflowOwnerLabel(r)} ${r.department || ""} ${r.work_item_number || ""}`
+              .toLowerCase()
+              .includes(q.toLowerCase())
+          }
+          filters={filters}
+          rowActions={[
+            {
+              label: "Review / Decision",
+              icon: ShieldCheck,
+              onClick: handleOpenReviewDialog,
             },
-          },
-        ]}
-        expandable={{
-          render: (r) => (
-            <div className="grid grid-cols-1 gap-6 p-5 text-xs md:grid-cols-2">
-              <div className="space-y-3">
-                <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
-                  Description & Scope
-                </h4>
-                <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
-                  {r.description || "No description provided."}
-                </div>
+            { label: "Edit Task", icon: Pencil, onClick: handleOpenTaskDialog },
+            {
+              label: "Archive Task",
+              icon: Trash2,
+              variant: "destructive",
+              onClick: (r) => {
+                setTaskToDelete(r)
+                setIsDeleteDialogOpen(true)
+              },
+            },
+          ]}
+          expandable={{
+            render: (r) => (
+              <div className="grid grid-cols-1 gap-6 p-5 text-xs md:grid-cols-2">
+                <div className="space-y-3">
+                  <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
+                    Description & Scope
+                  </h4>
+                  <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
+                    {r.description || "No description provided."}
+                  </div>
 
-                {r.unable_to_complete_reason && (
-                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-800 dark:text-amber-300">
-                    <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
-                    {r.unable_to_complete_reason}
-                  </div>
-                )}
+                  {r.unable_to_complete_reason && (
+                    <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-800 dark:text-amber-300">
+                      <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
+                      {r.unable_to_complete_reason}
+                    </div>
+                  )}
 
-                {r.failure_reason && (
-                  <div className="rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-rose-800 dark:text-rose-300">
-                    <span className="mb-0.5 block font-semibold">Failure Note:</span>
-                    {r.failure_reason}
-                  </div>
-                )}
+                  {r.failure_reason && (
+                    <div className="rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-rose-800 dark:text-rose-300">
+                      <span className="mb-0.5 block font-semibold">Failure Note:</span>
+                      {r.failure_reason}
+                    </div>
+                  )}
 
-                {r.extension_reason && (
-                  <div className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-blue-800 dark:text-blue-300">
-                    <span className="mb-0.5 block font-semibold">Extension Reason:</span>
-                    {r.extension_reason}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
-                  Attribution & Lifecycle
-                </h4>
-                <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
-                  <div>
-                    <span className="text-muted-foreground block text-[10px]">Assigned To:</span>
-                    <span className="font-medium">{workflowOwnerLabel(r)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[10px]">Assigned By:</span>
-                    <span className="font-medium">
-                      {r.assigned_by_user
-                        ? formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)
-                        : "System"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[10px]">Created At:</span>
-                    <span>{formatWATDateTime(r.created_at)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[10px]">Due Date:</span>
-                    <span className="font-medium">{r.due_date ? formatWATDate(r.due_date) : "No deadline"}</span>
-                  </div>
-                  {r.reviewed_by_user && (
-                    <div className="col-span-2 border-t pt-1">
-                      <span className="text-muted-foreground block text-[10px]">Reviewed By:</span>
-                      <span className="font-medium">
-                        {formatFullName(r.reviewed_by_user.first_name, r.reviewed_by_user.last_name)}
-                        {r.reviewed_at && ` on ${formatWATDateTime(r.reviewed_at)}`}
-                      </span>
+                  {r.extension_reason && (
+                    <div className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-blue-800 dark:text-blue-300">
+                      <span className="mb-0.5 block font-semibold">Extension Reason:</span>
+                      {r.extension_reason}
                     </div>
                   )}
                 </div>
 
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 text-xs"
-                    onClick={() => handleOpenReviewDialog(r)}
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    Review & Take Action
-                  </Button>
+                <div className="space-y-3">
+                  <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
+                    Attribution & Lifecycle
+                  </h4>
+                  <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Assigned To:</span>
+                      <span className="font-medium">{workflowOwnerLabel(r)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Assigned By:</span>
+                      <span className="font-medium">
+                        {r.assigned_by_user
+                          ? formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)
+                          : "System"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Created At:</span>
+                      <span>{formatWATDateTime(r.created_at)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">Due Date:</span>
+                      <span className="font-medium">{r.due_date ? formatWATDate(r.due_date) : "No deadline"}</span>
+                    </div>
+                    {r.reviewed_by_user && (
+                      <div className="col-span-2 border-t pt-1">
+                        <span className="text-muted-foreground block text-[10px]">Reviewed By:</span>
+                        <span className="font-medium">
+                          {formatFullName(r.reviewed_by_user.first_name, r.reviewed_by_user.last_name)}
+                          {r.reviewed_at && ` on ${formatWATDateTime(r.reviewed_at)}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-xs"
+                      onClick={() => handleOpenReviewDialog(r)}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Review & Take Action
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ),
-        }}
-        viewToggle
-        contactsView
-        stickyToolbar
-        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        mobileRow={{
-          title: (r) => r.title,
-          subtitle: (r) =>
-            `${r.work_item_number || "Task"} · ${workflowOwnerLabel(r)} · Due ${r.due_date ? formatWATDate(r.due_date) : "No deadline"}`,
-          trailing: (r) => (
-            <Badge variant="outline" className="text-[10px]">
-              {formatName(r.status)}
-            </Badge>
-          ),
-          detail: {
-            title: (r) => r.title,
-            subtitle: (r) => r.work_item_number || undefined,
-            badges: (r) => (
-              <>
-                <Badge variant="outline" className="text-[10px]">
-                  {formatName(r.status)}
-                </Badge>
-                <Badge
-                  className={
-                    r.priority === "urgent" || r.priority === "high"
-                      ? "bg-red-500/10 text-red-500"
-                      : "bg-blue-500/10 text-blue-500"
-                  }
-                >
-                  {formatName(r.priority)}
-                </Badge>
-              </>
             ),
-            fields: (r) => [
-              { label: "Item #", value: r.work_item_number || "-", copyable: true },
-              { label: "Owner", value: workflowOwnerLabel(r) },
-              { label: "Priority", value: formatName(r.priority) },
-              { label: "Status", value: formatName(r.status) },
-              { label: "Due Date", value: r.due_date ? formatWATDate(r.due_date) : "No deadline" },
-              { label: "Description", value: r.description || null, fullWidth: true },
-            ],
-            actions: (r) => [
-              {
-                label: "Review / Manage Task",
-                onClick: () => handleOpenReviewDialog(r),
-              },
-            ],
-          },
-        }}
-        cardRenderer={(r) => (
-          <div className="bg-card group relative space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
-            <div className="flex items-start justify-between">
-              <span className="text-muted-foreground font-mono text-[10px]">{r.work_item_number}</span>
-              <Badge
-                className={
-                  r.priority === "urgent" || r.priority === "high"
-                    ? "bg-red-500/10 text-red-500"
-                    : "bg-blue-500/10 text-blue-500"
-                }
-              >
-                {formatName(r.priority)}
-              </Badge>
-            </div>
-            <div>
-              <h4 className="line-clamp-1 text-sm font-semibold">{r.title}</h4>
-              <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{r.description}</p>
-            </div>
-            <div className="flex items-center justify-between border-t pt-2">
-              <div className="flex items-center gap-1.5">
-                <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>
+          }}
+          viewToggle
+          contactsView
+          stickyToolbar
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            title: (r) => r.title,
+            subtitle: (r) => {
+              const parts = [
+                r.work_item_number || null,
+                workflowOwnerLabel(r),
+                `Weight ${r.weight ?? TASK_WEIGHT_DEFAULT}`,
+                r.due_date ? `Due ${formatWATDate(r.due_date)}` : "No deadline",
+                r.kpi_measure || r.goal_title || null,
+              ].filter(Boolean)
+              return parts.join(" · ")
+            },
+            trailing: (r) => <AdminTaskStatusBadge status={r.status} className="text-[10px]" />,
+            detail: {
+              title: (r) => r.title,
+              subtitle: (r) => r.work_item_number || undefined,
+              badges: (r) => (
+                <>
+                  <AdminTaskStatusBadge status={r.status} className="text-[10px]" />
+                  <Badge
+                    variant="outline"
+                    className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(r.weight))}
+                  >
+                    Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
+                  </Badge>
+                </>
+              ),
+              fields: (r) => [
+                { label: "Item #", value: r.work_item_number || "-", copyable: true },
+                { label: "Owner", value: workflowOwnerLabel(r) },
+                { label: "Department", value: r.department || "-" },
+                { label: "Status", value: formatName(r.status) },
+                { label: "Task Weight", value: `${r.weight ?? TASK_WEIGHT_DEFAULT} (compulsory)` },
+                {
+                  label: "Corporate KPI",
+                  value: r.kpi_measure ? `${r.kpi_measure}${r.kpi_pillar ? ` (🎯 ${r.kpi_pillar})` : ""}` : "—",
+                },
+                { label: "Strategic Goal", value: r.goal_title || "—" },
+                { label: "Project", value: r.project_name || "—" },
+                { label: "Start Date", value: r.task_start_date ? formatWATDate(r.task_start_date) : "—" },
+                { label: "Due Date", value: r.due_date ? formatWATDate(r.due_date) : "No deadline" },
+                { label: "Description", value: r.description || null, fullWidth: true },
+              ],
+              actions: (r) => [
+                {
+                  label: "Review / Manage Task",
+                  onClick: () => handleOpenReviewDialog(r),
+                },
+              ],
+            },
+          }}
+          cardRenderer={(r) => (
+            <div className="bg-card group relative space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
+              <div className="flex items-start justify-between">
+                <span className="text-muted-foreground font-mono text-[10px]">{r.work_item_number}</span>
+                <Badge
+                  variant="outline"
+                  className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(r.weight))}
+                >
+                  Weight {r.weight ?? TASK_WEIGHT_DEFAULT}
+                </Badge>
               </div>
-              <Badge variant="outline" className="text-[10px]">
-                {formatName(r.status)}
-              </Badge>
+              <div>
+                <h4 className="line-clamp-1 text-sm font-semibold">{r.title}</h4>
+                <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{r.description}</p>
+              </div>
+              {r.kpi_measure && (
+                <div className="text-muted-foreground line-clamp-1 text-[11px]">🎯 {r.kpi_measure}</div>
+              )}
+              <div className="flex items-center justify-between border-t pt-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>
+                </div>
+                <AdminTaskStatusBadge status={r.status} className="text-[10px]" />
+              </div>
             </div>
-          </div>
-        )}
-      />
+          )}
+        />
+      )}
 
       <TaskFormDialog
         isOpen={isTaskDialogOpen}
@@ -771,6 +848,16 @@ export function AdminTasksContent({
         onOpenChange={setIsReviewDialogOpen}
         task={reviewTask}
         assignableEmployees={assignableEmployees}
+        ratingBlockedReason={
+          reviewTask &&
+          isSelfRatingBlocked({
+            userId: userProfile.id,
+            assigneeIds: [reviewTask.assigned_to],
+            isMd: userProfile.is_md === true,
+          })
+            ? SELF_RATING_BLOCKED_REASON
+            : null
+        }
         onSuccess={loadData}
       />
 
@@ -799,17 +886,18 @@ export function AdminTasksContent({
               </p>
             </div>
             <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">2. Strategic Goal Linking (Optional)</p>
+              <p className="text-foreground font-semibold">2. Corporate KPI Alignment</p>
               <p className="text-muted-foreground">
-                Tasks can be created with or without linking to strategic goals. Goal-linked tasks feed into the goal
-                achievement formula for performance reviews.
+                Every task is linked to an approved departmental Corporate KPI. The associated Strategic Goal and Pillar
+                are automatically aligned and feed directly into performance reviews and scorecard progress.
               </p>
             </div>
             <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">3. Lead Review & Status Progression</p>
+              <p className="text-foreground font-semibold">3. Lead Review & Weight Scoring</p>
               <p className="text-muted-foreground">
-                Submitted tasks require lead/admin approval to reach Completed status and award KPI points. Blocked
-                tasks can be reassigned (neutral for KPI), granted extensions, or marked failed.
+                Submitted tasks require lead/admin approval to reach Completed status and award KPI points based on task
+                weight (1–5) and review rating. Blocked tasks can be reassigned (neutral for KPI), granted extensions,
+                or marked failed.
               </p>
             </div>
           </div>

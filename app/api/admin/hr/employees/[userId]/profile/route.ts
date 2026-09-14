@@ -54,6 +54,7 @@ const UpdateEmployeeProfileSchema = z.object({
   office_location: z.string().nullable().optional(),
   designation: z.string().nullable().optional(),
   is_department_lead: z.boolean(),
+  lead_departments: z.array(z.string()).optional(),
   first_name: z.string(),
   last_name: z.string(),
   other_names: z.string().nullable().optional(),
@@ -127,7 +128,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const canonicalDepartment = normalizeDepartmentName(body.department) || ""
-  const leadDepartments = body.is_department_lead && canonicalDepartment ? [canonicalDepartment] : []
+
+  // A lead may hold several departments. Fall back to the home department so an
+  // older client that omits the field keeps the lead's existing single entry
+  // rather than clearing it. departments.department_head_id is maintained by
+  // trg_enforce_single_department_lead, so it is deliberately not written here.
+  const leadDepartments = body.is_department_lead
+    ? Array.from(
+        new Set(
+          (body.lead_departments?.length ? body.lead_departments : [canonicalDepartment])
+            .map((name) => normalizeDepartmentName(name) || "")
+            .filter((name) => name !== "")
+        )
+      )
+    : []
+
+  if (body.is_department_lead && leadDepartments.length === 0) {
+    return NextResponse.json({ error: "A department lead must lead at least one department" }, { status: 400 })
+  }
 
   let departmentId: string | null = null
   if (canonicalDepartment) {

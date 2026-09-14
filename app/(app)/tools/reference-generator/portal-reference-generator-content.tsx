@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { AlertTriangle, Building2, CalendarClock, Check, CircleDot, FileCode2, Mail, User } from "lucide-react"
+import {
+  AlertTriangle,
+  Building2,
+  Calendar,
+  CalendarClock,
+  Check,
+  CircleDot,
+  FileCode2,
+  FileText,
+  Mail,
+  User,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -11,6 +22,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 import { CreateReferenceDialog, type CreateReferenceForm } from "@/components/correspondence/create-reference-dialog"
 import { cn, formatName } from "@/lib/utils"
+import { formatWATDate } from "@/lib/utils/date"
+import { getDepartmentShortCode } from "@/shared/departments"
 import { apiFetch } from "@/lib/api-client"
 
 interface DepartmentCodeOption {
@@ -295,17 +308,19 @@ export function PortalReferenceGeneratorContent({
       },
       {
         key: "department",
-        label: "Department",
+        label: "Dept",
         sortable: true,
-        accessor: (row) => row.department_name || row.assigned_department_name || "-",
+        initialWidth: 90,
+        accessor: (row) => getDepartmentShortCode(row.department_name || row.assigned_department_name),
         hideOnMobile: true,
         render: (row) => (
-          <span
-            className="block max-w-[180px] truncate"
+          <Badge
+            variant="secondary"
+            className="font-mono text-[11px]"
             title={row.department_name || row.assigned_department_name || undefined}
           >
-            {row.department_name || row.assigned_department_name || "-"}
-          </span>
+            {getDepartmentShortCode(row.department_name || row.assigned_department_name)}
+          </Badge>
         ),
       },
       {
@@ -446,7 +461,10 @@ export function PortalReferenceGeneratorContent({
               {["approved", "sent", "filed"].includes(row.status) ? row.reference_number : "Reference pending"}
             </span>
           ),
-          subtitle: (row) => row.subject,
+          subtitle: (row) => {
+            const deptCode = getDepartmentShortCode(row.department_name || row.assigned_department_name)
+            return deptCode && deptCode !== "-" ? `${deptCode} · ${row.subject}` : row.subject
+          },
           trailing: (row) => (
             <Badge className={cn("text-[10px]", statusBadgeClass(row.status))}>{statusLabel(row.status)}</Badge>
           ),
@@ -463,7 +481,11 @@ export function PortalReferenceGeneratorContent({
                 {(row.department_name || row.assigned_department_name) && (
                   <span className="inline-flex items-center gap-1">
                     <Building2 className="text-muted-foreground/70 h-3.5 w-3.5" />
-                    <span>{row.department_name || row.assigned_department_name}</span>
+                    <span>
+                      {getDepartmentShortCode(row.department_name || row.assigned_department_name)}
+                      {" · "}
+                      {row.department_name || row.assigned_department_name}
+                    </span>
                   </span>
                 )}
               </div>
@@ -484,7 +506,23 @@ export function PortalReferenceGeneratorContent({
                     },
                   ]
                 : []),
-              { icon: FileCode2, label: "Subject", value: row.subject, copyable: true },
+              { icon: FileText, label: "Title / Subject", value: row.subject, fullWidth: true, copyable: true },
+              {
+                icon: Building2,
+                label: "Department",
+                value:
+                  row.department_name || row.assigned_department_name
+                    ? `${getDepartmentShortCode(row.department_name || row.assigned_department_name)} — ${row.department_name || row.assigned_department_name}`
+                    : "—",
+                fullWidth: true,
+              },
+              {
+                icon: Calendar,
+                label: "Date",
+                value: row.created_at
+                  ? formatWATDate(row.created_at, { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+                  : "—",
+              },
               {
                 icon: User,
                 label: "Recipient",
@@ -510,6 +548,7 @@ export function PortalReferenceGeneratorContent({
                       label: "Notes",
                       value: (row.metadata as Record<string, string>).notes,
                       copyable: true,
+                      fullWidth: true,
                     },
                   ]
                 : []),
@@ -549,9 +588,14 @@ export function PortalReferenceGeneratorContent({
             </div>
             <div>
               <h4 className="line-clamp-2 text-sm font-semibold">{row.subject}</h4>
-              <p className="text-muted-foreground text-xs">
-                {row.department_name || row.assigned_department_name || "-"}
-              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <Badge variant="secondary" className="h-4 px-1 py-0 font-mono text-[10px]">
+                  {getDepartmentShortCode(row.department_name || row.assigned_department_name)}
+                </Badge>
+                <span className="text-muted-foreground truncate text-xs">
+                  {row.department_name || row.assigned_department_name || "-"}
+                </span>
+              </div>
             </div>
             <div className="border-border/40 flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground capitalize">{statusLabel(row.status)}</span>

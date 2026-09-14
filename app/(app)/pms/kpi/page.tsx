@@ -3,6 +3,7 @@ import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
 import { getCurrentUserPmsData } from "../_lib"
 import { CycleSelector } from "../_components/cycle-selector"
 import { TASK_WEIGHT_DEFAULT, isTaskInCycle } from "@/lib/tasks/scoring"
+import { EmployeeKpiTabs } from "./_components/employee-kpi-tabs"
 
 function formatPercent(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
@@ -184,34 +185,36 @@ export default async function PmsKpiPage({ searchParams }: { searchParams: Promi
   }))
 
   return (
-    <PmsTablePage
-      title="PMS KPI"
-      description="Track your goal progress, task weights, and effective KPI attainment for the review cycle."
-      backHref="/pms"
-      backLabel="Back to PMS"
-      icon="kpi"
-      cycles={cycles}
-      activeCycleId={activeCycleId}
-      summaryCards={[
-        { label: "KPI Score", value: formatPercent(score.kpi_score) },
-        { label: "Approved Goals", value: goalSummary.approved },
-        { label: "Completed Goals", value: goalSummary.completed },
-      ]}
-      tableTitle="KPI Task Breakdown"
-      tableDescription={`Your scored tasks in ${score.cycle_name}, grouped by goal. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
-      rows={rows}
-      columns={[
-        { key: "cycle", label: "Cycle" },
-        { key: "goal", label: "Goal" },
-        { key: "goal_progress_pct", label: "Group Score" },
-        { key: "effective_kpi_pct", label: "Effective KPI" },
-        { key: "linked_tasks", label: "Completed / Scored" },
-        { key: "weight", label: "Total Weight" },
-      ]}
-      searchPlaceholder="Search goal or KPI row..."
-      filterKey="cycle"
-      filterLabel="Cycle"
-      filterAllLabel="All Cycles"
-    />
+    <EmployeeKpiTabs department={profile?.department || null}>
+      <PmsTablePage
+        title="PMS KPI"
+        description="Track your goal progress, task weights, and effective KPI attainment for the review cycle."
+        backHref="/pms"
+        backLabel="Back to PMS"
+        icon="kpi"
+        cycles={cycles}
+        activeCycleId={activeCycleId}
+        summaryCards={[
+          { label: "KPI Score", value: formatPercent(score.kpi_score) },
+          { label: "Approved Goals", value: goalSummary.approved },
+          { label: "Completed Goals", value: goalSummary.completed },
+        ]}
+        tableTitle="KPI Task Breakdown"
+        tableDescription={`Your scored tasks in ${score.cycle_name}, grouped by goal. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
+        rows={rows}
+        columns={[
+          { key: "cycle", label: "Cycle" },
+          { key: "goal", label: "Goal" },
+          { key: "goal_progress_pct", label: "Group Score" },
+          { key: "effective_kpi_pct", label: "Effective KPI" },
+          { key: "linked_tasks", label: "Completed / Scored" },
+          { key: "weight", label: "Total Weight" },
+        ]}
+        searchPlaceholder="Search goal or KPI row..."
+        filterKey="cycle"
+        filterLabel="Cycle"
+        filterAllLabel="All Cycles"
+      />
+    </EmployeeKpiTabs>
   )
 }

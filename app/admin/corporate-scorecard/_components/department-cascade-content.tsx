@@ -7,7 +7,7 @@ import { ClipboardEdit, PlusCircle, Target } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ type CascadeRow = {
   kpi_id: string
   source_sn: number
   perspective: string
+  strategic_priority?: string
   strategic_objective: string
   measure: string
   target_text: string
@@ -69,17 +70,38 @@ function ragBadge(status: RagStatus | null) {
  * visibility, per the agreed rule that a department is not judged on work it
  * merely contributes to.
  */
+export interface DepartmentCascadeContentProps {
+  departments: string[]
+  initialDepartment: string | null
+  lockedDepartment?: string
+  backLink?: { href: string; label: string }
+  isReadOnly?: boolean
+  tabs?: DataTableTab[]
+  activeTab?: string
+  onTabChange?: (tab: string) => void
+}
+
 export function DepartmentCascadeContent({
   departments,
   initialDepartment,
-}: {
-  departments: string[]
-  initialDepartment: string | null
-}) {
+  lockedDepartment,
+  backLink,
+  isReadOnly,
+  tabs,
+  activeTab,
+  onTabChange,
+}: DepartmentCascadeContentProps) {
   const queryClient = useQueryClient()
-  const [department, setDepartment] = useState(initialDepartment || departments[0] || "")
+  const activeDepartment = lockedDepartment || initialDepartment || departments[0] || ""
+  const [department, setDepartment] = useState(activeDepartment)
   const [editingRow, setEditingRow] = useState<CascadeRow | null>(null)
   const [recordingRow, setRecordingRow] = useState<CascadeRow | null>(null)
+
+  useEffect(() => {
+    if (lockedDepartment && department !== lockedDepartment) {
+      setDepartment(lockedDepartment)
+    }
+  }, [lockedDepartment, department])
 
   const queryKey = ["corporate-scorecard-department", department]
 
@@ -102,11 +124,21 @@ export function DepartmentCascadeContent({
   const departmentAttainment = useMemo(() => averageCappedPct(coreRows.map((r) => r.capped_pct)), [coreRows])
   const recordedCount = coreRows.filter((r) => r.latest_actual !== null).length
 
+  const pillarOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const row of rows) {
+      if (row.strategic_priority) set.add(row.strategic_priority)
+    }
+    return Array.from(set)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => ({ value, label: value }))
+  }, [rows])
+
   const columns = useMemo<DataTableColumn<CascadeRow>[]>(
     () => [
       {
         key: "measure",
-        label: "KPI",
+        label: "KPI & Pillar",
         sortable: true,
         resizable: true,
         initialWidth: 320,
@@ -115,6 +147,9 @@ export function DepartmentCascadeContent({
           <div className="flex flex-col">
             <span className="line-clamp-2 font-medium">{r.measure}</span>
             <span className="text-muted-foreground text-[11px]">
+              {r.strategic_priority ? (
+                <span className="text-foreground/80 font-semibold">{r.strategic_priority} · </span>
+              ) : null}
               {r.perspective} · {r.strategic_objective}
             </span>
           </div>
@@ -212,31 +247,50 @@ export function DepartmentCascadeContent({
           { value: "Organizational Capacity", label: "Organizational Capacity" },
         ],
       },
+      {
+        key: "strategic_priority",
+        label: "Strategic Pillar",
+        options: pillarOptions,
+      },
     ],
-    []
+    [pillarOptions]
   )
 
   return (
     <DataTablePage
-      title="Department Cascade"
-      description="This department's KPIs, its own confirmed targets, and recorded progress against them."
+      title={tabs ? "Corporate Scorecard" : "Department KPIs"}
+      description="Each department's assigned KPIs, confirmed targets, proposed action plans, and recorded actual progress against the 2026 plan."
       icon={Target}
-      backLink={{ href: "/admin/corporate-scorecard", label: "Back to Register" }}
+      backLink={backLink || { href: "/admin", label: "Back to Admin" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={onTabChange}
       actions={
-        <div className="w-full max-w-[260px]">
-          <Select value={department} onValueChange={setDepartment}>
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Select a department" />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((d) => (
-                <SelectItem key={d} value={d}>
-                  {d}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        lockedDepartment ? (
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className="border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600"
+            >
+              {lockedDepartment}
+            </Badge>
+          </div>
+        ) : (
+          <div className="w-full max-w-[260px]">
+            <Select value={department} onValueChange={setDepartment}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select a department" />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
       }
       stats={
         <StatGrid>
@@ -270,7 +324,9 @@ export function DepartmentCascadeContent({
         getRowId={(r) => r.assignment_id}
         searchPlaceholder="Search KPI or objective..."
         searchFn={(row, query) =>
-          `${row.measure} ${row.strategic_objective}`.toLowerCase().includes(query.toLowerCase())
+          `${row.measure} ${row.strategic_objective} ${row.strategic_priority || ""}`
+            .toLowerCase()
+            .includes(query.toLowerCase())
         }
         isLoading={isLoading}
         error={error instanceof Error ? error.message : null}
@@ -278,10 +334,14 @@ export function DepartmentCascadeContent({
         emptyTitle="No KPIs for This Department"
         emptyDescription="This department has no CORE or SUPPORT role on any corporate KPI yet."
         emptyIcon={Target}
-        rowActions={[
-          { label: "Edit Target", icon: ClipboardEdit, onClick: (r) => setEditingRow(r) },
-          { label: "Record Actual", icon: PlusCircle, onClick: (r) => setRecordingRow(r) },
-        ]}
+        rowActions={
+          isReadOnly
+            ? undefined
+            : [
+                { label: "Edit Target", icon: ClipboardEdit, onClick: (r) => setEditingRow(r) },
+                { label: "Record Actual", icon: PlusCircle, onClick: (r) => setRecordingRow(r) },
+              ]
+        }
         expandable={{
           render: (r) => (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

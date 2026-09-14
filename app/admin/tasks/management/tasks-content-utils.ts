@@ -94,6 +94,7 @@ export function applyTaskFilters(
 
 export function validateTaskForm(form: TaskFormState): string | null {
   if (!form.title.trim()) return "Please enter a task title"
+  if (!form.kpi_id?.trim()) return "Please select a Corporate KPI for this task"
   const hasAssignee = form.assigned_to || (form.assigned_users && form.assigned_users.length > 0)
   if (!hasAssignee && form.assignment_type !== "department") {
     return "Please select at least one assignee for this task"

@@ -124,6 +124,10 @@ test("route resolver maps critical override routes", () => {
   assert.equal(resolveAdminRouteKeyV2("/admin/portfolios"), "portfolios.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/project"), "projects.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/corporate-scorecard/departments"), "scorecard.main")
+  assert.equal(resolveAdminRouteKeyV2("/admin/corporate-services/scorecard"), "scorecard.main")
+  assert.equal(resolveAdminRouteKeyV2("/admin/corporate-services/risk-register"), "scorecard.main")
+  assert.equal(resolveAdminRouteKeyV2("/admin/events"), "events.main")
+  assert.equal(resolveAdminRouteKeyV2("/admin/md-desk"), "mddesk.main")
 })
 
 test("unrecognised admin routes are denied, not dept-visible", () => {

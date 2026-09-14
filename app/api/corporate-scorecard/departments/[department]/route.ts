@@ -19,6 +19,7 @@ type AssignmentRow = {
     id: string
     source_sn: number
     perspective: string
+    strategic_priority: string
     strategic_objective: string
     measure: string
     target_text: string
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
     .select(
       `id, kpi_id, role, target_value, target_unit, department_target, proposed_action,
        corporate_kpis!inner (
-         id, source_sn, perspective, strategic_objective, measure, target_text, measure_type, direction
+         id, source_sn, perspective, strategic_priority, strategic_objective, measure, target_text, measure_type, direction
        )`
     )
     .eq("department", department)
@@ -115,6 +116,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
         kpi_id: kpi.id,
         source_sn: kpi.source_sn,
         perspective: kpi.perspective,
+        strategic_priority: kpi.strategic_priority,
         strategic_objective: kpi.strategic_objective,
         measure: kpi.measure,
         target_text: kpi.target_text,

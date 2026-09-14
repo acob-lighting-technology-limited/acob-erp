@@ -22,11 +22,15 @@ async function getTasksData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const { data: userProfile } = await supabase
-    .from("profiles")
-    .select("department, role, is_department_lead, lead_departments")
-    .eq("id", user.id)
-    .maybeSingle<TaskUserProfile>()
+  const [{ data: profileRow }, { data: isMd }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("department, role, is_department_lead, lead_departments")
+      .eq("id", user.id)
+      .maybeSingle<TaskUserProfile>(),
+    supabase.rpc("is_md"),
+  ])
+  const userProfile: TaskUserProfile | null = profileRow ? { ...profileRow, is_md: isMd === true } : null
 
   const tasks = await loadUserTasks(
     supabase as unknown as Parameters<typeof loadUserTasks>[0],

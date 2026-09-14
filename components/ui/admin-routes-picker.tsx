@@ -58,7 +58,7 @@ export const ADMIN_ROUTE_GROUPS: RouteGroup[] = [
     routes: [
       { key: "portfolios.main", label: "Portfolios", hint: "Programmes & client groupings" },
       { key: "projects.main", label: "Projects", hint: "Project register & project tasks" },
-      { key: "scorecard.main", label: "Corporate Scorecard", hint: "Register, Department Cascade & Summary" },
+      { key: "scorecard.main", label: "Corporate Services", hint: "Scorecard & Risk Register" },
     ],
   },
   {
@@ -77,6 +77,7 @@ export const ADMIN_ROUTE_GROUPS: RouteGroup[] = [
       { key: "notifications.main", label: "Notifications" },
       { key: "correspondence.main", label: "Correspondence" },
       { key: "documentation.main", label: "Documentation" },
+      { key: "events.main", label: "Events", hint: "Company calendar, workshops & webinars" },
       { key: "feedback.main", label: "Feedback" },
     ],
   },

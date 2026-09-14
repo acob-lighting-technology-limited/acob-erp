@@ -19,9 +19,10 @@ import {
 } from "lucide-react"
 import type { Task } from "@/types/task"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
+import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { formatWATDateTime, formatWATDate } from "@/lib/utils/date"
-import { formatFullName } from "@/lib/utils"
-import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT, TASK_WEIGHT_LABELS } from "@/lib/tasks/scoring"
+import { cn, formatFullName } from "@/lib/utils"
+import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import {
   DetailActionBar,
   DetailCallout,
@@ -49,6 +50,8 @@ interface UserTaskDetailsDialogProps {
   taskUpdates: TaskUpdate[]
   /** True when this user may approve, rate, reject or reassign the task. */
   canReview?: boolean
+  /** Why this user may not approve and rate the task, when they may not. */
+  ratingBlockedReason?: string | null
   /** Called after a status change so the list behind the dialog refreshes. */
   onChanged?: () => void | Promise<void>
   /** Posts a comment and refreshes taskUpdates. */
@@ -62,6 +65,7 @@ export function UserTaskDetailsDialog({
   selectedTask,
   taskUpdates,
   canReview = false,
+  ratingBlockedReason = null,
   onChanged,
   onAddComment,
   isPostingComment = false,
@@ -105,11 +109,19 @@ export function UserTaskDetailsDialog({
                 {selectedTask.work_item_number}
               </Badge>
             )}
+            {(() => {
+              const cfg = TASK_STATUS_CONFIG[selectedTask.status as TaskStatus] || TASK_STATUS_CONFIG.pending
+              return (
+                <Badge variant={cfg.badgeVariant} className={cn("text-[11px] capitalize", cfg.color)}>
+                  {cfg.label}
+                </Badge>
+              )
+            })()}
             <Badge
-              variant={["high", "urgent"].includes(selectedTask.priority) ? "destructive" : "outline"}
-              className="text-[11px] capitalize"
+              variant="outline"
+              className={cn("font-mono text-[11px] font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
             >
-              {selectedTask.priority}
+              Weight {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
             </Badge>
             {isOverdue && (
               <Badge variant="destructive" className="gap-1 text-[11px]">
@@ -138,7 +150,12 @@ export function UserTaskDetailsDialog({
         {/* Moving a task forward is why this dialog gets opened, so it sits above
             the scroll rather than inside a tab you have to find. */}
         <DetailActionBar label="Move this task to">
-          <TaskStatusControl task={selectedTask} canReview={canReview} onChanged={() => onChanged?.()} />
+          <TaskStatusControl
+            task={selectedTask}
+            canReview={canReview}
+            ratingBlockedReason={ratingBlockedReason}
+            onChanged={() => onChanged?.()}
+          />
         </DetailActionBar>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -183,14 +200,27 @@ export function UserTaskDetailsDialog({
                   {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
                 </DetailField>
                 <DetailField icon={Target} label="Strategic goal">
-                  {selectedTask.goal_title || <span className="text-muted-foreground">Ad-hoc / operational</span>}
+                  {selectedTask.goal_title || <span className="text-muted-foreground">—</span>}
                 </DetailField>
                 <DetailField icon={Target} label="Corporate KPI">
-                  {selectedTask.kpi_measure || <span className="text-muted-foreground">Not linked</span>}
+                  {selectedTask.kpi_measure ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium">{selectedTask.kpi_measure}</span>
+                      {selectedTask.kpi_pillar && (
+                        <span className="text-muted-foreground text-[11px]">🎯 {selectedTask.kpi_pillar}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </DetailField>
                 <DetailField icon={Gauge} label="Weight">
-                  {selectedTask.weight ?? TASK_WEIGHT_DEFAULT} —{" "}
-                  {TASK_WEIGHT_LABELS[selectedTask.weight ?? TASK_WEIGHT_DEFAULT]}
+                  <Badge
+                    variant="outline"
+                    className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
+                  >
+                    {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+                  </Badge>
                 </DetailField>
                 <DetailField icon={Star} label="Rating">
                   {selectedTask.rating ? (

@@ -34,6 +34,8 @@ export interface Task {
   /** The corporate KPI this task's work serves. Reporting label only — does not affect scoring. */
   kpi_id?: string | null
   kpi_measure?: string | null
+  kpi_pillar?: string | null
+  kpi_objective?: string | null
   project_id?: string | null
   project_name?: string | null
   plan_id?: string | null
@@ -77,4 +79,6 @@ export interface TaskUserProfile {
   role?: string | null
   is_department_lead?: boolean | null
   lead_departments?: string[] | null
+  /** Head of Executive Management; the only person who may rate their own tasks. */
+  is_md?: boolean
 }

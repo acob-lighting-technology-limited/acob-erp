@@ -23,7 +23,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
   const supabase = await createClient()
   const dataClient = getServiceRoleClientOrFallback(supabase)
 
-  const { data: authData } = await supabase.auth.getUser()
+  const [{ data: authData }, { data: isMd }] = await Promise.all([supabase.auth.getUser(), supabase.rpc("is_md")])
   const userId = authData.user?.id ?? scope.userId
 
   const deptName = normalizeDepartmentName(scope.deptName)
@@ -37,6 +37,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     lead_departments: expandedDepts,
     managed_departments: expandedDepts,
     is_global_task_assigner: false,
+    is_md: isMd === true,
   }
 
   const [tasksResult, employeeResult] = await Promise.all([
@@ -58,6 +59,8 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
 
   const profileIds = new Set<string>()
   const goalIds = new Set<string>()
+  const kpiIds = new Set<string>()
+  const projectIds = new Set<string>()
 
   rawTasks.forEach((t) => {
     if (t.assigned_to) profileIds.add(t.assigned_to)
@@ -65,15 +68,27 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     if (t.created_by) profileIds.add(t.created_by)
     if (t.reviewed_by) profileIds.add(t.reviewed_by)
     if (t.goal_id) goalIds.add(t.goal_id)
+    if (t.kpi_id) kpiIds.add(t.kpi_id)
+    if (t.project_id) projectIds.add(t.project_id)
   })
 
-  const [profilesRes, goalsRes] = await Promise.all([
+  const [profilesRes, goalsRes, kpisRes, projectsRes, allProjectsRes] = await Promise.all([
     profileIds.size > 0
       ? dataClient.from("profiles").select("id, first_name, last_name, department").in("id", Array.from(profileIds))
       : { data: [] },
     goalIds.size > 0
       ? dataClient.from("goals_objectives").select("id, title").in("id", Array.from(goalIds))
       : { data: [] },
+    kpiIds.size > 0
+      ? dataClient
+          .from("corporate_kpis")
+          .select("id, measure, strategic_objective, strategic_priority")
+          .in("id", Array.from(kpiIds))
+      : { data: [] },
+    projectIds.size > 0
+      ? dataClient.from("projects").select("id, project_name").in("id", Array.from(projectIds))
+      : { data: [] },
+    dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
   ])
 
   const profileMap = new Map<string, TaskPersonSummary>(
@@ -81,6 +96,11 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
   )
   const goalMap = new Map<string, string>(
     ((goalsRes.data || []) as Array<{ id: string; title: string }>).map((g) => [g.id, g.title])
+  )
+  type KpiInfo = { id: string; measure: string; strategic_objective: string; strategic_priority: string }
+  const kpiMap = new Map<string, KpiInfo>(((kpisRes.data || []) as KpiInfo[]).map((k) => [k.id, k]))
+  const projectMap = new Map<string, string>(
+    ((projectsRes.data || []) as Array<{ id: string; project_name: string }>).map((p) => [p.id, p.project_name])
   )
 
   const tasksWithUsers = rawTasks.map((task) => {
@@ -90,6 +110,18 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     if (task.created_by) copy.created_by_user = profileMap.get(task.created_by)
     if (task.reviewed_by) copy.reviewed_by_user = profileMap.get(task.reviewed_by)
     if (task.goal_id) copy.goal_title = goalMap.get(task.goal_id) || null
+    if (task.project_id) copy.project_name = projectMap.get(task.project_id) || null
+    if (task.kpi_id) {
+      const kpi = kpiMap.get(task.kpi_id)
+      if (kpi) {
+        copy.kpi_measure = kpi.measure
+        copy.kpi_pillar = kpi.strategic_priority
+        copy.kpi_objective = kpi.strategic_objective
+        if (!copy.goal_title) {
+          copy.goal_title = kpi.strategic_objective
+        }
+      }
+    }
     return copy
   })
 
@@ -126,6 +158,7 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
       initialemployee={(employeeResult.data || []) as employee[]}
       initialDepartments={[deptName]}
       initialGoals={goalRows}
+      initialProjects={(allProjectsRes.data || []) as Array<{ id: string; project_name: string }>}
       userProfile={userProfile}
       initialGoalId={resolvedSearchParams?.goal_id || ""}
     />

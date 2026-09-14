@@ -671,7 +671,9 @@ export function EmployeeViewModal({
                           setEditForm({
                             ...editForm,
                             department: value,
-                            lead_departments: editForm.is_department_lead ? [value] : editForm.lead_departments,
+                            lead_departments: editForm.is_department_lead
+                              ? Array.from(new Set([...editForm.lead_departments, value]))
+                              : editForm.lead_departments,
                           })
                         }
                       >
@@ -757,9 +759,50 @@ export function EmployeeViewModal({
                       className="text-primary focus:ring-primary h-3.5 w-3.5 rounded border-gray-300"
                     />
                     <Label htmlFor="is_department_lead_checkbox" className="cursor-pointer text-xs">
-                      Designate as Department Lead for {editForm.department || "assigned department"}
+                      Designate as Department Lead
                     </Label>
                   </div>
+
+                  {editForm.is_department_lead && (
+                    <div className="bg-muted/20 mt-2 space-y-1.5 rounded-lg border p-3">
+                      <Label className="text-xs font-semibold">Departments Led *</Label>
+                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                        {DEPARTMENTS.map((dept) => {
+                          const checked = editForm.lead_departments.includes(dept)
+                          const isLastSelected = checked && editForm.lead_departments.length === 1
+                          return (
+                            <div key={dept} className="flex items-center gap-2">
+                              <input
+                                id={`lead_dept_${dept}`}
+                                type="checkbox"
+                                checked={checked}
+                                disabled={isLastSelected}
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({
+                                    ...prev,
+                                    lead_departments: e.target.checked
+                                      ? Array.from(new Set([...prev.lead_departments, dept]))
+                                      : prev.lead_departments.filter((name) => name !== dept),
+                                  }))
+                                }
+                                className="text-primary focus:ring-primary h-3.5 w-3.5 rounded border-gray-300 disabled:opacity-50"
+                              />
+                              <Label
+                                htmlFor={`lead_dept_${dept}`}
+                                className={`text-xs ${isLastSelected ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
+                              >
+                                {dept}
+                              </Label>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <p className="text-muted-foreground text-[11px]">
+                        A lead must hold at least one department. Taking a department from another lead leaves the rest
+                        of their departments intact.
+                      </p>
+                    </div>
+                  )}
 
                   {editForm.role === "admin" && (
                     <div className="bg-muted/20 mt-2 space-y-1.5 rounded-lg border p-3">

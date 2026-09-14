@@ -78,6 +78,7 @@ type TaskScoreRow = {
   rating: number | null
   assignment_type: string | null
   assigned_to: string | null
+  assigned_by: string | null
   department: string | null
   task_end_date: string | null
   due_date: string | null
@@ -203,6 +204,15 @@ export async function computeIndividualPerformanceScore(
 
   const userDepartment = profile?.department || null
 
+  // The MD's own tasks have no one above them to rate them honestly, so they
+  // are left out of the MD's KPI (see lib/tasks/rating-authority.ts).
+  const { data: mdDept } = await supabase
+    .from("departments")
+    .select("department_head_id")
+    .eq("department_code", "MD")
+    .maybeSingle<{ department_head_id: string | null }>()
+  const userIsMd = Boolean(mdDept?.department_head_id) && mdDept?.department_head_id === params.userId
+
   // ── KPI / Task Performance (70%) ──────────────────────────────
   // Weighted task scoring: SUM(weight * rating/5) / SUM(weight).
   //
@@ -221,7 +231,7 @@ export async function computeIndividualPerformanceScore(
   const userCompletedTaskIds = new Set((userCompletions || []).map((row) => row.task_id))
 
   const TASK_FIELDS =
-    "id, goal_id, title, status, weight, rating, assignment_type, assigned_to, department, task_end_date, due_date, created_at, is_archived"
+    "id, goal_id, title, status, weight, rating, assignment_type, assigned_to, assigned_by, department, task_end_date, due_date, created_at, is_archived"
 
   const [{ data: assignedTasks }, { data: departmentTasks }, { data: completedTasks }] = await Promise.all([
     supabase.from("tasks").select(TASK_FIELDS).eq("assigned_to", params.userId).eq("is_archived", false),
@@ -246,6 +256,7 @@ export async function computeIndividualPerformanceScore(
   const scorableTasks: TaskScoreRow[] = []
   for (const task of tasksById.values()) {
     if (cycle && !isTaskInCycle(task, cycle.start_date, cycle.end_date)) continue
+    if (userIsMd && task.assigned_to === params.userId && task.assigned_by === params.userId) continue
 
     // Department- and multi-assigned work only counts for this employee when
     // they are the named assignee or individually recorded their completion.

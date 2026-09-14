@@ -27,14 +27,7 @@ export const TASK_RATING_MAX = 5
  *  neither credit nor failure for this employee. */
 const EXCLUDED_STATUSES = new Set(["reassigned", "cancelled"])
 
-/** Plain names for the weight scale, so a lead is not guessing what "3" means. */
-export const TASK_WEIGHT_LABELS: Record<number, string> = {
-  1: "minor",
-  2: "small",
-  3: "normal",
-  4: "significant",
-  5: "critical",
-}
+/** Task weights are strictly numeric (1–5) and must never display descriptive text labels. */
 
 export const TASK_RATING_LABELS: Record<number, string> = {
   1: "Poor",
@@ -195,5 +188,26 @@ export function computeProjectProgress(tasks: ScorableTask[]) {
     qualityPct: quality.score,
     completedWeight,
     totalWeight,
+  }
+}
+
+/**
+ * Visual badge styling for task weights (1 to 5).
+ * Higher weight tasks have greater visual intensity.
+ */
+export function getTaskWeightBadgeClass(weight?: number | null): string {
+  const w = clampWeight(weight)
+  switch (w) {
+    case 5:
+      return "border-purple-300 bg-purple-500/15 text-purple-700 dark:border-purple-800 dark:text-purple-300 font-semibold"
+    case 4:
+      return "border-sky-300 bg-sky-500/15 text-sky-700 dark:border-sky-800 dark:text-sky-300 font-medium"
+    case 3:
+      return "border-teal-300 bg-teal-500/15 text-teal-700 dark:border-teal-800 dark:text-teal-300 font-medium"
+    case 2:
+      return "border-slate-300 bg-slate-500/10 text-slate-700 dark:border-slate-700 dark:text-slate-300"
+    case 1:
+    default:
+      return "border-border/70 bg-muted/40 text-muted-foreground"
   }
 }

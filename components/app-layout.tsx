@@ -3,7 +3,7 @@ import { SidebarContent } from "@/components/sidebar-content"
 import { AcoBot } from "@/components/acobot/acobot"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
-import { normalizeDepartmentName } from "@/shared/departments"
+import { resolveDeptConsoles } from "@/lib/dept/consoles"
 import { redirect } from "next/navigation"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
@@ -26,20 +26,11 @@ export async function AppLayout({ children }: AppLayoutProps) {
   const adminScope = await resolveAdminScope(typedSupabase, data.user.id)
   const canAccessAdmin = Boolean(adminScope)
 
-  // Compute deptConsoleHref for any user who is a dept lead — pure leads AND admin+lead.
-  // Both surfaces are useful independently: admin = global ops, dept = scoped view.
-  let deptConsoleHref: string | undefined
-  if (profile?.is_department_lead) {
-    const leadDepts: string[] = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
-    const primaryDeptName = leadDepts[0] ?? profile.department
-    if (primaryDeptName) {
-      const normalized = normalizeDepartmentName(primaryDeptName)
-      const { data: deptRow } = await supabase.from("departments").select("id").eq("name", normalized).single()
-      if (deptRow?.id) {
-        deptConsoleHref = `/dept/${deptRow.id}`
-      }
-    }
-  }
+  // Resolve every dept console for any user who is a dept lead — pure leads AND
+  // admin+lead. Both surfaces are useful independently: admin = global ops,
+  // dept = scoped view. A lead may hold several departments.
+  const deptConsoles = await resolveDeptConsoles(typedSupabase, profile)
+  const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
 
   const userData = {
     email: data.user.email,
@@ -52,7 +43,8 @@ export async function AppLayout({ children }: AppLayoutProps) {
         user={userData}
         profile={profile || undefined}
         canAccessAdmin={canAccessAdmin}
-        deptConsoleHref={deptConsoleHref}
+        deptConsoles={deptConsoles}
+        showMdDesk={isMdDeskMember === true}
       />
       <SidebarContent>
         <div className="pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">{children}</div>

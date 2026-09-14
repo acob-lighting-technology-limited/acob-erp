@@ -35,6 +35,8 @@ interface TaskReviewDecisionDialogProps {
   onOpenChange: (open: boolean) => void
   task: Task | null
   assignableEmployees: TaskReviewEmployee[]
+  /** Set when this reviewer may not approve and rate the task (their own task). */
+  ratingBlockedReason?: string | null
   onSuccess: () => void
 }
 
@@ -101,6 +103,7 @@ export function TaskReviewDecisionDialog({
   onOpenChange,
   task,
   assignableEmployees,
+  ratingBlockedReason = null,
   onSuccess,
 }: TaskReviewDecisionDialogProps) {
   const [actionType, setActionType] = useState<DecisionId | null>(null)
@@ -279,7 +282,12 @@ export function TaskReviewDecisionDialog({
               </SelectTrigger>
               <SelectContent>
                 {DECISIONS.map((decision) => {
-                  const blockedReason = decision.available(task) ? null : decision.unavailableReason
+                  const blockedReason =
+                    decision.id === "approve" && ratingBlockedReason
+                      ? ratingBlockedReason
+                      : decision.available(task)
+                        ? null
+                        : decision.unavailableReason
                   return (
                     <SelectItem key={decision.id} value={decision.id} disabled={Boolean(blockedReason)}>
                       {decision.label}

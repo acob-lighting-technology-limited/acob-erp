@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import {
+  Briefcase,
+  CalendarDays,
   ChevronsUpDown,
   ChevronRight,
   ClipboardList,
@@ -24,6 +26,7 @@ import {
   Users,
   Wrench,
   FolderKanban,
+  Layers,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -45,6 +48,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
+import type { DeptConsole } from "@/lib/dept/consoles"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { useSidebar } from "./sidebar-context"
 
@@ -65,8 +69,10 @@ interface SidebarProps {
     lead_departments?: string[]
   }
   canAccessAdmin?: boolean
-  /** Href for the dept console — shown for pure leads (non-admin dept leads). */
-  deptConsoleHref?: string
+  /** Dept consoles this lead may open — shown for pure leads (non-admin dept leads). */
+  deptConsoles?: DeptConsole[]
+  /** The viewer is the MD or an MD's Desk delegate. */
+  showMdDesk?: boolean
 }
 
 type NavSubChild = { name: string; href: string }
@@ -85,6 +91,7 @@ const navigationSections: NavSectionDef[] = [
     items: [
       { name: "Dashboard", href: "/profile", icon: LayoutDashboard },
       { name: "Directory", href: "/directory", icon: Users },
+      { name: "Calendar", href: "/calendar", icon: CalendarDays },
     ],
   },
   {
@@ -128,7 +135,24 @@ const navigationSections: NavSectionDef[] = [
           { name: "Assets", href: "/assets" },
         ],
       },
-      { name: "Projects", href: "/project", icon: FolderKanban },
+      {
+        name: "Portfolios",
+        href: "/portfolios",
+        icon: Layers,
+        children: [
+          { name: "Portfolios", href: "/portfolios" },
+          { name: "Projects", href: "/projects" },
+        ],
+      },
+      {
+        name: "Corporate Services",
+        href: "/admin/corporate-services/scorecard",
+        icon: Briefcase,
+        children: [
+          { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
+          { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
+        ],
+      },
     ],
   },
   {
@@ -189,7 +213,7 @@ const NAV_ROUTE_ALIASES: Record<string, string[]> = {
   "/tools": ["/feedback"],
 }
 
-export function Sidebar({ user, profile, canAccessAdmin, deptConsoleHref }: SidebarProps) {
+export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -318,6 +342,15 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoleHref }: Side
     : null
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
+  // MD's Desk is membership-gated, so it is added per viewer rather than listed statically.
+  const visibleSections: NavSectionDef[] = showMdDesk
+    ? navigationSections.map((section) =>
+        section.key === "workspace"
+          ? { ...section, items: [...section.items, { name: "MD's Desk", href: "/md-desk", icon: Briefcase }] }
+          : section
+      )
+    : navigationSections
+
   const labelCls = cn(
     "min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out",
     isCollapsed ? "max-w-0 opacity-0" : "max-w-full opacity-100"
@@ -328,7 +361,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoleHref }: Side
       <div className={cn("transition-[padding] duration-300 ease-in-out", isCollapsed ? "px-2 py-2" : "px-3 py-2")} />
 
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
-        {navigationSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.key} className="space-y-0.5">
             {isCollapsed ? (
               section.key !== "workspace" && <div className="mx-1.5 my-1.5 border-t" />
@@ -561,14 +594,14 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoleHref }: Side
                 </Link>
               </DropdownMenuItem>
             )}
-            {deptConsoleHref && (
-              <DropdownMenuItem asChild>
-                <Link href={deptConsoleHref} className="flex w-full items-center gap-2">
+            {deptConsoles.map((console) => (
+              <DropdownMenuItem key={console.id} asChild>
+                <Link href={console.href} className="flex w-full items-center gap-2">
                   <ShieldCheck className="h-4 w-4" />
-                  Go to Dept
+                  {deptConsoles.length > 1 ? console.name : "Go to Dept"}
                 </Link>
               </DropdownMenuItem>
-            )}
+            ))}
             <DropdownMenuItem onClick={() => setShowLogoutConfirm(true)} className="flex items-center gap-2">
               <LogOut className="h-4 w-4" />
               Logout

@@ -3,14 +3,36 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus, Loader2, Trash2, FolderTree, Scale, Star, Pencil } from "lucide-react"
+import {
+  Plus,
+  Loader2,
+  Trash2,
+  FolderTree,
+  Scale,
+  Star,
+  Pencil,
+  ChevronDown,
+  ChevronRight,
+  MoreVertical,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { apiFetch } from "@/lib/api-client"
-import { formatFullName } from "@/lib/utils"
-import { formatWATDate } from "@/lib/utils/date"
+import { cn, formatFullName } from "@/lib/utils"
+import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT, computeProjectProgress } from "@/lib/tasks/scoring"
 import { TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
@@ -76,12 +98,21 @@ const EMPTY_TASK_FORM: TaskFormState = {
  */
 export function ProjectPlanBoard({ project, profiles }: { project: Project; profiles: employee[] }) {
   const queryClient = useQueryClient()
-  const [newPlanName, setNewPlanName] = useState("")
+  const [isAddPlanOpen, setIsAddPlanOpen] = useState(false)
+  const [planForm, setPlanForm] = useState({ name: "", description: "" })
   const [taskDialogPlan, setTaskDialogPlan] = useState<Plan | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false)
   const [taskForm, setTaskForm] = useState<TaskFormState>(EMPTY_TASK_FORM)
   const [isSavingTask, setIsSavingTask] = useState(false)
+  const [expandedPlans, setExpandedPlans] = useState<Record<string, boolean>>({})
+
+  const togglePlan = (id: string) => {
+    setExpandedPlans((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }))
+  }
 
   const plansKey = ["project-plans", project.id]
   const tasksKey = ["project-tasks", project.id]
@@ -107,11 +138,11 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
   })
 
   const addPlan = useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async ({ name, description }: { name: string; description?: string }) => {
       const res = await apiFetch(`/api/projects/${project.id}/plans`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, sort_order: plans.length }),
+        body: JSON.stringify({ name, description: description || null, sort_order: plans.length }),
       })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to add plan")
@@ -119,7 +150,8 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
     },
     onSuccess: () => {
       toast.success("Implementation plan added")
-      setNewPlanName("")
+      setPlanForm({ name: "", description: "" })
+      setIsAddPlanOpen(false)
       void queryClient.invalidateQueries({ queryKey: plansKey })
     },
     onError: (err: Error) => toast.error(err.message),
@@ -222,7 +254,12 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
 
   function openTaskDialog(plan: Plan | null) {
     setEditingTask(null)
-    setTaskForm({ ...EMPTY_TASK_FORM, project_id: project.id, plan_id: plan?.id ?? "" })
+    setTaskForm({
+      ...EMPTY_TASK_FORM,
+      project_id: project.id,
+      plan_id: plan?.id ?? "",
+      task_start_date: toLocalISODate(),
+    })
     setTaskDialogPlan(plan)
     setIsTaskDialogOpen(true)
   }
@@ -300,7 +337,7 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
             <Star className="h-3 w-3" />
             {task.rating ? `${task.rating}/5` : "unrated"}
           </Badge>
-          <Badge variant={config?.badgeVariant ?? "outline"} className="text-[10px] capitalize">
+          <Badge variant={config?.badgeVariant ?? "outline"} className={cn("text-[10px] capitalize", config?.color)}>
             {config?.label ?? task.status.replaceAll("_", " ")}
           </Badge>
           <Button
@@ -323,18 +360,41 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
   function renderGroup(key: string, title: string, description: string | null, plan: Plan | null) {
     const groupTasks = tasksByPlan.get(key) || []
     const progress = computeProjectProgress(groupTasks)
+    const isExpanded = Boolean(expandedPlans[key])
 
     return (
-      <div key={key || "ungrouped"} className="bg-background rounded-lg border">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 font-semibold">
-              <FolderTree className="text-muted-foreground h-4 w-4" />
-              {title}
-            </p>
-            {description && <p className="text-muted-foreground text-xs">{description}</p>}
+      <div key={key || "ungrouped"} className="bg-background overflow-hidden rounded-lg border transition-all">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => togglePlan(key)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              togglePlan(key)
+            }
+          }}
+          className="hover:bg-muted/40 flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2.5 transition-colors"
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            {isExpanded ? (
+              <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
+            ) : (
+              <ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+            )}
+            <FolderTree className="text-muted-foreground h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-sm font-semibold">{title}</span>
+                <Badge variant="secondary" className="h-4 px-1.5 py-0 text-[10px] font-normal">
+                  {groupTasks.length} {groupTasks.length === 1 ? "task" : "tasks"}
+                </Badge>
+              </div>
+              {description && <p className="text-muted-foreground max-w-md truncate text-xs">{description}</p>}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex shrink-0 items-center gap-3" onClick={(e) => e.stopPropagation()}>
             <div className="w-28">
               <Progress value={progress.deliveryPct ?? 0} className="h-1.5" />
               <p className="text-muted-foreground mt-1 text-[10px]">
@@ -342,29 +402,82 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
               </p>
             </div>
             {plan && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => openTaskDialog(plan)}>
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Task
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => deletePlan.mutate(plan.id)}
-                  disabled={deletePlan.isPending}
-                  aria-label={`Delete ${plan.name}`}
-                >
-                  <Trash2 className="text-destructive h-3.5 w-3.5" />
-                </Button>
-              </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+                    aria-label={`Options for ${plan.name}`}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                    onClick={() => deletePlan.mutate(plan.id)}
+                    disabled={deletePlan.isPending}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete plan
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>
 
-        {groupTasks.length === 0 ? (
-          <p className="text-muted-foreground border-t px-3 py-3 text-xs">No tasks in this plan yet.</p>
-        ) : (
-          groupTasks.map((task, idx) => renderTaskRow(task, idx))
+        {isExpanded && (
+          <div className="bg-muted/10 border-t">
+            {plan && (
+              <div className="bg-background/50 flex items-center justify-between border-b px-3 py-2">
+                <span className="text-muted-foreground text-xs font-medium">Tasks in {title}</span>
+                <div className="flex items-center gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Task
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+                        aria-label={`Options for ${plan.name}`}
+                      >
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                        onClick={() => deletePlan.mutate(plan.id)}
+                        disabled={deletePlan.isPending}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete plan
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            )}
+
+            {groupTasks.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <p className="text-muted-foreground mb-2 text-xs">No tasks in this plan yet.</p>
+                {plan && (
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Add First Task
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div>{groupTasks.map((task, idx) => renderTaskRow(task, idx))}</div>
+            )}
+          </div>
         )}
       </div>
     )
@@ -374,31 +487,23 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
 
   return (
     <div className="space-y-3 p-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          value={newPlanName}
-          onChange={(e) => setNewPlanName(e.target.value)}
-          placeholder="New implementation plan (e.g. Civil Works)"
-          className="h-9 max-w-xs text-sm"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && newPlanName.trim()) addPlan.mutate(newPlanName.trim())
-          }}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        <div>
+          <h4 className="text-foreground text-sm font-semibold">Implementation Plans</h4>
+          <p className="text-muted-foreground text-xs">
+            Break this project into structured phases or execution workstreams.
+          </p>
+        </div>
         <Button
           size="sm"
-          onClick={() => newPlanName.trim() && addPlan.mutate(newPlanName.trim())}
-          disabled={addPlan.isPending || !newPlanName.trim()}
+          onClick={() => {
+            setPlanForm({ name: "", description: "" })
+            setIsAddPlanOpen(true)
+          }}
+          className="gap-1.5 text-xs"
         >
-          {addPlan.isPending ? (
-            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Plus className="mr-1 h-3.5 w-3.5" />
-          )}
+          <Plus className="h-3.5 w-3.5" />
           Add Plan
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => openTaskDialog(null)}>
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Task (no plan)
         </Button>
       </div>
 
@@ -418,6 +523,70 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
           )}
         </div>
       )}
+
+      <Dialog open={isAddPlanOpen} onOpenChange={setIsAddPlanOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!planForm.name.trim()) return
+              addPlan.mutate({
+                name: planForm.name.trim(),
+                description: planForm.description.trim() || undefined,
+              })
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Add Implementation Plan</DialogTitle>
+              <DialogDescription>Create a new plan phase or workstream for {project.project_name}.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="plan-name" className="text-xs font-medium">
+                  Plan Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="plan-name"
+                  value={planForm.name}
+                  onChange={(e) => setPlanForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Civil Works, Electrical Rough-in, Procurement"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="plan-description" className="text-xs font-medium">
+                  Description <span className="text-muted-foreground">(Optional)</span>
+                </Label>
+                <Textarea
+                  id="plan-description"
+                  value={planForm.description}
+                  onChange={(e) => setPlanForm((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Summary of scope, milestones, or deliverables for this plan..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddPlanOpen(false)}
+                disabled={addPlan.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addPlan.isPending || !planForm.name.trim()}>
+                {addPlan.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Plan
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <TaskFormDialog
         isOpen={isTaskDialogOpen}

@@ -170,7 +170,10 @@ export async function GET(request: NextRequest) {
         ? supabase.from("goals_objectives").select("id, title").in("id", Array.from(goalIds))
         : { data: [] },
       kpiIds.size > 0
-        ? supabase.from("corporate_kpis").select("id, measure").in("id", Array.from(kpiIds))
+        ? supabase
+            .from("corporate_kpis")
+            .select("id, measure, strategic_objective, strategic_priority")
+            .in("id", Array.from(kpiIds))
         : { data: [] },
       multipleTaskIds.length > 0
         ? supabase.from("task_assignments").select("task_id, user_id").in("task_id", multipleTaskIds)
@@ -183,9 +186,8 @@ export async function GET(request: NextRequest) {
     const goalMap = new Map<string, string>(
       ((goalsRes.data || []) as Array<{ id: string; title: string }>).map((g) => [g.id, g.title])
     )
-    const kpiMap = new Map<string, string>(
-      ((kpisRes.data || []) as Array<{ id: string; measure: string }>).map((k) => [k.id, k.measure])
-    )
+    type KpiInfo = { id: string; measure: string; strategic_objective: string; strategic_priority: string }
+    const kpiMap = new Map<string, KpiInfo>(((kpisRes.data || []) as KpiInfo[]).map((k) => [k.id, k]))
 
     // Check if assignments referenced additional users
     const assignmentRows = (assignmentsRes.data || []) as Array<{ task_id: string; user_id: string }>
@@ -218,7 +220,17 @@ export async function GET(request: NextRequest) {
       if (t.reviewed_by) copy.reviewed_by_user = profileMap.get(t.reviewed_by)
       if (t.reassigned_to) copy.reassigned_to_user = profileMap.get(t.reassigned_to)
       if (t.goal_id) copy.goal_title = goalMap.get(t.goal_id) || null
-      if (t.kpi_id) copy.kpi_measure = kpiMap.get(t.kpi_id) || null
+      if (t.kpi_id) {
+        const kpi = kpiMap.get(t.kpi_id)
+        if (kpi) {
+          copy.kpi_measure = kpi.measure
+          copy.kpi_pillar = kpi.strategic_priority
+          copy.kpi_objective = kpi.strategic_objective
+          if (!copy.goal_title) {
+            copy.goal_title = kpi.strategic_objective
+          }
+        }
+      }
       if (t.assignment_type === "multiple") {
         copy.assigned_users = assignmentsByTaskId.get(t.id) || []
       }

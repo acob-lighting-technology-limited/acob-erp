@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
@@ -66,13 +67,14 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
+  const db = getServiceRoleClientOrFallback<any>(supabase as any)
 
   const parsed = PlanSchema.safeParse(await request.json())
   if (!parsed.success) {
     return apiError(parsed.error.issues[0]?.message ?? "Validation failed", ApiErrorCode.VALIDATION_ERROR, 400)
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("implementation_plans")
     .insert({
       project_id: params.id,
@@ -99,6 +101,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
+  const db = getServiceRoleClientOrFallback<any>(supabase as any)
 
   const parsed = UpdatePlanSchema.safeParse(await request.json())
   if (!parsed.success) {
@@ -106,7 +109,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
   }
 
   const { plan_id, ...changes } = parsed.data
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("implementation_plans")
     .update({ ...changes, updated_at: new Date().toISOString() })
     .eq("id", plan_id)
@@ -134,11 +137,12 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
+  const db = getServiceRoleClientOrFallback<any>(supabase as any)
 
   const planId = new URL(request.url).searchParams.get("plan_id")
   if (!planId) return apiError("plan_id query param is required", ApiErrorCode.MISSING_REQUIRED_FIELD, 400)
 
-  const { error } = await supabase.from("implementation_plans").delete().eq("id", planId).eq("project_id", params.id)
+  const { error } = await db.from("implementation_plans").delete().eq("id", planId).eq("project_id", params.id)
 
   if (error) {
     log.error({ err: error.message }, "Failed to delete implementation plan")

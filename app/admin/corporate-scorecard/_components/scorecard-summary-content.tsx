@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { BarChart3, Eye, TrendingUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableTab } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -44,6 +44,13 @@ function ragBadge(status: RagStatus | null) {
   return <span className="text-muted-foreground text-xs">No data</span>
 }
 
+export interface ScorecardSummaryContentProps {
+  onSelectDepartment?: (dept: string) => void
+  tabs?: DataTableTab[]
+  activeTab?: string
+  onTabChange?: (tab: string) => void
+}
+
 /**
  * The MD view: how the company is doing against the 2026 plan, rolled up
  * KPI → objective → perspective → company (equal-weighted at every level),
@@ -51,7 +58,12 @@ function ragBadge(status: RagStatus | null) {
  * shared formula (lib/corporate-scorecard/attainment) every other scorecard
  * screen uses, so this page can never disagree with a department's own.
  */
-export function ScorecardSummaryContent() {
+export function ScorecardSummaryContent({
+  onSelectDepartment,
+  tabs,
+  activeTab,
+  onTabChange,
+}: ScorecardSummaryContentProps = {}) {
   const router = useRouter()
 
   const { data, isLoading, error, refetch } = useQuery<SummaryResponse>({
@@ -122,10 +134,13 @@ export function ScorecardSummaryContent() {
 
   return (
     <DataTablePage
-      title="Scorecard Summary"
+      title={tabs ? "Corporate Scorecard" : "Scorecard Summary"}
       description="Company-wide attainment against the 2026 plan. Departments are scored on CORE ownership only."
       icon={BarChart3}
-      backLink={{ href: "/admin/corporate-scorecard", label: "Back to Register" }}
+      backLink={{ href: "/admin", label: "Back to Admin" }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={onTabChange}
       stats={
         <div className="space-y-4">
           <StatGrid>
@@ -165,10 +180,12 @@ export function ScorecardSummaryContent() {
         emptyIcon={BarChart3}
         rowActions={[
           {
-            label: "View Cascade",
+            label: "View Department KPIs",
             icon: Eye,
-            onClick: (r) =>
-              router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`),
+            onClick: (r) => {
+              if (onSelectDepartment) onSelectDepartment(r.department)
+              else router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
+            },
           },
         ]}
         viewToggle
@@ -180,15 +197,18 @@ export function ScorecardSummaryContent() {
           subtitle: (r) =>
             `CORE KPIs: ${r.coreKpiCount} · Attainment: ${r.attainmentPct != null ? `${r.attainmentPct}%` : "No data"}`,
           trailing: (r) => ragBadge(r.status),
-          onSelect: (r) =>
-            router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`),
+          onSelect: (r) => {
+            if (onSelectDepartment) onSelectDepartment(r.department)
+            else router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
+          },
         }}
         cardRenderer={(r) => (
           <div
             className="bg-card cursor-pointer space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md"
-            onClick={() =>
-              router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
-            }
+            onClick={() => {
+              if (onSelectDepartment) onSelectDepartment(r.department)
+              else router.push(`/admin/corporate-scorecard/departments?department=${encodeURIComponent(r.department)}`)
+            }}
           >
             <div className="flex items-start justify-between">
               <div>

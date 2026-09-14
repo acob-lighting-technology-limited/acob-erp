@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Bell,
+  Briefcase,
+  CalendarDays,
   ChevronsUpDown,
   ChevronRight,
   LayoutDashboard,
@@ -50,6 +52,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
+import type { DeptConsole } from "@/lib/dept/consoles"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion } from "framer-motion"
 import { normalizeDepartmentName } from "@/shared/departments"
@@ -87,10 +90,12 @@ interface AdminSidebarProps {
    */
   deptId?: string
   /**
-   * When set (admin shell only), a "Go to Dept" link is shown in the account
-   * dropdown for admin+lead users so they can jump to their dept shell.
+   * Admin shell only: the dept consoles this lead may open. Each is listed in
+   * the account dropdown so an admin+lead can jump to any dept shell they hold.
    */
-  deptConsoleHref?: string
+  deptConsoles?: DeptConsole[]
+  /** Admin shell only: the viewer is the MD or an MD's Desk delegate. */
+  showMdDesk?: boolean
 }
 
 /**
@@ -260,6 +265,14 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
   },
   {
+    // Shown only to the MD and their delegates (showMdDesk); the page re-checks.
+    section: "overview",
+    name: "MD's Desk",
+    href: "/admin/md-desk",
+    icon: Briefcase,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
     section: "management",
     name: "HR",
     href: "/admin/hr",
@@ -304,14 +317,13 @@ const adminNavigation: NavItem[] = [
   },
   {
     section: "management",
-    name: "Corporate Scorecard",
-    href: "/admin/corporate-scorecard",
-    icon: Target,
+    name: "Corporate Services",
+    href: "/admin/corporate-services/scorecard",
+    icon: Briefcase,
     roles: ["developer", "super_admin", "admin"],
     children: [
-      { name: "Register", href: "/admin/corporate-scorecard" },
-      { name: "Department Cascade", href: "/admin/corporate-scorecard/departments" },
-      { name: "Summary", href: "/admin/corporate-scorecard/summary" },
+      { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
+      { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
     ],
   },
   {
@@ -379,6 +391,13 @@ const adminNavigation: NavItem[] = [
     name: "Help Desk",
     href: "/admin/help-desk",
     icon: Ticket,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "operations",
+    name: "Events",
+    href: "/admin/events",
+    icon: CalendarDays,
     roles: ["developer", "super_admin", "admin"],
   },
   {
@@ -512,6 +531,8 @@ const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
   // Accounts — legacy /admin/finance and /admin/payments/* redirect into accounts.
   "/admin/accounts": ["/admin/finance", "/admin/payments"],
   "/admin/finance": ["/admin/payments"],
+  // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
+  "/admin/corporate-services/scorecard": ["/admin/corporate-scorecard"],
   // Tools — feedback is surfaced through tools.
   "/admin/tools": ["/admin/feedback"],
 }
@@ -549,7 +570,14 @@ function getItemMatchScore(item: NavItem, pathname: string, deptId?: string): nu
   return best
 }
 
-export function AdminSidebar({ user, profile, adminScopeMode = "global", deptId, deptConsoleHref }: AdminSidebarProps) {
+export function AdminSidebar({
+  user,
+  profile,
+  adminScopeMode = "global",
+  deptId,
+  deptConsoles = [],
+  showMdDesk = false,
+}: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -701,6 +729,7 @@ export function AdminSidebar({ user, profile, adminScopeMode = "global", deptId,
   const filteredNavigation = deptId
     ? activeNavigation
     : activeNavigation.reduce<NavItem[]>((acc, item) => {
+        if (item.href === "/admin/md-desk" && !showMdDesk) return acc
         const children = filterNavChildren(item.children)
         const selfAllowed = canAccessRoute(item.roles, item.href)
         if (!selfAllowed && !children) return acc
@@ -1020,17 +1049,20 @@ export function AdminSidebar({ user, profile, adminScopeMode = "global", deptId,
                 Settings
               </Link>
             </DropdownMenuItem>
-            {!deptId && deptConsoleHref && (
-              <DropdownMenuItem
-                asChild
-                className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
-              >
-                <Link href={deptConsoleHref} className="flex w-full items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Go to Dept
-                </Link>
-              </DropdownMenuItem>
-            )}
+            {deptConsoles
+              .filter((console) => console.id !== deptId)
+              .map((console) => (
+                <DropdownMenuItem
+                  key={console.id}
+                  asChild
+                  className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
+                >
+                  <Link href={console.href} className="flex w-full items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    {deptConsoles.length > 1 ? console.name : "Go to Dept"}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
             {deptId && isAdminLikeUser && (
               <DropdownMenuItem
                 asChild

@@ -13,19 +13,23 @@ import {
   AlertTriangle,
   CalendarDays,
   Target,
+  Scale,
 } from "lucide-react"
 
 import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import { Button } from "@/components/ui/button"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
+import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
+import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import type { Task, TaskUserProfile } from "@/types/task"
+import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import { formatName, formatFullName } from "@/lib/utils"
+import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
@@ -59,18 +63,10 @@ interface TasksContentProps {
  * already the tap target and an inline control inside it would fight for taps.
  * The editable `TaskStatusControl` lives in the table cell and the detail sheet. */
 function TaskStatusPill({ status }: { status: string }) {
+  const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
   return (
-    <Badge
-      variant={
-        status === "completed"
-          ? "default"
-          : ["failed", "cancelled", "unable_to_complete"].includes(status)
-            ? "destructive"
-            : "outline"
-      }
-      className="text-[10px] whitespace-nowrap capitalize"
-    >
-      {formatName(status)}
+    <Badge variant={cfg.badgeVariant} className={cn("text-[10px] whitespace-nowrap capitalize", cfg.color)}>
+      {cfg.label}
     </Badge>
   )
 }
@@ -100,6 +96,11 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     const scope = [userProfile.department, ...leadDepartments].filter(Boolean) as string[]
     return Boolean(task.department && scope.includes(task.department))
   }
+
+  const ratingBlockedReasonFor = (task: Task) =>
+    isSelfRatingBlocked({ userId, assigneeIds: [task.assigned_to], isMd: userProfile?.is_md === true })
+      ? SELF_RATING_BLOCKED_REASON
+      : null
 
   const stats = useMemo(
     () => ({
@@ -203,42 +204,39 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     },
     {
       key: "title",
-      label: "Task",
+      label: "Task Title",
       sortable: true,
       resizable: true,
       initialWidth: 300,
       accessor: (t) => t.title,
-      render: (t) => (
-        <div className="flex flex-col">
-          <span className="line-clamp-1 font-medium">{t.title}</span>
-          {t.goal_title && <span className="text-muted-foreground line-clamp-1 text-[10px]">{t.goal_title}</span>}
-        </div>
-      ),
+      render: (t) => <span className="line-clamp-1 font-medium">{t.title}</span>,
     },
     {
       key: "goal",
       label: "Strategic Goal",
       sortable: true,
-      accessor: (t) => t.goal_title || "",
+      accessor: (t) => t.goal_title || t.kpi_measure || "",
       render: (t) =>
         t.goal_title ? (
-          <span className="text-foreground line-clamp-1 text-xs font-medium">{t.goal_title}</span>
+          <div className="flex flex-col">
+            <span className="text-foreground line-clamp-1 text-xs font-medium">{t.goal_title}</span>
+            {t.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-[10px]">{t.kpi_measure}</span>}
+          </div>
+        ) : t.kpi_measure ? (
+          <span className="text-foreground line-clamp-1 text-xs font-medium">{t.kpi_measure}</span>
         ) : (
-          <span className="text-muted-foreground text-xs italic">Ad-Hoc / Operational</span>
+          <span className="text-muted-foreground text-xs">—</span>
         ),
       hideOnMobile: true,
     },
     {
-      key: "priority",
-      label: "Priority",
+      key: "weight",
+      label: "Weight",
       sortable: true,
-      accessor: (t) => t.priority,
+      accessor: (t) => t.weight ?? TASK_WEIGHT_DEFAULT,
       render: (t) => (
-        <Badge
-          variant={t.priority === "high" || t.priority === "urgent" ? "destructive" : "outline"}
-          className="text-[11px] capitalize"
-        >
-          {t.priority}
+        <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}>
+          {t.weight ?? TASK_WEIGHT_DEFAULT}
         </Badge>
       ),
     },
@@ -251,7 +249,13 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       // three states was the slowest part of the whole workflow.
       render: (t) => (
         <div onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          <TaskStatusControl task={t} canReview={canReviewTask(t)} onChanged={() => void loadTasks()} size="sm" />
+          <TaskStatusControl
+            task={t}
+            canReview={canReviewTask(t)}
+            ratingBlockedReason={ratingBlockedReasonFor(t)}
+            onChanged={() => void loadTasks()}
+            size="sm"
+          />
         </div>
       ),
     },
@@ -329,14 +333,20 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       ],
     },
     {
-      key: "priority",
-      label: "Priority",
+      key: "weight",
+      label: "Weight",
       options: [
-        { value: "low", label: "Low" },
-        { value: "medium", label: "Medium" },
-        { value: "high", label: "High" },
-        { value: "urgent", label: "Urgent" },
+        { value: "1", label: "Weight 1" },
+        { value: "2", label: "Weight 2" },
+        { value: "3", label: "Weight 3" },
+        { value: "4", label: "Weight 4" },
+        { value: "5", label: "Weight 5" },
       ],
+      mode: "custom",
+      filterFn: (row, vals) => {
+        if (vals.length === 0) return true
+        return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
+      },
     },
   ]
 
@@ -349,6 +359,14 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       spacing="tight"
       stats={
         <StatGrid>
+          <StatCard
+            variant="compact"
+            title="Total Tasks"
+            value={stats.total}
+            icon={ClipboardList}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
           <StatCard
             variant="compact"
             title="Pending"
@@ -365,10 +383,22 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             iconBgColor="bg-sky-500/10"
             iconColor="text-sky-500"
           />
-          {/* Only when there is something to answer for — a permanent "Overdue 0"
-              is noise, and the card is the page's one alarm. Third in source order
-              so StatGrid keeps it on a phone; when it is absent Completed takes
-              the slot, which is what the old hand-written classes did. */}
+          <StatCard
+            variant="compact"
+            title="Submitted"
+            value={stats.submitted}
+            icon={Send}
+            iconBgColor="bg-purple-500/10"
+            iconColor="text-purple-500"
+          />
+          <StatCard
+            variant="compact"
+            title="Completed"
+            value={stats.completed}
+            icon={CheckCircle2}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
           {stats.overdue > 0 && (
             <StatCard
               variant="compact"
@@ -379,30 +409,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               iconColor="text-rose-500"
             />
           )}
-          <StatCard
-            variant="compact"
-            title="Completed"
-            value={stats.completed}
-            icon={CheckCircle2}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Total Tasks"
-            value={stats.total}
-            icon={ClipboardList}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Submitted"
-            value={stats.submitted}
-            icon={Send}
-            iconBgColor="bg-purple-500/10"
-            iconColor="text-purple-500"
-          />
         </StatGrid>
       }
     >
@@ -432,7 +438,9 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
           subtitle: (t) =>
             [
               t.work_item_number || null,
+              `Weight ${t.weight ?? TASK_WEIGHT_DEFAULT}`,
               t.due_date ? `Due ${formatWATDate(t.due_date)}` : "No deadline",
+              t.kpi_measure || t.goal_title || null,
               (t.comment_count || 0) > 0 ? `${t.comment_count} comment${t.comment_count === 1 ? "" : "s"}` : null,
             ]
               .filter(Boolean)
@@ -444,15 +452,24 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             badges: (t) => (
               <>
                 <TaskStatusPill status={t.status} />
-                <Badge variant="outline" className="text-[10px] capitalize">
-                  {t.priority}
+                <Badge
+                  variant="outline"
+                  className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(t.weight))}
+                >
+                  Weight {t.weight ?? TASK_WEIGHT_DEFAULT}
                 </Badge>
               </>
             ),
             fields: (t) => [
               { label: "Item #", value: t.work_item_number || "-", copyable: true },
               { label: "Status", value: t.status.replace(/_/g, " ") },
-              { label: "Priority", value: t.priority },
+              { label: "Task Weight", value: `${t.weight ?? TASK_WEIGHT_DEFAULT} (compulsory)` },
+              {
+                label: "Corporate KPI",
+                value: t.kpi_measure ? `${t.kpi_measure}${t.kpi_pillar ? ` (🎯 ${t.kpi_pillar})` : ""}` : "—",
+              },
+              { label: "Strategic Goal", value: t.goal_title || "—" },
+              { label: "Start Date", value: t.task_start_date ? formatWATDate(t.task_start_date) : "—" },
               { label: "Due Date", value: t.due_date ? formatWATDate(t.due_date) : "No deadline" },
               {
                 label: "Assignee",
@@ -487,11 +504,11 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               </div>
               <div className="flex items-center gap-1.5">
                 <Target className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t.goal_title || "Ad-Hoc / Operational"}</span>
+                <span className="truncate">{t.kpi_measure || t.goal_title || "—"}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                <span className="capitalize">{t.priority} priority</span>
+                <Scale className="h-3.5 w-3.5 shrink-0" />
+                <span>Weight {t.weight ?? TASK_WEIGHT_DEFAULT}</span>
               </div>
             </div>
           </div>
@@ -509,6 +526,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         selectedTask={selectedTask}
         taskUpdates={taskUpdates}
         canReview={selectedTask ? canReviewTask(selectedTask) : false}
+        ratingBlockedReason={selectedTask ? ratingBlockedReasonFor(selectedTask) : null}
         onChanged={async () => {
           const loaded = await loadTasks()
           if (loaded && selectedTask) {

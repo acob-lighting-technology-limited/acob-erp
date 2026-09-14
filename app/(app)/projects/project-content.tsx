@@ -9,7 +9,16 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Progress } from "@/components/ui/progress"
-import { FolderGit2, FolderKanban, RefreshCw, Calendar, MapPin, Wrench, ShieldCheck, Briefcase } from "lucide-react"
+import {
+  FolderGit2,
+  FolderKanban,
+  RefreshCw,
+  Calendar,
+  MapPin,
+  Wrench,
+  ShieldCheck,
+  Briefcase,
+} from "lucide-react"
 import { ProjectTaskViewer } from "./_components/project-task-viewer"
 import { computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
 import { toLocalISODate } from "@/lib/utils/date"
@@ -28,6 +37,7 @@ export interface ProjectRow {
   status: "planning" | "active" | "on_hold" | "completed" | "cancelled"
   created_at: string
   updated_at: string
+  portfolio_id?: string | null
   project_manager?: {
     id: string
     full_name: string | null
@@ -36,6 +46,15 @@ export interface ProjectRow {
   } | null
   portfolio?: { id: string; name: string; code: string | null } | null
   tasks?: ProjectHealthTask[]
+}
+
+export interface ProjectContentProps {
+  currentUser?: {
+    id: string
+    role: string
+    is_department_lead: boolean
+    department: string | null
+  }
 }
 
 async function fetchUserProjects(): Promise<ProjectRow[]> {
@@ -47,7 +66,7 @@ async function fetchUserProjects(): Promise<ProjectRow[]> {
   return (payload?.data || []) as ProjectRow[]
 }
 
-export function ProjectContent() {
+export function ProjectContent({ currentUser: _currentUser }: ProjectContentProps = {}) {
   const queryClient = useQueryClient()
 
   // Fetch project list
@@ -134,7 +153,14 @@ export function ProjectContent() {
         accessor: (r) => r.project_name,
         render: (r) => (
           <div className="space-y-1">
-            <p className="text-foreground font-semibold">{r.project_name}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="text-foreground font-semibold">{r.project_name}</p>
+              {r.portfolio && (
+                <Badge variant="secondary" className="text-[10px] font-normal">
+                  {r.portfolio.code || r.portfolio.name}
+                </Badge>
+              )}
+            </div>
             {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
           </div>
         ),
@@ -207,6 +233,19 @@ export function ProjectContent() {
     []
   )
 
+  // Portfolio option list for filtering
+  const portfolioOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const r of rows) {
+      if (r.portfolio) {
+        map.set(r.portfolio.id, r.portfolio.code ? `${r.portfolio.code} — ${r.portfolio.name}` : r.portfolio.name)
+      }
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label }))
+  }, [rows])
+
   // Filters definition
   const filters = useMemo<DataTableFilter<ProjectRow>[]>(
     () => [
@@ -226,8 +265,20 @@ export function ProjectContent() {
         label: "Technology",
         options: techOptions,
       },
+      ...(portfolioOptions.length > 0
+        ? [
+            {
+              key: "portfolio",
+              label: "Portfolio",
+              options: portfolioOptions,
+              mode: "custom" as const,
+              filterFn: (row: ProjectRow, selected: string[]) =>
+                selected.length === 0 || (row.portfolio?.id ? selected.includes(row.portfolio.id) : false),
+            },
+          ]
+        : []),
     ],
-    [techOptions]
+    [techOptions, portfolioOptions]
   )
 
   return (
@@ -237,15 +288,17 @@ export function ProjectContent() {
       spacing="tight"
       actionsPlacement="inline-always"
       actions={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ["user-projects"] })}
-          disabled={isLoading}
-        >
-          <RefreshCw className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["user-projects"] })}
+            disabled={isLoading}
+          >
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+        </div>
       }
       stats={
         <StatGrid>
@@ -372,7 +425,7 @@ export function ProjectContent() {
         }}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 rounded-lg border p-2">
+            <div className="bg-muted/20 space-y-3 rounded-lg border p-2">
               <ProjectTaskViewer projectId={r.id} projectName={r.project_name} />
             </div>
           ),

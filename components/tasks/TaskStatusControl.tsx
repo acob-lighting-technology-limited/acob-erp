@@ -79,6 +79,7 @@ export function statusLabel(status: string): string {
 export function TaskStatusControl({
   task,
   canReview,
+  ratingBlockedReason = null,
   onChanged,
   size = "default",
   className,
@@ -86,6 +87,8 @@ export function TaskStatusControl({
   task: Task
   /** True for a department lead, an admin, or the manager of the task's project. */
   canReview: boolean
+  /** Set when this reviewer may not approve and rate this task (their own task). */
+  ratingBlockedReason?: string | null
   onChanged: () => void | Promise<void>
   size?: "default" | "sm"
   className?: string
@@ -115,9 +118,10 @@ export function TaskStatusControl({
         const requires: StatusOption["requires"] =
           value === "completed" ? "rating" : value === "failed" || value === "unable_to_complete" ? "reason" : undefined
 
-        return { value, blockedReason: null, requires }
+        const blockedReason = value === "completed" ? ratingBlockedReason : null
+        return { value, blockedReason, requires }
       })
-  }, [canReview, current, isTerminal])
+  }, [canReview, current, isTerminal, ratingBlockedReason])
 
   async function submit(option: StatusOption, payloadExtras: Record<string, unknown> = {}) {
     setIsSaving(true)
@@ -144,7 +148,7 @@ export function TaskStatusControl({
 
   function handleSelect(value: string) {
     const option = options.find((entry) => entry.value === value)
-    if (!option) return
+    if (!option || option.blockedReason) return
 
     // Rating and reason are collected in place; everything else applies at once.
     if (option.requires) {
@@ -180,8 +184,13 @@ export function TaskStatusControl({
             <span className={cn("font-medium", config?.color)}>{statusLabel(current)}</span>
           </SelectItem>
           {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              <span>{statusLabel(option.value)}</span>
+            <SelectItem key={option.value} value={option.value} disabled={Boolean(option.blockedReason)}>
+              <span className="flex flex-col">
+                <span>{statusLabel(option.value)}</span>
+                {option.blockedReason && (
+                  <span className="text-muted-foreground text-[11px] leading-tight">{option.blockedReason}</span>
+                )}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
