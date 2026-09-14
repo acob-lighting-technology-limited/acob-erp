@@ -94,7 +94,7 @@ function PortfolioProjects({ projects }: { projects: ProjectHealthRow[] }) {
             <tr key={project.id} className="border-t">
               <td className="px-3 py-2 font-medium">
                 <Link
-                  href={`/project?search=${encodeURIComponent(project.project_name)}`}
+                  href={`/projects?search=${encodeURIComponent(project.project_name)}`}
                   className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors hover:underline"
                 >
                   {project.project_name}
@@ -281,7 +281,7 @@ export function PortfoliosContent({ isAdmin = true }: PortfoliosContentProps = {
       title="Project Portfolios"
       description="Programmes and client groupings, each holding its own projects. Progress is derived from project tasks."
       icon={Layers}
-      backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/project", label: "Back to Projects" }}
+      backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/projects", label: "Back to Projects" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}

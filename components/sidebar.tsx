@@ -141,7 +141,7 @@ const navigationSections: NavSectionDef[] = [
         icon: Layers,
         children: [
           { name: "Portfolios", href: "/portfolios" },
-          { name: "Projects", href: "/project" },
+          { name: "Projects", href: "/projects" },
         ],
       },
       {

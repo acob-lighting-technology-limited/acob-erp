@@ -1,7 +1,6 @@
 "use client"
 
-import { AlertTriangle, CheckCircle2, Clock, ExternalLink, Pencil, ShieldAlert, User } from "lucide-react"
-import Link from "next/link"
+import { Pencil, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
@@ -14,8 +13,6 @@ interface RiskCardProps {
 }
 
 export function RiskCard({ risk, onEdit }: RiskCardProps) {
-  const score = (risk.likelihood || 2) * (risk.impact || 2)
-
   const severityColors = {
     critical: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-900/50",
     high: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-900/50",

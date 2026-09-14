@@ -645,7 +645,7 @@ export function PortfolioAnalytics({
                 {focusedPortfolio.projects.map((proj) => (
                   <Link
                     key={proj.id}
-                    href={`/project?search=${encodeURIComponent(proj.project_name)}`}
+                    href={`/projects?search=${encodeURIComponent(proj.project_name)}`}
                     className="bg-background hover:bg-accent text-foreground inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors hover:underline"
                   >
                     {proj.project_name}

@@ -127,6 +127,16 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: "/project",
+        destination: "/projects",
+        permanent: true,
+      },
+      {
+        source: "/project/:path*",
+        destination: "/projects/:path*",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

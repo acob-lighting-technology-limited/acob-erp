@@ -12,7 +12,6 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { toLocalISODate } from "@/lib/utils/date"
-import { AddRiskDialog } from "./add-risk-dialog"
 import { EditRiskDialog, type RiskItem } from "./edit-risk-dialog"
 import { RiskCard } from "./risk-card"
 import { apiFetch } from "@/lib/api-client"
@@ -29,7 +28,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
 
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isAddOpen, setIsAddOpen] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery<{ data: RiskItem[] }>({
     queryKey,
@@ -59,13 +57,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
       return {
         data: old.data.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
       }
-    })
-  }
-
-  function handleRiskAdded(newRisk: RiskItem) {
-    queryClient.setQueryData<{ data: RiskItem[] }>(queryKey, (old) => {
-      if (!old) return { data: [newRisk] }
-      return { data: [newRisk, ...old.data] }
     })
   }
 
@@ -282,17 +273,12 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
       icon={ShieldAlert}
       backLink={{ href: "/admin/corporate-services/scorecard", label: "Back to Scorecard" }}
       actions={
-        <div className="flex items-center gap-2">
-          {risks.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleExportCsv}>
-              <Download className="mr-1.5 h-4 w-4" aria-hidden />
-              Export
-            </Button>
-          )}
-          <Button size="sm" onClick={() => setIsAddOpen(true)}>
-            <ShieldAlert className="mr-1.5 h-4 w-4" /> Add Risk
+        risks.length > 0 ? (
+          <Button variant="outline" size="sm" onClick={handleExportCsv}>
+            <Download className="mr-1.5 h-4 w-4" aria-hidden />
+            Export
           </Button>
-        </div>
+        ) : undefined
       }
       stats={
         <StatGrid>
@@ -461,14 +447,6 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
         onOpenChange={setIsEditOpen}
         employees={employees}
         onRiskUpdated={handleRiskSaved}
-      />
-
-      <AddRiskDialog
-        open={isAddOpen}
-        onOpenChange={setIsAddOpen}
-        departments={departments}
-        employees={employees}
-        onRiskAdded={handleRiskAdded}
       />
     </DataTablePage>
   )
