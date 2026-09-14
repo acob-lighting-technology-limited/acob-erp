@@ -27,6 +27,7 @@ const ATTEMPT_WINDOW_MS = 15 * 60_000
 type ProfileRow = {
   id: string
   full_name: string | null
+  first_name: string | null
   department: string | null
   company_email: string | null
   additional_email: string | null
@@ -34,7 +35,7 @@ type ProfileRow = {
   lead_departments: string[] | null
 }
 
-type Recipient = { userId: string; email: string; name: string }
+type Recipient = { userId: string; email: string; name: string; firstName: string }
 
 /**
  * True when the bearer is a service-role JWT. The Supabase gateway verifies the
@@ -158,7 +159,9 @@ serve(async (req) => {
 
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, full_name, department, company_email, additional_email, is_department_lead, lead_departments")
+      .select(
+        "id, full_name, first_name, department, company_email, additional_email, is_department_lead, lead_departments"
+      )
       .eq("employment_status", "active")
     if (profilesError) throw new Error(`profiles query failed: ${profilesError.message}`)
     const active = (profiles || []) as ProfileRow[]
@@ -189,7 +192,13 @@ serve(async (req) => {
         : FALLBACK_LEADERSHIP_DEPARTMENTS.some((dept) => leadsDepartment(profile, dept))
       const email = (profile.company_email || profile.additional_email || "").trim()
       if ((inDepartment || isExtra) && email && !recipients.has(profile.id)) {
-        recipients.set(profile.id, { userId: profile.id, email, name: profile.full_name || "" })
+        recipients.set(profile.id, {
+          userId: profile.id,
+          email,
+          name: profile.full_name || "",
+          // Greet by first name; fall back to the first word of the full name.
+          firstName: (profile.first_name || "").trim() || (profile.full_name || "").trim().split(/s+/)[0] || "",
+        })
       }
     }
     if (recipients.size === 0) return json({ skipped: true, reason: "no_recipients", department })
@@ -225,7 +234,7 @@ serve(async (req) => {
           ...EDGE_MAIL_ROUTING.meetings,
           to: recipient.email,
           subject,
-          html: buildHtml({ department, meetingDateLabel, recipientName: recipient.name }),
+          html: buildHtml({ department, meetingDateLabel, recipientName: recipient.firstName }),
           traceLabel: `kss-heads-up:${index + 1}/${recipients.size}:${recipient.email}`,
         })
         sent++
