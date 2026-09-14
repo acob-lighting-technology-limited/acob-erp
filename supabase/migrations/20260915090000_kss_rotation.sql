@@ -92,6 +92,13 @@ create table if not exists public.kss_heads_up_log (
 
 alter table public.kss_heads_up_log enable row level security;
 
+-- Deployed on Monday 14 Sep 2026 after 12:00: hold the heads-up for week 37 so
+-- the first run does not mail Stakeholder Engagement before the email has been
+-- previewed. Delete this row to release that send.
+insert into public.kss_heads_up_log (meeting_week, meeting_year, department, attempt_count, last_attempt_at, sent_at, recipient_count, outcome)
+values (37, 2026, 'Stakeholder Engagement', 0, now(), now(), 0, 'held_for_preview')
+on conflict (meeting_week, meeting_year) do nothing;
+
 create policy kss_heads_up_log_select on public.kss_heads_up_log
   for select to authenticated
   using (

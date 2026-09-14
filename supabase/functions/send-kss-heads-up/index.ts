@@ -98,11 +98,23 @@ serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const body = (await req.json().catch(() => ({}))) as { meetingWeek?: number; meetingYear?: number }
+    const body = (await req.json().catch(() => ({}))) as {
+      meetingWeek?: number
+      meetingYear?: number
+      previewTo?: string
+    }
     const week = Number(body.meetingWeek)
     const year = Number(body.meetingYear)
     if (!Number.isInteger(week) || !Number.isInteger(year))
       return json({ error: "meetingWeek and meetingYear required" }, 400)
+
+    // Preview: one email to a single address, no notifications, nothing marked sent.
+    // Service-role callers only, so the public anon key cannot use it as a relay.
+    const previewTo = typeof body.previewTo === "string" ? body.previewTo.trim() : ""
+    const bearer = (req.headers.get("Authorization") || "").replace(/^Bearers+/i, "").trim()
+    if (previewTo && (!SUPABASE_SERVICE_ROLE_KEY || bearer !== SUPABASE_SERVICE_ROLE_KEY)) {
+      return json({ error: "Preview requires the service role" }, 403)
+    }
 
     // Only act on a send the scheduler has just logged: stops anyone holding the
     // public anon key from mailing a department on demand or re-sending.
@@ -114,7 +126,7 @@ serve(async (req) => {
       .maybeSingle()
     if (logError) throw new Error(`heads-up log query failed: ${logError.message}`)
     const lastAttempt = log?.last_attempt_at ? Date.parse(log.last_attempt_at) : 0
-    if (!log || log.sent_at || Date.now() - lastAttempt > ATTEMPT_WINDOW_MS) {
+    if (!previewTo && (!log || log.sent_at || Date.now() - lastAttempt > ATTEMPT_WINDOW_MS)) {
       return json({ skipped: true, reason: "no_pending_scheduled_attempt" })
     }
 
@@ -152,6 +164,24 @@ serve(async (req) => {
     const meetingDateIso = await resolveEffectiveMeetingDateIso(supabase, week, year)
     const meetingDateLabel = formatMeetingDateLabel(meetingDateIso)
     const subject = `Knowledge Sharing Session Next Week — ${department}`
+
+    if (previewTo) {
+      await sendEmail({
+        from: EDGE_SENDERS.system,
+        ...EDGE_MAIL_ROUTING.meetings,
+        to: previewTo,
+        subject,
+        html: buildHtml({ department, meetingDateLabel, recipientName: "Colleague" }),
+        traceLabel: `kss-heads-up:preview:${previewTo}`,
+      })
+      return json({
+        preview: true,
+        sentTo: previewTo,
+        department,
+        meetingDate: meetingDateIso,
+        wouldSendTo: Array.from(recipients.values()).map((r) => r.name || r.email),
+      })
+    }
     const message = `${department} presents the Knowledge Sharing Session at the General Weekly Meeting on ${meetingDateLabel}.`
 
     let sent = 0
