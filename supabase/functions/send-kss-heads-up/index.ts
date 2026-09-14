@@ -17,8 +17,8 @@ import { isSameDepartment } from "../../../shared/departments.ts"
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 
-/** Leadership copied on every heads-up, matched the same way leave approvals resolve them. */
-const LEADERSHIP_DEPARTMENTS = ["Admin and HR", "Corporate Services", "Executive Management"]
+/** Used only if the settings predate configurable recipients. */
+const FALLBACK_LEADERSHIP_DEPARTMENTS = ["Admin and HR", "Corporate Services", "Executive Management"]
 /** The General Weekly Meeting always starts at 8:30 AM. */
 const MEETING_TIME = "8:30 AM"
 /** The scheduler logs an attempt immediately before calling; anything older is not a scheduled call. */
@@ -91,7 +91,7 @@ function buildHtml(params: { department: string; meetingDateLabel: string; recip
     '<img src="https://matrix.acoblighting.com/images/acob-logo-dark.png" height="60" alt="ACOB Lighting">' +
     "</td></tr></table>" +
     '<div style="max-width:600px;margin:0 auto;background:#fff;padding:32px 28px;">' +
-    '<div style="font-size:20px;font-weight:700;color:#111827;margin:0 0 6px;">Knowledge Sharing Session Next Week</div>' +
+    '<div style="font-size:20px;font-weight:700;color:#111827;margin:0 0 6px;">Upcoming Knowledge Sharing Session</div>' +
     `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">Dear ${name},</p>` +
     `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">The <strong>${department}</strong> department is scheduled to present the Knowledge Sharing Session at the General Weekly Meeting on <strong>${dateLabel}</strong> at <strong>${MEETING_TIME}</strong>.</p>` +
     '<p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0;">You are receiving this because you are in the presenting department or on the leadership team.</p>' +
@@ -164,12 +164,31 @@ serve(async (req) => {
     const active = (profiles || []) as ProfileRow[]
     if (active.length === 0) throw new Error("No active profiles returned")
 
+    // Who receives it is configured on the Meeting Reminders page.
+    const { data: settingsRow, error: settingsError } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "kss_rotation")
+      .maybeSingle()
+    if (settingsError) throw new Error(`settings query failed: ${settingsError.message}`)
+    const settings = (settingsRow?.value ?? {}) as {
+      include_department_members?: boolean
+      extra_recipient_ids?: unknown
+    }
+    const includeDepartment = settings.include_department_members !== false
+    const extraIds = Array.isArray(settings.extra_recipient_ids)
+      ? new Set(settings.extra_recipient_ids.filter((id): id is string => typeof id === "string"))
+      : null
+
     const recipients = new Map<string, Recipient>()
     for (const profile of active) {
-      const inDepartment = isSameDepartment(profile.department, department) || leadsDepartment(profile, department)
-      const isLeadership = LEADERSHIP_DEPARTMENTS.some((dept) => leadsDepartment(profile, dept))
+      const inDepartment =
+        includeDepartment && (isSameDepartment(profile.department, department) || leadsDepartment(profile, department))
+      const isExtra = extraIds
+        ? extraIds.has(profile.id)
+        : FALLBACK_LEADERSHIP_DEPARTMENTS.some((dept) => leadsDepartment(profile, dept))
       const email = (profile.company_email || profile.additional_email || "").trim()
-      if ((inDepartment || isLeadership) && email && !recipients.has(profile.id)) {
+      if ((inDepartment || isExtra) && email && !recipients.has(profile.id)) {
         recipients.set(profile.id, { userId: profile.id, email, name: profile.full_name || "" })
       }
     }
@@ -177,7 +196,7 @@ serve(async (req) => {
 
     const meetingDateIso = await resolveEffectiveMeetingDateIso(supabase, week, year)
     const meetingDateLabel = formatMeetingDateLabel(meetingDateIso)
-    const subject = `Knowledge Sharing Session Next Week — ${department}`
+    const subject = `Knowledge Sharing Session Scheduled — ${department}`
 
     if (previewTo) {
       await sendEmail({
@@ -220,7 +239,7 @@ serve(async (req) => {
         type: "announcement",
         category: "meetings",
         priority: "normal",
-        title: "Knowledge Sharing Session next week",
+        title: "Upcoming Knowledge Sharing Session",
         message,
         link_url: "/reports/kss",
       })
