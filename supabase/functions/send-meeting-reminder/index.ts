@@ -44,6 +44,7 @@ type ReminderRequestBody = {
   meetingTime?: string
   teamsLink?: string
   agenda?: string[]
+  /** Ignored: the footer is always signed by Admin and HR. Older schedules still send these. */
   meetingPreparedByName?: string
   meetingPreparedByDesignation?: string
   meetingPreparedByDepartment?: string
@@ -229,17 +230,11 @@ function buildMeetingReminderHtml(
   meetingTime: string,
   teamsLink: string,
   agenda: string[],
-  preparedByName?: string,
-  preparedByDesignation?: string,
-  preparedByDepartment?: string,
   kssPresenter?: KnowledgePresenter,
   kssDepartment?: string
 ): string {
   const { timingPhrase, effectiveDate } = getMeetingReminderDescriptor(meetingDate, meetingTime)
   const displayTime = formatTimeWithMeridiem(meetingTime)
-  const preparedBy = escapeHtml(preparedByName?.trim() || "ACOB Team")
-  const designation = escapeHtml(preparedByDesignation?.trim() || "")
-  const department = escapeHtml(preparedByDepartment?.trim() || "Admin and HR")
   const presenterName = getKnowledgePresenterName(kssPresenter)
   const isGuestPresenter = Boolean(presenterName) && !kssPresenter?.id
   const presenterDisplayText = presenterName ? `${presenterName}${isGuestPresenter ? " (Guest)" : ""}` : ""
@@ -329,18 +324,15 @@ function buildMeetingReminderHtml(
     "</div>" +
     '<div class="note-box">' +
     "<strong>Note:</strong> Your attendance is crucial to ensure we're all on the same page and can collaborate effectively. " +
-    `Please join on time, and feel free to reach out to <a href="mailto:${MEETING_CONTACT_EMAIL}" style="color:#1e40af;font-weight:600;text-decoration:none;">me</a> or any team member if you have questions or concerns.` +
+    `Please join on time, and feel free to reach out to <a href="mailto:${MEETING_CONTACT_EMAIL}" style="color:#1e40af;font-weight:600;text-decoration:none;">Admin &amp; HR</a> or any team member if you have questions or concerns.` +
     "</div>" +
     '<p class="text" style="text-align: center; font-weight: 600; color: #16a34a;">Looking forward to seeing you there.</p>' +
     "</div>" +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">' +
     '<tr><td align="center" style="padding:20px;background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;font-size:11px;color:#d1d5db;">' +
-    '<span style="color:#f3f4f6;">Prepared by ' +
-    preparedBy +
-    "</span><br>" +
-    (designation ? designation + "<br>" : "") +
-    department +
-    "<br>" +
+    // Signed by the department, never a person, so it cannot go stale when someone
+    // leaves. Prepared-by values still stored in saved schedules are ignored.
+    '<span style="color:#f3f4f6;">Admin &amp; HR Department</span><br>' +
     '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>' +
     '<span style="color:#16a34a;font-weight:600;">Meeting Management System</span>' +
     "<br><br>" +
@@ -603,9 +595,6 @@ serve(async (req) => {
       meetingDate,
       teamsLink,
       agenda,
-      meetingPreparedByName,
-      meetingPreparedByDesignation,
-      meetingPreparedByDepartment,
       sessionDate,
       sessionTime,
       duration,
@@ -665,9 +654,6 @@ serve(async (req) => {
         meetingTime || "8:30 AM",
         teamsLink || "",
         normalizedAgenda,
-        meetingPreparedByName,
-        meetingPreparedByDesignation,
-        meetingPreparedByDepartment,
         knowledgeSharingPresenter,
         knowledgeSharingDepartment
       )
@@ -789,9 +775,7 @@ serve(async (req) => {
           knowledge_sharing_department: knowledgeSharingDepartment || null,
           knowledge_sharing_presenter: getKnowledgePresenterName(knowledgeSharingPresenter),
           kss_roster_status: kssRosterStatus || null,
-          prepared_by: meetingPreparedByName || null,
-          prepared_by_designation: meetingPreparedByDesignation || null,
-          prepared_by_department: meetingPreparedByDepartment || "Admin and HR",
+          prepared_by_department: "Admin and HR",
         },
       })
     } catch (auditErr) {

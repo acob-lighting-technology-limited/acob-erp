@@ -34,11 +34,8 @@ interface MeetingReminderFormProps {
   knowledgeDepartment: string
   knowledgePresenterId: string
   knowledgePresenterName: string
-  meetingPreparedById: string
-  setMeetingPreparedById: (v: string) => void
   departmentOptions: string[]
   presenterOptions: Employee[]
-  meetingPreparedByOptions: Employee[]
 }
 
 export function MeetingReminderForm({
@@ -59,11 +56,8 @@ export function MeetingReminderForm({
   knowledgeDepartment,
   knowledgePresenterId,
   knowledgePresenterName,
-  meetingPreparedById,
-  setMeetingPreparedById,
   departmentOptions,
   presenterOptions,
-  meetingPreparedByOptions,
 }: MeetingReminderFormProps) {
   const VISITOR_ITEM_VALUE = "__visitor_presenter__"
   const presenterSelectValue =
@@ -191,25 +185,6 @@ export function MeetingReminderForm({
         </div>
         <p className="text-muted-foreground text-xs">
           Department and presenter are managed from Admin Reports week setup so the reminder and KSS stay in sync.
-        </p>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="meeting-prepared-by">Prepared by</Label>
-        <Select value={meetingPreparedById} onValueChange={setMeetingPreparedById}>
-          <SelectTrigger id="meeting-prepared-by" className="w-[320px]">
-            <SelectValue placeholder="Select person" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Select person</SelectItem>
-            {meetingPreparedByOptions.map((emp) => (
-              <SelectItem key={emp.id} value={emp.id}>
-                {emp.full_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-muted-foreground text-xs">
-          Admin &amp; HR only. This appears as &quot;Prepared by&quot; in the footer.
         </p>
       </div>
     </>
