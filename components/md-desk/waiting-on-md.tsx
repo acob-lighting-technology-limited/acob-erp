@@ -145,6 +145,70 @@ export function WaitingOnMd() {
         error={error instanceof Error ? error.message : null}
         onRetry={() => refetch()}
         pagination={{ pageSize: 25 }}
+        viewToggle
+        contactsView
+        stickyToolbar
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        mobileRow={{
+          title: (i) => i.title,
+          subtitle: (i) => {
+            const parts = [
+              i.requester,
+              i.department || null,
+              typeof i.amount === "number" ? naira.format(i.amount) : null,
+              formatWATRelative(i.waiting_since),
+            ].filter(Boolean)
+            return parts.join(" · ")
+          },
+          trailing: (i) => (
+            <div className="flex items-center gap-1.5">
+              {i.urgent && (
+                <Badge variant="destructive" className="text-[10px]">
+                  Emergency
+                </Badge>
+              )}
+              <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+                {MD_DESK_QUEUE_LABELS[i.kind]}
+              </Badge>
+            </div>
+          ),
+          onSelect: (i) => {
+            window.location.href = i.href
+          },
+          detail: {
+            title: (i) => i.title,
+            subtitle: (i) => i.requester,
+            badges: (i) => (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {i.urgent && (
+                  <Badge variant="destructive" className="text-[10px]">
+                    Emergency
+                  </Badge>
+                )}
+                <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+                  {MD_DESK_QUEUE_LABELS[i.kind]}
+                </Badge>
+              </div>
+            ),
+            fields: (i) => [
+              { label: "Requester", value: i.requester },
+              { label: "Department", value: i.department || "—" },
+              { label: "Amount", value: typeof i.amount === "number" ? naira.format(i.amount) : "—" },
+              {
+                label: "Waiting Since",
+                value: `${formatWATDate(i.waiting_since)} (${formatWATRelative(i.waiting_since)})`,
+              },
+              { label: "Detail", value: i.detail || null, fullWidth: true },
+            ],
+            actions: (i) => [
+              {
+                label: "Open Approval Screen",
+                icon: ArrowUpRight,
+                href: i.href,
+              },
+            ],
+          },
+        }}
       />
 
       <div className="bg-card rounded-xl border-2 p-4">

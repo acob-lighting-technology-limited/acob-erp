@@ -116,6 +116,32 @@ export function MdDeskDelegates() {
         error={error instanceof Error ? error.message : null}
         onRetry={() => refetch()}
         rowActions={rowActions}
+        viewToggle
+        contactsView
+        stickyToolbar
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        mobileRow={{
+          title: (d) => d.name,
+          subtitle: (d) => `${d.department || "General"} · Added ${formatWATDate(d.created_at)}`,
+          trailing: (d) => (
+            <Badge variant={d.can_edit ? "default" : "secondary"} className="text-[10px]">
+              {d.can_edit ? "Can edit" : "View only"}
+            </Badge>
+          ),
+          detail: {
+            title: (d) => d.name,
+            subtitle: (d) => d.department || "General",
+            badges: (d) => (
+              <Badge variant={d.can_edit ? "default" : "secondary"}>{d.can_edit ? "Can edit" : "View only"}</Badge>
+            ),
+            fields: (d) => [
+              { label: "Department", value: d.department || "—" },
+              { label: "Access Level", value: d.can_edit ? "Can edit schedule & approvals" : "View only" },
+              { label: "Added By", value: d.granted_by_name || "—" },
+              { label: "Added On", value: formatWATDate(d.created_at) },
+            ],
+          },
+        }}
       />
 
       {!canManage && delegates.length > 0 && (
