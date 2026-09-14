@@ -19,6 +19,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "
 
 /** Leadership copied on every heads-up, matched the same way leave approvals resolve them. */
 const LEADERSHIP_DEPARTMENTS = ["Admin and HR", "Corporate Services", "Executive Management"]
+/** The General Weekly Meeting always starts at 8:30 AM. */
+const MEETING_TIME = "8:30 AM"
 /** The scheduler logs an attempt immediately before calling; anything older is not a scheduled call. */
 const ATTEMPT_WINDOW_MS = 15 * 60_000
 
@@ -91,14 +93,7 @@ function buildHtml(params: { department: string; meetingDateLabel: string; recip
     '<div style="max-width:600px;margin:0 auto;background:#fff;padding:32px 28px;">' +
     '<div style="font-size:20px;font-weight:700;color:#111827;margin:0 0 6px;">Knowledge Sharing Session Next Week</div>' +
     `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">Dear ${name},</p>` +
-    `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">The <strong>${department}</strong> department is scheduled to present the Knowledge Sharing Session at the General Weekly Meeting on <strong>${dateLabel}</strong>.</p>` +
-    '<div style="margin:22px 0;border:1px solid #d1d5db;overflow:hidden;background:#f9fafb;border-radius:8px;">' +
-    '<div style="padding:12px 18px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #d1d5db;background:#ecfdf5;color:#065f46;">What to do</div>' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' +
-    '<tr><td style="padding:10px 18px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">Agree who in the department will present.</td></tr>' +
-    '<tr><td style="padding:10px 18px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">Prepare the presentation before the meeting.</td></tr>' +
-    '<tr><td style="padding:10px 18px;font-size:14px;color:#374151;">Let Admin &amp; HR know the presenter so they can be added to the roster.</td></tr>' +
-    "</table></div>" +
+    `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 16px;">The <strong>${department}</strong> department is scheduled to present the Knowledge Sharing Session at the General Weekly Meeting on <strong>${dateLabel}</strong> at <strong>${MEETING_TIME}</strong>.</p>` +
     '<p style="font-size:13px;color:#6b7280;line-height:1.6;margin:0;">You are receiving this because you are in the presenting department or on the leadership team.</p>' +
     "</div>" +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="${darkLock}border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;">` +
@@ -201,7 +196,7 @@ serve(async (req) => {
         wouldSendTo: Array.from(recipients.values()).map((r) => r.name || r.email),
       })
     }
-    const message = `${department} presents the Knowledge Sharing Session at the General Weekly Meeting on ${meetingDateLabel}.`
+    const message = `${department} presents the Knowledge Sharing Session at the General Weekly Meeting on ${meetingDateLabel} at ${MEETING_TIME}.`
 
     let sent = 0
     for (const [index, recipient] of Array.from(recipients.values()).entries()) {
