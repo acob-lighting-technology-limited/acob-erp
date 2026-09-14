@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { ArrowDown, ArrowUp, CalendarOff, Plus, RotateCcw, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, CalendarOff, Mail, Plus, RotateCcw, Send, Trash2, Users } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,10 +11,20 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { apiFetch } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { getOfficeWeekFromDate, getOfficeWeekMonday } from "@/lib/meeting-week"
-import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
+import { toLocalISODate, formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 
 type RotationSettings = {
   departments: string[]
@@ -22,6 +32,9 @@ type RotationSettings = {
   anchor_year: number
   heads_up_enabled: boolean
   heads_up_time: string
+  heads_up_day: number
+  include_department_members: boolean
+  extra_recipient_ids: string[]
 }
 
 type PreviewWeek = {
@@ -31,15 +44,18 @@ type PreviewWeek = {
   department: string | null
   presenter_name: string | null
   source: "roster" | "rotation" | "no_session" | "unconfigured" | "before_start"
+  recipients: string[]
+  heads_up: { sent_at: string | null; recipient_count: number | null; outcome: string | null } | null
 }
 
 type SkipRow = { id: string; meeting_week: number; meeting_year: number; reason: string | null }
 
 type RotationPayload = {
-  settings: RotationSettings | null
+  settings: Partial<RotationSettings> | null
   skips: SkipRow[]
   departmentOptions: string[]
   preview: PreviewWeek[]
+  employeeOptions: Array<{ id: string; full_name: string | null; department: string | null }>
 }
 
 const EMPTY_SETTINGS: RotationSettings = {
@@ -48,6 +64,23 @@ const EMPTY_SETTINGS: RotationSettings = {
   anchor_year: new Date().getFullYear(),
   heads_up_enabled: false,
   heads_up_time: "12:00",
+  heads_up_day: 1,
+  include_department_members: true,
+  extra_recipient_ids: [],
+}
+
+const WEEKDAYS = [
+  { value: 1, label: "Monday" },
+  { value: 2, label: "Tuesday" },
+  { value: 3, label: "Wednesday" },
+  { value: 4, label: "Thursday" },
+  { value: 5, label: "Friday" },
+  { value: 6, label: "Saturday" },
+  { value: 7, label: "Sunday" },
+]
+
+function withDefaults(settings: Partial<RotationSettings> | null | undefined): RotationSettings {
+  return { ...EMPTY_SETTINGS, ...(settings ?? {}) }
 }
 
 function dateToWeek(dateIso: string): { week: number; year: number } | null {
@@ -64,6 +97,27 @@ function describePreview(row: PreviewWeek): string {
   return `${row.department ?? "—"}${name}`
 }
 
+function describeHeadsUp(row: PreviewWeek): string | null {
+  const status = row.heads_up
+  if (!status) return null
+  if (status.outcome === "sent" && status.sent_at) {
+    return `Heads-up sent ${formatWATDateTime(status.sent_at)} to ${status.recipient_count ?? 0}`
+  }
+  if (status.outcome === "held_for_preview") return "Heads-up held — not sent"
+  if (status.outcome === "attempted") return "Heads-up sending…"
+  return null
+}
+
+async function postAction(body: Record<string, unknown>) {
+  const res = await apiFetch("/api/admin/communications/kss-rotation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  const json = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(json?.error || "Request failed")
+}
+
 export function KssRotationCard() {
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<RotationSettings>(EMPTY_SETTINGS)
@@ -71,6 +125,10 @@ export function KssRotationCard() {
   const [skipDate, setSkipDate] = useState("")
   const [skipReason, setSkipReason] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [sendWeekKey, setSendWeekKey] = useState("")
+  const [previewEmail, setPreviewEmail] = useState("")
+  const [isSending, setIsSending] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.adminKssRotation(),
@@ -82,9 +140,23 @@ export function KssRotationCard() {
     },
   })
 
+  const savedSettings = useMemo(() => withDefaults(data?.settings), [data?.settings])
+
   useEffect(() => {
-    if (data?.settings) setDraft(data.settings)
-  }, [data?.settings])
+    if (data?.settings) setDraft(savedSettings)
+  }, [data?.settings, savedSettings])
+
+  const sendableWeeks = useMemo(() => (data?.preview ?? []).filter((row) => Boolean(row.department)), [data?.preview])
+
+  // Default the send target to the next session after today.
+  useEffect(() => {
+    if (sendWeekKey || sendableWeeks.length === 0) return
+    const today = toLocalISODate(new Date())
+    const next = sendableWeeks.find((row) => row.date > today) ?? sendableWeeks[0]
+    setSendWeekKey(`${next.year}-${next.week}`)
+  }, [sendableWeeks, sendWeekKey])
+
+  const sendTarget = sendableWeeks.find((row) => `${row.year}-${row.week}` === sendWeekKey) ?? null
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminKssRotation() })
 
@@ -111,7 +183,7 @@ export function KssRotationCard() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(json?.error || "Failed to save")
-      toast.success("Knowledge Sharing rotation saved")
+      toast.success("Knowledge Sharing settings saved")
       await refresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save")
@@ -123,17 +195,15 @@ export function KssRotationCard() {
   const addSkip = async () => {
     const week = dateToWeek(skipDate)
     if (!week) return toast.error("Pick the meeting date to mark")
-    const res = await apiFetch("/api/admin/communications/kss-rotation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ meeting_week: week.week, meeting_year: week.year, reason: skipReason || null }),
-    })
-    const json = await res.json().catch(() => null)
-    if (!res.ok) return toast.error(json?.error || "Failed to mark week")
-    toast.success(`Week ${week.week}, ${week.year} marked as no session`)
-    setSkipDate("")
-    setSkipReason("")
-    await refresh()
+    try {
+      await postAction({ action: "skip", meeting_week: week.week, meeting_year: week.year, reason: skipReason || null })
+      toast.success(`Week ${week.week}, ${week.year} marked as no session`)
+      setSkipDate("")
+      setSkipReason("")
+      await refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to mark week")
+    }
   }
 
   const removeSkip = async (id: string) => {
@@ -145,9 +215,34 @@ export function KssRotationCard() {
     await refresh()
   }
 
+  const sendHeadsUp = async (mode: "preview" | "send") => {
+    if (!sendTarget) return
+    setIsSending(true)
+    try {
+      await postAction({
+        action: mode,
+        meeting_week: sendTarget.week,
+        meeting_year: sendTarget.year,
+        ...(mode === "preview" ? { email: previewEmail } : {}),
+      })
+      toast.success(mode === "preview" ? `Preview sent to ${previewEmail}` : "Heads-up is sending")
+      setConfirmOpen(false)
+      // The send runs in the background; refresh shortly so the status updates.
+      setTimeout(() => void refresh(), 8000)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send")
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   const anchorDateIso = toLocalISODate(getOfficeWeekMonday(draft.anchor_week, draft.anchor_year))
   const addableDepartments = (data?.departmentOptions ?? []).filter((name) => !draft.departments.includes(name))
-  const isDirty = JSON.stringify(draft) !== JSON.stringify(data?.settings ?? EMPTY_SETTINGS)
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(savedSettings)
+  const employeeSelectOptions = (data?.employeeOptions ?? []).map((employee) => ({
+    value: employee.id,
+    label: `${employee.full_name || "Unnamed"}${employee.department ? ` (${employee.department})` : ""}`,
+  }))
 
   return (
     <Card>
@@ -157,8 +252,8 @@ export function KssRotationCard() {
           Knowledge Sharing Rotation
         </CardTitle>
         <CardDescription>
-          The Sunday reminder names the presenting department from this order, and a heads-up email goes to next
-          week&apos;s department on Monday. A presenter entered in Reports &rsaquo; KSS always takes precedence.
+          The Sunday reminder names the presenting department from this order, and a heads-up email tells the department
+          ahead of its session. A presenter entered in Reports &rsaquo; KSS always takes precedence.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -229,10 +324,7 @@ export function KssRotationCard() {
                   </Button>
                 </div>
               )}
-            </section>
-
-            <section className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
+              <div className="space-y-2 sm:max-w-xs">
                 <Label htmlFor="kss-anchor">First department presents on</Label>
                 <Input
                   id="kss-anchor"
@@ -247,32 +339,145 @@ export function KssRotationCard() {
                   Office week {draft.anchor_week}, {draft.anchor_year}
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="kss-heads-up-time">Monday heads-up time (WAT)</Label>
-                <div className="flex items-center gap-3">
+            </section>
+
+            <section className="space-y-4 rounded-md border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" /> Heads-up email
+                </Label>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Send automatically</span>
+                  <Switch
+                    aria-label="Send the heads-up automatically"
+                    checked={draft.heads_up_enabled}
+                    onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, heads_up_enabled: checked }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Send on</Label>
+                  <Select
+                    value={String(draft.heads_up_day)}
+                    onValueChange={(value) => setDraft((prev) => ({ ...prev, heads_up_day: Number(value) }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WEEKDAYS.map((day) => (
+                        <SelectItem key={day.value} value={String(day.value)}>
+                          {day.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="kss-heads-up-time">At (WAT)</Label>
                   <Input
                     id="kss-heads-up-time"
                     type="time"
                     value={draft.heads_up_time}
                     onChange={(event) => setDraft((prev) => ({ ...prev, heads_up_time: event.target.value }))}
                   />
-                  <Switch
-                    aria-label="Send Monday heads-up email"
-                    checked={draft.heads_up_enabled}
-                    onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, heads_up_enabled: checked }))}
-                  />
                 </div>
-                <p className="text-muted-foreground text-xs">
-                  Emails next week&apos;s department, the Admin &amp; HR lead, HCS and MD.
-                </p>
               </div>
+              <p className="text-muted-foreground text-xs">
+                Announces the next session after the send day. Turn automatic sending off to only send manually below.
+              </p>
+
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="kss-include-dept" className="font-normal">
+                  Email everyone in the presenting department
+                </Label>
+                <Switch
+                  id="kss-include-dept"
+                  checked={draft.include_department_members}
+                  onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, include_department_members: checked }))}
+                />
+              </div>
+              <SearchableMultiSelect
+                label="Also send to"
+                icon={<Users className="h-4 w-4" />}
+                values={draft.extra_recipient_ids}
+                options={employeeSelectOptions}
+                onChange={(values) => setDraft((prev) => ({ ...prev, extra_recipient_ids: values }))}
+                placeholder="Choose people who always receive it"
+                searchPlaceholder="Search staff…"
+              />
             </section>
 
             <div className="flex justify-end">
               <Button onClick={saveSettings} disabled={!isDirty || isSaving}>
-                {isSaving ? "Saving…" : "Save rotation"}
+                {isSaving ? "Saving…" : "Save settings"}
               </Button>
             </div>
+
+            <section className="space-y-3 rounded-md border p-4">
+              <Label className="flex items-center gap-2">
+                <Send className="h-4 w-4" /> Send heads-up now
+              </Label>
+              {isDirty && (
+                <p className="text-xs text-amber-600">Save your settings first — sends use the saved recipients.</p>
+              )}
+              {sendableWeeks.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No upcoming session has a department yet.</p>
+              ) : (
+                <>
+                  <Select value={sendWeekKey} onValueChange={setSendWeekKey}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a session" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sendableWeeks.map((row) => (
+                        <SelectItem key={`${row.year}-${row.week}`} value={`${row.year}-${row.week}`}>
+                          {formatWATDate(row.date)} — {row.department}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {sendTarget && (
+                    <div className="space-y-1 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Recipients ({sendTarget.recipients.length}): </span>
+                        {sendTarget.recipients.length > 0
+                          ? sendTarget.recipients.join(", ")
+                          : "nobody — check settings"}
+                      </p>
+                      {describeHeadsUp(sendTarget) && (
+                        <p className="text-muted-foreground text-xs">{describeHeadsUp(sendTarget)}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      type="email"
+                      placeholder="Preview to email"
+                      value={previewEmail}
+                      onChange={(event) => setPreviewEmail(event.target.value)}
+                    />
+                    <Button
+                      variant="outline"
+                      disabled={!sendTarget || !previewEmail || isSending}
+                      onClick={() => void sendHeadsUp("preview")}
+                    >
+                      Send preview
+                    </Button>
+                    <Button
+                      disabled={!sendTarget || sendTarget.recipients.length === 0 || isSending || isDirty}
+                      onClick={() => setConfirmOpen(true)}
+                    >
+                      Send now
+                    </Button>
+                  </div>
+                </>
+              )}
+            </section>
 
             <section className="space-y-3">
               <Label className="flex items-center gap-2">
@@ -313,10 +518,11 @@ export function KssRotationCard() {
               <Label>Upcoming sessions (saved settings)</Label>
               <ul className="divide-y rounded-md border">
                 {data.preview.map((row) => (
-                  <li key={`${row.year}-${row.week}`} className="flex items-center gap-3 px-3 py-2 text-sm">
+                  <li key={`${row.year}-${row.week}`} className="flex flex-wrap items-center gap-x-3 px-3 py-2 text-sm">
                     <span className="text-muted-foreground w-28 shrink-0">{formatWATDate(row.date)}</span>
                     <span className="min-w-0 flex-1 truncate">{describePreview(row)}</span>
                     {row.source === "roster" && <Badge variant="secondary">Roster</Badge>}
+                    {row.heads_up?.outcome === "sent" && <Badge variant="outline">Heads-up sent</Badge>}
                   </li>
                 ))}
               </ul>
@@ -324,6 +530,25 @@ export function KssRotationCard() {
           </>
         )}
       </CardContent>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send the heads-up now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {sendTarget
+                ? `${sendTarget.department} — session on ${formatWATDate(sendTarget.date)}. ${sendTarget.recipients.length} people will be emailed${sendTarget.heads_up?.outcome === "sent" ? ", and it was already sent once for this session" : ""}.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSending}>Cancel</AlertDialogCancel>
+            <Button loading={isSending} onClick={() => void sendHeadsUp("send")}>
+              Send now
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
