@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { apiFetch } from "@/lib/api-client"
 
 export interface RiskItem {
   id: string
@@ -78,7 +79,7 @@ export function EditRiskDialog({ risk, open, onOpenChange, employees, onRiskUpda
 
     setIsSaving(true)
     try {
-      const res = await fetch(`/api/corporate-services/risk-register/${risk.id}`, {
+      const res = await apiFetch(`/api/corporate-services/risk-register/${risk.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

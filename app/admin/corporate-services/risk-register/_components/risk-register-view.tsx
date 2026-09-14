@@ -13,6 +13,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { EditRiskDialog, type RiskItem } from "./edit-risk-dialog"
 import { RiskCard } from "./risk-card"
+import { apiFetch } from "@/lib/api-client"
 
 interface RiskRegisterViewProps {
   departments: string[]
@@ -30,7 +31,7 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
   const { data, isLoading, error, refetch } = useQuery<{ data: RiskItem[] }>({
     queryKey,
     queryFn: async () => {
-      const res = await fetch("/api/corporate-services/risk-register", { cache: "no-store" })
+      const res = await apiFetch("/api/corporate-services/risk-register", { cache: "no-store" })
       if (!res.ok) throw new Error("Failed to load risk register")
       return res.json()
     },
