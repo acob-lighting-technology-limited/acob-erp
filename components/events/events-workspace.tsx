@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CalendarRange,
   Clock,
+  Download,
   Eye,
   Inbox,
   Pencil,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/events/types"
 import { DeleteEventDialog } from "./delete-event-dialog"
 import { EventStatusBadge, EventTypeBadge, MdInvolvementBadge } from "./event-badges"
+import { EventCard } from "./event-card"
 import { EventDetailSheet } from "./event-detail-sheet"
 import { EventFormDialog, type EventFormDefaults } from "./event-form-dialog"
 import { EventMonthCalendar } from "./event-month-calendar"
@@ -263,17 +265,44 @@ export function EventsWorkspace({
     { label: "Delete", icon: Trash2, onClick: openDelete, variant: "destructive", hidden: (e) => !e.can_manage },
   ]
 
+  const handleExportCsv = () => {
+    if (rows.length === 0) return
+    const headers = ["Title", "Type", "Status", "Start", "End", "Location", "Audience", "Organizer"]
+    const lines = rows.map((e) => [
+      `"${(e.title || "").replace(/"/g, '""')}"`,
+      `"${e.type}"`,
+      `"${e.status}"`,
+      `"${e.start_at}"`,
+      `"${e.end_at}"`,
+      `"${locationLabel(e).replace(/"/g, '""')}"`,
+      `"${e.visibility}"`,
+      `"${(e.organizer_name || "").replace(/"/g, '""')}"`,
+    ])
+    const csvContent = [headers.join(","), ...lines.map((l) => l.join(","))].join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.setAttribute("href", url)
+    link.setAttribute("download", `company-events-${toLocalISODate()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
   const statCards =
     variant === "manage" ? (
       <StatGrid>
         <StatCard
-          title="Next 7 days"
+          variant="compact"
+          title="Next 7 Days"
           value={stats.thisWeek}
           icon={CalendarRange}
           iconBgColor="bg-blue-500/10"
           iconColor="text-blue-500"
         />
         <StatCard
+          variant="compact"
           title="Drafts"
           value={stats.drafts}
           icon={Pencil}
@@ -281,14 +310,16 @@ export function EventsWorkspace({
           iconColor="text-amber-500"
         />
         <StatCard
-          title="Workshops & trainings"
+          variant="compact"
+          title="Workshops & Trainings"
           value={stats.learning}
           icon={Presentation}
           iconBgColor="bg-violet-500/10"
           iconColor="text-violet-500"
         />
         <StatCard
-          title="In view"
+          variant="compact"
+          title="Total Events"
           value={stats.total}
           icon={CalendarDays}
           iconBgColor="bg-emerald-500/10"
@@ -298,25 +329,36 @@ export function EventsWorkspace({
     ) : (
       <StatGrid>
         <StatCard
-          title="Awaiting your reply"
-          value={stats.awaiting}
-          icon={Inbox}
-          iconBgColor="bg-amber-500/10"
-          iconColor="text-amber-500"
-        />
-        <StatCard
-          title="Next 7 days"
+          variant="compact"
+          title="Next 7 Days"
           value={stats.thisWeek}
           icon={CalendarRange}
           iconBgColor="bg-blue-500/10"
           iconColor="text-blue-500"
         />
         <StatCard
-          title="Workshops & trainings"
+          variant="compact"
+          title="Awaiting Reply"
+          value={stats.awaiting}
+          icon={Inbox}
+          iconBgColor="bg-amber-500/10"
+          iconColor="text-amber-500"
+        />
+        <StatCard
+          variant="compact"
+          title="Workshops & Trainings"
           value={stats.learning}
           icon={Presentation}
           iconBgColor="bg-violet-500/10"
           iconColor="text-violet-500"
+        />
+        <StatCard
+          variant="compact"
+          title="Total Events"
+          value={stats.total}
+          icon={CalendarDays}
+          iconBgColor="bg-emerald-500/10"
+          iconColor="text-emerald-500"
         />
       </StatGrid>
     )
@@ -338,12 +380,20 @@ export function EventsWorkspace({
       onTabChange={setTab}
       stats={statCards}
       actions={
-        canCreate ? (
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-            New event
-          </Button>
-        ) : undefined
+        <div className="flex items-center gap-2">
+          {rows.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleExportCsv}>
+              <Download className="mr-1.5 h-4 w-4" aria-hidden />
+              Export
+            </Button>
+          )}
+          {canCreate && (
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+              New event
+            </Button>
+          )}
+        </div>
       }
     >
       {activeExtra ? (
@@ -385,6 +435,85 @@ export function EventsWorkspace({
           onRetry={() => eventsQuery.refetch()}
           rowActions={rowActions}
           pagination={{ pageSize: 25 }}
+          viewToggle
+          contactsView
+          stickyToolbar
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          cardRenderer={(event) => (
+            <EventCard
+              event={event}
+              onSelect={openEvent}
+              onEdit={variant === "manage" || event.can_manage ? openEdit : undefined}
+            />
+          )}
+          mobileRow={{
+            title: (e) => e.title,
+            subtitle: (e) => {
+              const parts = [
+                whenLabel(e),
+                locationLabel(e),
+                e.visibility === "department" && e.department_name
+                  ? e.department_name
+                  : EVENT_VISIBILITY_LABELS[e.visibility],
+                e.organizer_name ? `By ${e.organizer_name}` : null,
+              ].filter(Boolean)
+              return parts.join(" · ")
+            },
+            trailing: (e) => (
+              <div className="flex items-center gap-1.5">
+                <EventTypeBadge type={e.type} className="text-[10px]" />
+                <EventStatusBadge status={e.status} className="text-[10px]" />
+              </div>
+            ),
+            onSelect: openEvent,
+            detail: {
+              title: (e) => e.title,
+              subtitle: (e) => whenLabel(e),
+              badges: (e) => (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <EventTypeBadge type={e.type} className="text-[10px]" />
+                  <EventStatusBadge status={e.status} className="text-[10px]" />
+                  <MdInvolvementBadge value={e.md_involvement} />
+                </div>
+              ),
+              fields: (e) => [
+                { label: "When", value: whenLabel(e) },
+                { label: "Location", value: locationLabel(e) },
+                {
+                  label: "Audience",
+                  value:
+                    e.visibility === "department" && e.department_name
+                      ? e.department_name
+                      : EVENT_VISIBILITY_LABELS[e.visibility],
+                },
+                { label: "Organizer", value: e.organizer_name || "—" },
+                { label: "Status", value: EVENT_STATUS_LABELS[e.status] },
+                { label: "MD Schedule", value: MD_INVOLVEMENT_LABELS[e.md_involvement] },
+                {
+                  label: "RSVP Count",
+                  value: `${e.attendees.filter((a) => a.rsvp === "yes").length} of ${e.attendees.length}`,
+                },
+                { label: "Description", value: e.description || null, fullWidth: true },
+              ],
+              actions: (e) => [
+                {
+                  label: "Open Event Sheet",
+                  icon: Eye,
+                  onClick: () => openEvent(e),
+                },
+                ...(variant === "manage" || e.can_manage
+                  ? [
+                      {
+                        label: "Edit Event",
+                        icon: Pencil,
+                        onClick: () => openEdit(e),
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          }}
+          urlSync
         />
       )}
 
