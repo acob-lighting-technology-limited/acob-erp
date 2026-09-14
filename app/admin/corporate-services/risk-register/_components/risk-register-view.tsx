@@ -22,6 +22,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { cn } from "@/lib/utils"
 import { EditRiskDialog, type RiskItem } from "./edit-risk-dialog"
 import { AddRiskDialog } from "./add-risk-dialog"
+import { RiskCard } from "./risk-card"
 
 interface RiskRegisterViewProps {
   departments: string[]
@@ -326,6 +327,8 @@ export function RiskRegisterView({ departments, employees, userRole }: RiskRegis
         error={error ? (error instanceof Error ? error.message : "Failed to load risk register") : null}
         onRetry={refetch}
         pagination={{ pageSize: 25 }}
+        viewToggle
+        cardRenderer={(risk) => <RiskCard risk={risk} onEdit={() => handleOpenEdit(risk)} />}
         expandable={{
           render: (r) => (
             <div className="bg-muted/20 space-y-3 border-t p-4 text-sm">
