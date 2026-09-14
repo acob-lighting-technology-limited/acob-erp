@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Send,
   Users,
+  FolderKanban,
 } from "lucide-react"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
@@ -46,7 +47,7 @@ import {
 } from "./tasks-content-utils"
 import { filterAssignableTaskDepartments, filterAssignableTaskUsers } from "@/lib/tasks/assignment-scope"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
-import { AdminUserTasksPlan, type ReviewCycleOption } from "./admin-user-tasks-plan"
+import { AdminUserTasksPlan } from "./admin-user-tasks-plan"
 
 const log = logger("tasks-management-admin-tasks-content")
 
@@ -75,6 +76,15 @@ export interface UserProfile {
   is_md?: boolean
 }
 
+interface ReviewCycleOption {
+  id: string
+  name: string
+  review_type: string | null
+  start_date: string | null
+  end_date: string | null
+  status?: string | null
+}
+
 interface GoalFilterOption {
   id: string
   title: string
@@ -86,6 +96,7 @@ interface AdminTasksContentProps {
   initialDepartments: string[]
   initialGoals?: GoalFilterOption[]
   initialReviewCycles?: ReviewCycleOption[]
+  initialProjects?: Array<{ id: string; project_name: string }>
   userProfile: UserProfile
   initialGoalId?: string
 }
@@ -147,12 +158,14 @@ export function AdminTasksContent({
   initialDepartments,
   initialGoals = [],
   initialReviewCycles = [],
+  initialProjects = [],
   userProfile,
   initialGoalId = "",
 }: AdminTasksContentProps) {
   const [activeTab, setActiveTab] = useState<"tasks" | "user_plan">("tasks")
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
+  const projects = useMemo(() => (Array.isArray(initialProjects) ? initialProjects : []), [initialProjects])
   const assignerProfile = {
     id: userProfile.id,
     role: userProfile.role,
@@ -400,7 +413,17 @@ export function AdminTasksContent({
         resizable: true,
         initialWidth: 260,
         accessor: (r) => r.title,
-        render: (r) => <span className="text-foreground font-medium">{r.title}</span>,
+        render: (r) => (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-foreground font-medium">{r.title}</span>
+            {r.project_name && (
+              <span className="text-primary/80 inline-flex items-center gap-1 text-[10px] font-medium">
+                <FolderKanban className="h-3 w-3 shrink-0" />
+                <span className="line-clamp-1">{r.project_name}</span>
+              </span>
+            )}
+          </div>
+        ),
       },
       {
         key: "assigned_to",
@@ -522,8 +545,22 @@ export function AdminTasksContent({
         label: "Department",
         options: departmentOptions.map((d) => ({ value: d, label: d })),
       },
+      ...(projects.length > 0
+        ? [
+            {
+              key: "project",
+              label: "Project",
+              options: projects.map((p) => ({ value: p.id, label: p.project_name })),
+              mode: "custom" as const,
+              filterFn: (row: Task, vals: string[]) => {
+                if (vals.length === 0) return true
+                return vals.includes(row.project_id || "")
+              },
+            },
+          ]
+        : []),
     ],
-    [departmentOptions]
+    [departmentOptions, projects]
   )
 
   return (
@@ -766,6 +803,7 @@ export function AdminTasksContent({
                   value: r.kpi_measure ? `${r.kpi_measure}${r.kpi_pillar ? ` (🎯 ${r.kpi_pillar})` : ""}` : "—",
                 },
                 { label: "Strategic Goal", value: r.goal_title || "—" },
+                { label: "Project", value: r.project_name || "—" },
                 { label: "Start Date", value: r.task_start_date ? formatWATDate(r.task_start_date) : "—" },
                 { label: "Due Date", value: r.due_date ? formatWATDate(r.due_date) : "No deadline" },
                 { label: "Description", value: r.description || null, fullWidth: true },
