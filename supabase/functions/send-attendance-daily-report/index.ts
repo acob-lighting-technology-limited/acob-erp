@@ -286,6 +286,17 @@ function renderReportHtml(dateIso: string, rows: ReportRow[], summary: Record<st
   )
 }
 
+/**
+ * Unwrap a query result, throwing on error. The report used to ignore errors, so a
+ * transient 504 on attendance_records read as "no records" and mailed everyone as
+ * absent (14 Sep 2026). Throwing returns a 500 before the slot is marked sent, so
+ * the next 15-minute cron run retries it.
+ */
+function must<T>(result: { data: T; error: { message: string } | null }, label: string): T {
+  if (result.error) throw new Error(`${label} query failed: ${result.error.message}`)
+  return result.data
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -294,11 +305,10 @@ serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const { data: settingRow } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", SETTINGS_KEY)
-      .maybeSingle()
+    const settingRow = must(
+      await supabase.from("system_settings").select("value").eq("key", SETTINGS_KEY).maybeSingle(),
+      "report settings"
+    )
 
     const config = (settingRow?.value ?? {}) as {
       recipientUserIds?: string[]
@@ -412,10 +422,10 @@ serve(async (req) => {
         })
       }
 
-      const { data: recipientProfiles } = await supabase
-        .from("profiles")
-        .select("id, company_email, additional_email")
-        .in("id", recipientUserIds)
+      const recipientProfiles = must(
+        await supabase.from("profiles").select("id, company_email, additional_email").in("id", recipientUserIds),
+        "recipient profiles"
+      )
       recipientEmails = Array.from(
         new Set(
           (recipientProfiles ?? [])
@@ -434,17 +444,19 @@ serve(async (req) => {
       })
     }
 
-    const { data: policyRow } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", "attendance_policy")
-      .maybeSingle()
+    const policyRow = must(
+      await supabase.from("system_settings").select("value").eq("key", "attendance_policy").maybeSingle(),
+      "attendance policy"
+    )
     const policy = { ...DEFAULT_POLICY, ...((policyRow?.value as object) ?? {}) }
 
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name, first_name, last_name, department, attendance_exempt")
-      .eq("employment_status", "active")
+    const profiles = must(
+      await supabase
+        .from("profiles")
+        .select("id, full_name, first_name, last_name, department, attendance_exempt")
+        .eq("employment_status", "active"),
+      "active profiles"
+    )
     const activeProfiles = (profiles ?? []) as Array<{
       id: string
       full_name: string | null
@@ -455,29 +467,36 @@ serve(async (req) => {
     }>
     const userIds = activeProfiles.map((p) => p.id)
 
-    const [{ data: records }, { data: holidays }, { data: leaves }, { data: exemptPeriods }, { data: closures }] =
-      await Promise.all([
-        supabase
-          .from("attendance_records")
-          .select("user_id, status, total_hours, clock_in, clock_out, waived")
-          .eq("date", today)
-          .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]),
-        supabase.from("holiday_calendar").select("holiday_date").eq("holiday_date", today),
-        supabase
-          .from("leave_requests")
-          .select("user_id")
-          .eq("status", "approved")
-          .lte("start_date", today)
-          .gte("end_date", today)
-          .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]),
-        supabase
-          .from("attendance_exempt_periods")
-          .select("user_id")
-          .lte("start_date", today)
-          .gte("end_date", today)
-          .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]),
-        supabase.from("attendance_early_closures").select("close_time").eq("closure_date", today).maybeSingle(),
-      ])
+    const [recordsResult, holidaysResult, leavesResult, exemptResult, closuresResult] = await Promise.all([
+      supabase
+        .from("attendance_records")
+        .select("user_id, status, total_hours, clock_in, clock_out, waived")
+        .eq("date", today)
+        .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]),
+      supabase.from("holiday_calendar").select("holiday_date").eq("holiday_date", today),
+      supabase
+        .from("leave_requests")
+        .select("user_id")
+        .eq("status", "approved")
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]),
+      supabase
+        .from("attendance_exempt_periods")
+        .select("user_id")
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]),
+      supabase.from("attendance_early_closures").select("close_time").eq("closure_date", today).maybeSingle(),
+    ])
+    const records = must(recordsResult, "attendance records")
+    const holidays = must(holidaysResult, "holiday calendar")
+    const leaves = must(leavesResult, "approved leave")
+    const exemptPeriods = must(exemptResult, "exempt periods")
+    const closures = must(closuresResult, "early closures")
+
+    // An empty staff list is never a real report; treat it as a failed read.
+    if (activeProfiles.length === 0) throw new Error("No active profiles returned")
 
     const earlyCloseTime = (closures as { close_time?: string | null } | null)?.close_time
       ? String((closures as { close_time: string }).close_time).slice(0, 5)
