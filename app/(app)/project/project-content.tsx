@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,10 +9,24 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Progress } from "@/components/ui/progress"
-import { FolderGit2, FolderKanban, RefreshCw, Calendar, MapPin, Wrench, ShieldCheck, Briefcase } from "lucide-react"
+import {
+  FolderGit2,
+  FolderKanban,
+  Plus,
+  RefreshCw,
+  Calendar,
+  MapPin,
+  Wrench,
+  ShieldCheck,
+  Briefcase,
+} from "lucide-react"
 import { ProjectTaskViewer } from "./_components/project-task-viewer"
 import { computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
 import { toLocalISODate } from "@/lib/utils/date"
+import { isAdminLikeRole } from "@/lib/admin/rbac"
+import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
+import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
+import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 
 // Define user-facing project type (includes tasks count payload)
 export interface ProjectRow {
@@ -28,6 +42,7 @@ export interface ProjectRow {
   status: "planning" | "active" | "on_hold" | "completed" | "cancelled"
   created_at: string
   updated_at: string
+  portfolio_id?: string | null
   project_manager?: {
     id: string
     full_name: string | null
@@ -36,6 +51,16 @@ export interface ProjectRow {
   } | null
   portfolio?: { id: string; name: string; code: string | null } | null
   tasks?: ProjectHealthTask[]
+}
+
+export interface ProjectContentProps {
+  currentUser?: {
+    id: string
+    role: string
+    is_department_lead: boolean
+    department: string | null
+  }
+  profiles?: employee[]
 }
 
 async function fetchUserProjects(): Promise<ProjectRow[]> {
@@ -47,8 +72,17 @@ async function fetchUserProjects(): Promise<ProjectRow[]> {
   return (payload?.data || []) as ProjectRow[]
 }
 
-export function ProjectContent() {
+export function ProjectContent({ currentUser, profiles = [] }: ProjectContentProps = {}) {
   const queryClient = useQueryClient()
+  const [activeProject, setActiveProject] = useState<ProjectRow | null>(null)
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+
+  const isAdmin = currentUser ? isAdminLikeRole(currentUser.role) : false
+  const isLead = Boolean(currentUser?.is_department_lead)
+  const canCreate = isAdmin || isLead
+  const canManage = (p: ProjectRow) =>
+    isAdmin || p.project_manager_id === currentUser?.id || (p as any).created_by === currentUser?.id
 
   // Fetch project list
   const {
@@ -237,15 +271,30 @@ export function ProjectContent() {
       spacing="tight"
       actionsPlacement="inline-always"
       actions={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => queryClient.invalidateQueries({ queryKey: ["user-projects"] })}
-          disabled={isLoading}
-        >
-          <RefreshCw className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["user-projects"] })}
+            disabled={isLoading}
+          >
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+          {canCreate && (
+            <Button
+              size="sm"
+              onClick={() => {
+                setActiveProject(null)
+                setIsAddOpen(true)
+              }}
+            >
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Project</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
+        </div>
       }
       stats={
         <StatGrid>
@@ -309,6 +358,12 @@ export function ProjectContent() {
           title: (r) => r.project_name,
           subtitle: (r) => [r.location, r.technology_type].filter(Boolean).join(" · ") || r.location,
           trailing: (r) => renderStatusBadge(r.status),
+          onSelect: (r) => {
+            if (canManage(r)) {
+              setActiveProject(r)
+              setIsEditOpen(true)
+            }
+          },
           detail: {
             title: (r) => r.project_name,
             subtitle: (r) => <span className="text-muted-foreground text-xs">{r.location}</span>,
@@ -370,10 +425,24 @@ export function ProjectContent() {
             </div>
           )
         }}
+        rowActions={[
+          {
+            label: "Edit Project Details",
+            onClick: (r) => {
+              setActiveProject(r)
+              setIsEditOpen(true)
+            },
+            hidden: (r) => !canManage(r),
+          },
+        ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 rounded-lg border p-2">
-              <ProjectTaskViewer projectId={r.id} projectName={r.project_name} />
+            <div className="bg-muted/20 space-y-3 rounded-lg border p-2">
+              {canManage(r) && profiles.length > 0 ? (
+                <ProjectPlanBoard project={r as any} profiles={profiles} />
+              ) : (
+                <ProjectTaskViewer projectId={r.id} projectName={r.project_name} />
+              )}
             </div>
           ),
         }}
@@ -381,6 +450,18 @@ export function ProjectContent() {
         emptyDescription="You will see projects here once you are assigned as a manager or member."
         emptyIcon={FolderKanban}
         urlSync
+      />
+
+      <ProjectDialogs
+        profiles={profiles}
+        isAddOpen={isAddOpen}
+        setIsAddOpen={setIsAddOpen}
+        isEditOpen={isEditOpen}
+        setIsEditOpen={setIsEditOpen}
+        selectedProject={activeProject as any}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: ["user-projects"] })
+        }}
       />
     </DataTablePage>
   )

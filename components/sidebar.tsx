@@ -134,7 +134,15 @@ const navigationSections: NavSectionDef[] = [
           { name: "Assets", href: "/assets" },
         ],
       },
-      { name: "Projects", href: "/project", icon: FolderKanban },
+      {
+        name: "Projects",
+        href: "/project",
+        icon: FolderKanban,
+        children: [
+          { name: "Portfolios", href: "/portfolios" },
+          { name: "Projects", href: "/project" },
+        ],
+      },
     ],
   },
   {

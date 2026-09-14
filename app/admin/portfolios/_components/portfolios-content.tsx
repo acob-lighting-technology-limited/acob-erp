@@ -129,8 +129,13 @@ function PortfolioProjects({ projects }: { projects: ProjectHealthRow[] }) {
   )
 }
 
-export function PortfoliosContent() {
+interface PortfoliosContentProps {
+  isAdmin?: boolean
+}
+
+export function PortfoliosContent({ isAdmin = true }: PortfoliosContentProps = {}) {
   const queryClient = useQueryClient()
+  const [selected, setSelected] = useState<Portfolio | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editing, setEditing] = useState<Portfolio | null>(null)
 
@@ -259,7 +264,7 @@ export function PortfoliosContent() {
       title="Project Portfolios"
       description="Programmes and client groupings, each holding its own projects. Progress is derived from project tasks."
       icon={Layers}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
+      backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/project", label: "Back to Projects" }}
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -271,11 +276,13 @@ export function PortfoliosContent() {
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button size="sm" onClick={() => setIsAddOpen(true)}>
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Portfolio</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          {isAdmin && (
+            <Button size="sm" onClick={() => setIsAddOpen(true)}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Portfolio</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
         </div>
       }
       stats={
@@ -345,7 +352,7 @@ export function PortfoliosContent() {
               {r.status.replaceAll("_", " ")}
             </Badge>
           ),
-          onSelect: (r) => setEditing(r),
+          onSelect: isAdmin ? (r) => setEditing(r) : undefined,
         }}
         cardRenderer={(r) => (
           <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
@@ -364,7 +371,7 @@ export function PortfoliosContent() {
             </div>
           </div>
         )}
-        rowActions={[{ label: "Edit Portfolio", onClick: (r) => setEditing(r) }]}
+        rowActions={isAdmin ? [{ label: "Edit Portfolio", onClick: (r) => setEditing(r) }] : undefined}
         expandable={{
           render: (r) => (
             <div className="bg-muted/20 rounded-lg border p-2">
