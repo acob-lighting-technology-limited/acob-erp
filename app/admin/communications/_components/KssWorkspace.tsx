@@ -136,7 +136,6 @@ export function KssWorkspace() {
   const [addDepartment, setAddDepartment] = useState("")
   const [skipDate, setSkipDate] = useState("")
   const [skipReason, setSkipReason] = useState("")
-  const [previewEmail, setPreviewEmail] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -223,24 +222,15 @@ export function KssWorkspace() {
     await refresh()
   }
 
-  const send = async (mode: "preview" | "send") => {
+  const send = async () => {
     if (!selected) return
     setIsSending(true)
     try {
-      await postAction({
-        action: mode,
-        meeting_week: selected.week,
-        meeting_year: selected.year,
-        ...(mode === "preview" ? { email: previewEmail } : {}),
-      })
-      if (mode === "preview") {
-        toast.success(`Preview sent to ${previewEmail}`)
-      } else {
-        toast.success("Heads-up is sending")
-        setConfirmOpen(false)
-        // The send runs in the background; refresh shortly so the status updates.
-        setTimeout(() => void refresh(), 8000)
-      }
+      await postAction({ action: "send", meeting_week: selected.week, meeting_year: selected.year })
+      toast.success("Heads-up is sending")
+      setConfirmOpen(false)
+      // The send runs in the background; refresh shortly so the status updates.
+      setTimeout(() => void refresh(), 8000)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send")
     } finally {
@@ -653,22 +643,6 @@ export function KssWorkspace() {
               </Button>
             )}
 
-            <div className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="Preview to email"
-                value={previewEmail}
-                onChange={(event) => setPreviewEmail(event.target.value)}
-              />
-              <Button
-                variant="outline"
-                disabled={!selected || !previewEmail || isSending}
-                onClick={() => void send("preview")}
-              >
-                Preview
-              </Button>
-            </div>
-
             <Button
               className="w-full bg-orange-600 text-white hover:bg-orange-700"
               size="lg"
@@ -712,7 +686,7 @@ export function KssWorkspace() {
             <Button
               className="bg-orange-600 text-white hover:bg-orange-700"
               loading={isSending}
-              onClick={() => void send("send")}
+              onClick={() => void send()}
             >
               Send
             </Button>
