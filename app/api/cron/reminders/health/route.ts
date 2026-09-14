@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
-import { ORG_ICT_EMAIL } from "@/lib/org-config"
+import { escapeHtml } from "@/lib/email-templates/utils"
+import { ORG_EMAIL_SENDERS, ORG_ICT_EMAIL, ORG_MAIL_ROUTING } from "@/lib/org-config"
 
 const log = logger("cron-reminders-health")
 
@@ -106,6 +107,34 @@ function describe(failure: Failure): string {
     : `The ${label} was due at ${when} WAT but the scheduler has not picked it up.`
 }
 
+/** Branded ACOB shell (dark-mode-locked header/footer), per the email template standard. */
+function renderAlertHtml(title: string, lines: string[]): string {
+  const darkLock =
+    "background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;"
+  const bar = (content: string, padding: string) =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="${darkLock}border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;"><tr><td align="center" style="padding:${padding};${darkLock}font-size:11px;color:#d1d5db;">${content}</td></tr></table>`
+  return (
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"></head>' +
+    '<body style="margin:0;padding:0;background:#fff;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">' +
+    '<div style="max-width:600px;margin:0 auto;">' +
+    bar(
+      '<img src="https://matrix.acoblighting.com/images/acob-logo-dark.png" height="60" alt="ACOB Lighting">',
+      "20px 0"
+    ) +
+    '<div style="padding:32px 28px;">' +
+    `<div style="font-size:20px;font-weight:700;color:#991b1b;margin:0 0 12px;">${escapeHtml(title)}</div>` +
+    `<ul style="font-size:14px;color:#374151;line-height:1.6;padding-left:18px;">${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>` +
+    '<p style="font-size:14px;color:#374151;line-height:1.6;">Staff have not received it. Send it manually from <strong>Admin &rsaquo; Communications &rsaquo; Meeting Reminders</strong> if it is still needed.</p>' +
+    '<p style="font-size:13px;color:#6b7280;">Check the send-meeting-reminder edge function logs for the cause.</p>' +
+    "</div>" +
+    bar(
+      '<strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br><span style="color:#16a34a;font-weight:600;">IT &amp; Communications</span><br><br><i style="color:#9ca3af;">This is an automated notification.</i>',
+      "20px"
+    ) +
+    "</div></body></html>"
+  )
+}
+
 /**
  * Watches meeting reminder schedules and alerts IT when one fails outright.
  *
@@ -152,7 +181,7 @@ export async function GET(request: NextRequest) {
       for (const failure of failures) {
         const { error: notifyError } = await supabase.rpc("create_notification", {
           p_user_id: userId,
-          p_type: "reminder_send_failed",
+          p_type: "system",
           p_category: "system",
           p_title: title,
           p_message: describe(failure),
@@ -168,18 +197,25 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const html = `
-      <p><strong>${title}</strong></p>
-      <ul>${lines.map((line) => `<li>${line}</li>`).join("")}</ul>
-      <p>Staff have not received it. Send it manually from
-      <strong>Admin &rsaquo; Communications &rsaquo; Meeting Reminders</strong> if it is still needed.</p>
-      <p style="color:#6b7280">Check the send-meeting-reminder edge function logs for the cause.</p>`
-    const emailResult = await sendNotificationEmailWithRetry({ to: emails, subject: `[Action needed] ${title}`, html })
-    if (!emailResult.sent) log.error({ reason: emailResult.reason }, "Alert email failed")
+    const html = renderAlertHtml(title, lines)
+    const subject = `Meeting Reminder Failed to Send — ${new Date(failures[0].since).toLocaleDateString("en-GB", { timeZone: "Africa/Lagos" })}`
+    // One email per recipient, so nobody sees the others' addresses.
+    let emailed = 0
+    for (const email of emails) {
+      const result = await sendNotificationEmailWithRetry({
+        from: ORG_EMAIL_SENDERS.system,
+        ...ORG_MAIL_ROUTING.Meetings,
+        to: [email],
+        subject,
+        html,
+      })
+      if (result.sent) emailed++
+      else log.error({ reason: result.reason }, "Alert email failed")
+    }
 
     // Mark as alerted only if someone was actually told, so a total delivery
     // failure is retried on the next run instead of being swallowed.
-    if (emailResult.sent || notified > 0) {
+    if (emailed > 0 || notified > 0) {
       const { error: markError } = await supabase
         .from("reminder_schedules")
         .update({ last_alerted_at: new Date().toISOString() })
@@ -190,8 +226,8 @@ export async function GET(request: NextRequest) {
       if (markError) log.error({ err: markError.message }, "Failed to record alert")
     }
 
-    log.warn({ alerts: failures.length, emailed: emailResult.sent, notified }, "Reminder failure alert raised")
-    return NextResponse.json({ data: { alerts: failures.length, emailed: emailResult.sent, notified } })
+    log.warn({ alerts: failures.length, emailed, notified }, "Reminder failure alert raised")
+    return NextResponse.json({ data: { alerts: failures.length, emailed, notified } })
   } catch (error) {
     log.error({ err: String(error) }, "Reminder health check failed")
     return NextResponse.json({ error: "Reminder health check failed" }, { status: 500 })
