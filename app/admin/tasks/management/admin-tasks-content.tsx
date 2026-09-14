@@ -165,7 +165,6 @@ export function AdminTasksContent({
   const [activeTab, setActiveTab] = useState<"tasks" | "user_plan">("tasks")
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [employee] = useState<employee[]>(initialemployee)
-  const projects = useMemo(() => (Array.isArray(initialProjects) ? initialProjects : []), [initialProjects])
   const assignerProfile = {
     id: userProfile.id,
     role: userProfile.role,
@@ -545,22 +544,8 @@ export function AdminTasksContent({
         label: "Department",
         options: departmentOptions.map((d) => ({ value: d, label: d })),
       },
-      ...(projects.length > 0
-        ? [
-            {
-              key: "project",
-              label: "Project",
-              options: projects.map((p) => ({ value: p.id, label: p.project_name })),
-              mode: "custom" as const,
-              filterFn: (row: Task, vals: string[]) => {
-                if (vals.length === 0) return true
-                return vals.includes(row.project_id || "")
-              },
-            },
-          ]
-        : []),
     ],
-    [departmentOptions, projects]
+    [departmentOptions]
   )
 
   return (

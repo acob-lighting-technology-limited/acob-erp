@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Filter,
   Layers,
@@ -15,11 +16,10 @@ import {
   AlertTriangle,
   RotateCcw,
 } from "lucide-react"
+import * as PopoverPrimitive from "@radix-ui/react-popover"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable } from "@/components/ui/data-table"
@@ -103,6 +103,256 @@ function isTaskAssignedToUser(task: Task, user: employee): boolean {
   return false
 }
 
+function PeriodFilterControl({
+  periodMode,
+  onPeriodModeChange,
+  selectedDay,
+  onDayChange,
+  selectedWeek,
+  onWeekChange,
+  selectedWeekYear,
+  onWeekYearChange,
+  selectedMonth,
+  onMonthChange,
+  selectedCycleId,
+  onCycleIdChange,
+  selectedYear,
+  onYearChange,
+  customStartDate,
+  onCustomStartDateChange,
+  customEndDate,
+  onCustomEndDateChange,
+  weekOptions,
+  yearOptions,
+  cycles,
+  description,
+  selectedValues,
+  onClear,
+}: {
+  periodMode: PeriodFilterMode
+  onPeriodModeChange: (mode: PeriodFilterMode) => void
+  selectedDay: string
+  onDayChange: (day: string) => void
+  selectedWeek: number
+  onWeekChange: (week: number) => void
+  selectedWeekYear: number
+  onWeekYearChange: (year: number) => void
+  selectedMonth: string
+  onMonthChange: (month: string) => void
+  selectedCycleId: string
+  onCycleIdChange: (cycleId: string) => void
+  selectedYear: number
+  onYearChange: (year: number) => void
+  customStartDate: string
+  onCustomStartDateChange: (date: string) => void
+  customEndDate: string
+  onCustomEndDateChange: (date: string) => void
+  weekOptions: number[]
+  yearOptions: number[]
+  cycles: ReviewCycleOption[]
+  description: string
+  selectedValues: string[]
+  onClear: () => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (selectedValues.length === 0 && periodMode !== "all") {
+      onPeriodModeChange("all")
+    }
+  }, [selectedValues, periodMode, onPeriodModeChange])
+
+  return (
+    <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
+      <PopoverPrimitive.Trigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "border-input ring-offset-background hover:bg-muted/50 focus:ring-ring flex h-9 w-full items-center justify-between rounded-lg border bg-transparent px-3 text-xs shadow-xs focus:ring-1 focus:outline-none",
+            periodMode !== "all" ? "text-foreground font-medium" : "text-muted-foreground"
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-1.5 truncate">
+            <Calendar className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{periodMode === "all" ? "All Time" : description}</span>
+          </span>
+          <ChevronDown className="text-muted-foreground ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+        </button>
+      </PopoverPrimitive.Trigger>
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="start"
+          sideOffset={4}
+          className={cn(
+            "bg-popover text-popover-foreground z-50 w-80 space-y-3 rounded-lg border p-3.5 shadow-md outline-none",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+          )}
+        >
+          <div className="flex items-center justify-between border-b pb-2">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="text-primary h-3.5 w-3.5" />
+              <span className="text-xs font-semibold">Time Period Filter</span>
+            </div>
+            {periodMode !== "all" && (
+              <button
+                type="button"
+                onClick={() => {
+                  onPeriodModeChange("all")
+                  onClear()
+                }}
+                className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[11px]"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-muted-foreground block text-[11px] font-medium">Period Mode</label>
+            <select
+              value={periodMode}
+              onChange={(e) => onPeriodModeChange(e.target.value as PeriodFilterMode)}
+              className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
+            >
+              <option value="all">All Time</option>
+              <option value="day">Specific Day</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+              <option value="cycle">PMS Review Cycle</option>
+              <option value="year">Year</option>
+              <option value="custom">Custom Date Range</option>
+            </select>
+          </div>
+
+          {periodMode === "day" && (
+            <div className="space-y-1">
+              <label className="text-muted-foreground block text-[11px] font-medium">Select Date</label>
+              <Input
+                type="date"
+                value={selectedDay}
+                onChange={(e) => onDayChange(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          )}
+
+          {periodMode === "week" && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-muted-foreground block text-[11px] font-medium">Office Week</label>
+                <select
+                  value={String(selectedWeek)}
+                  onChange={(e) => onWeekChange(Number(e.target.value))}
+                  className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
+                >
+                  {weekOptions.map((w) => (
+                    <option key={w} value={String(w)}>
+                      Week {w}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-muted-foreground block text-[11px] font-medium">Year</label>
+                <select
+                  value={String(selectedWeekYear)}
+                  onChange={(e) => onWeekYearChange(Number(e.target.value))}
+                  className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {periodMode === "month" && (
+            <div className="space-y-1">
+              <label className="text-muted-foreground block text-[11px] font-medium">Select Month</label>
+              <Input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => onMonthChange(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+          )}
+
+          {periodMode === "cycle" && (
+            <div className="space-y-1">
+              <label className="text-muted-foreground block text-[11px] font-medium">Select Review Cycle</label>
+              <select
+                value={selectedCycleId}
+                onChange={(e) => onCycleIdChange(e.target.value)}
+                className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
+              >
+                {cycles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.review_type ? `(${c.review_type})` : ""}
+                    {c.status === "active" ? " • Active" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {periodMode === "year" && (
+            <div className="space-y-1">
+              <label className="text-muted-foreground block text-[11px] font-medium">Select Year</label>
+              <select
+                value={String(selectedYear)}
+                onChange={(e) => onYearChange(Number(e.target.value))}
+                className="border-input bg-background focus:ring-ring flex h-8 w-full rounded-md border px-2 text-xs shadow-xs focus:ring-1 focus:outline-none"
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={String(y)}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {periodMode === "custom" && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-muted-foreground block text-[11px] font-medium">Start Date</label>
+                <Input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => onCustomStartDateChange(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-muted-foreground block text-[11px] font-medium">End Date</label>
+                <Input
+                  type="date"
+                  value={customEndDate}
+                  min={customStartDate}
+                  onChange={(e) => onCustomEndDateChange(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[11px]">
+            <span>Active window:</span>
+            <Badge variant="secondary" className="text-[10px] font-normal">
+              {description}
+            </Badge>
+          </div>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
+  )
+}
+
 export function AdminUserTasksPlan({
   tasks,
   employees,
@@ -125,6 +375,9 @@ export function AdminUserTasksPlan({
   const [selectedMonth, setSelectedMonth] = useState(toLocalYearMonth())
   const [selectedCycleId, setSelectedCycleId] = useState(cycles[0]?.id || "")
   const [selectedYear, setSelectedYear] = useState(currentYear)
+
+  const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
+  const yearOptions = useMemo(() => [currentYear - 2, currentYear - 1, currentYear, currentYear + 1], [currentYear])
 
   // Resolve active date bounds [startIso, endIso]
   const dateBounds = useMemo<{ start: string; end: string; description: string }>(() => {
@@ -427,6 +680,74 @@ export function AdminUserTasksPlan({
         options: departments.map((d) => ({ value: d, label: d })),
       },
       {
+        key: "period",
+        label: "Time Period",
+        defaultValues: ["week"],
+        options: [
+          {
+            value: periodMode,
+            label: dateBounds.description,
+          },
+        ],
+        mode: "custom",
+        filterFn: () => true,
+        render: (selectedValues, onChange) => (
+          <PeriodFilterControl
+            periodMode={periodMode}
+            onPeriodModeChange={(mode) => {
+              setPeriodMode(mode)
+              onChange(mode === "all" ? [] : [mode])
+            }}
+            selectedDay={selectedDay}
+            onDayChange={(day) => {
+              setSelectedDay(day)
+              onChange([periodMode])
+            }}
+            selectedWeek={selectedWeek}
+            onWeekChange={(week) => {
+              setSelectedWeek(week)
+              onChange([periodMode])
+            }}
+            selectedWeekYear={selectedWeekYear}
+            onWeekYearChange={(year) => {
+              setSelectedWeekYear(year)
+              onChange([periodMode])
+            }}
+            selectedMonth={selectedMonth}
+            onMonthChange={(month) => {
+              setSelectedMonth(month)
+              onChange([periodMode])
+            }}
+            selectedCycleId={selectedCycleId}
+            onCycleIdChange={(cycleId) => {
+              setSelectedCycleId(cycleId)
+              onChange([periodMode])
+            }}
+            selectedYear={selectedYear}
+            onYearChange={(year) => {
+              setSelectedYear(year)
+              onChange([periodMode])
+            }}
+            customStartDate={customStartDate}
+            onCustomStartDateChange={(date) => {
+              setCustomStartDate(date)
+              onChange([periodMode])
+            }}
+            customEndDate={customEndDate}
+            onCustomEndDateChange={(date) => {
+              setCustomEndDate(date)
+              onChange([periodMode])
+            }}
+            weekOptions={weekOptions}
+            yearOptions={yearOptions}
+            cycles={cycles}
+            description={dateBounds.description}
+            selectedValues={selectedValues}
+            onClear={() => onChange([])}
+          />
+        ),
+      },
+      {
         key: "activity",
         label: "Task Activity",
         options: [
@@ -442,179 +763,25 @@ export function AdminUserTasksPlan({
         },
       },
     ]
-  }, [departments])
-
-  const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
-  const yearOptions = useMemo(() => [currentYear - 2, currentYear - 1, currentYear, currentYear + 1], [currentYear])
+  }, [
+    departments,
+    periodMode,
+    dateBounds.description,
+    selectedDay,
+    selectedWeek,
+    selectedWeekYear,
+    selectedMonth,
+    selectedCycleId,
+    selectedYear,
+    customStartDate,
+    customEndDate,
+    weekOptions,
+    yearOptions,
+    cycles,
+  ])
 
   return (
     <div className="space-y-4">
-      {/* ── Period Filter Control Bar ── */}
-      <div className="bg-card/70 rounded-xl border p-3.5 shadow-sm sm:p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="text-primary h-4 w-4" />
-            <span className="text-sm font-semibold">Time Period Filter</span>
-            <Badge variant="secondary" className="text-xs font-normal">
-              {dateBounds.description}
-            </Badge>
-          </div>
-          {periodMode !== "all" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPeriodMode("all")}
-              className="text-muted-foreground h-7 gap-1 text-xs"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset to All Time
-            </Button>
-          )}
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-end gap-3">
-          {/* Filter Mode Selector */}
-          <div className="w-full space-y-1 sm:w-44">
-            <Label className="text-muted-foreground text-xs">Filter By</Label>
-            <Select value={periodMode} onValueChange={(val) => setPeriodMode(val as PeriodFilterMode)}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Period Mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="day">Specific Day</SelectItem>
-                <SelectItem value="week">Week</SelectItem>
-                <SelectItem value="month">Month</SelectItem>
-                <SelectItem value="cycle">PMS Review Cycle</SelectItem>
-                <SelectItem value="year">Year</SelectItem>
-                <SelectItem value="custom">Custom Date Range</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Dynamic sub-controls depending on periodMode */}
-          {periodMode === "day" && (
-            <div className="space-y-1">
-              <Label className="text-muted-foreground text-xs">Select Date</Label>
-              <Input
-                type="date"
-                value={selectedDay}
-                onChange={(e) => setSelectedDay(e.target.value)}
-                className="h-9 w-44"
-              />
-            </div>
-          )}
-
-          {periodMode === "week" && (
-            <>
-              <div className="w-32 space-y-1">
-                <Label className="text-muted-foreground text-xs">Office Week</Label>
-                <Select value={String(selectedWeek)} onValueChange={(v) => setSelectedWeek(Number(v))}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Week" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {weekOptions.map((w) => (
-                      <SelectItem key={w} value={String(w)}>
-                        Week {w}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-28 space-y-1">
-                <Label className="text-muted-foreground text-xs">Year</Label>
-                <Select value={String(selectedWeekYear)} onValueChange={(v) => setSelectedWeekYear(Number(v))}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {yearOptions.map((y) => (
-                      <SelectItem key={y} value={String(y)}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
-
-          {periodMode === "month" && (
-            <div className="space-y-1">
-              <Label className="text-muted-foreground text-xs">Select Month</Label>
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="h-9 w-44"
-              />
-            </div>
-          )}
-
-          {periodMode === "cycle" && (
-            <div className="max-w-sm min-w-[220px] space-y-1">
-              <Label className="text-muted-foreground text-xs">Select Review Cycle</Label>
-              <Select value={selectedCycleId} onValueChange={setSelectedCycleId}>
-                <SelectTrigger className="h-9 truncate">
-                  <SelectValue placeholder="Select review cycle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cycles.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} {c.review_type ? `(${c.review_type})` : ""}
-                      {c.status === "active" ? " • Active" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {periodMode === "year" && (
-            <div className="w-32 space-y-1">
-              <Label className="text-muted-foreground text-xs">Select Year</Label>
-              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {periodMode === "custom" && (
-            <>
-              <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">Start Date</Label>
-                <Input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="h-9 w-40"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">End Date</Label>
-                <Input
-                  type="date"
-                  value={customEndDate}
-                  min={customStartDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="h-9 w-40"
-                />
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
       {/* ── Top Stat Cards ── */}
       <StatGrid>
         <StatCard
