@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Eye,
   FileSpreadsheet,
   Gavel,
   CalendarDays,
@@ -754,6 +755,11 @@ export default function ActionTrackerPortal() {
           }}
           rowActions={[
             {
+              label: "View Action Points",
+              icon: Eye,
+              onClick: (row) => setViewingDepartment(row),
+            },
+            {
               label: "Export",
               icon: Download,
               onClick: (row) => {
@@ -766,6 +772,60 @@ export default function ActionTrackerPortal() {
               },
             },
           ]}
+          expandable={{
+            render: (row) => (
+              <div className="space-y-3">
+                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Action Points</p>
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">#</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Action Point</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Status</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Hindrance</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {row.tasks.map((task, index) => (
+                        <tr key={task.id} className="border-t">
+                          <td className="text-muted-foreground px-3 py-2 text-xs">{index + 1}</td>
+                          <td className="px-3 py-2">
+                            <p className="font-medium">{task.title}</p>
+                            {task.description ? (
+                              <p className="text-muted-foreground text-xs">{task.description}</p>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Select
+                              value={task.status}
+                              disabled={!canMutateTask(task)}
+                              onValueChange={(newStatus) => {
+                                void handleStatusChange(task.id, newStatus)
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="not_started">Not Started</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-3 py-2">{renderBlockerButton(task)}</td>
+                          <td className={`px-3 py-2 text-xs ${getDueDateClassName(task)}`}>{formatDueDate(task)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ),
+          }}
           stickyToolbar
           viewToggle
           contactsView
