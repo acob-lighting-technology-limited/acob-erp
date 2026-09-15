@@ -49,12 +49,14 @@ export default function InventoryDashboard() {
       {/* Stats Grid */}
       <StatGrid>
         <StatCard
+          variant="compact"
           title="Total Products"
           value={stats.totalProducts}
           icon={Package}
           description={`In ${stats.totalCategories} categories`}
         />
         <StatCard
+          variant="compact"
           title="Low Stock"
           value={stats.lowStockItems}
           icon={AlertTriangle}
@@ -63,12 +65,19 @@ export default function InventoryDashboard() {
           description="Items need reorder"
         />
         <StatCard
+          variant="compact"
           title="Inventory Value"
           value={formatCurrency(stats.totalValue)}
           icon={TrendingUp}
           description="Total stock value"
         />
-        <StatCard title="Warehouses" value={stats.totalWarehouses} icon={Warehouse} description="Storage locations" />
+        <StatCard
+          variant="compact"
+          title="Warehouses"
+          value={stats.totalWarehouses}
+          icon={Warehouse}
+          description="Storage locations"
+        />
       </StatGrid>
 
       {/* Module Cards */}

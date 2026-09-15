@@ -10,7 +10,7 @@ export default function Loading() {
       columns={5}
       rows={8}
       showStats
-      statCards={4}
+      statCards={3}
       spacing="tight"
       showBackLink
       inlineActions

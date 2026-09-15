@@ -125,13 +125,24 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     if (!entity) return NextResponse.json({ error: "Action item not found" }, { status: 404 })
 
+    const referer = request.headers.get("referer")
+    let isAdminContext = false
+    if (referer) {
+      try {
+        const pathname = new URL(referer).pathname
+        isAdminContext = pathname.startsWith("/admin/")
+      } catch {
+        isAdminContext = false
+      }
+    }
+
     const scope = {
       department: entity.item.department,
       origin: String(entity.item.origin || ""),
       assigneeIds: entity.assigneeIds,
     }
-    const canEditContent = canEditActionContent(profile ?? null, scope)
-    const canUpdateProgress = canUpdateActionProgress(profile ?? null, scope)
+    const canEditContent = canEditActionContent(profile ?? null, scope, { isAdminContext })
+    const canUpdateProgress = canUpdateActionProgress(profile ?? null, scope, { isAdminContext })
 
     if (!canEditContent && !canUpdateProgress) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -235,7 +246,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   }
 }
 
-export async function DELETE(_: NextRequest, props: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const rl = await rateLimit("reports-action-tracker", { limit: 20, windowSec: 60 })
   if (!rl.allowed)
@@ -261,9 +272,21 @@ export async function DELETE(_: NextRequest, props: { params: Promise<{ id: stri
     ])
 
     if (!entity) return NextResponse.json({ error: "Action item not found" }, { status: 404 })
+
+    const referer = request.headers.get("referer")
+    let isAdminContext = false
+    if (referer) {
+      try {
+        const pathname = new URL(referer).pathname
+        isAdminContext = pathname.startsWith("/admin/")
+      } catch {
+        isAdminContext = false
+      }
+    }
+
     // Deleting is editing the record, not reporting against it: being tagged on a
     // directive never grants the right to remove it.
-    if (!canEditActionContent(profile ?? null, { department: entity.item.department })) {
+    if (!canEditActionContent(profile ?? null, { department: entity.item.department }, { isAdminContext })) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

@@ -1,5 +1,5 @@
-import { DashboardSkeleton } from "@/components/skeletons"
+import { CardGridPageSkeleton } from "@/components/skeletons"
 
-export default function Loading() {
-  return <DashboardSkeleton statCards={4} showActivity={true} />
+export default function DeptReportsLoading() {
+  return <CardGridPageSkeleton cards={1} columns={3} />
 }

@@ -19,6 +19,8 @@ import {
 import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import { Button } from "@/components/ui/button"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
@@ -80,6 +82,7 @@ function isTaskOverdue(task: Task): boolean {
 
 export function TasksContent({ initialTasks, userId, userProfile }: TasksContentProps) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const staffAvatars = useStaffAvatars()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskUpdates, setTaskUpdates] = useState<TaskUpdate[]>([])
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
@@ -89,6 +92,14 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   // Whether this user may approve, rate, reject or reassign a given task. The
   // control offers those decisions inline, so it needs to know per row.
   const canReviewTask = (task: Task) => {
+    // An assignee viewing their own task acts strictly as an employee, not as a reviewer.
+    if (
+      task.assigned_to === userId ||
+      (Array.isArray(task.assigned_users) &&
+        task.assigned_users.some((u) => (typeof u === "string" ? u === userId : u.id === userId)))
+    ) {
+      return false
+    }
     const role = String(userProfile?.role || "").toLowerCase()
     if (["admin", "super_admin", "developer"].includes(role)) return true
     if (!userProfile?.is_department_lead) return false
@@ -281,7 +292,14 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       label: "Assigned By",
       accessor: (t) => t.assigned_by_user?.first_name || "",
       render: (t) => (
-        <span className="text-muted-foreground text-xs">
+        <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          {t.assigned_by_user && (
+            <StaffAvatar
+              name={formatFullName(t.assigned_by_user.first_name, t.assigned_by_user.last_name)}
+              src={t.assigned_by ? staffAvatars[t.assigned_by] : null}
+              size="xs"
+            />
+          )}
           {t.assigned_by_user ? formatFullName(t.assigned_by_user.first_name, t.assigned_by_user.last_name) : "System"}
         </span>
       ),

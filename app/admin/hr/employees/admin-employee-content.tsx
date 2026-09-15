@@ -186,15 +186,14 @@ function EmployeeAvatar({ employee, size = "md" }: { employee: Employee; size?: 
 const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
 
 /**
- * Contract staff are a distinct population: engaged per contract, not on the regular
- * payroll, and largely not platform users. They are identified by employment_type, which
- * survives the profile normalisation — company_email being blank was only ever a symptom
- * of the same incomplete onboarding, never the defining attribute.
- *
- * NULL employment_type is treated as full time to match the Staff type filter.
+ * Field contractors on payroll (CTR group without company email). Contract personnel
+ * with company email addresses are active platform employees and appear under Employees.
  */
 function isContractStaff(employee: Employee): boolean {
-  return (employee.employment_type ?? "full_time") === "contract"
+  return (
+    ((employee.employment_status || "").toLowerCase() === "contract" || employee.employment_type === "contract") &&
+    !employee.company_email
+  )
 }
 
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {

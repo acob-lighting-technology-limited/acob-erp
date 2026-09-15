@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import { Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { apiFetch } from "@/lib/api-client"
 import type { Portfolio } from "./portfolios-content"
 
@@ -22,11 +24,14 @@ export function PortfolioDialog({
   onOpenChange,
   portfolio,
   onSuccess,
+  onDelete,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   portfolio: Portfolio | null
   onSuccess: () => void
+  /** Shown only when editing; hands off to the delete confirmation. */
+  onDelete?: (portfolio: Portfolio) => void
 }) {
   const [name, setName] = useState("")
   const [code, setCode] = useState("")
@@ -117,22 +122,33 @@ export function PortfolioDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="portfolio-status" className="text-xs font-semibold">
-              Status
-            </Label>
-            <select
-              id="portfolio-status"
+            <Label className="text-xs font-semibold">Status</Label>
+            <SearchableSelect
               value={status}
-              onChange={(e) => setStatus(e.target.value as "active" | "on_hold" | "closed")}
-              className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-            >
-              <option value="active">Active</option>
-              <option value="on_hold">On Hold</option>
-              <option value="closed">Closed</option>
-            </select>
+              onValueChange={(value) => setStatus(value as "active" | "on_hold" | "closed")}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "on_hold", label: "On Hold" },
+                { value: "closed", label: "Closed" },
+              ]}
+              placeholder="Select status"
+              searchPlaceholder="Search status..."
+            />
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
+            {portfolio && onDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-destructive hover:text-destructive sm:mr-auto"
+                onClick={() => onDelete(portfolio)}
+                disabled={isSaving}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
               Cancel
             </Button>

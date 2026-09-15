@@ -9,7 +9,6 @@ export default function TasksLoading() {
       columns={6}
       rows={8}
       showStats
-      statCardVariant="compact"
       statCards={5}
       spacing="tight"
       showBackLink

@@ -3,7 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn, formatName, getInitials } from "@/lib/utils"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -73,6 +74,7 @@ interface AdminSidebarProps {
     }
   }
   profile?: {
+    id?: string
     first_name?: string
     last_name?: string
     department?: string
@@ -583,6 +585,8 @@ export function AdminSidebar({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { isCollapsed } = useSidebar()
+  const staffAvatars = useStaffAvatars()
+  const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
   const supabase = createClient()
 
   // Listen for toggle event from navbar
@@ -985,11 +989,13 @@ export function AdminSidebar({
                     className="text-muted-foreground min-h-[52px] w-full justify-center px-2.5 text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                   >
                     <div className="flex items-center">
-                      <Avatar className="ring-primary/10 h-7 w-7 shrink-0 ring-2">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                          {getInitials(user?.email, profile?.first_name, profile?.last_name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <StaffAvatar
+                        name={accountName}
+                        src={accountAvatarUrl}
+                        initials={getInitials(user?.email, profile?.first_name, profile?.last_name)}
+                        className="ring-primary/10 h-7 w-7 ring-2"
+                        fallbackClassName="bg-primary text-primary-foreground text-xs font-semibold"
+                      />
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
@@ -1003,11 +1009,13 @@ export function AdminSidebar({
                 className="text-muted-foreground min-h-[52px] w-full justify-between px-3 text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
               >
                 <div className="flex items-center gap-2.5">
-                  <Avatar className="ring-primary/10 h-7 w-7 shrink-0 ring-2">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                      {getInitials(user?.email, profile?.first_name, profile?.last_name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <StaffAvatar
+                    name={accountName}
+                    src={accountAvatarUrl}
+                    initials={getInitials(user?.email, profile?.first_name, profile?.last_name)}
+                    className="ring-primary/10 h-7 w-7 ring-2"
+                    fallbackClassName="bg-primary text-primary-foreground text-xs font-semibold"
+                  />
                   <div
                     className={cn(
                       "min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out",

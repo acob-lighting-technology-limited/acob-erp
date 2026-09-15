@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 type Ticket = {
   id: string
@@ -27,6 +29,22 @@ type Ticket = {
   assigned_to_name?: string | null
   csat_rating?: number | null
   csat_feedback?: string | null
+}
+
+function TicketPerson({ label, name, src }: { label: string; name: string | null; src: string | null | undefined }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span>{label}:</span>
+      {name ? (
+        <span className="flex items-center gap-1.5">
+          <StaffAvatar name={name} src={src} size="xs" />
+          {name}
+        </span>
+      ) : (
+        "-"
+      )}
+    </div>
+  )
 }
 
 export function TicketDetailContent({
@@ -50,6 +68,7 @@ export function TicketDetailContent({
   approvals: Array<{ id: string; approval_stage?: string | null; status?: string | null; requested_at?: string | null }>
   comments: Array<{ id: string; comment?: string | null; body?: string | null; created_at?: string | null }>
 }) {
+  const staffAvatars = useStaffAvatars()
   const [newComment, setNewComment] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [rating, setRating] = useState(ticket?.csat_rating ? String(ticket.csat_rating) : "")
@@ -190,8 +209,16 @@ export function TicketDetailContent({
               <CardTitle>Ticket Metadata</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <div>Requester: {ticket.requester_name || (ticket.requester_id === viewerId ? "You" : "-")}</div>
-              <div>Assigned To: {ticket.assigned_to_name || (ticket.assigned_to === viewerId ? "You" : "-")}</div>
+              <TicketPerson
+                label="Requester"
+                name={ticket.requester_name || (ticket.requester_id === viewerId ? "You" : null)}
+                src={ticket.requester_id ? staffAvatars[ticket.requester_id] : null}
+              />
+              <TicketPerson
+                label="Assigned To"
+                name={ticket.assigned_to_name || (ticket.assigned_to === viewerId ? "You" : null)}
+                src={ticket.assigned_to ? staffAvatars[ticket.assigned_to] : null}
+              />
               <div>Department: {ticket.service_department || "-"}</div>
               <div>Category: {ticket.category || "-"}</div>
               <div>SLA Target: {ticket.sla_target_at ? formatWATDateTime(ticket.sla_target_at) : "-"}</div>

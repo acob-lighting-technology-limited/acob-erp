@@ -52,7 +52,18 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single<ActionTrackerScopeProfile>()
 
-    if (!canEditActionContent(profile ?? null, { department: parsed.data.department })) {
+    const referer = request.headers.get("referer")
+    let isAdminContext = false
+    if (referer) {
+      try {
+        const pathname = new URL(referer).pathname
+        isAdminContext = pathname.startsWith("/admin/")
+      } catch {
+        isAdminContext = false
+      }
+    }
+
+    if (!canEditActionContent(profile ?? null, { department: parsed.data.department }, { isAdminContext })) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

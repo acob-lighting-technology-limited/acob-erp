@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { StaffAvatar, type StaffAvatarSize } from "@/components/ui/staff-avatar"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -51,7 +52,11 @@ type DirectoryRow = {
 
 /** Field contractors on payroll (CTR group without company email). */
 function isContractStaff(row: DirectoryRow): boolean {
-  return (row.employment_status || "").toLowerCase() === "contract" && !row.company_email
+  return (
+    ((row.employment_status || "").toLowerCase() === "contract" ||
+      (row.employment_type || "").toLowerCase() === "contract") &&
+    !row.company_email
+  )
 }
 
 /**
@@ -97,10 +102,13 @@ function CopyValue({ value, className, muted }: { value: string | null; classNam
   )
 }
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return (name.slice(0, 2) || "AC").toUpperCase()
+/**
+ * The person, in every view. A directory is a list of people, so the face (or
+ * the initials standing in for it) belongs in the table cell and the card as
+ * much as in the contacts row.
+ */
+function DirectoryAvatar({ row, size = "md" }: { row: DirectoryRow; size?: StaffAvatarSize }) {
+  return <StaffAvatar name={displayName(row)} src={row.avatar_url} size={size} />
 }
 
 /**
@@ -108,38 +116,6 @@ function getInitials(name: string): string {
  * by its initial, so the surname has to lead. Falls back to whatever is available:
  * a row with only `full_name` keeps its last word as the surname.
  */
-const AVATAR_SIZES = {
-  sm: "h-8 w-8 text-[10px]",
-  md: "h-9 w-9 text-[11px]",
-  lg: "h-12 w-12 text-sm",
-  xl: "h-16 w-16 text-lg",
-} as const
-
-/**
- * The person, in every view. A directory is a list of people, so the face (or
- * the initials standing in for it) belongs in the table cell and the card as
- * much as in the contacts row — it was previously written inline twice and
- * missing from the other two.
- */
-function DirectoryAvatar({ row, size = "md" }: { row: DirectoryRow; size?: keyof typeof AVATAR_SIZES }) {
-  const name = displayName(row)
-  return (
-    <span
-      className={cn(
-        "bg-primary/10 text-primary flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold",
-        AVATAR_SIZES[size]
-      )}
-    >
-      {row.avatar_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={row.avatar_url} alt={name} className="h-full w-full object-cover" />
-      ) : (
-        getInitials(name)
-      )}
-    </span>
-  )
-}
-
 function displayName(row: DirectoryRow): string {
   const first = row.first_name?.trim()
   const last = row.last_name?.trim()

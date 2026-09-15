@@ -33,12 +33,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import type { Portfolio } from "./portfolios-content"
+import { projectHref } from "./project-href"
 
 interface PortfolioAnalyticsProps {
   rows: Portfolio[]
   unassigned?: Portfolio["rollup"]
   focusedPortfolioId?: string | null
   onFocusPortfolio?: (id: string | null) => void
+  isAdmin?: boolean
 }
 
 interface CustomTooltipPayloadItem {
@@ -95,6 +97,7 @@ export function PortfolioAnalytics({
   unassigned,
   focusedPortfolioId,
   onFocusPortfolio,
+  isAdmin = true,
 }: PortfolioAnalyticsProps) {
   const [internalFocusedId, setInternalFocusedId] = useState<string | null>(focusedPortfolioId ?? null)
   const [isMounted, setIsMounted] = useState(false)
@@ -645,7 +648,7 @@ export function PortfolioAnalytics({
                 {focusedPortfolio.projects.map((proj) => (
                   <Link
                     key={proj.id}
-                    href={`/projects?search=${encodeURIComponent(proj.project_name)}`}
+                    href={projectHref(proj.project_name, isAdmin)}
                     className="bg-background hover:bg-accent text-foreground inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors hover:underline"
                   >
                     {proj.project_name}

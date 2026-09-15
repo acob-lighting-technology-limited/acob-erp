@@ -374,54 +374,52 @@ export async function PATCH(request: Request) {
       log.error({ err: String(syncError), reportId: saved?.id }, "Weekly report action item sync failed")
     }
 
-    // Keep risk_register aligned with weekly_reports.challenges.
-    // Automatically ingests challenges into the Corporate Services Risk Register.
-    // Preserves any risks that have already had a custom mitigation plan or non-open status set.
+    // Keep meeting_challenges aligned with weekly_reports.challenges.
+    // Ingests challenges into the General Meeting Challenges table.
+    // Preserves any challenges that have already had a resolution note or non-open status set.
     try {
       const reportId = String(saved?.id || "")
       if (reportId && status === "submitted") {
-        const { data: existingRisks, error: existingRisksError } = await dataClient
-          .from("risk_register")
-          .select("id, status, mitigation_plan")
+        const { data: existingChallenges, error: existingChallengesError } = await dataClient
+          .from("meeting_challenges")
+          .select("id, status, resolution_note")
           .eq("report_id", reportId)
 
-        if (!existingRisksError) {
-          type RiskCheckRow = { id: string; status: string; mitigation_plan: string | null }
-          const rows = (existingRisks || []) as RiskCheckRow[]
-          const hasActiveRisks = rows.some((row) => row.status !== "open" || Boolean(row.mitigation_plan?.trim()))
+        if (!existingChallengesError) {
+          type ChallengeCheckRow = { id: string; status: string; resolution_note: string | null }
+          const rows = (existingChallenges || []) as ChallengeCheckRow[]
+          const hasActiveUpdates = rows.some((row) => row.status !== "open" || Boolean(row.resolution_note?.trim()))
 
-          if (!hasActiveRisks) {
-            await dataClient.from("risk_register").delete().eq("report_id", reportId)
+          if (!hasActiveUpdates) {
+            await dataClient.from("meeting_challenges").delete().eq("report_id", reportId)
 
             const parsedChallenges = parseChallengesLines(challenges)
             if (parsedChallenges.length > 0) {
-              const riskPayload = parsedChallenges.map((title, index) => ({
+              const challengePayload = parsedChallenges.map((title, index) => ({
                 title,
                 department,
                 week_number: weekNumber,
                 year: yearNumber,
-                category: "operational",
-                severity: "medium",
-                likelihood: 2,
-                impact: 2,
                 status: "open",
                 report_id: reportId,
                 position: index,
                 created_by: user.id,
               }))
-              const { error: insertRisksError } = await dataClient.from("risk_register").insert(riskPayload)
-              if (insertRisksError) {
+              const { error: insertChallengesError } = await dataClient
+                .from("meeting_challenges")
+                .insert(challengePayload)
+              if (insertChallengesError) {
                 log.warn(
-                  { err: insertRisksError.message, reportId },
-                  "Failed to auto-insert challenges to risk_register"
+                  { err: insertChallengesError.message, reportId },
+                  "Failed to auto-insert challenges to meeting_challenges"
                 )
               }
             }
           }
         }
       }
-    } catch (riskSyncError) {
-      log.warn({ err: String(riskSyncError), reportId: saved?.id }, "Weekly report risk register sync failed")
+    } catch (challengeSyncError) {
+      log.warn({ err: String(challengeSyncError), reportId: saved?.id }, "Weekly report meeting challenges sync failed")
     }
 
     log.info({ savedId: saved?.id, payload }, "Weekly report saved successfully")

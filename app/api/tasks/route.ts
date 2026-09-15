@@ -25,7 +25,8 @@ const TaskBodySchema = z.object({
   assigned_to: z.string().uuid().optional().nullable(),
   assigned_users: z.array(z.string().uuid()).optional().default([]),
   goal_id: z.string().uuid().optional().nullable(),
-  kpi_id: z.string().uuid().optional().nullable(),
+  // Compulsory: every task must be linked to a Corporate KPI.
+  kpi_id: z.string().uuid("Corporate KPI is required"),
   project_id: z.string().uuid().optional().nullable(),
   plan_id: z.string().uuid().optional().nullable(),
   // Compulsory: task weight is the denominator of the employee's KPI score.

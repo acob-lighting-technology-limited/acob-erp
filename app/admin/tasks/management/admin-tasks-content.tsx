@@ -36,6 +36,8 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
 import {
@@ -376,6 +378,7 @@ export function AdminTasksContent({
   )
 
   const departmentLeadMap = buildDepartmentLeadMap(activeEmployees)
+  const staffAvatars = useStaffAvatars()
 
   const workflowOwnerLabel = useCallback(
     (task: Task) => {
@@ -431,9 +434,18 @@ export function AdminTasksContent({
         initialWidth: 200,
         accessor: (r) => `${workflowOwnerLabel(r)} ${r.department || ""}`,
         render: (r) => (
-          <div className="flex flex-col">
-            <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>
-            <span className="text-muted-foreground text-[10px] uppercase">{r.department || "General"}</span>
+          <div className="flex items-center gap-2">
+            {r.assigned_to_user && (
+              <StaffAvatar
+                name={workflowOwnerLabel(r)}
+                src={r.assigned_to ? staffAvatars[r.assigned_to] : null}
+                size="xs"
+              />
+            )}
+            <div className="flex min-w-0 flex-col">
+              <span className="text-foreground text-xs font-medium">{workflowOwnerLabel(r)}</span>
+              <span className="text-muted-foreground text-[10px] uppercase">{r.department || "General"}</span>
+            </div>
           </div>
         ),
       },
@@ -497,7 +509,7 @@ export function AdminTasksContent({
         },
       },
     ],
-    [workflowOwnerLabel]
+    [workflowOwnerLabel, staffAvatars]
   )
 
   const filters: DataTableFilter<Task>[] = useMemo(
@@ -702,11 +714,27 @@ export function AdminTasksContent({
                   <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Assigned To:</span>
-                      <span className="font-medium">{workflowOwnerLabel(r)}</span>
+                      <span className="flex items-center gap-1.5 font-medium">
+                        {r.assigned_to_user && (
+                          <StaffAvatar
+                            name={workflowOwnerLabel(r)}
+                            src={r.assigned_to ? staffAvatars[r.assigned_to] : null}
+                            size="xs"
+                          />
+                        )}
+                        {workflowOwnerLabel(r)}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block text-[10px]">Assigned By:</span>
-                      <span className="font-medium">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        {r.assigned_by_user && (
+                          <StaffAvatar
+                            name={formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)}
+                            src={r.assigned_by ? staffAvatars[r.assigned_by] : null}
+                            size="xs"
+                          />
+                        )}
                         {r.assigned_by_user
                           ? formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)
                           : "System"}

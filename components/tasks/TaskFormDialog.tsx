@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Target, Users, User, Calendar, CheckSquare, Square, Scale, FolderKanban } from "lucide-react"
+import { Target, Users, User, Calendar, Scale, FolderKanban } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import {
   Select,
   SelectContent,
@@ -287,16 +288,6 @@ export function TaskFormDialog({
     }))
   }, [scopedAssignableEmployees])
 
-  const handleToggleUser = (userId: string) => {
-    setSelectedUserIds((prev) => {
-      const next = prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-      if (next.length === 1) {
-        setValue("assigned_to", next[0])
-      }
-      return next
-    })
-  }
-
   function buildTaskFormState(): TaskFormState {
     const values = getValues()
     const targetUsers = isMultiAssign ? selectedUserIds : values.assigned_to ? [values.assigned_to] : []
@@ -435,7 +426,25 @@ export function TaskFormDialog({
                     variant={isMultiAssign ? "secondary" : "outline"}
                     size="sm"
                     className="h-6 px-2 text-xs"
-                    onClick={() => setIsMultiAssign(!isMultiAssign)}
+                    onClick={() => {
+                      const nextMulti = !isMultiAssign
+                      setIsMultiAssign(nextMulti)
+                      if (!nextMulti) {
+                        if (selectedUserIds.length > 0) {
+                          const firstId = selectedUserIds[0]
+                          setValue("assigned_to", firstId)
+                          const member = scopedAssignableEmployees.find((e) => e.id === firstId)
+                          if (member?.department) {
+                            setValue("department", member.department)
+                          }
+                          setSelectedUserIds([firstId])
+                        }
+                      } else {
+                        if (assignedTo && !selectedUserIds.includes(assignedTo)) {
+                          setSelectedUserIds([assignedTo])
+                        }
+                      }
+                    }}
                   >
                     {isMultiAssign ? "Multi-Assign Active" : "Enable Multi-Assign"}
                   </Button>
@@ -464,39 +473,33 @@ export function TaskFormDialog({
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-muted-foreground text-xs">
-                  Select team members. Individual tasks will be created for each chosen person:
-                </p>
-                <div className="bg-background max-h-36 space-y-1 overflow-y-auto rounded border p-2">
-                  {scopedAssignableEmployees.map((emp) => {
-                    const isChecked = selectedUserIds.includes(emp.id)
-                    return (
-                      <button
-                        key={emp.id}
-                        type="button"
-                        onClick={() => handleToggleUser(emp.id)}
-                        className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors ${
-                          isChecked ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          {isChecked ? (
-                            <CheckSquare className="text-primary h-3.5 w-3.5 shrink-0" />
-                          ) : (
-                            <Square className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                          )}
-                          <span>{formatFullName(emp.first_name, emp.last_name)}</span>
-                        </span>
-                        <Badge variant="outline" className="py-0 text-[10px]">
-                          {emp.department}
-                        </Badge>
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="text-muted-foreground text-xs">
-                  Selected: <span className="text-foreground font-medium">{selectedUserIds.length}</span> staff
-                  member(s)
+                <SearchableMultiSelect
+                  label="Select Team Members"
+                  icon={<Users className="h-3.5 w-3.5" />}
+                  values={selectedUserIds}
+                  options={employeeSelectOptions}
+                  onChange={(vals) => {
+                    setSelectedUserIds(vals)
+                    if (vals.length === 1) {
+                      setValue("assigned_to", vals[0])
+                      const member = scopedAssignableEmployees.find((e) => e.id === vals[0])
+                      if (member?.department) {
+                        setValue("department", member.department)
+                      }
+                    } else {
+                      setValue("assigned_to", "")
+                    }
+                  }}
+                  placeholder="Select team members..."
+                  searchPlaceholder="Search staff name or department..."
+                  disabled={lockLevel !== "none"}
+                />
+                <div className="text-muted-foreground flex items-center justify-between text-xs">
+                  <span>Individual tasks will be created for each chosen person.</span>
+                  <span>
+                    Selected: <span className="text-foreground font-medium">{selectedUserIds.length}</span> staff
+                    member(s)
+                  </span>
                 </div>
               </div>
             )}
@@ -674,7 +677,7 @@ export function TaskFormDialog({
           </Button>
           <Button
             onClick={handleSaveClick}
-            disabled={isSaving || !titleValue || (!isMultiAssign && !assignedTo && selectedUserIds.length === 0)}
+            disabled={isSaving || !titleValue || (isMultiAssign ? selectedUserIds.length === 0 : !assignedTo)}
           >
             {isSaving ? "Saving..." : selectedTask ? "Update Task" : "Create Task"}
           </Button>

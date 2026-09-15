@@ -9,8 +9,7 @@ export default function Loading() {
       columns={6}
       rows={8}
       showStats
-      statCardVariant="compact"
-      statCards={4}
+      statCards={3}
       spacing="tight"
       showBackLink
       actions={0}

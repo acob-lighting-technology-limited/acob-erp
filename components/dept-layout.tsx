@@ -24,6 +24,7 @@ interface DeptLayoutProps {
     user_metadata?: { first_name?: string; last_name?: string }
   }
   profile?: {
+    id?: string
     first_name?: string
     last_name?: string
     department?: string

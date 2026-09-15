@@ -274,6 +274,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
       stats={
         <StatGrid>
           <StatCard
+            variant="compact"
             title={`Total ${meta.shortPlural}`}
             value={rows.length}
             icon={FileText}
@@ -281,6 +282,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
             iconColor="text-blue-500"
           />
           <StatCard
+            variant="compact"
             title="Review Due"
             value={stats.reviewDue}
             icon={CalendarClock}
@@ -289,6 +291,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
           />
           {isPolicy ? (
             <StatCard
+              variant="compact"
               title="Pending Acknowledgements"
               value={stats.ackPending}
               icon={Users}
@@ -297,6 +300,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
             />
           ) : (
             <StatCard
+              variant="compact"
               title="Drafts"
               value={stats.drafts}
               icon={FilePen}
@@ -305,6 +309,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
             />
           )}
           <StatCard
+            variant="compact"
             title="Published"
             value={stats.published}
             icon={CheckCircle2}

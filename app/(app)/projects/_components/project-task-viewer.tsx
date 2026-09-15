@@ -2,6 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Loader2, User } from "lucide-react"
 
 export interface TaskRow {
@@ -26,6 +28,8 @@ interface ProjectTaskViewerProps {
 }
 
 export function ProjectTaskViewer({ projectId, projectName }: ProjectTaskViewerProps) {
+  const staffAvatars = useStaffAvatars()
+
   // Query tasks for the project
   const {
     data: tasks = [],
@@ -105,7 +109,18 @@ export function ProjectTaskViewer({ projectId, projectName }: ProjectTaskViewerP
                   <td className="text-foreground px-4 py-2 font-medium">{task.title}</td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1.5 text-xs">
-                      <User className="text-muted-foreground h-3 w-3" />
+                      {task.assigned_to && task.assigned_user ? (
+                        <StaffAvatar
+                          name={
+                            task.assigned_user.full_name ||
+                            [task.assigned_user.first_name, task.assigned_user.last_name].join(" ")
+                          }
+                          src={staffAvatars[task.assigned_to]}
+                          size="xs"
+                        />
+                      ) : (
+                        <User className="text-muted-foreground h-3 w-3" />
+                      )}
                       <span>
                         {task.assigned_user?.full_name ||
                           [task.assigned_user?.first_name, task.assigned_user?.last_name].filter(Boolean).join(" ") ||

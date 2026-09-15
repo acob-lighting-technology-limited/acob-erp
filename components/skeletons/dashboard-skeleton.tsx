@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import { StatGridSkeleton } from "./stat-card-skeleton"
 
 interface DashboardSkeletonProps {
   /** Number of stat cards to show */
@@ -27,21 +27,7 @@ export function DashboardSkeleton({ statCards = 5, showActivity = true }: Dashbo
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-2 lg:grid-cols-5">
-          {[...Array(statCards)].map((_, i) => (
-            <Card key={i} className={cn("border", statCards > 3 && i >= 3 && "hidden lg:block")}>
-              <CardContent className="p-2.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="mt-1 h-6 w-10" />
-                  </div>
-                  <Skeleton className="h-7 w-7 rounded-lg" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <StatGridSkeleton count={statCards} />
 
         {/* Quick Actions */}
         <div>

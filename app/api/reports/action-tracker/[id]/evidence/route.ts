@@ -109,7 +109,24 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       assigneeIds = (assignees || []).map((row) => String(row.profile_id))
     }
 
-    if (!canUpdateActionProgress(profile ?? null, { department: item.department, origin: item.origin, assigneeIds })) {
+    const referer = request.headers.get("referer")
+    let isAdminContext = false
+    if (referer) {
+      try {
+        const pathname = new URL(referer).pathname
+        isAdminContext = pathname.startsWith("/admin/")
+      } catch {
+        isAdminContext = false
+      }
+    }
+
+    if (
+      !canUpdateActionProgress(
+        profile ?? null,
+        { department: item.department, origin: item.origin, assigneeIds },
+        { isAdminContext }
+      )
+    ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

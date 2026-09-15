@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Eye,
   FileSpreadsheet,
   Gavel,
   CalendarDays,
@@ -27,6 +28,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DetailCallout, DetailSectionHeading } from "@/components/ui/detail-dialog"
@@ -38,8 +41,20 @@ import { fetchActionTrackerMetadata, fetchActionTrackerTasks, type ActionTask } 
 import { canUpdateActionProgress } from "@/lib/reports/action-tracker-permissions"
 import { apiFetch } from "@/lib/api-client"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 const log = logger("dashboard-reports-action-tracker")
+
+function getDisabledEditReason(task: {
+  department: string
+  origin?: string
+  assignees?: { id: string; name: string }[]
+}) {
+  if (task.origin === "management_directive" && (task.assignees || []).length > 0) {
+    return `Only assigned staff or members of ${task.department} can update this directive`
+  }
+  return `Only members or leads of ${task.department} can update this status`
+}
 
 interface DepartmentActionRow {
   id: string
@@ -131,6 +146,7 @@ export default function ActionTrackerPortal() {
   const [deptFilter] = useState(() => searchParams.get("dept") || "all")
   const [isCarryForwarding, setIsCarryForwarding] = useState(false)
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
+  const staffAvatars = useStaffAvatars()
   const [exportScope, setExportScope] = useState<ExportScope>({ label: "All Departments", items: [] })
   const [viewingDepartment, setViewingDepartment] = useState<DepartmentActionRow | null>(null)
   // Rows currently visible in the table (after search + filters + sort).
@@ -217,7 +233,18 @@ export default function ActionTrackerPortal() {
     const hasBlocker = Boolean(task.blocker_note)
     const evidenceCount = task.evidence_count || 0
     if (!hasBlocker && !canMutateTask(task)) {
-      return <span className="text-muted-foreground text-xs">—</span>
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-muted-foreground inline-block cursor-not-allowed px-2 py-1 text-xs select-none">
+              —
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>{getDisabledEditReason(task)}</p>
+          </TooltipContent>
+        </Tooltip>
+      )
     }
     return (
       <Button
@@ -380,11 +407,58 @@ export default function ActionTrackerPortal() {
         hideOnMobile: true,
         accessor: (row) =>
           `${row.notStartedPoints}/${row.inProgressPoints}/${row.pendingPoints}/${row.completedPoints}`,
-        render: (row) => (
-          <span className="text-muted-foreground text-xs">
-            NS: {row.notStartedPoints} | IP: {row.inProgressPoints} | P: {row.pendingPoints} | C: {row.completedPoints}
-          </span>
-        ),
+        render: (row) => {
+          const parts: { label: string; count: number; colorClass: string }[] = []
+          if (row.completedPoints > 0) {
+            parts.push({
+              label: "Done",
+              count: row.completedPoints,
+              colorClass: "text-green-600 dark:text-green-400 font-medium",
+            })
+          }
+          if (row.inProgressPoints > 0) {
+            parts.push({
+              label: "In Progress",
+              count: row.inProgressPoints,
+              colorClass: "text-blue-600 dark:text-blue-400 font-medium",
+            })
+          }
+          if (row.notStartedPoints > 0) {
+            parts.push({
+              label: "Not Started",
+              count: row.notStartedPoints,
+              colorClass: "text-orange-600 dark:text-orange-400 font-medium",
+            })
+          }
+          if (row.pendingPoints > 0) {
+            parts.push({ label: "Pending", count: row.pendingPoints, colorClass: "text-slate-500 font-medium" })
+          }
+          const tooltipText = `${row.completedPoints} Completed · ${row.inProgressPoints} In Progress · ${row.notStartedPoints} Not Started · ${row.pendingPoints} Pending`
+
+          if (parts.length === 0) {
+            return <span className="text-muted-foreground text-xs">No points</span>
+          }
+
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex cursor-default flex-wrap items-center gap-1.5 text-xs">
+                  {parts.map((p, idx) => (
+                    <span key={p.label} className="inline-flex items-center gap-1">
+                      <span className={p.colorClass}>
+                        {p.count} {p.label}
+                      </span>
+                      {idx < parts.length - 1 && <span className="text-muted-foreground/40">·</span>}
+                    </span>
+                  ))}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">{tooltipText}</p>
+              </TooltipContent>
+            </Tooltip>
+          )
+        },
       },
     ],
     []
@@ -393,16 +467,6 @@ export default function ActionTrackerPortal() {
   const departmentOptions = useMemo(
     () => allDepartments.map((department) => ({ value: department, label: department })),
     [allDepartments]
-  )
-
-  const priorityOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(tasks.map((task) => task.priority).filter((priority): priority is string => Boolean(priority)))
-      )
-        .sort()
-        .map((priority) => ({ value: priority, label: priority.replace(/_/g, " ") })),
-    [tasks]
   )
 
   const filters = useMemo<DataTableFilter<DepartmentActionRow>[]>(
@@ -463,18 +527,8 @@ export default function ActionTrackerPortal() {
         label: "Department",
         options: departmentOptions,
       },
-      {
-        key: "point_priority",
-        label: "Point Priority",
-        mode: "custom",
-        options: priorityOptions,
-        filterFn: (row, values) => {
-          if (!values || values.length === 0) return true
-          return row.tasks.some((task) => values.includes(task.priority))
-        },
-      },
     ],
-    [departmentOptions, priorityOptions, week, weekOptions, year, yearOptions]
+    [departmentOptions, week, weekOptions, year, yearOptions]
   )
 
   const directiveColumns = useMemo<DataTableColumn<ActionTask>[]>(
@@ -500,7 +554,13 @@ export default function ActionTrackerPortal() {
           row.assignees && row.assignees.length > 0 ? (
             <div className="flex flex-wrap gap-1">
               {row.assignees.map((person) => (
-                <Badge key={person.id} variant="secondary" className="text-[11px] font-normal">
+                <Badge key={person.id} variant="secondary" className="gap-1 pl-0.5 text-[11px] font-normal">
+                  <StaffAvatar
+                    name={person.name}
+                    src={staffAvatars[person.id]}
+                    size="xs"
+                    className="h-4 w-4 text-[7px]"
+                  />
                   {person.name}
                 </Badge>
               ))}
@@ -547,9 +607,18 @@ export default function ActionTrackerPortal() {
               </SelectContent>
             </Select>
           ) : (
-            <Badge className={`${getItemStatusBadgeClass(row.status)} capitalize`}>
-              {row.status.replace(/_/g, " ")}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-block cursor-not-allowed">
+                  <Badge className={`${getItemStatusBadgeClass(row.status)} capitalize opacity-80`}>
+                    {row.status.replace(/_/g, " ")}
+                  </Badge>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{getDisabledEditReason(row)}</p>
+              </TooltipContent>
+            </Tooltip>
           ),
       },
       {
@@ -577,7 +646,7 @@ export default function ActionTrackerPortal() {
     // handleStatusChange and canMutateTask close over the current task list and
     // profile, so the status control must be rebuilt when either changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, profile?.department]
+    [tasks, profile?.department, staffAvatars]
   )
 
   const directiveFilters = useMemo<DataTableFilter<ActionTask>[]>(
@@ -754,6 +823,11 @@ export default function ActionTrackerPortal() {
           }}
           rowActions={[
             {
+              label: "View Action Points",
+              icon: Eye,
+              onClick: (row) => setViewingDepartment(row),
+            },
+            {
               label: "Export",
               icon: Download,
               onClick: (row) => {
@@ -766,6 +840,76 @@ export default function ActionTrackerPortal() {
               },
             },
           ]}
+          expandable={{
+            render: (row) => (
+              <div className="space-y-3">
+                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Action Points</p>
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">#</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Action Point</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Status</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Hindrance</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {row.tasks.map((task, index) => (
+                        <tr key={task.id} className="border-t">
+                          <td className="text-muted-foreground px-3 py-2 text-xs">{index + 1}</td>
+                          <td className="px-3 py-2">
+                            <p className="font-medium">{task.title}</p>
+                            {task.description ? (
+                              <p className="text-muted-foreground text-xs">{task.description}</p>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2">
+                            {canMutateTask(task) ? (
+                              <Select
+                                value={task.status}
+                                onValueChange={(newStatus) => {
+                                  void handleStatusChange(task.id, newStatus)
+                                }}
+                              >
+                                <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="not_started">Not Started</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-block cursor-not-allowed">
+                                    <Select value={task.status} disabled>
+                                      <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase opacity-70">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </Select>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <p>{getDisabledEditReason(task)}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">{renderBlockerButton(task)}</td>
+                          <td className={`px-3 py-2 text-xs ${getDueDateClassName(task)}`}>{formatDueDate(task)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ),
+          }}
           stickyToolbar
           viewToggle
           contactsView
@@ -975,23 +1119,39 @@ export default function ActionTrackerPortal() {
                       ) : null}
                     </div>
                     <div className="w-full sm:w-44">
-                      <Select
-                        value={task.status}
-                        disabled={!canMutateTask(task)}
-                        onValueChange={(newStatus) => {
-                          void handleStatusChange(task.id, newStatus)
-                        }}
-                      >
-                        <SelectTrigger className="h-9 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="not_started">Not Started</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {canMutateTask(task) ? (
+                        <Select
+                          value={task.status}
+                          onValueChange={(newStatus) => {
+                            void handleStatusChange(task.id, newStatus)
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="not_started">Not Started</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-block w-full cursor-not-allowed">
+                              <Select value={task.status} disabled>
+                                <SelectTrigger className="h-9 text-sm opacity-70">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </Select>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>{getDisabledEditReason(task)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </div>
 

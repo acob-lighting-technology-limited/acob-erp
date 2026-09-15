@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { cn, formatFullName } from "@/lib/utils"
@@ -98,6 +100,7 @@ export function AdminUserTasksPlan({
   onOpenReviewDialog,
 }: AdminUserTasksPlanProps) {
   const currentWeekInfo = useMemo(() => getCurrentOfficeWeek(), [])
+  const staffAvatars = useStaffAvatars()
   const currentYear = new Date().getFullYear()
 
   // Period filter state — driven directly by DataTable's single-select filter
@@ -342,9 +345,7 @@ export function AdminUserTasksPlan({
         accessor: (r) => r.name,
         render: (r) => (
           <div className="flex items-center gap-3">
-            <div className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase">
-              {r.name.slice(0, 2)}
-            </div>
+            <StaffAvatar name={r.name} src={staffAvatars[r.userId]} size="sm" className="text-xs" />
             <div className="min-w-0">
               <p className="truncate font-medium">{r.name}</p>
               <p className="text-muted-foreground truncate text-xs">{r.email}</p>
@@ -457,7 +458,7 @@ export function AdminUserTasksPlan({
         },
       },
     ],
-    []
+    [staffAvatars]
   )
 
   const filters = useMemo<DataTableFilter<UserPlanRow>[]>(() => {
@@ -570,6 +571,7 @@ export function AdminUserTasksPlan({
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: (r) => <StaffAvatar name={r.name} src={staffAvatars[r.userId]} />,
           title: (r) => r.name,
           subtitle: (r) =>
             `${r.department} · ${r.totalTasks} tasks · ${r.totalWeight} pts · Rate: ${r.completionRate}%`,

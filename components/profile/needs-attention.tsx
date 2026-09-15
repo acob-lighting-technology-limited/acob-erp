@@ -117,6 +117,7 @@ export function NeedsAttention({
       {items.map((item) => (
         <AttentionTile key={item.title} href={item.href} hint={item.hint}>
           <StatCard
+            variant="compact"
             title={item.title}
             value={item.value}
             icon={item.icon}
