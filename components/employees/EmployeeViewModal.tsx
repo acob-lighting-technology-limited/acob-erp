@@ -19,7 +19,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { AdminRoutesPicker } from "@/components/ui/admin-routes-picker"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
@@ -247,6 +248,7 @@ export function EmployeeViewModal({
   })
 
   const viewEmployeeProfile = employee
+  const staffAvatars = useStaffAvatars()
   const displayedLeadDepartments =
     viewEmployeeProfile?.is_department_lead && viewEmployeeProfile.department
       ? [viewEmployeeProfile.department]
@@ -282,12 +284,12 @@ export function EmployeeViewModal({
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               {viewEmployeeProfile && (
-                <Avatar className="h-9 w-9 shrink-0 border">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                    {formatName(viewEmployeeProfile.first_name)?.[0]}
-                    {formatName(viewEmployeeProfile.last_name)?.[0]}
-                  </AvatarFallback>
-                </Avatar>
+                <StaffAvatar
+                  name={`${formatName(viewEmployeeProfile.first_name)} ${formatName(viewEmployeeProfile.last_name)}`}
+                  src={staffAvatars[viewEmployeeProfile.id]}
+                  size="md"
+                  className="border"
+                />
               )}
               <div className="min-w-0">
                 <DialogTitle className="flex flex-wrap items-center gap-2 text-base font-semibold">

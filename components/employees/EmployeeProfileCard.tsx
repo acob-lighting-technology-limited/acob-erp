@@ -1,6 +1,9 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { User, Mail, Phone, Building2, MapPin, Shield, Calendar } from "lucide-react"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { formatWATDate, formatDDMMYYYY } from "@/lib/utils/date"
@@ -14,6 +17,7 @@ interface EmployeeProfileCardProps {
 }
 
 export function EmployeeProfileCard({ profile, fullName, initials }: EmployeeProfileCardProps) {
+  const staffAvatars = useStaffAvatars()
   return (
     <Card>
       <CardHeader>
@@ -25,9 +29,13 @@ export function EmployeeProfileCard({ profile, fullName, initials }: EmployeePro
       <CardContent>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
-            </Avatar>
+            <StaffAvatar
+              name={fullName}
+              src={staffAvatars[profile.id]}
+              initials={initials}
+              size="lg"
+              fallbackClassName="bg-primary text-primary-foreground"
+            />
             <div>
               <p className="text-muted-foreground text-sm">Full Name</p>
               <p className="font-medium">{fullName}</p>
