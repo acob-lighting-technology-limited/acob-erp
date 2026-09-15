@@ -160,16 +160,3 @@ export async function sendUpdateNotifications(form: TaskFormState, selectedTask:
     }
   }
 }
-
-export async function sendCreateNotifications(form: TaskFormState, newTask: Task, userId: string) {
-  const { notifyTaskAssigned } = await import("@/lib/notifications")
-  if (form.assignment_type === "individual" && form.assigned_to) {
-    await notifyTaskAssigned({
-      userId: form.assigned_to,
-      taskId: newTask.id,
-      taskTitle: newTask.title,
-      assignedBy: userId,
-      priority: newTask.priority as NotificationPriority,
-    })
-  }
-}

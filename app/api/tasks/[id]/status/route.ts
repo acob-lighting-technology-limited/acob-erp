@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -10,6 +10,7 @@ import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
 import { TASK_STATUSES, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_RATING_MAX, TASK_RATING_MIN, isValidRating } from "@/lib/tasks/scoring"
 import { SELF_RATING_BLOCKED_REASON, isLeadForTaskDepartment, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
+import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 const log = logger("tasks-status-route")
 
@@ -352,6 +353,17 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         } catch (nErr) {
           log.error({ err: String(nErr) }, "Failed to notify reassigned user")
         }
+
+        if (newAssigneeId !== user.id) {
+          after(() =>
+            sendTaskEmail(supabase, {
+              kind: "assigned",
+              taskId: spawnedTask.id,
+              recipientIds: [newAssigneeId],
+              replyToUserId: user.id,
+            })
+          )
+        }
       }
     }
 
@@ -395,6 +407,18 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         } catch (nErr) {
           log.error({ err: String(nErr) }, "Notification failed")
         }
+      }
+
+      if (reviewers.size > 0) {
+        const reviewerIds = Array.from(reviewers)
+        after(() =>
+          sendTaskEmail(supabase, {
+            kind: "awaiting_review",
+            taskId: task.id,
+            recipientIds: reviewerIds,
+            replyToUserId: user.id,
+          })
+        )
       }
     }
 

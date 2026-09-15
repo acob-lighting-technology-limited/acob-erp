@@ -45,7 +45,6 @@ import {
   buildDepartmentLeadMap,
   validateTaskForm,
   sendUpdateNotifications,
-  sendCreateNotifications,
 } from "./tasks-content-utils"
 import { filterAssignableTaskDepartments, filterAssignableTaskUsers } from "@/lib/tasks/assignment-scope"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
@@ -331,7 +330,6 @@ export function AdminTasksContent({
         } | null
         if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to create task")
         const newTask = payload.data
-        await sendCreateNotifications(activeTaskForm, newTask, userId)
         const count = payload.createdCount || 1
         toast.success(
           count > 1 ? `${count} tasks created and assigned` : `${newTask.work_item_number || "Task"} created`
