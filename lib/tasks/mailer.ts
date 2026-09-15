@@ -31,7 +31,7 @@ interface TaskEmailInput {
   waitingDays?: number
 }
 
-interface TaskRow {
+export interface TaskEmailTask {
   id: string
   title: string | null
   work_item_number: string | null
@@ -43,7 +43,7 @@ interface TaskRow {
   assigned_to: string | null
 }
 
-interface PersonRow {
+export interface TaskEmailPerson {
   id: string
   first_name: string | null
   last_name: string | null
@@ -54,12 +54,12 @@ interface PersonRow {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://matrix.acoblighting.com"
 
-function fullName(person: PersonRow | undefined): string {
+function fullName(person: TaskEmailPerson | undefined): string {
   if (!person) return ""
   return [person.first_name, person.last_name].filter(Boolean).join(" ").trim()
 }
 
-function primaryEmail(person: PersonRow | undefined): string | null {
+function primaryEmail(person: TaskEmailPerson | undefined): string | null {
   const email = (person?.company_email || person?.additional_email || "").trim().toLowerCase()
   return email.includes("@") ? email : null
 }
@@ -73,12 +73,16 @@ function whenLabel(days: number): string {
  * Older tasks predate the department column; the assigner's department stands
  * in, and the company identity is the last resort.
  */
-function senderFor(task: TaskRow, assigner: PersonRow | undefined): string {
+function senderFor(task: TaskEmailTask, assigner: TaskEmailPerson | undefined): string {
   const department = (task.department || assigner?.department || "").replace(/^ACOB\s+/i, "").trim()
   return department ? orgDepartmentSenderBare(department) : ORG_EMAIL_SENDERS.system
 }
 
-function buildContent(input: TaskEmailInput, task: TaskRow, people: Map<string, PersonRow>) {
+function buildContent(
+  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays">,
+  task: TaskEmailTask,
+  people: Map<string, TaskEmailPerson>
+) {
   const title = task.title || "Untitled task"
   const assigner = fullName(task.assigned_by ? people.get(task.assigned_by) : undefined)
   const assignee = fullName(task.assigned_to ? people.get(task.assigned_to) : undefined)
@@ -142,7 +146,9 @@ function buildHtml(params: {
   details: Array<[string, string]>
   departmentLabel: string
 }): string {
-  const rows = params.details.map(([label, value], index) => detailRow(label, value, index === params.details.length - 1))
+  const rows = params.details.map(([label, value], index) =>
+    detailRow(label, value, index === params.details.length - 1)
+  )
   const band =
     'bgcolor="#000000" style="background:#000000 !important;background-color:#000000 !important;background-image:linear-gradient(#000000,#000000) !important;border-top:3px solid #16a34a;border-bottom:3px solid #16a34a;mso-line-height-rule:exactly;"'
 
@@ -181,6 +187,48 @@ function buildHtml(params: {
 }
 
 /**
+ * Pure rendering of one recipient's task email — sender, subject and HTML.
+ * Kept separate from sending so the template can be previewed without a send.
+ */
+export function renderTaskEmail(
+  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays">,
+  task: TaskEmailTask,
+  people: Map<string, TaskEmailPerson>,
+  recipient: TaskEmailPerson | undefined
+): { from: string; subject: string; html: string } {
+  const assigner = task.assigned_by ? people.get(task.assigned_by) : undefined
+  const departmentLabel = (task.department || assigner?.department || "Task Management").replace(/^ACOB\s+/i, "")
+  const content = buildContent(input, task, people)
+
+  const deadline = (task.task_end_date || task.due_date || "").slice(0, 10)
+  const details: Array<[string, string]> = [
+    ["Task", task.title || "Untitled task"],
+    ...(task.work_item_number ? ([["Reference", task.work_item_number]] as Array<[string, string]>) : []),
+    ["Department", departmentLabel],
+    ["Priority", task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : "Normal"],
+    ["Deadline", deadline || "Not set"],
+    ["Assigned by", fullName(assigner) || "—"],
+  ]
+  if (input.kind === "awaiting_review" || input.kind === "needs_rating") {
+    details.push(["Assignee", fullName(task.assigned_to ? people.get(task.assigned_to) : undefined) || "—"])
+  }
+
+  return {
+    from: senderFor(task, assigner),
+    subject: content.subject,
+    html: buildHtml({
+      recipientFirstName: recipient?.first_name || "",
+      heading: content.heading,
+      intro: content.intro,
+      ctaLabel: content.ctaLabel,
+      ctaPath: content.ctaPath,
+      details,
+      departmentLabel,
+    }),
+  }
+}
+
+/**
  * Emails the recipients of a task event, alongside the in-app notification
  * the caller already creates. Never throws: a mail failure must not undo or
  * fail the task operation that triggered it.
@@ -201,60 +249,34 @@ export async function sendTaskEmail(supabaseClient: SupabaseClient, input: TaskE
       .from("tasks")
       .select("id, title, work_item_number, department, priority, due_date, task_end_date, assigned_by, assigned_to")
       .eq("id", input.taskId)
-      .maybeSingle<TaskRow>()
+      .maybeSingle<TaskEmailTask>()
     if (!task) return
 
     const personIds = Array.from(
-      new Set(
-        [...eligibleIds, task.assigned_by, task.assigned_to, input.replyToUserId].filter(Boolean) as string[]
-      )
+      new Set([...eligibleIds, task.assigned_by, task.assigned_to, input.replyToUserId].filter(Boolean) as string[])
     )
     const { data: personRows } = await supabase
       .from("profiles")
       .select("id, first_name, last_name, department, company_email, additional_email")
       .in("id", personIds)
-      .returns<PersonRow[]>()
+      .returns<TaskEmailPerson[]>()
     const people = new Map((personRows || []).map((person) => [person.id, person]))
 
-    const assigner = task.assigned_by ? people.get(task.assigned_by) : undefined
-    const from = senderFor(task, assigner)
-    const departmentLabel = (task.department || assigner?.department || "Task Management").replace(/^ACOB\s+/i, "")
     const replyTo = input.replyToUserId ? primaryEmail(people.get(input.replyToUserId)) : null
-    const content = buildContent(input, task, people)
-
-    const deadline = (task.task_end_date || task.due_date || "").slice(0, 10)
-    const details: Array<[string, string]> = [
-      ["Task", task.title || "Untitled task"],
-      ...(task.work_item_number ? ([["Reference", task.work_item_number]] as Array<[string, string]>) : []),
-      ["Department", departmentLabel],
-      ["Priority", task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : "Normal"],
-      ["Deadline", deadline || "Not set"],
-      ["Assigned by", fullName(assigner) || "—"],
-    ]
-    if (input.kind === "awaiting_review" || input.kind === "needs_rating") {
-      details.push(["Assignee", fullName(task.assigned_to ? people.get(task.assigned_to) : undefined) || "—"])
-    }
 
     for (const recipientId of eligibleIds) {
       const recipient = people.get(recipientId)
       const to = primaryEmail(recipient)
       if (!to) continue
 
+      const email = renderTaskEmail(input, task, people, recipient)
       const result = await sendNotificationEmailWithRetry({
-        from,
+        from: email.from,
         to: [to],
-        subject: content.subject,
+        subject: email.subject,
         listId: TASKS_LIST_ID,
         ...(replyTo && replyTo !== to ? { replyTo } : {}),
-        html: buildHtml({
-          recipientFirstName: recipient?.first_name || "",
-          heading: content.heading,
-          intro: content.intro,
-          ctaLabel: content.ctaLabel,
-          ctaPath: content.ctaPath,
-          details,
-          departmentLabel,
-        }),
+        html: email.html,
       })
 
       if (!result.sent && result.reason !== "missing_resend_key") {
