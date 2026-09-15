@@ -265,10 +265,16 @@ export function ProductFormDialog({ open, onOpenChange, queryClient, product = n
             </div>
 
             <div className="space-y-6">
-              <StatCard title="Unit Cost" value={formatCurrency(formData.unit_cost)} icon={Package} />
-              <StatCard title="Selling Price" value={formatCurrency(formData.selling_price)} icon={Package} />
-              <StatCard title="Margin" value={`${marginPercent.toFixed(1)}%`} icon={Package} />
+              <StatCard variant="compact" title="Unit Cost" value={formatCurrency(formData.unit_cost)} icon={Package} />
               <StatCard
+                variant="compact"
+                title="Selling Price"
+                value={formatCurrency(formData.selling_price)}
+                icon={Package}
+              />
+              <StatCard variant="compact" title="Margin" value={`${marginPercent.toFixed(1)}%`} icon={Package} />
+              <StatCard
+                variant="compact"
                 title="Stock Value"
                 value={formatCurrency(formData.unit_cost * formData.quantity_on_hand)}
                 icon={Package}

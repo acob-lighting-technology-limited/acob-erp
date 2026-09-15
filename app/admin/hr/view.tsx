@@ -82,36 +82,42 @@ export function HRAdminDashboard({
       {/* Stats Grid */}
       <StatGrid>
         <StatCard
+          variant="compact"
           title="Pending Leave"
           value={stats.pendingLeaveRequests}
           icon={Calendar}
           description="Requests awaiting approval"
         />
         <StatCard
+          variant="compact"
           title="Today's Attendance"
           value={stats.todayAttendance}
           icon={Clock}
           description="Employees clocked in today"
         />
         <StatCard
+          variant="compact"
           title="Pending Reviews"
           value={stats.upcomingReviews}
           icon={FileText}
           description="Reviews to complete"
         />
         <StatCard
+          variant="compact"
           title="Total Employees"
           value={stats.totalEmployees}
           icon={Users}
           description="Registered employees"
         />
         <StatCard
+          variant="compact"
           title="Total Departments"
           value={stats.totalDepartments}
           icon={Building}
           description="Configured departments"
         />
         <StatCard
+          variant="compact"
           title="Rooms & Offices"
           value={stats.totalOfficeLocations}
           icon={MapPin}

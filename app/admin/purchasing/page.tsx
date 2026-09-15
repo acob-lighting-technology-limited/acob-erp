@@ -44,14 +44,22 @@ export default function PurchasingDashboard() {
 
       {/* Stats */}
       <StatGrid>
-        <StatCard title="Suppliers" value={stats.totalSuppliers} icon={Users} description="Registered vendors" />
         <StatCard
+          variant="compact"
+          title="Suppliers"
+          value={stats.totalSuppliers}
+          icon={Users}
+          description="Registered vendors"
+        />
+        <StatCard
+          variant="compact"
           title="Active Orders"
           value={stats.activeOrders}
           icon={ShoppingCart}
           description="Pending & approved"
         />
         <StatCard
+          variant="compact"
           title="Pending Receipts"
           value={stats.pendingReceipts}
           icon={Clock}
@@ -60,6 +68,7 @@ export default function PurchasingDashboard() {
           description="Awaiting delivery"
         />
         <StatCard
+          variant="compact"
           title="Order Value"
           value={formatCurrency(stats.totalOrderValue)}
           icon={FileText}

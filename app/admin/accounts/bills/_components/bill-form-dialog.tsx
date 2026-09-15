@@ -292,7 +292,7 @@ export function BillFormDialog({ open, onOpenChange, queryClient }: BillFormDial
                 </CardContent>
               </Card>
 
-              <StatCard title="Total" value={formatCurrency(totals.total)} icon={Receipt} />
+              <StatCard variant="compact" title="Total" value={formatCurrency(totals.total)} icon={Receipt} />
             </div>
           </div>
 

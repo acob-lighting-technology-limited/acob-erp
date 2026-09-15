@@ -309,7 +309,12 @@ export function PurchaseOrderFormDialog({ open, onOpenChange, queryClient }: Pur
             </div>
 
             <div className="space-y-6">
-              <StatCard title="Total Amount" value={formatCurrency(calculateTotal())} icon={ShoppingCart} />
+              <StatCard
+                variant="compact"
+                title="Total Amount"
+                value={formatCurrency(calculateTotal())}
+                icon={ShoppingCart}
+              />
             </div>
           </div>
 

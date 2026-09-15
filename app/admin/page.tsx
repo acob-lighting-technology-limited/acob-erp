@@ -456,6 +456,7 @@ export default async function AdminDashboardPage() {
       <Section title="Core KPIs" description="Current operational totals across core business areas.">
         <StatGrid>
           <StatCard
+            variant="compact"
             title="Total Employees"
             value={employeeStats.count || 0}
             description="Registered user profiles"
@@ -464,6 +465,7 @@ export default async function AdminDashboardPage() {
             iconColor="text-blue-600 dark:text-blue-400"
           />
           <StatCard
+            variant="compact"
             title="Assets"
             value={assetStats.count || 0}
             description="Tracked inventory records"
@@ -472,6 +474,7 @@ export default async function AdminDashboardPage() {
             iconColor="text-purple-600 dark:text-purple-400"
           />
           <StatCard
+            variant="compact"
             title="Active Tasks"
             value={taskStats.count || 0}
             description="Total tasks in system"
@@ -480,6 +483,7 @@ export default async function AdminDashboardPage() {
             iconColor="text-green-600 dark:text-green-400"
           />
           <StatCard
+            variant="compact"
             title="Documents"
             value={docStats.count || 0}
             description="User documentation files"
@@ -488,6 +492,7 @@ export default async function AdminDashboardPage() {
             iconColor="text-orange-600 dark:text-orange-400"
           />
           <StatCard
+            variant="compact"
             title="Feedback"
             value={feedbackStats.count || 0}
             description="Submitted feedback records"

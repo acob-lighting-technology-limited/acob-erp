@@ -179,30 +179,35 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
 
       <StatGrid>
         <StatCard
+          variant="compact"
           title="Avg PMS"
           value={formatPercent(summary.overallPms)}
           icon={Award}
           description="Average department PMS"
         />
         <StatCard
+          variant="compact"
           title="Avg KPI"
           value={formatPercent(summary.overallKpi)}
           icon={Target}
           description="Average department KPI"
         />
         <StatCard
+          variant="compact"
           title="Avg CBT"
           value={formatPercent(summary.cbt)}
           icon={Brain}
           description="Average learning capability score"
         />
         <StatCard
+          variant="compact"
           title="Avg Attendance"
           value={formatPercent(summary.attendance)}
           icon={Clock3}
           description="Attendance compliance"
         />
         <StatCard
+          variant="compact"
           title="Approved Goals"
           value={summary.approvedGoals}
           icon={CheckCircle2}

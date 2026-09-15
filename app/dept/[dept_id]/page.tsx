@@ -337,6 +337,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
       <Section title="Core KPIs" description="Current operational totals for this department.">
         <StatGrid>
           <StatCard
+            variant="compact"
             title="Team Members"
             value={employeeStats.count || 0}
             description="Active profiles in dept"
@@ -345,6 +346,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             iconColor="text-blue-600 dark:text-blue-400"
           />
           <StatCard
+            variant="compact"
             title="Assets"
             value={assetStats.count || 0}
             description="Tracked dept inventory"
@@ -353,6 +355,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             iconColor="text-purple-600 dark:text-purple-400"
           />
           <StatCard
+            variant="compact"
             title="Active Tasks"
             value={taskStats.count || 0}
             description="Tasks in dept"
@@ -361,6 +364,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             iconColor="text-green-600 dark:text-green-400"
           />
           <StatCard
+            variant="compact"
             title="Documents"
             value={docStats.count || 0}
             description="Team documentation"
@@ -369,6 +373,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             iconColor="text-orange-600 dark:text-orange-400"
           />
           <StatCard
+            variant="compact"
             title="Feedback"
             value={feedbackStats.count || 0}
             description="Submitted by team"
