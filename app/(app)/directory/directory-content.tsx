@@ -51,7 +51,11 @@ type DirectoryRow = {
 
 /** Field contractors on payroll (CTR group without company email). */
 function isContractStaff(row: DirectoryRow): boolean {
-  return (row.employment_status || "").toLowerCase() === "contract" && !row.company_email
+  return (
+    ((row.employment_status || "").toLowerCase() === "contract" ||
+      (row.employment_type || "").toLowerCase() === "contract") &&
+    !row.company_email
+  )
 }
 
 /**
