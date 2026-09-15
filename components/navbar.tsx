@@ -169,7 +169,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 lg:h-11 lg:w-11">
-          <Avatar className="h-10 w-10 lg:h-11 lg:w-11">
+          <Avatar className="h-8 w-8 lg:h-9 lg:w-9">
             {currentAvatarUrl && (
               <AvatarImage
                 src={currentAvatarUrl}
@@ -179,7 +179,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             )}
             <AvatarFallback
               className={cn(
-                "text-sm font-semibold lg:text-base",
+                "text-xs font-semibold lg:text-sm",
                 isAdminMode
                   ? "bg-[var(--navbar-admin-primary,var(--admin-primary))] text-[var(--navbar-admin-primary-foreground,var(--admin-primary-foreground))]"
                   : "bg-primary text-primary-foreground"
