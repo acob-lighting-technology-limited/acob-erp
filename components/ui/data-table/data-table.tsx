@@ -524,10 +524,10 @@ export function DataTable<TData>({
       return
     }
 
-    const APP_BAR_PX = 64 // matches the toolbar's `top-16`
+    // Matches the toolbar's top: app bar plus any sticky app banner (--app-banner-h).
     const measure = () => {
       const height = toolbarRef.current?.offsetHeight ?? 0
-      root.style.setProperty("--dt-sticky-offset", `${APP_BAR_PX + height}px`)
+      root.style.setProperty("--dt-sticky-offset", `calc(4rem + var(--app-banner-h, 0px) + ${height}px)`)
     }
 
     measure()
@@ -856,9 +856,9 @@ export function DataTable<TData>({
       ref={toolbarRef}
       className={cn(
         "space-y-3 p-4",
-        // `top-16` clears the app bar. Card has no overflow of its own, so the
-        // sticky context is the page scroller, which is what we want.
-        stickyToolbar && "bg-card/95 sticky top-16 z-20 rounded-t-xl backdrop-blur-md"
+        // Clears the app bar and any sticky app banner. Card has no overflow of its
+        // own, so the sticky context is the page scroller, which is what we want.
+        stickyToolbar && "bg-card/95 sticky top-[calc(4rem+var(--app-banner-h,0px))] z-20 rounded-t-xl backdrop-blur-md"
       )}
     >
       {/* Row 1: search + column toggle + view toggle */}
