@@ -16,7 +16,7 @@ function safeCompare(a: string, b: string): boolean {
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization") ?? ""
   const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!safeCompare(authHeader, expected)) {
+  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
