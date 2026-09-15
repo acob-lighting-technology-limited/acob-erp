@@ -9,6 +9,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { StaffAvatar, type StaffAvatarSize } from "@/components/ui/staff-avatar"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { cn } from "@/lib/utils"
 import {
@@ -47,36 +48,8 @@ export interface OnboardingRow {
   profile_created_at: string
 }
 
-const AVATAR_SIZES = {
-  sm: "h-8 w-8 text-xs",
-  md: "h-10 w-10 text-sm",
-  lg: "h-12 w-12 text-base",
-  xl: "h-16 w-16 text-xl",
-} as const
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return (name.slice(0, 2) || "AC").toUpperCase()
-}
-
-function OnboardingAvatar({ row, size = "md" }: { row: OnboardingRow; size?: keyof typeof AVATAR_SIZES }) {
-  const name = row.full_name || row.email || "User"
-  return (
-    <span
-      className={cn(
-        "bg-primary/10 text-primary flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold",
-        AVATAR_SIZES[size]
-      )}
-    >
-      {row.avatar_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={row.avatar_url} alt={name} className="h-full w-full object-cover" />
-      ) : (
-        getInitials(name)
-      )}
-    </span>
-  )
+function OnboardingAvatar({ row, size = "md" }: { row: OnboardingRow; size?: StaffAvatarSize }) {
+  return <StaffAvatar name={row.full_name || row.email || "User"} src={row.avatar_url} size={size} />
 }
 
 interface OnboardingMeta {
