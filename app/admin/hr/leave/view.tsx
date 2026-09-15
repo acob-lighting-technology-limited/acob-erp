@@ -22,6 +22,8 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -293,6 +295,7 @@ export function LeaveApprovePage({
 }: { backLinkHref?: string; apiBasePath?: string } = {}) {
   const normalizedApiBasePath = apiBasePath.replace(/\/$/, "")
   const queryClient = useQueryClient()
+  const staffAvatars = useStaffAvatars()
   const [activeTab, setActiveTab] = useState("all")
   const [actionDialog, setActionDialog] = useState<ActionDialogState>({
     open: false,
@@ -967,14 +970,11 @@ export function LeaveApprovePage({
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
             mobileRow={{
               leading: (r) => (
-                <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
-                  {(r.user?.full_name || "E")
-                    .split(" ")
-                    .slice(0, 2)
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()}
-                </div>
+                <StaffAvatar
+                  name={r.user?.full_name || "Employee"}
+                  src={staffAvatars[r.user_id]}
+                  className="h-10 w-10 text-sm"
+                />
               ),
               title: (r) => r.user?.full_name || "Employee",
               subtitle: (r) => `${r.leave_type?.name || "—"} · ${r.start_date} to ${r.end_date} (${r.days_count}d)`,
@@ -998,14 +998,12 @@ export function LeaveApprovePage({
                 title: (r) => r.user?.full_name || "Employee",
                 subtitle: (r) => r.leave_type?.name || "—",
                 avatar: (r) => (
-                  <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold">
-                    {(r.user?.full_name || "E")
-                      .split(" ")
-                      .slice(0, 2)
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()}
-                  </div>
+                  <StaffAvatar
+                    name={r.user?.full_name || "Employee"}
+                    src={staffAvatars[r.user_id]}
+                    size="xl"
+                    className="text-xl"
+                  />
                 ),
                 badges: (r) => (
                   <Badge

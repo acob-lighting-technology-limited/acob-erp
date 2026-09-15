@@ -1,5 +1,5 @@
 import { TablePageSkeleton } from "@/components/skeletons"
 
 export default function AdminRequisitionLoading() {
-  return <TablePageSkeleton />
+  return <TablePageSkeleton statCards={5} />
 }

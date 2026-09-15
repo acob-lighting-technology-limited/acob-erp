@@ -1,5 +1,5 @@
 import { TablePageSkeleton } from "@/components/skeletons"
 
 export default function DeptRequisitionsLoading() {
-  return <TablePageSkeleton />
+  return <TablePageSkeleton statCards={4} />
 }

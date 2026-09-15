@@ -1,5 +1,2 @@
-import { TablePageSkeleton } from "@/components/skeletons"
-
-export default function AttendanceReportsLoading() {
-  return <TablePageSkeleton filters={4} columns={7} rows={8} showStats={true} statCards={3} />
-}
+// This route only redirects to /admin/hr/employees/attendance; show that page's skeleton while it does.
+export { default } from "../employees/loading"

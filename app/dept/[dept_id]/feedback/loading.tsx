@@ -1,5 +1,5 @@
 import { TablePageSkeleton } from "@/components/skeletons"
 
 export default function FeedbackLoading() {
-  return <TablePageSkeleton filters={2} columns={5} rows={8} showStats={true} statCards={3} actions={1} />
+  return <TablePageSkeleton filters={2} columns={5} rows={8} showStats={true} statCards={5} actions={1} />
 }
