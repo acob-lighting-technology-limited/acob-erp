@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Clock,
@@ -77,6 +78,7 @@ export function LeaveDetailDialog({
 }: LeaveDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<ModalTab>("overview")
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const staffAvatars = useStaffAvatars()
 
   const handleCopy = useCallback((text: string, fieldName: string) => {
     if (!text) return
@@ -153,11 +155,12 @@ export function LeaveDetailDialog({
         <DialogHeader className="bg-muted/20 border-b px-5 py-3.5 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar className="h-10 w-10 shrink-0 border shadow-xs">
-                <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                  {getInitials(employeeName)}
-                </AvatarFallback>
-              </Avatar>
+              <StaffAvatar
+                name={employeeName}
+                src={staffAvatars[leave.user_id]}
+                initials={getInitials(employeeName)}
+                className="h-10 w-10 border text-xs shadow-xs"
+              />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <DialogTitle className="truncate text-base font-semibold">{formatName(employeeName)}</DialogTitle>
