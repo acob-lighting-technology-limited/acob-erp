@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 
 interface SearchableMultiSelectProps {
-  label: string
+  label?: string
   icon?: React.ReactNode
   values: string[]
   options: { value: string; label: string; icon?: React.ReactNode }[]
@@ -57,7 +57,8 @@ export function SearchableMultiSelect({
 
   const filteredOptions = React.useMemo(() => {
     if (!searchQuery) return options
-    return options.filter((option) => option.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    const q = searchQuery.toLowerCase()
+    return options.filter((option) => option.label.toLowerCase().includes(q))
   }, [options, searchQuery])
 
   const toggleValue = (value: string) => {
@@ -92,28 +93,30 @@ export function SearchableMultiSelect({
     }
     const triggerEl = triggerRef.current
     if (!triggerEl) return
-    const inDialog = Boolean(triggerEl.closest('[role="dialog"]'))
+    const inDialog = Boolean(triggerEl.closest('[role="dialog"], [data-radix-dialog-content]'))
     setResolvedPortal(!inDialog)
   }, [portal, open])
 
   const contentClassName =
-    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 flex max-h-[400px] w-[var(--radix-popover-trigger-width)] flex-col overflow-hidden rounded-md border shadow-md"
+    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 flex max-h-[360px] w-[var(--radix-popover-trigger-width)] flex-col overflow-hidden rounded-md border shadow-md"
 
   const renderContent = () => (
     <>
       <div className="shrink-0 border-b p-2">
-        <div className="mb-2 flex items-center gap-2">
-          {icon && <span className="flex-shrink-0">{icon}</span>}
-          <span className="text-sm font-medium">{label}</span>
-        </div>
+        {label && (
+          <div className="mb-2 flex items-center gap-2">
+            {icon && <span className="flex-shrink-0">{icon}</span>}
+            <span className="text-xs font-semibold">{label}</span>
+          </div>
+        )}
         <div className="relative">
-          <Search className="text-muted-foreground absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 transform" />
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 transform" />
           <Input
             ref={inputRef}
             placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 pl-8"
+            className="h-8 pl-8 text-xs"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               e.stopPropagation()
@@ -125,11 +128,7 @@ export function SearchableMultiSelect({
           />
         </div>
         {selectedOptions.length > 0 && (
-          // Capped and independently scrollable — otherwise a long selection
-          // list grows unbounded and, since the outer popover clips overflow,
-          // pushes the options list below out of view entirely (rather than
-          // just scrolling), making it impossible to select anything past
-          // however many already-selected badges fit.
+          // Capped and independently scrollable
           <div
             className="mt-2 flex max-h-[72px] flex-wrap gap-1 overflow-y-auto"
             onMouseDown={(e) => e.stopPropagation()}
@@ -139,18 +138,18 @@ export function SearchableMultiSelect({
               <Badge
                 key={option.value}
                 variant="secondary"
-                className="text-xs"
+                className="hover:bg-destructive/20 hover:text-destructive cursor-pointer text-[11px] transition-colors"
                 onClick={(e) => removeValue(option.value, e)}
               >
-                {option.label}
-                <X className="ml-1 h-3 w-3" />
+                <span className="max-w-[180px] truncate">{option.label}</span>
+                <X className="ml-1 h-3 w-3 shrink-0" />
               </Badge>
             ))}
           </div>
         )}
       </div>
       <div
-        className="min-h-0 flex-1 overflow-y-auto p-1"
+        className="max-h-[220px] min-h-0 flex-1 overflow-y-auto p-1"
         onMouseDown={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
       >
@@ -162,17 +161,17 @@ export function SearchableMultiSelect({
                 key={option.value}
                 onClick={() => toggleValue(option.value)}
                 className={cn(
-                  "group relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pr-8 pl-8 text-sm transition-colors outline-none",
+                  "group relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pr-8 pl-8 text-xs transition-colors outline-none select-none",
                   "hover:bg-accent hover:text-accent-foreground",
                   "dark:hover:bg-accent dark:hover:text-foreground",
-                  isSelected && "bg-accent/50"
+                  isSelected && "bg-accent/50 font-medium"
                 )}
               >
                 <span className="absolute left-2 flex h-4 w-4 items-center justify-center">
                   {isSelected ? (
                     <Check className="text-primary h-4 w-4" />
                   ) : (
-                    <div className="border-input h-4 w-4 rounded border" />
+                    <div className="border-input h-3.5 w-3.5 rounded border" />
                   )}
                 </span>
                 <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -183,7 +182,7 @@ export function SearchableMultiSelect({
             )
           })
         ) : (
-          <div className="text-muted-foreground py-6 text-center text-sm">No results found</div>
+          <div className="text-muted-foreground py-6 text-center text-xs">No results found</div>
         )}
       </div>
     </>
@@ -197,15 +196,19 @@ export function SearchableMultiSelect({
           ref={triggerRef}
           disabled={disabled}
           className={cn(
-            "border-input ring-offset-background focus:ring-ring flex h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+            "border-input ring-offset-background focus:ring-ring flex h-9 w-full max-w-full min-w-0 items-center justify-between overflow-hidden rounded-md border bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
             className
           )}
         >
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             {icon && <span className="flex-shrink-0">{icon}</span>}
-            <span className="min-w-0 flex-1 truncate text-left">
+            <span className="min-w-0 flex-1 truncate text-left text-xs">
               {selectedOptions.length > 0 ? (
-                <span className="text-muted-foreground text-xs">{selectedOptions.length} selected</span>
+                <span className="text-foreground font-normal">
+                  {selectedOptions.length === 1
+                    ? selectedOptions[0].label
+                    : `${selectedOptions.length} staff members selected`}
+                </span>
               ) : (
                 <span className="text-muted-foreground">{placeholder}</span>
               )}
