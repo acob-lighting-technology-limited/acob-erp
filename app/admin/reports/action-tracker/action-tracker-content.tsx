@@ -35,6 +35,7 @@ import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 import { DirectiveFormDialog, type EditableDirective } from "@/components/admin/action-tracker/directive-form-dialog"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 const log = logger("reports-action-tracker-action-tracker-co")
 
@@ -480,11 +481,58 @@ export function ActionTrackerContent({
         sortable: true,
         accessor: (row) =>
           `${row.notStartedPoints}/${row.inProgressPoints}/${row.pendingPoints}/${row.completedPoints}`,
-        render: (row) => (
-          <span className="text-muted-foreground text-xs">
-            NS: {row.notStartedPoints} | IP: {row.inProgressPoints} | P: {row.pendingPoints} | C: {row.completedPoints}
-          </span>
-        ),
+        render: (row) => {
+          const parts: { label: string; count: number; colorClass: string }[] = []
+          if (row.completedPoints > 0) {
+            parts.push({
+              label: "Done",
+              count: row.completedPoints,
+              colorClass: "text-green-600 dark:text-green-400 font-medium",
+            })
+          }
+          if (row.inProgressPoints > 0) {
+            parts.push({
+              label: "In Progress",
+              count: row.inProgressPoints,
+              colorClass: "text-blue-600 dark:text-blue-400 font-medium",
+            })
+          }
+          if (row.notStartedPoints > 0) {
+            parts.push({
+              label: "Not Started",
+              count: row.notStartedPoints,
+              colorClass: "text-orange-600 dark:text-orange-400 font-medium",
+            })
+          }
+          if (row.pendingPoints > 0) {
+            parts.push({ label: "Pending", count: row.pendingPoints, colorClass: "text-slate-500 font-medium" })
+          }
+          const tooltipText = `${row.completedPoints} Completed · ${row.inProgressPoints} In Progress · ${row.notStartedPoints} Not Started · ${row.pendingPoints} Pending`
+
+          if (parts.length === 0) {
+            return <span className="text-muted-foreground text-xs">No points</span>
+          }
+
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex cursor-default flex-wrap items-center gap-1.5 text-xs">
+                  {parts.map((p, idx) => (
+                    <span key={p.label} className="inline-flex items-center gap-1">
+                      <span className={p.colorClass}>
+                        {p.count} {p.label}
+                      </span>
+                      {idx < parts.length - 1 && <span className="text-muted-foreground/40">·</span>}
+                    </span>
+                  ))}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">{tooltipText}</p>
+              </TooltipContent>
+            </Tooltip>
+          )
+        },
         hideOnMobile: true,
       },
     ],
