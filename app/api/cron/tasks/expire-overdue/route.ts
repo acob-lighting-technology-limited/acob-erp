@@ -20,8 +20,15 @@ type OverdueTaskRow = {
   task_end_date: string | null
 }
 
-/** Statuses that are still open work, and so can run out of time. */
-const OPEN_STATUSES = ["pending", "in_progress", "unable_to_complete"]
+/**
+ * Statuses that are still open work, and so can run out of time.
+ *
+ * unable_to_complete is deliberately absent: the employee has already reported
+ * the task blocked, and whether to reassign, extend or fail it is the lead's
+ * call. Failing it automatically would take that decision away and charge the
+ * employee's KPI for a problem they raised.
+ */
+const OPEN_STATUSES = ["pending", "in_progress"]
 
 /**
  * Closes out tasks whose deadline has passed.
