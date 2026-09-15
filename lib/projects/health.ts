@@ -21,6 +21,32 @@ export const PROJECT_HEALTH_LABELS: Record<ProjectHealthStatus, string> = {
   completed: "Completed",
 }
 
+/**
+ * One-line definitions for the figures above, shown as header help on every
+ * table that displays them so the wording cannot drift between pages.
+ */
+export const PROJECT_METRIC_HELP = {
+  elapsed:
+    "How far through its schedule the project is today: days since the start date over the total days to the end date.",
+  delivery:
+    "Share of the planned work that is finished, by task weight (1–5). Cancelled and reassigned tasks are left out.",
+  quality:
+    "How well the work scored: each task's weight × rating ÷ 5, over all its scorable tasks. Unfinished work counts as 0; completed work awaiting a rating is held out.",
+  deliveryQuality:
+    "Delivered: share of planned work finished, by task weight. Quality: weighted task ratings, with unfinished work counting as 0.",
+  variance:
+    "Delivered minus Elapsed. Negative means the calendar has moved further than the work; below −5% is At Risk, below −15% is Behind Schedule.",
+  overdue: "Tasks past their end or due date that are not completed, cancelled or reassigned.",
+  health:
+    "Worked out from the tasks: Completed at 100% delivered; Behind Schedule when variance is below −15%; At Risk below −5% or with any overdue task; otherwise On Track.",
+  status:
+    "The stage a manager sets by hand (planning, ongoing, on hold, completed, cancelled). Separate from the calculated health.",
+  portfolioStatus: "Set by hand: active, on hold, or closed.",
+  portfolioProjects: "Projects in this portfolio, counted by their calculated health.",
+  portfolioDeliveryQuality:
+    "Delivered: finished task weight over total task weight across all its projects. Quality: the average of its projects' quality.",
+} as const
+
 /** Delivery may sit this far behind elapsed time before the project is flagged. */
 const AT_RISK_VARIANCE = -5
 const BEHIND_VARIANCE = -15

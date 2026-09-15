@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableDetailField, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Progress } from "@/components/ui/progress"
@@ -18,9 +18,17 @@ import {
   Wrench,
   ShieldCheck,
   Briefcase,
+  Activity,
+  Layers,
 } from "lucide-react"
 import { ProjectTaskViewer } from "./_components/project-task-viewer"
-import { computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
+import {
+  PROJECT_HEALTH_LABELS,
+  PROJECT_METRIC_HELP,
+  computeProjectHealth,
+  type ProjectHealthTask,
+} from "@/lib/projects/health"
+import { HealthBadge, ProjectSummary, formatCapacity, formatVariance } from "@/components/projects/project-summary"
 import { toLocalISODate } from "@/lib/utils/date"
 
 // Define user-facing project type (includes tasks count payload)
@@ -80,13 +88,6 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
     queryFn: fetchUserProjects,
   })
 
-  // Format power capacity helper
-  const formatCapacity = (watts: number | null) => {
-    if (watts === null || watts === undefined) return "-"
-    const kwp = watts / 1000
-    return `${kwp.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWp`
-  }
-
   // Calculate project summary statistics
   const stats = useMemo(() => {
     const total = rows.length
@@ -107,22 +108,28 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
     return types.sort().map((t) => ({ value: t!, label: t! }))
   }, [rows])
 
-  // Weighted delivery, from the same helper the admin project and portfolio
-  // dashboards use — a count of finished tasks would report a different number
-  // for the same project depending on which page you opened.
+  // Weighted delivery and health, from the same helper the admin project and
+  // portfolio dashboards use — a count of finished tasks would report a
+  // different number for the same project depending on which page you opened.
+  const healthById = useMemo(() => {
+    const today = toLocalISODate()
+    return new Map(
+      rows.map((project) => [
+        project.id,
+        computeProjectHealth({
+          startDate: project.deployment_start_date,
+          endDate: project.deployment_end_date,
+          tasks: project.tasks || [],
+          today,
+        }),
+      ])
+    )
+  }, [rows])
+
   const getProgressInfo = (project: ProjectRow) => {
-    const projectTasks = project.tasks || []
-    if (projectTasks.length === 0) return { percent: 0, text: "No tasks" }
-    const health = computeProjectHealth({
-      startDate: project.deployment_start_date,
-      endDate: project.deployment_end_date,
-      tasks: projectTasks,
-      today: toLocalISODate(),
-    })
-    return {
-      percent: health.deliveryPct ?? 0,
-      text: `${health.qualityPct ?? 0}% quality`,
-    }
+    const health = healthById.get(project.id)
+    if (!health || health.taskCount === 0) return { percent: 0, text: "No tasks" }
+    return { percent: health.deliveryPct ?? 0, text: `${health.qualityPct ?? 0}% quality` }
   }
 
   // Project Status Badge formatter
@@ -178,20 +185,9 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         ),
       },
       {
-        key: "technology_type",
-        label: "Tech / Capacity",
-        sortable: true,
-        accessor: (r) => r.technology_type || "",
-        render: (r) => (
-          <div className="space-y-0.5 text-sm">
-            <p className="font-medium">{formatCapacity(r.capacity_w)}</p>
-            {r.technology_type && <p className="text-muted-foreground text-xs">{r.technology_type}</p>}
-          </div>
-        ),
-      },
-      {
         key: "progress",
         label: "Delivery / Quality",
+        description: PROJECT_METRIC_HELP.deliveryQuality,
         sortable: false,
         render: (r) => {
           const info = getProgressInfo(r)
@@ -225,12 +221,14 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
       {
         key: "status",
         label: "Status",
+        description: PROJECT_METRIC_HELP.status,
         sortable: true,
         accessor: (r) => r.status,
         render: (r) => renderStatusBadge(r.status),
       },
     ],
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- getProgressInfo reads healthById
+    [healthById]
   )
 
   // Portfolio option list for filtering
@@ -264,6 +262,21 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         key: "technology_type",
         label: "Technology",
         options: techOptions,
+        // The technology column lives in the expanded view, so match on the row.
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(row.technology_type || ""),
+      },
+      {
+        key: "health",
+        label: "Health",
+        options: [
+          { value: "on_track", label: PROJECT_HEALTH_LABELS.on_track },
+          { value: "at_risk", label: PROJECT_HEALTH_LABELS.at_risk },
+          { value: "behind_schedule", label: PROJECT_HEALTH_LABELS.behind_schedule },
+          { value: "completed", label: PROJECT_HEALTH_LABELS.completed },
+        ],
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(healthById.get(row.id)?.status ?? "on_track"),
       },
       ...(portfolioOptions.length > 0
         ? [
@@ -278,7 +291,7 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
           ]
         : []),
     ],
-    [techOptions, portfolioOptions]
+    [techOptions, portfolioOptions, healthById]
   )
 
   return (
@@ -365,10 +378,21 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
           detail: {
             title: (r) => r.project_name,
             subtitle: (r) => <span className="text-muted-foreground text-xs">{r.location}</span>,
-            badges: (r) => renderStatusBadge(r.status),
+            badges: (r) => {
+              const health = healthById.get(r.id)
+              return (
+                <>
+                  {renderStatusBadge(r.status)}
+                  {health && <HealthBadge status={health.status} />}
+                </>
+              )
+            },
             fields: (r) => {
               const info = getProgressInfo(r)
-              return [
+              const health = healthById.get(r.id)
+              const pct = (value: number | null | undefined) =>
+                value === null || value === undefined ? null : `${value}%`
+              const fields: DataTableDetailField[] = [
                 { icon: MapPin, label: "Location", value: r.location },
                 {
                   icon: Briefcase,
@@ -379,10 +403,31 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
                     "Unassigned",
                 },
                 { icon: Wrench, label: "Technology", value: r.technology_type },
-                { icon: FolderGit2, label: "Capacity", value: formatCapacity(r.capacity_w) },
-                { icon: Calendar, label: "Delivery progress", value: `${info.percent}% — ${info.text}` },
-                { icon: FolderKanban, label: "Description", value: r.description },
+                {
+                  icon: FolderGit2,
+                  label: "Capacity",
+                  value: r.capacity_w === null ? null : formatCapacity(r.capacity_w),
+                },
+                { icon: Layers, label: "Portfolio", value: r.portfolio?.name, copyable: false },
+                {
+                  icon: Calendar,
+                  label: "Schedule",
+                  value: `${r.deployment_start_date} → ${r.deployment_end_date}`,
+                  copyable: false,
+                },
+                { label: "Delivery progress", value: `${info.percent}% — ${info.text}`, copyable: false },
+                {
+                  icon: Activity,
+                  label: "Health",
+                  value: health ? PROJECT_HEALTH_LABELS[health.status] : null,
+                  copyable: false,
+                },
+                { label: "Elapsed", value: pct(health?.timeElapsedPct), copyable: false },
+                { label: "Variance", value: formatVariance(health?.variancePct), copyable: false },
+                { label: "Overdue tasks", value: health ? String(health.overdueCount) : null, copyable: false },
+                { icon: FolderKanban, label: "Description", value: r.description, fullWidth: true },
               ]
+              return fields.filter((field) => field.value)
             },
           },
         }}
@@ -426,6 +471,7 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         expandable={{
           render: (r) => (
             <div className="bg-muted/20 space-y-3 rounded-lg border p-2">
+              <ProjectSummary project={r} health={healthById.get(r.id)} />
               <ProjectTaskViewer projectId={r.id} projectName={r.project_name} />
             </div>
           ),

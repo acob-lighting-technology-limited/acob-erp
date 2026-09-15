@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableDetailField, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -19,14 +19,23 @@ import {
   Wrench,
   ShieldCheck,
   Briefcase,
+  Pencil,
+  Activity,
+  Layers,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { ProjectDialogs } from "./project-dialogs"
-import { PROJECT_HEALTH_LABELS, computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
+import {
+  PROJECT_HEALTH_LABELS,
+  PROJECT_METRIC_HELP,
+  computeProjectHealth,
+  type ProjectHealthTask,
+} from "@/lib/projects/health"
 import { toLocalISODate } from "@/lib/utils/date"
 import { Progress } from "@/components/ui/progress"
 import { ProjectPlanBoard } from "./project-plan-board"
+import { HealthBadge, ProjectSummary, formatCapacity, formatVariance } from "@/components/projects/project-summary"
 
 // Define core project structure
 export interface Project {
@@ -59,6 +68,14 @@ interface ProjectAdminContentProps {
   currentUser: { id: string; role: string; department: string | null }
 }
 
+function managerName(project: Project) {
+  return (
+    project.project_manager?.full_name ||
+    [project.project_manager?.first_name, project.project_manager?.last_name].filter(Boolean).join(" ") ||
+    "Unassigned"
+  )
+}
+
 async function fetchProjects(): Promise<Project[]> {
   const res = await fetch("/api/projects", { cache: "no-store" })
   const payload = await res.json()
@@ -84,13 +101,6 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
     queryKey: ["projects"],
     queryFn: fetchProjects,
   })
-
-  // Format power capacity helper
-  const formatCapacity = (watts: number | null) => {
-    if (watts === null || watts === undefined) return "-"
-    const kwp = watts / 1000
-    return `${kwp.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWp`
-  }
 
   // Calculate project summary statistics
   const stats = useMemo(() => {
@@ -122,21 +132,6 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
       ])
     )
   }, [rows])
-
-  const renderHealthBadge = (status: string) => {
-    switch (status) {
-      case "on_track":
-        return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">On Track</Badge>
-      case "at_risk":
-        return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">At Risk</Badge>
-      case "behind_schedule":
-        return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">Behind Schedule</Badge>
-      case "completed":
-        return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-500">Completed</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
 
   // Technology Types option list for filtering
   const techOptions = useMemo(() => {
@@ -190,18 +185,6 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         ),
       },
       {
-        key: "technology_type",
-        label: "Tech / Capacity",
-        sortable: true,
-        accessor: (r) => r.technology_type || "",
-        render: (r) => (
-          <div className="space-y-0.5 text-sm">
-            <p className="font-medium">{formatCapacity(r.capacity_w)}</p>
-            {r.technology_type && <p className="text-muted-foreground text-xs">{r.technology_type}</p>}
-          </div>
-        ),
-      },
-      {
         key: "project_manager",
         label: "Project Manager",
         sortable: true,
@@ -209,11 +192,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         render: (r) => (
           <div className="flex items-center gap-1.5 text-sm">
             <Briefcase className="text-muted-foreground h-3.5 w-3.5" />
-            <span>
-              {r.project_manager?.full_name ||
-                [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
-                "Unassigned"}
-            </span>
+            <span>{managerName(r)}</span>
           </div>
         ),
       },
@@ -234,6 +213,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
       {
         key: "progress",
         label: "Delivery / Quality",
+        description: PROJECT_METRIC_HELP.deliveryQuality,
         sortable: true,
         accessor: (r) => healthById.get(r.id)?.deliveryPct ?? 0,
         render: (r) => {
@@ -252,30 +232,9 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         },
       },
       {
-        key: "health",
-        label: "Health",
-        sortable: true,
-        accessor: (r) => PROJECT_HEALTH_LABELS[healthById.get(r.id)?.status ?? "on_track"],
-        render: (r) => {
-          const health = healthById.get(r.id)
-          if (!health) return null
-          return (
-            <div className="space-y-1">
-              {renderHealthBadge(health.status)}
-              {health.variancePct !== null && (
-                <p className="text-muted-foreground text-[11px]">
-                  {health.variancePct > 0 ? "+" : ""}
-                  {health.variancePct}% vs schedule
-                  {health.overdueCount > 0 ? ` · ${health.overdueCount} overdue` : ""}
-                </p>
-              )}
-            </div>
-          )
-        },
-      },
-      {
         key: "status",
-        label: "Lifecycle",
+        label: "Status",
+        description: PROJECT_METRIC_HELP.status,
         sortable: true,
         accessor: (r) => r.status,
         render: (r) => renderStatusBadge(r.status),
@@ -302,6 +261,9 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         key: "technology_type",
         label: "Technology",
         options: techOptions,
+        // The technology column moved into the expanded view, so match on the row.
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(row.technology_type || ""),
       },
       {
         key: "health",
@@ -312,9 +274,12 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
           { value: "Behind Schedule", label: "Behind Schedule" },
           { value: "Completed", label: "Completed" },
         ],
+        mode: "custom",
+        filterFn: (row, selected) =>
+          selected.includes(PROJECT_HEALTH_LABELS[healthById.get(row.id)?.status ?? "on_track"]),
       },
     ],
-    [techOptions]
+    [techOptions, healthById]
   )
 
   return (
@@ -406,9 +371,67 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
               {r.status || "Planned"}
             </Badge>
           ),
-          onSelect: (r) => {
-            setActiveProject(r)
-            setIsEditOpen(true)
+          detail: {
+            title: (r) => r.project_name,
+            subtitle: (r) => r.location,
+            badges: (r) => {
+              const health = healthById.get(r.id)
+              return (
+                <>
+                  {renderStatusBadge(r.status)}
+                  {health && <HealthBadge status={health.status} />}
+                </>
+              )
+            },
+            fields: (r) => {
+              const health = healthById.get(r.id)
+              const pct = (value: number | null | undefined) =>
+                value === null || value === undefined ? null : `${value}%`
+              const fields: DataTableDetailField[] = [
+                { icon: MapPin, label: "Location", value: r.location },
+                { icon: Briefcase, label: "Project manager", value: managerName(r) },
+                { icon: Layers, label: "Portfolio", value: r.portfolio?.name ?? "Unassigned", copyable: false },
+                { icon: Wrench, label: "Technology", value: r.technology_type },
+                {
+                  icon: FolderGit2,
+                  label: "Capacity",
+                  value: r.capacity_w === null ? null : formatCapacity(r.capacity_w),
+                },
+                {
+                  icon: Calendar,
+                  label: "Schedule",
+                  value: `${r.deployment_start_date} → ${r.deployment_end_date}`,
+                  copyable: false,
+                },
+                {
+                  icon: Activity,
+                  label: "Health",
+                  value: health ? PROJECT_HEALTH_LABELS[health.status] : null,
+                  copyable: false,
+                },
+                { label: "Delivered", value: pct(health?.deliveryPct), copyable: false },
+                { label: "Quality", value: pct(health?.qualityPct), copyable: false },
+                { label: "Elapsed", value: pct(health?.timeElapsedPct), copyable: false },
+                {
+                  label: "Variance",
+                  value: formatVariance(health?.variancePct),
+                  copyable: false,
+                },
+                { label: "Overdue tasks", value: health ? String(health.overdueCount) : null, copyable: false },
+                { icon: FolderKanban, label: "Description", value: r.description, fullWidth: true },
+              ]
+              return fields.filter((field) => field.value)
+            },
+            actions: (r) => [
+              {
+                label: "Edit Project",
+                icon: Pencil,
+                onClick: () => {
+                  setActiveProject(r)
+                  setIsEditOpen(true)
+                },
+              },
+            ],
           },
         }}
         cardRenderer={(r) => (
@@ -436,15 +459,18 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         rowActions={[
           {
             label: "Edit Project Details",
+            icon: Pencil,
             onClick: (r) => {
               setActiveProject(r)
               setIsEditOpen(true)
             },
           },
         ]}
+        forceRowActionsDropdown
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 rounded-lg border p-2">
+            <div className="bg-muted/20 space-y-2 rounded-lg border p-2">
+              <ProjectSummary project={r} health={healthById.get(r.id)} />
               <ProjectPlanBoard project={r} profiles={profiles} />
             </div>
           ),

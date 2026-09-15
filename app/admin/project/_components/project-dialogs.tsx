@@ -13,9 +13,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import type { Project } from "./project-admin-content"
 import { apiFetch } from "@/lib/api-client"
+
+const STATUS_OPTIONS = [
+  { value: "planning", label: "Planning" },
+  { value: "active", label: "Ongoing (Active)" },
+  { value: "on_hold", label: "On Hold" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+]
 
 interface ProjectDialogsProps {
   profiles: Array<{
@@ -31,6 +40,8 @@ interface ProjectDialogsProps {
   setIsEditOpen: (open: boolean) => void
   selectedProject: Project | null
   onSuccess: () => void
+  /** Pre-selects the portfolio when adding, e.g. when creating from a portfolio. */
+  defaultPortfolioId?: string | null
 }
 
 export function ProjectDialogs({
@@ -41,6 +52,7 @@ export function ProjectDialogs({
   setIsEditOpen,
   selectedProject,
   onSuccess,
+  defaultPortfolioId = null,
 }: ProjectDialogsProps) {
   const [loading, setLoading] = useState(false)
 
@@ -56,6 +68,18 @@ export function ProjectDialogs({
   const [status, setStatus] = useState<"planning" | "active" | "on_hold" | "completed" | "cancelled">("planning")
   const [portfolioId, setPortfolioId] = useState("")
   const [portfolios, setPortfolios] = useState<Array<{ id: string; name: string; code: string | null }>>([])
+
+  const portfolioOptions = [
+    { value: "", label: "No portfolio" },
+    ...portfolios.map((portfolio) => ({
+      value: portfolio.id,
+      label: portfolio.code ? `${portfolio.code} — ${portfolio.name}` : portfolio.name,
+    })),
+  ]
+  const managerOptions = [
+    { value: "", label: "Unassigned" },
+    ...profiles.map((p) => ({ value: p.id, label: p.full_name || `${p.first_name} ${p.last_name}` })),
+  ]
 
   // A project may sit outside every portfolio, so a failed load must not block
   // the form — it just leaves the selector empty.
@@ -99,9 +123,9 @@ export function ProjectDialogs({
       setManagerId("")
       setDescription("")
       setStatus("planning")
-      setPortfolioId("")
+      setPortfolioId(defaultPortfolioId ?? "")
     }
-  }, [selectedProject, isEditOpen])
+  }, [selectedProject, isEditOpen, isAddOpen, defaultPortfolioId])
 
   // Handle Add Project submit
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -248,40 +272,24 @@ export function ProjectDialogs({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="add-portfolio" className="text-xs font-semibold">
-                  Portfolio
-                </Label>
-                <select
-                  id="add-portfolio"
+                <Label className="text-xs font-semibold">Portfolio</Label>
+                <SearchableSelect
                   value={portfolioId}
-                  onChange={(e) => setPortfolioId(e.target.value)}
-                  className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  <option value="">No portfolio</option>
-                  {portfolios.map((portfolio) => (
-                    <option key={portfolio.id} value={portfolio.id}>
-                      {portfolio.code ? `${portfolio.code} — ${portfolio.name}` : portfolio.name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setPortfolioId}
+                  options={portfolioOptions}
+                  placeholder="No portfolio"
+                  searchPlaceholder="Search portfolios..."
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="add-manager" className="text-xs font-semibold">
-                  Project Manager
-                </Label>
-                <select
-                  id="add-manager"
+                <Label className="text-xs font-semibold">Project Manager</Label>
+                <SearchableSelect
                   value={managerId}
-                  onChange={(e) => setManagerId(e.target.value)}
-                  className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  <option value="">Unassigned</option>
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name || `${p.first_name} ${p.last_name}`}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setManagerId}
+                  options={managerOptions}
+                  placeholder="Unassigned"
+                  searchPlaceholder="Search staff..."
+                />
               </div>
             </div>
 
@@ -307,21 +315,14 @@ export function ProjectDialogs({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-status" className="text-xs font-semibold">
-                Project Status
-              </Label>
-              <select
-                id="add-status"
+              <Label className="text-xs font-semibold">Project Status</Label>
+              <SearchableSelect
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <option value="planning">Planning</option>
-                <option value="active">Ongoing (Active)</option>
-                <option value="on_hold">On Hold</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+                onValueChange={(value) => setStatus(value as typeof status)}
+                options={STATUS_OPTIONS}
+                placeholder="Select status"
+                searchPlaceholder="Search status..."
+              />
             </div>
 
             <div className="space-y-2">
@@ -410,40 +411,24 @@ export function ProjectDialogs({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-portfolio" className="text-xs font-semibold">
-                  Portfolio
-                </Label>
-                <select
-                  id="edit-portfolio"
+                <Label className="text-xs font-semibold">Portfolio</Label>
+                <SearchableSelect
                   value={portfolioId}
-                  onChange={(e) => setPortfolioId(e.target.value)}
-                  className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  <option value="">No portfolio</option>
-                  {portfolios.map((portfolio) => (
-                    <option key={portfolio.id} value={portfolio.id}>
-                      {portfolio.code ? `${portfolio.code} — ${portfolio.name}` : portfolio.name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setPortfolioId}
+                  options={portfolioOptions}
+                  placeholder="No portfolio"
+                  searchPlaceholder="Search portfolios..."
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-manager" className="text-xs font-semibold">
-                  Project Manager
-                </Label>
-                <select
-                  id="edit-manager"
+                <Label className="text-xs font-semibold">Project Manager</Label>
+                <SearchableSelect
                   value={managerId}
-                  onChange={(e) => setManagerId(e.target.value)}
-                  className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  <option value="">Unassigned</option>
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name || `${p.first_name} ${p.last_name}`}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setManagerId}
+                  options={managerOptions}
+                  placeholder="Unassigned"
+                  searchPlaceholder="Search staff..."
+                />
               </div>
             </div>
 
@@ -475,21 +460,14 @@ export function ProjectDialogs({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-status" className="text-xs font-semibold">
-                Project Status
-              </Label>
-              <select
-                id="edit-status"
+              <Label className="text-xs font-semibold">Project Status</Label>
+              <SearchableSelect
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <option value="planning">Planning</option>
-                <option value="active">Ongoing (Active)</option>
-                <option value="on_hold">On Hold</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+                onValueChange={(value) => setStatus(value as typeof status)}
+                options={STATUS_OPTIONS}
+                placeholder="Select status"
+                searchPlaceholder="Search status..."
+              />
             </div>
 
             <div className="space-y-2">
