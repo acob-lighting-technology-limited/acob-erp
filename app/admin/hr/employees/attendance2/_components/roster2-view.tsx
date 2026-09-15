@@ -17,6 +17,8 @@ import {
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -88,12 +90,6 @@ const STATUS_TEXT: Record<string, string> = {
   holiday: "text-sky-600 dark:text-sky-400",
 }
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return (name.slice(0, 2) || "??").toUpperCase()
-}
-
 function statusLabelOf(status: string): string {
   return ATTENDANCE_STATUS_LABELS[status as keyof typeof ATTENDANCE_STATUS_LABELS] ?? status.replaceAll("_", " ")
 }
@@ -115,6 +111,7 @@ const STATUS_OPTIONS = [
 ]
 
 export function Roster2View({ departments, lockedDepartment }: { departments: string[]; lockedDepartment?: string }) {
+  const staffAvatars = useStaffAvatars()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -539,9 +536,7 @@ export function Roster2View({ departments, lockedDepartment }: { departments: st
                     onClick={() => setPeeked(r)}
                     className="hover:bg-muted/40 active:bg-muted relative flex w-full items-center gap-3 py-2.5 pr-3.5 pl-3 text-left transition-colors"
                   >
-                    <span className="bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold">
-                      {initialsOf(r.user_name)}
-                    </span>
+                    <StaffAvatar name={r.user_name} src={staffAvatars[r.user_id]} />
 
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{r.user_name}</span>
