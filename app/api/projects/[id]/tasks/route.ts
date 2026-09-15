@@ -1,10 +1,49 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { clampWeight } from "@/lib/tasks/scoring"
 import { logger } from "@/lib/logger"
+import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 export const dynamic = "force-dynamic"
 const log = logger("project-tasks-api")
+
+type ServerSupabase = Awaited<ReturnType<typeof createClient>>
+
+/**
+ * Tell a new assignee about a project task: in the bell and by email, matching
+ * what POST /api/tasks does. Neither channel may fail the task write.
+ */
+async function notifyProjectTaskAssigned(
+  supabase: ServerSupabase,
+  params: { taskId: string; title: string; priority: string | null; assigneeId: string; actorId: string }
+) {
+  try {
+    const { error } = await supabase.rpc("create_notification", {
+      p_user_id: params.assigneeId,
+      p_type: "task_assigned",
+      p_category: "tasks",
+      p_title: "New task assigned to you",
+      p_message: params.title,
+      p_priority: params.priority === "urgent" ? "urgent" : params.priority === "high" ? "high" : "normal",
+      p_link_url: "/tasks/management",
+      p_actor_id: params.actorId,
+      p_entity_type: "task",
+      p_entity_id: params.taskId,
+    })
+    if (error) throw error
+  } catch (err) {
+    log.error({ err: String(err), taskId: params.taskId }, "Project task assignment notification failed")
+  }
+
+  after(() =>
+    sendTaskEmail(supabase, {
+      kind: "assigned",
+      taskId: params.taskId,
+      recipientIds: [params.assigneeId],
+      replyToUserId: params.actorId,
+    })
+  )
+}
 
 // GET /api/projects/[id]/tasks - Fetch all tasks for a specific project
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -89,6 +128,16 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    if (task.assigned_to && task.assigned_to !== user.id) {
+      await notifyProjectTaskAssigned(supabase, {
+        taskId: task.id,
+        title: task.title,
+        priority: task.priority,
+        assigneeId: task.assigned_to,
+        actorId: user.id,
+      })
+    }
+
     return NextResponse.json({ data: task })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project tasks POST")
@@ -126,6 +175,13 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
       )
     }
 
+    const { data: previous } = await supabase
+      .from("tasks")
+      .select("assigned_to")
+      .eq("id", task_id)
+      .eq("project_id", params.id)
+      .maybeSingle<{ assigned_to: string | null }>()
+
     const { data: task, error } = await (supabase as any)
       .from("tasks")
       .update({
@@ -145,6 +201,16 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     if (error) {
       log.error({ err: error.message }, "Failed to update task")
       return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    if (task.assigned_to && task.assigned_to !== previous?.assigned_to && task.assigned_to !== user.id) {
+      await notifyProjectTaskAssigned(supabase, {
+        taskId: task.id,
+        title: task.title,
+        priority: task.priority,
+        assigneeId: task.assigned_to,
+        actorId: user.id,
+      })
     }
 
     return NextResponse.json({ data: task })
