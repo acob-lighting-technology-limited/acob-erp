@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
 import { computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
+import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 const log = logger("cron-tasks-reminders")
 
@@ -183,7 +184,17 @@ async function sendDueSoonReminders(supabase: Supabase, today: string): Promise<
       linkUrl: "/tasks",
       priority: remaining <= 1 ? "high" : "normal",
     })
-    if (ok) sent++
+    if (ok) {
+      sent++
+      // Inside the cooldown guard above, so the email is no more frequent than the bell.
+      await sendTaskEmail(supabase, {
+        kind: "due_soon",
+        taskId: task.id,
+        recipientIds: [task.assigned_to],
+        replyToUserId: task.assigned_by,
+        daysRemaining: remaining,
+      })
+    }
   }
 
   return sent
@@ -243,7 +254,16 @@ async function sendRatingReminders(supabase: Supabase, today: string): Promise<n
       linkUrl: "/admin/tasks",
       priority: "high",
     })
-    if (ok) sent++
+    if (ok) {
+      sent++
+      await sendTaskEmail(supabase, {
+        kind: "needs_rating",
+        taskId: task.id,
+        recipientIds: [raterId],
+        replyToUserId: task.assigned_to,
+        waitingDays,
+      })
+    }
   }
 
   return sent

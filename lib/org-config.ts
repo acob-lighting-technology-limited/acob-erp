@@ -73,6 +73,10 @@ export function orgSender(label: string): string {
 // routed by Reply-To (see ORG_MAIL_ROUTING) rather than by the display name. Per-
 // subsystem display names bought nothing — every one of them sent from the same
 // address, which is what mail clients actually thread, filter, and score.
+//
+// Two exceptions use a department display name (orgDepartmentSenderBare), because
+// there the department genuinely is who is speaking: Communications broadcasts,
+// and task mail, since every task is issued by a department.
 export const ORG_EMAIL_SENDERS = {
   /** The single identity for every automated notification (env-overridable). */
   system: ORG_NOTIFICATION_SENDER,
@@ -116,6 +120,13 @@ export const ORG_MAIL_ROUTING: Record<
   Correspondence: { replyTo: ORG_CORPORATE_SERVICES_EMAIL, listId: listId("correspondence") },
   Security: { replyTo: ORG_ICT_EMAIL, listId: listId("security") },
 }
+
+/**
+ * List-Id for task mail. Tasks are absent from ORG_MAIL_ROUTING for the same
+ * reason as Communications: Reply-To is a person (the assigner or assignee),
+ * resolved per send in lib/tasks/mailer.ts.
+ */
+export const TASKS_LIST_ID = listId("tasks")
 
 /** Dynamic department sender, e.g. "ACOB Finance Department" (label resolved at runtime). */
 export function orgDepartmentSender(departmentLabel: string): string {

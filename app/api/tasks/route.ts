@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -10,6 +10,7 @@ import { TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { canAssignToDepartment, canAssignToProfile } from "@/lib/tasks/assignment-scope"
 import { TASK_STATUSES, TASK_ASSIGNMENT_TYPES } from "@/lib/tasks/constants"
+import { sendTaskEmail } from "@/lib/tasks/mailer"
 import type { Task, TaskPersonSummary } from "@/types/task"
 
 const log = logger("tasks-route")
@@ -424,6 +425,22 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Email after the response: a fan-out can be many sends, and none of them
+      // should hold up the lead who created the tasks.
+      const emailTargets = createdTasks.filter((t) => t.assigned_to && t.assigned_to !== user.id)
+      if (emailTargets.length > 0) {
+        after(async () => {
+          for (const t of emailTargets) {
+            await sendTaskEmail(supabase, {
+              kind: "assigned",
+              taskId: t.id,
+              recipientIds: [t.assigned_to as string],
+              replyToUserId: user.id,
+            })
+          }
+        })
+      }
+
       return NextResponse.json({ data: createdTasks[0], createdCount: createdTasks.length }, { status: 201 })
     }
 
@@ -498,6 +515,11 @@ export async function POST(request: NextRequest) {
       } catch (notifyErr) {
         log.error({ err: String(notifyErr), targetId: task.assigned_to }, "Task assignment notification failed")
       }
+
+      const assigneeId = task.assigned_to
+      after(() =>
+        sendTaskEmail(supabase, { kind: "assigned", taskId: task.id, recipientIds: [assigneeId], replyToUserId: user.id })
+      )
     }
 
     return NextResponse.json({ data: task }, { status: 201 })
