@@ -26,7 +26,7 @@ export default async function DeptLayoutPage({ children, params }: DeptLayoutPag
   const { data: profile } = authData?.user
     ? await supabase
         .from("profiles")
-        .select("first_name, last_name, department, role, is_department_lead, admin_routes, lead_departments")
+        .select("id, first_name, last_name, department, role, is_department_lead, admin_routes, lead_departments")
         .eq("id", authData.user.id)
         .single()
     : { data: null }
@@ -53,6 +53,7 @@ export default async function DeptLayoutPage({ children, params }: DeptLayoutPag
   // filters nav items correctly for this user's role.
   const sidebarProfile = profile
     ? {
+        id: profile.id,
         first_name: profile.first_name ?? undefined,
         last_name: profile.last_name ?? undefined,
         department: scope.deptName, // always show the dept this console is for

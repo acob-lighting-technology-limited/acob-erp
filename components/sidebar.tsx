@@ -33,7 +33,8 @@ import { toast } from "sonner"
 import { cn, formatName, getInitials } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { getRoleDisplayName } from "@/lib/permissions"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -61,6 +62,7 @@ interface SidebarProps {
     }
   }
   profile?: {
+    id?: string
     first_name?: string
     last_name?: string
     department?: string
@@ -220,6 +222,8 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [departmentCode, setDepartmentCode] = useState<string | null>(null)
   const { isCollapsed } = useSidebar()
+  const staffAvatars = useStaffAvatars()
+  const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
 
   useEffect(() => {
     const handleToggle = (e: Event) => {
@@ -533,11 +537,13 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                     )}
                   >
                     <div className="flex items-center">
-                      <Avatar className="ring-primary/10 h-7 w-7 shrink-0 ring-2">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                          {getInitials(user?.email, profile?.first_name, profile?.last_name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <StaffAvatar
+                        name={accountName}
+                        src={accountAvatarUrl}
+                        initials={getInitials(user?.email, profile?.first_name, profile?.last_name)}
+                        className="ring-primary/10 h-7 w-7 ring-2"
+                        fallbackClassName="bg-primary text-primary-foreground text-xs font-semibold"
+                      />
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
@@ -551,11 +557,13 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                 className="text-muted-foreground hover:text-foreground min-h-[52px] w-full justify-between px-3 text-sm transition-[padding,gap] duration-300 ease-in-out"
               >
                 <div className="flex items-center gap-2.5">
-                  <Avatar className="ring-primary/10 h-7 w-7 shrink-0 ring-2">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                      {getInitials(user?.email, profile?.first_name, profile?.last_name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <StaffAvatar
+                    name={accountName}
+                    src={accountAvatarUrl}
+                    initials={getInitials(user?.email, profile?.first_name, profile?.last_name)}
+                    className="ring-primary/10 h-7 w-7 ring-2"
+                    fallbackClassName="bg-primary text-primary-foreground text-xs font-semibold"
+                  />
                   <div className={labelCls}>
                     <p className="truncate text-left text-sm font-medium">{accountName}</p>
                     {(accountDepartment || accountRole) && (
