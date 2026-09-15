@@ -396,16 +396,6 @@ export default function ActionTrackerPortal() {
     [allDepartments]
   )
 
-  const priorityOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(tasks.map((task) => task.priority).filter((priority): priority is string => Boolean(priority)))
-      )
-        .sort()
-        .map((priority) => ({ value: priority, label: priority.replace(/_/g, " ") })),
-    [tasks]
-  )
-
   const filters = useMemo<DataTableFilter<DepartmentActionRow>[]>(
     () => [
       // Week and year refetch from the server rather than narrowing the rows
@@ -464,18 +454,8 @@ export default function ActionTrackerPortal() {
         label: "Department",
         options: departmentOptions,
       },
-      {
-        key: "point_priority",
-        label: "Point Priority",
-        mode: "custom",
-        options: priorityOptions,
-        filterFn: (row, values) => {
-          if (!values || values.length === 0) return true
-          return row.tasks.some((task) => values.includes(task.priority))
-        },
-      },
     ],
-    [departmentOptions, priorityOptions, week, weekOptions, year, yearOptions]
+    [departmentOptions, week, weekOptions, year, yearOptions]
   )
 
   const directiveColumns = useMemo<DataTableColumn<ActionTask>[]>(

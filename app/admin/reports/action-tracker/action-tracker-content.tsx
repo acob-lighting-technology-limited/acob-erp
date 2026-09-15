@@ -417,19 +417,6 @@ export function ActionTrackerContent({
     [initialDepartments]
   )
 
-  const priorityOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(tasks.map((task) => task.priority).filter((priority): priority is string => Boolean(priority)))
-      )
-        .sort()
-        .map((priority) => ({
-          value: priority,
-          label: priority.replace(/_/g, " "),
-        })),
-    [tasks]
-  )
-
   const departmentRows = useMemo<DepartmentActionRow[]>(() => {
     const grouped = new Map<string, ActionTask[]>()
     weeklyTasks.forEach((task) => {
@@ -561,18 +548,8 @@ export function ActionTrackerContent({
         label: "Department",
         options: departmentOptions,
       },
-      {
-        key: "point_priority",
-        label: "Point Priority",
-        mode: "custom",
-        options: priorityOptions,
-        filterFn: (row, values) => {
-          if (!values || values.length === 0) return true
-          return row.tasks.some((task) => values.includes(task.priority))
-        },
-      },
     ],
-    [departmentOptions, priorityOptions, weekFilter, weekOptions, yearFilter, yearOptions]
+    [departmentOptions, weekFilter, weekOptions, yearFilter, yearOptions]
   )
 
   const directiveColumns = useMemo<DataTableColumn<ActionTask>[]>(

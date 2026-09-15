@@ -18,6 +18,8 @@
  * what "leave empty when the whole department is responsible" means in the form.
  */
 
+import { isSameDepartment } from "@/shared/departments"
+
 const ADMIN_ROLES = ["developer", "super_admin", "admin"]
 
 export type ActionTrackerScopeProfile = {
@@ -44,6 +46,21 @@ export type ActionTrackerPermissionOptions = {
   isAdminContext?: boolean
 }
 
+/**
+ * Check if the user belongs to the department, or is a department lead over it.
+ */
+export function isUserInActionDepartment(
+  profile: ActionTrackerScopeProfile | null | undefined,
+  department: string | null | undefined
+): boolean {
+  if (!profile || !department) return false
+  if (isSameDepartment(profile.department, department)) return true
+  if (profile.is_department_lead && Array.isArray(profile.lead_departments)) {
+    return profile.lead_departments.some((leadDept) => isSameDepartment(leadDept, department))
+  }
+  return false
+}
+
 /** Admin (in admin context), or a lead over the department the item is stamped with. */
 export function canManageActionDepartment(
   profile: ActionTrackerScopeProfile | null | undefined,
@@ -51,9 +68,11 @@ export function canManageActionDepartment(
   options?: ActionTrackerPermissionOptions
 ): boolean {
   if (options?.isAdminContext && isActionTrackerAdmin(profile)) return true
-  if (!profile?.is_department_lead || !department) return false
+  if (!department) return false
+  if (!profile?.is_department_lead) return false
+  if (isSameDepartment(profile.department, department)) return true
   const leadDepartments = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
-  return profile.department === department || leadDepartments.includes(department)
+  return leadDepartments.some((leadDept) => isSameDepartment(leadDept, department))
 }
 
 /** Editing the item itself: title, department, week/year, timeline, responsible staff, deletion. */
@@ -67,11 +86,12 @@ export function canEditActionContent(
 
 /**
  * Moving the status or reporting a hindrance. Named responsible staff own their
- * directive regardless of which department it is filed under; an untagged
- * colleague — lead or not — does not.
+ * directive regardless of which department it is filed under; for department-wide
+ * directives or weekly report action points, staff belonging to that department
+ * (or leading that department) may move it.
  *
  * In portal context (isAdminContext !== true), admin powers do not override department
- * boundaries: only the named assignees or the department's actual lead may update progress.
+ * boundaries: only the named assignees, department members, or department leads may update progress.
  */
 export function canUpdateActionProgress(
   profile: ActionTrackerScopeProfile | null | undefined,
@@ -86,5 +106,5 @@ export function canUpdateActionProgress(
     return Boolean(profile?.id && assigneeIds.includes(String(profile.id)))
   }
 
-  return canManageActionDepartment(profile, item.department, options)
+  return isUserInActionDepartment(profile, item.department)
 }
