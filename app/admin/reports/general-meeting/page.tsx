@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ClipboardList, FileText, ChevronRight, Presentation, Users, UserCheck } from "lucide-react"
+import { ClipboardList, FileText, ChevronRight, Presentation, Users, UserCheck, AlertTriangle } from "lucide-react"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { IconFill } from "@/components/ui/icon-fill"
@@ -31,6 +31,17 @@ export default function AdminGeneralMeetingReportsPage() {
       hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
       hoverText: "group-hover:text-emerald-500",
       subLabel: "Department updates",
+    },
+    {
+      title: "Departmental Challenges",
+      description: "Oversee and resolve departmental challenges, track action plans, and update resolution statuses.",
+      href: "/admin/reports/general-meeting/challenges",
+      icon: AlertTriangle,
+      color: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+      fill: "bg-rose-500",
+      hoverBorder: "hover:border-rose-500/60 dark:hover:border-rose-400/60",
+      hoverText: "group-hover:text-rose-500",
+      subLabel: "Blockers & mitigation status",
     },
     {
       title: "Knowledge Sharing Session",

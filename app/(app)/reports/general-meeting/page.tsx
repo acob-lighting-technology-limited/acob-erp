@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { FileBarChart, ClipboardList, FileText, ChevronRight, Presentation, Users } from "lucide-react"
+import { FileBarChart, ClipboardList, FileText, ChevronRight, Presentation, Users, AlertTriangle } from "lucide-react"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { Badge } from "@/components/ui/badge"
@@ -33,6 +33,18 @@ export default function PortalGeneralMeetingPage() {
       fill: "bg-blue-500",
       hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
       hoverText: "group-hover:text-blue-500",
+    },
+    {
+      title: "Departmental Challenges",
+      description: "Review challenges, blockers, and mitigation plans flagged by departments across meeting weeks.",
+      href: "/reports/general-meeting/challenges",
+      icon: AlertTriangle,
+      tag: "Challenges",
+      subLabel: "Department blockers & mitigation",
+      color: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+      fill: "bg-rose-500",
+      hoverBorder: "hover:border-rose-500/60 dark:hover:border-rose-400/60",
+      hoverText: "group-hover:text-rose-500",
     },
     {
       title: "Knowledge Sharing Session",
@@ -70,7 +82,7 @@ export default function PortalGeneralMeetingPage() {
       />
 
       <PageSection title="Available Trackers & Reports">
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {reportCards.map((card) => (
             <Link key={card.title} href={card.href} className="group block">
               <div
