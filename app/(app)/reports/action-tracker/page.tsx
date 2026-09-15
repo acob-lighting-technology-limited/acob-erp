@@ -28,6 +28,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DetailCallout, DetailSectionHeading } from "@/components/ui/detail-dialog"
@@ -144,6 +146,7 @@ export default function ActionTrackerPortal() {
   const [deptFilter] = useState(() => searchParams.get("dept") || "all")
   const [isCarryForwarding, setIsCarryForwarding] = useState(false)
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
+  const staffAvatars = useStaffAvatars()
   const [exportScope, setExportScope] = useState<ExportScope>({ label: "All Departments", items: [] })
   const [viewingDepartment, setViewingDepartment] = useState<DepartmentActionRow | null>(null)
   // Rows currently visible in the table (after search + filters + sort).
@@ -551,7 +554,13 @@ export default function ActionTrackerPortal() {
           row.assignees && row.assignees.length > 0 ? (
             <div className="flex flex-wrap gap-1">
               {row.assignees.map((person) => (
-                <Badge key={person.id} variant="secondary" className="text-[11px] font-normal">
+                <Badge key={person.id} variant="secondary" className="gap-1 pl-0.5 text-[11px] font-normal">
+                  <StaffAvatar
+                    name={person.name}
+                    src={staffAvatars[person.id]}
+                    size="xs"
+                    className="h-4 w-4 text-[7px]"
+                  />
                   {person.name}
                 </Badge>
               ))}
@@ -637,7 +646,7 @@ export default function ActionTrackerPortal() {
     // handleStatusChange and canMutateTask close over the current task list and
     // profile, so the status control must be rebuilt when either changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, profile?.department]
+    [tasks, profile?.department, staffAvatars]
   )
 
   const directiveFilters = useMemo<DataTableFilter<ActionTask>[]>(
