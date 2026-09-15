@@ -40,7 +40,7 @@ const OPEN_STATUSES = ["pending", "in_progress", "unable_to_complete"]
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization") ?? ""
   const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!safeCompare(authHeader, expected)) {
+  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -100,7 +100,8 @@ export async function GET(request: NextRequest) {
       const recipients = new Set([task.assigned_to, task.assigned_by].filter(Boolean) as string[])
       for (const userId of recipients) {
         try {
-          await supabase.rpc("create_notification", {
+          // supabase-js reports RPC failures in the result rather than throwing.
+          const { error: notifyRpcError } = await supabase.rpc("create_notification", {
             p_user_id: userId,
             p_type: "task_updated",
             p_category: "tasks",
@@ -113,6 +114,7 @@ export async function GET(request: NextRequest) {
             p_entity_id: task.id,
             p_rich_content: null,
           })
+          if (notifyRpcError) throw notifyRpcError
           notified++
         } catch (notifyError) {
           log.error({ err: String(notifyError), taskId: task.id, userId }, "Failed to notify on task expiry")
