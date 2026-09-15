@@ -4,6 +4,8 @@ import { useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableDetailField, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -76,6 +78,7 @@ async function fetchUserProjects(): Promise<ProjectRow[]> {
 
 export function ProjectContent({ currentUser: _currentUser }: ProjectContentProps = {}) {
   const queryClient = useQueryClient()
+  const staffAvatars = useStaffAvatars()
 
   // Fetch project list
   const {
@@ -209,7 +212,17 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         accessor: (r) => r.project_manager?.full_name || "",
         render: (r) => (
           <div className="flex items-center gap-1.5 text-sm">
-            <Briefcase className="text-muted-foreground h-3.5 w-3.5" />
+            {r.project_manager ? (
+              <StaffAvatar
+                name={
+                  r.project_manager.full_name || [r.project_manager.first_name, r.project_manager.last_name].join(" ")
+                }
+                src={staffAvatars[r.project_manager.id]}
+                size="xs"
+              />
+            ) : (
+              <Briefcase className="text-muted-foreground h-3.5 w-3.5" />
+            )}
             <span>
               {r.project_manager?.full_name ||
                 [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
@@ -228,7 +241,7 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- getProgressInfo reads healthById
-    [healthById]
+    [healthById, staffAvatars]
   )
 
   // Portfolio option list for filtering
