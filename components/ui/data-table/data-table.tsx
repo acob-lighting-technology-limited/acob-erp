@@ -73,6 +73,7 @@ import {
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Copy } from "lucide-react"
+import { ColumnHelp } from "./column-help"
 import type { DataTableDetailConfig, DataTableProps, SortConfig } from "./types"
 
 // ─── Debounce hook ───────────────────────────────────────────────────────────
@@ -169,6 +170,7 @@ function TableSkeleton({
 interface SortableColHeadProps {
   id: string
   label: string
+  description?: string
   align?: "left" | "center" | "right"
   hideOnMobile?: boolean
   sortable?: boolean
@@ -183,6 +185,7 @@ interface SortableColHeadProps {
 function SortableColHead({
   id,
   label,
+  description,
   align,
   hideOnMobile,
   sortable,
@@ -230,6 +233,7 @@ function SortableColHead({
           <GripVertical className="h-3.5 w-3.5" />
         </span>
         {label}
+        {description && <ColumnHelp label={label} text={description} />}
         {sortable &&
           (sortConfig?.key === id ? (
             sortConfig.direction === "asc" ? (
@@ -1221,6 +1225,7 @@ export function DataTable<TData>({
                     key={col.key}
                     id={col.key}
                     label={col.label}
+                    description={col.description}
                     align={col.align}
                     hideOnMobile={col.hideOnMobile && !contactsAvailable}
                     sortable={col.sortable}

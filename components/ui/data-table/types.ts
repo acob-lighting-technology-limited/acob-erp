@@ -52,6 +52,8 @@ export interface DataTableColumn<TData> {
   key: string
   /** Header label */
   label: string
+  /** Explains the column's figure — shown as a help icon + tooltip beside the header */
+  description?: string
   /** Whether the column is sortable */
   sortable?: boolean
   /** Custom width class e.g. "w-16" */
