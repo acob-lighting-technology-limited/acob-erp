@@ -39,8 +39,20 @@ import { fetchActionTrackerMetadata, fetchActionTrackerTasks, type ActionTask } 
 import { canUpdateActionProgress } from "@/lib/reports/action-tracker-permissions"
 import { apiFetch } from "@/lib/api-client"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 const log = logger("dashboard-reports-action-tracker")
+
+function getDisabledEditReason(task: {
+  department: string
+  origin?: string
+  assignees?: { id: string; name: string }[]
+}) {
+  if (task.origin === "management_directive" && (task.assignees || []).length > 0) {
+    return `Only assigned staff or members of ${task.department} can update this directive`
+  }
+  return `Only members or leads of ${task.department} can update this status`
+}
 
 interface DepartmentActionRow {
   id: string
@@ -218,7 +230,18 @@ export default function ActionTrackerPortal() {
     const hasBlocker = Boolean(task.blocker_note)
     const evidenceCount = task.evidence_count || 0
     if (!hasBlocker && !canMutateTask(task)) {
-      return <span className="text-muted-foreground text-xs">—</span>
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-muted-foreground inline-block cursor-not-allowed px-2 py-1 text-xs select-none">
+              —
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>{getDisabledEditReason(task)}</p>
+          </TooltipContent>
+        </Tooltip>
+      )
     }
     return (
       <Button
@@ -528,9 +551,18 @@ export default function ActionTrackerPortal() {
               </SelectContent>
             </Select>
           ) : (
-            <Badge className={`${getItemStatusBadgeClass(row.status)} capitalize`}>
-              {row.status.replace(/_/g, " ")}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-block cursor-not-allowed">
+                  <Badge className={`${getItemStatusBadgeClass(row.status)} capitalize opacity-80`}>
+                    {row.status.replace(/_/g, " ")}
+                  </Badge>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{getDisabledEditReason(row)}</p>
+              </TooltipContent>
+            </Tooltip>
           ),
       },
       {
@@ -778,23 +810,39 @@ export default function ActionTrackerPortal() {
                             ) : null}
                           </td>
                           <td className="px-3 py-2">
-                            <Select
-                              value={task.status}
-                              disabled={!canMutateTask(task)}
-                              onValueChange={(newStatus) => {
-                                void handleStatusChange(task.id, newStatus)
-                              }}
-                            >
-                              <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="not_started">Not Started</SelectItem>
-                                <SelectItem value="in_progress">In Progress</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {canMutateTask(task) ? (
+                              <Select
+                                value={task.status}
+                                onValueChange={(newStatus) => {
+                                  void handleStatusChange(task.id, newStatus)
+                                }}
+                              >
+                                <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="not_started">Not Started</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-block cursor-not-allowed">
+                                    <Select value={task.status} disabled>
+                                      <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase opacity-70">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </Select>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <p>{getDisabledEditReason(task)}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </td>
                           <td className="px-3 py-2">{renderBlockerButton(task)}</td>
                           <td className={`px-3 py-2 text-xs ${getDueDateClassName(task)}`}>{formatDueDate(task)}</td>
@@ -1015,23 +1063,39 @@ export default function ActionTrackerPortal() {
                       ) : null}
                     </div>
                     <div className="w-full sm:w-44">
-                      <Select
-                        value={task.status}
-                        disabled={!canMutateTask(task)}
-                        onValueChange={(newStatus) => {
-                          void handleStatusChange(task.id, newStatus)
-                        }}
-                      >
-                        <SelectTrigger className="h-9 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="not_started">Not Started</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {canMutateTask(task) ? (
+                        <Select
+                          value={task.status}
+                          onValueChange={(newStatus) => {
+                            void handleStatusChange(task.id, newStatus)
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="not_started">Not Started</SelectItem>
+                            <SelectItem value="in_progress">In Progress</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-block w-full cursor-not-allowed">
+                              <Select value={task.status} disabled>
+                                <SelectTrigger className="h-9 text-sm opacity-70">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </Select>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>{getDisabledEditReason(task)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </div>
 

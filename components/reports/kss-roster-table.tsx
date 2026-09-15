@@ -708,6 +708,42 @@ export function KssRosterTable({
         render: (row) => getPresenterName(row),
       },
       {
+        key: "file_status",
+        label: "File",
+        sortable: true,
+        accessor: (row) => (docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`) ? "Uploaded" : "No File"),
+        render: (row) => {
+          const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
+          const presenterName = getPresenterName(row)
+          if (!doc) {
+            return (
+              <Badge variant="outline" className="text-muted-foreground border-dashed text-xs">
+                No File
+              </Badge>
+            )
+          }
+          if (doc.signed_url) {
+            return (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-primary h-7 gap-1.5 px-2 text-xs font-normal hover:underline"
+                onClick={() => void handleDownload(doc, row, presenterName)}
+                title={`Download ${doc.file_name}`}
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                <span className="max-w-[150px] truncate font-medium">{doc.file_name}</span>
+              </Button>
+            )
+          }
+          return (
+            <Badge className="bg-emerald-100 text-xs text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+              Uploaded
+            </Badge>
+          )
+        },
+      },
+      {
         key: "meeting_date",
         label: "Meeting Date",
         sortable: true,
@@ -752,7 +788,7 @@ export function KssRosterTable({
         render: (row) => formatWATTimeDate(row.created_at),
       },
     ],
-    [docByWeekYear, employeeNameById, getPresenterName]
+    [docByWeekYear, employeeNameById, getPresenterName, handleDownload]
   )
 
   const filters = useMemo<DataTableFilter<KssRosterEntry>[]>(
