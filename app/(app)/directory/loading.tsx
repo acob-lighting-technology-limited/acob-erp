@@ -9,7 +9,6 @@ export default function Loading() {
       filters={3}
       rows={9}
       showStats
-      statCardVariant="compact"
       statCards={4}
       spacing="tight"
       inlineActions
