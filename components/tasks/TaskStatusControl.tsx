@@ -104,12 +104,15 @@ export function TaskStatusControl({
   const options = useMemo<StatusOption[]>(() => {
     if (isTerminal) return []
 
+    // When self-rating is blocked, the user is an assignee of this task and
+    // cannot act as its reviewer (they cannot approve, rate, fail, or reassign their own work).
+    const effectiveCanReview = canReview && !ratingBlockedReason
     const allowedForEmployee = EMPLOYEE_TRANSITIONS[current] || []
 
     return ORDERED_STATUSES.filter((value) => value !== current)
       .filter((value) => {
         const reviewerOnly = REVIEWER_ONLY.includes(value)
-        if (!canReview && (reviewerOnly || !allowedForEmployee.includes(value))) {
+        if (!effectiveCanReview && (reviewerOnly || !allowedForEmployee.includes(value))) {
           return false
         }
         return true

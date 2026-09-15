@@ -89,6 +89,14 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   // Whether this user may approve, rate, reject or reassign a given task. The
   // control offers those decisions inline, so it needs to know per row.
   const canReviewTask = (task: Task) => {
+    // An assignee viewing their own task acts strictly as an employee, not as a reviewer.
+    if (
+      task.assigned_to === userId ||
+      (Array.isArray(task.assigned_users) &&
+        task.assigned_users.some((u) => (typeof u === "string" ? u === userId : u.id === userId)))
+    ) {
+      return false
+    }
     const role = String(userProfile?.role || "").toLowerCase()
     if (["admin", "super_admin", "developer"].includes(role)) return true
     if (!userProfile?.is_department_lead) return false
