@@ -58,6 +58,21 @@ export function EmployeeKpiTabs({
   }
 
   if (activeTab === "department_kpis") {
+    if (department) {
+      return (
+        <DepartmentCascadeContent
+          departments={[department]}
+          initialDepartment={department}
+          lockedDepartment={department}
+          backLink={{ href: "/pms", label: "Back to PMS" }}
+          isReadOnly={true}
+          tabs={KPI_TABS}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        />
+      )
+    }
+
     return (
       <PmsTablePage
         title="PMS KPI"
@@ -75,24 +90,14 @@ export function EmployeeKpiTabs({
         rows={[]}
         columns={[]}
       >
-        {department ? (
-          <DepartmentCascadeContent
-            departments={[department]}
-            initialDepartment={department}
-            lockedDepartment={department}
-            backLink={{ href: "/pms", label: "Back to PMS" }}
-            isReadOnly={true}
-          />
-        ) : (
-          <div className="bg-card mx-auto my-12 max-w-md rounded-xl border p-8 text-center shadow-sm">
-            <Building2 className="text-muted-foreground mx-auto h-10 w-10" />
-            <h3 className="mt-4 text-base font-semibold">No Department Assigned</h3>
-            <p className="text-muted-foreground mt-2 text-xs">
-              Your user profile does not have a department set. Contact HR or an administrator to assign your department
-              to view your departmental Corporate KPIs.
-            </p>
-          </div>
-        )}
+        <div className="bg-card mx-auto my-12 max-w-md rounded-xl border p-8 text-center shadow-sm">
+          <Building2 className="text-muted-foreground mx-auto h-10 w-10" />
+          <h3 className="mt-4 text-base font-semibold">No Department Assigned</h3>
+          <p className="text-muted-foreground mt-2 text-xs">
+            Your user profile does not have a department set. Contact HR or an administrator to assign your department
+            to view your departmental Corporate KPIs.
+          </p>
+        </div>
       </PmsTablePage>
     )
   }
