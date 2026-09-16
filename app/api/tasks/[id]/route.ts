@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -10,6 +10,7 @@ import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
 import { canAssignToDepartment, canAssignToProfile } from "@/lib/tasks/assignment-scope"
 import { TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { TASK_ASSIGNMENT_TYPES } from "@/lib/tasks/constants"
+import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 const log = logger("task-detail-route")
 
@@ -201,6 +202,20 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       },
       { failOpen: true }
     )
+
+    // The edit form resends every field, so compare the saved row, not the payload.
+    // The in-app notification for this is still sent client-side by the admin page.
+    const newAssigneeId = updatedTask.assigned_to as string | null
+    if (newAssigneeId && newAssigneeId !== existingTask.assigned_to && newAssigneeId !== user.id) {
+      after(() =>
+        sendTaskEmail(supabase, {
+          kind: "assigned",
+          taskId: updatedTask.id,
+          recipientIds: [newAssigneeId],
+          replyToUserId: user.id,
+        })
+      )
+    }
 
     return NextResponse.json({ data: updatedTask })
   } catch (error) {

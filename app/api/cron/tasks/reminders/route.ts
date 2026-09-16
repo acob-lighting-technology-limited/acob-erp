@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
 import { computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
+import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 const log = logger("cron-tasks-reminders")
 
@@ -71,7 +72,7 @@ function daysUntil(from: string, to: string): number {
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization") ?? ""
   const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!safeCompare(authHeader, expected)) {
+  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -134,7 +135,8 @@ async function notify(
   }
 ): Promise<boolean> {
   try {
-    await supabase.rpc("create_notification", {
+    // supabase-js reports RPC failures in the result rather than throwing.
+    const { error } = await supabase.rpc("create_notification", {
       p_user_id: params.userId,
       p_type: params.type,
       p_category: "tasks",
@@ -147,6 +149,7 @@ async function notify(
       p_entity_id: params.entityId,
       p_rich_content: null,
     })
+    if (error) throw error
     return true
   } catch (error) {
     log.error({ err: String(error), entityId: params.entityId }, "Reminder notification failed")
@@ -187,7 +190,17 @@ async function sendDueSoonReminders(supabase: Supabase, today: string): Promise<
       linkUrl: "/tasks",
       priority: remaining <= 1 ? "high" : "normal",
     })
-    if (ok) sent++
+    if (ok) {
+      sent++
+      // Inside the cooldown guard above, so the email is no more frequent than the bell.
+      await sendTaskEmail(supabase, {
+        kind: "due_soon",
+        taskId: task.id,
+        recipientIds: [task.assigned_to],
+        replyToUserId: task.assigned_by,
+        daysRemaining: remaining,
+      })
+    }
   }
 
   return sent
@@ -311,7 +324,16 @@ async function sendRatingReminders(supabase: Supabase, today: string): Promise<n
       linkUrl: "/admin/tasks",
       priority: "high",
     })
-    if (ok) sent++
+    if (ok) {
+      sent++
+      await sendTaskEmail(supabase, {
+        kind: "needs_rating",
+        taskId: task.id,
+        recipientIds: [raterId],
+        replyToUserId: task.assigned_to,
+        waitingDays,
+      })
+    }
   }
 
   return sent
