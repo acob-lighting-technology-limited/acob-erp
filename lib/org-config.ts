@@ -112,6 +112,9 @@ export const ORG_MAIL_ROUTING: Record<
   Onboarding: { replyTo: ORG_HR_EMAIL, listId: listId("onboarding") },
   Meetings: { replyTo: ORG_HR_EMAIL, listId: listId("meetings") },
   Reports: { replyTo: ORG_HR_EMAIL, listId: listId("reports") },
+  // Deadline and KPI mail. Replies are about someone's own score, so they go
+  // to HR rather than to ICT who merely run the job that sent it.
+  Tasks: { replyTo: ORG_HR_EMAIL, listId: listId("tasks") },
   Attendance: { replyTo: ORG_HR_EMAIL, listId: listId("attendance") },
   Exit: { replyTo: ORG_HR_EMAIL, listId: listId("exit") },
   Birthday: { replyTo: ORG_HR_EMAIL, listId: listId("birthday") },

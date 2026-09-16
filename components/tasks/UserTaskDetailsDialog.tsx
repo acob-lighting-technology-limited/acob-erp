@@ -20,7 +20,8 @@ import {
 import type { Task } from "@/types/task"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
-import { formatWATDateTime, formatWATDate } from "@/lib/utils/date"
+import { formatWATDateTime, formatWATDate, toLocalISODate } from "@/lib/utils/date"
+import { isTaskOverdue } from "@/lib/tasks/overdue"
 import { cn, formatFullName } from "@/lib/utils"
 import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import {
@@ -74,11 +75,7 @@ export function UserTaskDetailsDialog({
 
   if (!selectedTask) return null
 
-  const isOverdue = Boolean(
-    selectedTask.due_date &&
-      new Date(selectedTask.due_date).getTime() < new Date().setHours(0, 0, 0, 0) &&
-      !["completed", "reassigned", "cancelled"].includes(selectedTask.status)
-  )
+  const isOverdue = isTaskOverdue(selectedTask, toLocalISODate())
 
   const assignedByName = selectedTask.assigned_by_user
     ? formatFullName(selectedTask.assigned_by_user.first_name, selectedTask.assigned_by_user.last_name)

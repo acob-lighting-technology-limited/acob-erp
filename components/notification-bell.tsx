@@ -87,6 +87,7 @@ const typeIcons = {
   system: Settings,
   announcement: AlertTriangle,
   task_due_soon: Clock,
+  task_overdue: AlertTriangle,
   task_awaiting_review: FileText,
   task_needs_rating: Star,
   task_blocked: AlertTriangle,

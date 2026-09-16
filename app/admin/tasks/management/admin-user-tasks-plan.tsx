@@ -12,6 +12,7 @@ import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { cn, formatFullName } from "@/lib/utils"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
+import { isTaskOverdue } from "@/lib/tasks/overdue"
 import { monthBounds, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
 import {
@@ -672,10 +673,7 @@ export function AdminUserTasksPlan({
                       const weight = task.weight ?? TASK_WEIGHT_DEFAULT
                       const rating = task.rating
                       const earned = rating ? Math.round(((weight * rating) / 5) * 100) / 100 : 0
-                      const isOverdue =
-                        task.due_date &&
-                        new Date(task.due_date).getTime() < new Date().setHours(0, 0, 0, 0) &&
-                        !["completed", "reassigned", "cancelled"].includes(task.status)
+                      const isOverdue = isTaskOverdue(task, toLocalISODate())
 
                       return (
                         <tr key={task.id} className="hover:bg-muted/30 transition-colors">

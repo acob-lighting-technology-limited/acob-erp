@@ -14,7 +14,7 @@ const log = logger("tasks-mailer")
  * changes they merely need to know about (updated, completed, blocked) stay
  * in-app, so the inbox stream stays worth reading.
  */
-export type TaskEmailKind = "assigned" | "awaiting_review" | "due_soon" | "needs_rating"
+export type TaskEmailKind = "assigned" | "awaiting_review" | "due_soon" | "needs_rating" | "overdue" | "failed"
 
 interface TaskEmailInput {
   kind: TaskEmailKind
@@ -29,6 +29,9 @@ interface TaskEmailInput {
   daysRemaining?: number
   /** needs_rating: days the submission has been waiting. */
   waitingDays?: number
+  /** overdue: last day to act, e.g. "Mon 21 Sep", and how many working days that is. */
+  actByLabel?: string
+  workingDaysLeft?: number
 }
 
 export interface TaskEmailTask {
@@ -79,7 +82,7 @@ function senderFor(task: TaskEmailTask, assigner: TaskEmailPerson | undefined): 
 }
 
 function buildContent(
-  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays">,
+  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays" | "actByLabel" | "workingDaysLeft">,
   task: TaskEmailTask,
   people: Map<string, TaskEmailPerson>
 ) {
@@ -105,15 +108,46 @@ function buildContent(
         ctaPath: "/admin/tasks",
       }
     case "due_soon": {
+      // Only ever sent on the day itself. Mailing three days out, then two,
+      // then one, trains people to ignore the stream before the day that
+      // matters arrives.
       const when = whenLabel(input.daysRemaining ?? 0)
       return {
         subject: `Task due ${when}: ${title}`,
         heading: `Your task is due ${when}`,
-        intro: "This task is not finished yet. Submit it before the deadline, or speak to whoever assigned it.",
+        intro: "This task is not finished yet. Submit it before the end of the day, or ask for more time.",
         ctaLabel: "Open my tasks",
         ctaPath: "/tasks",
       }
     }
+    case "overdue": {
+      const days = input.workingDaysLeft ?? 2
+      const actBy = input.actByLabel || "the deadline"
+      return {
+        // The date named is the last day to act, not the day it fails - those
+        // are different days, and naming the failure invited people to deal
+        // with it the morning it had already gone.
+        subject: `Overdue — act by ${actBy}: ${title}`,
+        heading: "Your task is past its deadline",
+        intro:
+          `It is still open, and you have ${days} working day${days === 1 ? "" : "s"} to act. ` +
+          `After ${actBy} it is recorded as failed, which scores zero at full weight. ` +
+          "If it is only part done, submit what you have - rated work still earns marks, an expired task earns none.",
+        ctaLabel: "Open my tasks",
+        ctaPath: "/tasks",
+      }
+    }
+    case "failed":
+      return {
+        subject: `Task recorded as failed: ${title}`,
+        heading: "Your task has been recorded as failed",
+        intro:
+          "Its deadline passed without the work being submitted, so it has been closed automatically. " +
+          "It counts as zero at full weight towards your KPI. If that is wrong - the work was delivered, " +
+          "or the deadline had moved - speak to whoever assigned it, as only a lead can reopen it.",
+        ctaLabel: "Open my tasks",
+        ctaPath: "/tasks",
+      }
     case "needs_rating": {
       const days = input.waitingDays ?? 0
       return {
@@ -191,7 +225,7 @@ function buildHtml(params: {
  * Kept separate from sending so the template can be previewed without a send.
  */
 export function renderTaskEmail(
-  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays">,
+  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays" | "actByLabel" | "workingDaysLeft">,
   task: TaskEmailTask,
   people: Map<string, TaskEmailPerson>,
   recipient: TaskEmailPerson | undefined

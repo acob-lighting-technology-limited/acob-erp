@@ -519,7 +519,12 @@ export async function POST(request: NextRequest) {
 
       const assigneeId = task.assigned_to
       after(() =>
-        sendTaskEmail(supabase, { kind: "assigned", taskId: task.id, recipientIds: [assigneeId], replyToUserId: user.id })
+        sendTaskEmail(supabase, {
+          kind: "assigned",
+          taskId: task.id,
+          recipientIds: [assigneeId],
+          replyToUserId: user.id,
+        })
       )
     }
 
