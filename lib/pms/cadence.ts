@@ -161,6 +161,6 @@ export function cadencePeriodLabel(cadence: PmsCadence): string {
     case "annual":
       return "Year"
     default:
-      return "Cycle"
+      return "Quarter"
   }
 }

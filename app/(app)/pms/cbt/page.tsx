@@ -150,7 +150,7 @@ export default async function PmsCbtPage({ searchParams }: { searchParams: Promi
   return (
     <PmsTablePage
       title="PMS CBT"
-      description="Your CBT score history by review cycle. Use the standalone /cbt page only when you are starting a live test."
+      description="Your CBT score history by quarter. Use the standalone /cbt page only when you are starting a live test."
       backHref="/pms"
       backLabel="Back to PMS"
       icon="cbt"
@@ -158,17 +158,17 @@ export default async function PmsCbtPage({ searchParams }: { searchParams: Promi
       activeCycleId={activeCycleId}
       summaryCards={summaryCards}
       tableTitle="CBT Score History"
-      tableDescription="Recorded CBT scores for your review cycles. Expand any row to review questions and answers."
+      tableDescription="Recorded CBT scores for your quarters. Expand any row to review questions and answers."
       rows={rows}
       columns={[
-        { key: "cycle", label: "Cycle" },
+        { key: "cycle", label: "Quarter" },
         { key: "date_taken", label: "Date & Time Taken" },
         { key: "cbt_score", label: "Score" },
         { key: "questions", label: "Questions" },
         { key: "status", label: "Result" },
         { key: "proctoring", label: "Focus / Proctoring" },
       ]}
-      searchPlaceholder="Search CBT cycles or results..."
+      searchPlaceholder="Search quarter or results..."
       hideSecondaryFilter
       cbtExpandable
     />

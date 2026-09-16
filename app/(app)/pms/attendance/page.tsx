@@ -23,7 +23,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
 
   const activeCycle = cycles.find((c) => c.id === activeCycleId)
   const cadence = getCadenceType(activeCycle?.reviewType, activeCycle?.name)
-  const cycleColumnLabel = cadence === "biannual" || cadence === "annual" ? "Quarter" : "Cycle"
+  const cycleColumnLabel = "Quarter"
 
   const getCycleLabel = (dateValue: string) => {
     const date = new Date(dateValue)
@@ -52,7 +52,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
   return (
     <PmsTablePage
       title="PMS Attendance"
-      description="Track your daily clock-in records, working hours, and attendance score for the review cycle."
+      description="Track your daily clock-in records, working hours, and attendance score for the review quarter."
       backHref="/pms"
       backLabel="Back to PMS"
       icon="attendance"
@@ -64,7 +64,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
         { label: "Tracked Days", value: score.breakdown.attendance.total },
       ]}
       tableTitle="Attendance Log"
-      tableDescription={`Attendance entries for ${score.cycle_name || "the selected cycle"}.`}
+      tableDescription={`Attendance entries for ${score.cycle_name || "all quarters"}.`}
       rows={rows}
       columns={[
         { key: "date", label: "Date" },

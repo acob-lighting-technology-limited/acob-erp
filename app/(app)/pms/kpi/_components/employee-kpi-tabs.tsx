@@ -113,17 +113,17 @@ export function EmployeeKpiTabs({
       tableDescription={`Your scored tasks in ${cycleName}, grouped by goal. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
       rows={rows}
       columns={[
-        { key: "cycle", label: "Cycle" },
+        { key: "cycle", label: "Quarter" },
         { key: "rating", label: "Rating" },
         { key: "earned", label: "Earned" },
         { key: "effective_kpi_pct", label: "Effective KPI" },
         { key: "linked_tasks", label: "Completed / Scored" },
         { key: "weight", label: "Total Weight" },
       ]}
-      searchPlaceholder="Search cycle or rating..."
+      searchPlaceholder="Search quarter or rating..."
       filterKey="cycle"
-      filterLabel="Cycle"
-      filterAllLabel="All Cycles"
+      filterLabel="Quarter"
+      filterAllLabel="All Quarters"
     />
   )
 }
