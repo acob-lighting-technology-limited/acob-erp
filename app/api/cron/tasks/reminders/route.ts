@@ -16,6 +16,8 @@ function safeCompare(a: string, b: string): boolean {
 const DUE_SOON_DAYS = 3
 /** Submitted work is chased once it has waited this long for a rating. */
 const RATING_NUDGE_DAYS = 2
+/** Blocked work is chased once it has waited this long for a decision. */
+const BLOCKED_NUDGE_DAYS = 1
 /** Nobody is told the same thing twice inside these windows. */
 const TASK_REMINDER_COOLDOWN_HOURS = 48
 const PROJECT_REMINDER_COOLDOWN_HOURS = 168 // weekly
@@ -56,7 +58,8 @@ function daysUntil(from: string, to: string): number {
 
 /**
  * Project-manager reminders: deadlines approaching, submitted work waiting on
- * a decision, approved work still unrated, and projects slipping behind.
+ * a decision, blocked work waiting on a decision, approved work still unrated,
+ * and projects slipping behind.
  *
  * Every send is guarded by a cooldown lookup against the notifications already
  * on record, so a daily job does not become a daily nagging — a reminder people
@@ -83,14 +86,15 @@ export async function GET(request: NextRequest) {
   const today = toLocalISODate()
 
   try {
-    const [dueSoon, needsRating, delayed] = await Promise.all([
+    const [dueSoon, needsRating, blocked, delayed] = await Promise.all([
       sendDueSoonReminders(supabase, today),
       sendRatingReminders(supabase, today),
+      sendBlockedReminders(supabase),
       sendProjectDelayReminders(supabase, today),
     ])
 
-    log.info({ dueSoon, needsRating, delayed }, "Task reminders sent")
-    return NextResponse.json({ data: { dueSoon, needsRating, delayed } })
+    log.info({ dueSoon, needsRating, blocked, delayed }, "Task reminders sent")
+    return NextResponse.json({ data: { dueSoon, needsRating, blocked, delayed } })
   } catch (error) {
     log.error({ err: String(error) }, "Task reminders failed")
     return NextResponse.json({ error: "Failed to send task reminders" }, { status: 500 })
@@ -195,6 +199,70 @@ async function sendDueSoonReminders(supabase: Supabase, today: string): Promise<
  * This one matters beyond tidiness: an unrated submission is held out of the
  * employee's KPI entirely, so a rater who never acts leaves real work uncounted.
  */
+/**
+ * Work the assignee has declared they cannot finish, still waiting on a lead.
+ *
+ * "Unable to complete" is a request for a decision, not a status an employee
+ * can resolve alone, and only the lead cancelling or reassigning the task
+ * actually clears it from that employee's score - leaving it open, marking it
+ * blocked and letting it fail all score zero at full weight alike. The status
+ * route already announces the block once, but nothing chased it afterwards, so
+ * a lead who missed that single notification left the employee carrying a zero
+ * for work that was never theirs to finish. This keeps asking until somebody
+ * decides.
+ */
+async function sendBlockedReminders(supabase: Supabase): Promise<number> {
+  const cutoff = new Date(Date.now() - BLOCKED_NUDGE_DAYS * 86_400_000).toISOString()
+
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select("id, title, status, assigned_to, assigned_by, due_date, task_end_date, updated_at, project_id")
+    .eq("status", "unable_to_complete")
+    .eq("is_archived", false)
+    .lte("updated_at", cutoff)
+    .returns<TaskRow[]>()
+
+  if (!tasks || tasks.length === 0) return 0
+
+  // One lookup for every project involved, rather than one per task.
+  const projectIds = Array.from(new Set(tasks.map((task) => task.project_id).filter(Boolean) as string[]))
+  const managerByProject = new Map<string, string | null>()
+  if (projectIds.length > 0) {
+    const { data: projects } = await supabase
+      .from("projects")
+      .select("id, project_manager_id")
+      .in("id", projectIds)
+      .returns<Array<{ id: string; project_manager_id: string | null }>>()
+    for (const project of projects || []) managerByProject.set(project.id, project.project_manager_id)
+  }
+
+  let sent = 0
+  for (const task of tasks) {
+    const deciderId = (task.project_id ? managerByProject.get(task.project_id) : null) || task.assigned_by
+    if (!deciderId) continue
+
+    if (await recentlyNotified(supabase, deciderId, task.id, "task_blocked", TASK_REMINDER_COOLDOWN_HOURS)) {
+      continue
+    }
+
+    const ok = await notify(supabase, {
+      userId: deciderId,
+      type: "task_blocked",
+      title: "Blocked task needs your decision",
+      message:
+        `"${task.title || "Untitled task"}" is marked unable to complete and is waiting on you. ` +
+        `Reassign or cancel it if it is not this person's to finish - that is the only thing that ` +
+        `takes it off their score. Extending the deadline keeps it open; doing nothing lets it fail.`,
+      entityType: "task",
+      entityId: task.id,
+      linkUrl: "/admin/tasks",
+      priority: "high",
+    })
+    if (ok) sent++
+  }
+  return sent
+}
+
 async function sendRatingReminders(supabase: Supabase, today: string): Promise<number> {
   const cutoff = new Date(Date.now() - RATING_NUDGE_DAYS * 86_400_000).toISOString()
 

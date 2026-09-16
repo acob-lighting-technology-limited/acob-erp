@@ -191,7 +191,16 @@ A: Tasks can be assigned to you directly (individual), as part of a group of peo
 A: From [Tasks](/tasks) there is a tab or filter for tasks you created or assigned. Check the tab options on the page.
 
 **Q: What task statuses are there?**
-A: Common statuses: Pending, In Progress, Completed, Cancelled, On Hold. The exact statuses depend on your organisation's configuration.
+A: Pending, In Progress, Submitted for Review, Unable to Complete, Completed, Reassigned, Cancelled, and Failed.
+
+**Q: What happens if I miss a task deadline?**
+A: Nothing on the due date itself — you have all of it. At midnight you and whoever assigned the task are notified that it is overdue, and you get 2 working days (weekends, public holidays, and any days you are on approved leave do not count) to submit it or have the deadline extended. If neither happens, the task is recorded as **Failed**, which scores zero at full weight in your performance score. Marking a task "Unable to Complete" does not stop it failing — it flags the problem to your lead, who can extend the deadline or close the task out.
+
+**Q: I cannot finish a task in time — what is the best thing to do?**
+A: Submit whatever you have rather than letting the deadline pass. Submitted work gets rated 1-5 and earns that share of the marks, so even a low rating earns something — a task that simply expires earns nothing at all. If the work genuinely is not yours to finish, mark it "Unable to Complete" **and** chase your lead: only they can reassign or cancel it, and that is the only thing that takes it off your score. Marking it unable to complete on its own does not stop it failing, and it still scores zero while it sits there.
+
+**Q: My task was marked Failed — can that be undone?**
+A: Not by you, but a lead, admin or the project manager can reopen it. If it was failed in error (you delivered it, or the deadline had moved), contact whoever assigned it.
 
 **Q: Can I create a task?**
 A: Yes — from [Tasks](/tasks), click "Add Task" (or "Create Task"). You can assign it to a person, multiple people, or a department.

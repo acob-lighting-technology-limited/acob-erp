@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
+import { isTaskOverdue } from "@/lib/tasks/overdue"
 import {
   ClipboardList,
   Plus,
@@ -493,10 +494,7 @@ export function AdminTasksContent({
         hideOnMobile: true,
         accessor: (r) => r.due_date || "",
         render: (r) => {
-          const isOverdue =
-            r.due_date &&
-            new Date(r.due_date).getTime() < new Date().setHours(0, 0, 0, 0) &&
-            !["completed", "reassigned", "cancelled"].includes(r.status)
+          const isOverdue = isTaskOverdue(r, toLocalISODate())
           return (
             <div className="flex items-center gap-1.5 text-xs">
               <Calendar className="text-muted-foreground h-3.5 w-3.5" />

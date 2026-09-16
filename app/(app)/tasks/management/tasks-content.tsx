@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { isTaskOverdue as isTaskPastDeadline } from "@/lib/tasks/overdue"
+import { toLocalISODate } from "@/lib/utils/date"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
@@ -73,11 +75,9 @@ function TaskStatusPill({ status }: { status: string }) {
   )
 }
 
-/** Past its deadline and still actionable - a cancelled task is not overdue. */
+/** Past its deadline and still actionable - a closed-out task is not overdue. */
 function isTaskOverdue(task: Task): boolean {
-  if (!task.due_date) return false
-  if (["completed", "reassigned", "cancelled"].includes(task.status)) return false
-  return new Date(task.due_date).getTime() < new Date().setHours(0, 0, 0, 0)
+  return isTaskPastDeadline(task, toLocalISODate())
 }
 
 export function TasksContent({ initialTasks, userId, userProfile }: TasksContentProps) {

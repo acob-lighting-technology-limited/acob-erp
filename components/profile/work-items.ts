@@ -1,4 +1,6 @@
 import type { Task, HelpDeskItem, CorrespondenceItem, PaymentItem } from "@/app/(app)/profile/page"
+import { calendarDaysBetween, taskDeadline } from "@/lib/tasks/overdue"
+import { toLocalISODate } from "@/lib/utils/date"
 
 export const DUE_SOON_WINDOW_DAYS = 3
 
@@ -40,16 +42,24 @@ export type TaskUrgency =
   | { kind: "scheduled"; dueDate: string }
   | { kind: "no_date" }
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
+/**
+ * Urgency is measured in whole WAT calendar days, not in elapsed milliseconds.
+ * A `date` column arrives as "2026-09-24", which `new Date()` reads as UTC
+ * midnight — an hour before WAT midnight — so comparing it against the current
+ * instant turned a task red at 01:00 on the day it was due, a day before the
+ * nightly job would fail it and a day before every other task screen agreed.
+ */
 export function getTaskUrgency(task: Task, now: Date): TaskUrgency {
-  if (!task.due_date) return { kind: "no_date" }
-  if (isTaskTerminal(task)) return { kind: "scheduled", dueDate: task.due_date }
-  const dueAt = new Date(task.due_date).getTime()
-  const diff = dueAt - now.getTime()
-  if (diff < 0) return { kind: "overdue", days: Math.max(1, Math.floor(-diff / DAY_MS)) }
-  if (diff <= DUE_SOON_WINDOW_DAYS * DAY_MS) return { kind: "due_soon", days: Math.floor(diff / DAY_MS) }
-  return { kind: "scheduled", dueDate: task.due_date }
+  // task_end_date wins over due_date, matching the nightly expiry job and the
+  // project health rollup - a plan task carries both, and measuring the badge
+  // against the wrong one would put the screen a day out from the job again.
+  const deadline = taskDeadline(task)
+  if (!deadline) return { kind: "no_date" }
+  if (isTaskTerminal(task)) return { kind: "scheduled", dueDate: deadline }
+  const days = calendarDaysBetween(toLocalISODate(now), deadline)
+  if (days < 0) return { kind: "overdue", days: -days }
+  if (days <= DUE_SOON_WINDOW_DAYS) return { kind: "due_soon", days }
+  return { kind: "scheduled", dueDate: deadline }
 }
 
 const URGENCY_RANK: Record<TaskUrgency["kind"], number> = {
@@ -67,9 +77,9 @@ export function sortTasksByUrgency(tasks: Task[], now: Date): Task[] {
     .sort((a, b) => {
       const rankDiff = URGENCY_RANK[a.urgency.kind] - URGENCY_RANK[b.urgency.kind]
       if (rankDiff !== 0) return rankDiff
-      const aDue = a.task.due_date ? new Date(a.task.due_date).getTime() : Infinity
-      const bDue = b.task.due_date ? new Date(b.task.due_date).getTime() : Infinity
-      return aDue - bDue
+      const aDue = taskDeadline(a.task) ?? "9999-12-31"
+      const bDue = taskDeadline(b.task) ?? "9999-12-31"
+      return aDue < bDue ? -1 : aDue > bDue ? 1 : 0
     })
     .map(({ task }) => task)
 }
