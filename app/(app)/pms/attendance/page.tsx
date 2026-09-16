@@ -84,7 +84,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
       present_tracked: `${presentCount} / ${totalDays} days`,
       total_work_hours: totalDays > 0 ? `${totalWorkHours.toFixed(1)} hrs` : "-",
       total_miss_hours: totalDays > 0 ? `${totalMissedHours.toFixed(1)} hrs` : "-",
-      lateness: lateCount > 0 ? `${lateCount} day${lateCount === 1 ? "" : "s"} late` : "None",
+      lateness: `${lateCount} / ${totalDays} days`,
       __presentCount: presentCount,
       __totalDays: totalDays,
       __attendanceRecords: formattedRecords,
