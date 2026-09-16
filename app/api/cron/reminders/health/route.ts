@@ -5,6 +5,8 @@ import { logger } from "@/lib/logger"
 import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
 import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_ICT_EMAIL, ORG_MAIL_ROUTING } from "@/lib/org-config"
+import { taskDeadline } from "@/lib/tasks/overdue"
+import { toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("cron-reminders-health")
 
@@ -23,6 +25,24 @@ const STALL_MS = 30 * 60_000
 const LOOKBACK_MS = 24 * 3_600_000
 /** system_settings key: { "user_ids": ["<uuid>", ...] } */
 const RECIPIENTS_SETTING_KEY = "reminder_failure_alert"
+
+/**
+ * Task expiry watchdog.
+ *
+ * The KPI calculation stopped presuming unfinished work had failed once the
+ * nightly expiry job became reliable: unfinished tasks are held out of the
+ * score and enter it when that job marks them `failed`. The failure mode is
+ * therefore silent and upward - if the job stops, nothing is ever failed, and
+ * everyone's KPI drifts up with nobody noticing. The expiry job cannot detect
+ * its own absence, so this one does, by checking the invariant rather than the
+ * plumbing: work this far past its deadline and still open should not exist.
+ *
+ * The count threshold keeps a single long absence from tripping it - someone
+ * on a month's leave legitimately keeps a few tasks open - while a stopped job
+ * builds a backlog well past it within days.
+ */
+const EXPIRY_STALE_DAYS = 14
+const EXPIRY_STALE_THRESHOLD = 10
 
 type ScheduleRow = {
   id: string
@@ -136,6 +156,67 @@ function renderAlertHtml(title: string, lines: string[]): string {
 }
 
 /**
+ * Open work so far past its deadline that the expiry job cannot be running.
+ *
+ * The deadline is `task_end_date` where set and `due_date` otherwise, which no
+ * single column filter expresses - a plan task can carry an early due_date and
+ * a much later end date, and counting it by due_date alone would raise a false
+ * alarm. So both columns come back and `taskDeadline` decides.
+ */
+async function countUnexpiredOverdue(supabase: Supabase): Promise<number> {
+  const cutoff = toLocalISODate(new Date(Date.now() - EXPIRY_STALE_DAYS * 86_400_000))
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("id, due_date, task_end_date")
+    .in("status", ["pending", "in_progress", "unable_to_complete"])
+    .eq("is_archived", false)
+    .or(`due_date.lt.${cutoff},task_end_date.lt.${cutoff}`)
+    .returns<Array<{ due_date: string | null; task_end_date: string | null }>>()
+
+  if (error) {
+    log.error({ err: error.message }, "Expiry watchdog lookup failed")
+    return 0
+  }
+  return (data ?? []).filter((task) => {
+    const deadline = taskDeadline(task)
+    return deadline !== null && deadline < cutoff
+  }).length
+}
+
+/** Alerts the configured recipients, once a day, that expiry has stalled. */
+async function alertStaleExpiry(supabase: Supabase, staleCount: number): Promise<void> {
+  const { userIds } = await resolveRecipients(supabase)
+  for (const userId of userIds) {
+    const { count } = await supabase
+      .from("notifications")
+      .select("id", { head: true, count: "exact" })
+      .eq("user_id", userId)
+      .eq("type", "system")
+      .eq("entity_type", "cron_task_expiry")
+      .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString())
+    if (count && count > 0) continue
+
+    const { error } = await supabase.rpc("create_notification", {
+      p_user_id: userId,
+      p_type: "system",
+      p_category: "system",
+      p_title: "Task expiry job has stopped",
+      p_message:
+        `${staleCount} tasks are more than ${EXPIRY_STALE_DAYS} days past their deadline and still open. ` +
+        "The nightly expiry job is not failing them, so unfinished work is missing from everyone's KPI. " +
+        "Check the app-tasks-expire-overdue pg_cron job.",
+      p_priority: "urgent",
+      p_link_url: "/admin/tasks",
+      p_actor_id: null,
+      p_entity_type: "cron_task_expiry",
+      p_entity_id: null,
+      p_rich_content: null,
+    })
+    if (error) log.error({ err: error.message, userId }, "Expiry watchdog alert failed")
+  }
+}
+
+/**
  * Watches meeting reminder schedules and alerts IT when one fails outright.
  *
  * process_reminder_schedules() retries a send up to three times, and the edge
@@ -169,7 +250,14 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     const failures = findFailures(data || [], Date.now())
-    if (failures.length === 0) return NextResponse.json({ data: { alerts: 0 } })
+    const staleExpiry = await countUnexpiredOverdue(supabase)
+
+    if (staleExpiry > EXPIRY_STALE_THRESHOLD) {
+      log.error({ staleExpiry }, "Task expiry job appears to have stopped: overdue work is not being failed")
+      await alertStaleExpiry(supabase, staleExpiry)
+    }
+
+    if (failures.length === 0) return NextResponse.json({ data: { alerts: 0, staleExpiry } })
 
     const { userIds, emails } = await resolveRecipients(supabase)
     const lines = failures.map(describe)

@@ -27,6 +27,19 @@ export const TASK_RATING_MAX = 5
  *  neither credit nor failure for this employee. */
 const EXCLUDED_STATUSES = new Set(["reassigned", "cancelled"])
 
+/**
+ * Still being worked on, and so not yet judged either way.
+ *
+ * These used to score zero at full weight from the moment the task was
+ * assigned, which meant a task due at the end of the quarter dragged the
+ * employee's KPI down for every week they were not yet late. The rule existed
+ * because abandoned work had to count against someone - but the nightly expiry
+ * job now resolves anything past its deadline to `failed` within two working
+ * days, so unfinished work reaches the score on its own and no longer has to
+ * be presumed failed in advance.
+ */
+const UNRESOLVED_STATUSES = new Set(["pending", "in_progress", "unable_to_complete"])
+
 /** Task weights are strictly numeric (1–5) and must never display descriptive text labels. */
 
 export const TASK_RATING_LABELS: Record<number, string> = {
@@ -81,20 +94,38 @@ export function isValidRating(value: unknown): boolean {
 }
 
 /**
- * Does this task belong in the KPI calculation at all?
+ * Does this task belong in the KPI calculation yet?
  *
- * Reassigned and cancelled work drops out entirely. Work that was submitted but
- * not yet rated also drops out — holding it back is deliberate, so a slow rater
- * cannot cost the employee a zero on work they already delivered. Everything
- * else stays in at full weight, including failed and unfinished work, because
- * excluding it would mean not doing a task raised your score.
+ * A task is judged once, when it is resolved:
+ *
+ *   completed and rated  →  earns weight * rating/5
+ *   failed               →  zero at full weight
+ *   reassigned/cancelled →  out entirely, neither credit nor failure
+ *
+ * Everything else is held out rather than presumed failed. Work still in
+ * progress has not been judged, and neither has work delivered but waiting on
+ * a rater - holding the latter back is deliberate, so a slow rater cannot cost
+ * an employee a zero on work they already delivered.
+ *
+ * This leans on the nightly expiry job: unfinished work past its deadline
+ * becomes `failed` within two working days and enters the score there. If that
+ * job stops running, unfinished work stops reaching the score at all and
+ * everyone's KPI drifts upward silently - which is why its health is
+ * monitored rather than this function second-guessing the deadline.
  */
 export function isTaskScorable(task: ScorableTask): boolean {
   if (task.is_archived) return false
   const status = String(task.status || "").toLowerCase()
   if (EXCLUDED_STATUSES.has(status)) return false
+  if (UNRESOLVED_STATUSES.has(status)) return false
   if (isAwaitingRating(task)) return false
   return true
+}
+
+/** Assigned and still being worked on: counted nowhere in the score yet. */
+export function isTaskUnresolved(task: ScorableTask): boolean {
+  if (task.is_archived) return false
+  return UNRESOLVED_STATUSES.has(String(task.status || "").toLowerCase())
 }
 
 /**
@@ -127,6 +158,8 @@ export type WeightedTaskScore = {
   ratedCount: number
   /** Delivered but awaiting a rating — held out of the calculation. */
   awaitingRatingCount: number
+  /** Assigned and still in progress — not yet judged, so not yet counted. */
+  unresolvedCount: number
 }
 
 /**
@@ -135,18 +168,40 @@ export type WeightedTaskScore = {
  * Returns null rather than 0 when nothing is scorable, so "no work assigned"
  * stays distinguishable from "work assigned and failed".
  */
-export function computeWeightedTaskScore(tasks: ScorableTask[]): WeightedTaskScore {
+export type WeightedScoreOptions = {
+  /**
+   * Count unfinished work as zero at full weight instead of holding it out.
+   *
+   * False for an employee's KPI: a task that is not yet due has not been
+   * judged, and presuming it failed would penalise them for every week they
+   * were not yet late. True for a project's quality figure, where the question
+   * is "how good is this project's delivered work as a share of everything
+   * planned" - a project half of whose work is untouched must not read as
+   * perfect quality on the strength of the half that is done.
+   */
+  countUnresolvedAsZero?: boolean
+}
+
+export function computeWeightedTaskScore(tasks: ScorableTask[], options: WeightedScoreOptions = {}): WeightedTaskScore {
   let earnedPoints = 0
   let availablePoints = 0
   let taskCount = 0
   let ratedCount = 0
   let awaitingRatingCount = 0
+  let unresolvedCount = 0
 
   for (const task of tasks) {
     if (task.is_archived) continue
 
     if (isAwaitingRating(task)) {
       awaitingRatingCount++
+      continue
+    }
+    if (isTaskUnresolved(task)) {
+      unresolvedCount++
+      if (!options.countUnresolvedAsZero) continue
+      availablePoints += clampWeight(task.weight)
+      taskCount++
       continue
     }
     if (!isTaskScorable(task)) continue
@@ -159,7 +214,7 @@ export function computeWeightedTaskScore(tasks: ScorableTask[]): WeightedTaskSco
 
   const score = availablePoints > 0 ? Math.round((earnedPoints / availablePoints) * 100 * 100) / 100 : null
 
-  return { score, earnedPoints, availablePoints, taskCount, ratedCount, awaitingRatingCount }
+  return { score, earnedPoints, availablePoints, taskCount, ratedCount, awaitingRatingCount, unresolvedCount }
 }
 
 /**
@@ -175,13 +230,15 @@ export function computeProjectProgress(tasks: ScorableTask[]) {
 
   for (const task of tasks) {
     if (task.is_archived) continue
-    if (!isTaskScorable(task) && !isAwaitingRating(task)) continue
+    // Unfinished work stays in the denominator here: delivery is a share of
+    // everything planned, so work not yet done is exactly what is missing.
+    if (!isTaskScorable(task) && !isAwaitingRating(task) && !isTaskUnresolved(task)) continue
     const weight = clampWeight(task.weight)
     totalWeight += weight
     if (String(task.status || "").toLowerCase() === "completed") completedWeight += weight
   }
 
-  const quality = computeWeightedTaskScore(tasks)
+  const quality = computeWeightedTaskScore(tasks, { countUnresolvedAsZero: true })
 
   return {
     deliveryPct: totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100 * 100) / 100 : null,

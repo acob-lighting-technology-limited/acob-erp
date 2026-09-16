@@ -1,6 +1,12 @@
 import { strict as assert } from "node:assert"
 import { test } from "node:test"
-import { computeProjectProgress, computeWeightedTaskScore, isTaskInCycle, isTaskScorable } from "../scoring"
+import {
+  computeProjectProgress,
+  computeWeightedTaskScore,
+  isTaskInCycle,
+  isTaskScorable,
+  isTaskUnresolved,
+} from "../scoring"
 
 test("a task earns its weight scaled by its rating", () => {
   const { score, earnedPoints, availablePoints } = computeWeightedTaskScore([
@@ -21,16 +27,53 @@ test("weights decide how much each task moves the score", () => {
   assert.equal(score, 33.33)
 })
 
-test("unfinished work scores zero at full weight, so skipping tasks cannot raise a score", () => {
+test("failed work scores zero at full weight, so skipping tasks cannot raise a score", () => {
   const finishedOnly = computeWeightedTaskScore([{ status: "completed", weight: 5, rating: 5 }])
   const withAbandoned = computeWeightedTaskScore([
     { status: "completed", weight: 5, rating: 5 },
     { status: "failed", weight: 5, rating: null },
-    { status: "pending", weight: 5, rating: null },
   ])
   assert.equal(finishedOnly.score, 100)
-  assert.equal(withAbandoned.score, 33.33)
+  assert.equal(withAbandoned.score, 50)
   assert.ok(withAbandoned.score! < finishedOnly.score!)
+})
+
+test("work still in progress is not yet judged, so it does not drag the score down", () => {
+  // A task due at the end of the quarter must not score its owner zero for
+  // every week they are not yet late; the expiry job fails it if it lapses.
+  const { score, taskCount, unresolvedCount } = computeWeightedTaskScore([
+    { status: "completed", weight: 5, rating: 5 },
+    { status: "pending", weight: 5, rating: null },
+    { status: "in_progress", weight: 5, rating: null },
+    { status: "unable_to_complete", weight: 5, rating: null },
+  ])
+  assert.equal(unresolvedCount, 3)
+  assert.equal(taskCount, 1)
+  assert.equal(score, 100)
+})
+
+test("unresolved work enters the score the moment it is failed", () => {
+  const inFlight = computeWeightedTaskScore([
+    { status: "completed", weight: 5, rating: 5 },
+    { status: "pending", weight: 5, rating: null },
+  ])
+  const lapsed = computeWeightedTaskScore([
+    { status: "completed", weight: 5, rating: 5 },
+    { status: "failed", weight: 5, rating: null },
+  ])
+  assert.equal(inFlight.score, 100)
+  assert.equal(lapsed.score, 50)
+})
+
+test("unresolved is distinct from excluded and from archived", () => {
+  assert.equal(isTaskUnresolved({ status: "pending" }), true)
+  assert.equal(isTaskUnresolved({ status: "in_progress" }), true)
+  assert.equal(isTaskUnresolved({ status: "unable_to_complete" }), true)
+  assert.equal(isTaskUnresolved({ status: "failed" }), false)
+  assert.equal(isTaskUnresolved({ status: "cancelled" }), false)
+  assert.equal(isTaskUnresolved({ status: "pending", is_archived: true }), false)
+  assert.equal(isTaskScorable({ status: "pending" }), false)
+  assert.equal(isTaskScorable({ status: "failed" }), true)
 })
 
 test("reassigned and cancelled work is neutral", () => {
@@ -108,4 +151,25 @@ test("legacy completed work with no rating is held back, not scored zero", () =>
   ])
   assert.equal(awaitingRatingCount, 1)
   assert.equal(score, 80)
+})
+
+test("a project's quality counts unfinished work, an employee's KPI does not", () => {
+  const tasks = [
+    { status: "completed", weight: 5, rating: 5 },
+    { status: "pending", weight: 5, rating: null },
+  ]
+  // The employee has not been judged on the pending task yet.
+  assert.equal(computeWeightedTaskScore(tasks).score, 100)
+  // The project has half its planned work untouched and must not read perfect.
+  assert.equal(computeWeightedTaskScore(tasks, { countUnresolvedAsZero: true }).score, 50)
+})
+
+test("project delivery still counts unfinished work in the denominator", () => {
+  const progress = computeProjectProgress([
+    { status: "completed", weight: 5, rating: 5 },
+    { status: "pending", weight: 5, rating: null },
+  ])
+  assert.equal(progress.totalWeight, 10)
+  assert.equal(progress.completedWeight, 5)
+  assert.equal(progress.deliveryPct, 50)
 })
