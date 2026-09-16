@@ -101,17 +101,33 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
   const columns = useMemo<DataTableColumn<RegisterRow>[]>(
     () => [
       {
-        key: "measure",
-        label: "KPI & Pillar",
+        key: "strategic_priority",
+        label: "Pillar",
         sortable: true,
         resizable: true,
-        initialWidth: 340,
+        initialWidth: 170,
+        accessor: (r) => r.strategic_priority || "",
+        render: (r) =>
+          r.strategic_priority ? (
+            <Badge variant="secondary" className="text-left text-[11px] font-medium whitespace-normal">
+              {r.strategic_priority}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">-</span>
+          ),
+      },
+      {
+        key: "measure",
+        label: "KPI Measure",
+        sortable: true,
+        resizable: true,
+        initialWidth: 320,
         accessor: (r) => r.measure,
         render: (r) => (
-          <div className="flex flex-col">
-            <span className="line-clamp-2 font-medium">{r.measure}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs leading-snug font-medium">{r.measure}</span>
             <span className="text-muted-foreground text-[11px]">
-              <span className="text-foreground/80 font-semibold">{r.strategic_priority}</span> · {r.strategic_objective}
+              {r.perspective} · {r.strategic_objective}
             </span>
           </div>
         ),

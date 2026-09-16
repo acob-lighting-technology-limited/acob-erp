@@ -137,19 +137,32 @@ export function DepartmentCascadeContent({
   const columns = useMemo<DataTableColumn<CascadeRow>[]>(
     () => [
       {
-        key: "measure",
-        label: "KPI & Pillar",
+        key: "strategic_priority",
+        label: "Pillar",
         sortable: true,
         resizable: true,
-        initialWidth: 320,
+        initialWidth: 170,
+        accessor: (r) => r.strategic_priority || "",
+        render: (r) =>
+          r.strategic_priority ? (
+            <Badge variant="secondary" className="text-left text-[11px] font-medium whitespace-normal">
+              {r.strategic_priority}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">-</span>
+          ),
+      },
+      {
+        key: "measure",
+        label: "KPI Measure",
+        sortable: true,
+        resizable: true,
+        initialWidth: 300,
         accessor: (r) => r.measure,
         render: (r) => (
-          <div className="flex flex-col">
-            <span className="line-clamp-2 font-medium">{r.measure}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs leading-snug font-medium">{r.measure}</span>
             <span className="text-muted-foreground text-[11px]">
-              {r.strategic_priority ? (
-                <span className="text-foreground/80 font-semibold">{r.strategic_priority} · </span>
-              ) : null}
               {r.perspective} · {r.strategic_objective}
             </span>
           </div>
@@ -172,17 +185,22 @@ export function DepartmentCascadeContent({
       {
         key: "target_value",
         label: "Target",
-        accessor: (r) => r.target_value ?? -1,
-        render: (r) =>
-          r.measure_type === "milestone" ? (
-            <span className="text-muted-foreground text-xs">3 milestones</span>
-          ) : r.target_value != null ? (
-            <span className="text-xs font-medium">
-              {r.target_value} {r.target_unit || ""}
-            </span>
-          ) : (
-            <span className="text-xs text-amber-600 dark:text-amber-400">Not set</span>
-          ),
+        accessor: (r) => r.department_target || r.target_text || (r.target_value != null ? String(r.target_value) : ""),
+        render: (r) => {
+          const targetDisplay =
+            r.department_target ||
+            r.target_text ||
+            (r.target_value != null ? `${r.target_value} ${r.target_unit || ""}`.trim() : null)
+          if (!targetDisplay) return <span className="text-xs text-amber-600 dark:text-amber-400">Not set</span>
+          return (
+            <div className="flex flex-col">
+              <span className="text-xs font-medium">{targetDisplay}</span>
+              {r.department_target && r.target_text && r.department_target !== r.target_text ? (
+                <span className="text-muted-foreground text-[10px]">Corp: {r.target_text}</span>
+              ) : null}
+            </div>
+          )
+        },
       },
       {
         key: "latest_actual",
@@ -191,13 +209,29 @@ export function DepartmentCascadeContent({
         render: (r) => {
           if (!r.latest_actual) return <span className="text-muted-foreground text-xs">Not recorded</span>
           if (r.measure_type === "milestone") {
+            const completed = r.latest_actual.milestones_completed ?? 0
+            const total = r.latest_actual.milestones_total ?? 3
             return (
-              <span className="text-xs">
-                {r.latest_actual.milestones_completed ?? 0}/{r.latest_actual.milestones_total ?? 3} milestones
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xs font-medium">
+                  {completed}/{total} milestones
+                </span>
+                {r.latest_actual.note ? (
+                  <span className="text-muted-foreground line-clamp-1 text-[10px]">{r.latest_actual.note}</span>
+                ) : null}
+              </div>
             )
           }
-          return <span className="text-xs">{r.latest_actual.actual_value}</span>
+          return (
+            <div className="flex flex-col">
+              <span className="text-xs font-medium">
+                {r.latest_actual.actual_value} {r.target_unit || ""}
+              </span>
+              {r.latest_actual.note ? (
+                <span className="text-muted-foreground line-clamp-1 text-[10px]">{r.latest_actual.note}</span>
+              ) : null}
+            </div>
+          )
         },
       },
       {
