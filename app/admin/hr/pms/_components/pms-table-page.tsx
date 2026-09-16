@@ -418,7 +418,7 @@ export function PmsTablePage({
               subtitle: (row) => {
                 if (icon === "attendance") {
                   const cycle = normalizeCell(row.cycle)
-                  const hours = normalizeCell(row.total_hours)
+                  const hours = normalizeCell(row.total_work_hours || row.total_hours)
                   return (
                     [cycle !== "-" ? cycle : null, hours !== "-" ? hours : null].filter(Boolean).join(" · ") ||
                     undefined

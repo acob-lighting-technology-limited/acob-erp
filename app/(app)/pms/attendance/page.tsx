@@ -1,4 +1,5 @@
 import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
+import { NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
 import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { getCurrentUserPmsData } from "../_lib"
@@ -58,31 +59,21 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
       return s === "present" || s === "early" || s.includes("permission") || s === "on_leave"
     }).length
     const lateCount = cycleRecords.filter((r) => (r.status || "").toLowerCase() === "late").length
-    const totalHours = cycleRecords.reduce((sum, r) => sum + (r.total_hours || 0), 0)
+    const totalWorkHours = cycleRecords.reduce((sum, r) => sum + (r.total_hours || 0), 0)
     const totalDays = cycleRecords.length
+    const totalMissedHours = cycleRecords.reduce((sum, r) => {
+      const worked = r.total_hours || 0
+      return sum + Math.max(0, NET_DAY_HOURS - worked)
+    }, 0)
     const quarterScore = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : null
-
-    let status = "On Target"
-    if (quarterScore !== null) {
-      if (quarterScore < 75) {
-        status = "At Risk"
-      } else if (quarterScore < 90) {
-        status = "Needs Attention"
-      }
-    } else {
-      status = "No Data"
-    }
-
-    const rawStatus = status.toLowerCase().replace(/\s+/g, "_")
 
     return {
       quarter: formatCycleLabel(cycle.name),
       score: formatPercent(quarterScore),
       present_tracked: `${presentCount} / ${totalDays} days`,
-      total_hours: totalHours > 0 ? `${totalHours.toFixed(1)} hrs` : "-",
+      total_work_hours: totalWorkHours > 0 ? `${totalWorkHours.toFixed(1)} hrs` : totalDays > 0 ? "0.0 hrs" : "-",
+      total_miss_hours: totalDays > 0 ? `${totalMissedHours.toFixed(1)} hrs` : "-",
       lateness: lateCount > 0 ? `${lateCount} day${lateCount === 1 ? "" : "s"} late` : "None",
-      status: status,
-      __rawStatus: rawStatus,
       __attendanceRecords: formattedRecords,
     }
   })
@@ -108,9 +99,9 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
         { key: "quarter", label: "Quarter" },
         { key: "score", label: "Score" },
         { key: "present_tracked", label: "Present / Evaluated" },
-        { key: "total_hours", label: "Total Hours" },
+        { key: "total_work_hours", label: "Total Work Hours" },
+        { key: "total_miss_hours", label: "Total Miss Hours" },
         { key: "lateness", label: "Lateness" },
-        { key: "status", label: "Status" },
       ]}
       searchPlaceholder="Search quarter or score..."
       hideFirstColumnFilter
