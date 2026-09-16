@@ -173,6 +173,7 @@ const navigationSections: NavSectionDef[] = [
             href: "/reports/general-meeting",
             children: [
               { name: "Action Tracker", href: "/reports/general-meeting/action-tracker" },
+              { name: "Challenges", href: "/reports/general-meeting/challenges" },
               { name: "KSS", href: "/reports/general-meeting/kss" },
               { name: "Minutes of Meeting", href: "/reports/general-meeting/minutes-of-meeting" },
               { name: "Weekly Reports", href: "/reports/general-meeting/weekly-reports" },
