@@ -96,7 +96,15 @@ const EMPTY_TASK_FORM: TaskFormState = {
  * project and plan locked — there is no separate project-task form, because
  * there is no separate project-task table. One row, counted once.
  */
-export function ProjectPlanBoard({ project, profiles }: { project: Project; profiles: employee[] }) {
+export function ProjectPlanBoard({
+  project,
+  profiles = [],
+  readOnly = false,
+}: {
+  project: Project
+  profiles?: employee[]
+  readOnly?: boolean
+}) {
   const queryClient = useQueryClient()
   const [isAddPlanOpen, setIsAddPlanOpen] = useState(false)
   const [planForm, setPlanForm] = useState({ name: "", description: "" })
@@ -294,16 +302,23 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
     return (
       <div
         key={task.id}
-        onClick={() => openEditTaskDialog(task)}
-        className="group hover:bg-muted/40 flex cursor-pointer flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm transition-colors"
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault()
-            openEditTaskDialog(task)
-          }
-        }}
+        onClick={readOnly ? undefined : () => openEditTaskDialog(task)}
+        className={cn(
+          "hover:bg-muted/40 flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-sm transition-colors",
+          !readOnly && "group cursor-pointer"
+        )}
+        role={readOnly ? undefined : "button"}
+        tabIndex={readOnly ? undefined : 0}
+        onKeyDown={
+          readOnly
+            ? undefined
+            : (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  openEditTaskDialog(task)
+                }
+              }
+        }
       >
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <span className="text-muted-foreground w-6 shrink-0 pt-0.5 font-mono text-xs font-semibold">
@@ -311,7 +326,9 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="group-hover:text-primary truncate font-medium transition-colors">{task.title}</p>
+              <p className={cn("truncate font-medium transition-colors", !readOnly && "group-hover:text-primary")}>
+                {task.title}
+              </p>
               {task.work_item_number && (
                 <Badge variant="outline" className="text-muted-foreground shrink-0 px-1.5 py-0 font-mono text-[10px]">
                   {task.work_item_number}
@@ -340,18 +357,20 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
           <Badge variant={config?.badgeVariant ?? "outline"} className={cn("text-[10px] capitalize", config?.color)}>
             {config?.label ?? task.status.replaceAll("_", " ")}
           </Badge>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-muted-foreground hover:text-foreground h-7 gap-1 px-2 text-xs"
-            onClick={(e) => {
-              e.stopPropagation()
-              openEditTaskDialog(task)
-            }}
-          >
-            <Pencil className="h-3 w-3" />
-            <span className="hidden sm:inline">Edit</span>
-          </Button>
+          {!readOnly && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground hover:text-foreground h-7 gap-1 px-2 text-xs"
+              onClick={(e) => {
+                e.stopPropagation()
+                openEditTaskDialog(task)
+              }}
+            >
+              <Pencil className="h-3 w-3" />
+              <span className="hidden sm:inline">Edit</span>
+            </Button>
+          )}
         </div>
       </div>
     )
@@ -401,7 +420,7 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
                 {progress.deliveryPct ?? 0}% delivered · {progress.qualityPct ?? 0}% quality
               </p>
             </div>
-            {plan && (
+            {!readOnly && plan && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -433,41 +452,43 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
             {plan && (
               <div className="bg-background/50 flex items-center justify-between border-b px-3 py-2">
                 <span className="text-muted-foreground text-xs font-medium">Tasks in {title}</span>
-                <div className="flex items-center gap-1.5">
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
-                    <Plus className="mr-1 h-3.5 w-3.5" />
-                    Task
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
-                        aria-label={`Options for ${plan.name}`}
-                      >
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                        onClick={() => deletePlan.mutate(plan.id)}
-                        disabled={deletePlan.isPending}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete plan
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                {!readOnly && (
+                  <div className="flex items-center gap-1.5">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Task
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+                          aria-label={`Options for ${plan.name}`}
+                        >
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                          onClick={() => deletePlan.mutate(plan.id)}
+                          disabled={deletePlan.isPending}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete plan
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
               </div>
             )}
 
             {groupTasks.length === 0 ? (
               <div className="px-3 py-6 text-center">
                 <p className="text-muted-foreground mb-2 text-xs">No tasks in this plan yet.</p>
-                {plan && (
+                {!readOnly && plan && (
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openTaskDialog(plan)}>
                     <Plus className="mr-1 h-3.5 w-3.5" />
                     Add First Task
@@ -486,25 +507,28 @@ export function ProjectPlanBoard({ project, profiles }: { project: Project; prof
   const ungroupedCount = (tasksByPlan.get("") || []).length
 
   return (
-    <div className="space-y-3 p-1">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-foreground text-sm font-semibold">Implementation Plans</h4>
+          <h4 className="text-sm font-semibold">Implementation Plans</h4>
           <p className="text-muted-foreground text-xs">
-            Break this project into structured phases or execution workstreams.
+            Workstreams and their assigned tasks. Delivery and health roll up automatically.
           </p>
         </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setPlanForm({ name: "", description: "" })
-            setIsAddPlanOpen(true)
-          }}
-          className="gap-1.5 text-xs"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add Plan
-        </Button>
+        {!readOnly && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setPlanForm({ name: "", description: "" })
+              setIsAddPlanOpen(true)
+            }}
+            className="gap-1.5 text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Plan
+          </Button>
+        )}
       </div>
 
       {plansLoading || tasksLoading ? (
