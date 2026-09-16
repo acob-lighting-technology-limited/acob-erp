@@ -69,7 +69,8 @@ export default async function PmsKpiPage({
   searchParams: Promise<{ cycle_id?: string; tab?: string }>
 }) {
   const { cycle_id, tab } = await searchParams
-  const { score, cycles, activeCycleId, goalSummary, profile } = await getCurrentUserPmsData(cycle_id)
+  const effectiveCycleId = cycle_id ?? "all"
+  const { score, cycles, activeCycleId, goalSummary, profile } = await getCurrentUserPmsData(effectiveCycleId)
   const supabase = await createClient()
 
   const goalIds = score.breakdown.goals.map((goal) => goal.goal_id).filter((id): id is string => Boolean(id))
@@ -184,8 +185,18 @@ export default async function PmsKpiPage({
     }, 0)
     const roundedEarned = Math.round(earnedPoints * 100) / 100
 
+    let resolvedCycle = goalCycleByGoalId.get(goal.goal_id)
+    if (!resolvedCycle || resolvedCycle === "Current") {
+      const firstTaskWithDate = goalTasks.find((t) => t.dueDate)
+      if (firstTaskWithDate?.dueDate) {
+        resolvedCycle = toQuarterLabel(firstTaskWithDate.dueDate)
+      } else {
+        resolvedCycle = goal.goal_id ? "Goal" : "Ad-hoc"
+      }
+    }
+
     return {
-      cycle: goalCycleByGoalId.get(goal.goal_id) || "Current",
+      cycle: resolvedCycle,
       rating: avgRating ? `${avgRating}/5` : "Unrated",
       earned: `${roundedEarned} / ${goal.priority_weight}`,
       effective_kpi_pct: `${goal.effective_kpi_pct}%`,
@@ -205,7 +216,7 @@ export default async function PmsKpiPage({
       kpiScore={score.kpi_score}
       approvedGoals={goalSummary.approved}
       completedGoals={goalSummary.completed}
-      cycleName={score.cycle_name || "Active Cycle"}
+      cycleName={score.cycle_name || (effectiveCycleId === "all" ? "All Quarters" : "Active Cycle")}
       rows={rows}
     />
   )

@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { DataTableFilter } from "@/components/ui/data-table"
 import {
+  ALL_CYCLES_VALUE,
   CADENCE_OPTIONS,
   cadencePeriodLabel,
   cycleOptionLabel,
@@ -72,13 +73,18 @@ export function CycleSelector({ cycles, activeCycleId, showLabel = false }: Cycl
   )
 
   const selectedValue = useMemo(() => {
+    if (activeCycleId === "all" || activeCycleId === ALL_CYCLES_VALUE) return "all"
     if (activeCycleId && visibleCycles.some((cycle) => cycle.id === activeCycleId)) return activeCycleId
-    return pickCurrentCycle(cadenceCycles, toLocalISODate(), cadence)?.id || ""
-  }, [activeCycleId, cadence, cadenceCycles, visibleCycles])
+    return "all"
+  }, [activeCycleId, visibleCycles])
 
   function handleSelect(newCycleId: string) {
     const params = new URLSearchParams(searchParams.toString())
-    params.set("cycle_id", newCycleId)
+    if (newCycleId === "all" || newCycleId === ALL_CYCLES_VALUE) {
+      params.set("cycle_id", "all")
+    } else {
+      params.set("cycle_id", newCycleId)
+    }
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`)
     })
@@ -117,6 +123,9 @@ export function CycleSelector({ cycles, activeCycleId, showLabel = false }: Cycl
           />
         </SelectTrigger>
         <SelectContent align="start">
+          <SelectItem value="all" textValue={`All ${periodLabel}s`} className="text-xs font-medium">
+            All {periodLabel}s
+          </SelectItem>
           {visibleCycles.map((cycle) => (
             <SelectItem
               key={cycle.id}
@@ -192,14 +201,19 @@ export function useCycleUrlFilters<TRow = Record<string, unknown>>({
   )
 
   const selectedValue = useMemo(() => {
+    if (activeCycleId === "all" || activeCycleId === ALL_CYCLES_VALUE) return "all"
     if (activeCycleId && visibleCycles.some((cycle) => cycle.id === activeCycleId)) return activeCycleId
-    return pickCurrentCycle(cadenceCycles, toLocalISODate(), cadence)?.id || ""
-  }, [activeCycleId, cadence, cadenceCycles, visibleCycles])
+    return "all"
+  }, [activeCycleId, visibleCycles])
 
   const handleSelect = useCallback(
     (newCycleId: string) => {
       const params = new URLSearchParams(searchParams.toString())
-      params.set("cycle_id", newCycleId)
+      if (newCycleId === "all" || newCycleId === ALL_CYCLES_VALUE) {
+        params.set("cycle_id", "all")
+      } else {
+        params.set("cycle_id", newCycleId)
+      }
       startTransition(() => {
         router.push(`${pathname}?${params.toString()}`)
       })
@@ -248,10 +262,13 @@ export function useCycleUrlFilters<TRow = Record<string, unknown>>({
       {
         key: "cycle_selector",
         label: periodLabel,
-        options: visibleCycles.map((cycle) => ({
-          value: cycle.id,
-          label: cycleOptionLabel(cycle, visibleCycles),
-        })),
+        options: [
+          { value: "all", label: `All ${periodLabel}s` },
+          ...visibleCycles.map((cycle) => ({
+            value: cycle.id,
+            label: cycleOptionLabel(cycle, visibleCycles),
+          })),
+        ],
         multi: false,
         mode: "custom" as const,
         filterFn: () => true,
@@ -263,6 +280,9 @@ export function useCycleUrlFilters<TRow = Record<string, unknown>>({
               />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all" textValue={`All ${periodLabel}s`} className="text-xs font-medium">
+                All {periodLabel}s
+              </SelectItem>
               {visibleCycles.map((cycle) => (
                 <SelectItem
                   key={cycle.id}

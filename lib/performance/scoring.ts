@@ -147,6 +147,9 @@ function weightedScore(
 }
 
 async function getCycleWindow(supabase: SupabaseClient, cycleId?: string | null): Promise<ReviewCycleRow | null> {
+  if (cycleId === "all" || cycleId === "__all__") {
+    return null
+  }
   if (cycleId) {
     const { data } = await supabase
       .from("review_cycles")
