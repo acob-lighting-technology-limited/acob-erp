@@ -46,8 +46,8 @@ type KpiTableTask = {
 
 type KpiTableRow = {
   cycle: string
-  goal: string
-  goal_progress_pct: string
+  rating: string
+  earned: string
   effective_kpi_pct: string
   linked_tasks: string
   weight: string
@@ -170,17 +170,31 @@ export default async function PmsKpiPage({
     }
   }
 
-  const rows: KpiTableRow[] = score.breakdown.goals.map((goal) => ({
-    cycle: goalCycleByGoalId.get(goal.goal_id) || "Current",
-    goal: goal.title,
-    goal_progress_pct: `${goal.goal_progress_pct}%`,
-    effective_kpi_pct: `${goal.effective_kpi_pct}%`,
-    linked_tasks: `${goal.linked_tasks_completed}/${goal.linked_tasks_total}`,
-    // Total task weight in this group: how much of the score it could move.
-    weight: String(goal.priority_weight),
-    __goalId: goal.goal_id,
-    __tasks: tasksByGoalId.get(goal.goal_id) || [],
-  }))
+  const rows: KpiTableRow[] = score.breakdown.goals.map((goal) => {
+    const goalTasks = tasksByGoalId.get(goal.goal_id) || []
+    const ratedTasks = goalTasks.filter((t) => typeof t.rating === "number" && t.rating > 0)
+    const avgRating =
+      ratedTasks.length > 0
+        ? (ratedTasks.reduce((acc, t) => acc + (t.rating || 0), 0) / ratedTasks.length).toFixed(1)
+        : null
+
+    const earnedPoints = goalTasks.reduce((acc, t) => {
+      if (!t.weight || t.rating == null) return acc
+      return acc + (t.weight * t.rating) / 5
+    }, 0)
+    const roundedEarned = Math.round(earnedPoints * 100) / 100
+
+    return {
+      cycle: goalCycleByGoalId.get(goal.goal_id) || "Current",
+      rating: avgRating ? `${avgRating}/5` : "Unrated",
+      earned: `${roundedEarned} / ${goal.priority_weight}`,
+      effective_kpi_pct: `${goal.effective_kpi_pct}%`,
+      linked_tasks: `${goal.linked_tasks_completed}/${goal.linked_tasks_total}`,
+      weight: String(goal.priority_weight),
+      __goalId: goal.goal_id,
+      __tasks: goalTasks,
+    }
+  })
 
   return (
     <EmployeeKpiTabs

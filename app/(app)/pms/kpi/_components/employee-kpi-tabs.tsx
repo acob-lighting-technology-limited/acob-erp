@@ -119,13 +119,13 @@ export function EmployeeKpiTabs({
       rows={rows}
       columns={[
         { key: "cycle", label: "Cycle" },
-        { key: "goal", label: "Goal" },
-        { key: "goal_progress_pct", label: "Group Score" },
+        { key: "rating", label: "Rating" },
+        { key: "earned", label: "Earned" },
         { key: "effective_kpi_pct", label: "Effective KPI" },
         { key: "linked_tasks", label: "Completed / Scored" },
         { key: "weight", label: "Total Weight" },
       ]}
-      searchPlaceholder="Search goal or KPI row..."
+      searchPlaceholder="Search cycle or rating..."
       filterKey="cycle"
       filterLabel="Cycle"
       filterAllLabel="All Cycles"

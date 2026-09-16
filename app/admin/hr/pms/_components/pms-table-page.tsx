@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { ATTENDANCE_STATUS_LABELS, normalizeStoredAttendanceStatus } from "@/lib/hr/attendance-status"
 import type { ReviewCycleOption } from "@/app/(app)/pms/_lib"
-import { CycleSelector } from "@/app/(app)/pms/_components/cycle-selector"
+import { useCycleUrlFilters } from "@/app/(app)/pms/_components/cycle-selector"
 
 type IconKey = "kpi" | "goals" | "attendance" | "cbt" | "behaviour" | "reviews"
 type TableColumn = { key: string; label: string }
@@ -191,17 +191,14 @@ export function PmsTablePage({
     [firstColumnKey, rows]
   )
 
+  const cycleFilters = useCycleUrlFilters<TableRowData>({ cycles, activeCycleId })
+
   const filters = useMemo<DataTableFilter<TableRowData>[]>(() => {
     const activeFilters: DataTableFilter<TableRowData>[] = []
     const hasCycles = Boolean(cycles && cycles.length > 0)
 
-    if (hasCycles && cycles) {
-      activeFilters.push({
-        key: "cycle_selector",
-        label: "Review Cycle",
-        options: cycles.map((c) => ({ value: c.id, label: c.name })),
-        render: () => <CycleSelector cycles={cycles} activeCycleId={activeCycleId} />,
-      })
+    if (hasCycles && cycleFilters.length > 0) {
+      activeFilters.push(...cycleFilters)
     }
 
     if (!hideSecondaryFilter && (!hasCycles || filterKey !== "cycle")) {
@@ -259,8 +256,8 @@ export function PmsTablePage({
 
     return activeFilters
   }, [
-    activeCycleId,
     cycles,
+    cycleFilters,
     extraFilters,
     rows,
     filterAllLabel,
