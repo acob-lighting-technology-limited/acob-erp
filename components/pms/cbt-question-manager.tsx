@@ -538,6 +538,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
               {question.is_active === false ? "Inactive" : "Active"}
             </Badge>
           ),
+          onSelect: openEditModal,
         }}
         pagination={{ pageSize: 50 }}
         searchPlaceholder="Search question text, options, explanation, or answer..."
@@ -598,6 +599,8 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
           ),
         }}
         viewToggle
+        contactsView
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         cardRenderer={(question) => (
           <QuestionCard
             question={question}
