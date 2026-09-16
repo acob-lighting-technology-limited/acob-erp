@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,8 +22,9 @@ import {
   Briefcase,
   Activity,
   Layers,
+  Plus,
+  Pencil,
 } from "lucide-react"
-import { ProjectTaskViewer } from "./_components/project-task-viewer"
 import {
   PROJECT_HEALTH_LABELS,
   PROJECT_METRIC_HELP,
@@ -32,6 +33,10 @@ import {
 } from "@/lib/projects/health"
 import { HealthBadge, ProjectSummary, formatCapacity, formatVariance } from "@/components/projects/project-summary"
 import { toLocalISODate } from "@/lib/utils/date"
+import { isAdminLikeRole } from "@/lib/admin/rbac"
+import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
+import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
+import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 
 // Define user-facing project type (includes tasks count payload)
 export interface ProjectRow {
@@ -59,6 +64,7 @@ export interface ProjectRow {
 }
 
 export interface ProjectContentProps {
+  profiles?: employee[]
   currentUser?: {
     id: string
     role: string
@@ -76,9 +82,14 @@ async function fetchUserProjects(): Promise<ProjectRow[]> {
   return (payload?.data || []) as ProjectRow[]
 }
 
-export function ProjectContent({ currentUser: _currentUser }: ProjectContentProps = {}) {
+export function ProjectContent({ profiles = [], currentUser }: ProjectContentProps = {}) {
   const queryClient = useQueryClient()
   const staffAvatars = useStaffAvatars()
+  const [activeProject, setActiveProject] = useState<ProjectRow | null>(null)
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+
+  const canManage = Boolean(currentUser && (isAdminLikeRole(currentUser.role) || currentUser.is_department_lead))
 
   // Fetch project list
   const {
@@ -129,12 +140,6 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
     )
   }, [rows])
 
-  const getProgressInfo = (project: ProjectRow) => {
-    const health = healthById.get(project.id)
-    if (!health || health.taskCount === 0) return { percent: 0, text: "No tasks" }
-    return { percent: health.deliveryPct ?? 0, text: `${health.qualityPct ?? 0}% quality` }
-  }
-
   // Project Status Badge formatter
   const renderStatusBadge = (status: string) => {
     switch (status) {
@@ -163,14 +168,7 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         accessor: (r) => r.project_name,
         render: (r) => (
           <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <p className="text-foreground font-semibold">{r.project_name}</p>
-              {r.portfolio && (
-                <Badge variant="secondary" className="text-[10px] font-normal">
-                  {r.portfolio.code || r.portfolio.name}
-                </Badge>
-              )}
-            </div>
+            <p className="text-foreground font-semibold">{r.project_name}</p>
             {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
           </div>
         ),
@@ -186,24 +184,6 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
             <span>{r.location}</span>
           </div>
         ),
-      },
-      {
-        key: "progress",
-        label: "Delivery / Quality",
-        description: PROJECT_METRIC_HELP.deliveryQuality,
-        sortable: false,
-        render: (r) => {
-          const info = getProgressInfo(r)
-          return (
-            <div className="max-w-[180px] min-w-[120px] space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span>{info.percent}%</span>
-                <span className="text-muted-foreground">{info.text}</span>
-              </div>
-              <Progress value={info.percent} className="h-1.5" />
-            </div>
-          )
-        },
       },
       {
         key: "project_manager",
@@ -232,6 +212,41 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         ),
       },
       {
+        key: "portfolio",
+        label: "Portfolio",
+        sortable: true,
+        accessor: (r) => r.portfolio?.name || "",
+        render: (r) =>
+          r.portfolio ? (
+            <Badge variant="outline" className="text-xs">
+              {r.portfolio.code || r.portfolio.name}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">Unassigned</span>
+          ),
+      },
+      {
+        key: "progress",
+        label: "Delivery / Quality",
+        description: PROJECT_METRIC_HELP.deliveryQuality,
+        sortable: true,
+        accessor: (r) => healthById.get(r.id)?.deliveryPct ?? 0,
+        render: (r) => {
+          const health = healthById.get(r.id)
+          if (!health || health.totalWeight === 0) {
+            return <span className="text-muted-foreground text-xs">No tasks</span>
+          }
+          return (
+            <div className="w-32 space-y-1">
+              <Progress value={health.deliveryPct ?? 0} className="h-1.5" />
+              <p className="text-muted-foreground text-[11px]">
+                {health.deliveryPct ?? 0}% delivered · {health.qualityPct ?? 0}% quality
+              </p>
+            </div>
+          )
+        },
+      },
+      {
         key: "status",
         label: "Status",
         description: PROJECT_METRIC_HELP.status,
@@ -240,7 +255,6 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         render: (r) => renderStatusBadge(r.status),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- getProgressInfo reads healthById
     [healthById, staffAvatars]
   )
 
@@ -275,7 +289,6 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         key: "technology_type",
         label: "Technology",
         options: techOptions,
-        // The technology column lives in the expanded view, so match on the row.
         mode: "custom",
         filterFn: (row, selected) => selected.includes(row.technology_type || ""),
       },
@@ -324,6 +337,13 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
+          {canManage && (
+            <Button size="sm" onClick={() => setIsAddOpen(true)}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Project</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
         </div>
       }
       stats={
@@ -401,7 +421,6 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
               )
             },
             fields: (r) => {
-              const info = getProgressInfo(r)
               const health = healthById.get(r.id)
               const pct = (value: number | null | undefined) =>
                 value === null || value === undefined ? null : `${value}%`
@@ -428,7 +447,11 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
                   value: `${r.deployment_start_date} → ${r.deployment_end_date}`,
                   copyable: false,
                 },
-                { label: "Delivery progress", value: `${info.percent}% — ${info.text}`, copyable: false },
+                {
+                  label: "Delivery progress",
+                  value: `${health?.deliveryPct ?? 0}% — ${health?.qualityPct ?? 0}% quality`,
+                  copyable: false,
+                },
                 {
                   icon: Activity,
                   label: "Health",
@@ -442,10 +465,22 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
               ]
               return fields.filter((field) => field.value)
             },
+            actions: canManage
+              ? (r) => [
+                  {
+                    label: "Edit Project",
+                    icon: Pencil,
+                    onClick: () => {
+                      setActiveProject(r)
+                      setIsEditOpen(true)
+                    },
+                  },
+                ]
+              : undefined,
           },
         }}
         cardRenderer={(r) => {
-          const info = getProgressInfo(r)
+          const health = healthById.get(r.id)
           return (
             <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
               <div className="flex items-start justify-between gap-2">
@@ -467,7 +502,7 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
                 </div>
                 <div>
                   <p className="text-muted-foreground text-[10px] font-medium uppercase">Progress</p>
-                  <p className="font-medium">{info.percent}%</p>
+                  <p className="font-medium">{health?.deliveryPct ?? 0}%</p>
                 </div>
               </div>
               <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
@@ -476,16 +511,31 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
                     [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
                     "Unassigned"}
                 </span>
-                <span>{info.text}</span>
+                <span>{health?.qualityPct ?? 0}% quality</span>
               </div>
             </div>
           )
         }}
+        rowActions={
+          canManage
+            ? [
+                {
+                  label: "Edit Project Details",
+                  icon: Pencil,
+                  onClick: (r) => {
+                    setActiveProject(r)
+                    setIsEditOpen(true)
+                  },
+                },
+              ]
+            : undefined
+        }
+        forceRowActionsDropdown={canManage}
         expandable={{
           render: (r) => (
             <div className="bg-muted/20 space-y-3 rounded-lg border p-2">
               <ProjectSummary project={r} health={healthById.get(r.id)} />
-              <ProjectTaskViewer projectId={r.id} projectName={r.project_name} />
+              <ProjectPlanBoard project={r as any} profiles={profiles} />
             </div>
           ),
         }}
@@ -494,6 +544,20 @@ export function ProjectContent({ currentUser: _currentUser }: ProjectContentProp
         emptyIcon={FolderKanban}
         urlSync
       />
+
+      {canManage && (
+        <ProjectDialogs
+          profiles={profiles}
+          isAddOpen={isAddOpen}
+          setIsAddOpen={setIsAddOpen}
+          isEditOpen={isEditOpen}
+          setIsEditOpen={setIsEditOpen}
+          selectedProject={activeProject as any}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["user-projects"] })
+          }}
+        />
+      )}
     </DataTablePage>
   )
 }
