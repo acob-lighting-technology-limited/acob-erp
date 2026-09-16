@@ -6,6 +6,7 @@ export type NotificationModule =
   | "Meetings"
   | "Communications"
   | "Reports"
+  | "Tasks"
   | "Attendance"
   | "Exit"
   | "Birthday"

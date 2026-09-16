@@ -109,9 +109,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   }
 
   const ratingBlockedReasonFor = (task: Task) =>
-    isSelfRatingBlocked({ userId, assigneeIds: [task.assigned_to], isMd: userProfile?.is_md === true })
-      ? SELF_RATING_BLOCKED_REASON
-      : null
+    isSelfRatingBlocked({ userId, assigneeIds: [task.assigned_to] }) ? SELF_RATING_BLOCKED_REASON : null
 
   const stats = useMemo(
     () => ({

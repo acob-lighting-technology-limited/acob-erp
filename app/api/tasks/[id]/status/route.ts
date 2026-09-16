@@ -127,16 +127,16 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return apiError("Task not found", ApiErrorCode.NOT_FOUND, 404)
     }
 
-    const [{ data: profile }, { data: assignments }, { data: isMdResult }] = await Promise.all([
+    // No is_md lookup: the MD is no longer a special case for rating, so the
+    // round trip it cost on every status change went with it.
+    const [{ data: profile }, { data: assignments }] = await Promise.all([
       supabase
         .from("profiles")
         .select("id, role, department, is_department_lead, lead_departments")
         .eq("id", user.id)
         .single<ProfileRecord>(),
       supabase.from("task_assignments").select("user_id").eq("task_id", task.id).eq("user_id", user.id).limit(1),
-      supabase.rpc("is_md"),
     ])
-    const isMd = isMdResult === true
 
     const taskScope = await getRequestScope()
     const isAdmin = isAdminProfile(taskScope)
@@ -160,11 +160,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const canReview = isLeadOrAdmin || isProjectManager
     const isAssignee = task.assigned_to === user.id || Boolean(assignments && assignments.length > 0)
     const isAssigner = task.assigned_by === user.id
-    // A reviewer who is also an assignee cannot judge their own work; the MD does.
+    // A reviewer who is also an assignee cannot judge their own work - an
+    // administrator rates it from the admin side instead.
     const selfRatingBlocked = isSelfRatingBlocked({
       userId: user.id,
       assigneeIds: isAssignee ? [user.id] : [],
-      isMd,
     })
 
     if (!isAssignee && !isAssigner && !canReview) {
