@@ -734,6 +734,80 @@ export function LunchRegisterPage({
   }
 
   // Daily checklist columns
+  const renderDailyMealChoice = (userId: string) => {
+    const vote = dailyVotes.find((v) => v.user_id === userId)
+    if (!vote) {
+      return <span className="text-muted-foreground text-xs italic">No vote</span>
+    }
+    if (!vote.is_eating) {
+      return (
+        <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-xs font-medium text-rose-600">
+          NO — Opted out
+        </Badge>
+      )
+    }
+    const dishNames = dailyMenu?.groups
+      ? dailyMenu.groups
+          .map((g) => g.options.find((o) => o.id === vote.selections[g.id])?.name)
+          .filter(Boolean)
+          .join(" + ")
+      : "Opted In"
+    return (
+      <Badge className="border-0 bg-emerald-500/10 text-xs font-medium text-emerald-600">
+        {dishNames || "Opted In"}
+      </Badge>
+    )
+  }
+
+  const renderDailyDeduction = (userId: string) => {
+    if (!ateUserIds.includes(userId)) return <span className="text-muted-foreground text-xs">—</span>
+    return (
+      <span className="font-mono text-xs font-bold text-red-600">
+        ₦{employeeSurcharge.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+      </span>
+    )
+  }
+
+  const renderDailyServed = (userId: string) => {
+    const hasEaten = ateUserIds.includes(userId)
+    return (
+      <Badge
+        className={
+          hasEaten
+            ? "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+            : "border bg-gray-100 text-gray-400 hover:bg-gray-100/80"
+        }
+      >
+        {hasEaten ? "Served" : "Skipped"}
+      </Badge>
+    )
+  }
+
+  const openDailyOverride = (userId: string) => {
+    setOverrideUserId(userId)
+    setOverrideMenu(dailyMenu)
+  }
+
+  const renderDailyAction = (userId: string) => {
+    if (!dailyMenu) {
+      return (
+        <Checkbox
+          checked={ateUserIds.includes(userId)}
+          onCheckedChange={(checked) => {
+            void toggleEmployeeLunch(userId, !!checked)
+          }}
+          className="h-5 w-5 border-2"
+          title="Toggle payroll lunch status"
+        />
+      )
+    }
+    return (
+      <Button size="sm" variant="outline" className="h-7 text-xs font-medium" onClick={() => openDailyOverride(userId)}>
+        Change Choice
+      </Button>
+    )
+  }
+
   const dailyColumns: DataTableColumn<{ id: string; employee: LunchEmployee }>[] = [
     {
       key: "employee_name",
@@ -756,92 +830,22 @@ export function LunchRegisterPage({
     {
       key: "meal_choice",
       label: "Meal Choice / Vote",
-      render: (row) => {
-        const vote = dailyVotes.find((v) => v.user_id === row.employee.id)
-        if (!vote) {
-          return <span className="text-muted-foreground text-xs italic">No vote</span>
-        }
-        if (!vote.is_eating) {
-          return (
-            <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-xs font-medium text-rose-600">
-              NO — Opted out
-            </Badge>
-          )
-        }
-        const dishNames = dailyMenu?.groups
-          ? dailyMenu.groups
-              .map((g) => g.options.find((o) => o.id === vote.selections[g.id])?.name)
-              .filter(Boolean)
-              .join(" + ")
-          : "Opted In"
-        return (
-          <Badge className="border-0 bg-emerald-500/10 text-xs font-medium text-emerald-600">
-            {dishNames || "Opted In"}
-          </Badge>
-        )
-      },
+      render: (row) => renderDailyMealChoice(row.employee.id),
     },
     {
       key: "deduction",
       label: "Deduction",
-      render: (row) => {
-        const hasEaten = ateUserIds.includes(row.employee.id)
-        if (!hasEaten) return <span className="text-muted-foreground text-xs">—</span>
-        return (
-          <span className="font-mono text-xs font-bold text-red-600">
-            ₦{employeeSurcharge.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-          </span>
-        )
-      },
+      render: (row) => renderDailyDeduction(row.employee.id),
     },
     {
       key: "status",
       label: "Status",
-      render: (row) => {
-        const hasEaten = ateUserIds.includes(row.employee.id)
-        return (
-          <Badge
-            className={
-              hasEaten
-                ? "border-0 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                : "border bg-gray-100 text-gray-400 hover:bg-gray-100/80"
-            }
-          >
-            {hasEaten ? "Served" : "Skipped"}
-          </Badge>
-        )
-      },
+      render: (row) => renderDailyServed(row.employee.id),
     },
     {
       key: "actions",
       label: "Action",
-      render: (row) => {
-        if (!dailyMenu) {
-          return (
-            <Checkbox
-              checked={ateUserIds.includes(row.employee.id)}
-              onCheckedChange={(checked) => {
-                void toggleEmployeeLunch(row.employee.id, !!checked)
-              }}
-              className="h-5 w-5 border-2"
-              title="Toggle payroll lunch status"
-            />
-          )
-        }
-        return (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs font-medium"
-            onClick={() => {
-              setOverrideUserId(row.employee.id)
-              setOverrideMenu(dailyMenu)
-            }}
-          >
-            Change Choice
-          </Button>
-        )
-      },
+      render: (row) => renderDailyAction(row.employee.id),
     },
   ]
 
@@ -1771,6 +1775,77 @@ export function LunchRegisterPage({
               searchFn={(row, q) => row.employee.full_name.toLowerCase().includes(q.toLowerCase())}
               filters={dailyFilters.filter((f) => f.key !== "date")}
               isLoading={false}
+              viewToggle
+              contactsView
+              stickyToolbar
+              defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+              mobileRow={{
+                title: (row) => row.employee.full_name,
+                subtitle: (row) => `${row.employee.department || "General"} · ${row.employee.employee_number}`,
+                trailing: (row) => renderDailyServed(row.employee.id),
+                detail: {
+                  title: (row) => row.employee.full_name,
+                  subtitle: (row) => row.employee.department || "General",
+                  badges: (row) => (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {renderDailyServed(row.employee.id)}
+                      {renderDailyMealChoice(row.employee.id)}
+                    </div>
+                  ),
+                  fields: (row) => [
+                    { label: "Staff Code", value: row.employee.employee_number },
+                    { label: "Department", value: row.employee.department || "General" },
+                    {
+                      label: "Deduction",
+                      value: ateUserIds.includes(row.employee.id)
+                        ? `₦${employeeSurcharge.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                        : "—",
+                      copyable: false,
+                    },
+                  ],
+                  actions: (row) => {
+                    if (dailyMenu) {
+                      return [{ label: "Change Choice", onClick: () => openDailyOverride(row.employee.id) }]
+                    }
+                    const hasEaten = ateUserIds.includes(row.employee.id)
+                    return [
+                      {
+                        label: hasEaten ? "Mark as Skipped" : "Mark as Served",
+                        variant: hasEaten ? ("outline" as const) : ("default" as const),
+                        onClick: () => void toggleEmployeeLunch(row.employee.id, !hasEaten),
+                      },
+                    ]
+                  },
+                },
+              }}
+              cardRenderer={(row) => (
+                <div className="bg-card flex h-full flex-col gap-3 rounded-xl border p-4 text-xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{row.employee.full_name}</p>
+                      <p className="text-muted-foreground truncate">
+                        {row.employee.department || "General"} ·{" "}
+                        <span className="font-mono">{row.employee.employee_number}</span>
+                      </p>
+                    </div>
+                    {renderDailyServed(row.employee.id)}
+                  </div>
+                  <div className="grid gap-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Meal</span>
+                      {renderDailyMealChoice(row.employee.id)}
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Deduction</span>
+                      {renderDailyDeduction(row.employee.id)}
+                    </div>
+                  </div>
+                  <div className="mt-auto flex items-center justify-end gap-2 border-t pt-3">
+                    {!dailyMenu && <span className="text-muted-foreground">Served</span>}
+                    {renderDailyAction(row.employee.id)}
+                  </div>
+                </div>
+              )}
             />
           )}
         </div>
