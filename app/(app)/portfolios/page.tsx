@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { PortfoliosContent } from "@/app/admin/portfolios/_components/portfolios-content"
 
 export const metadata: Metadata = {
@@ -20,14 +19,6 @@ export default async function AppPortfoliosPage() {
   } = await supabase.auth.getUser()
 
   if (error || !user) redirect("/auth/login")
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, is_department_lead")
-    .eq("id", user.id)
-    .single()
-
-  const isAdmin = isAdminLikeRole(profile?.role) || Boolean(profile?.is_department_lead)
 
   const { data: profiles, error: profilesError } = await getServiceRoleClientOrFallback(supabase as DbClient)
     .from("profiles")
@@ -47,5 +38,5 @@ export default async function AppPortfoliosPage() {
     department: p.department || "",
   }))
 
-  return <PortfoliosContent isAdmin={isAdmin} profiles={managerOptions} />
+  return <PortfoliosContent isAdmin={false} profiles={managerOptions} />
 }

@@ -89,6 +89,15 @@ const EMPTY_TASK_FORM: TaskFormState = {
   task_end_date: "",
 }
 
+export type ProjectPlanStaffOption = {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+  department?: string | null
+  company_email?: string | null
+}
+
 /**
  * Implementation plans and their tasks for one project.
  *
@@ -102,7 +111,7 @@ export function ProjectPlanBoard({
   readOnly = false,
 }: {
   project: Project
-  profiles?: employee[]
+  profiles?: ProjectPlanStaffOption[] | employee[]
   readOnly?: boolean
 }) {
   const queryClient = useQueryClient()
@@ -626,7 +635,7 @@ export function ProjectPlanBoard({
         setTaskForm={setTaskForm}
         onSave={handleSaveTask}
         isSaving={isSavingTask}
-        scopedAssignableEmployees={profiles}
+        scopedAssignableEmployees={profiles as employee[]}
         scopedAssignableDepartments={Array.from(new Set(profiles.map((p) => p.department).filter(Boolean) as string[]))}
         lockedProjectId={project.id}
         lockedProjectName={project.project_name}

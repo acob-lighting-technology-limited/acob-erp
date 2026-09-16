@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,8 +22,6 @@ import {
   Briefcase,
   Activity,
   Layers,
-  Plus,
-  Pencil,
 } from "lucide-react"
 import {
   PROJECT_HEALTH_LABELS,
@@ -34,7 +32,6 @@ import {
 import { HealthBadge, ProjectSummary, formatCapacity, formatVariance } from "@/components/projects/project-summary"
 import { toLocalISODate } from "@/lib/utils/date"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
-import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 
 // Define user-facing project type (includes tasks count payload)
@@ -82,18 +79,9 @@ async function fetchUserProjects(): Promise<ProjectRow[]> {
   return (payload?.data || []) as ProjectRow[]
 }
 
-export function ProjectContent({ profiles = [], currentUser }: ProjectContentProps = {}) {
+export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
   const queryClient = useQueryClient()
   const staffAvatars = useStaffAvatars()
-  const [activeProject, setActiveProject] = useState<ProjectRow | null>(null)
-  const [isAddOpen, setIsAddOpen] = useState(false)
-  const [isEditOpen, setIsEditOpen] = useState(false)
-
-  const canManage = Boolean(
-    currentUser?.canManage ??
-      (currentUser &&
-        (["developer", "super_admin", "admin"].includes(currentUser.role) || currentUser.is_department_lead))
-  )
 
   // Fetch project list
   const {
@@ -341,13 +329,6 @@ export function ProjectContent({ profiles = [], currentUser }: ProjectContentPro
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          {canManage && (
-            <Button size="sm" onClick={() => setIsAddOpen(true)}>
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Project</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
-          )}
         </div>
       }
       stats={
@@ -469,18 +450,6 @@ export function ProjectContent({ profiles = [], currentUser }: ProjectContentPro
               ]
               return fields.filter((field) => field.value)
             },
-            actions: canManage
-              ? (r) => [
-                  {
-                    label: "Edit Project",
-                    icon: Pencil,
-                    onClick: () => {
-                      setActiveProject(r)
-                      setIsEditOpen(true)
-                    },
-                  },
-                ]
-              : undefined,
           },
         }}
         cardRenderer={(r) => {
@@ -520,26 +489,11 @@ export function ProjectContent({ profiles = [], currentUser }: ProjectContentPro
             </div>
           )
         }}
-        rowActions={
-          canManage
-            ? [
-                {
-                  label: "Edit Project Details",
-                  icon: Pencil,
-                  onClick: (r) => {
-                    setActiveProject(r)
-                    setIsEditOpen(true)
-                  },
-                },
-              ]
-            : undefined
-        }
-        forceRowActionsDropdown={canManage}
         expandable={{
           render: (r) => (
             <div className="bg-muted/20 space-y-3 rounded-lg border p-2">
               <ProjectSummary project={r} health={healthById.get(r.id)} />
-              <ProjectPlanBoard project={r as any} profiles={profiles} />
+              <ProjectPlanBoard project={r as any} profiles={profiles} readOnly={true} />
             </div>
           ),
         }}
@@ -548,20 +502,6 @@ export function ProjectContent({ profiles = [], currentUser }: ProjectContentPro
         emptyIcon={FolderKanban}
         urlSync
       />
-
-      {canManage && (
-        <ProjectDialogs
-          profiles={profiles}
-          isAddOpen={isAddOpen}
-          setIsAddOpen={setIsAddOpen}
-          isEditOpen={isEditOpen}
-          setIsEditOpen={setIsEditOpen}
-          selectedProject={activeProject as any}
-          onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["user-projects"] })
-          }}
-        />
-      )}
     </DataTablePage>
   )
 }

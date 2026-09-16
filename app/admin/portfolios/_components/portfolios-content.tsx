@@ -1,12 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
   AlertTriangle,
   BarChart3,
+  ChevronDown,
+  ChevronRight,
   ExternalLink,
   FolderCog,
   FolderGit2,
@@ -26,6 +28,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { PROJECT_HEALTH_LABELS, PROJECT_METRIC_HELP, type ProjectHealthStatus } from "@/lib/projects/health"
 import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
+import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import { DeletePortfolioDialog } from "./delete-portfolio-dialog"
 import { PortfolioDialog } from "./portfolio-dialog"
 import { PortfolioProjectsDialog } from "./portfolio-projects-dialog"
@@ -93,14 +96,22 @@ const PROJECT_TABLE_HEADERS = [
 function PortfolioProjects({
   projects,
   isAdmin,
+  profiles = [],
   onManage,
   onAddProject,
 }: {
   projects: ProjectHealthRow[]
   isAdmin: boolean
+  profiles?: ProjectManagerOption[]
   onManage?: () => void
   onAddProject?: () => void
 }) {
+  const [expandedProjectIds, setExpandedProjectIds] = useState<Record<string, boolean>>({})
+
+  const toggleProject = (projectId: string) => {
+    setExpandedProjectIds((prev) => ({ ...prev, [projectId]: !prev[projectId] }))
+  }
+
   const actions =
     onManage || onAddProject ? (
       <div className="flex flex-wrap justify-end gap-2">
@@ -137,6 +148,7 @@ function PortfolioProjects({
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-muted/50 text-muted-foreground text-xs">
             <tr>
+              <th className="w-8 px-2 py-2"></th>
               <th className="px-3 py-2 text-left font-medium">Project</th>
               {PROJECT_TABLE_HEADERS.map((header) => (
                 <th key={header.label} className="px-3 py-2 text-left font-medium">
@@ -149,47 +161,110 @@ function PortfolioProjects({
             </tr>
           </thead>
           <tbody>
-            {projects.map((project) => (
-              <tr key={project.id} className="border-t">
-                <td className="px-3 py-2 font-medium">
-                  <Link
-                    href={projectHref(project.project_name, isAdmin)}
-                    className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors hover:underline"
-                  >
-                    {project.project_name}
-                    <ExternalLink className="text-muted-foreground h-3 w-3 opacity-70" />
-                  </Link>
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    {project.taskCount} task{project.taskCount === 1 ? "" : "s"}
-                  </span>
-                </td>
-                <td className="text-muted-foreground px-3 py-2">
-                  {project.timeElapsedPct === null ? "-" : `${project.timeElapsedPct}%`}
-                </td>
-                <td className="px-3 py-2">
-                  <div className="w-24">
-                    <Progress value={project.deliveryPct ?? 0} className="h-1.5" />
-                    <span className="text-muted-foreground text-[11px]">{project.deliveryPct ?? 0}%</span>
-                  </div>
-                </td>
-                <td className="px-3 py-2">{project.qualityPct === null ? "-" : `${project.qualityPct}%`}</td>
-                <td
-                  className={
-                    project.variancePct !== null && project.variancePct < 0 ? "px-3 py-2 text-red-500" : "px-3 py-2"
-                  }
-                >
-                  {project.variancePct === null ? "-" : `${project.variancePct > 0 ? "+" : ""}${project.variancePct}%`}
-                </td>
-                <td className="px-3 py-2">
-                  {project.overdueCount > 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400">{project.overdueCount}</span>
-                  ) : (
-                    <span className="text-muted-foreground">0</span>
+            {projects.map((project) => {
+              const isExpanded = Boolean(expandedProjectIds[project.id])
+              return (
+                <Fragment key={project.id}>
+                  <tr className="hover:bg-muted/30 border-t transition-colors">
+                    <td className="px-2 py-2 text-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground h-6 w-6 p-0"
+                        onClick={() => toggleProject(project.id)}
+                        aria-label={isExpanded ? "Collapse project plans" : "Expand project plans"}
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </td>
+                    <td className="px-3 py-2 font-medium">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={projectHref(project.project_name, isAdmin)}
+                          className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors hover:underline"
+                        >
+                          {project.project_name}
+                          <ExternalLink className="text-muted-foreground h-3 w-3 opacity-70" />
+                        </Link>
+                        <span className="text-muted-foreground text-xs">
+                          ({project.taskCount} task{project.taskCount === 1 ? "" : "s"})
+                        </span>
+                      </div>
+                    </td>
+                    <td className="text-muted-foreground px-3 py-2">
+                      {project.timeElapsedPct === null ? "-" : `${project.timeElapsedPct}%`}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="w-24">
+                        <Progress value={project.deliveryPct ?? 0} className="h-1.5" />
+                        <span className="text-muted-foreground text-[11px]">{project.deliveryPct ?? 0}%</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">{project.qualityPct === null ? "-" : `${project.qualityPct}%`}</td>
+                    <td
+                      className={
+                        project.variancePct !== null && project.variancePct < 0 ? "px-3 py-2 text-red-500" : "px-3 py-2"
+                      }
+                    >
+                      {project.variancePct === null
+                        ? "-"
+                        : `${project.variancePct > 0 ? "+" : ""}${project.variancePct}%`}
+                    </td>
+                    <td className="px-3 py-2">
+                      {project.overdueCount > 0 ? (
+                        <span className="text-amber-600 dark:text-amber-400">{project.overdueCount}</span>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">{healthBadge(project.status)}</td>
+                  </tr>
+                  {isExpanded && (
+                    <tr className="bg-muted/10 border-t">
+                      <td colSpan={8} className="p-3">
+                        <div className="bg-card space-y-3 rounded-lg border p-3 shadow-xs">
+                          <div className="flex items-center justify-between border-b pb-2">
+                            <span className="text-foreground text-xs font-semibold">
+                              Implementation Plans &amp; Workstreams — {project.project_name}
+                            </span>
+                            <Link
+                              href={projectHref(project.project_name, isAdmin)}
+                              className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                            >
+                              Open project workspace <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          </div>
+                          <ProjectPlanBoard
+                            project={{
+                              id: project.id,
+                              project_name: project.project_name,
+                              location: "",
+                              deployment_start_date: "",
+                              deployment_end_date: "",
+                              capacity_w: null,
+                              technology_type: null,
+                              project_manager_id: null,
+                              description: null,
+                              status: (project.lifecycle_status as any) || "active",
+                              created_at: "",
+                              updated_at: "",
+                              portfolio_id: null,
+                            }}
+                            profiles={profiles}
+                            readOnly={!isAdmin}
+                          />
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                </td>
-                <td className="px-3 py-2">{healthBadge(project.status)}</td>
-              </tr>
-            ))}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -512,6 +587,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
                 <PortfolioProjects
                   projects={r.projects}
                   isAdmin={isAdmin}
+                  profiles={profiles}
                   onManage={isAdmin ? () => setManagingId(r.id) : undefined}
                   onAddProject={isAdmin ? () => setCreateInPortfolioId(r.id) : undefined}
                 />
