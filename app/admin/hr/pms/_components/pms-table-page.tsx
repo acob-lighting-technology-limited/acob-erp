@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { Brain, CheckCircle2, Clock3, Download, FileText, ShieldCheck, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { StatCard } from "@/components/ui/stat-card"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
@@ -27,6 +27,9 @@ interface PmsTablePageProps {
   backHref: string
   backLabel: string
   icon: IconKey
+  tabs?: DataTableTab[]
+  activeTab?: string
+  onTabChange?: (tab: string) => void
   tableTitle: string
   tableDescription: string
   rows: TableRowData[]
@@ -48,6 +51,7 @@ interface PmsTablePageProps {
   headerActions?: React.ReactNode
   cycles?: ReviewCycleOption[]
   activeCycleId?: string | null
+  children?: React.ReactNode
 }
 
 const iconMap = {
@@ -115,6 +119,9 @@ export function PmsTablePage({
   backHref,
   backLabel,
   icon,
+  tabs,
+  activeTab,
+  onTabChange,
   tableTitle,
   tableDescription,
   rows,
@@ -131,6 +138,7 @@ export function PmsTablePage({
   headerActions,
   cycles,
   activeCycleId,
+  children,
 }: PmsTablePageProps) {
   const Icon = iconMap[icon]
   const [isExportOpen, setIsExportOpen] = useState(false)
@@ -283,6 +291,9 @@ export function PmsTablePage({
       description={description}
       icon={Icon}
       backLink={{ href: backHref, label: backLabel }}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={onTabChange}
       spacing="tight"
       actionsPlacement="inline-always"
       actions={
@@ -325,214 +336,234 @@ export function PmsTablePage({
         ) : undefined
       }
     >
-      <DataTable<TableRowData>
-        data={rows.map((row, index) => ({ ...row, __rowId: `row-${index}-${normalizeCell(row[firstColumnKey])}` }))}
-        columns={tableColumns}
-        onProcessedDataChange={setProcessedRows}
-        filters={filters}
-        getRowId={(row) => row.__rowId || normalizeCell(row[firstColumnKey])}
-        pagination={{ pageSize: 50 }}
-        searchPlaceholder={searchPlaceholder}
-        searchFn={(row, query) =>
-          columns.some((column) => normalizeCell(row[column.key]).toLowerCase().includes(query))
-        }
-        stickyToolbar
-        contactsView
-        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        mobileRow={{
-          leading: () => null,
-          title: (row) => normalizeCell(row[firstColumnKey]),
-          subtitle: (row) => {
-            if (icon === "attendance") {
-              const inTime = normalizeCell(row.clock_in)
-              const outTime = normalizeCell(row.clock_out)
-              const hours = normalizeCell(row.total_hours)
-              const cycle = normalizeCell(row.cycle)
-
-              const timeRange = inTime !== "-" || outTime !== "-" ? `${inTime} – ${outTime}` : "No clock-in"
-              const parts = [
-                timeRange,
-                hours !== "-" && hours !== "Pending" ? hours : null,
-                cycle !== "-" ? cycle : null,
-              ].filter(Boolean)
-
-              return parts.length > 0 ? parts.join(" · ") : "No clock-in"
-            }
-
-            const second = columns[1]?.key ? normalizeCell(row[columns[1].key]) : null
-            const scoreCol = columns.find((c) => ["cbt_score", "score", "rating", "metric_value"].includes(c.key))
-            const scoreVal = scoreCol ? normalizeCell(row[scoreCol.key]) : null
-            const parts = [
-              second && second !== "-" ? second : null,
-              scoreVal && scoreVal !== "-" ? `${scoreCol?.label || "Score"}: ${scoreVal}` : null,
-            ].filter(Boolean)
-            return parts.length > 0 ? parts.join(" · ") : undefined
-          },
-          trailing: (row) => {
-            const statusVal = row.__rawStatus || row.status
-            const scoreCol = columns.find((c) => ["cbt_score", "score"].includes(c.key))
-            const scoreVal = scoreCol ? normalizeCell(row[scoreCol.key]) : null
-            const hasScore = Boolean(scoreVal && scoreVal !== "-")
-            const hasStatus = Boolean(statusVal && statusVal !== "-")
-
-            if (!hasScore && !hasStatus) return undefined
-
-            return (
-              <div className="flex flex-col items-end gap-1">
-                {scoreVal && scoreVal !== "-" && (
-                  <span className="text-foreground font-mono text-xs font-bold">
-                    {scoreVal.includes("%") ? scoreVal : `${scoreVal}%`}
-                  </span>
-                )}
-                {hasStatus ? renderStatusBadge(statusVal) : null}
-              </div>
-            )
-          },
-          detail: {
+      {children ? (
+        children
+      ) : (
+        <DataTable<TableRowData>
+          data={rows.map((row, index) => ({ ...row, __rowId: `row-${index}-${normalizeCell(row[firstColumnKey])}` }))}
+          columns={tableColumns}
+          onProcessedDataChange={setProcessedRows}
+          filters={filters}
+          getRowId={(row) => row.__rowId || normalizeCell(row[firstColumnKey])}
+          pagination={{ pageSize: 50 }}
+          searchPlaceholder={searchPlaceholder}
+          searchFn={(row, query) =>
+            columns.some((column) => normalizeCell(row[column.key]).toLowerCase().includes(query))
+          }
+          stickyToolbar
+          contactsView
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            leading: () => null,
             title: (row) => normalizeCell(row[firstColumnKey]),
             subtitle: (row) => {
               if (icon === "attendance") {
-                const cycle = normalizeCell(row.cycle)
+                const inTime = normalizeCell(row.clock_in)
+                const outTime = normalizeCell(row.clock_out)
                 const hours = normalizeCell(row.total_hours)
-                return (
-                  [cycle !== "-" ? cycle : null, hours !== "-" ? hours : null].filter(Boolean).join(" · ") || undefined
-                )
+                const cycle = normalizeCell(row.cycle)
+
+                const timeRange = inTime !== "-" || outTime !== "-" ? `${inTime} – ${outTime}` : "No clock-in"
+                const parts = [
+                  timeRange,
+                  hours !== "-" && hours !== "Pending" ? hours : null,
+                  cycle !== "-" ? cycle : null,
+                ].filter(Boolean)
+
+                return parts.length > 0 ? parts.join(" · ") : "No clock-in"
               }
-              return undefined
+
+              const second = columns[1]?.key ? normalizeCell(row[columns[1].key]) : null
+              const scoreCol = columns.find((c) => ["cbt_score", "score", "rating", "metric_value"].includes(c.key))
+              const scoreVal = scoreCol ? normalizeCell(row[scoreCol.key]) : null
+              const parts = [
+                second && second !== "-" ? second : null,
+                scoreVal && scoreVal !== "-" ? `${scoreCol?.label || "Score"}: ${scoreVal}` : null,
+              ].filter(Boolean)
+              return parts.length > 0 ? parts.join(" · ") : undefined
             },
-            fields: (row) =>
-              columns.slice(1).map((col) => ({
-                label: col.label,
-                value:
-                  col.key === "status" ? normalizeCell(row.__rawStatus || row.status) : normalizeCell(row[col.key]),
-              })),
-          },
-        }}
-        expandable={
-          shouldRenderTaskExpansion
-            ? {
-                canExpand: (row) => Array.isArray((row as { __tasks?: unknown[] }).__tasks),
-                render: (row) => {
-                  const tasks =
-                    (
-                      row as {
-                        __tasks?: Array<{
-                          id: string
-                          title: string
-                          description?: string | null
-                          status: string
-                          dueDate?: string | null
-                          assignmentType?: string | null
-                          weight?: number | null
-                          rating?: number | null
-                        }>
-                      }
-                    ).__tasks || []
-                  if (tasks.length === 0) {
-                    return (
-                      <p className="text-muted-foreground text-sm">No tasks in this group for the selected cycle.</p>
-                    )
-                  }
+            trailing: (row) => {
+              const statusVal = row.__rawStatus || row.status
+              const scoreCol = columns.find((c) => ["cbt_score", "score"].includes(c.key))
+              const scoreVal = scoreCol ? normalizeCell(row[scoreCol.key]) : null
+              const hasScore = Boolean(scoreVal && scoreVal !== "-")
+              const hasStatus = Boolean(statusVal && statusVal !== "-")
 
-                  return (
-                    <div className="space-y-3">
-                      <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                        Assigned Tasks
-                      </p>
-                      <div className="overflow-x-auto rounded-lg border">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/40">
-                            <tr>
-                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Task</th>
-                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Status</th>
-                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Type</th>
-                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                Due Date
-                              </th>
-                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Weight</th>
-                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Rating</th>
-                              <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Earned</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {tasks.map((task) => (
-                              <tr key={task.id} className="border-t">
-                                <td className="px-3 py-2">
-                                  <p className="font-medium">{task.title}</p>
-                                  {task.description ? (
-                                    <p className="text-muted-foreground text-xs">{task.description}</p>
-                                  ) : null}
-                                </td>
-                                <td className="px-3 py-2 capitalize">{String(task.status || "").replace(/_/g, " ")}</td>
-                                <td className="px-3 py-2 capitalize">
-                                  {String(task.assignmentType || "department").replace(/_/g, " ")}
-                                </td>
-                                <td className="px-3 py-2">{task.dueDate ? formatWATDate(task.dueDate) : "-"}</td>
-                                <td className="px-3 py-2">{task.weight ?? "-"}</td>
-                                <td className="px-3 py-2">{task.rating ? `${task.rating}/5` : "Unrated"}</td>
-                                <td className="px-3 py-2">
-                                  {task.weight
-                                    ? `${Math.round(((task.weight * (task.rating ?? 0)) / 5) * 100) / 100} / ${task.weight}`
-                                    : "-"}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )
-                },
-              }
-            : cbtExpandable
-              ? {
-                  canExpand: (row) => !!(row.user_id && row.review_cycle_id),
-                  render: (row) => (
-                    <CbtAttemptDetail profileId={row.user_id as string} reviewCycleId={row.review_cycle_id as string} />
-                  ),
-                }
-              : undefined
-        }
-        emptyTitle={tableTitle}
-        emptyDescription={tableDescription}
-        emptyIcon={Icon}
-        skeletonRows={5}
-        viewToggle
-        cardRenderer={(row) => {
-          const firstVal = normalizeCell(row[firstColumnKey])
-          const secondKey = columns[1]?.key
-          const secondVal = secondKey ? normalizeCell(row[secondKey]) : null
-          const statusVal = row.__rawStatus || row.status
+              if (!hasScore && !hasStatus) return undefined
 
-          return (
-            <div className="space-y-3 rounded-xl border p-3.5 sm:p-4">
-              <div className="flex items-start justify-between gap-2 border-b pb-2">
-                <div>
-                  <span className="text-foreground block text-sm font-semibold">{firstVal}</span>
-                  {secondVal && secondVal !== "-" && (
-                    <span className="text-muted-foreground block text-xs">{secondVal}</span>
+              return (
+                <div className="flex flex-col items-end gap-1">
+                  {scoreVal && scoreVal !== "-" && (
+                    <span className="text-foreground font-mono text-xs font-bold">
+                      {scoreVal.includes("%") ? scoreVal : `${scoreVal}%`}
+                    </span>
                   )}
+                  {hasStatus ? renderStatusBadge(statusVal) : null}
                 </div>
-                {Boolean(statusVal && statusVal !== "-") && renderStatusBadge(statusVal)}
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {columns.slice(2).map((col) => {
-                  if (col.key === "status") return null
-                  const val = normalizeCell(row[col.key])
-                  if (val === "-") return null
+              )
+            },
+            detail: {
+              title: (row) => normalizeCell(row[firstColumnKey]),
+              subtitle: (row) => {
+                if (icon === "attendance") {
+                  const cycle = normalizeCell(row.cycle)
+                  const hours = normalizeCell(row.total_hours)
                   return (
-                    <div key={col.key}>
-                      <span className="text-muted-foreground block text-[10px] font-medium uppercase">{col.label}</span>
-                      <span className="text-foreground font-medium">{val}</span>
-                    </div>
+                    [cycle !== "-" ? cycle : null, hours !== "-" ? hours : null].filter(Boolean).join(" · ") ||
+                    undefined
                   )
-                })}
+                }
+                return undefined
+              },
+              fields: (row) =>
+                columns.slice(1).map((col) => ({
+                  label: col.label,
+                  value:
+                    col.key === "status" ? normalizeCell(row.__rawStatus || row.status) : normalizeCell(row[col.key]),
+                })),
+            },
+          }}
+          expandable={
+            shouldRenderTaskExpansion
+              ? {
+                  canExpand: (row) => Array.isArray((row as { __tasks?: unknown[] }).__tasks),
+                  render: (row) => {
+                    const tasks =
+                      (
+                        row as {
+                          __tasks?: Array<{
+                            id: string
+                            title: string
+                            description?: string | null
+                            status: string
+                            dueDate?: string | null
+                            assignmentType?: string | null
+                            weight?: number | null
+                            rating?: number | null
+                          }>
+                        }
+                      ).__tasks || []
+                    if (tasks.length === 0) {
+                      return (
+                        <p className="text-muted-foreground text-sm">No tasks in this group for the selected cycle.</p>
+                      )
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                          Assigned Tasks
+                        </p>
+                        <div className="overflow-x-auto rounded-lg border">
+                          <table className="w-full text-sm">
+                            <thead className="bg-muted/40">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Task</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                  Status
+                                </th>
+                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Type</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                  Due Date
+                                </th>
+                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                  Weight
+                                </th>
+                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                  Rating
+                                </th>
+                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                  Earned
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {tasks.map((task) => (
+                                <tr key={task.id} className="border-t">
+                                  <td className="px-3 py-2">
+                                    <p className="font-medium">{task.title}</p>
+                                    {task.description ? (
+                                      <p className="text-muted-foreground text-xs">{task.description}</p>
+                                    ) : null}
+                                  </td>
+                                  <td className="px-3 py-2 capitalize">
+                                    {String(task.status || "").replace(/_/g, " ")}
+                                  </td>
+                                  <td className="px-3 py-2 capitalize">
+                                    {String(task.assignmentType || "department").replace(/_/g, " ")}
+                                  </td>
+                                  <td className="px-3 py-2">{task.dueDate ? formatWATDate(task.dueDate) : "-"}</td>
+                                  <td className="px-3 py-2">{task.weight ?? "-"}</td>
+                                  <td className="px-3 py-2">{task.rating ? `${task.rating}/5` : "Unrated"}</td>
+                                  <td className="px-3 py-2">
+                                    {task.weight
+                                      ? `${Math.round(((task.weight * (task.rating ?? 0)) / 5) * 100) / 100} / ${task.weight}`
+                                      : "-"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  },
+                }
+              : cbtExpandable
+                ? {
+                    canExpand: (row) => !!(row.user_id && row.review_cycle_id),
+                    render: (row) => (
+                      <CbtAttemptDetail
+                        profileId={row.user_id as string}
+                        reviewCycleId={row.review_cycle_id as string}
+                      />
+                    ),
+                  }
+                : undefined
+          }
+          emptyTitle={tableTitle}
+          emptyDescription={tableDescription}
+          emptyIcon={Icon}
+          skeletonRows={5}
+          viewToggle
+          cardRenderer={(row) => {
+            const firstVal = normalizeCell(row[firstColumnKey])
+            const secondKey = columns[1]?.key
+            const secondVal = secondKey ? normalizeCell(row[secondKey]) : null
+            const statusVal = row.__rawStatus || row.status
+
+            return (
+              <div className="space-y-3 rounded-xl border p-3.5 sm:p-4">
+                <div className="flex items-start justify-between gap-2 border-b pb-2">
+                  <div>
+                    <span className="text-foreground block text-sm font-semibold">{firstVal}</span>
+                    {secondVal && secondVal !== "-" && (
+                      <span className="text-muted-foreground block text-xs">{secondVal}</span>
+                    )}
+                  </div>
+                  {Boolean(statusVal && statusVal !== "-") && renderStatusBadge(statusVal)}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {columns.slice(2).map((col) => {
+                    if (col.key === "status") return null
+                    const val = normalizeCell(row[col.key])
+                    if (val === "-") return null
+                    return (
+                      <div key={col.key}>
+                        <span className="text-muted-foreground block text-[10px] font-medium uppercase">
+                          {col.label}
+                        </span>
+                        <span className="text-foreground font-medium">{val}</span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )
-        }}
-        urlSync
-      />
+            )
+          }}
+          urlSync
+        />
+      )}
 
       <ExportOptionsDialog
         open={isExportOpen}

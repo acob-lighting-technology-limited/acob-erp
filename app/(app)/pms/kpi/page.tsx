@@ -1,13 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
-import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
 import { getCurrentUserPmsData } from "../_lib"
-import { CycleSelector } from "../_components/cycle-selector"
 import { TASK_WEIGHT_DEFAULT, isTaskInCycle } from "@/lib/tasks/scoring"
 import { EmployeeKpiTabs } from "./_components/employee-kpi-tabs"
-
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
-}
 
 type GoalCycleRow = {
   id: string
@@ -69,8 +63,12 @@ function toQuarterLabel(dateString?: string | null) {
   return `Q${quarter} ${date.getFullYear()}`
 }
 
-export default async function PmsKpiPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
-  const { cycle_id } = await searchParams
+export default async function PmsKpiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cycle_id?: string; tab?: string }>
+}) {
+  const { cycle_id, tab } = await searchParams
   const { score, cycles, activeCycleId, goalSummary, profile } = await getCurrentUserPmsData(cycle_id)
   const supabase = await createClient()
 
@@ -185,36 +183,16 @@ export default async function PmsKpiPage({ searchParams }: { searchParams: Promi
   }))
 
   return (
-    <EmployeeKpiTabs department={profile?.department || null}>
-      <PmsTablePage
-        title="PMS KPI"
-        description="Track your goal progress, task weights, and effective KPI attainment for the review cycle."
-        backHref="/pms"
-        backLabel="Back to PMS"
-        icon="kpi"
-        cycles={cycles}
-        activeCycleId={activeCycleId}
-        summaryCards={[
-          { label: "KPI Score", value: formatPercent(score.kpi_score) },
-          { label: "Approved Goals", value: goalSummary.approved },
-          { label: "Completed Goals", value: goalSummary.completed },
-        ]}
-        tableTitle="KPI Task Breakdown"
-        tableDescription={`Your scored tasks in ${score.cycle_name}, grouped by goal. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
-        rows={rows}
-        columns={[
-          { key: "cycle", label: "Cycle" },
-          { key: "goal", label: "Goal" },
-          { key: "goal_progress_pct", label: "Group Score" },
-          { key: "effective_kpi_pct", label: "Effective KPI" },
-          { key: "linked_tasks", label: "Completed / Scored" },
-          { key: "weight", label: "Total Weight" },
-        ]}
-        searchPlaceholder="Search goal or KPI row..."
-        filterKey="cycle"
-        filterLabel="Cycle"
-        filterAllLabel="All Cycles"
-      />
-    </EmployeeKpiTabs>
+    <EmployeeKpiTabs
+      department={profile?.department || null}
+      initialTab={tab}
+      cycles={cycles}
+      activeCycleId={activeCycleId}
+      kpiScore={score.kpi_score}
+      approvedGoals={goalSummary.approved}
+      completedGoals={goalSummary.completed}
+      cycleName={score.cycle_name || "Active Cycle"}
+      rows={rows}
+    />
   )
 }
