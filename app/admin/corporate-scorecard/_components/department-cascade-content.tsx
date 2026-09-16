@@ -162,10 +162,19 @@ export function DepartmentCascadeContent({
         render: (r) => (
           <div className="flex flex-col gap-0.5">
             <span className="text-xs leading-snug font-medium">{r.measure}</span>
-            <span className="text-muted-foreground text-[11px]">
-              {r.perspective} · {r.strategic_objective}
-            </span>
+            <span className="text-muted-foreground text-[11px]">{r.strategic_objective}</span>
           </div>
+        ),
+      },
+      {
+        key: "perspective",
+        label: "Perspective",
+        sortable: true,
+        accessor: (r) => r.perspective,
+        render: (r) => (
+          <Badge variant="outline" className="text-xs">
+            {r.perspective}
+          </Badge>
         ),
       },
       {
@@ -197,38 +206,6 @@ export function DepartmentCascadeContent({
               <span className="text-xs font-medium">{targetDisplay}</span>
               {r.department_target && r.target_text && r.department_target !== r.target_text ? (
                 <span className="text-muted-foreground text-[10px]">Corp: {r.target_text}</span>
-              ) : null}
-            </div>
-          )
-        },
-      },
-      {
-        key: "latest_actual",
-        label: "Latest Actual",
-        accessor: (r) => r.latest_actual?.actual_value ?? r.latest_actual?.milestones_completed ?? -1,
-        render: (r) => {
-          if (!r.latest_actual) return <span className="text-muted-foreground text-xs">Not recorded</span>
-          if (r.measure_type === "milestone") {
-            const completed = r.latest_actual.milestones_completed ?? 0
-            const total = r.latest_actual.milestones_total ?? 3
-            return (
-              <div className="flex flex-col">
-                <span className="text-xs font-medium">
-                  {completed}/{total} milestones
-                </span>
-                {r.latest_actual.note ? (
-                  <span className="text-muted-foreground line-clamp-1 text-[10px]">{r.latest_actual.note}</span>
-                ) : null}
-              </div>
-            )
-          }
-          return (
-            <div className="flex flex-col">
-              <span className="text-xs font-medium">
-                {r.latest_actual.actual_value} {r.target_unit || ""}
-              </span>
-              {r.latest_actual.note ? (
-                <span className="text-muted-foreground line-clamp-1 text-[10px]">{r.latest_actual.note}</span>
               ) : null}
             </div>
           )
