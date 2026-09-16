@@ -1,4 +1,4 @@
-import { formatWATDate } from "@/lib/utils/date"
+import { formatDDMMYYYY } from "@/lib/utils/date"
 
 export interface User {
   id: string
@@ -10,6 +10,7 @@ export interface User {
   department: string | null
   is_active: boolean
   employment_status: string
+  employment_date?: string | null
   created_at: string
   last_sign_in?: string | null
 }
@@ -34,6 +35,6 @@ export async function fetchAllUsersForPicker(): Promise<User[]> {
   return (json.users || []) as User[]
 }
 
-export function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
+export function formatDate(date?: string | null) {
+  return formatDDMMYYYY(date) || "—"
 }

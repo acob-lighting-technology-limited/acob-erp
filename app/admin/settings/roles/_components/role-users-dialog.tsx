@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label"
 import { EmptyState } from "@/components/ui/patterns"
 import { Plus, Users } from "lucide-react"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatDDMMYYYY } from "@/lib/utils/date"
 
 export interface RoleMember {
   id: string
@@ -17,6 +17,7 @@ export interface RoleMember {
   company_email: string | null
   department: string | null
   employment_status: string | null
+  employment_date?: string | null
   created_at: string
 }
 
@@ -116,7 +117,8 @@ export function RoleUsersDialog({
                   <TableHead>Email</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Joined</TableHead>
+                  <TableHead>Employment Date</TableHead>
+                  <TableHead>Onboarding Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -135,7 +137,8 @@ export function RoleUsersDialog({
                         {member.employment_status || "unknown"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatWATDate(member.created_at)}</TableCell>
+                    <TableCell>{formatDDMMYYYY(member.employment_date) || "—"}</TableCell>
+                    <TableCell>{formatDDMMYYYY(member.created_at) || "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
