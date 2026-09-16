@@ -1,5 +1,5 @@
 import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
-import { getCadenceType } from "@/lib/pms/cadence"
+import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { getCurrentUserPmsData } from "../_lib"
 
@@ -23,9 +23,14 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
 
   const todayISO = toLocalISODate()
 
+  // Only include quarterly cycles (exclude biannual H1/H2 and annual FY)
+  const quarterlyCycles = cycles.filter((c) => matchesCadence("quarterly", c.reviewType, c.name))
+
   // Filter cycles if a specific quarter cycle was requested in URL
   const targetCycles =
-    effectiveCycleId && effectiveCycleId !== "all" ? cycles.filter((c) => c.id === effectiveCycleId) : cycles
+    effectiveCycleId && effectiveCycleId !== "all"
+      ? quarterlyCycles.filter((c) => c.id === effectiveCycleId)
+      : quarterlyCycles
 
   const rows = targetCycles.map((cycle) => {
     const cycleRecords = attendance.recent.filter((rec) => {
@@ -58,22 +63,20 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
     const quarterScore = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : null
 
     let status = "On Target"
-    let rawStatus = "present"
     if (quarterScore !== null) {
       if (quarterScore < 75) {
         status = "At Risk"
-        rawStatus = "absent"
       } else if (quarterScore < 90) {
         status = "Needs Attention"
-        rawStatus = "late"
       }
     } else {
       status = "No Data"
-      rawStatus = "incomplete"
     }
 
+    const rawStatus = status.toLowerCase().replace(/\s+/g, "_")
+
     return {
-      quarter: cycle.name,
+      quarter: formatCycleLabel(cycle.name),
       score: formatPercent(quarterScore),
       present_tracked: `${presentCount} / ${totalDays} days`,
       total_hours: totalHours > 0 ? `${totalHours.toFixed(1)} hrs` : "-",
@@ -110,6 +113,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
         { key: "status", label: "Status" },
       ]}
       searchPlaceholder="Search quarter or score..."
+      hideFirstColumnFilter
       hideSecondaryFilter
     />
   )

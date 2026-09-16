@@ -80,7 +80,15 @@ function renderStatusBadge(rawStatus: unknown) {
   let badgeClasses = "bg-muted text-muted-foreground border-muted-foreground/20"
 
   const s = strStatus.toLowerCase()
-  if (s === "lwp" || s === "lateness_with_permission" || norm === "lateness_with_permission") {
+  if (s === "on_target" || s === "on target") {
+    badgeClasses = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+  } else if (s === "needs_attention" || s === "needs attention") {
+    badgeClasses = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+  } else if (s === "at_risk" || s === "at risk") {
+    badgeClasses = "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+  } else if (s === "no_data" || s === "no data") {
+    badgeClasses = "bg-muted text-muted-foreground border-muted-foreground/20"
+  } else if (s === "lwp" || s === "lateness_with_permission" || norm === "lateness_with_permission") {
     badgeClasses = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
   } else if (s === "iwp" || s === "incomplete_with_permission" || norm === "incomplete_with_permission") {
     badgeClasses = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
