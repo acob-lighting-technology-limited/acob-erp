@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
-import { formatWATDate, formatDateOfBirth } from "@/lib/utils/date"
+import { formatWATDate, formatDateOfBirth, formatDDMMYYYY } from "@/lib/utils/date"
 import {
   Users,
   UserCheck,
@@ -1131,12 +1131,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     <span className="font-mono">{r.employee_number || "—"}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Joined</span>
-                    <span>{r.employment_date ? formatWATDate(r.employment_date) : "—"}</span>
+                    <span className="text-muted-foreground">Employment Date</span>
+                    <span>{r.employment_date ? formatDDMMYYYY(r.employment_date) : "—"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Confirmed</span>
-                    <span>{r.confirmation_date ? formatWATDate(r.confirmation_date) : "—"}</span>
+                    <span>{r.confirmation_date ? formatDDMMYYYY(r.confirmation_date) : "—"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">DOB</span>
@@ -1240,13 +1240,13 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               },
               {
                 icon: Calendar,
-                label: "Joined",
-                value: r.employment_date ? formatWATDate(r.employment_date) : "-",
+                label: "Employment Date",
+                value: r.employment_date ? formatDDMMYYYY(r.employment_date) : "-",
               },
               {
                 icon: Calendar,
                 label: "Confirmed",
-                value: r.confirmation_date ? formatWATDate(r.confirmation_date) : "Probation (Pending)",
+                value: r.confirmation_date ? formatDDMMYYYY(r.confirmation_date) : "Probation (Pending)",
               },
             ],
             actions: (r) => [
