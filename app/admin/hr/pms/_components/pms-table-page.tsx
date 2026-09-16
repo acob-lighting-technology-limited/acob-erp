@@ -16,7 +16,11 @@ import { getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { ATTENDANCE_STATUS_LABELS, normalizeStoredAttendanceStatus } from "@/lib/hr/attendance-status"
+import {
+  ATTENDANCE_STATUS_COLORS,
+  ATTENDANCE_STATUS_LABELS,
+  normalizeStoredAttendanceStatus,
+} from "@/lib/hr/attendance-status"
 import type { ReviewCycleOption } from "@/app/(app)/pms/_lib"
 import { useCycleUrlFilters } from "@/app/(app)/pms/_components/cycle-selector"
 
@@ -75,10 +79,22 @@ function renderStatusBadge(rawStatus: unknown) {
   if (rawStatus === null || rawStatus === undefined || rawStatus === "" || rawStatus === "-") return "-"
   const strStatus = String(rawStatus)
   const norm = normalizeStoredAttendanceStatus(strStatus)
-  const label = (norm && ATTENDANCE_STATUS_LABELS[norm]) || strStatus
+
+  if (norm && ATTENDANCE_STATUS_COLORS[norm]) {
+    const label = ATTENDANCE_STATUS_LABELS[norm] || strStatus
+    return (
+      <Badge
+        className={cn(
+          "rounded-md border px-2 py-0.5 text-xs font-semibold capitalize shadow-none",
+          ATTENDANCE_STATUS_COLORS[norm]
+        )}
+      >
+        {label}
+      </Badge>
+    )
+  }
 
   let badgeClasses = "bg-muted text-muted-foreground border-muted-foreground/20"
-
   const s = strStatus.toLowerCase()
   if (s === "on_target" || s === "on target") {
     badgeClasses = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
@@ -86,40 +102,11 @@ function renderStatusBadge(rawStatus: unknown) {
     badgeClasses = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
   } else if (s === "at_risk" || s === "at risk") {
     badgeClasses = "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-  } else if (s === "no_data" || s === "no data") {
-    badgeClasses = "bg-muted text-muted-foreground border-muted-foreground/20"
-  } else if (s === "lwp" || s === "lateness_with_permission" || norm === "lateness_with_permission") {
-    badgeClasses = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-  } else if (s === "iwp" || s === "incomplete_with_permission" || norm === "incomplete_with_permission") {
-    badgeClasses = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-  } else if (
-    s === "awp" ||
-    s === "absence_with_permission" ||
-    s === "absent_with_permission" ||
-    norm === "absent_with_permission"
-  ) {
-    badgeClasses = "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20"
-  } else if (s === "lewp" || s === "early_departure_with_permission" || norm === "early_departure_with_permission") {
-    badgeClasses = "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20"
-  } else if (s === "lwop" || s === "leave_without_pay" || norm === "lwop") {
-    badgeClasses = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-  } else if (s === "present" || norm === "present") {
-    badgeClasses = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
-  } else if (s === "early" || norm === "early") {
-    badgeClasses = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-  } else if (s === "late" || norm === "late") {
-    badgeClasses = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-  } else if (s === "incomplete" || norm === "incomplete") {
-    badgeClasses = "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20"
-  } else if (s === "absent" || norm === "absent") {
-    badgeClasses = "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-  } else if (s === "on_leave" || norm === "on_leave") {
-    badgeClasses = "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20"
   }
 
   return (
     <Badge className={cn("rounded-md border px-2 py-0.5 text-xs font-semibold capitalize shadow-none", badgeClasses)}>
-      {label}
+      {strStatus}
     </Badge>
   )
 }
