@@ -1,7 +1,8 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Brain, CheckCircle2, Clock3, Download, FileText, ShieldCheck, Target } from "lucide-react"
+import { Brain, CheckCircle2, Clock3, Download, ExternalLink, FileText, ShieldCheck, Star, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -10,6 +11,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
 import { CbtAttemptDetail } from "@/components/pms/cbt-attempt-detail"
+import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
+import { getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -475,33 +478,101 @@ export function PmsTablePage({
                                 <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
                                   Earned
                                 </th>
+                                <th className="px-3 py-2 text-right text-xs font-bold tracking-wide uppercase">
+                                  Action
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {tasks.map((task) => (
-                                <tr key={task.id} className="border-t">
-                                  <td className="px-3 py-2">
-                                    <p className="font-medium">{task.title}</p>
-                                    {task.description ? (
-                                      <p className="text-muted-foreground text-xs">{task.description}</p>
-                                    ) : null}
-                                  </td>
-                                  <td className="px-3 py-2 capitalize">
-                                    {String(task.status || "").replace(/_/g, " ")}
-                                  </td>
-                                  <td className="px-3 py-2 capitalize">
-                                    {String(task.assignmentType || "department").replace(/_/g, " ")}
-                                  </td>
-                                  <td className="px-3 py-2">{task.dueDate ? formatWATDate(task.dueDate) : "-"}</td>
-                                  <td className="px-3 py-2">{task.weight ?? "-"}</td>
-                                  <td className="px-3 py-2">{task.rating ? `${task.rating}/5` : "Unrated"}</td>
-                                  <td className="px-3 py-2">
-                                    {task.weight
-                                      ? `${Math.round(((task.weight * (task.rating ?? 0)) / 5) * 100) / 100} / ${task.weight}`
-                                      : "-"}
-                                  </td>
-                                </tr>
-                              ))}
+                              {tasks.map((task) => {
+                                const cfg = TASK_STATUS_CONFIG[task.status as TaskStatus] || TASK_STATUS_CONFIG.pending
+                                return (
+                                  <tr key={task.id} className="hover:bg-muted/20 border-t transition-colors">
+                                    <td className="px-3 py-2.5">
+                                      <div className="flex flex-col gap-0.5">
+                                        <Link
+                                          href={`/tasks?task=${task.id}`}
+                                          className="group text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors"
+                                        >
+                                          <span className="group-hover:underline">{task.title}</span>
+                                          <ExternalLink className="h-3 w-3 shrink-0 opacity-60 group-hover:opacity-100" />
+                                        </Link>
+                                        {task.description ? (
+                                          <p className="text-muted-foreground line-clamp-1 max-w-md text-xs">
+                                            {task.description}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      <Badge
+                                        variant={cfg.badgeVariant}
+                                        className={cn(
+                                          "px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap capitalize shadow-none",
+                                          cfg.color
+                                        )}
+                                      >
+                                        {cfg.label}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "px-2 py-0.5 text-[10px] font-medium capitalize shadow-none",
+                                          task.assignmentType === "individual"
+                                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                            : "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                                        )}
+                                      >
+                                        {task.assignmentType || "department"}
+                                      </Badge>
+                                    </td>
+                                    <td className="text-muted-foreground px-3 py-2.5 text-xs whitespace-nowrap">
+                                      {task.dueDate ? formatWATDate(task.dueDate) : "-"}
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "px-2 py-0.5 text-[10px] font-medium shadow-none",
+                                          getTaskWeightBadgeClass(task.weight)
+                                        )}
+                                      >
+                                        {task.weight ?? 3} pts
+                                      </Badge>
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      {task.rating ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="gap-1 border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 shadow-none dark:text-amber-400"
+                                        >
+                                          <Star className="h-3 w-3 shrink-0 fill-amber-500 text-amber-500" />
+                                          <span>{task.rating}/5</span>
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">Unrated</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-xs">
+                                      {task.weight ? (
+                                        <span className="text-foreground font-semibold">
+                                          {Math.round(((task.weight * (task.rating ?? 0)) / 5) * 100) / 100}{" "}
+                                          <span className="text-muted-foreground font-normal">/ {task.weight}</span>
+                                        </span>
+                                      ) : (
+                                        "-"
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right">
+                                      <Button variant="outline" size="sm" asChild className="h-7 text-xs font-medium">
+                                        <Link href={`/tasks?task=${task.id}`}>Update</Link>
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
