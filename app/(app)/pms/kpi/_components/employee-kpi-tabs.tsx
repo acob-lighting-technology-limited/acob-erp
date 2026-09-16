@@ -1,6 +1,7 @@
 "use client"
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { BarChart2, Building2, Target } from "lucide-react"
 import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
 import type { DataTableTab } from "@/components/ui/data-table"
@@ -39,22 +40,11 @@ export function EmployeeKpiTabs({
   cycleName,
   rows,
 }: EmployeeKpiTabsProps) {
-  const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
-
-  const currentTab = searchParams.get("tab") || initialTab || "appraisal"
-  const activeTab = currentTab === "department_kpis" ? "department_kpis" : "appraisal"
+  const [activeTab, setActiveTab] = useState<string>(() => searchParams.get("tab") || initialTab || "appraisal")
 
   const handleTabChange = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
-    if (value === "appraisal") {
-      params.delete("tab")
-    } else {
-      params.set("tab", value)
-    }
-    const query = params.toString()
-    router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false })
+    setActiveTab(value)
   }
 
   if (activeTab === "department_kpis") {
