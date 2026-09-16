@@ -284,6 +284,9 @@ export function PmsTablePage({
   }, [columns, rows, processedRows])
 
   const shouldRenderTaskExpansion = rows.some((row) => Array.isArray((row as { __tasks?: unknown }).__tasks))
+  const shouldRenderAttendanceExpansion = rows.some((row) =>
+    Array.isArray((row as { __attendanceRecords?: unknown }).__attendanceRecords)
+  )
 
   return (
     <DataTablePage
@@ -577,17 +580,86 @@ export function PmsTablePage({
                     )
                   },
                 }
-              : cbtExpandable
+              : shouldRenderAttendanceExpansion
                 ? {
-                    canExpand: (row) => !!(row.user_id && row.review_cycle_id),
-                    render: (row) => (
-                      <CbtAttemptDetail
-                        profileId={row.user_id as string}
-                        reviewCycleId={row.review_cycle_id as string}
-                      />
-                    ),
+                    canExpand: (row) => Array.isArray((row as { __attendanceRecords?: unknown[] }).__attendanceRecords),
+                    render: (row) => {
+                      const records =
+                        (
+                          row as {
+                            __attendanceRecords?: Array<{
+                              id: string
+                              date: string
+                              clock_in: string
+                              clock_out: string
+                              total_hours: string
+                              status: string
+                              rawStatus?: string | null
+                            }>
+                          }
+                        ).__attendanceRecords || []
+                      if (records.length === 0) {
+                        return (
+                          <p className="text-muted-foreground text-sm">
+                            No attendance records logged for this quarter.
+                          </p>
+                        )
+                      }
+
+                      return (
+                        <div className="space-y-3">
+                          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                            Daily Clock-in / Attendance Logs
+                          </p>
+                          <div className="overflow-x-auto rounded-lg border">
+                            <table className="w-full text-sm">
+                              <thead className="bg-muted/40">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                    Date
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                    Clock In
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                    Clock Out
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                    Total Hours
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
+                                    Status
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {records.map((rec) => (
+                                  <tr key={rec.id} className="hover:bg-muted/20 border-t transition-colors">
+                                    <td className="px-3 py-2.5 font-medium">{rec.date}</td>
+                                    <td className="px-3 py-2.5 text-xs">{rec.clock_in}</td>
+                                    <td className="px-3 py-2.5 text-xs">{rec.clock_out}</td>
+                                    <td className="px-3 py-2.5 text-xs">{rec.total_hours}</td>
+                                    <td className="px-3 py-2.5">{renderStatusBadge(rec.rawStatus || rec.status)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )
+                    },
                   }
-                : undefined
+                : cbtExpandable
+                  ? {
+                      canExpand: (row) => !!(row.user_id && row.review_cycle_id),
+                      render: (row) => (
+                        <CbtAttemptDetail
+                          profileId={row.user_id as string}
+                          reviewCycleId={row.review_cycle_id as string}
+                        />
+                      ),
+                    }
+                  : undefined
           }
           emptyTitle={tableTitle}
           emptyDescription={tableDescription}
