@@ -1,5 +1,5 @@
 import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
-import { NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay } from "@/lib/hr/attendance-ssot"
 import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { getCurrentUserPmsData } from "../_lib"
@@ -39,44 +39,65 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
       return rec.date >= cycle.startDate && rec.date <= cycle.endDate
     })
 
+    let totalWorkHours = 0
+    let totalMissedHours = 0
+    let presentCount = 0
+    let lateCount = 0
+
     const formattedRecords = cycleRecords.map((record) => {
       const isToday = record.date === todayISO
       const inProgress = isToday && Boolean(record.clock_in) && !record.clock_out
+
+      const dayResult = computeAttendanceDay({
+        status: record.status || (record.clock_in ? "present" : "absent"),
+        clockIn: record.clock_in,
+        clockOut: record.clock_out,
+        inProgress,
+      })
+
+      totalWorkHours += dayResult.hoursWorked
+      totalMissedHours += dayResult.hoursLost
+      if (dayResult.hoursWorked > 0 || dayResult.covered) {
+        presentCount++
+      }
+      if (dayResult.lateBracket > 0) {
+        lateCount++
+      }
+
       return {
         id: record.id || `rec-${record.date}`,
         date: formatWATDate(record.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
         clock_in: formatClockTime(record.clock_in),
         clock_out: inProgress ? "In progress" : formatClockTime(record.clock_out),
-        total_hours:
-          record.total_hours !== null ? `${record.total_hours.toFixed(2)} hrs` : inProgress ? "Pending" : "-",
-        status: record.status || "unknown",
+        total_hours: inProgress ? "In progress" : `${dayResult.hoursWorked.toFixed(1)} hrs`,
+        status: record.status || dayResult.status || "unknown",
         rawStatus: record.status,
       }
     })
 
-    const presentCount = cycleRecords.filter((r) => {
-      const s = (r.status || "").toLowerCase()
-      return s === "present" || s === "early" || s.includes("permission") || s === "on_leave"
-    }).length
-    const lateCount = cycleRecords.filter((r) => (r.status || "").toLowerCase() === "late").length
-    const totalWorkHours = cycleRecords.reduce((sum, r) => sum + (r.total_hours || 0), 0)
     const totalDays = cycleRecords.length
-    const totalMissedHours = cycleRecords.reduce((sum, r) => {
-      const worked = r.total_hours || 0
-      return sum + Math.max(0, NET_DAY_HOURS - worked)
-    }, 0)
     const quarterScore = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : null
 
     return {
       quarter: formatCycleLabel(cycle.name),
       score: formatPercent(quarterScore),
       present_tracked: `${presentCount} / ${totalDays} days`,
-      total_work_hours: totalWorkHours > 0 ? `${totalWorkHours.toFixed(1)} hrs` : totalDays > 0 ? "0.0 hrs" : "-",
+      total_work_hours: totalDays > 0 ? `${totalWorkHours.toFixed(1)} hrs` : "-",
       total_miss_hours: totalDays > 0 ? `${totalMissedHours.toFixed(1)} hrs` : "-",
       lateness: lateCount > 0 ? `${lateCount} day${lateCount === 1 ? "" : "s"} late` : "None",
+      __presentCount: presentCount,
+      __totalDays: totalDays,
       __attendanceRecords: formattedRecords,
     }
   })
+
+  const sumPresent = rows.reduce((sum, r) => sum + r.__presentCount, 0)
+  const sumTracked = rows.reduce((sum, r) => sum + r.__totalDays, 0)
+  const avgScore = sumTracked > 0 ? Math.round((sumPresent / sumTracked) * 100) : null
+
+  const summaryScore = effectiveCycleId !== "all" ? score.attendance_score : avgScore
+  const summaryPresent = effectiveCycleId !== "all" ? score.breakdown.attendance.present : sumPresent
+  const summaryTracked = effectiveCycleId !== "all" ? score.breakdown.attendance.total : sumTracked
 
   return (
     <PmsTablePage
@@ -88,9 +109,9 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
       cycles={cycles}
       activeCycleId={activeCycleId}
       summaryCards={[
-        { label: "Score", value: formatPercent(score.attendance_score), tooltip: "Attendance Score" },
-        { label: "Present Days", value: score.breakdown.attendance.present },
-        { label: "Tracked Days", value: score.breakdown.attendance.total },
+        { label: "Score", value: formatPercent(summaryScore), tooltip: "Attendance Score" },
+        { label: "Present Days", value: summaryPresent },
+        { label: "Tracked Days", value: summaryTracked },
       ]}
       tableTitle="Attendance by Quarter"
       tableDescription={`Attendance scores for ${score.cycle_name || "all quarters"}. Expand any quarter to review daily clock-in details.`}
