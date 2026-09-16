@@ -33,7 +33,6 @@ import {
 } from "@/lib/projects/health"
 import { HealthBadge, ProjectSummary, formatCapacity, formatVariance } from "@/components/projects/project-summary"
 import { toLocalISODate } from "@/lib/utils/date"
-import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
@@ -70,6 +69,7 @@ export interface ProjectContentProps {
     role: string
     is_department_lead: boolean
     department: string | null
+    canManage?: boolean
   }
 }
 
@@ -89,7 +89,11 @@ export function ProjectContent({ profiles = [], currentUser }: ProjectContentPro
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
 
-  const canManage = Boolean(currentUser && (isAdminLikeRole(currentUser.role) || currentUser.is_department_lead))
+  const canManage = Boolean(
+    currentUser?.canManage ??
+      (currentUser &&
+        (["developer", "super_admin", "admin"].includes(currentUser.role) || currentUser.is_department_lead))
+  )
 
   // Fetch project list
   const {
