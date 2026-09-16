@@ -120,6 +120,44 @@ export function MdDeskDelegates() {
         contactsView
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        cardRenderer={(d) => (
+          <div className="bg-card flex h-full flex-col gap-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{d.name}</p>
+                <p className="text-muted-foreground truncate text-sm">{d.department || "General"}</p>
+              </div>
+              <Badge variant={d.can_edit ? "default" : "secondary"}>{d.can_edit ? "Can edit" : "View only"}</Badge>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Added by</span>
+                <span className="truncate">{d.granted_by_name || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Added</span>
+                <span>{formatWATDate(d.created_at)}</span>
+              </div>
+            </div>
+            {canManage && (
+              <div className="mt-auto flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => void toggleEdit(d)}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {d.can_edit ? "Make view only" : "Allow edit"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => void remove(d)}
+                  aria-label={`Remove ${d.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
         mobileRow={{
           title: (d) => d.name,
           subtitle: (d) => `${d.department || "General"} · Added ${formatWATDate(d.created_at)}`,

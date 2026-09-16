@@ -149,6 +149,45 @@ export function WaitingOnMd() {
         contactsView
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        cardRenderer={(i) => (
+          <div className="bg-card flex h-full flex-col gap-3 rounded-xl border p-4">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className={`border-transparent ${KIND_CLASSES[i.kind]}`}>
+                {MD_DESK_QUEUE_LABELS[i.kind]}
+              </Badge>
+              {i.urgent && <Badge variant="destructive">Emergency</Badge>}
+            </div>
+            <div className="min-w-0 space-y-0.5">
+              <p className="font-medium">{i.title}</p>
+              {i.detail && <p className="text-muted-foreground line-clamp-2 text-xs">{i.detail}</p>}
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">From</span>
+                <span className="truncate">
+                  {i.requester}
+                  {i.department && <span className="text-muted-foreground"> · {i.department}</span>}
+                </span>
+              </div>
+              {typeof i.amount === "number" && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span>{naira.format(i.amount)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Waiting</span>
+                <span title={formatWATDate(i.waiting_since)}>{formatWATRelative(i.waiting_since)}</span>
+              </div>
+            </div>
+            <Button asChild size="sm" variant="outline" className="mt-auto w-full">
+              <Link href={i.href}>
+                Open
+                <ArrowUpRight className="ml-1 h-3.5 w-3.5" aria-hidden />
+              </Link>
+            </Button>
+          </div>
+        )}
         mobileRow={{
           title: (i) => i.title,
           subtitle: (i) => {
