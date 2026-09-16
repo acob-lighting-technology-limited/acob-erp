@@ -12,6 +12,7 @@ import {
   workingDaysPastDeadline,
 } from "@/lib/tasks/overdue"
 import { addIsoDays, eachIsoDate, isWorkingDay, type HolidaySet } from "@/lib/hr/leave-days"
+import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 const log = logger("cron-tasks-expire-overdue")
 
@@ -151,6 +152,23 @@ export async function GET(request: NextRequest) {
       if (!isWorkingDay(today, excluded)) continue
       const used = workingDaysPastDeadline(graceStartFor(deadline), today, excluded)
       const left = Math.max(1, TASK_GRACE_WORKING_DAYS - used)
+      // The in-app warning reaches a bell icon nobody opens, so the assignee
+      // is emailed too - once, on the first night past the deadline. The
+      // cooldown below is what keeps it to once.
+      const alreadyWarned = task.assigned_to
+        ? await recentlyNotified(supabase, task.assigned_to, task.id, "task_overdue")
+        : true
+      if (!alreadyWarned && task.assigned_to) {
+        await sendTaskEmail(supabase, {
+          kind: "overdue",
+          taskId: task.id,
+          recipientIds: [task.assigned_to],
+          replyToUserId: task.assigned_by,
+          actByLabel: actByLabelFor(today, excluded),
+          workingDaysLeft: Math.max(1, TASK_GRACE_WORKING_DAYS - used),
+        })
+      }
+
       warned += await notifyBoth(supabase, task, {
         type: "task_overdue",
         title: "Task past its deadline",
@@ -185,6 +203,14 @@ export async function GET(request: NextRequest) {
     // not undo the expiry that already succeeded, so each one is isolated.
     let notified = 0
     for (const task of toFail) {
+      if (task.assigned_to) {
+        await sendTaskEmail(supabase, {
+          kind: "failed",
+          taskId: task.id,
+          recipientIds: [task.assigned_to],
+          replyToUserId: task.assigned_by,
+        })
+      }
       notified += await notifyBoth(supabase, task, {
         type: "task_updated",
         title: "Task expired",
@@ -201,6 +227,28 @@ export async function GET(request: NextRequest) {
     log.error({ err: String(error) }, "Overdue task expiry failed")
     return NextResponse.json({ error: "Failed to expire overdue tasks" }, { status: 500 })
   }
+}
+
+/**
+ * The last day the assignee can still act: the working day before the grace
+ * runs out. Naming the failure date instead would invite them to deal with it
+ * the morning it had already gone.
+ */
+function actByLabelFor(todayIso: string, nonWorking: HolidaySet): string {
+  let cursor = todayIso
+  let remaining = TASK_GRACE_WORKING_DAYS
+  let guard = 0
+  while (remaining > 1 && guard < 30) {
+    cursor = addIsoDays(cursor, 1)
+    if (isWorkingDay(cursor, nonWorking)) remaining -= 1
+    guard += 1
+  }
+  return new Date(`${cursor}T12:00:00Z`).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  })
 }
 
 async function loadHolidays(supabase: Supabase, start: string, end: string): Promise<HolidaySet> {

@@ -13,8 +13,14 @@ function safeCompare(a: string, b: string): boolean {
   return timingSafeEqual(Buffer.from(a), Buffer.from(b))
 }
 
-/** Deadline reminders start this many days out. */
-const DUE_SOON_DAYS = 3
+/**
+ * Deadline reminders go out on the day itself and no earlier.
+ *
+ * They used to start three days out, which meant a mail on day 3, day 2, day 1
+ * and the day itself. Four messages saying the same thing teaches people to
+ * skip the stream before the one that matters arrives.
+ */
+const DUE_SOON_DAYS = 0
 /** Submitted work is chased once it has waited this long for a rating. */
 const RATING_NUDGE_DAYS = 2
 /** Blocked work is chased once it has waited this long for a decision. */
