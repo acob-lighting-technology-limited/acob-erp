@@ -18,7 +18,8 @@ function formatClockTime(value: string | null | undefined): string {
 
 export default async function PmsAttendancePage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
-  const { score, cycles, activeCycleId, attendance } = await getCurrentUserPmsData(cycle_id)
+  const effectiveCycleId = cycle_id ?? "all"
+  const { score, cycles, activeCycleId, attendance } = await getCurrentUserPmsData(effectiveCycleId)
 
   const activeCycle = cycles.find((c) => c.id === activeCycleId)
   const cadence = getCadenceType(activeCycle?.reviewType, activeCycle?.name)

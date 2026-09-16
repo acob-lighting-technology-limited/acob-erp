@@ -25,8 +25,9 @@ function normalizeValue(value: unknown) {
 
 export default async function PmsBehaviourPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
+  const effectiveCycleId = cycle_id ?? "all"
   const supabase = await createClient()
-  const { profile, score, cycles, activeCycleId } = await getCurrentUserPmsData(cycle_id)
+  const { profile, score, cycles, activeCycleId } = await getCurrentUserPmsData(effectiveCycleId)
 
   let reviewQuery = supabase
     .from("performance_reviews")
@@ -35,7 +36,7 @@ export default async function PmsBehaviourPage({ searchParams }: { searchParams:
     )
     .eq("user_id", profile?.id || "")
 
-  if (activeCycleId) {
+  if (activeCycleId && activeCycleId !== "all") {
     reviewQuery = reviewQuery.eq("review_cycle_id", activeCycleId)
   }
 

@@ -26,8 +26,9 @@ function formatPercent(value: number | null | undefined) {
 
 export default async function PmsPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
+  const effectiveCycleId = cycle_id ?? "all"
   const { profile, score, cycles, activeCycleId, goalSummary, attendance, latestReview } =
-    await getCurrentUserPmsData(cycle_id)
+    await getCurrentUserPmsData(effectiveCycleId)
 
   const pmsAreaCards = [
     {

@@ -27,7 +27,8 @@ type AttemptQueryRow = {
 
 export default async function PmsCbtPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
-  const { cycles, activeCycleId } = await getCurrentUserPmsData(cycle_id)
+  const effectiveCycleId = cycle_id ?? "all"
+  const { cycles, activeCycleId } = await getCurrentUserPmsData(effectiveCycleId)
   const supabase = await createClient()
   const {
     data: { user },
