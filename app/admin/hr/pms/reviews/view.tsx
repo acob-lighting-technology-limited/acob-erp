@@ -693,7 +693,7 @@ export function AdminPmsReviewsPage({
                 <span>{r.submitted}</span>
                 <span className="text-muted-foreground">{pct}%</span>
               </div>
-              <Progress value={pct} className="h-1.5" />
+              <Progress value={pct} />
             </div>
           )
         },

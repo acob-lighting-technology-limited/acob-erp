@@ -12,8 +12,8 @@
  * not a percentage, so a project's weights are deliberately not constrained to
  * total 100: adding a task never forces a rebalance of the existing ones.
  *
- * Both PMS scoring and the project dashboards read from here so a project's
- * quality figure and an employee's KPI can never disagree about the same task.
+ * PMS scoring reads from here. Project pages count tasks instead, in
+ * lib/projects/health.ts, so everyone can check the figures by hand.
  */
 
 export const TASK_WEIGHT_MIN = 1
@@ -215,37 +215,6 @@ export function computeWeightedTaskScore(tasks: ScorableTask[], options: Weighte
   const score = availablePoints > 0 ? Math.round((earnedPoints / availablePoints) * 100 * 100) / 100 : null
 
   return { score, earnedPoints, availablePoints, taskCount, ratedCount, awaitingRatingCount, unresolvedCount }
-}
-
-/**
- * Delivery vs quality for a project.
- *
- * Kept apart on purpose: a task can be finished on time and still be poor work.
- * Delivery answers "how much of the weighted plan is done", quality answers
- * "how well was it done" — one number would hide the difference.
- */
-export function computeProjectProgress(tasks: ScorableTask[]) {
-  let completedWeight = 0
-  let totalWeight = 0
-
-  for (const task of tasks) {
-    if (task.is_archived) continue
-    // Unfinished work stays in the denominator here: delivery is a share of
-    // everything planned, so work not yet done is exactly what is missing.
-    if (!isTaskScorable(task) && !isAwaitingRating(task) && !isTaskUnresolved(task)) continue
-    const weight = clampWeight(task.weight)
-    totalWeight += weight
-    if (String(task.status || "").toLowerCase() === "completed") completedWeight += weight
-  }
-
-  const quality = computeWeightedTaskScore(tasks, { countUnresolvedAsZero: true })
-
-  return {
-    deliveryPct: totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100 * 100) / 100 : null,
-    qualityPct: quality.score,
-    completedWeight,
-    totalWeight,
-  }
 }
 
 /**

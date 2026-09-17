@@ -114,7 +114,7 @@ interface TaskFormDialogProps {
   /** Set when the form is opened from inside a project: the project is fixed. */
   lockedProjectId?: string | null
   lockedProjectName?: string | null
-  /** Set when the form is opened from inside an implementation plan. */
+  /** Set when the form is opened from inside a plan. */
   lockedPlanId?: string | null
   lockedPlanName?: string | null
 }

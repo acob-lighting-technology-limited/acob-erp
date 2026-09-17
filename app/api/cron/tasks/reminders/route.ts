@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
-import { computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
+import { computeProjectHealth, describeAttention, type ProjectHealthTask } from "@/lib/projects/health"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 const log = logger("cron-tasks-reminders")
@@ -385,7 +385,7 @@ async function sendProjectDelayReminders(supabase: Supabase, today: string): Pro
       userId: project.project_manager_id,
       type: "project_delayed",
       title: "Project behind schedule",
-      message: `"${project.project_name}" is ${health.deliveryPct ?? 0}% delivered with ${health.timeElapsedPct ?? 0}% of its schedule elapsed${health.overdueCount > 0 ? `, and has ${health.overdueCount} overdue task${health.overdueCount === 1 ? "" : "s"}` : ""}.`,
+      message: `"${project.project_name}" is behind: ${describeAttention(health)}.`,
       entityType: "project",
       entityId: project.id,
       linkUrl: "/admin/project",

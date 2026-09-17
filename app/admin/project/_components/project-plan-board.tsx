@@ -34,7 +34,8 @@ import { apiFetch } from "@/lib/api-client"
 import { cn, formatFullName } from "@/lib/utils"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
-import { TASK_WEIGHT_DEFAULT, computeProjectProgress } from "@/lib/tasks/scoring"
+import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
+import { countWork } from "@/lib/projects/health"
 import { TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task } from "@/types/task"
@@ -99,7 +100,7 @@ export type ProjectPlanStaffOption = {
 }
 
 /**
- * Implementation plans and their tasks for one project.
+ * Plans and their tasks for one project.
  *
  * Tasks are created through the same dialog department leads use, with the
  * project and plan locked — there is no separate project-task form, because
@@ -166,7 +167,7 @@ export function ProjectPlanBoard({
       return payload.data
     },
     onSuccess: () => {
-      toast.success("Implementation plan added")
+      toast.success("Plan added")
       setPlanForm({ name: "", description: "" })
       setIsAddPlanOpen(false)
       void queryClient.invalidateQueries({ queryKey: plansKey })
@@ -387,7 +388,7 @@ export function ProjectPlanBoard({
 
   function renderGroup(key: string, title: string, description: string | null, plan: Plan | null) {
     const groupTasks = tasksByPlan.get(key) || []
-    const progress = computeProjectProgress(groupTasks)
+    const progress = countWork(groupTasks)
     const isExpanded = Boolean(expandedPlans[key])
 
     return (
@@ -424,9 +425,9 @@ export function ProjectPlanBoard({
 
           <div className="flex shrink-0 items-center gap-3" onClick={(e) => e.stopPropagation()}>
             <div className="w-28">
-              <Progress value={progress.deliveryPct ?? 0} className="h-1.5" />
+              <Progress value={progress.workDonePct ?? 0} />
               <p className="text-muted-foreground mt-1 text-[10px]">
-                {progress.deliveryPct ?? 0}% delivered · {progress.qualityPct ?? 0}% quality
+                {progress.taskCount === 0 ? "No tasks yet" : `${progress.doneCount} of ${progress.taskCount} done`}
               </p>
             </div>
             {!readOnly && plan && (
@@ -519,9 +520,9 @@ export function ProjectPlanBoard({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-sm font-semibold">Implementation Plans</h4>
+          <h4 className="text-sm font-semibold">Plans</h4>
           <p className="text-muted-foreground text-xs">
-            Workstreams and their assigned tasks. Delivery and health roll up automatically.
+            Plans and their tasks. Progress updates as tasks are completed.
           </p>
         </div>
         {!readOnly && (
@@ -543,7 +544,7 @@ export function ProjectPlanBoard({
       {plansLoading || tasksLoading ? (
         <div className="text-muted-foreground flex items-center gap-2 py-6 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading implementation plans...
+          Loading plans...
         </div>
       ) : (
         <div className="space-y-2">
@@ -551,7 +552,7 @@ export function ProjectPlanBoard({
           {ungroupedCount > 0 && renderGroup("", "Ungrouped tasks", "Project work not filed under a plan.", null)}
           {plans.length === 0 && ungroupedCount === 0 && (
             <p className="text-muted-foreground rounded-lg border border-dashed py-6 text-center text-sm">
-              No implementation plans yet. Add one to start breaking this project into tasks.
+              No plans yet. Add one to start breaking this project into tasks.
             </p>
           )}
         </div>
@@ -570,8 +571,8 @@ export function ProjectPlanBoard({
             }}
           >
             <DialogHeader>
-              <DialogTitle>Add Implementation Plan</DialogTitle>
-              <DialogDescription>Create a new plan phase or workstream for {project.project_name}.</DialogDescription>
+              <DialogTitle>Add Plan</DialogTitle>
+              <DialogDescription>Create a new plan for {project.project_name}.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-4">

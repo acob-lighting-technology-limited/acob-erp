@@ -46,8 +46,10 @@ export async function GET(request: NextRequest) {
           rating,
           is_archived,
           due_date,
-          task_end_date
-        )
+          task_end_date,
+          plan_id
+        ),
+        plans:implementation_plans(id)
       `
       )
       .order("project_name", { ascending: true })

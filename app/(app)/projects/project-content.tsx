@@ -2,15 +2,15 @@
 
 import { useMemo } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableDetailField, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableDetailField, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { Progress } from "@/components/ui/progress"
 import {
   FolderGit2,
   FolderKanban,
@@ -18,29 +18,31 @@ import {
   Calendar,
   MapPin,
   Wrench,
-  ShieldCheck,
   Briefcase,
   Activity,
   Layers,
-  TrendingUp,
   AlertTriangle,
   Clock,
-  CheckCircle2,
+  LayoutDashboard,
 } from "lucide-react"
 import {
   PROJECT_HEALTH_LABELS,
   PROJECT_METRIC_HELP,
   computeProjectHealth,
+  formatTimeUsed,
+  plural,
   type ProjectHealthTask,
 } from "@/lib/projects/health"
 import {
   HealthBadge,
   ProjectStatusBadge,
   ProjectSummary,
-  ProjectStatusBar,
+  WorkDoneCell,
+  WorkDoneText,
   formatCapacity,
-  formatVariance,
+  plansText,
 } from "@/components/projects/project-summary"
+import { ProjectsOverview, type OverviewProject } from "@/components/projects/projects-overview"
 import { toLocalISODate } from "@/lib/utils/date"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
@@ -68,6 +70,7 @@ export interface ProjectRow {
   } | null
   portfolio?: { id: string; name: string; code: string | null } | null
   tasks?: ProjectHealthTask[]
+  plans?: { id: string }[] | null
 }
 
 export interface ProjectContentProps {
@@ -90,35 +93,6 @@ async function fetchUserProjects(): Promise<ProjectRow[]> {
   return (payload?.data || []) as ProjectRow[]
 }
 
-function getProjectTaskCounts(tasks: ProjectHealthTask[] = []) {
-  const today = toLocalISODate()
-  let completed = 0
-  let inProgress = 0
-  let overdue = 0
-  let pending = 0
-  for (const t of tasks) {
-    if (t.is_archived) continue
-    const status = String(t.status || "").toLowerCase()
-    const deadline = t.task_end_date || t.due_date
-    const isPastDue =
-      deadline &&
-      String(deadline).slice(0, 10) < today &&
-      status !== "completed" &&
-      status !== "cancelled" &&
-      status !== "reassigned"
-    if (status === "completed") {
-      completed++
-    } else if (isPastDue) {
-      overdue++
-    } else if (status === "in_progress") {
-      inProgress++
-    } else {
-      pending++
-    }
-  }
-  return { completed, inProgress, overdue, pending, total: completed + inProgress + overdue + pending }
-}
-
 export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
   const queryClient = useQueryClient()
   const staffAvatars = useStaffAvatars()
@@ -134,9 +108,8 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
     queryFn: fetchUserProjects,
   })
 
-  // Weighted delivery and health, from the same helper the admin project and
-  // portfolio dashboards use — a count of finished tasks would report a
-  // different number for the same project depending on which page you opened.
+  // Progress comes from the same helper the admin project and portfolio pages
+  // use, so a project reads the same whichever page you open it on.
   const healthById = useMemo(() => {
     const today = toLocalISODate()
     return new Map(
@@ -146,52 +119,54 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
           startDate: project.deployment_start_date,
           endDate: project.deployment_end_date,
           tasks: project.tasks || [],
+          planIds: (project.plans || []).map((plan) => plan.id),
           today,
         }),
       ])
     )
   }, [rows])
 
-  // Calculate project summary statistics
   const stats = useMemo(() => {
-    const total = rows.length
-    const active = rows.filter((r) => r.status === "active").length
-    const completed = rows.filter((r) => r.status === "completed").length
-
-    let totalDeliveryPctSum = 0
-    let projectsWithDeliveryCount = 0
-    let onTrackCount = 0
-    let atRiskCount = 0
-    let totalOverdue = 0
-
-    for (const p of rows) {
-      const h = healthById.get(p.id)
-      if (h) {
-        if (h.deliveryPct !== null) {
-          totalDeliveryPctSum += h.deliveryPct
-          projectsWithDeliveryCount++
-        }
-        if (h.status === "on_track" || h.status === "completed") {
-          onTrackCount++
-        } else {
-          atRiskCount++
-        }
-        totalOverdue += h.overdueCount
-      }
+    let needAttention = 0
+    let pastDue = 0
+    for (const health of healthById.values()) {
+      if (health.status === "at_risk" || health.status === "behind_schedule") needAttention++
+      pastDue += health.overdueCount
     }
-
-    const avgDelivery = projectsWithDeliveryCount > 0 ? Math.round(totalDeliveryPctSum / projectsWithDeliveryCount) : 0
-
-    return {
-      total,
-      active,
-      completed,
-      avgDelivery,
-      onTrackCount,
-      atRiskCount,
-      totalOverdue,
-    }
+    return { total: rows.length, needAttention, pastDue }
   }, [rows, healthById])
+
+  // The tab lives in the URL, so a link from the Overview to "?q=<project>"
+  // drops the tab and lands on the table already filtered to that project.
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const activeTab = searchParams.get("tab") === "overview" ? "overview" : "projects"
+  const tabs = useMemo<DataTableTab[]>(
+    () => [
+      { key: "projects", label: "Projects", icon: FolderKanban },
+      { key: "overview", label: "Overview", icon: LayoutDashboard },
+    ],
+    []
+  )
+
+  const overviewItems = useMemo<OverviewProject[]>(
+    () =>
+      rows.flatMap((project) => {
+        const health = healthById.get(project.id)
+        return health
+          ? [
+              {
+                id: project.id,
+                project_name: project.project_name,
+                portfolioName: project.portfolio?.name ?? null,
+                health,
+              },
+            ]
+          : []
+      }),
+    [rows, healthById]
+  )
 
   // Technology Types option list for filtering
   const techOptions = useMemo(() => {
@@ -268,29 +243,25 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
       },
       {
         key: "progress",
-        label: "Delivery / Quality",
-        description: PROJECT_METRIC_HELP.deliveryQuality,
+        label: "Progress",
+        description: PROJECT_METRIC_HELP.progress,
         sortable: true,
-        accessor: (r) => healthById.get(r.id)?.deliveryPct ?? 0,
+        accessor: (r) => healthById.get(r.id)?.workDonePct ?? -1,
         render: (r) => {
           const health = healthById.get(r.id)
-          if (!health || health.totalWeight === 0) {
-            return <span className="text-muted-foreground text-xs">No tasks</span>
-          }
+          if (!health) return null
           return (
-            <div className="w-32 space-y-1">
-              <Progress value={health.deliveryPct ?? 0} className="h-1.5" />
-              <p className="text-muted-foreground text-[11px]">
-                {health.deliveryPct ?? 0}% delivered · {health.qualityPct ?? 0}% quality
-              </p>
+            <div className="flex items-center gap-3">
+              <WorkDoneCell health={health} />
+              <HealthBadge status={health.status} />
             </div>
           )
         },
       },
       {
         key: "status",
-        label: "Status",
-        description: PROJECT_METRIC_HELP.status,
+        label: "Stage",
+        description: PROJECT_METRIC_HELP.stage,
         sortable: true,
         accessor: (r) => r.status,
         render: (r) => <ProjectStatusBadge status={r.status} />,
@@ -317,11 +288,11 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
     () => [
       {
         key: "status",
-        label: "Status",
+        label: "Stage",
         options: [
           { value: "planning", label: "Planning" },
           { value: "active", label: "Ongoing" },
-          { value: "on_hold", label: "On Hold" },
+          { value: "on_hold", label: "On hold" },
           { value: "completed", label: "Completed" },
           { value: "cancelled", label: "Cancelled" },
         ],
@@ -335,7 +306,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
       },
       {
         key: "health",
-        label: "Health",
+        label: "Progress",
         options: [
           { value: "on_track", label: PROJECT_HEALTH_LABELS.on_track },
           { value: "at_risk", label: PROJECT_HEALTH_LABELS.at_risk },
@@ -366,6 +337,11 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
       title="Projects &amp; Deployments"
       description="View ongoing mini-grid electrification and solar installations progress and task milestones."
       spacing="tight"
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(tab) =>
+        router.replace(tab === "overview" ? `${pathname}?tab=overview` : pathname, { scroll: false })
+      }
       actionsPlacement="inline-always"
       actions={
         <div className="flex items-center gap-2">
@@ -384,187 +360,172 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
         <StatGrid>
           <StatCard
             variant="compact"
-            title="Active Projects"
-            value={`${stats.active} / ${stats.total}`}
+            title="My projects"
+            value={stats.total}
             icon={FolderKanban}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
           />
           <StatCard
             variant="compact"
-            title="Avg Delivery Progress"
-            value={`${stats.avgDelivery}%`}
-            icon={TrendingUp}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
+            title="Need attention"
+            value={stats.needAttention}
+            tooltip="Projects that are Slipping or Behind"
+            icon={AlertTriangle}
+            iconBgColor={stats.needAttention > 0 ? "bg-amber-500/10" : "bg-slate-500/10"}
+            iconColor={stats.needAttention > 0 ? "text-amber-500" : "text-slate-500"}
           />
           <StatCard
             variant="compact"
-            title="Schedule Health"
-            value={`${stats.onTrackCount} On Track`}
-            icon={ShieldCheck}
-            iconBgColor={stats.atRiskCount > 0 ? "bg-amber-500/10" : "bg-emerald-500/10"}
-            iconColor={stats.atRiskCount > 0 ? "text-amber-500" : "text-emerald-500"}
-          />
-          <StatCard
-            variant="compact"
-            title="Action Items"
-            value={`${stats.totalOverdue} Overdue`}
-            icon={stats.totalOverdue > 0 ? AlertTriangle : CheckCircle2}
-            iconBgColor={stats.totalOverdue > 0 ? "bg-red-500/10" : "bg-slate-500/10"}
-            iconColor={stats.totalOverdue > 0 ? "text-red-500" : "text-slate-500"}
+            title="Tasks past due"
+            value={stats.pastDue}
+            tooltip={PROJECT_METRIC_HELP.pastDue}
+            icon={Clock}
+            iconBgColor={stats.pastDue > 0 ? "bg-red-500/10" : "bg-slate-500/10"}
+            iconColor={stats.pastDue > 0 ? "text-red-500" : "text-slate-500"}
           />
         </StatGrid>
       }
     >
-      <DataTable<ProjectRow>
-        data={rows}
-        columns={columns}
-        filters={filters}
-        getRowId={(r) => r.id}
-        searchPlaceholder="Search project title or site location..."
-        searchFn={(row, query) => {
-          const q = query.toLowerCase()
-          return (
-            row.project_name.toLowerCase().includes(q) ||
-            row.location.toLowerCase().includes(q) ||
-            (row.description || "").toLowerCase().includes(q)
-          )
-        }}
-        isLoading={isLoading}
-        error={error instanceof Error ? error.message : null}
-        onRetry={refetch}
-        viewToggle
-        stickyToolbar
-        contactsView
-        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        mobileRow={{
-          title: (r) => r.project_name,
-          subtitle: (r) => [r.location, r.technology_type].filter(Boolean).join(" · ") || r.location,
-          trailing: (r) => <ProjectStatusBadge status={r.status} />,
-          detail: {
-            title: (r) => r.project_name,
-            subtitle: (r) => <span className="text-muted-foreground text-xs">{r.location}</span>,
-            badges: (r) => {
-              const health = healthById.get(r.id)
-              return (
-                <>
-                  <ProjectStatusBadge status={r.status} />
-                  {health && <HealthBadge status={health.status} />}
-                </>
-              )
-            },
-            fields: (r) => {
-              const health = healthById.get(r.id)
-              const pct = (value: number | null | undefined) =>
-                value === null || value === undefined ? null : `${value}%`
-              const fields: DataTableDetailField[] = [
-                { icon: MapPin, label: "Location", value: r.location },
-                {
-                  icon: Briefcase,
-                  label: "Project manager",
-                  value:
-                    r.project_manager?.full_name ||
-                    [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
-                    "Unassigned",
-                },
-                { icon: Wrench, label: "Technology", value: r.technology_type },
-                {
-                  icon: FolderGit2,
-                  label: "Capacity",
-                  value: r.capacity_w === null ? null : formatCapacity(r.capacity_w),
-                },
-                { icon: Layers, label: "Portfolio", value: r.portfolio?.name, copyable: false },
-                {
-                  icon: Calendar,
-                  label: "Schedule",
-                  value: `${r.deployment_start_date} → ${r.deployment_end_date}`,
-                  copyable: false,
-                },
-                {
-                  label: "Delivery progress",
-                  value: `${health?.deliveryPct ?? 0}% — ${health?.qualityPct ?? 0}% quality`,
-                  copyable: false,
-                },
-                {
-                  icon: Activity,
-                  label: "Health",
-                  value: health ? PROJECT_HEALTH_LABELS[health.status] : null,
-                  copyable: false,
-                },
-                { label: "Elapsed", value: pct(health?.timeElapsedPct), copyable: false },
-                { label: "Variance", value: formatVariance(health?.variancePct), copyable: false },
-                { label: "Overdue tasks", value: health ? String(health.overdueCount) : null, copyable: false },
-                { icon: FolderKanban, label: "Description", value: r.description, fullWidth: true },
-              ]
-              return fields.filter((field) => field.value)
-            },
-          },
-        }}
-        cardRenderer={(r) => {
-          const health = healthById.get(r.id)
-          return (
-            <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="line-clamp-2 text-sm font-semibold">{r.project_name}</h4>
-                <ProjectStatusBadge status={r.status} />
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 text-xs">
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Location</p>
-                  <p className="font-medium">{r.location || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Technology</p>
-                  <p className="font-medium">{r.technology_type || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Capacity</p>
-                  <p className="font-medium">{formatCapacity(r.capacity_w)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Progress</p>
-                  <p className="font-medium">{health?.deliveryPct ?? 0}%</p>
-                </div>
-              </div>
-              <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
-                <span>
-                  {r.project_manager?.full_name ||
-                    [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
-                    "Unassigned"}
-                </span>
-                <span>{health?.qualityPct ?? 0}% quality</span>
-              </div>
-            </div>
-          )
-        }}
-        expandable={{
-          render: (r) => {
-            const taskCounts = getProjectTaskCounts(r.tasks || [])
+      {activeTab === "overview" ? (
+        <ProjectsOverview
+          projects={overviewItems}
+          hrefFor={(p) => `${pathname}?q=${encodeURIComponent(p.project_name)}`}
+        />
+      ) : (
+        <DataTable<ProjectRow>
+          data={rows}
+          columns={columns}
+          filters={filters}
+          getRowId={(r) => r.id}
+          searchPlaceholder="Search project title or site location..."
+          searchFn={(row, query) => {
+            const q = query.toLowerCase()
             return (
-              <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
-                <ProjectSummary project={r} health={healthById.get(r.id)} />
-                {taskCounts.total > 0 && (
-                  <div className="bg-card space-y-1.5 rounded-lg border p-3">
-                    <div className="flex items-center justify-between text-xs font-medium">
-                      <span className="text-foreground font-semibold">Task Breakdown</span>
-                      <span className="text-muted-foreground">
-                        {taskCounts.completed} of {taskCounts.total} tasks finished
-                      </span>
-                    </div>
-                    <ProjectStatusBar {...taskCounts} />
+              row.project_name.toLowerCase().includes(q) ||
+              row.location.toLowerCase().includes(q) ||
+              (row.description || "").toLowerCase().includes(q)
+            )
+          }}
+          isLoading={isLoading}
+          error={error instanceof Error ? error.message : null}
+          onRetry={refetch}
+          viewToggle
+          stickyToolbar
+          contactsView
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            title: (r) => r.project_name,
+            subtitle: (r) => [r.location, r.technology_type].filter(Boolean).join(" · ") || r.location,
+            trailing: (r) => <ProjectStatusBadge status={r.status} />,
+            detail: {
+              title: (r) => r.project_name,
+              subtitle: (r) => <span className="text-muted-foreground text-xs">{r.location}</span>,
+              badges: (r) => {
+                const health = healthById.get(r.id)
+                return (
+                  <>
+                    {health && <HealthBadge status={health.status} />}
+                    <ProjectStatusBadge status={r.status} />
+                  </>
+                )
+              },
+              fields: (r) => {
+                const health = healthById.get(r.id)
+                const fields: DataTableDetailField[] = [
+                  { icon: MapPin, label: "Location", value: r.location },
+                  {
+                    icon: Briefcase,
+                    label: "Project manager",
+                    value:
+                      r.project_manager?.full_name ||
+                      [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
+                      "Unassigned",
+                  },
+                  { icon: Wrench, label: "Technology", value: r.technology_type },
+                  {
+                    icon: FolderGit2,
+                    label: "Capacity",
+                    value: r.capacity_w === null ? null : formatCapacity(r.capacity_w),
+                  },
+                  { icon: Layers, label: "Portfolio", value: r.portfolio?.name, copyable: false },
+                  {
+                    icon: Calendar,
+                    label: "Dates",
+                    value: `${r.deployment_start_date} → ${r.deployment_end_date}`,
+                    copyable: false,
+                  },
+                  {
+                    icon: Activity,
+                    label: "Work done",
+                    value: health ? `${health.doneCount} of ${plural(health.taskCount, "task")}` : null,
+                    copyable: false,
+                  },
+                  { label: "Time used", value: health ? formatTimeUsed(health) : null, copyable: false },
+                  { label: "Plans", value: health ? plansText(health) : null, copyable: false },
+                  {
+                    label: "Tasks past due",
+                    value: health?.overdueCount ? String(health.overdueCount) : null,
+                    copyable: false,
+                  },
+                  { icon: FolderKanban, label: "Description", value: r.description, fullWidth: true },
+                ]
+                return fields.filter((field) => field.value)
+              },
+            },
+          }}
+          cardRenderer={(r) => {
+            const health = healthById.get(r.id)
+            return (
+              <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="line-clamp-2 text-sm font-semibold">{r.project_name}</h4>
+                  <ProjectStatusBadge status={r.status} />
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 text-xs">
+                  <div>
+                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Location</p>
+                    <p className="font-medium">{r.location || "—"}</p>
                   </div>
+                  <div>
+                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Technology</p>
+                    <p className="font-medium">{r.technology_type || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Capacity</p>
+                    <p className="font-medium">{formatCapacity(r.capacity_w)}</p>
+                  </div>
+                </div>
+                {health && (
+                  <p className="text-muted-foreground text-xs">
+                    <WorkDoneText health={health} />
+                  </p>
                 )}
-                <ProjectPlanBoard project={r as any} profiles={profiles} readOnly={true} />
+                <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
+                  <span>
+                    {r.project_manager?.full_name ||
+                      [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
+                      "Unassigned"}
+                  </span>
+                  {health && <HealthBadge status={health.status} />}
+                </div>
               </div>
             )
-          },
-        }}
-        emptyTitle="No Projects Assigned"
-        emptyDescription="You will see projects here once you are assigned as a manager or member."
-        emptyIcon={FolderKanban}
-        urlSync
-      />
+          }}
+          expandable={{
+            render: (r) => (
+              <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
+                <ProjectSummary project={r} health={healthById.get(r.id)} />
+                <ProjectPlanBoard project={r as any} profiles={profiles} readOnly={true} />
+              </div>
+            ),
+          }}
+          emptyTitle="No Projects Assigned"
+          emptyDescription="You will see projects here once you are assigned as a manager or member."
+          emptyIcon={FolderKanban}
+          urlSync
+        />
+      )}
     </DataTablePage>
   )
 }

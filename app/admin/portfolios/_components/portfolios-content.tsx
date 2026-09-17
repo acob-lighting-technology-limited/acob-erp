@@ -6,13 +6,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
   AlertTriangle,
-  BarChart3,
-  ChevronDown,
-  ChevronRight,
+  Clock,
   ExternalLink,
   FolderCog,
-  FolderGit2,
   FolderKanban,
+  LayoutDashboard,
   Layers,
   Plus,
   RefreshCw,
@@ -20,52 +18,32 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ColumnHelp, DataTable, DataTablePage } from "@/components/ui/data-table"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
-import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import { PROJECT_HEALTH_LABELS, PROJECT_METRIC_HELP, type ProjectHealthStatus } from "@/lib/projects/health"
-import { HealthBadge, PortfolioStatusBadge, ProjectStatusBadge } from "@/components/projects/project-summary"
+import {
+  PROJECT_HEALTH_LABELS,
+  PROJECT_METRIC_HELP,
+  plural,
+  type PortfolioHealth,
+  type ProjectHealth,
+} from "@/lib/projects/health"
+import { HealthBadge, PortfolioStatusBadge, ProjectProgress, WorkDoneCell } from "@/components/projects/project-summary"
 import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import { DeletePortfolioDialog } from "./delete-portfolio-dialog"
 import { PortfolioDialog } from "./portfolio-dialog"
 import { PortfolioProjectsDialog } from "./portfolio-projects-dialog"
-import { PortfolioAnalytics } from "./portfolio-analytics"
+import { PortfolioOverview } from "./portfolio-overview"
 import { projectHref } from "./project-href"
 
-export type ProjectHealthRow = {
+export type ProjectHealthRow = ProjectHealth & {
   id: string
   project_name: string
   lifecycle_status: string | null
-  deliveryPct: number | null
-  qualityPct: number | null
-  timeElapsedPct: number | null
-  variancePct: number | null
-  status: ProjectHealthStatus
-  overdueCount: number
-  totalWeight: number
-  taskCount: number
-  totalPlans?: number
-  completedPlans?: number
-  planProgressPct?: number | null
-}
-
-type PortfolioRollup = {
-  projectCount: number
-  onTrack: number
-  atRisk: number
-  behindSchedule: number
-  completed: number
-  overdueCount: number
-  deliveryPct: number | null
-  qualityPct: number | null
-  totalPlans?: number
-  completedPlans?: number
-  planProgressPct?: number | null
 }
 
 export type Portfolio = {
@@ -75,10 +53,10 @@ export type Portfolio = {
   description: string | null
   status: "active" | "on_hold" | "closed"
   projects: ProjectHealthRow[]
-  rollup: PortfolioRollup
+  rollup: PortfolioHealth
 }
 
-/** The implementation plans and project boards shown when a portfolio is expanded. */
+/** The plans and project boards shown when a portfolio is expanded. */
 function PortfolioProjects({
   projects,
   isAdmin,
@@ -146,25 +124,13 @@ function PortfolioProjects({
                     )}
                   >
                     <span>{p.project_name}</span>
-                    {p.totalPlans !== undefined && p.totalPlans > 0 && (
-                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                        {p.completedPlans ?? 0}/{p.totalPlans} plans
-                      </Badge>
-                    )}
+                    <span className={cn("h-1.5 w-1.5 rounded-full", HEALTH_DOT[p.status])} />
                   </button>
                 )
               })}
             </div>
           ) : activeProject ? (
-            <div className="flex items-center gap-2">
-              <span className="text-foreground text-sm font-semibold">{activeProject.project_name}</span>
-              <HealthBadge status={activeProject.status} />
-              {activeProject.planProgressPct !== null && (
-                <Badge variant="outline" className="text-xs">
-                  {activeProject.planProgressPct}% Plan Progress
-                </Badge>
-              )}
-            </div>
+            <span className="text-foreground text-sm font-semibold">{activeProject.project_name}</span>
           ) : null}
         </div>
 
@@ -183,23 +149,17 @@ function PortfolioProjects({
 
       {activeProject && (
         <div className="bg-card space-y-4 rounded-xl border p-4 shadow-xs">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h4 className="text-foreground text-base font-semibold">{activeProject.project_name}</h4>
-                <HealthBadge status={activeProject.status} />
-                {activeProject.planProgressPct !== null && (
-                  <Badge variant="secondary" className="text-xs">
-                    {activeProject.planProgressPct}% Progress
-                  </Badge>
-                )}
-              </div>
-              <p className="text-muted-foreground text-xs">
-                {activeProject.taskCount} task{activeProject.taskCount === 1 ? "" : "s"}
-                {activeProject.totalPlans !== undefined &&
-                  ` · ${activeProject.completedPlans ?? 0}/${activeProject.totalPlans} implementation plans completed`}
-              </p>
+          <div className="space-y-3 border-b pb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-foreground text-base font-semibold">{activeProject.project_name}</h4>
+              <HealthBadge status={activeProject.status} />
+              {activeProject.overdueCount > 0 && (
+                <span className="text-xs font-medium text-red-700 dark:text-red-400">
+                  {plural(activeProject.overdueCount, "task")} past due
+                </span>
+              )}
             </div>
+            <ProjectProgress health={activeProject} />
           </div>
 
           <ProjectPlanBoard
@@ -227,6 +187,13 @@ function PortfolioProjects({
   )
 }
 
+const HEALTH_DOT: Record<ProjectHealthRow["status"], string> = {
+  on_track: "bg-emerald-500",
+  at_risk: "bg-amber-500",
+  behind_schedule: "bg-red-500",
+  completed: "bg-blue-500",
+}
+
 type ProjectManagerOption = {
   id: string
   first_name: string
@@ -244,7 +211,6 @@ interface PortfoliosContentProps {
 export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosContentProps = {}) {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<string>("portfolios")
-  const [focusedPortfolioId, setFocusedPortfolioId] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editing, setEditing] = useState<Portfolio | null>(null)
   const [deleting, setDeleting] = useState<Portfolio | null>(null)
@@ -254,14 +220,14 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   const tabs = useMemo<DataTableTab[]>(
     () => [
       { key: "portfolios", label: "Portfolios", icon: Layers },
-      { key: "analytics", label: "Analytics", icon: BarChart3 },
+      { key: "overview", label: "Overview", icon: LayoutDashboard },
     ],
     []
   )
 
   const { data, isLoading, error, refetch } = useQuery<{
     data: Portfolio[]
-    unassigned: { projects: ProjectHealthRow[]; rollup: PortfolioRollup }
+    unassigned: { projects: ProjectHealthRow[]; rollup: PortfolioHealth }
   }>({
     queryKey: ["portfolios"],
     queryFn: async () => {
@@ -277,12 +243,15 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   const managing = useMemo(() => rows.find((row) => row.id === managingId) ?? null, [rows, managingId])
   const refreshPortfolios = () => queryClient.invalidateQueries({ queryKey: ["portfolios"] })
 
+  // Counted across unassigned projects too, so the numbers match the Overview tab.
   const stats = useMemo(() => {
-    const projectCount = rows.reduce((sum, row) => sum + row.rollup.projectCount, 0)
-    const atRisk = rows.reduce((sum, row) => sum + row.rollup.atRisk + row.rollup.behindSchedule, 0)
-    const overdue = rows.reduce((sum, row) => sum + row.rollup.overdueCount, 0)
-    return { portfolios: rows.length, projectCount, atRisk, overdue }
-  }, [rows])
+    const rollups = [...rows.map((row) => row.rollup), ...(data?.unassigned ? [data.unassigned.rollup] : [])]
+    return {
+      projectCount: rollups.reduce((sum, r) => sum + r.projectCount, 0),
+      needAttention: rollups.reduce((sum, r) => sum + r.atRisk + r.behindSchedule, 0),
+      pastDue: rollups.reduce((sum, r) => sum + r.overdueCount, 0),
+    }
+  }, [rows, data])
 
   const columns = useMemo<DataTableColumn<Portfolio>[]>(
     () => [
@@ -306,46 +275,40 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         accessor: (r) => r.rollup.projectCount,
         render: (r) => (
           <div className="text-xs">
-            <p className="text-foreground font-medium">{r.rollup.projectCount} total</p>
+            <p className="text-foreground font-medium">
+              {r.rollup.completed} of {plural(r.rollup.projectCount, "project")} done
+            </p>
             <p className="text-muted-foreground">
-              {r.rollup.onTrack} on track · {r.rollup.atRisk} at risk · {r.rollup.behindSchedule} behind
+              {[
+                r.rollup.onTrack && `${r.rollup.onTrack} on time`,
+                r.rollup.atRisk && `${r.rollup.atRisk} slipping`,
+                r.rollup.behindSchedule && `${r.rollup.behindSchedule} behind`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </div>
         ),
       },
       {
         key: "progress",
-        label: "Plan Progress",
-        description: PROJECT_METRIC_HELP.portfolioProgress,
+        label: "Work done",
+        description: PROJECT_METRIC_HELP.workDone,
         sortable: true,
-        accessor: (r) => r.rollup.planProgressPct ?? 0,
-        render: (r) =>
-          r.rollup.planProgressPct === null ? (
-            <span className="text-muted-foreground text-xs">No plans</span>
-          ) : (
-            <div className="w-36 space-y-1">
-              <Progress value={r.rollup.planProgressPct} className="h-1.5" />
-              <p className="text-muted-foreground text-[11px]">
-                <span className="text-foreground font-semibold">{r.rollup.planProgressPct}% progress</span>
-                {Boolean(r.rollup.totalPlans && r.rollup.totalPlans > 0) && (
-                  <span>
-                    {" "}
-                    · {r.rollup.completedPlans}/{r.rollup.totalPlans} plans
-                  </span>
-                )}
-              </p>
-            </div>
-          ),
+        accessor: (r) => r.rollup.workDonePct ?? -1,
+        render: (r) => <WorkDoneCell health={r.rollup} />,
       },
       {
         key: "overdue",
-        label: "Overdue Tasks",
-        description: PROJECT_METRIC_HELP.overdue,
+        label: "Tasks past due",
+        description: PROJECT_METRIC_HELP.pastDue,
         sortable: true,
         accessor: (r) => r.rollup.overdueCount,
         render: (r) =>
           r.rollup.overdueCount > 0 ? (
-            <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">{r.rollup.overdueCount}</Badge>
+            <Badge className="border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400">
+              {r.rollup.overdueCount}
+            </Badge>
           ) : (
             <span className="text-muted-foreground text-xs">None</span>
           ),
@@ -369,7 +332,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         label: "Status",
         options: [
           { value: "active", label: "Active" },
-          { value: "on_hold", label: "On Hold" },
+          { value: "on_hold", label: "On hold" },
           { value: "closed", label: "Closed" },
         ],
       },
@@ -379,7 +342,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         options: [
           { value: "at_risk", label: PROJECT_HEALTH_LABELS.at_risk },
           { value: "behind_schedule", label: PROJECT_HEALTH_LABELS.behind_schedule },
-          { value: "overdue", label: "Overdue tasks" },
+          { value: "overdue", label: "Tasks past due" },
         ],
         mode: "custom",
         filterFn: (row, selected) =>
@@ -394,7 +357,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   return (
     <DataTablePage
       title="Project Portfolios"
-      description="Programmes and client groupings, each holding its own projects. Progress is derived from project tasks."
+      description="Groups of related projects. Progress is counted from each project's tasks."
       icon={Layers}
       backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/projects", label: "Back to Projects" }}
       tabs={tabs}
@@ -424,47 +387,35 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         <StatGrid>
           <StatCard
             variant="compact"
-            title="Portfolios"
-            value={stats.portfolios}
-            icon={Layers}
-            iconBgColor="bg-violet-500/10"
-            iconColor="text-violet-500"
-          />
-          <StatCard
-            variant="compact"
-            title="At Risk / Behind"
-            value={stats.atRisk}
-            icon={AlertTriangle}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Overdue Tasks"
-            value={stats.overdue}
-            icon={FolderGit2}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
-          />
-          <StatCard
-            variant="compact"
             title="Projects"
             value={stats.projectCount}
             icon={FolderKanban}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
           />
+          <StatCard
+            variant="compact"
+            title="Need attention"
+            value={stats.needAttention}
+            tooltip="Projects that are Slipping or Behind"
+            icon={AlertTriangle}
+            iconBgColor={stats.needAttention > 0 ? "bg-amber-500/10" : "bg-slate-500/10"}
+            iconColor={stats.needAttention > 0 ? "text-amber-500" : "text-slate-500"}
+          />
+          <StatCard
+            variant="compact"
+            title="Tasks past due"
+            value={stats.pastDue}
+            tooltip={PROJECT_METRIC_HELP.pastDue}
+            icon={Clock}
+            iconBgColor={stats.pastDue > 0 ? "bg-red-500/10" : "bg-slate-500/10"}
+            iconColor={stats.pastDue > 0 ? "text-red-500" : "text-slate-500"}
+          />
         </StatGrid>
       }
     >
-      {activeTab === "analytics" ? (
-        <PortfolioAnalytics
-          rows={rows}
-          unassigned={data?.unassigned?.rollup}
-          isAdmin={isAdmin}
-          focusedPortfolioId={focusedPortfolioId}
-          onFocusPortfolio={setFocusedPortfolioId}
-        />
+      {activeTab === "overview" ? (
+        <PortfolioOverview rows={rows} unassigned={data?.unassigned} />
       ) : (
         <DataTable<Portfolio>
           data={rows}
@@ -490,7 +441,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
           mobileRow={{
             title: (r) => (r.code ? `${r.code} — ${r.name}` : r.name),
             subtitle: (r) =>
-              `${r.rollup.projectCount} projects · ${r.rollup.planProgressPct ?? 0}% progress · ${r.rollup.overdueCount} overdue`,
+              `${plural(r.rollup.projectCount, "project")} · ${r.rollup.doneCount} of ${plural(r.rollup.taskCount, "task")} done`,
             trailing: (r) => <PortfolioStatusBadge status={r.status} />,
             onSelect: isAdmin ? (r) => setEditing(r) : undefined,
           }}
@@ -504,20 +455,14 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
                 <PortfolioStatusBadge status={r.status} />
               </div>
               <div className="flex items-center justify-between border-t pt-2 text-xs">
-                <span className="text-muted-foreground">{r.rollup.projectCount} projects</span>
-                <span className="text-muted-foreground">{r.rollup.planProgressPct ?? 0}% progress</span>
+                <span className="text-muted-foreground">{plural(r.rollup.projectCount, "project")}</span>
+                <span className="text-muted-foreground">
+                  {r.rollup.doneCount} of {plural(r.rollup.taskCount, "task")} done
+                </span>
               </div>
             </div>
           )}
           rowActions={[
-            {
-              label: "View Analytics",
-              icon: BarChart3,
-              onClick: (r) => {
-                setFocusedPortfolioId(r.id)
-                setActiveTab("analytics")
-              },
-            },
             ...(isAdmin
               ? [
                   { label: "Manage Projects", icon: FolderCog, onClick: (r: Portfolio) => setManagingId(r.id) },

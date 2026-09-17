@@ -20,7 +20,7 @@ const UpdatePlanSchema = PlanSchema.partial().extend({
 })
 
 /**
- * Implementation plans for a project.
+ * Plans for a project.
  *
  * A plan is purely a folder for tasks — it has no weight and contributes
  * nothing to scoring on its own. Its tasks are ordinary rows in public.tasks
@@ -48,8 +48,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     .order("created_at", { ascending: true })
 
   if (error) {
-    log.error({ err: error.message }, "Failed to load implementation plans")
-    return apiError("Failed to load implementation plans", ApiErrorCode.DATABASE_ERROR, 500)
+    log.error({ err: error.message }, "Failed to load plans")
+    return apiError("Failed to load plans", ApiErrorCode.DATABASE_ERROR, 500)
   }
 
   return NextResponse.json({ data: data || [] })
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     .single()
 
   if (error) {
-    log.error({ err: error.message }, "Failed to create implementation plan")
+    log.error({ err: error.message }, "Failed to create plan")
     return apiError(error.message, ApiErrorCode.DATABASE_ERROR, 400)
   }
 
@@ -118,7 +118,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     .single()
 
   if (error) {
-    log.error({ err: error.message }, "Failed to update implementation plan")
+    log.error({ err: error.message }, "Failed to update plan")
     return apiError(error.message, ApiErrorCode.DATABASE_ERROR, 400)
   }
 
@@ -145,7 +145,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const { error } = await db.from("implementation_plans").delete().eq("id", planId).eq("project_id", params.id)
 
   if (error) {
-    log.error({ err: error.message }, "Failed to delete implementation plan")
+    log.error({ err: error.message }, "Failed to delete plan")
     return apiError(error.message, ApiErrorCode.DATABASE_ERROR, 400)
   }
 

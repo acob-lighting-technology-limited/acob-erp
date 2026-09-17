@@ -221,7 +221,7 @@ export function DepartmentCascadeContent({
             <span className="text-muted-foreground text-xs">-</span>
           ) : (
             <div className="w-28 space-y-1">
-              <Progress value={r.capped_pct} className="h-1.5" />
+              <Progress value={r.capped_pct} />
               <span className="text-muted-foreground text-[11px]">
                 {r.raw_pct}% {r.raw_pct !== r.capped_pct ? "(capped at 100 for rollup)" : ""}
               </span>

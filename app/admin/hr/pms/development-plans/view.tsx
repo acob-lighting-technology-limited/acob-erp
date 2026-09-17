@@ -140,7 +140,7 @@ function PlanCard({
           <span className="text-muted-foreground">Progress</span>
           <span>{plan.progress_pct || 0}%</span>
         </div>
-        <Progress value={plan.progress_pct || 0} className="h-2" />
+        <Progress value={plan.progress_pct || 0} />
       </div>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={() => onView(plan)}>
@@ -409,7 +409,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         accessor: (plan) => plan.progress_pct || 0,
         render: (plan) => (
           <div className="flex items-center gap-2">
-            <Progress value={plan.progress_pct || 0} className="h-2 w-20" />
+            <Progress value={plan.progress_pct || 0} className="w-20" />
             <span className="text-muted-foreground text-xs">{plan.progress_pct || 0}%</span>
           </div>
         ),
