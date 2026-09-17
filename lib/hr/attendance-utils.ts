@@ -3,7 +3,7 @@ import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 export { toLocalISODate, toLocalYearMonth }
 
 /** Earliest month digital attendance tracking began — the floor for "all time" ranges and period pickers. */
-export const ATTENDANCE_TRACKING_START = "2026-04-01"
+export const ATTENDANCE_TRACKING_START = "2026-06-01"
 
 /** Returns true if the clock-in time is after the 8:20am grace period. */
 export function isLate(clockIn: string | null | undefined): boolean {
