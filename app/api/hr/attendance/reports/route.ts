@@ -10,7 +10,13 @@ import {
   getWorkdaysInRange,
   timeToMinutes,
 } from "@/lib/hr/attendance-utils"
-import { computeAttendanceDay, attendanceRateFrom, overtimeHoursFor, netDayHoursFor } from "@/lib/hr/attendance-ssot"
+import {
+  computeAttendanceDay,
+  attendanceRateFrom,
+  overtimeHoursFor,
+  netDayHoursFor,
+  getEffectiveAttendanceStartDate,
+} from "@/lib/hr/attendance-ssot"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
@@ -152,6 +158,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: attendanceError.message }, { status: 500 })
     }
 
+    // Query earliest attendance record for each employee to establish their scorable start date
+    const { data: earliestRows } = await dataClient
+      .from("attendance_records")
+      .select("user_id, date")
+      .in("user_id", allowedProfileIds)
+      .order("date", { ascending: true })
+
+    const earliestLogByEmployee = new Map<string, string>()
+    for (const row of earliestRows ?? []) {
+      if (row.user_id && row.date && !earliestLogByEmployee.has(row.user_id)) {
+        earliestLogByEmployee.set(row.user_id, row.date)
+      }
+    }
+
     // Appeals filed for days within the selected range, per employee
     const { data: appealRows } = await dataClient
       .from("attendance_appeals")
@@ -182,9 +202,14 @@ export async function GET(request: NextRequest) {
       recordsByEmployee.get(row.user_id)!.set(row.date, row)
     }
 
-    // Calculate workday-based summaries — missing days count as absent
+    // Calculate workday-based summaries — missing days count as absent only after attendance start date
     const summaries = allowedProfiles.map((profile) => {
       const empRecords = recordsByEmployee.get(profile.id) ?? new Map<string, AttendanceRow>()
+      const effectiveStartDate = getEffectiveAttendanceStartDate({
+        earliestLogDate: earliestLogByEmployee.get(profile.id) ?? null,
+        isExempt: Boolean(profile.attendance_exempt),
+      })
+
       let early_days = 0,
         present_days = 0,
         late_days = 0,
@@ -209,6 +234,8 @@ export async function GET(request: NextRequest) {
       let available_days = 0
 
       for (const workday of periodWorkdays) {
+        if (!effectiveStartDate || workday < effectiveStartDate) continue
+
         if (ctx.isHoliday(workday)) {
           holiday_days++
           continue
@@ -375,6 +402,7 @@ export async function GET(request: NextRequest) {
     type DeptAccumulator = {
       department: string
       employee_count: number
+      scorable_employee_count: number
       attendance_rate_sum: number
       clock_in_minutes_sum: number
       clock_in_days: number
@@ -394,6 +422,7 @@ export async function GET(request: NextRequest) {
         deptMap.set(deptName, {
           department: deptName,
           employee_count: 0,
+          scorable_employee_count: 0,
           attendance_rate_sum: 0,
           clock_in_minutes_sum: 0,
           clock_in_days: 0,
@@ -408,7 +437,10 @@ export async function GET(request: NextRequest) {
       }
       const dept = deptMap.get(deptName)!
       dept.employee_count += 1
-      dept.attendance_rate_sum += summary.attendance_rate
+      if (summary.total_days > 0) {
+        dept.scorable_employee_count += 1
+        dept.attendance_rate_sum += summary.attendance_rate
+      }
       dept.clock_in_minutes_sum += summary.clock_in_minutes_sum
       dept.clock_in_days += summary.clock_in_days
       dept.clock_out_minutes_sum += summary.clock_out_minutes_sum
@@ -425,7 +457,9 @@ export async function GET(request: NextRequest) {
         department: dept.department,
         employee_count: dept.employee_count,
         avg_attendance_rate:
-          dept.employee_count > 0 ? Math.round((dept.attendance_rate_sum / dept.employee_count) * 100) / 100 : 0,
+          dept.scorable_employee_count > 0
+            ? Math.round((dept.attendance_rate_sum / dept.scorable_employee_count) * 100) / 100
+            : 0,
         avg_clock_in_minutes:
           dept.clock_in_days > 0 ? Math.round(dept.clock_in_minutes_sum / dept.clock_in_days) : null,
         avg_clock_out_minutes:

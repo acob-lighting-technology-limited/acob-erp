@@ -11,6 +11,7 @@
  */
 
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
+import { getEffectiveAttendanceStartDate } from "@/lib/hr/attendance-ssot"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import {
   calculatePayroll,
@@ -141,7 +142,13 @@ export async function computePayrollBatch(
 
   const workdayDates = getPayrollWorkdays(period.start_date, period.end_date, ctx)
 
-  const [{ data: salaries }, { data: attendance }, { data: lunchLogs }, { data: existingEntries }] = await Promise.all([
+  const [
+    { data: salaries },
+    { data: attendance },
+    { data: earliestLogs },
+    { data: lunchLogs },
+    { data: existingEntries },
+  ] = await Promise.all([
     dataClient.from("employee_salaries").select("*").in("user_id", userIds).eq("is_active", true),
     dataClient
       .from("attendance_records")
@@ -150,6 +157,11 @@ export async function computePayrollBatch(
       .gte("date", period.start_date)
       .lte("date", period.end_date),
     dataClient
+      .from("attendance_records")
+      .select("user_id, date")
+      .in("user_id", userIds)
+      .order("date", { ascending: true }),
+    dataClient
       .from("attendance_lunch_log")
       .select("user_id, employee_deduction")
       .in("user_id", userIds)
@@ -157,6 +169,13 @@ export async function computePayrollBatch(
       .lte("date", period.end_date),
     dataClient.from("payroll_entries").select("*").eq("payroll_period_id", periodId),
   ])
+
+  const earliestLogByUser = new Map<string, string>()
+  for (const row of earliestLogs || []) {
+    if (row.user_id && row.date && !earliestLogByUser.has(row.user_id)) {
+      earliestLogByUser.set(row.user_id, row.date)
+    }
+  }
 
   const existingMap = new Map<string, any>((existingEntries || []).map((e: any) => [e.user_id, e]))
 
@@ -177,9 +196,15 @@ export async function computePayrollBatch(
     const salary = salaries?.find((s: any) => s.user_id === emp.id)
     const defaultMonthlyBase = salary ? Number(salary.basic_salary) : 0
 
+    const effectiveAttendanceStartDate = getEffectiveAttendanceStartDate({
+      earliestLogDate: earliestLogByUser.get(emp.id) ?? null,
+      isExempt: Boolean(emp.attendance_exempt),
+    })
+
     const { missedHours, absentDays } = derivePayrollAttendance({
       userId: emp.id,
       attendanceExempt: Boolean(emp.attendance_exempt),
+      effectiveAttendanceStartDate,
       workdayDates,
       attendanceByDate: attByUser.get(emp.id) || new Map(),
       ctx,

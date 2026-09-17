@@ -9,6 +9,7 @@ import {
   loadAttendancePolicy,
 } from "@/lib/hr/attendance-utils"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { getEffectiveAttendanceStartDate } from "@/lib/hr/attendance-ssot"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 
 type AttendanceRow = {
@@ -42,14 +43,28 @@ export async function GET(request: NextRequest) {
   const { start: monthStart, end: monthEnd } = monthBounds(yearMonth)
 
   const { data: profile } = await dataClient.from("profiles").select("attendance_exempt").eq("id", userId).maybeSingle()
-  const { data: records, error: recordsError } = await dataClient
-    .from("attendance_records")
-    .select("id, date, clock_in, clock_out, total_hours, status, source, waived, created_at, updated_at")
-    .eq("user_id", userId)
-    .gte("date", monthStart)
-    .lte("date", monthEnd)
-    .returns<AttendanceRow[]>()
+  const [{ data: records, error: recordsError }, { data: earliestRecord }] = await Promise.all([
+    dataClient
+      .from("attendance_records")
+      .select("id, date, clock_in, clock_out, total_hours, status, source, waived, created_at, updated_at")
+      .eq("user_id", userId)
+      .gte("date", monthStart)
+      .lte("date", monthEnd)
+      .returns<AttendanceRow[]>(),
+    dataClient
+      .from("attendance_records")
+      .select("date")
+      .eq("user_id", userId)
+      .order("date", { ascending: true })
+      .limit(1)
+      .maybeSingle<{ date: string }>(),
+  ])
   if (recordsError) return NextResponse.json({ error: recordsError.message }, { status: 500 })
+
+  const effectiveStartDate = getEffectiveAttendanceStartDate({
+    earliestLogDate: earliestRecord?.date ?? null,
+    isExempt: Boolean(profile?.attendance_exempt),
+  })
 
   const ctx = await loadDayContext(dataClient, { userIds: [userId], start: monthStart, end: monthEnd })
 
@@ -68,7 +83,7 @@ export async function GET(request: NextRequest) {
       const rec = recordsByDate.get(date) || null
       const closeTime = ctx.earlyCloseTime(date)
       const lateRes = ctx.lateResumptionTime(date)
-      const status = deriveUnifiedAttendanceStatus(
+      let status = deriveUnifiedAttendanceStatus(
         {
           record: rec,
           isHoliday: ctx.isHoliday(date),
@@ -81,6 +96,13 @@ export async function GET(request: NextRequest) {
         },
         policy
       )
+
+      if (!rec && (!effectiveStartDate || date < effectiveStartDate)) {
+        if (!ctx.isHoliday(date) && !ctx.isOnLeave(userId, date) && !ctx.isOnUnpaidLeave(userId, date)) {
+          status = "no_record"
+        }
+      }
+
       return { date, record: rec, status }
     })
 
