@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react"
 import type { Task } from "@/types/task"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { formatWATDateTime, formatWATDate, toLocalISODate } from "@/lib/utils/date"
@@ -155,110 +156,126 @@ export function UserTaskDetailsDialog({
           />
         </DetailActionBar>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-5 px-4 py-4 sm:px-6">
-            {/* Anything that needs answering comes before the reference data. */}
-            {(selectedTask.unable_to_complete_reason ||
-              selectedTask.failure_reason ||
-              selectedTask.extension_reason) && (
-              <div className="space-y-2">
-                {selectedTask.unable_to_complete_reason && (
-                  <DetailCallout tone="amber" label="Reported blocker">
-                    {selectedTask.unable_to_complete_reason}
-                  </DetailCallout>
-                )}
-                {selectedTask.failure_reason && (
-                  <DetailCallout tone="rose" label="Failure note">
-                    {selectedTask.failure_reason}
-                  </DetailCallout>
-                )}
-                {selectedTask.extension_reason && (
-                  <DetailCallout tone="blue" label="Extension granted for">
-                    {selectedTask.extension_reason}
-                  </DetailCallout>
-                )}
-              </div>
-            )}
-
-            {selectedTask.description && (
-              <section className="space-y-1.5">
-                <DetailSectionHeading>What was asked for</DetailSectionHeading>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedTask.description}</p>
-              </section>
-            )}
-
-            <section className="space-y-3">
-              <DetailSectionHeading>Details</DetailSectionHeading>
-              <DetailFieldGrid>
-                <DetailField icon={User} label="Assigned to">
-                  {assignedToName}
-                </DetailField>
-                <DetailField icon={CalendarDays} label="Period">
-                  {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
-                </DetailField>
-                <DetailField icon={Target} label="Strategic goal">
-                  {selectedTask.goal_title || <span className="text-muted-foreground">—</span>}
-                </DetailField>
-                <DetailField icon={Target} label="Corporate KPI">
-                  {selectedTask.kpi_measure ? (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium">{selectedTask.kpi_measure}</span>
-                      {selectedTask.kpi_pillar && (
-                        <span className="text-muted-foreground text-[11px]">🎯 {selectedTask.kpi_pillar}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </DetailField>
-                <DetailField icon={Gauge} label="Weight">
-                  <Badge
-                    variant="outline"
-                    className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
-                  >
-                    {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+        <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
+          <div className="border-b px-4 py-2 sm:px-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="activity" className="gap-1.5">
+                <span>Activity</span>
+                {taskUpdates.length > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+                    {taskUpdates.length}
                   </Badge>
-                </DetailField>
-                <DetailField icon={Star} label="Rating">
-                  {selectedTask.rating ? (
-                    `${selectedTask.rating}/5 — ${TASK_RATING_LABELS[selectedTask.rating]}`
-                  ) : (
-                    <span className="text-muted-foreground">Not yet rated</span>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="details" className="mt-0 min-h-0 flex-1 overflow-y-auto">
+            <div className="space-y-5 px-4 py-4 sm:px-6">
+              {/* Anything that needs answering comes before the reference data. */}
+              {(selectedTask.unable_to_complete_reason ||
+                selectedTask.failure_reason ||
+                selectedTask.extension_reason) && (
+                <div className="space-y-2">
+                  {selectedTask.unable_to_complete_reason && (
+                    <DetailCallout tone="amber" label="Reported blocker">
+                      {selectedTask.unable_to_complete_reason}
+                    </DetailCallout>
                   )}
-                </DetailField>
-                <DetailField icon={Building2} label="Created">
-                  {formatWATDateTime(selectedTask.created_at)}
-                </DetailField>
-                {selectedTask.reviewed_by_user && (
-                  <DetailField icon={User} label="Reviewed by">
-                    {formatFullName(selectedTask.reviewed_by_user.first_name, selectedTask.reviewed_by_user.last_name)}
-                    {selectedTask.reviewed_at && (
-                      <span className="text-muted-foreground"> · {formatWATDateTime(selectedTask.reviewed_at)}</span>
+                  {selectedTask.failure_reason && (
+                    <DetailCallout tone="rose" label="Failure note">
+                      {selectedTask.failure_reason}
+                    </DetailCallout>
+                  )}
+                  {selectedTask.extension_reason && (
+                    <DetailCallout tone="blue" label="Extension granted for">
+                      {selectedTask.extension_reason}
+                    </DetailCallout>
+                  )}
+                </div>
+              )}
+
+              {selectedTask.description && (
+                <section className="space-y-1.5">
+                  <DetailSectionHeading>What was asked for</DetailSectionHeading>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedTask.description}</p>
+                </section>
+              )}
+
+              <section className="space-y-3">
+                <DetailSectionHeading>Details</DetailSectionHeading>
+                <DetailFieldGrid>
+                  <DetailField icon={User} label="Assigned to">
+                    {assignedToName}
+                  </DetailField>
+                  <DetailField icon={CalendarDays} label="Period">
+                    {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
+                  </DetailField>
+                  <DetailField icon={Target} label="Strategic goal">
+                    {selectedTask.goal_title || <span className="text-muted-foreground">—</span>}
+                  </DetailField>
+                  <DetailField icon={Target} label="Corporate KPI">
+                    {selectedTask.kpi_measure ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium">{selectedTask.kpi_measure}</span>
+                        {selectedTask.kpi_pillar && (
+                          <span className="text-muted-foreground text-[11px]">🎯 {selectedTask.kpi_pillar}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </DetailField>
-                )}
-                {selectedTask.group_id && (
-                  <DetailField icon={Users} label="Shared task">
-                    Assigned to several people
+                  <DetailField icon={Gauge} label="Weight">
+                    <Badge
+                      variant="outline"
+                      className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
+                    >
+                      {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+                    </Badge>
                   </DetailField>
-                )}
-              </DetailFieldGrid>
-            </section>
+                  <DetailField icon={Star} label="Rating">
+                    {selectedTask.rating ? (
+                      `${selectedTask.rating}/5 — ${TASK_RATING_LABELS[selectedTask.rating]}`
+                    ) : (
+                      <span className="text-muted-foreground">Not yet rated</span>
+                    )}
+                  </DetailField>
+                  <DetailField icon={Building2} label="Created">
+                    {formatWATDateTime(selectedTask.created_at)}
+                  </DetailField>
+                  {selectedTask.reviewed_by_user && (
+                    <DetailField icon={User} label="Reviewed by">
+                      {formatFullName(
+                        selectedTask.reviewed_by_user.first_name,
+                        selectedTask.reviewed_by_user.last_name
+                      )}
+                      {selectedTask.reviewed_at && (
+                        <span className="text-muted-foreground"> · {formatWATDateTime(selectedTask.reviewed_at)}</span>
+                      )}
+                    </DetailField>
+                  )}
+                  {selectedTask.group_id && (
+                    <DetailField icon={Users} label="Shared task">
+                      Assigned to several people
+                    </DetailField>
+                  )}
+                </DetailFieldGrid>
+              </section>
+            </div>
+          </TabsContent>
 
-            {/* ── Activity, in the same scroll rather than behind a tab ─────── */}
-            {/* It is usually a handful of entries, and hiding it cost a click to
-                find out whether anything had happened at all. */}
-            <section className="space-y-3">
-              <DetailSectionHeading count={taskUpdates.length}>Activity</DetailSectionHeading>
-
+          <TabsContent value="activity" className="mt-0 min-h-0 flex-1 overflow-y-auto">
+            <div className="space-y-4 px-4 py-4 sm:px-6">
               {onAddComment && (
                 <div className="space-y-2">
                   <Textarea
                     value={commentDraft}
                     onChange={(event) => setCommentDraft(event.target.value)}
-                    placeholder="Post a progress note or update…"
-                    className="min-h-[68px] text-sm"
-                    aria-label="Add a comment"
+                    placeholder="Post an activity note or progress update…"
+                    className="min-h-[72px] text-sm"
+                    aria-label="Add an activity"
                   />
                   <div className="flex justify-end">
                     <Button
@@ -271,7 +288,7 @@ export function UserTaskDetailsDialog({
                       }}
                     >
                       <Send className="h-3.5 w-3.5" />
-                      {isPostingComment ? "Posting…" : "Post comment"}
+                      {isPostingComment ? "Posting…" : "Post activity"}
                     </Button>
                   </div>
                 </div>
@@ -290,14 +307,14 @@ export function UserTaskDetailsDialog({
                   ))}
                 </ul>
               ) : (
-                <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                <p className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
                   <MessageSquare className="h-4 w-4" />
-                  No updates yet.
+                  No activities yet.
                 </p>
               )}
-            </section>
-          </div>
-        </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   )

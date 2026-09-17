@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import {
   AlertTriangle,
   Clock,
-  ExternalLink,
+  ArrowRight,
   FolderCog,
   FolderKanban,
   BarChart3,
@@ -32,16 +32,22 @@ import {
   type PortfolioHealth,
   type ProjectHealth,
 } from "@/lib/projects/health"
-import { HealthBadge, PortfolioStatusBadge, ProjectProgress, WorkDoneCell } from "@/components/projects/project-summary"
+import {
+  HealthBadge,
+  PortfolioStatusBadge,
+  WorkDoneCell,
+  WorkDoneText,
+  plansText,
+} from "@/components/projects/project-summary"
 import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
-import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import { DeletePortfolioDialog } from "./delete-portfolio-dialog"
 import { PortfolioDialog } from "./portfolio-dialog"
 import { PortfolioProjectsDialog } from "./portfolio-projects-dialog"
 import { PortfolioOverview } from "./portfolio-overview"
 import { ProjectCharts, type ChartsProject } from "@/components/projects/project-charts"
 import type { ProjectHealthTask } from "@/lib/projects/health"
-import { projectHref } from "./project-href"
+import { portfolioHref, projectHref } from "@/lib/projects/links"
+import { useRouter } from "next/navigation"
 
 export type ProjectHealthRow = ProjectHealth & {
   id: string
@@ -59,142 +65,75 @@ export type Portfolio = {
   rollup: PortfolioHealth
 }
 
-/** The plans and project boards shown when a portfolio is expanded. */
+/**
+ * The projects shown when a portfolio row is expanded — a short list that
+ * links to each project's own page, where its plans are managed.
+ */
 function PortfolioProjects({
+  portfolioId,
   projects,
   isAdmin,
-  profiles = [],
   onManage,
   onAddProject,
 }: {
+  portfolioId: string
   projects: ProjectHealthRow[]
   isAdmin: boolean
-  profiles?: ProjectManagerOption[]
   onManage?: () => void
   onAddProject?: () => void
 }) {
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || "")
-
-  const activeProject = projects.find((p) => p.id === selectedProjectId) || projects[0] || null
-
-  const actions =
-    onManage || onAddProject ? (
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {onManage && (
-          <Button type="button" variant="outline" size="sm" onClick={onManage}>
-            <FolderCog className="mr-2 h-4 w-4" />
-            Manage Projects
-          </Button>
-        )}
-        {onAddProject && (
-          <Button type="button" size="sm" onClick={onAddProject}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
-        )}
-      </div>
-    ) : null
-
-  if (projects.length === 0) {
-    return (
-      <div className="space-y-3 p-4">
+  return (
+    <div className="space-y-3 p-2">
+      {projects.length === 0 ? (
         <p className="text-muted-foreground rounded-lg border border-dashed py-8 text-center text-sm">
           No projects in this portfolio yet.
         </p>
-        {actions}
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4 p-2">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {projects.length > 1 ? (
-            <div className="bg-muted/60 flex flex-wrap items-center gap-1.5 rounded-lg p-1">
-              {projects.map((p) => {
-                const isActive = p.id === activeProject?.id
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setSelectedProjectId(p.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
-                      isActive
-                        ? "bg-background text-foreground font-semibold shadow-xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <span>{p.project_name}</span>
-                    <span className={cn("h-1.5 w-1.5 rounded-full", HEALTH_DOT[p.status])} />
-                  </button>
-                )
-              })}
-            </div>
-          ) : activeProject ? (
-            <span className="text-foreground text-sm font-semibold">{activeProject.project_name}</span>
-          ) : null}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {activeProject && (
-            <Link
-              href={projectHref(activeProject.project_name, isAdmin)}
-              className="text-primary mr-1 inline-flex items-center gap-1 text-xs hover:underline"
-            >
-              Open project workspace <ExternalLink className="h-3.5 w-3.5" />
-            </Link>
-          )}
-          {actions}
-        </div>
-      </div>
-
-      {activeProject && (
-        <div className="bg-card space-y-4 rounded-xl border p-4 shadow-xs">
-          <div className="space-y-3 border-b pb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-foreground text-base font-semibold">{activeProject.project_name}</h4>
-              <HealthBadge status={activeProject.status} />
-              {activeProject.overdueCount > 0 && (
-                <span className="text-xs font-medium text-red-700 dark:text-red-400">
-                  {plural(activeProject.overdueCount, "task")} past due
+      ) : (
+        <ul className="bg-card divide-y rounded-lg border">
+          {projects.map((project) => (
+            <li key={project.id}>
+              <Link
+                href={projectHref(project.id, isAdmin)}
+                className="group hover:bg-muted/40 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{project.project_name}</span>
+                <HealthBadge status={project.status} />
+                <span className="text-muted-foreground text-xs">
+                  <WorkDoneText health={project} />
                 </span>
-              )}
-            </div>
-            <ProjectProgress health={activeProject} />
-          </div>
-
-          <ProjectPlanBoard
-            project={{
-              id: activeProject.id,
-              project_name: activeProject.project_name,
-              location: "",
-              deployment_start_date: "",
-              deployment_end_date: "",
-              capacity_w: null,
-              technology_type: null,
-              project_manager_id: null,
-              description: null,
-              status: (activeProject.lifecycle_status as any) || "active",
-              created_at: "",
-              updated_at: "",
-              portfolio_id: null,
-            }}
-            profiles={profiles}
-            readOnly={!isAdmin}
-          />
-        </div>
+                {plansText(project) && <span className="text-muted-foreground text-xs">{plansText(project)}</span>}
+                <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button asChild variant="ghost" size="sm">
+          <Link href={portfolioHref(portfolioId, isAdmin)}>
+            Open portfolio
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+        {(onManage || onAddProject) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {onManage && (
+              <Button type="button" variant="outline" size="sm" onClick={onManage}>
+                <FolderCog className="mr-2 h-4 w-4" />
+                Manage Projects
+              </Button>
+            )}
+            {onAddProject && (
+              <Button type="button" size="sm" onClick={onAddProject}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Project
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
-}
-
-const HEALTH_DOT: Record<ProjectHealthRow["status"], string> = {
-  on_track: "bg-emerald-500",
-  at_risk: "bg-amber-500",
-  behind_schedule: "bg-red-500",
-  completed: "bg-blue-500",
 }
 
 type ProjectManagerOption = {
@@ -212,6 +151,7 @@ interface PortfoliosContentProps {
 }
 
 export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosContentProps = {}) {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<string>("portfolios")
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -296,7 +236,13 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         accessor: (r) => r.name,
         render: (r) => (
           <div className="space-y-1">
-            <p className="text-foreground font-semibold">{r.code ? `${r.code} — ${r.name}` : r.name}</p>
+            <Link
+              href={portfolioHref(r.id, isAdmin)}
+              onClick={(e) => e.stopPropagation()}
+              className="text-foreground hover:text-primary font-semibold hover:underline"
+            >
+              {r.code ? `${r.code} — ${r.name}` : r.name}
+            </Link>
             {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
           </div>
         ),
@@ -356,7 +302,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         render: (r) => <PortfolioStatusBadge status={r.status} />,
       },
     ],
-    []
+    [isAdmin]
   )
 
   const filters = useMemo<DataTableFilter<Portfolio>[]>(
@@ -455,7 +401,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
           <ProjectCharts projects={chartProjects} filterBy="portfolio" />
         )
       ) : activeTab === "overview" ? (
-        <PortfolioOverview rows={rows} unassigned={data?.unassigned} />
+        <PortfolioOverview rows={rows} unassigned={data?.unassigned} isAdmin={isAdmin} />
       ) : (
         <DataTable<Portfolio>
           data={rows}
@@ -503,6 +449,11 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
             </div>
           )}
           rowActions={[
+            {
+              label: "Open portfolio",
+              icon: ArrowRight,
+              onClick: (r: Portfolio) => router.push(portfolioHref(r.id, isAdmin)),
+            },
             ...(isAdmin
               ? [
                   { label: "Manage Projects", icon: FolderCog, onClick: (r: Portfolio) => setManagingId(r.id) },
@@ -521,9 +472,9 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
             render: (r) => (
               <div className="bg-muted/20 rounded-lg border p-2">
                 <PortfolioProjects
+                  portfolioId={r.id}
                   projects={r.projects}
                   isAdmin={isAdmin}
-                  profiles={profiles}
                   onManage={isAdmin ? () => setManagingId(r.id) : undefined}
                   onAddProject={isAdmin ? () => setCreateInPortfolioId(r.id) : undefined}
                 />

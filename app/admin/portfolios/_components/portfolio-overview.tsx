@@ -1,6 +1,8 @@
 "use client"
 
+import Link from "next/link"
 import { Layers } from "lucide-react"
+import { portfolioHref } from "@/lib/projects/links"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { HEALTH_TONE, LabelledBar, PortfolioStatusBadge } from "@/components/projects/project-summary"
 import { cn } from "@/lib/utils"
@@ -10,6 +12,7 @@ import type { Portfolio, ProjectHealthRow } from "./portfolios-content"
 interface PortfolioOverviewProps {
   rows: Portfolio[]
   unassigned?: { projects: ProjectHealthRow[]; rollup: PortfolioHealth }
+  isAdmin: boolean
 }
 
 const STATUS_ORDER = ["completed", "on_track", "at_risk", "behind_schedule"] as const
@@ -64,7 +67,7 @@ function StatusMix({ rollup }: { rollup: PortfolioHealth }) {
   )
 }
 
-export function PortfolioOverview({ rows, unassigned }: PortfolioOverviewProps) {
+export function PortfolioOverview({ rows, unassigned, isAdmin }: PortfolioOverviewProps) {
   const portfolioLines = [
     ...rows.map((portfolio) => ({
       key: portfolio.id,
@@ -109,9 +112,16 @@ export function PortfolioOverview({ rows, unassigned }: PortfolioOverviewProps) 
                     <Layers className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className={cn("truncate text-sm font-semibold", !line.status && "text-muted-foreground")}>
-                      {line.name}
-                    </p>
+                    {line.key === "unassigned" ? (
+                      <p className="text-muted-foreground truncate text-sm font-semibold">{line.name}</p>
+                    ) : (
+                      <Link
+                        href={portfolioHref(line.key, isAdmin)}
+                        className="hover:text-primary block truncate text-sm font-semibold hover:underline"
+                      >
+                        {line.name}
+                      </Link>
+                    )}
                     {line.code && <p className="text-muted-foreground font-mono text-[11px]">{line.code}</p>}
                   </div>
                 </div>

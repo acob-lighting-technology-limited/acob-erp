@@ -201,8 +201,11 @@ export function ProjectCharts({
   filterBy,
 }: {
   projects: ChartsProject[]
-  /** What the dropdown narrows the charts to: one portfolio, or one project. */
-  filterBy: "portfolio" | "project"
+  /**
+   * What the dropdown narrows the charts to: one portfolio, or one project.
+   * "none" is for a single project's own page — no dropdown, no portfolio chart.
+   */
+  filterBy: "portfolio" | "project" | "none"
 }) {
   const [scope, setScope] = useState("all")
   const today = toLocalISODate()
@@ -250,19 +253,21 @@ export function ProjectCharts({
 
   return (
     <div className={`space-y-4 ${COLOR_VARS}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchableSelect
-          value={scope}
-          onValueChange={(value) => setScope(value || "all")}
-          options={options}
-          placeholder={filterBy === "project" ? "All projects" : "All portfolios"}
-          searchPlaceholder={filterBy === "project" ? "Search projects..." : "Search portfolios..."}
-          className="w-full sm:w-80"
-        />
-        <span className="text-muted-foreground text-xs">
-          {plural(selected.length, "project")} · {plural(progress.total, "task")}
-        </span>
-      </div>
+      {filterBy !== "none" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchableSelect
+            value={scope}
+            onValueChange={(value) => setScope(value || "all")}
+            options={options}
+            placeholder={filterBy === "project" ? "All projects" : "All portfolios"}
+            searchPlaceholder={filterBy === "project" ? "Search projects..." : "Search portfolios..."}
+            className="w-full sm:w-80"
+          />
+          <span className="text-muted-foreground text-xs">
+            {plural(selected.length, "project")} · {plural(progress.total, "task")}
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartCard
@@ -366,6 +371,7 @@ export function ProjectCharts({
         </ChartCard>
 
         <ChartCard
+          className={filterBy === "none" ? "lg:col-span-2" : undefined}
           title="Is the team speeding up or slowing down?"
           description="Tasks finished each week, over the last 12 weeks."
           notes={
@@ -413,69 +419,71 @@ export function ProjectCharts({
           )}
         </ChartCard>
 
-        <ChartCard
-          title="Which portfolio is in trouble?"
-          description="Projects in each portfolio, by how they are progressing."
-          legend={
-            <Legend
-              items={STATUS_ORDER.map((status) => ({
-                label: PROJECT_HEALTH_LABELS[status],
-                color: STATUS_COLOR[status],
-              }))}
-            />
-          }
-          table={{
-            columns: ["Portfolio", ...STATUS_ORDER.map((s) => PROJECT_HEALTH_LABELS[s])],
-            rows: byPortfolio.map((g) => [g.name, ...STATUS_ORDER.map((s) => g[s])]),
-          }}
-        >
-          {byPortfolio.length === 0 ? (
-            <EmptyChart message="No projects yet." />
-          ) : (
-            <div style={{ height: Math.max(160, byPortfolio.length * 40 + 32) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byPortfolio} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                  <CartesianGrid horizontal={false} stroke="var(--border)" />
-                  <XAxis type="number" allowDecimals={false} {...AXIS} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={150}
-                    tickFormatter={(v) => truncate(String(v), 22)}
-                    {...AXIS}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "var(--muted)", opacity: 0.5 }}
-                    content={({ active, payload, label }) =>
-                      active && payload?.length ? (
-                        <TooltipBox
-                          title={String(label)}
-                          rows={STATUS_ORDER.map((status) => ({
-                            label: PROJECT_HEALTH_LABELS[status],
-                            value: payload[0].payload[status],
-                            color: STATUS_COLOR[status],
-                          }))}
-                        />
-                      ) : null
-                    }
-                  />
-                  {STATUS_ORDER.map((status) => (
-                    <Bar
-                      key={status}
-                      dataKey={status}
-                      stackId="status"
-                      fill={STATUS_COLOR[status]}
-                      stroke="var(--card)"
-                      strokeWidth={2}
-                      maxBarSize={24}
-                      isAnimationActive={false}
+        {filterBy !== "none" && (
+          <ChartCard
+            title="Which portfolio is in trouble?"
+            description="Projects in each portfolio, by how they are progressing."
+            legend={
+              <Legend
+                items={STATUS_ORDER.map((status) => ({
+                  label: PROJECT_HEALTH_LABELS[status],
+                  color: STATUS_COLOR[status],
+                }))}
+              />
+            }
+            table={{
+              columns: ["Portfolio", ...STATUS_ORDER.map((s) => PROJECT_HEALTH_LABELS[s])],
+              rows: byPortfolio.map((g) => [g.name, ...STATUS_ORDER.map((s) => g[s])]),
+            }}
+          >
+            {byPortfolio.length === 0 ? (
+              <EmptyChart message="No projects yet." />
+            ) : (
+              <div style={{ height: Math.max(160, byPortfolio.length * 40 + 32) }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={byPortfolio} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid horizontal={false} stroke="var(--border)" />
+                    <XAxis type="number" allowDecimals={false} {...AXIS} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={150}
+                      tickFormatter={(v) => truncate(String(v), 22)}
+                      {...AXIS}
                     />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </ChartCard>
+                    <Tooltip
+                      cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+                      content={({ active, payload, label }) =>
+                        active && payload?.length ? (
+                          <TooltipBox
+                            title={String(label)}
+                            rows={STATUS_ORDER.map((status) => ({
+                              label: PROJECT_HEALTH_LABELS[status],
+                              value: payload[0].payload[status],
+                              color: STATUS_COLOR[status],
+                            }))}
+                          />
+                        ) : null
+                      }
+                    />
+                    {STATUS_ORDER.map((status) => (
+                      <Bar
+                        key={status}
+                        dataKey={status}
+                        stackId="status"
+                        fill={STATUS_COLOR[status]}
+                        stroke="var(--card)"
+                        strokeWidth={2}
+                        maxBarSize={24}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </ChartCard>
+        )}
 
         <ChartCard
           className="lg:col-span-2"

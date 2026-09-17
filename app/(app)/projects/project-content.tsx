@@ -25,6 +25,7 @@ import {
   Clock,
   LayoutDashboard,
   BarChart3,
+  ArrowRight,
 } from "lucide-react"
 import {
   PROJECT_HEALTH_LABELS,
@@ -47,6 +48,8 @@ import {
 import { ProjectsOverview, type OverviewProject } from "@/components/projects/projects-overview"
 import { ProjectCharts, type ChartsProject } from "@/components/projects/project-charts"
 import { toLocalISODate } from "@/lib/utils/date"
+import { projectHref } from "@/lib/projects/links"
+import Link from "next/link"
 import {
   PROJECT_PRIORITIES,
   PROJECT_PRIORITY_HELP,
@@ -54,7 +57,6 @@ import {
   normalizePriority,
   priorityRank,
 } from "@/lib/projects/priority"
-import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 
 // Define user-facing project type (includes tasks count payload)
@@ -221,7 +223,13 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
         accessor: (r) => r.project_name,
         render: (r) => (
           <div className="space-y-1">
-            <p className="text-foreground font-semibold">{r.project_name}</p>
+            <Link
+              href={projectHref(r.id, false)}
+              onClick={(e) => e.stopPropagation()}
+              className="text-foreground hover:text-primary font-semibold hover:underline"
+            >
+              {r.project_name}
+            </Link>
             {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
           </div>
         ),
@@ -440,10 +448,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
       {activeTab === "charts" ? (
         <ProjectCharts projects={chartProjects} filterBy="project" />
       ) : activeTab === "overview" ? (
-        <ProjectsOverview
-          projects={overviewItems}
-          hrefFor={(p) => `${pathname}?q=${encodeURIComponent(p.project_name)}`}
-        />
+        <ProjectsOverview projects={overviewItems} hrefFor={(p) => projectHref(p.id, false)} />
       ) : (
         <DataTable<ProjectRow>
           data={rowsByPriority}
@@ -569,7 +574,14 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
             render: (r) => (
               <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
                 <ProjectSummary project={r} health={healthById.get(r.id)} />
-                <ProjectPlanBoard project={r as any} profiles={profiles} readOnly={true} />
+                <div className="flex justify-end">
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={projectHref(r.id, false)}>
+                      Open project and plans
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
             ),
           }}
