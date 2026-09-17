@@ -22,6 +22,10 @@ import {
   Pencil,
   Activity,
   Layers,
+  TrendingUp,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
@@ -36,6 +40,7 @@ import {
   HealthBadge,
   ProjectStatusBadge,
   ProjectSummary,
+  ProjectStatusBar,
   formatCapacity,
   formatVariance,
 } from "@/components/projects/project-summary"
@@ -91,6 +96,35 @@ async function fetchProjects(): Promise<Project[]> {
   return (payload?.data || []) as Project[]
 }
 
+function getProjectTaskCounts(tasks: ProjectHealthTask[] = []) {
+  const today = toLocalISODate()
+  let completed = 0
+  let inProgress = 0
+  let overdue = 0
+  let pending = 0
+  for (const t of tasks) {
+    if (t.is_archived) continue
+    const status = String(t.status || "").toLowerCase()
+    const deadline = t.task_end_date || t.due_date
+    const isPastDue =
+      deadline &&
+      String(deadline).slice(0, 10) < today &&
+      status !== "completed" &&
+      status !== "cancelled" &&
+      status !== "reassigned"
+    if (status === "completed") {
+      completed++
+    } else if (isPastDue) {
+      overdue++
+    } else if (status === "in_progress") {
+      inProgress++
+    } else {
+      pending++
+    }
+  }
+  return { completed, inProgress, overdue, pending, total: completed + inProgress + overdue + pending }
+}
+
 export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminContentProps) {
   const queryClient = useQueryClient()
   const [activeProject, setActiveProject] = useState<Project | null>(null)
@@ -108,20 +142,6 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
     queryFn: fetchProjects,
   })
 
-  // Calculate project summary statistics
-  const stats = useMemo(() => {
-    const total = rows.length
-    const active = rows.filter((r) => r.status === "active").length
-    const completed = rows.filter((r) => r.status === "completed").length
-    const totalCapacityWatts = rows.reduce((sum, r) => sum + (r.capacity_w || 0), 0)
-    return {
-      total,
-      active,
-      completed,
-      totalCapacity: formatCapacity(totalCapacityWatts),
-    }
-  }, [rows])
-
   // Health is derived from the project's own tasks on every render — nothing
   // about progress is stored, so these figures cannot drift from the tasks.
   const healthById = useMemo(() => {
@@ -138,6 +158,47 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
       ])
     )
   }, [rows])
+
+  // Calculate intuitive project summary statistics
+  const stats = useMemo(() => {
+    const total = rows.length
+    const active = rows.filter((r) => r.status === "active").length
+    const completed = rows.filter((r) => r.status === "completed").length
+
+    let totalDeliveryPctSum = 0
+    let projectsWithDeliveryCount = 0
+    let onTrackCount = 0
+    let atRiskCount = 0
+    let totalOverdue = 0
+
+    for (const p of rows) {
+      const h = healthById.get(p.id)
+      if (h) {
+        if (h.deliveryPct !== null) {
+          totalDeliveryPctSum += h.deliveryPct
+          projectsWithDeliveryCount++
+        }
+        if (h.status === "on_track" || h.status === "completed") {
+          onTrackCount++
+        } else {
+          atRiskCount++
+        }
+        totalOverdue += h.overdueCount
+      }
+    }
+
+    const avgDelivery = projectsWithDeliveryCount > 0 ? Math.round(totalDeliveryPctSum / projectsWithDeliveryCount) : 0
+
+    return {
+      total,
+      active,
+      completed,
+      avgDelivery,
+      onTrackCount,
+      atRiskCount,
+      totalOverdue,
+    }
+  }, [rows, healthById])
 
   // Technology Types option list for filtering
   const techOptions = useMemo(() => {
@@ -297,35 +358,35 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         <StatGrid>
           <StatCard
             variant="compact"
-            title="Total Projects"
-            value={stats.total}
+            title="Active Projects"
+            value={`${stats.active} / ${stats.total}`}
             icon={FolderKanban}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
           />
           <StatCard
             variant="compact"
-            title="Ongoing Projects"
-            value={stats.active}
-            icon={Wrench}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Completed Projects"
-            value={stats.completed}
-            icon={ShieldCheck}
+            title="Avg Delivery Progress"
+            value={`${stats.avgDelivery}%`}
+            icon={TrendingUp}
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
           <StatCard
             variant="compact"
-            title="Total Power Capacity"
-            value={stats.totalCapacity}
-            icon={FolderGit2}
-            iconBgColor="bg-violet-500/10"
-            iconColor="text-violet-500"
+            title="Schedule Health"
+            value={`${stats.onTrackCount} On Track`}
+            icon={ShieldCheck}
+            iconBgColor={stats.atRiskCount > 0 ? "bg-amber-500/10" : "bg-emerald-500/10"}
+            iconColor={stats.atRiskCount > 0 ? "text-amber-500" : "text-emerald-500"}
+          />
+          <StatCard
+            variant="compact"
+            title="Action Items"
+            value={`${stats.totalOverdue} Overdue`}
+            icon={stats.totalOverdue > 0 ? AlertTriangle : CheckCircle2}
+            iconBgColor={stats.totalOverdue > 0 ? "bg-red-500/10" : "bg-slate-500/10"}
+            iconColor={stats.totalOverdue > 0 ? "text-red-500" : "text-slate-500"}
           />
         </StatGrid>
       }
@@ -450,12 +511,26 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         ]}
         forceRowActionsDropdown
         expandable={{
-          render: (r) => (
-            <div className="bg-muted/20 space-y-2 rounded-lg border p-2">
-              <ProjectSummary project={r} health={healthById.get(r.id)} />
-              <ProjectPlanBoard project={r} profiles={profiles} />
-            </div>
-          ),
+          render: (r) => {
+            const taskCounts = getProjectTaskCounts(r.tasks || [])
+            return (
+              <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
+                <ProjectSummary project={r} health={healthById.get(r.id)} />
+                {taskCounts.total > 0 && (
+                  <div className="bg-card space-y-1.5 rounded-lg border p-3">
+                    <div className="flex items-center justify-between text-xs font-medium">
+                      <span className="text-foreground font-semibold">Task Breakdown</span>
+                      <span className="text-muted-foreground">
+                        {taskCounts.completed} of {taskCounts.total} tasks finished
+                      </span>
+                    </div>
+                    <ProjectStatusBar {...taskCounts} />
+                  </div>
+                )}
+                <ProjectPlanBoard project={r} profiles={profiles} />
+              </div>
+            )
+          },
         }}
         emptyTitle="No Projects Found"
         emptyDescription="Create a new project deployment profile to start tracking tasks."
