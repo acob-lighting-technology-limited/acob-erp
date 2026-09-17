@@ -22,20 +22,33 @@ function displayName(row: DirectoryRow | undefined): string {
   return row.full_name?.trim() || [row.first_name, row.last_name].filter(Boolean).join(" ") || "Unknown"
 }
 
-export type MdDeskAccess = { isMember: boolean; canEdit: boolean; isMd: boolean; canManageDelegates: boolean }
+export type MdDeskAccess = {
+  isMember: boolean
+  /** May open MD's Desk pages: the MD, delegates, and (for now) super admins and developers. */
+  canView: boolean
+  canEdit: boolean
+  isMd: boolean
+  canManageDelegates: boolean
+}
 
 /** Same database helpers the RLS policies use, so page gates and data rules agree. */
 export async function loadMdDeskAccess(session: EventsSession): Promise<MdDeskAccess> {
   const { supabase } = session
-  const [member, edit, md, admin] = await Promise.all([
+  const [member, edit, md, admin, superAdmin] = await Promise.all([
     supabase.rpc("is_md_desk_member"),
     supabase.rpc("can_edit_md_desk"),
     supabase.rpc("is_md"),
     supabase.rpc("is_admin_like"),
+    // has_role('super_admin') is true for super_admin and developer.
+    supabase.rpc("has_role", { required_role: "super_admin" }),
   ])
   const isMd = md.data === true
+  const isMember = member.data === true
   return {
-    isMember: member.data === true,
+    isMember,
+    // Temporary product decision: super admins and developers see MD's Desk without
+    // being delegates. RLS still hides the MD's private event details from them.
+    canView: isMember || superAdmin.data === true,
     canEdit: edit.data === true,
     isMd,
     canManageDelegates: isMd || admin.data === true,

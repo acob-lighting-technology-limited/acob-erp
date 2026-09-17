@@ -37,6 +37,7 @@ export type MdDeskDelegate = {
 
 export type MdDeskAccessDto = {
   isMember: boolean
+  canView: boolean
   canEdit: boolean
   isMd: boolean
   canManageDelegates: boolean
