@@ -332,7 +332,7 @@ app/admin/<section>/<page>/
 3. Stats cards     3–4 StatCard items — total, a key status, a period, a %
 4. DataTable       renders internally in this fixed order:
      a. Search bar (debounced 300ms) + Columns toggle + View toggle
-     b. Filter dropdowns  (minimum 2 per table page)
+     b. Filter dropdowns  (minimum 2, maximum 4 per table)
      c. Active filter pills + "Clear all" button
      d. Row count  — always visible: "X results" / "Showing X–Y of Z"
      e. Skeleton rows while loading  (never a spinner)
@@ -543,6 +543,8 @@ table or filter bar. Use `ExportOptionsDialog` from
 - ❌ Inline search or filter state in a page — all handled by `DataTable`
 - ❌ `<Loader2>` spinner for table loading — skeletons are automatic
 - ❌ Fewer than 2 filter options on any table page
+- ❌ More than 4 filters on one table — pick the four people actually use; merge a
+  start/end pair into one range filter rather than two dropdowns
 - ❌ A table page with no metrics at all — supply `stats` (StatCards), `statBadges`,
   or both. Prefer `statBadges` with `statBadgeStyle="line"` on lookup and record
   pages: even a `StatGrid` row of three costs a phone height it could spend on

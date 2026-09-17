@@ -236,12 +236,35 @@ export function EventsWorkspace({
     },
   ]
 
+  // At most four filters per page. MD schedule only matters on the company-wide
+  // management page (on MD's Desk every event is on the MD's schedule), and that
+  // page drops Format to stay within four. Type is hidden when a page shows one type.
+  const showMdScheduleFilter = variant === "manage" && scope === "all"
+  const typeOptions = eventTypes ?? EVENT_TYPES
+  const formatFilter: DataTableFilter<CalendarEvent> = {
+    key: "format",
+    label: "Format",
+    mode: "custom",
+    options: EVENT_LOCATION_TYPES.map((l) => ({ value: l, label: EVENT_LOCATION_LABELS[l] })),
+    filterFn: (e, values) => values.includes(e.location_type),
+  }
+  const mdScheduleFilter: DataTableFilter<CalendarEvent> = {
+    key: "md_involvement",
+    label: "MD schedule",
+    mode: "custom",
+    options: (["host", "attending", "none"] as const).map((m) => ({ value: m, label: MD_INVOLVEMENT_LABELS[m] })),
+    filterFn: (e, values) => values.includes(e.md_involvement),
+  }
   const filters: DataTableFilter<CalendarEvent>[] = [
-    {
-      key: "type",
-      label: "Type",
-      options: (eventTypes ?? EVENT_TYPES).map((t) => ({ value: t, label: EVENT_TYPE_LABELS[t] })),
-    },
+    ...(typeOptions.length > 1
+      ? [
+          {
+            key: "type",
+            label: "Type",
+            options: typeOptions.map((t) => ({ value: t, label: EVENT_TYPE_LABELS[t] })),
+          },
+        ]
+      : []),
     {
       key: "status",
       label: "Status",
@@ -251,31 +274,11 @@ export function EventsWorkspace({
       })),
     },
     {
-      key: "format",
-      label: "Format",
-      mode: "custom",
-      options: EVENT_LOCATION_TYPES.map((l) => ({ value: l, label: EVENT_LOCATION_LABELS[l] })),
-      filterFn: (e, values) => values.includes(e.location_type),
-    },
-    {
       key: "visibility",
       label: "Audience",
       options: EVENT_VISIBILITIES.map((v) => ({ value: v, label: EVENT_VISIBILITY_LABELS[v] })),
     },
-    ...(variant === "manage"
-      ? [
-          {
-            key: "md_involvement",
-            label: "MD schedule",
-            mode: "custom" as const,
-            options: (["host", "attending", "none"] as const).map((m) => ({
-              value: m,
-              label: MD_INVOLVEMENT_LABELS[m],
-            })),
-            filterFn: (e: CalendarEvent, values: string[]) => values.includes(e.md_involvement),
-          },
-        ]
-      : []),
+    showMdScheduleFilter ? mdScheduleFilter : formatFilter,
   ]
 
   const rowActions: RowAction<CalendarEvent>[] = [
