@@ -227,8 +227,6 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
     cycleLabel: "Quarter",
   })
 
-  const focusOptions = useMemo(() => Object.entries(FOCUS_LABELS).map(([value, label]) => ({ value, label })), [])
-
   function resetForm() {
     setSelectedEmployee("")
     setSelectedCycle("none")
@@ -437,6 +435,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
     [cycleNameMap]
   )
 
+  // Four filters max (AGENTS.md): Department, Status, Review Type, Quarter.
   const filters: DataTableFilter<DevelopmentPlan>[] = useMemo(
     () => [
       {
@@ -459,14 +458,8 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         placeholder: "All Statuses",
       },
       ...cycleFilters,
-      {
-        key: "focus_area",
-        label: "Focus Area",
-        options: focusOptions,
-        placeholder: "All Focus Areas",
-      },
     ],
-    [cycleFilters, departmentOptions, focusOptions]
+    [cycleFilters, departmentOptions]
   )
 
   const rowActions: RowAction<DevelopmentPlan>[] = [

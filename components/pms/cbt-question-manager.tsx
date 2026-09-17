@@ -280,6 +280,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
     return formatDate([...dates].sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0])
   }, [filteredQuestions])
 
+  // Four filters max (AGENTS.md): Review Type, Quarter, Department, Status.
   const filters: DataTableFilter<CbtQuestion>[] = [
     ...cycleFilters,
     {
@@ -287,12 +288,6 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       label: "Department",
       options: departmentsList.map((dept) => ({ value: dept, label: dept })),
       placeholder: "All Departments",
-    },
-    {
-      key: "correct_option",
-      label: "Correct Answer",
-      options: (["A", "B", "C", "D"] as const).map((value) => ({ value, label: `Option ${value}` })),
-      placeholder: "All Answers",
     },
     {
       key: "is_active",

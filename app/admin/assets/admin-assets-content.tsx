@@ -1201,18 +1201,6 @@ export function AdminAssetsContent({
   )
     .sort()
     .map((office) => ({ value: office, label: office }))
-  const employeeOptions = employees
-    .map((employee) => {
-      const fullName = `${formatName(employee.first_name)} ${formatName(employee.last_name)}`.trim()
-      return {
-        value: employee.id,
-        label: fullName || employee.company_email || "Unknown employee",
-      }
-    })
-    .sort((a, b) => a.label.localeCompare(b.label))
-  const yearOptions = Array.from(new Set(scopedAssets.map((asset) => String(asset.acquisition_year))))
-    .sort()
-    .map((year) => ({ value: year, label: year }))
 
   const assetColumns: DataTableColumn<Asset>[] = [
     {
@@ -1346,6 +1334,7 @@ export function AdminAssetsContent({
     },
   ]
 
+  // Four filters max (AGENTS.md). Employee is reachable through search; year was dropped.
   const assetFilters: DataTableFilter<Asset>[] = [
     {
       key: "status",
@@ -1368,20 +1357,6 @@ export function AdminAssetsContent({
       placeholder: "All Asset Types",
     },
     {
-      key: "employee",
-      label: "Employee",
-      options: employeeOptions,
-      placeholder: "All Employees",
-      mode: "custom",
-      filterFn: (asset, values) => {
-        if (values.length === 0) return true
-        const assignmentType = getEffectiveAssignmentType(asset)
-        if (assignmentType === "department" || assignmentType === "office") return false
-        const assignedTo = asset.current_assignment?.assigned_to || ""
-        return assignedTo ? values.includes(assignedTo) : false
-      },
-    },
-    {
       key: "department",
       label: "Department",
       options: departmentOptions,
@@ -1402,14 +1377,6 @@ export function AdminAssetsContent({
         const office = asset.current_assignment?.office_location || asset.office_location || ""
         return values.length === 0 || values.includes(office)
       },
-    },
-    {
-      key: "year",
-      label: "Year",
-      options: yearOptions,
-      placeholder: "All Years",
-      mode: "custom",
-      filterFn: (asset, values) => values.length === 0 || values.includes(String(asset.acquisition_year)),
     },
   ]
 

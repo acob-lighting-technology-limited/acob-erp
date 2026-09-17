@@ -317,6 +317,13 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
     return rows
   }, [data.cycles, data.scores, data.users])
 
+  // Exited staff were hidden by the old Status filter's default. That filter is gone
+  // (four-filter limit), so they are left out of the individual list directly.
+  const currentStaffRows = useMemo(
+    () => individualRows.filter((row) => row.employment_status !== "exited"),
+    [individualRows]
+  )
+
   const departmentRows = useMemo<DepartmentRow[]>(() => {
     const allDepts = Array.from(new Set(data.users.map((u) => u.department).filter(Boolean) as string[])).sort()
     const rows: DepartmentRow[] = []
@@ -576,40 +583,13 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
     { key: "questions", label: "Questions", sortable: true, accessor: (row) => row.questions, hideOnMobile: true },
   ]
 
+  // Four filters max (AGENTS.md): Department, CBT Status, Review Type, Quarter.
   const individualFilters: DataTableFilter<IndividualRow>[] = [
     {
       key: "department",
       label: "Department",
       options: departmentOptions,
       placeholder: "All Departments",
-    },
-    {
-      key: "status",
-      label: "Status",
-      options: [
-        { value: "active", label: "Active" },
-        { value: "contract", label: "Contract" },
-        { value: "suspended", label: "Suspended" },
-        { value: "on_leave", label: "On Leave" },
-        { value: "exited", label: "Exited" },
-      ],
-      placeholder: "Active Statuses",
-      defaultValues: ["active", "contract", "suspended", "on_leave"],
-      mode: "custom",
-      filterFn: (row, selected) => selected.includes(row.employment_status || "active"),
-    },
-    {
-      key: "employment_type",
-      label: "Staff type",
-      options: [
-        { value: "full_time", label: "Full Time" },
-        { value: "part_time", label: "Part Time" },
-        { value: "contract", label: "Contract" },
-      ],
-      placeholder: "All Types",
-      defaultValues: ["full_time"],
-      mode: "custom",
-      filterFn: (row, selected) => selected.includes(row.employment_type || "full_time"),
     },
     {
       key: "cbt_status",
@@ -712,10 +692,10 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
   }
 
   const activeRowCount =
-    tab === "individual" ? individualRows.length : tab === "department" ? departmentRows.length : cycleRows.length
+    tab === "individual" ? currentStaffRows.length : tab === "department" ? departmentRows.length : cycleRows.length
   const scoreCount =
     tab === "individual"
-      ? individualRows.filter((row) => typeof row.cbt_score === "number").length
+      ? currentStaffRows.filter((row) => typeof row.cbt_score === "number").length
       : tab === "department"
         ? departmentRows.reduce((sum, row) => sum + row.scores_recorded, 0)
         : cycleRows.reduce((sum, row) => sum + row.scores_recorded, 0)
@@ -795,7 +775,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
     >
       {tab === "individual" ? (
         <DataTable<IndividualRow>
-          data={individualRows}
+          data={currentStaffRows}
           columns={individualColumns}
           filters={individualFilters}
           getRowId={(row) => row.id}
