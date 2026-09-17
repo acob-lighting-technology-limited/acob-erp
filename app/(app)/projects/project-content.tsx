@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Clock,
   LayoutDashboard,
+  BarChart3,
 } from "lucide-react"
 import {
   PROJECT_HEALTH_LABELS,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/projects/health"
 import {
   HealthBadge,
+  PriorityBadge,
   ProjectStatusBadge,
   ProjectSummary,
   WorkDoneCell,
@@ -43,7 +45,15 @@ import {
   plansText,
 } from "@/components/projects/project-summary"
 import { ProjectsOverview, type OverviewProject } from "@/components/projects/projects-overview"
+import { ProjectCharts, type ChartsProject } from "@/components/projects/project-charts"
 import { toLocalISODate } from "@/lib/utils/date"
+import {
+  PROJECT_PRIORITIES,
+  PROJECT_PRIORITY_HELP,
+  PROJECT_PRIORITY_LABELS,
+  normalizePriority,
+  priorityRank,
+} from "@/lib/projects/priority"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 
@@ -62,6 +72,7 @@ export interface ProjectRow {
   created_at: string
   updated_at: string
   portfolio_id?: string | null
+  priority?: string | null
   project_manager?: {
     id: string
     full_name: string | null
@@ -141,13 +152,29 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const activeTab = searchParams.get("tab") === "overview" ? "overview" : "projects"
+  const tabParam = searchParams.get("tab")
+  const activeTab = tabParam === "overview" || tabParam === "charts" ? tabParam : "projects"
   const tabs = useMemo<DataTableTab[]>(
     () => [
       { key: "projects", label: "Projects", icon: FolderKanban },
       { key: "overview", label: "Overview", icon: LayoutDashboard },
+      { key: "charts", label: "Charts", icon: BarChart3 },
     ],
     []
+  )
+
+  const chartProjects = useMemo<ChartsProject[]>(
+    () =>
+      rows.map((project) => ({
+        id: project.id,
+        project_name: project.project_name,
+        portfolioId: project.portfolio?.id ?? null,
+        portfolioName: project.portfolio?.name ?? null,
+        startDate: project.deployment_start_date,
+        endDate: project.deployment_end_date,
+        tasks: project.tasks || [],
+      })),
+    [rows]
   )
 
   const overviewItems = useMemo<OverviewProject[]>(
@@ -160,12 +187,22 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
                 id: project.id,
                 project_name: project.project_name,
                 portfolioName: project.portfolio?.name ?? null,
+                priority: project.priority ?? null,
                 health,
               },
             ]
           : []
       }),
     [rows, healthById]
+  )
+
+  // Most important first until someone sorts by a column themselves.
+  const rowsByPriority = useMemo(
+    () =>
+      [...rows].sort(
+        (a, b) => priorityRank(a.priority) - priorityRank(b.priority) || a.project_name.localeCompare(b.project_name)
+      ),
+    [rows]
   )
 
   // Technology Types option list for filtering
@@ -242,6 +279,14 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
           ),
       },
       {
+        key: "priority",
+        label: "Priority",
+        description: PROJECT_PRIORITY_HELP,
+        sortable: true,
+        accessor: (r) => priorityRank(r.priority),
+        render: (r) => <PriorityBadge priority={r.priority} />,
+      },
+      {
         key: "progress",
         label: "Progress",
         description: PROJECT_METRIC_HELP.progress,
@@ -298,6 +343,13 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
         ],
       },
       {
+        key: "priority",
+        label: "Priority",
+        options: PROJECT_PRIORITIES.map((value) => ({ value, label: PROJECT_PRIORITY_LABELS[value] })),
+        mode: "custom",
+        filterFn: (row, selected) => selected.includes(normalizePriority(row.priority)),
+      },
+      {
         key: "technology_type",
         label: "Technology",
         options: techOptions,
@@ -339,9 +391,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
       spacing="tight"
       tabs={tabs}
       activeTab={activeTab}
-      onTabChange={(tab) =>
-        router.replace(tab === "overview" ? `${pathname}?tab=overview` : pathname, { scroll: false })
-      }
+      onTabChange={(tab) => router.replace(tab === "projects" ? pathname : `${pathname}?tab=${tab}`, { scroll: false })}
       actionsPlacement="inline-always"
       actions={
         <div className="flex items-center gap-2">
@@ -387,14 +437,16 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
         </StatGrid>
       }
     >
-      {activeTab === "overview" ? (
+      {activeTab === "charts" ? (
+        <ProjectCharts projects={chartProjects} filterBy="project" />
+      ) : activeTab === "overview" ? (
         <ProjectsOverview
           projects={overviewItems}
           hrefFor={(p) => `${pathname}?q=${encodeURIComponent(p.project_name)}`}
         />
       ) : (
         <DataTable<ProjectRow>
-          data={rows}
+          data={rowsByPriority}
           columns={columns}
           filters={filters}
           getRowId={(r) => r.id}
@@ -426,6 +478,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
                 return (
                   <>
                     {health && <HealthBadge status={health.status} />}
+                    <PriorityBadge priority={r.priority} />
                     <ProjectStatusBadge status={r.status} />
                   </>
                 )

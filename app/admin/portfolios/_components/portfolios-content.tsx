@@ -10,6 +10,7 @@ import {
   ExternalLink,
   FolderCog,
   FolderKanban,
+  BarChart3,
   LayoutDashboard,
   Layers,
   Plus,
@@ -38,6 +39,8 @@ import { DeletePortfolioDialog } from "./delete-portfolio-dialog"
 import { PortfolioDialog } from "./portfolio-dialog"
 import { PortfolioProjectsDialog } from "./portfolio-projects-dialog"
 import { PortfolioOverview } from "./portfolio-overview"
+import { ProjectCharts, type ChartsProject } from "@/components/projects/project-charts"
+import type { ProjectHealthTask } from "@/lib/projects/health"
 import { projectHref } from "./project-href"
 
 export type ProjectHealthRow = ProjectHealth & {
@@ -221,6 +224,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
     () => [
       { key: "portfolios", label: "Portfolios", icon: Layers },
       { key: "overview", label: "Overview", icon: LayoutDashboard },
+      { key: "charts", label: "Charts", icon: BarChart3 },
     ],
     []
   )
@@ -239,6 +243,36 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   })
 
   const rows = useMemo(() => data?.data ?? [], [data])
+
+  // The charts need each task's dates, which the portfolio rollup leaves out, so
+  // they read the projects list — only once the Charts tab is opened.
+  const { data: chartProjects = [], isLoading: chartsLoading } = useQuery({
+    queryKey: ["projects", "charts"],
+    enabled: activeTab === "charts",
+    queryFn: async (): Promise<ChartsProject[]> => {
+      const res = await apiFetch("/api/projects", { cache: "no-store" })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to load projects")
+      return (
+        (payload.data || []) as Array<{
+          id: string
+          project_name: string
+          deployment_start_date: string | null
+          deployment_end_date: string | null
+          portfolio?: { id: string; name: string } | null
+          tasks?: ProjectHealthTask[] | null
+        }>
+      ).map((project) => ({
+        id: project.id,
+        project_name: project.project_name,
+        portfolioId: project.portfolio?.id ?? null,
+        portfolioName: project.portfolio?.name ?? null,
+        startDate: project.deployment_start_date,
+        endDate: project.deployment_end_date,
+        tasks: project.tasks || [],
+      }))
+    },
+  })
   // Read from the live rows so the dialog reflects each add/remove once refetched.
   const managing = useMemo(() => rows.find((row) => row.id === managingId) ?? null, [rows, managingId])
   const refreshPortfolios = () => queryClient.invalidateQueries({ queryKey: ["portfolios"] })
@@ -414,7 +448,13 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         </StatGrid>
       }
     >
-      {activeTab === "overview" ? (
+      {activeTab === "charts" ? (
+        chartsLoading ? (
+          <div className="bg-muted/40 h-64 animate-pulse rounded-xl" />
+        ) : (
+          <ProjectCharts projects={chartProjects} filterBy="portfolio" />
+        )
+      ) : activeTab === "overview" ? (
         <PortfolioOverview rows={rows} unassigned={data?.unassigned} />
       ) : (
         <DataTable<Portfolio>

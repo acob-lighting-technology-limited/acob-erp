@@ -5,6 +5,8 @@ import { Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ColumnHelp } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
+import { cn } from "@/lib/utils"
+import { PROJECT_PRIORITY_LABELS, normalizePriority, type ProjectPriority } from "@/lib/projects/priority"
 import {
   PROJECT_HEALTH_LABELS,
   PROJECT_METRIC_HELP,
@@ -65,6 +67,23 @@ export function PortfolioStatusBadge({ status }: { status: string }) {
         </Badge>
       )
   }
+}
+
+const PRIORITY_BADGE: Record<ProjectPriority, string> = {
+  critical: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
+  high: "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  medium: "border-border text-muted-foreground",
+  low: "border-border text-muted-foreground/80",
+}
+
+/** Priority, set by hand. Only Critical and High are coloured, so they stand out. */
+export function PriorityBadge({ priority }: { priority: string | null | undefined }) {
+  const value = normalizePriority(priority)
+  return (
+    <Badge variant="outline" className={cn("font-medium", PRIORITY_BADGE[value])}>
+      {PROJECT_PRIORITY_LABELS[value]}
+    </Badge>
+  )
 }
 
 /** The stage a manager sets by hand — deliberately neutral so it never reads as progress. */

@@ -50,6 +50,7 @@ export type ProjectHealthTask = {
   due_date?: string | null
   task_end_date?: string | null
   plan_id?: string | null
+  completed_at?: string | null
 }
 
 export type ProjectHealth = {
@@ -83,17 +84,18 @@ function daysBetween(from: string, to: string): number {
   return Math.round((end - start) / 86_400_000)
 }
 
-function isCounted(task: ProjectHealthTask) {
+/** On the project at all: not archived, cancelled or reassigned. */
+export function isCountedTask(task: ProjectHealthTask) {
   if (task.is_archived) return false
   return !LEFT_OUT_STATUSES.has(String(task.status || "").toLowerCase())
 }
 
-function isDone(task: ProjectHealthTask) {
+export function isTaskDone(task: ProjectHealthTask) {
   return String(task.status || "").toLowerCase() === "completed"
 }
 
 function isOverdue(task: ProjectHealthTask, today: string): boolean {
-  if (!isCounted(task) || isDone(task)) return false
+  if (!isCountedTask(task) || isTaskDone(task)) return false
   const deadline = task.task_end_date || task.due_date
   if (!deadline) return false
   return String(deadline).slice(0, 10) < today
@@ -101,8 +103,8 @@ function isOverdue(task: ProjectHealthTask, today: string): boolean {
 
 /** Tasks done out of tasks planned — also used for a single plan. */
 export function countWork(tasks: ProjectHealthTask[]) {
-  const counted = tasks.filter(isCounted)
-  const doneCount = counted.filter(isDone).length
+  const counted = tasks.filter(isCountedTask)
+  const doneCount = counted.filter(isTaskDone).length
   return {
     taskCount: counted.length,
     doneCount,
@@ -123,7 +125,7 @@ export function computeProjectHealth(params: {
   const overdueCount = tasks.filter((task) => isOverdue(task, today)).length
 
   const ratings = tasks
-    .filter((task) => isCounted(task) && isDone(task))
+    .filter((task) => isCountedTask(task) && isTaskDone(task))
     .map((task) => Number(task.rating))
     .filter((rating) => Number.isInteger(rating) && rating >= 1 && rating <= 5)
   const averageRating =

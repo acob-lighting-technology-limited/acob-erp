@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react"
 import {
+  DEFAULT_PROJECT_PRIORITY,
+  PROJECT_PRIORITIES,
+  PROJECT_PRIORITY_LABELS,
+  normalizePriority,
+  type ProjectPriority,
+} from "@/lib/projects/priority"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -17,6 +24,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import type { Project } from "./project-admin-content"
 import { apiFetch } from "@/lib/api-client"
+
+const PRIORITY_OPTIONS = PROJECT_PRIORITIES.map((value) => ({ value, label: PROJECT_PRIORITY_LABELS[value] }))
 
 const STATUS_OPTIONS = [
   { value: "planning", label: "Planning" },
@@ -67,6 +76,7 @@ export function ProjectDialogs({
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<"planning" | "active" | "on_hold" | "completed" | "cancelled">("planning")
   const [portfolioId, setPortfolioId] = useState("")
+  const [priority, setPriority] = useState<ProjectPriority>(DEFAULT_PROJECT_PRIORITY)
   const [portfolios, setPortfolios] = useState<Array<{ id: string; name: string; code: string | null }>>([])
 
   const portfolioOptions = [
@@ -112,6 +122,7 @@ export function ProjectDialogs({
       setDescription(selectedProject.description || "")
       setStatus(selectedProject.status)
       setPortfolioId(selectedProject.portfolio_id || "")
+      setPriority(normalizePriority(selectedProject.priority))
     } else {
       // Reset for add
       setProjectName("")
@@ -123,6 +134,7 @@ export function ProjectDialogs({
       setManagerId("")
       setDescription("")
       setStatus("planning")
+      setPriority(DEFAULT_PROJECT_PRIORITY)
       setPortfolioId(defaultPortfolioId ?? "")
     }
   }, [selectedProject, isEditOpen, isAddOpen, defaultPortfolioId])
@@ -150,6 +162,7 @@ export function ProjectDialogs({
           project_manager_id: managerId || null,
           description: description || null,
           status,
+          priority,
           portfolio_id: portfolioId || null,
         }),
       })
@@ -192,6 +205,7 @@ export function ProjectDialogs({
           project_manager_id: managerId || null,
           description: description || null,
           status,
+          priority,
           portfolio_id: portfolioId || null,
         }),
       })
@@ -314,15 +328,27 @@ export function ProjectDialogs({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Project Status</Label>
-              <SearchableSelect
-                value={status}
-                onValueChange={(value) => setStatus(value as typeof status)}
-                options={STATUS_OPTIONS}
-                placeholder="Select status"
-                searchPlaceholder="Search status..."
-              />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Priority</Label>
+                <SearchableSelect
+                  value={priority}
+                  onValueChange={(value) => setPriority(normalizePriority(value))}
+                  options={PRIORITY_OPTIONS}
+                  placeholder="Select priority"
+                  searchPlaceholder="Search priority..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Stage</Label>
+                <SearchableSelect
+                  value={status}
+                  onValueChange={(value) => setStatus(value as typeof status)}
+                  options={STATUS_OPTIONS}
+                  placeholder="Select stage"
+                  searchPlaceholder="Search stage..."
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -459,15 +485,27 @@ export function ProjectDialogs({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">Project Status</Label>
-              <SearchableSelect
-                value={status}
-                onValueChange={(value) => setStatus(value as typeof status)}
-                options={STATUS_OPTIONS}
-                placeholder="Select status"
-                searchPlaceholder="Search status..."
-              />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Priority</Label>
+                <SearchableSelect
+                  value={priority}
+                  onValueChange={(value) => setPriority(normalizePriority(value))}
+                  options={PRIORITY_OPTIONS}
+                  placeholder="Select priority"
+                  searchPlaceholder="Search priority..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Stage</Label>
+                <SearchableSelect
+                  value={status}
+                  onValueChange={(value) => setStatus(value as typeof status)}
+                  options={STATUS_OPTIONS}
+                  placeholder="Select stage"
+                  searchPlaceholder="Search stage..."
+                />
+              </div>
             </div>
 
             <div className="space-y-2">

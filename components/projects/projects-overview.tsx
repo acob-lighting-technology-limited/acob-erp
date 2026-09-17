@@ -4,7 +4,8 @@ import Link from "next/link"
 import { ChevronRight, Clock, FolderKanban } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { HEALTH_TONE, HealthBadge, LabelledBar } from "@/components/projects/project-summary"
+import { HEALTH_TONE, HealthBadge, LabelledBar, PriorityBadge } from "@/components/projects/project-summary"
+import { priorityRank } from "@/lib/projects/priority"
 import { cn } from "@/lib/utils"
 import { plural, type ProjectHealth, type ProjectHealthStatus } from "@/lib/projects/health"
 
@@ -12,6 +13,7 @@ export type OverviewProject = {
   id: string
   project_name: string
   portfolioName: string | null
+  priority: string | null
   health: ProjectHealth
 }
 
@@ -26,12 +28,14 @@ function gap(health: ProjectHealth) {
 
 /**
  * Every project, most in need of attention first: Behind, then Slipping, then
- * On time, then Done — and within each, the widest gap and most past-due tasks.
+ * On time, then Done. Within each, higher priority first, then the widest gap
+ * and the most past-due tasks.
  */
 export function rankByAttention(projects: OverviewProject[]) {
   return [...projects].sort(
     (a, b) =>
       URGENCY[a.health.status] - URGENCY[b.health.status] ||
+      priorityRank(a.priority) - priorityRank(b.priority) ||
       gap(b.health) - gap(a.health) ||
       b.health.overdueCount - a.health.overdueCount ||
       a.project_name.localeCompare(b.project_name)
@@ -56,7 +60,9 @@ export function ProjectsOverview({
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 border-b py-4">
         <div className="space-y-1">
           <CardTitle className="text-base">All projects</CardTitle>
-          <CardDescription>Ranked by what needs attention most: behind first, done last.</CardDescription>
+          <CardDescription>
+            Ranked by what needs attention most: behind first, done last, higher priority first within each.
+          </CardDescription>
         </div>
         {needAttention > 0 && (
           <Badge className="border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400">
@@ -90,6 +96,7 @@ export function ProjectsOverview({
                       </p>
                       <div className="flex items-center gap-2">
                         <HealthBadge status={health.status} />
+                        <PriorityBadge priority={project.priority} />
                         <span className="text-muted-foreground truncate text-xs">
                           {project.portfolioName ?? "Not in a portfolio"}
                         </span>
