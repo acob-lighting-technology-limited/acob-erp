@@ -433,6 +433,29 @@ export async function computeIndividualPerformanceScore(
       const dow = d.getDay()
       if (dow !== 0 && dow !== 6) workdays.push(toLocalISODate(d))
     }
+  } else if (params.cycleId === "all" || params.cycleId === "__all__") {
+    const { data: allCycles } = await supabase
+      .from("review_cycles")
+      .select("start_date, end_date, review_type, name")
+      .order("start_date", { ascending: true })
+
+    if (allCycles && allCycles.length > 0) {
+      const targetCycles = allCycles.filter((c) => isQuarterlyCycle(c.review_type, c.name))
+      const cyclesToUse = targetCycles.length > 0 ? targetCycles : allCycles
+      const workdaySet = new Set<string>()
+
+      for (const c of cyclesToUse) {
+        if (!c.start_date || !c.end_date) continue
+        const rangeEnd = c.end_date < todayIso ? c.end_date : todayIso
+        for (let d = new Date(c.start_date); toLocalISODate(d) <= rangeEnd; d.setDate(d.getDate() + 1)) {
+          const dow = d.getDay()
+          if (dow !== 0 && dow !== 6) {
+            workdaySet.add(toLocalISODate(d))
+          }
+        }
+      }
+      workdays.push(...Array.from(workdaySet).sort())
+    }
   }
 
   if (workdays.length > 0) {
