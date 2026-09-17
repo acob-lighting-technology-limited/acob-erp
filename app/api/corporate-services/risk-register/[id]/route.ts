@@ -1,90 +1,100 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getRequestScope } from "@/lib/admin/api-scope"
+import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
+import { OWNER_EDITABLE_FIELDS, RISK_COLUMNS, UpdateRiskSchema, type RiskRow } from "@/lib/risk-register/model"
+import { leadsDepartment, notifyControlOwner } from "@/lib/risk-register/server"
 
 const log = logger("corporate-services:risk-register:item")
 
-const UpdateRiskSchema = z.object({
-  title: z.string().min(3).max(500).optional(),
-  description: z.string().optional().nullable(),
-  department: z.string().optional().nullable(),
-  category: z
-    .enum(["operational", "financial", "strategic", "compliance", "technical", "reputational", "health_safety"])
-    .optional(),
-  severity: z.enum(["low", "medium", "high", "critical"]).optional(),
-  likelihood: z.number().int().min(1).max(5).optional(),
-  impact: z.number().int().min(1).max(5).optional(),
-  mitigation_plan: z.string().optional().nullable(),
-  contingency_plan: z.string().optional().nullable(),
-  owner_id: z.string().uuid().optional().nullable(),
-  status: z.enum(["open", "mitigating", "resolved", "closed"]).optional(),
-})
+type RouteContext = { params: Promise<{ id: string }> }
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
     const scope = await getRequestScope()
-    if (!scope) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const json = await request.json()
-    const parsed = UpdateRiskSchema.safeParse(json)
+    const parsed = UpdateRiskSchema.safeParse(await request.json().catch(() => null))
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid payload" }, { status: 400 })
     }
 
     const supabase = await createClient()
-    const { data, error } = await supabase
+    const { data: existingData, error: loadError } = await supabase
       .from("risk_register")
-      .update(parsed.data)
+      .select(RISK_COLUMNS)
       .eq("id", id)
-      .select(
-        `
-        id,
-        title,
-        description,
-        department,
-        week_number,
-        year,
-        category,
-        severity,
-        likelihood,
-        impact,
-        risk_score,
-        mitigation_plan,
-        contingency_plan,
-        owner_id,
-        status,
-        report_id,
-        created_at,
-        updated_at,
-        profiles:owner_id (
-          id,
-          first_name,
-          last_name,
-          email:company_email
-        )
-      `
-      )
-      .single()
+      .maybeSingle()
 
-    if (error) {
-      log.error({ err: error.message, id }, "Failed to update risk item")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (loadError) {
+      log.error({ err: loadError.message, id }, "Failed to load risk item")
+      return NextResponse.json({ error: "Failed to load the risk" }, { status: 500 })
+    }
+    if (!existingData) return NextResponse.json({ error: "Risk not found" }, { status: 404 })
+    const existing = existingData as RiskRow
+
+    const leadsIt = leadsDepartment(scope, existing.department)
+    const canEditAll = scope.isAdminLike || leadsIt
+    const isOwner = existing.control_owner_id === scope.userId
+    if (!canEditAll && !isOwner) {
+      return NextResponse.json({ error: "You cannot edit this risk" }, { status: 403 })
     }
 
-    return NextResponse.json({ data })
+    const updates = parsed.data
+    if (!canEditAll) {
+      const allowed = new Set<string>(OWNER_EDITABLE_FIELDS)
+      const blocked = Object.keys(updates).filter((key) => !allowed.has(key))
+      if (blocked.length > 0) {
+        return NextResponse.json(
+          { error: "As control owner you can update the mitigation, timeline and status only" },
+          { status: 403 }
+        )
+      }
+    }
+    // A lead moving a risk to a department they do not lead would lose it.
+    if (!scope.isAdminLike && updates.department && !leadsDepartment(scope, updates.department)) {
+      return NextResponse.json({ error: "You can only move a risk to a department you lead" }, { status: 403 })
+    }
+
+    const { data, error } = await supabase
+      .from("risk_register")
+      .update(updates)
+      .eq("id", id)
+      .select(RISK_COLUMNS)
+      .single()
+
+    if (error || !data) {
+      log.error({ err: error?.message, id }, "Failed to update risk item")
+      return NextResponse.json({ error: "Failed to save the risk" }, { status: 500 })
+    }
+
+    const risk = data as RiskRow
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "risk_register",
+        entityId: id,
+        oldValues: { ...existing },
+        newValues: updates,
+        context: { actorId: scope.userId, source: "api", route: "/api/corporate-services/risk-register/[id]" },
+      },
+      { failOpen: true }
+    )
+    if (risk.control_owner_id !== existing.control_owner_id) {
+      await notifyControlOwner(supabase, risk, scope.userId)
+    }
+
+    return NextResponse.json({ data: risk })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Internal Server Error"
-    log.error({ err: msg }, "Failed to patch risk register item")
-    return NextResponse.json({ error: msg }, { status: 500 })
+    log.error({ err: String(err) }, "Failed to patch risk register item")
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   try {
     const scope = await getRequestScope()
     if (!scope || !scope.isAdminLike) {
@@ -93,17 +103,34 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
     const { id } = await params
     const supabase = await createClient()
-    const { error } = await supabase.from("risk_register").delete().eq("id", id)
+    const { data, error } = await supabase
+      .from("risk_register")
+      .delete()
+      .eq("id", id)
+      .select("id, risk_name")
+      .maybeSingle()
 
     if (error) {
       log.error({ err: error.message, id }, "Failed to delete risk item")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: "Failed to delete the risk" }, { status: 500 })
     }
+    if (!data) return NextResponse.json({ error: "Risk not found" }, { status: 404 })
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "delete",
+        entityType: "risk_register",
+        entityId: id,
+        oldValues: data,
+        context: { actorId: scope.userId, source: "api", route: "/api/corporate-services/risk-register/[id]" },
+      },
+      { failOpen: true }
+    )
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Internal Server Error"
-    log.error({ err: msg }, "Failed to delete risk item")
-    return NextResponse.json({ error: msg }, { status: 500 })
+    log.error({ err: String(err) }, "Failed to delete risk item")
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }
