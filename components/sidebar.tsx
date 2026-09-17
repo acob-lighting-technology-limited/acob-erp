@@ -358,7 +358,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
 
   const visibleSections: NavSectionDef[] = showMdDesk
     ? navigationSections.map((section) =>
-        section.key === "workspace" ? { ...section, items: [...section.items, MD_DESK_NAV_ITEM] } : section
+        section.key === "management" ? { ...section, items: [MD_DESK_NAV_ITEM, ...section.items] } : section
       )
     : navigationSections
 

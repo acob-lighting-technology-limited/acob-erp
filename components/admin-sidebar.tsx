@@ -268,8 +268,8 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
   },
   {
-    // Shown only to the MD and their delegates (showMdDesk); the page re-checks.
-    section: "overview",
+    // Shown to the MD, delegates, super admins and developers (showMdDesk); the page re-checks.
+    section: "management",
     name: "MD's Desk",
     href: "/admin/md-desk",
     icon: Briefcase,
