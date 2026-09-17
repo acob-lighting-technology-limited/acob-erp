@@ -51,6 +51,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { useSidebar } from "./sidebar-context"
 
 interface SidebarProps {
@@ -212,6 +213,14 @@ const navigationSections: NavSectionDef[] = [
 
 const allNavItems: NavItemDef[] = navigationSections.flatMap((section) => section.items)
 
+// Membership-gated (the MD + delegates), so it is added per viewer rather than listed in navigationSections.
+const MD_DESK_NAV_ITEM: NavItemDef = {
+  name: "MD's Desk",
+  href: "/md-desk",
+  icon: Briefcase,
+  children: mdDeskNavChildren("/md-desk"),
+}
+
 const NAV_ROUTE_ALIASES: Record<string, string[]> = {
   "/tools": ["/feedback"],
 }
@@ -266,7 +275,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
 
   useEffect(() => {
     if (!pathname) return
-    for (const item of allNavItems) {
+    for (const item of [...allNavItems, MD_DESK_NAV_ITEM]) {
       if (!item.children) continue
       for (const child of item.children) {
         const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
@@ -347,12 +356,9 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     : null
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
-  // MD's Desk is membership-gated, so it is added per viewer rather than listed statically.
   const visibleSections: NavSectionDef[] = showMdDesk
     ? navigationSections.map((section) =>
-        section.key === "workspace"
-          ? { ...section, items: [...section.items, { name: "MD's Desk", href: "/md-desk", icon: Briefcase }] }
-          : section
+        section.key === "workspace" ? { ...section, items: [...section.items, MD_DESK_NAV_ITEM] } : section
       )
     : navigationSections
 

@@ -1,10 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowUpRight, FileBarChart } from "lucide-react"
+import { ArrowUpRight, Clock, FileText, Inbox, Wallet } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { DataTable } from "@/components/ui/data-table"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { formatWATDate, formatWATRelative } from "@/lib/utils/date"
 import { MD_DESK_QUEUE_LABELS, type MdDeskQueueItem, type MdDeskQueueKind } from "@/lib/md-desk/types"
@@ -17,19 +19,15 @@ const KIND_CLASSES: Record<MdDeskQueueKind, string> = {
   task_rating: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
 }
 
-/** Existing report screens the MD reads; MD's Desk links to them rather than copying them. */
-const REPORT_LINKS = [
-  { label: "Weekly reports", href: "/admin/reports/general-meeting/weekly-reports" },
-  { label: "Action tracker", href: "/admin/reports/general-meeting/action-tracker" },
-  { label: "Minutes of meeting", href: "/admin/reports/general-meeting/minutes-of-meeting" },
-  { label: "Corporate scorecard", href: "/admin/corporate-scorecard" },
-]
-
 const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 })
 
+/** MD's Desk → Overview: everything currently waiting on the MD's decision. */
 export function WaitingOnMd() {
   const { data, isLoading, error, refetch } = useMdDeskOverview()
   const items = data?.queue.items ?? []
+  const counts = data?.queue.counts
+  const now = Date.now()
+  const overdue = items.filter((i) => now - new Date(i.waiting_since).getTime() > 3 * 86_400_000).length
 
   const columns: DataTableColumn<MdDeskQueueItem>[] = [
     {
@@ -123,13 +121,43 @@ export function WaitingOnMd() {
   ]
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-base font-semibold">Waiting on the MD</h2>
-        <p className="text-muted-foreground text-sm">
-          Approvals currently at the MD&apos;s stage. Decisions are made on each item&apos;s own screen.
-        </p>
-      </div>
+    <DataTablePage
+      title="MD's Desk"
+      description="Approvals currently at the MD's stage. Decisions are made on each item's own screen."
+      icon={Inbox}
+      stats={
+        <StatGrid>
+          <StatCard
+            title="Waiting on MD"
+            value={items.length}
+            icon={Inbox}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Waiting 3+ days"
+            value={overdue}
+            icon={Clock}
+            iconBgColor="bg-red-500/10"
+            iconColor="text-red-500"
+          />
+          <StatCard
+            title="Requisitions"
+            value={counts?.requisition ?? 0}
+            icon={Wallet}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+          <StatCard
+            title="Letters"
+            value={counts?.correspondence ?? 0}
+            icon={FileText}
+            iconBgColor="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+        </StatGrid>
+      }
+    >
       <DataTable<MdDeskQueueItem>
         data={items}
         columns={columns}
@@ -249,20 +277,6 @@ export function WaitingOnMd() {
           },
         }}
       />
-
-      <div className="bg-card rounded-xl border-2 p-4">
-        <p className="mb-3 flex items-center gap-2 text-sm font-medium">
-          <FileBarChart className="h-4 w-4" aria-hidden />
-          Reports
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {REPORT_LINKS.map((r) => (
-            <Button key={r.href} asChild size="sm" variant="outline">
-              <Link href={r.href}>{r.label}</Link>
-            </Button>
-          ))}
-        </div>
-      </div>
-    </div>
+    </DataTablePage>
   )
 }

@@ -57,6 +57,7 @@ import type { DeptConsole } from "@/lib/dept/consoles"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion } from "framer-motion"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import {
   canAccessRouteV2,
   resolveAdminRouteKeyV2,
@@ -273,6 +274,7 @@ const adminNavigation: NavItem[] = [
     href: "/admin/md-desk",
     icon: Briefcase,
     roles: ["developer", "super_admin", "admin"],
+    children: mdDeskNavChildren("/admin/md-desk"),
   },
   {
     section: "management",
