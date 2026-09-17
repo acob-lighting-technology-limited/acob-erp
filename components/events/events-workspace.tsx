@@ -114,7 +114,7 @@ export function EventsWorkspace({
 
   const eventsQuery = useEvents(range, scope)
   const optionsQuery = useEventOptions()
-  const canCreate = optionsQuery.data?.capabilities.canCreate === true
+  const canCreate = variant === "manage" && optionsQuery.data?.capabilities.canCreate === true
 
   const allEvents = useMemo(() => eventsQuery.data?.events ?? [], [eventsQuery.data])
   const rows = useMemo(() => {
