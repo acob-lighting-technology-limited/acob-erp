@@ -114,11 +114,12 @@ export function AdminUserTasksPlan({
   const currentYear = new Date().getFullYear()
 
   // Period filter state — driven directly by DataTable's single-select filter
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("this_week")
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("all_time")
 
   // Options for the Time Period filter dropdown
   const periodOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [
+      { value: "all_time", label: "All Time" },
       { value: "this_week", label: `This Week (W${currentWeekInfo.week})` },
       { value: "last_week", label: `Last Week (W${currentWeekInfo.week > 1 ? currentWeekInfo.week - 1 : 52})` },
       { value: "today", label: "Today" },
@@ -483,7 +484,6 @@ export function AdminUserTasksPlan({
         label: "Time Period",
         multi: false,
         placeholder: "All Time",
-        defaultValues: ["this_week"],
         options: periodOptions,
         mode: "custom",
         filterFn: () => true,
@@ -513,7 +513,7 @@ export function AdminUserTasksPlan({
   const [searchQuery, setSearchQuery] = useState("")
 
   const handlePeriodFilterChange = useCallback((fv: Record<string, string[]>) => {
-    setSelectedPeriod(fv["period"]?.[0] || "all")
+    setSelectedPeriod(fv["period"]?.[0] || "all_time")
     setFilterValues(fv)
   }, [])
 
