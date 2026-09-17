@@ -43,8 +43,8 @@ export const PROJECT_METRIC_HELP = {
     "The stage a manager sets by hand (planning, ongoing, on hold, completed, cancelled). Separate from the calculated health.",
   portfolioStatus: "Set by hand: active, on hold, or closed.",
   portfolioProjects: "Projects in this portfolio, counted by their calculated health.",
-  portfolioDeliveryQuality:
-    "Delivered: finished task weight over total task weight across all its projects. Quality: the average of its projects' quality.",
+  portfolioProgress:
+    "Plan progress: completion of implementation plan workstreams and tasks across all projects in this portfolio.",
 } as const
 
 /** Delivery may sit this far behind elapsed time before the project is flagged. */

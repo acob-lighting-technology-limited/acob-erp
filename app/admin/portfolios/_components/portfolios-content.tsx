@@ -26,7 +26,9 @@ import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
 import { PROJECT_HEALTH_LABELS, PROJECT_METRIC_HELP, type ProjectHealthStatus } from "@/lib/projects/health"
+import { HealthBadge, PortfolioStatusBadge, ProjectStatusBadge } from "@/components/projects/project-summary"
 import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import { DeletePortfolioDialog } from "./delete-portfolio-dialog"
@@ -47,6 +49,9 @@ export type ProjectHealthRow = {
   overdueCount: number
   totalWeight: number
   taskCount: number
+  totalPlans?: number
+  completedPlans?: number
+  planProgressPct?: number | null
 }
 
 type PortfolioRollup = {
@@ -58,6 +63,9 @@ type PortfolioRollup = {
   overdueCount: number
   deliveryPct: number | null
   qualityPct: number | null
+  totalPlans?: number
+  completedPlans?: number
+  planProgressPct?: number | null
 }
 
 export type Portfolio = {
@@ -70,29 +78,7 @@ export type Portfolio = {
   rollup: PortfolioRollup
 }
 
-function healthBadge(status: ProjectHealthStatus) {
-  switch (status) {
-    case "on_track":
-      return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">On Track</Badge>
-    case "at_risk":
-      return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">At Risk</Badge>
-    case "behind_schedule":
-      return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">Behind Schedule</Badge>
-    case "completed":
-      return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-500">Completed</Badge>
-  }
-}
-
-const PROJECT_TABLE_HEADERS = [
-  { label: "Elapsed", help: PROJECT_METRIC_HELP.elapsed },
-  { label: "Delivered", help: PROJECT_METRIC_HELP.delivery },
-  { label: "Quality", help: PROJECT_METRIC_HELP.quality },
-  { label: "Variance", help: PROJECT_METRIC_HELP.variance },
-  { label: "Overdue", help: PROJECT_METRIC_HELP.overdue },
-  { label: "Health", help: PROJECT_METRIC_HELP.health },
-]
-
-/** The project rows shown when a portfolio is expanded. */
+/** The implementation plans and project boards shown when a portfolio is expanded. */
 function PortfolioProjects({
   projects,
   isAdmin,
@@ -106,15 +92,13 @@ function PortfolioProjects({
   onManage?: () => void
   onAddProject?: () => void
 }) {
-  const [expandedProjectIds, setExpandedProjectIds] = useState<Record<string, boolean>>({})
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || "")
 
-  const toggleProject = (projectId: string) => {
-    setExpandedProjectIds((prev) => ({ ...prev, [projectId]: !prev[projectId] }))
-  }
+  const activeProject = projects.find((p) => p.id === selectedProjectId) || projects[0] || null
 
   const actions =
     onManage || onAddProject ? (
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {onManage && (
           <Button type="button" variant="outline" size="sm" onClick={onManage}>
             <FolderCog className="mr-2 h-4 w-4" />
@@ -132,8 +116,8 @@ function PortfolioProjects({
 
   if (projects.length === 0) {
     return (
-      <div className="space-y-2">
-        <p className="text-muted-foreground rounded-lg border border-dashed py-6 text-center text-sm">
+      <div className="space-y-3 p-4">
+        <p className="text-muted-foreground rounded-lg border border-dashed py-8 text-center text-sm">
           No projects in this portfolio yet.
         </p>
         {actions}
@@ -142,132 +126,103 @@ function PortfolioProjects({
   }
 
   return (
-    <div className="space-y-2">
-      {actions}
-      <div className="bg-background overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-muted/50 text-muted-foreground text-xs">
-            <tr>
-              <th className="w-8 px-2 py-2"></th>
-              <th className="px-3 py-2 text-left font-medium">Project</th>
-              {PROJECT_TABLE_HEADERS.map((header) => (
-                <th key={header.label} className="px-3 py-2 text-left font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    {header.label}
-                    <ColumnHelp label={header.label} text={header.help} />
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((project) => {
-              const isExpanded = Boolean(expandedProjectIds[project.id])
-              return (
-                <Fragment key={project.id}>
-                  <tr className="hover:bg-muted/30 border-t transition-colors">
-                    <td className="px-2 py-2 text-center">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground h-6 w-6 p-0"
-                        onClick={() => toggleProject(project.id)}
-                        aria-label={isExpanded ? "Collapse project plans" : "Expand project plans"}
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        ) : (
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    </td>
-                    <td className="px-3 py-2 font-medium">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={projectHref(project.project_name, isAdmin)}
-                          className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors hover:underline"
-                        >
-                          {project.project_name}
-                          <ExternalLink className="text-muted-foreground h-3 w-3 opacity-70" />
-                        </Link>
-                        <span className="text-muted-foreground text-xs">
-                          ({project.taskCount} task{project.taskCount === 1 ? "" : "s"})
-                        </span>
-                      </div>
-                    </td>
-                    <td className="text-muted-foreground px-3 py-2">
-                      {project.timeElapsedPct === null ? "-" : `${project.timeElapsedPct}%`}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="w-24">
-                        <Progress value={project.deliveryPct ?? 0} className="h-1.5" />
-                        <span className="text-muted-foreground text-[11px]">{project.deliveryPct ?? 0}%</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">{project.qualityPct === null ? "-" : `${project.qualityPct}%`}</td>
-                    <td
-                      className={
-                        project.variancePct !== null && project.variancePct < 0 ? "px-3 py-2 text-red-500" : "px-3 py-2"
-                      }
-                    >
-                      {project.variancePct === null
-                        ? "-"
-                        : `${project.variancePct > 0 ? "+" : ""}${project.variancePct}%`}
-                    </td>
-                    <td className="px-3 py-2">
-                      {project.overdueCount > 0 ? (
-                        <span className="text-amber-600 dark:text-amber-400">{project.overdueCount}</span>
-                      ) : (
-                        <span className="text-muted-foreground">0</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">{healthBadge(project.status)}</td>
-                  </tr>
-                  {isExpanded && (
-                    <tr className="bg-muted/10 border-t">
-                      <td colSpan={8} className="p-3">
-                        <div className="bg-card space-y-3 rounded-lg border p-3 shadow-xs">
-                          <div className="flex items-center justify-between border-b pb-2">
-                            <span className="text-foreground text-xs font-semibold">
-                              Implementation Plans &amp; Workstreams — {project.project_name}
-                            </span>
-                            <Link
-                              href={projectHref(project.project_name, isAdmin)}
-                              className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
-                            >
-                              Open project workspace <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          </div>
-                          <ProjectPlanBoard
-                            project={{
-                              id: project.id,
-                              project_name: project.project_name,
-                              location: "",
-                              deployment_start_date: "",
-                              deployment_end_date: "",
-                              capacity_w: null,
-                              technology_type: null,
-                              project_manager_id: null,
-                              description: null,
-                              status: (project.lifecycle_status as any) || "active",
-                              created_at: "",
-                              updated_at: "",
-                              portfolio_id: null,
-                            }}
-                            profiles={profiles}
-                            readOnly={!isAdmin}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
+    <div className="space-y-4 p-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {projects.length > 1 ? (
+            <div className="bg-muted/60 flex flex-wrap items-center gap-1.5 rounded-lg p-1">
+              {projects.map((p) => {
+                const isActive = p.id === activeProject?.id
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedProjectId(p.id)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                      isActive
+                        ? "bg-background text-foreground font-semibold shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span>{p.project_name}</span>
+                    {p.totalPlans !== undefined && p.totalPlans > 0 && (
+                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                        {p.completedPlans ?? 0}/{p.totalPlans} plans
+                      </Badge>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ) : activeProject ? (
+            <div className="flex items-center gap-2">
+              <span className="text-foreground text-sm font-semibold">{activeProject.project_name}</span>
+              <HealthBadge status={activeProject.status} />
+              {activeProject.planProgressPct !== null && (
+                <Badge variant="outline" className="text-xs">
+                  {activeProject.planProgressPct}% Plan Progress
+                </Badge>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {activeProject && (
+            <Link
+              href={projectHref(activeProject.project_name, isAdmin)}
+              className="text-primary mr-1 inline-flex items-center gap-1 text-xs hover:underline"
+            >
+              Open project workspace <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          )}
+          {actions}
+        </div>
       </div>
+
+      {activeProject && (
+        <div className="bg-card space-y-4 rounded-xl border p-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h4 className="text-foreground text-base font-semibold">{activeProject.project_name}</h4>
+                <HealthBadge status={activeProject.status} />
+                {activeProject.planProgressPct !== null && (
+                  <Badge variant="secondary" className="text-xs">
+                    {activeProject.planProgressPct}% Progress
+                  </Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {activeProject.taskCount} task{activeProject.taskCount === 1 ? "" : "s"}
+                {activeProject.totalPlans !== undefined &&
+                  ` · ${activeProject.completedPlans ?? 0}/${activeProject.totalPlans} implementation plans completed`}
+              </p>
+            </div>
+          </div>
+
+          <ProjectPlanBoard
+            project={{
+              id: activeProject.id,
+              project_name: activeProject.project_name,
+              location: "",
+              deployment_start_date: "",
+              deployment_end_date: "",
+              capacity_w: null,
+              technology_type: null,
+              project_manager_id: null,
+              description: null,
+              status: (activeProject.lifecycle_status as any) || "active",
+              created_at: "",
+              updated_at: "",
+              portfolio_id: null,
+            }}
+            profiles={profiles}
+            readOnly={!isAdmin}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -359,19 +314,25 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         ),
       },
       {
-        key: "delivery",
-        label: "Delivery / Quality",
-        description: PROJECT_METRIC_HELP.portfolioDeliveryQuality,
+        key: "progress",
+        label: "Plan Progress",
+        description: PROJECT_METRIC_HELP.portfolioProgress,
         sortable: true,
-        accessor: (r) => r.rollup.deliveryPct ?? 0,
+        accessor: (r) => r.rollup.planProgressPct ?? 0,
         render: (r) =>
-          r.rollup.deliveryPct === null ? (
-            <span className="text-muted-foreground text-xs">No tasks</span>
+          r.rollup.planProgressPct === null ? (
+            <span className="text-muted-foreground text-xs">No plans</span>
           ) : (
-            <div className="w-32 space-y-1">
-              <Progress value={r.rollup.deliveryPct} className="h-1.5" />
+            <div className="w-36 space-y-1">
+              <Progress value={r.rollup.planProgressPct} className="h-1.5" />
               <p className="text-muted-foreground text-[11px]">
-                {r.rollup.deliveryPct}% delivered · {r.rollup.qualityPct ?? 0}% quality
+                <span className="text-foreground font-semibold">{r.rollup.planProgressPct}% progress</span>
+                {Boolean(r.rollup.totalPlans && r.rollup.totalPlans > 0) && (
+                  <span>
+                    {" "}
+                    · {r.rollup.completedPlans}/{r.rollup.totalPlans} plans
+                  </span>
+                )}
               </p>
             </div>
           ),
@@ -395,11 +356,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         description: PROJECT_METRIC_HELP.portfolioStatus,
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => (
-          <Badge variant="outline" className="capitalize">
-            {r.status.replaceAll("_", " ")}
-          </Badge>
-        ),
+        render: (r) => <PortfolioStatusBadge status={r.status} />,
       },
     ],
     []
@@ -533,12 +490,8 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
           mobileRow={{
             title: (r) => (r.code ? `${r.code} — ${r.name}` : r.name),
             subtitle: (r) =>
-              `${r.rollup.projectCount} projects · ${r.rollup.deliveryPct ?? 0}% delivery · ${r.rollup.overdueCount} overdue`,
-            trailing: (r) => (
-              <Badge variant="outline" className="text-[10px] capitalize">
-                {r.status.replaceAll("_", " ")}
-              </Badge>
-            ),
+              `${r.rollup.projectCount} projects · ${r.rollup.planProgressPct ?? 0}% progress · ${r.rollup.overdueCount} overdue`,
+            trailing: (r) => <PortfolioStatusBadge status={r.status} />,
             onSelect: isAdmin ? (r) => setEditing(r) : undefined,
           }}
           cardRenderer={(r) => (
@@ -548,13 +501,11 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
                   <p className="text-sm font-semibold">{r.code ? `${r.code} — ${r.name}` : r.name}</p>
                   {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
                 </div>
-                <Badge variant="outline" className="capitalize">
-                  {r.status.replaceAll("_", " ")}
-                </Badge>
+                <PortfolioStatusBadge status={r.status} />
               </div>
               <div className="flex items-center justify-between border-t pt-2 text-xs">
                 <span className="text-muted-foreground">{r.rollup.projectCount} projects</span>
-                <span className="text-muted-foreground">{r.rollup.deliveryPct ?? 0}% delivery</span>
+                <span className="text-muted-foreground">{r.rollup.planProgressPct ?? 0}% progress</span>
               </div>
             </div>
           )}

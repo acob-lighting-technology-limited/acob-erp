@@ -19,15 +19,67 @@ export function formatVariance(variancePct: number | null | undefined) {
 export function HealthBadge({ status }: { status: string }) {
   switch (status) {
     case "on_track":
-      return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">On Track</Badge>
+      return (
+        <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          On Track
+        </Badge>
+      )
     case "at_risk":
-      return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">At Risk</Badge>
+      return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">At Risk</Badge>
     case "behind_schedule":
-      return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">Behind Schedule</Badge>
+      return <Badge className="border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400">Behind Schedule</Badge>
     case "completed":
-      return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-500">Completed</Badge>
+      return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400">Completed</Badge>
     default:
-      return <Badge variant="outline">{status}</Badge>
+      return (
+        <Badge variant="outline" className="capitalize">
+          {status.replaceAll("_", " ")}
+        </Badge>
+      )
+  }
+}
+
+export function PortfolioStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case "active":
+      return (
+        <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Active</Badge>
+      )
+    case "on_hold":
+      return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">On Hold</Badge>
+    case "closed":
+      return <Badge className="border-slate-500/20 bg-slate-500/10 text-slate-600 dark:text-slate-400">Closed</Badge>
+    default:
+      return (
+        <Badge variant="outline" className="capitalize">
+          {status.replaceAll("_", " ")}
+        </Badge>
+      )
+  }
+}
+
+export function ProjectStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case "active":
+      return (
+        <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          Ongoing
+        </Badge>
+      )
+    case "completed":
+      return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400">Completed</Badge>
+    case "planning":
+      return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400">Planning</Badge>
+    case "on_hold":
+      return <Badge className="border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400">On Hold</Badge>
+    case "cancelled":
+      return <Badge className="border-slate-500/20 bg-slate-500/10 text-slate-600 dark:text-slate-400">Cancelled</Badge>
+    default:
+      return (
+        <Badge variant="outline" className="capitalize">
+          {status.replaceAll("_", " ")}
+        </Badge>
+      )
   }
 }
 

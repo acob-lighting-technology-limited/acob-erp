@@ -29,7 +29,13 @@ import {
   computeProjectHealth,
   type ProjectHealthTask,
 } from "@/lib/projects/health"
-import { HealthBadge, ProjectSummary, formatCapacity, formatVariance } from "@/components/projects/project-summary"
+import {
+  HealthBadge,
+  ProjectStatusBadge,
+  ProjectSummary,
+  formatCapacity,
+  formatVariance,
+} from "@/components/projects/project-summary"
 import { toLocalISODate } from "@/lib/utils/date"
 import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
@@ -132,24 +138,6 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
     )
   }, [rows])
 
-  // Project Status Badge formatter
-  const renderStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">Ongoing</Badge>
-      case "completed":
-        return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-500">Completed</Badge>
-      case "planning":
-        return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">Planning</Badge>
-      case "on_hold":
-        return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">On Hold</Badge>
-      case "cancelled":
-        return <Badge className="border-slate-500/20 bg-slate-500/10 text-slate-500">Cancelled</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
   // Table columns definition
   const columns = useMemo<DataTableColumn<ProjectRow>[]>(
     () => [
@@ -244,7 +232,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
         description: PROJECT_METRIC_HELP.status,
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => renderStatusBadge(r.status),
+        render: (r) => <ProjectStatusBadge status={r.status} />,
       },
     ],
     [healthById, staffAvatars]
@@ -392,7 +380,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
         mobileRow={{
           title: (r) => r.project_name,
           subtitle: (r) => [r.location, r.technology_type].filter(Boolean).join(" · ") || r.location,
-          trailing: (r) => renderStatusBadge(r.status),
+          trailing: (r) => <ProjectStatusBadge status={r.status} />,
           detail: {
             title: (r) => r.project_name,
             subtitle: (r) => <span className="text-muted-foreground text-xs">{r.location}</span>,
@@ -400,7 +388,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
               const health = healthById.get(r.id)
               return (
                 <>
-                  {renderStatusBadge(r.status)}
+                  <ProjectStatusBadge status={r.status} />
                   {health && <HealthBadge status={health.status} />}
                 </>
               )
@@ -458,7 +446,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
             <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
               <div className="flex items-start justify-between gap-2">
                 <h4 className="line-clamp-2 text-sm font-semibold">{r.project_name}</h4>
-                {renderStatusBadge(r.status)}
+                <ProjectStatusBadge status={r.status} />
               </div>
               <div className="grid grid-cols-2 gap-1.5 text-xs">
                 <div>

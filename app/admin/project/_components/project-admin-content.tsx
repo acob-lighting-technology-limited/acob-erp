@@ -32,10 +32,16 @@ import {
   computeProjectHealth,
   type ProjectHealthTask,
 } from "@/lib/projects/health"
+import {
+  HealthBadge,
+  ProjectStatusBadge,
+  ProjectSummary,
+  formatCapacity,
+  formatVariance,
+} from "@/components/projects/project-summary"
 import { toLocalISODate } from "@/lib/utils/date"
 import { Progress } from "@/components/ui/progress"
 import { ProjectPlanBoard } from "./project-plan-board"
-import { HealthBadge, ProjectSummary, formatCapacity, formatVariance } from "@/components/projects/project-summary"
 
 // Define core project structure
 export interface Project {
@@ -139,24 +145,6 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
     return types.sort().map((t) => ({ value: t!, label: t! }))
   }, [rows])
 
-  // Project Status Badge formatter
-  const renderStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">Ongoing</Badge>
-      case "completed":
-        return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-500">Completed</Badge>
-      case "planning":
-        return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">Planning</Badge>
-      case "on_hold":
-        return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">On Hold</Badge>
-      case "cancelled":
-        return <Badge className="border-slate-500/20 bg-slate-500/10 text-slate-500">Cancelled</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
   // Table columns definition
   const columns = useMemo<DataTableColumn<Project>[]>(
     () => [
@@ -237,7 +225,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         description: PROJECT_METRIC_HELP.status,
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => renderStatusBadge(r.status),
+        render: (r) => <ProjectStatusBadge status={r.status} />,
       },
     ],
     [healthById]
@@ -366,11 +354,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         mobileRow={{
           title: (r) => r.project_name,
           subtitle: (r) => `${r.location} · ${formatCapacity(r.capacity_w)} · ${r.technology_type || "General"}`,
-          trailing: (r) => (
-            <Badge variant="outline" className="text-[10px] capitalize">
-              {r.status || "Planned"}
-            </Badge>
-          ),
+          trailing: (r) => <ProjectStatusBadge status={r.status} />,
           detail: {
             title: (r) => r.project_name,
             subtitle: (r) => r.location,
@@ -378,7 +362,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
               const health = healthById.get(r.id)
               return (
                 <>
-                  {renderStatusBadge(r.status)}
+                  <ProjectStatusBadge status={r.status} />
                   {health && <HealthBadge status={health.status} />}
                 </>
               )
@@ -441,9 +425,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
                 <p className="text-sm font-semibold">{r.project_name}</p>
                 <p className="text-muted-foreground text-xs">{r.location}</p>
               </div>
-              <Badge variant="outline" className="capitalize">
-                {r.status || "Planned"}
-              </Badge>
+              <ProjectStatusBadge status={r.status} />
             </div>
             <div className="text-muted-foreground flex items-center justify-between text-xs">
               <span>{formatCapacity(r.capacity_w)}</span>
