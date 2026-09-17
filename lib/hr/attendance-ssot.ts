@@ -64,17 +64,22 @@ export function netDayHoursFor(policy: AttendancePolicy = DEFAULT_ATTENDANCE_POL
   return Math.max(0, grossDayHoursFor(policy) - lunch / 60)
 }
 
+/** Official company biometric attendance launch date. */
+export const COMPANY_ATTENDANCE_LAUNCH_DATE = "2026-06-01"
+
 /**
  * Statuses where the day is covered and costs the employee nothing.
  * Kept as a plain string set so this module stays free of import cycles with
  * `attendance-status.ts`.
  */
-const COVERED_STATUSES = new Set([
+export const COVERED_STATUSES = new Set([
   "waiver",
+  "waived",
   "exempted",
   "on_leave",
   "holiday",
   "out_of_station",
+  "oos",
   "absent_with_permission",
   "absence_with_permission",
   "awp",
@@ -82,10 +87,49 @@ const COVERED_STATUSES = new Set([
   "lwp",
   "incomplete_with_permission",
   "iwp",
+  "early_departure_with_permission",
+  "lewp",
   "early_closure",
   "late_resumption",
   "early",
 ])
+
+export function isCoveredAttendanceStatus(status: string | null | undefined): boolean {
+  if (!status) return false
+  return COVERED_STATUSES.has(String(status).toLowerCase().trim())
+}
+
+/**
+ * Positive attendance days: days the employee was either present/worked
+ * or covered by an authorized waiver/permission (AWP/LWP/OOS/LEWP/IWP/Waiver/Early Closure).
+ */
+export function isPositiveAttendanceStatus(status: string | null | undefined): boolean {
+  if (!status) return false
+  const s = String(status).toLowerCase().trim()
+  if (s === "absent" || s === "lwop" || s === "leave_without_pay" || s === "no_record") return false
+  if (COVERED_STATUSES.has(s)) return true
+  if (s === "present" || s === "late" || s === "early_departure" || s === "incomplete") return true
+  return false
+}
+
+/**
+ * Resolves the date when an employee's attendance should start being scorable.
+ * - Exempt staff: null (exempt from biometric attendance scoring).
+ * - Staff with no logs in the DB: null (not started yet, no absence penalty).
+ * - Trial period logs (< 2026-06-01): clamped to 2026-06-01.
+ * - Live logs (>= 2026-06-01): starts on their actual earliest log date.
+ */
+export function getEffectiveAttendanceStartDate(params: {
+  earliestLogDate?: string | null
+  isExempt?: boolean | null
+  companyLaunchDate?: string
+}): string | null {
+  if (params.isExempt) return null
+  if (!params.earliestLogDate) return null
+  const launch = params.companyLaunchDate ?? COMPANY_ATTENDANCE_LAUNCH_DATE
+  if (params.earliestLogDate < launch) return launch
+  return params.earliestLogDate
+}
 
 export interface AttendanceDayInput {
   /** Derived day status, from `deriveUnifiedAttendanceStatus`. */
@@ -243,7 +287,8 @@ export function computeAttendanceDay(input: AttendanceDayInput): AttendanceDayRe
   const effectiveEnd = input.earlyCloseTime || policy.endTime
   const forgiveLateArrival =
     Boolean(input.latenessApproved) || status === "lateness_with_permission" || status === "lwp"
-  const forgiveEarlyOut = Boolean(input.earlyOutApproved) || status === "early_departure_with_permission"
+  const forgiveEarlyOut =
+    Boolean(input.earlyOutApproved) || status === "early_departure_with_permission" || status === "lewp"
   const forgiveIncomplete =
     Boolean(input.incompleteApproved) || status === "incomplete_with_permission" || status === "iwp"
 
