@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { ColumnHelp } from "@/components/ui/data-table"
 import { HealthBadge, PortfolioStatusBadge, ProjectStatusBar } from "@/components/projects/project-summary"
 import type { Portfolio } from "./portfolios-content"
 import { projectHref } from "./project-href"
@@ -289,10 +290,19 @@ export function PortfolioAnalytics({
 
           {/* Focused KPI Cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Delivery Progress: Share of planned work completed across all projects in this portfolio, weighted by task importance (1–5)."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Delivery Progress</span>
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="flex items-center gap-1">
+                  Delivery Progress
+                  <ColumnHelp
+                    label="Delivery Progress"
+                    text="Share of planned work completed across all projects in this portfolio, weighted by task importance (1–5)."
+                  />
+                </span>
+                <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
               </div>
               <p className="mt-1 text-xl font-bold">{focusedPortfolio.rollup.deliveryPct ?? 0}%</p>
               <div className="mt-2">
@@ -300,19 +310,42 @@ export function PortfolioAnalytics({
               </div>
             </div>
 
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Quality Score: Average rating score of finished work in this portfolio based on 1–5 star task reviews."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Quality Score</span>
-                <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />
+                <span className="flex items-center gap-1">
+                  Quality Score
+                  <ColumnHelp
+                    label="Quality Score"
+                    text="Average rating score of finished work in this portfolio based on 1–5 star task reviews."
+                  />
+                </span>
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-blue-500" />
               </div>
-              <p className="mt-1 text-xl font-bold">{focusedPortfolio.rollup.qualityPct ?? 0}%</p>
+              <p className="mt-1 text-xl font-bold">
+                {focusedPortfolio.rollup.qualityPct !== null
+                  ? Math.round(focusedPortfolio.rollup.qualityPct * 10) / 10
+                  : 0}
+                %
+              </p>
               <p className="text-muted-foreground mt-1 text-[11px]">Task review ratings</p>
             </div>
 
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Schedule Health: Number of projects in this portfolio meeting schedule milestones (On Track or Completed)."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Schedule Health</span>
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="flex items-center gap-1">
+                  Schedule Health
+                  <ColumnHelp
+                    label="Schedule Health"
+                    text="Number of projects in this portfolio meeting schedule milestones (On Track or Completed)."
+                  />
+                </span>
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
               </div>
               <p className="mt-1 text-xl font-bold">
                 {focusedPortfolio.rollup.onTrack + focusedPortfolio.rollup.completed} /{" "}
@@ -321,12 +354,23 @@ export function PortfolioAnalytics({
               <p className="text-muted-foreground mt-1 text-[11px]">Projects on track</p>
             </div>
 
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Action Items: Tasks that are past their deadline and projects flagged At Risk or Behind Schedule."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Action Items</span>
+                <span className="flex items-center gap-1">
+                  Action Items
+                  <ColumnHelp
+                    label="Action Items"
+                    text="Tasks that are past their deadline and projects flagged At Risk or Behind Schedule needing intervention."
+                  />
+                </span>
                 <AlertTriangle
                   className={
-                    focusedPortfolio.rollup.overdueCount > 0 ? "h-3.5 w-3.5 text-red-500" : "h-3.5 w-3.5 text-slate-400"
+                    focusedPortfolio.rollup.overdueCount > 0
+                      ? "h-3.5 w-3.5 shrink-0 text-red-500"
+                      : "h-3.5 w-3.5 shrink-0 text-slate-400"
                   }
                 />
               </div>
@@ -441,19 +485,37 @@ export function PortfolioAnalytics({
         <div className="space-y-6">
           {/* Top KPI Cards */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Total Scope: Total active portfolios and projects managed across the organisation."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Total Scope</span>
-                <Layers className="h-3.5 w-3.5 text-blue-500" />
+                <span className="flex items-center gap-1">
+                  Total Scope
+                  <ColumnHelp
+                    label="Total Scope"
+                    text="Total active portfolios and projects managed across the organisation."
+                  />
+                </span>
+                <Layers className="h-3.5 w-3.5 shrink-0 text-blue-500" />
               </div>
               <p className="mt-1 text-xl font-bold">{macroSummary.totalPortfolios} Portfolios</p>
               <p className="text-muted-foreground mt-0.5 text-[11px]">{macroSummary.totalProjects} active projects</p>
             </div>
 
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Avg Delivery Rate: Average delivery progress across all active projects and portfolios, weighted by task scale."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Avg Delivery Rate</span>
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="flex items-center gap-1">
+                  Avg Delivery Rate
+                  <ColumnHelp
+                    label="Avg Delivery Rate"
+                    text="Average delivery progress across all active projects and portfolios, weighted by task scale."
+                  />
+                </span>
+                <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
               </div>
               <p className="mt-1 text-xl font-bold">{macroSummary.avgDelivery}%</p>
               <div className="mt-2">
@@ -461,10 +523,19 @@ export function PortfolioAnalytics({
               </div>
             </div>
 
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Schedule Health: Percentage of portfolio projects currently on track or successfully completed."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Schedule Health</span>
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="flex items-center gap-1">
+                  Schedule Health
+                  <ColumnHelp
+                    label="Schedule Health"
+                    text="Percentage of portfolio projects currently on track or successfully completed."
+                  />
+                </span>
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
               </div>
               <p className="mt-1 text-xl font-bold">{macroSummary.healthyRate}% Healthy</p>
               <p className="text-muted-foreground mt-0.5 text-[11px]">
@@ -472,14 +543,23 @@ export function PortfolioAnalytics({
               </p>
             </div>
 
-            <div className="bg-card rounded-lg border p-3">
+            <div
+              className="bg-card rounded-lg border p-3 transition-shadow hover:shadow-xs"
+              title="Action Required: Total projects currently experiencing schedule delays or holding overdue tasks."
+            >
               <div className="text-muted-foreground flex items-center justify-between text-xs font-medium">
-                <span>Action Required</span>
+                <span className="flex items-center gap-1">
+                  Action Required
+                  <ColumnHelp
+                    label="Action Required"
+                    text="Total projects currently experiencing schedule delays or holding overdue tasks."
+                  />
+                </span>
                 <AlertTriangle
                   className={
                     macroSummary.atRiskCount + macroSummary.behindScheduleCount > 0
-                      ? "h-3.5 w-3.5 text-amber-500"
-                      : "h-3.5 w-3.5 text-slate-400"
+                      ? "h-3.5 w-3.5 shrink-0 text-amber-500"
+                      : "h-3.5 w-3.5 shrink-0 text-slate-400"
                   }
                 />
               </div>
