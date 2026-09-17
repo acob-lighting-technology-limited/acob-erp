@@ -1,9 +1,31 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers"
+import { CSS } from "@dnd-kit/utilities"
+import {
+  ArrowDown,
+  ArrowUp,
+  GripVertical,
   Plus,
   Loader2,
   Trash2,
@@ -99,6 +121,44 @@ export type ProjectPlanStaffOption = {
   company_email?: string | null
 }
 
+/** One plan in the list, draggable by the handle it hands to its children. */
+function SortablePlan({
+  id,
+  disabled,
+  children,
+}: {
+  id: string
+  disabled: boolean
+  children: (handle: ReactNode) => ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  })
+  const handle = disabled ? null : (
+    <button
+      type="button"
+      ref={setActivatorNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={(e) => e.stopPropagation()}
+      className="text-muted-foreground hover:text-foreground hover:bg-muted -ml-1 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded active:cursor-grabbing"
+      aria-label="Drag to reorder plan"
+    >
+      <GripVertical className="h-4 w-4" />
+    </button>
+  )
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn("relative", isDragging && "z-10 opacity-90 shadow-lg")}
+    >
+      {children(handle)}
+    </div>
+  )
+}
+
 /**
  * Plans and their tasks for one project.
  *
@@ -189,6 +249,84 @@ export function ProjectPlanBoard({
     },
     onError: (err: Error) => toast.error(err.message),
   })
+
+  // Dragging needs a small movement first, so a click on the handle is not a drag;
+  // touch waits briefly so a phone can still scroll past the list.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
+
+  const reorderPlans = useMutation({
+    mutationFn: async (next: Plan[]) => {
+      const res = await apiFetch(`/api/projects/${project.id}/plans`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: next.map((plan) => plan.id) }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to reorder plans")
+      return payload.data
+    },
+    // Move the list straight away; put it back if the save fails.
+    onMutate: async (next) => {
+      await queryClient.cancelQueries({ queryKey: plansKey })
+      const previous = queryClient.getQueryData<Plan[]>(plansKey)
+      queryClient.setQueryData(plansKey, next)
+      return { previous }
+    },
+    onError: (err: Error, _next, context) => {
+      if (context?.previous) queryClient.setQueryData(plansKey, context.previous)
+      toast.error(err.message)
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: plansKey }),
+  })
+
+  function movePlan(from: number, to: number) {
+    if (to < 0 || to >= plans.length || from === to) return
+    reorderPlans.mutate(arrayMove(plans, from, to))
+  }
+
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return
+    movePlan(
+      plans.findIndex((plan) => plan.id === active.id),
+      plans.findIndex((plan) => plan.id === over.id)
+    )
+  }
+
+  function renderPlanMenuItems(plan: Plan) {
+    const index = plans.findIndex((p) => p.id === plan.id)
+    return (
+      <>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          disabled={index <= 0 || reorderPlans.isPending}
+          onClick={() => movePlan(index, index - 1)}
+        >
+          <ArrowUp className="mr-2 h-4 w-4" />
+          Move up
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="cursor-pointer"
+          disabled={index === plans.length - 1 || reorderPlans.isPending}
+          onClick={() => movePlan(index, index + 1)}
+        >
+          <ArrowDown className="mr-2 h-4 w-4" />
+          Move down
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+          onClick={() => deletePlan.mutate(plan.id)}
+          disabled={deletePlan.isPending}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete plan
+        </DropdownMenuItem>
+      </>
+    )
+  }
 
   const tasksByPlan = useMemo(() => {
     const map = new Map<string, ProjectTask[]>()
@@ -386,7 +524,13 @@ export function ProjectPlanBoard({
     )
   }
 
-  function renderGroup(key: string, title: string, description: string | null, plan: Plan | null) {
+  function renderGroup(
+    key: string,
+    title: string,
+    description: string | null,
+    plan: Plan | null,
+    dragHandle: ReactNode = null
+  ) {
     const groupTasks = tasksByPlan.get(key) || []
     const progress = countWork(groupTasks)
     const isExpanded = Boolean(expandedPlans[key])
@@ -406,6 +550,7 @@ export function ProjectPlanBoard({
           className="hover:bg-muted/40 flex cursor-pointer flex-wrap items-center justify-between gap-2 px-3 py-2.5 transition-colors"
         >
           <div className="flex min-w-0 items-center gap-2">
+            {dragHandle}
             {isExpanded ? (
               <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
             ) : (
@@ -442,16 +587,7 @@ export function ProjectPlanBoard({
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                    onClick={() => deletePlan.mutate(plan.id)}
-                    disabled={deletePlan.isPending}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete plan
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
+                <DropdownMenuContent align="end">{renderPlanMenuItems(plan)}</DropdownMenuContent>
               </DropdownMenu>
             )}
           </div>
@@ -479,16 +615,7 @@ export function ProjectPlanBoard({
                           <MoreVertical className="h-3.5 w-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                          onClick={() => deletePlan.mutate(plan.id)}
-                          disabled={deletePlan.isPending}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete plan
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
+                      <DropdownMenuContent align="end">{renderPlanMenuItems(plan)}</DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 )}
@@ -523,6 +650,7 @@ export function ProjectPlanBoard({
           <h4 className="text-sm font-semibold">Plans</h4>
           <p className="text-muted-foreground text-xs">
             Plans and their tasks. Progress updates as tasks are completed.
+            {!readOnly && plans.length > 1 && " Drag a plan by its handle to change the order."}
           </p>
         </div>
         {!readOnly && (
@@ -548,7 +676,22 @@ export function ProjectPlanBoard({
         </div>
       ) : (
         <div className="space-y-2">
-          {plans.map((plan) => renderGroup(plan.id, plan.name, plan.description, plan))}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={plans.map((plan) => plan.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {plans.map((plan) => (
+                  <SortablePlan key={plan.id} id={plan.id} disabled={readOnly || plans.length < 2}>
+                    {(handle) => renderGroup(plan.id, plan.name, plan.description, plan, handle)}
+                  </SortablePlan>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
           {ungroupedCount > 0 && renderGroup("", "Ungrouped tasks", "Project work not filed under a plan.", null)}
           {plans.length === 0 && ungroupedCount === 0 && (
             <p className="text-muted-foreground rounded-lg border border-dashed py-6 text-center text-sm">
