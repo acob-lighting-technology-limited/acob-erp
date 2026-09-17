@@ -10,6 +10,7 @@ import type { EventType } from "@/lib/events/types"
  */
 export const MD_DESK_SECTIONS = [
   { slug: "overview", name: "Overview" },
+  { slug: "task-reviews", name: "Task Reviews" },
   { slug: "calendar", name: "Calendar" },
   { slug: "meetings", name: "Meetings" },
   { slug: "workshops", name: "Workshops & Webinars" },

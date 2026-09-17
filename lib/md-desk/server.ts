@@ -4,6 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import type { EventsSession } from "@/lib/events/server"
 import type { MdDeskDelegate, MdDeskQueue, MdDeskQueueItem } from "@/lib/md-desk/types"
+import type { Task, TaskPersonSummary } from "@/types/task"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { isLeadForTaskDepartment } from "@/lib/tasks/rating-authority"
 
@@ -94,6 +95,11 @@ type ReviewerProfileRow = {
  * self-assigned task whose assignee is not a reviewer (e.g. a weekly-report
  * item an employee logged) still goes to their lead and is not listed here.
  */
+async function resolveMdId(db: SupabaseClient): Promise<string | null> {
+  const { data } = await db.from("departments").select("department_head_id").eq("department_code", "MD").maybeSingle()
+  return (data?.department_head_id as string | null) ?? null
+}
+
 async function loadSelfAssignedTasksAwaitingMd(db: SupabaseClient, mdId: string | null): Promise<SubmittedTaskRow[]> {
   const { data, error } = await db
     .from("tasks")
@@ -285,7 +291,7 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
       requester: displayName(names.get(t.assigned_to as string)),
       department: t.department,
       waiting_since: t.updated_at || t.created_at,
-      href: "/admin/tasks",
+      href: "/admin/md-desk/task-reviews",
       urgent: false,
     })),
   ].sort((x, y) => Number(y.urgent) - Number(x.urgent) || x.waiting_since.localeCompare(y.waiting_since))
@@ -322,4 +328,110 @@ export async function loadDelegates(session: EventsSession): Promise<MdDeskDeleg
     granted_by_name: r.granted_by ? displayName(names.get(r.granted_by)) : null,
     created_at: r.created_at,
   }))
+}
+
+export type MdTaskReviews = {
+  tasks: Task[]
+  viewer: { id: string; canReview: boolean }
+}
+
+/**
+ * MD's Desk → Task Reviews: the same tasks Overview counts as "Task rating",
+ * returned as full Task rows so the page can rate them with TaskStatusControl.
+ * The rating itself goes through PATCH /api/tasks/[id]/status, which re-checks
+ * reviewer rights and the no-self-rating rule — this loader only lists.
+ * Callers must check `canView` first (service-role read).
+ */
+export async function loadMdTaskReviews(session: EventsSession): Promise<MdTaskReviews> {
+  const db = getServiceRoleClientOrFallback(session.supabase)
+  const mdId = await resolveMdId(db)
+
+  const [queued, adminRes] = await Promise.all([
+    loadSelfAssignedTasksAwaitingMd(db, mdId),
+    session.supabase.rpc("is_admin_like"),
+  ])
+  const viewer = { id: session.userId, canReview: adminRes.data === true }
+  if (!queued.length) return { tasks: [], viewer }
+
+  const { data: rows, error } = await db
+    .from("tasks")
+    .select("*")
+    .in(
+      "id",
+      queued.map((t) => t.id)
+    )
+    .order("updated_at", { ascending: true })
+  if (error) throw error
+  const tasks = (rows ?? []) as Task[]
+
+  const profileIds = new Set<string>()
+  const goalIds = new Set<string>()
+  const kpiIds = new Set<string>()
+  for (const t of tasks) {
+    if (t.assigned_to) profileIds.add(t.assigned_to)
+    if (t.assigned_by) profileIds.add(t.assigned_by)
+    if (t.goal_id) goalIds.add(t.goal_id)
+    if (t.kpi_id) kpiIds.add(t.kpi_id)
+  }
+
+  const [profilesRes, goalsRes, kpisRes, projectsRes] = await Promise.all([
+    profileIds.size
+      ? db
+          .from("profiles")
+          .select("id, first_name, last_name, department")
+          .in("id", [...profileIds])
+      : Promise.resolve({ data: [], error: null }),
+    goalIds.size
+      ? db
+          .from("goals_objectives")
+          .select("id, title")
+          .in("id", [...goalIds])
+      : Promise.resolve({ data: [], error: null }),
+    kpiIds.size
+      ? db
+          .from("corporate_kpis")
+          .select("id, measure, strategic_objective, strategic_priority")
+          .in("id", [...kpiIds])
+      : Promise.resolve({ data: [], error: null }),
+    db
+      .from("projects")
+      .select("id, project_name")
+      .in(
+        "id",
+        tasks.map((t) => t.project_id).filter((v): v is string => Boolean(v))
+      ),
+  ])
+
+  const profileMap = new Map(((profilesRes.data ?? []) as TaskPersonSummary[]).map((p) => [p.id, p]))
+  const goalMap = new Map(((goalsRes.data ?? []) as { id: string; title: string }[]).map((g) => [g.id, g.title]))
+  const kpiMap = new Map(
+    (
+      (kpisRes.data ?? []) as {
+        id: string
+        measure: string
+        strategic_objective: string
+        strategic_priority: string
+      }[]
+    ).map((k) => [k.id, k])
+  )
+  const projectMap = new Map(
+    ((projectsRes.data ?? []) as { id: string; project_name: string }[]).map((p) => [p.id, p.project_name])
+  )
+
+  return {
+    viewer,
+    tasks: tasks.map((t) => {
+      const kpi = t.kpi_id ? kpiMap.get(t.kpi_id) : undefined
+      return {
+        ...t,
+        assigned_to_user: t.assigned_to ? profileMap.get(t.assigned_to) : undefined,
+        assigned_by_user: t.assigned_by ? profileMap.get(t.assigned_by) : undefined,
+        goal_title: (t.goal_id ? goalMap.get(t.goal_id) : null) || kpi?.strategic_objective || null,
+        kpi_measure: kpi?.measure ?? null,
+        kpi_pillar: kpi?.strategic_priority ?? null,
+        kpi_objective: kpi?.strategic_objective ?? null,
+        project_name: t.project_id ? (projectMap.get(t.project_id) ?? null) : null,
+      }
+    }),
+  }
 }
