@@ -135,6 +135,7 @@ export default async function ListPage() {
       {/* Stats Section */}
       <StatGrid>
         <StatCard
+          variant="compact"
           title="Total Items"
           value={pageData.stats.total}
           icon={Package}
@@ -142,6 +143,7 @@ export default async function ListPage() {
           iconColor="text-blue-600 dark:text-blue-400"
         />
         <StatCard
+          variant="compact"
           title="Active"
           value={pageData.stats.active}
           icon={Package}

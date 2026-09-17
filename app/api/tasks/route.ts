@@ -11,6 +11,10 @@ import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { canAssignToDepartment, canAssignToProfile } from "@/lib/tasks/assignment-scope"
 import { TASK_STATUSES, TASK_ASSIGNMENT_TYPES } from "@/lib/tasks/constants"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { taskDeadlineWindowError } from "@/lib/tasks/deadline-window"
+import { addIsoDays, type HolidaySet } from "@/lib/hr/leave-days"
+import { getHolidaySet } from "@/lib/hr/leave-workflow"
+import { toLocalISODate } from "@/lib/utils/date"
 import type { Task, TaskPersonSummary } from "@/types/task"
 
 const log = logger("tasks-route")
@@ -344,6 +348,28 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    // Every new task needs a deadline, and it may be at most five working days
+    // after the task starts. No start date means it starts today, which is what
+    // the dialog defaults to.
+    if (!payload.due_date && !payload.task_end_date) {
+      return apiError("Due date is required", ApiErrorCode.MISSING_REQUIRED_FIELD, 400)
+    }
+
+    const startIso = (payload.task_start_date || toLocalISODate()).slice(0, 10)
+    let holidays: HolidaySet
+    try {
+      // Five working days never span more than a few weeks, even across a holiday run.
+      holidays = await getHolidaySet(supabase, null, startIso, addIsoDays(startIso, 31))
+    } catch (holidayErr) {
+      log.error({ err: String(holidayErr) }, "Failed to load holidays for task deadline check")
+      holidays = new Set<string>()
+    }
+    const windowError = taskDeadlineWindowError(
+      { startIso, dueIso: payload.due_date, endIso: payload.task_end_date },
+      holidays
+    )
+    if (windowError) return apiError(windowError, ApiErrorCode.VALIDATION_ERROR, 400)
 
     const now = new Date().toISOString()
 

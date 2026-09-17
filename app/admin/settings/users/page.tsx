@@ -150,8 +150,16 @@ export default function UsersPage() {
         ),
       },
       {
+        key: "employment_date",
+        label: "Employment Date",
+        sortable: true,
+        accessor: (u) => u.employment_date || "",
+        render: (u) => <span className="text-sm">{formatDate(u.employment_date)}</span>,
+        hideOnMobile: true,
+      },
+      {
         key: "created_at",
-        label: "Joined",
+        label: "Onboarding Date",
         sortable: true,
         accessor: (u) => u.created_at,
         render: (u) => <span className="text-sm">{formatDate(u.created_at)}</span>,

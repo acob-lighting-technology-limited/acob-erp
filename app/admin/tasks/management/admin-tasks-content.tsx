@@ -23,6 +23,7 @@ import {
   Send,
   Users,
   FolderKanban,
+  Download,
 } from "lucide-react"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
@@ -49,7 +50,15 @@ import {
 } from "./tasks-content-utils"
 import { filterAssignableTaskDepartments, filterAssignableTaskUsers } from "@/lib/tasks/assignment-scope"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
-import { AdminUserTasksPlan } from "./admin-user-tasks-plan"
+import { AdminUserTasksPlan, type UserPlanExportContext } from "./admin-user-tasks-plan"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import {
+  exportTaskListToExcel,
+  exportTaskListToPdf,
+  exportUserPlanToExcel,
+  exportUserPlanToPdf,
+  type TaskExportMeta,
+} from "@/lib/tasks/export"
 
 const log = logger("tasks-management-admin-tasks-content")
 
@@ -193,6 +202,13 @@ export function AdminTasksContent({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isWorkflowOpen, setIsWorkflowOpen] = useState(false)
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  // Export reads exactly what each tab's table currently shows.
+  const userPlanExportRef = useRef<UserPlanExportContext | null>(null)
+  const [visibleTaskIds, setVisibleTaskIds] = useState<string[]>([])
+  const [taskFilterValues, setTaskFilterValues] = useState<Record<string, string[]>>({})
+  const [taskSearch, setTaskSearch] = useState("")
+  const handleProcessedTasks = useCallback((rows: Task[]) => setVisibleTaskIds(rows.map((r) => r.id)), [])
 
   const [taskForm, setTaskForm] = useState<TaskFormState>(INITIAL_TASK_FORM)
   const consumedInitialGoalIdRef = useRef("")
@@ -556,6 +572,41 @@ export function AdminTasksContent({
     [departmentOptions]
   )
 
+  const exportedBy = useMemo(() => {
+    const me = employee.find((e) => e.id === userProfile.id)
+    return me ? formatFullName(me.first_name, me.last_name) || undefined : undefined
+  }, [employee, userProfile.id])
+
+  const handleExport = (optionId: string) => {
+    if (activeTab === "user_plan") {
+      const ctx = userPlanExportRef.current
+      if (!ctx || ctx.rows.length === 0) {
+        toast.error("No employees to export for the current filters")
+        return
+      }
+      const meta: TaskExportMeta = { ...ctx.meta, generatedBy: exportedBy }
+      if (optionId === "excel") void exportUserPlanToExcel(ctx.rows, meta)
+      else void exportUserPlanToPdf(ctx.rows, meta, { includeTasks: optionId === "pdf_detail" })
+      return
+    }
+
+    const byId = new Map(tasks.map((t) => [t.id, t]))
+    const rows = visibleTaskIds.map((id) => byId.get(id)).filter((t): t is Task => Boolean(t))
+    if (rows.length === 0) {
+      toast.error("No tasks to export for the current filters")
+      return
+    }
+    const labelFor = (key: string, value: string) =>
+      filters.find((f) => f.key === key)?.options?.find((o) => o.value === value)?.label ?? value
+    const filterSummary = filters
+      .filter((f) => taskFilterValues[f.key]?.length)
+      .map((f) => `${f.label}: ${taskFilterValues[f.key].map((v) => labelFor(f.key, v)).join(", ")}`)
+    if (taskSearch.trim()) filterSummary.push(`Search: "${taskSearch.trim()}"`)
+    const meta: TaskExportMeta = { filters: filterSummary, generatedBy: exportedBy }
+    if (optionId === "excel") void exportTaskListToExcel(rows, workflowOwnerLabel, meta)
+    else void exportTaskListToPdf(rows, workflowOwnerLabel, meta)
+  }
+
   return (
     <DataTablePage
       title={activeTab === "user_plan" ? "User Task Plan & Workload" : "Task Management"}
@@ -574,6 +625,10 @@ export function AdminTasksContent({
           <Button variant="outline" size="sm" onClick={() => setIsWorkflowOpen(true)} className="h-8 gap-2">
             <ArrowRight className="h-4 w-4" />
             <span className="hidden sm:inline">Workflow Guide</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)} className="h-8 gap-2">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
           </Button>
           <Button onClick={() => handleOpenTaskDialog()} className="h-8 gap-2" size="sm">
             <Plus className="h-4 w-4" />
@@ -628,6 +683,25 @@ export function AdminTasksContent({
         ) : undefined
       }
     >
+      <ExportOptionsDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        title={activeTab === "user_plan" ? "Export User Task Plan" : "Export Tasks"}
+        options={
+          activeTab === "user_plan"
+            ? [
+                { id: "excel", label: "Excel (Summary + Tasks)", icon: "excel" },
+                { id: "pdf", label: "PDF (Summary)", icon: "pdf" },
+                { id: "pdf_detail", label: "PDF (Summary + Tasks)", icon: "pdf" },
+              ]
+            : [
+                { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+                { id: "pdf", label: "PDF", icon: "pdf" },
+              ]
+        }
+        onSelect={handleExport}
+      />
+
       {activeTab === "user_plan" ? (
         <AdminUserTasksPlan
           tasks={tasks}
@@ -637,6 +711,7 @@ export function AdminTasksContent({
           userProfile={userProfile}
           onOpenTaskDialog={handleOpenTaskDialog}
           onOpenReviewDialog={handleOpenReviewDialog}
+          exportContextRef={userPlanExportRef}
         />
       ) : (
         <DataTable<Task>
@@ -653,6 +728,9 @@ export function AdminTasksContent({
               .includes(q.toLowerCase())
           }
           filters={filters}
+          onFilterValuesChange={setTaskFilterValues}
+          onSearchChange={setTaskSearch}
+          onProcessedDataChange={handleProcessedTasks}
           rowActions={[
             {
               label: "Review / Decision",

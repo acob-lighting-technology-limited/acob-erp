@@ -204,16 +204,15 @@ export async function notifyProjectDelayed(params: {
   userId: string
   projectId: string
   projectName: string
-  deliveryPct: number
-  timeElapsedPct: number
-  overdueCount: number
+  /** Plain reason, from describeAttention in lib/projects/health. */
+  reason: string
 }) {
   return createNotification({
     userId: params.userId,
     type: "project_delayed",
     category: "tasks",
     title: "Project behind schedule",
-    message: `"${params.projectName}" is ${params.deliveryPct}% delivered with ${params.timeElapsedPct}% of its schedule elapsed${params.overdueCount > 0 ? `, and has ${params.overdueCount} overdue task${params.overdueCount === 1 ? "" : "s"}` : ""}.`,
+    message: `"${params.projectName}" is behind: ${params.reason}.`,
     priority: "high",
     linkUrl: `/admin/project`,
     entityType: "project",

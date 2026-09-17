@@ -121,7 +121,7 @@ export async function getCurrentUserPmsData(cycleId?: string) {
     activeCycleId: score.cycle_id,
     cycle: {
       id: score.cycle_id,
-      name: score.cycle_name || "Active Review Cycle",
+      name: score.cycle_name || (cycleId === "all" ? "All Quarters" : "Active Review Cycle"),
       startDate: score.cycle_start_date,
       endDate: score.cycle_end_date,
     },

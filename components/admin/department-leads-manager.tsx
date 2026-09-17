@@ -3,11 +3,11 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createClient } from "@/lib/supabase/client"
-import { TableSkeleton, QueryError } from "@/components/ui/query-states"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DataTable } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { User, Building, AlertCircle } from "lucide-react"
 import {
   Dialog,
@@ -42,6 +42,61 @@ interface Profile {
   department: string | null
   is_department_lead: boolean
 }
+
+function LeadBadge({ dept }: { dept: Department }) {
+  return dept.lead_id ? (
+    <Badge variant="default">Assigned</Badge>
+  ) : (
+    <Badge variant="outline" className="text-muted-foreground">
+      No lead
+    </Badge>
+  )
+}
+
+const columns: DataTableColumn<Department>[] = [
+  {
+    key: "name",
+    label: "Department",
+    sortable: true,
+    accessor: (dept) => dept.name,
+    render: (dept) => <span className="font-medium">{dept.name}</span>,
+  },
+  {
+    key: "lead_name",
+    label: "Assigned Lead",
+    sortable: true,
+    accessor: (dept) => dept.lead_name || "",
+    render: (dept) =>
+      dept.lead_name ? (
+        <div className="flex items-center gap-2">
+          <Badge variant="default">Lead</Badge>
+          <span>{dept.lead_name}</span>
+        </div>
+      ) : (
+        <span className="text-muted-foreground italic">No Lead Assigned</span>
+      ),
+  },
+  {
+    key: "lead_email",
+    label: "Email",
+    accessor: (dept) => dept.lead_email || "",
+    hideOnMobile: true,
+    render: (dept) => <span className="text-muted-foreground">{dept.lead_email || "—"}</span>,
+  },
+]
+
+const filters: DataTableFilter<Department>[] = [
+  {
+    key: "lead_status",
+    label: "Lead",
+    mode: "custom",
+    options: [
+      { value: "assigned", label: "Assigned" },
+      { value: "unassigned", label: "No lead" },
+    ],
+    filterFn: (dept, values) => values.includes(dept.lead_id ? "assigned" : "unassigned"),
+  },
+]
 
 async function fetchDepartmentsWithLeads(): Promise<Department[]> {
   const supabase = createClient()
@@ -163,48 +218,68 @@ export function DepartmentLeadsManager() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <TableSkeleton rows={5} cols={5} />
-        ) : isError ? (
-          <QueryError message="Could not load department leads." onRetry={refetch} />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-14">S/N</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Assigned Lead</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {departments.map((dept, index) => (
-                <TableRow key={dept.id}>
-                  <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                  <TableCell className="font-medium">{dept.name}</TableCell>
-                  <TableCell>
-                    {dept.lead_name ? (
-                      <div className="flex items-center gap-2">
-                        <Badge variant="default">Lead</Badge>
-                        <span>{dept.lead_name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground italic">No Lead Assigned</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{dept.lead_email || "\u2014"}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => openAssignDialog(dept)}>
-                      <User className="mr-2 h-4 w-4" />
-                      {dept.lead_id ? "Change Lead" : "Assign Lead"}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable<Department>
+          data={departments}
+          columns={columns}
+          filters={filters}
+          getRowId={(dept) => dept.id}
+          searchPlaceholder="Search department, lead or email..."
+          searchFn={(dept, query) =>
+            [dept.name, dept.lead_name, dept.lead_email].some((value) => (value || "").toLowerCase().includes(query))
+          }
+          isLoading={isLoading}
+          error={isError ? "Could not load department leads." : null}
+          onRetry={refetch}
+          rowActions={[
+            {
+              label: "Assign Lead",
+              icon: User,
+              onClick: openAssignDialog,
+              hidden: (dept) => Boolean(dept.lead_id),
+            },
+            {
+              label: "Change Lead",
+              icon: User,
+              onClick: openAssignDialog,
+              hidden: (dept) => !dept.lead_id,
+            },
+          ]}
+          viewToggle
+          contactsView
+          defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+          mobileRow={{
+            title: (dept) => dept.name,
+            subtitle: (dept) => dept.lead_name || "No lead assigned",
+            trailing: (dept) => <LeadBadge dept={dept} />,
+            onSelect: openAssignDialog,
+          }}
+          cardRenderer={(dept) => (
+            <div className="space-y-3 rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-medium">{dept.name}</p>
+                <LeadBadge dept={dept} />
+              </div>
+              <div className="grid gap-1 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Lead</span>
+                  <span className="truncate">{dept.lead_name || "—"}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Email</span>
+                  <span className="truncate">{dept.lead_email || "—"}</span>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="w-full" onClick={() => openAssignDialog(dept)}>
+                <User className="mr-2 h-4 w-4" />
+                {dept.lead_id ? "Change Lead" : "Assign Lead"}
+              </Button>
+            </div>
+          )}
+          emptyTitle="No active departments"
+          emptyDescription="Active departments appear here once they are created."
+          emptyIcon={Building}
+          skeletonRows={5}
+        />
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">

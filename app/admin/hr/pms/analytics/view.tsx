@@ -97,7 +97,7 @@ function AnalyticsCard({ row }: { row: AnalyticsRow }) {
           <span className="text-muted-foreground">Final Score</span>
           <span>{scoreText(row.final)}</span>
         </div>
-        <Progress value={finalPct} className="h-2" />
+        <Progress value={finalPct} />
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>

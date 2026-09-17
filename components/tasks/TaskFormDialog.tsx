@@ -33,9 +33,10 @@ import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { formatFullName } from "@/lib/utils"
-import { toLocalISODate } from "@/lib/utils/date"
+import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
+import { latestTaskDeadline, TASK_MAX_WORKING_DAYS, taskDeadlineWindowError } from "@/lib/tasks/deadline-window"
 
 interface GoalOption {
   id: string
@@ -114,7 +115,7 @@ interface TaskFormDialogProps {
   /** Set when the form is opened from inside a project: the project is fixed. */
   lockedProjectId?: string | null
   lockedProjectName?: string | null
-  /** Set when the form is opened from inside an implementation plan. */
+  /** Set when the form is opened from inside a plan. */
   lockedPlanId?: string | null
   lockedPlanName?: string | null
 }
@@ -140,6 +141,7 @@ export function TaskFormDialog({
   const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([])
   const [isMultiAssign, setIsMultiAssign] = useState(false)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [holidays, setHolidays] = useState<ReadonlySet<string>>(() => new Set())
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -219,6 +221,41 @@ export function TaskFormDialog({
   const weightValue = watch("weight")
   const titleValue = watch("title")
   const statusValue = watch("status")
+  const startDateValue = watch("task_start_date")
+  const dueDateValue = watch("due_date")
+
+  // New tasks only: the deadline may be at most five working days after the
+  // start. Holidays extend the window, so they are loaded to match the server;
+  // if they fail to load, the window is just weekends and the API has the final say.
+  const isCreating = !selectedTask
+  useEffect(() => {
+    if (!isOpen || !isCreating) return
+    fetch("/api/hr/leave/holidays", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => {
+        const rows = (payload.data ?? []) as Array<{
+          holiday_date: string
+          location?: string
+          is_business_day?: boolean
+        }>
+        setHolidays(
+          new Set(
+            rows
+              .filter((row) => !row.is_business_day && (!row.location || ["all", "global"].includes(row.location)))
+              .map((row) => row.holiday_date.slice(0, 10))
+          )
+        )
+      })
+      .catch(() => setHolidays(new Set()))
+  }, [isOpen, isCreating])
+
+  const effectiveStartDate = startDateValue || toLocalISODate()
+  const maxDueDate = isCreating ? latestTaskDeadline(effectiveStartDate, holidays) : undefined
+  const deadlineError =
+    isCreating && dueDateValue
+      ? taskDeadlineWindowError({ startIso: effectiveStartDate, dueIso: dueDateValue }, holidays)
+      : null
+  const isMissingDueDate = isCreating && !dueDateValue
 
   // Corporate KPIs a task may be tagged to: only the ones the target
   // department is CORE or SUPPORT on, per the RACI grid — not all 61.
@@ -659,14 +696,31 @@ export function TaskFormDialog({
               <Label htmlFor="due_date" className="flex items-center gap-1 text-xs font-semibold">
                 <Calendar className="h-3 w-3" />
                 Due Date / Deadline
+                {isCreating && <span className="text-destructive">*</span>}
               </Label>
               <Input
                 id="due_date"
+                required={isCreating}
                 type="date"
                 {...register("due_date")}
+                min={isCreating ? effectiveStartDate : undefined}
+                max={maxDueDate}
                 disabled={lockLevel !== "none"}
+                aria-invalid={Boolean(deadlineError)}
+                aria-describedby={isCreating ? "due_date_hint" : undefined}
                 className="mt-1 text-xs"
               />
+              {isCreating && (
+                <p
+                  id="due_date_hint"
+                  className={
+                    deadlineError ? "text-destructive mt-1 text-[11px]" : "text-muted-foreground mt-1 text-[11px]"
+                  }
+                >
+                  {deadlineError ??
+                    `Within ${TASK_MAX_WORKING_DAYS} working days of the start date — latest ${formatWATDate(maxDueDate!)}.`}
+                </p>
+              )}
             </div>
           </div>
         </fieldset>
@@ -677,7 +731,13 @@ export function TaskFormDialog({
           </Button>
           <Button
             onClick={handleSaveClick}
-            disabled={isSaving || !titleValue || (isMultiAssign ? selectedUserIds.length === 0 : !assignedTo)}
+            disabled={
+              isSaving ||
+              !titleValue ||
+              Boolean(deadlineError) ||
+              isMissingDueDate ||
+              (isMultiAssign ? selectedUserIds.length === 0 : !assignedTo)
+            }
           >
             {isSaving ? "Saving..." : selectedTask ? "Update Task" : "Create Task"}
           </Button>

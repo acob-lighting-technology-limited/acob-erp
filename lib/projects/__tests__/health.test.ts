@@ -1,106 +1,128 @@
 import { strict as assert } from "node:assert"
 import { test } from "node:test"
-import { computePortfolioHealth, computeProjectHealth, computeTimeElapsedPct } from "../health"
+import { computePortfolioHealth, computeProjectHealth, describeAttention, formatTimeUsed } from "../health"
 
 const YEAR = { start: "2026-01-01", end: "2026-12-31" }
 
-test("elapsed time is measured against the project's own schedule", () => {
-  assert.equal(computeTimeElapsedPct(YEAR.start, YEAR.end, "2026-01-01"), 0)
-  assert.equal(computeTimeElapsedPct(YEAR.start, YEAR.end, "2026-12-31"), 100)
-  // Past the end date it stays at 100 rather than running away above it.
-  assert.equal(computeTimeElapsedPct(YEAR.start, YEAR.end, "2027-06-01"), 100)
+test("time used is measured against the project's own schedule", () => {
+  const at = (today: string) => computeProjectHealth({ startDate: YEAR.start, endDate: YEAR.end, tasks: [], today })
+  assert.equal(at("2026-01-01").timeUsedPct, 0)
+  assert.equal(at("2026-12-31").timeUsedPct, 100)
+  // Past the end date it stays at 100 and the overrun is reported separately.
+  const late = at("2027-01-10")
+  assert.equal(late.timeUsedPct, 100)
+  assert.equal(late.daysOverrun, 10)
+  assert.equal(at("2025-12-25").daysToStart, 7)
 })
 
-test("delivery and quality diverge when work lands but lands badly", () => {
-  const health = computeProjectHealth({
-    startDate: YEAR.start,
-    endDate: YEAR.end,
-    today: "2026-08-21",
-    tasks: [
-      { status: "completed", weight: 2, rating: 4 },
-      { status: "completed", weight: 4, rating: 5 },
-      { status: "completed", weight: 5, rating: 2 },
-      { status: "in_progress", weight: 5, rating: null, task_end_date: "2026-07-01" },
-      { status: "pending", weight: 4, rating: null, task_end_date: "2026-11-01" },
-    ],
-  })
-
-  // 11 of 20 weight delivered; earned (1.6 + 4 + 2) of 20.
-  assert.equal(health.deliveryPct, 55)
-  assert.equal(health.qualityPct, 38)
-  assert.equal(health.overdueCount, 1)
-  assert.equal(health.status, "at_risk")
-})
-
-test("an overdue task alone is enough to flag a project", () => {
-  const health = computeProjectHealth({
-    startDate: YEAR.start,
-    endDate: YEAR.end,
-    today: "2026-08-21",
-    tasks: [
-      { status: "completed", weight: 5, rating: 5 },
-      { status: "completed", weight: 5, rating: 5 },
-      { status: "in_progress", weight: 1, rating: null, due_date: "2026-08-01" },
-    ],
-  })
-
-  assert.ok(health.deliveryPct! > (health.timeElapsedPct ?? 0))
-  assert.equal(health.overdueCount, 1)
-  assert.equal(health.status, "at_risk")
-})
-
-test("a fully delivered project reads as completed, whatever the calendar says", () => {
+test("work done is a plain count of completed tasks", () => {
   const health = computeProjectHealth({
     startDate: YEAR.start,
     endDate: YEAR.end,
     today: "2026-03-01",
-    tasks: [{ status: "completed", weight: 5, rating: 4 }],
+    tasks: [
+      { status: "completed", rating: 4 },
+      { status: "completed", rating: 2 },
+      { status: "in_progress" },
+      { status: "pending" },
+      { status: "cancelled" },
+      { status: "reassigned" },
+      { status: "completed", is_archived: true },
+    ],
   })
-  assert.equal(health.deliveryPct, 100)
-  assert.equal(health.status, "completed")
+  assert.equal(health.taskCount, 4)
+  assert.equal(health.doneCount, 2)
+  assert.equal(health.workDonePct, 50)
+  assert.equal(health.averageRating, 3)
 })
 
-test("far behind schedule is distinguished from merely at risk", () => {
+test("a task past its due date is enough to flag a project", () => {
   const health = computeProjectHealth({
     startDate: YEAR.start,
     endDate: YEAR.end,
-    today: "2026-10-01",
-    tasks: [
-      { status: "completed", weight: 1, rating: 5 },
-      { status: "pending", weight: 5, rating: null, task_end_date: "2026-12-01" },
-    ],
+    today: "2026-02-01",
+    tasks: [{ status: "completed" }, { status: "completed" }, { status: "in_progress", due_date: "2026-01-20" }],
   })
-  assert.equal(health.status, "behind_schedule")
+  assert.equal(health.overdueCount, 1)
+  assert.equal(health.status, "at_risk")
+  assert.equal(describeAttention(health), "1 task past due")
 })
 
-test("a project with no schedule falls back to overdue work as its only signal", () => {
+test("every task completed reads as done, whatever the calendar says", () => {
+  const health = computeProjectHealth({
+    startDate: YEAR.start,
+    endDate: YEAR.end,
+    today: "2027-03-01",
+    tasks: [{ status: "completed" }],
+  })
+  assert.equal(health.status, "completed")
+})
+
+test("far behind is told apart from slipping", () => {
+  const tasks = [{ status: "completed" }, { status: "pending" }, { status: "pending" }, { status: "pending" }]
+  // 25% done. At 60% of the year that is 35 points behind; at 29% it is 4.
+  const behind = computeProjectHealth({ startDate: YEAR.start, endDate: YEAR.end, today: "2026-08-08", tasks })
+  assert.equal(behind.status, "behind_schedule")
+  assert.equal(describeAttention(behind), `25% of work done with ${behind.timeUsedPct}% of time used`)
+
+  const onTime = computeProjectHealth({ startDate: YEAR.start, endDate: YEAR.end, today: "2026-04-15", tasks })
+  assert.equal(onTime.status, "on_track")
+  assert.equal(describeAttention(onTime), null)
+})
+
+test("a project with no schedule is not flagged on work alone", () => {
   const health = computeProjectHealth({
     startDate: null,
     endDate: null,
     today: "2026-08-21",
-    tasks: [{ status: "pending", weight: 5, rating: null }],
+    tasks: [{ status: "pending" }],
   })
-  assert.equal(health.timeElapsedPct, null)
-  assert.equal(health.variancePct, null)
+  assert.equal(health.timeUsedPct, null)
+  assert.equal(formatTimeUsed(health), null)
   assert.equal(health.status, "on_track")
 })
 
-test("portfolio delivery is weighted, so a big project cannot be masked by small ones", () => {
+test("time used reads in days for short schedules and weeks for long ones", () => {
+  assert.equal(formatTimeUsed({ daysUsed: 12, daysTotal: 30 }), "12 of 30 days")
+  assert.equal(formatTimeUsed({ daysUsed: 70, daysTotal: 140 }), "10 of 20 weeks")
+})
+
+test("portfolio work done counts every task, so a big project cannot be hidden", () => {
   const big = computeProjectHealth({
     startDate: YEAR.start,
     endDate: YEAR.end,
     today: "2026-08-21",
-    tasks: Array.from({ length: 10 }, () => ({ status: "pending", weight: 5, rating: null })),
+    tasks: Array.from({ length: 9 }, () => ({ status: "pending" })),
   })
   const small = computeProjectHealth({
     startDate: YEAR.start,
     endDate: YEAR.end,
     today: "2026-08-21",
-    tasks: [{ status: "completed", weight: 1, rating: 5 }],
+    tasks: [{ status: "completed" }],
   })
 
   const rollup = computePortfolioHealth([big, small])
   assert.equal(rollup.projectCount, 2)
-  // 1 of 51 weight delivered — not the 50% a mean of percentages would give.
-  assert.equal(rollup.deliveryPct, 1.96)
+  assert.equal(rollup.completed, 1)
+  // 1 of 10 tasks — not the 50% an average of the two projects would give.
+  assert.equal(rollup.workDonePct, 10)
+})
+
+test("a plan is finished only when it has tasks and every one is done", () => {
+  const health = computeProjectHealth({
+    startDate: YEAR.start,
+    endDate: YEAR.end,
+    today: "2026-03-01",
+    planIds: ["a", "b", "c"],
+    tasks: [
+      { status: "completed", plan_id: "a" },
+      { status: "cancelled", plan_id: "a" },
+      { status: "completed", plan_id: "b" },
+      { status: "pending", plan_id: "b" },
+    ],
+  })
+  // a: done (the cancelled task is left out). b: one task still open. c: no tasks yet.
+  assert.equal(health.planCount, 3)
+  assert.equal(health.plansDoneCount, 1)
+  assert.equal(computePortfolioHealth([health, health]).plansDoneCount, 2)
 })

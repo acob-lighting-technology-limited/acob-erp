@@ -190,7 +190,7 @@ export default function DevelopmentPlansPage() {
           const completedActions = (plan.actions || []).filter((a) => a.status === "completed").length
           return (
             <div className="w-28 space-y-1">
-              <Progress value={planProgress(plan)} className="h-1.5" />
+              <Progress value={planProgress(plan)} />
               <span className="text-muted-foreground text-[11px]">
                 {totalActions > 0 ? `${completedActions}/${totalActions} actions` : `${planProgress(plan)}%`}
               </span>

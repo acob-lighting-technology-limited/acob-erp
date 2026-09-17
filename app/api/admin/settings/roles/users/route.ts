@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("profiles")
-    .select("id, first_name, last_name, company_email, department, employment_status, created_at")
+    .select("id, first_name, last_name, company_email, department, employment_status, employment_date, created_at")
     .order("first_name", { ascending: true })
   if (role) query = query.eq("role", role)
 

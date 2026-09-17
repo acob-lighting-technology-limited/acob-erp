@@ -13,6 +13,7 @@ type ProfileRow = {
   admin_routes?: string[] | null
   department: string | null
   employment_status: string | null
+  employment_date: string | null
   created_at: string
 }
 
@@ -39,7 +40,9 @@ export async function GET(request: NextRequest) {
   if (picker) {
     const { data, error } = await db
       .from("profiles")
-      .select("id, company_email, first_name, last_name, role, department, employment_status, created_at")
+      .select(
+        "id, company_email, first_name, last_name, role, department, employment_status, employment_date, created_at"
+      )
       .eq("employment_status", "active")
       .order("first_name")
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -48,7 +51,9 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await db
     .from("profiles")
-    .select("id, company_email, first_name, last_name, role, admin_routes, department, employment_status, created_at")
+    .select(
+      "id, company_email, first_name, last_name, role, admin_routes, department, employment_status, employment_date, created_at"
+    )
     .order("created_at", { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

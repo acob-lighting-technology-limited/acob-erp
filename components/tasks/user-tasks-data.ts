@@ -43,12 +43,12 @@ export async function loadUserTasks(
   userId: string,
   userProfile: TaskUserProfile | null
 ): Promise<Task[]> {
-  // 1. Fetch direct tasks assigned to user or created by user
+  // 1. Fetch direct tasks assigned to user
   const { data: directTasks } = await supabase
     .from("tasks")
     .select("*")
     .eq("is_archived", false)
-    .or(`assigned_to.eq.${userId},assigned_by.eq.${userId}`)
+    .eq("assigned_to", userId)
     .neq("category", "weekly_action")
     .order("created_at", { ascending: false })
 

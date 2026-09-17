@@ -33,13 +33,13 @@ export function DeptPmsKpiView({ deptId, deptName }: DeptPmsKpiViewProps) {
               onClick={() => setActiveTab("appraisal_scores")}
             >
               <BarChart2 className="mr-1.5 h-4 w-4" />
-              Cycle Appraisal Scores
+              Quarterly Appraisal Scores
             </Button>
           </div>
           <span className="text-muted-foreground hidden text-xs sm:inline-block">
             {activeTab === "department_kpis"
               ? `Core & Support KPIs, targets, and progress for ${deptName}`
-              : `Appraisal cycle scoring for ${deptName} staff`}
+              : `Quarterly appraisal scoring for ${deptName} staff`}
           </span>
         </div>
       </div>

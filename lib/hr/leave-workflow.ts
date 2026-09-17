@@ -4,12 +4,7 @@ import { logger } from "@/lib/logger"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Json } from "@/types/database"
 import { toLocalISODate } from "@/lib/utils/date"
-import {
-  countLeaveDays,
-  isWorkingDay,
-  NO_HOLIDAYS,
-  type HolidaySet,
-} from "@/lib/hr/leave-days"
+import { countLeaveDays, isWorkingDay, NO_HOLIDAYS, type HolidaySet } from "@/lib/hr/leave-days"
 
 const log = logger("leave-workflow")
 
@@ -214,12 +209,7 @@ export async function computeLeaveDates(params: {
   }
 
   const searchEnd = addDays(start, Math.max(120, params.daysCount * 4))
-  const holidaySet = await getHolidaySet(
-    params.supabase,
-    params.location,
-    toISODate(start),
-    toISODate(searchEnd)
-  )
+  const holidaySet = await getHolidaySet(params.supabase, params.location, toISODate(start), toISODate(searchEnd))
 
   let current = new Date(start)
   let counted = 0
@@ -724,6 +714,24 @@ function buildNotificationRows(params: {
       link_url: actionUrl,
     },
   }))
+}
+
+/** Who holds a leave request at a given stage, e.g. "Department Lead". */
+export function leaveStageLabel(stageCode: string) {
+  switch (stageCode) {
+    case "pending_reliever":
+      return "Reliever"
+    case "pending_department_lead":
+      return "Department Lead"
+    case "pending_admin_hr_lead":
+      return "Admin and HR Lead"
+    case "pending_hcs":
+      return "HCS"
+    case "pending_md":
+      return "MD"
+    default:
+      return stageCode.replaceAll("_", " ")
+  }
 }
 
 export function formatLeaveReference(entityId?: string) {

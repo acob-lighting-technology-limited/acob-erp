@@ -332,7 +332,7 @@ app/admin/<section>/<page>/
 3. Stats cards     3–4 StatCard items — total, a key status, a period, a %
 4. DataTable       renders internally in this fixed order:
      a. Search bar (debounced 300ms) + Columns toggle + View toggle
-     b. Filter dropdowns  (minimum 2 per table page)
+     b. Filter dropdowns  (minimum 2, maximum 4 per table)
      c. Active filter pills + "Clear all" button
      d. Row count  — always visible: "X results" / "Showing X–Y of Z"
      e. Skeleton rows while loading  (never a spinner)
@@ -460,14 +460,19 @@ const filters: DataTableFilter<MyRow>[] = [
 
 Always wrap `StatCard`s in `StatGrid`. Never hand-write the grid `<div>`.
 
+**Card size: always the `compact` variant.** It is the house style for the stats
+band and is `StatCard`'s default, so omitting `variant` gives the right card. Never
+pass `variant="default"` or `variant="large"` on a table page — those are the older,
+taller cards and make a new page look out of place next to the rest of the app.
+
 ```tsx
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 
 <StatGrid>
-  <StatCard title="Total"   value={total}   icon={Users}      iconBgColor="bg-blue-500/10"    iconColor="text-blue-500" />
-  <StatCard title="Active"  value={active}  icon={Check}      iconBgColor="bg-emerald-500/10" iconColor="text-emerald-500" />
-  <StatCard title="Pending" value={pending} icon={Clock}      iconBgColor="bg-amber-500/10"   iconColor="text-amber-500" />
+  <StatCard variant="compact" title="Total"   value={total}   icon={Users} iconBgColor="bg-blue-500/10"    iconColor="text-blue-500" />
+  <StatCard variant="compact" title="Active"  value={active}  icon={Check} iconBgColor="bg-emerald-500/10" iconColor="text-emerald-500" />
+  <StatCard variant="compact" title="Pending" value={pending} icon={Clock} iconBgColor="bg-amber-500/10"   iconColor="text-amber-500" />
 </StatGrid>
 ```
 
@@ -538,11 +543,14 @@ table or filter bar. Use `ExportOptionsDialog` from
 - ❌ Inline search or filter state in a page — all handled by `DataTable`
 - ❌ `<Loader2>` spinner for table loading — skeletons are automatic
 - ❌ Fewer than 2 filter options on any table page
+- ❌ More than 4 filters on one table — pick the four people actually use; merge a
+  start/end pair into one range filter rather than two dropdowns
 - ❌ A table page with no metrics at all — supply `stats` (StatCards), `statBadges`,
   or both. Prefer `statBadges` with `statBadgeStyle="line"` on lookup and record
   pages: even a `StatGrid` row of three costs a phone height it could spend on
   data. Pass both only when the cards genuinely earn a desktop band; they then
   render `md`-and-up while the line covers mobile.
+- ❌ `StatCard` with `variant="default"` or `variant="large"` on a table page — use `compact`
 - ❌ A hand-written grid `<div>` wrapping `StatCard`s — use `StatGrid`, which owns
   the one-row / three-card mobile rule. A bare `grid-cols-2` or `grid-cols-3`
   wrapper is what put a second row of metrics on 82 phone screens.

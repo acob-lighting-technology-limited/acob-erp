@@ -48,7 +48,7 @@ test("KPI to Task to Review pipeline", async ({ browser }) => {
       description: `${taskTitle} description`,
       priority: "high",
       status: "pending",
-      due_date: futureIsoDate(14),
+      due_date: futureIsoDate(3),
       department: seed.testEmployee.department || null,
       assignment_type: "individual",
       assigned_to: seed.testEmployee.id,

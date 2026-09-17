@@ -137,22 +137,44 @@ export function DepartmentCascadeContent({
   const columns = useMemo<DataTableColumn<CascadeRow>[]>(
     () => [
       {
-        key: "measure",
-        label: "KPI & Pillar",
+        key: "strategic_priority",
+        label: "Pillar",
         sortable: true,
         resizable: true,
-        initialWidth: 320,
+        initialWidth: 170,
+        accessor: (r) => r.strategic_priority || "",
+        render: (r) =>
+          r.strategic_priority ? (
+            <Badge variant="secondary" className="text-left text-[11px] font-medium whitespace-normal">
+              {r.strategic_priority}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">-</span>
+          ),
+      },
+      {
+        key: "measure",
+        label: "KPI Measure",
+        sortable: true,
+        resizable: true,
+        initialWidth: 300,
         accessor: (r) => r.measure,
         render: (r) => (
-          <div className="flex flex-col">
-            <span className="line-clamp-2 font-medium">{r.measure}</span>
-            <span className="text-muted-foreground text-[11px]">
-              {r.strategic_priority ? (
-                <span className="text-foreground/80 font-semibold">{r.strategic_priority} · </span>
-              ) : null}
-              {r.perspective} · {r.strategic_objective}
-            </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs leading-snug font-medium">{r.measure}</span>
+            <span className="text-muted-foreground text-[11px]">{r.strategic_objective}</span>
           </div>
+        ),
+      },
+      {
+        key: "perspective",
+        label: "Perspective",
+        sortable: true,
+        accessor: (r) => r.perspective,
+        render: (r) => (
+          <Badge variant="outline" className="text-xs">
+            {r.perspective}
+          </Badge>
         ),
       },
       {
@@ -172,32 +194,21 @@ export function DepartmentCascadeContent({
       {
         key: "target_value",
         label: "Target",
-        accessor: (r) => r.target_value ?? -1,
-        render: (r) =>
-          r.measure_type === "milestone" ? (
-            <span className="text-muted-foreground text-xs">3 milestones</span>
-          ) : r.target_value != null ? (
-            <span className="text-xs font-medium">
-              {r.target_value} {r.target_unit || ""}
-            </span>
-          ) : (
-            <span className="text-xs text-amber-600 dark:text-amber-400">Not set</span>
-          ),
-      },
-      {
-        key: "latest_actual",
-        label: "Latest Actual",
-        accessor: (r) => r.latest_actual?.actual_value ?? r.latest_actual?.milestones_completed ?? -1,
+        accessor: (r) => r.department_target || r.target_text || (r.target_value != null ? String(r.target_value) : ""),
         render: (r) => {
-          if (!r.latest_actual) return <span className="text-muted-foreground text-xs">Not recorded</span>
-          if (r.measure_type === "milestone") {
-            return (
-              <span className="text-xs">
-                {r.latest_actual.milestones_completed ?? 0}/{r.latest_actual.milestones_total ?? 3} milestones
-              </span>
-            )
-          }
-          return <span className="text-xs">{r.latest_actual.actual_value}</span>
+          const targetDisplay =
+            r.department_target ||
+            r.target_text ||
+            (r.target_value != null ? `${r.target_value} ${r.target_unit || ""}`.trim() : null)
+          if (!targetDisplay) return <span className="text-xs text-amber-600 dark:text-amber-400">Not set</span>
+          return (
+            <div className="flex flex-col">
+              <span className="text-xs font-medium">{targetDisplay}</span>
+              {r.department_target && r.target_text && r.department_target !== r.target_text ? (
+                <span className="text-muted-foreground text-[10px]">Corp: {r.target_text}</span>
+              ) : null}
+            </div>
+          )
         },
       },
       {
@@ -210,7 +221,7 @@ export function DepartmentCascadeContent({
             <span className="text-muted-foreground text-xs">-</span>
           ) : (
             <div className="w-28 space-y-1">
-              <Progress value={r.capped_pct} className="h-1.5" />
+              <Progress value={r.capped_pct} />
               <span className="text-muted-foreground text-[11px]">
                 {r.raw_pct}% {r.raw_pct !== r.capped_pct ? "(capped at 100 for rollup)" : ""}
               </span>

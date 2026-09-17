@@ -29,7 +29,9 @@ export function StatCard({
   iconBgColor = "bg-primary/10",
   iconColor = "text-primary",
   trend,
-  variant = "default",
+  // compact is the house style (the stats band on every table page). "default" and
+  // "large" are the older, taller cards — opt into them explicitly.
+  variant = "compact",
   description,
   tooltip,
   className,

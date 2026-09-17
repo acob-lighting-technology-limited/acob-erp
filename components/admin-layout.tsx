@@ -65,7 +65,8 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
         profile={profile}
         adminScopeMode={scope.scopeMode}
         deptConsoles={deptConsoles}
-        showMdDesk={isMdDeskMember === true}
+        // Super admins and developers always see MD's Desk for now; others only as MD or delegate.
+        showMdDesk={isMdDeskMember === true || ["super_admin", "developer"].includes(String(scope.role))}
       />
       <SidebarContent>
         <div className="min-h-screen bg-[var(--admin-content-bg)] pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">

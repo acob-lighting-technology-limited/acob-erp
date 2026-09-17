@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState } from "react"
 import {
   CalendarDays,
   CalendarRange,
@@ -22,6 +22,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { formatWATDateTimeRange, formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import {
   EVENT_LOCATION_LABELS,
+  EVENT_LOCATION_TYPES,
   EVENT_RSVP_LABELS,
   EVENT_STATUSES,
   EVENT_STATUS_LABELS,
@@ -31,6 +32,7 @@ import {
   EVENT_VISIBILITY_LABELS,
   MD_INVOLVEMENT_LABELS,
   type CalendarEvent,
+  type EventType,
 } from "@/lib/events/types"
 import { DeleteEventDialog } from "./delete-event-dialog"
 import { EventStatusBadge, EventTypeBadge, MdInvolvementBadge } from "./event-badges"
@@ -56,8 +58,8 @@ export type EventsWorkspaceProps = {
   tabs: TabKey[]
   /** Management surfaces show drafts and the MD-involvement filter. */
   variant: "staff" | "manage"
-  /** Page-specific tabs (e.g. MD's Desk overview), rendered before the built-in ones. */
-  extraTabs?: { key: string; label: string; icon: LucideIcon; render: () => ReactNode }[]
+  /** Limit the page to these event types (e.g. MD's Desk → Meetings). Omit for all types. */
+  eventTypes?: readonly EventType[]
   /** Prefills for the New event form. */
   formDefaults?: EventFormDefaults
 }
@@ -89,11 +91,12 @@ export function EventsWorkspace({
   scope = "all",
   tabs,
   variant,
-  extraTabs = [],
+  eventTypes,
   formDefaults,
 }: EventsWorkspaceProps) {
-  const [tab, setTab] = useState<string>(extraTabs[0]?.key ?? tabs[0])
-  const activeExtra = extraTabs.find((t) => t.key === tab) ?? null
+  const [tab, setTab] = useState<TabKey>(tabs[0])
+  // Joined so a fresh array literal from the parent does not bust the memo every render.
+  const typeKey = eventTypes?.join(",") ?? ""
   const [nowMs] = useState(() => Date.now())
   const [month, setMonth] = useState(() => {
     const [y, m] = toLocalISODate().split("-").map(Number)
@@ -114,9 +117,14 @@ export function EventsWorkspace({
 
   const eventsQuery = useEvents(range, scope)
   const optionsQuery = useEventOptions()
-  const canCreate = optionsQuery.data?.capabilities.canCreate === true
+  const canCreate = variant === "manage" && optionsQuery.data?.capabilities.canCreate === true
 
-  const allEvents = useMemo(() => eventsQuery.data?.events ?? [], [eventsQuery.data])
+  const allEvents = useMemo(() => {
+    const list = eventsQuery.data?.events ?? []
+    if (!typeKey) return list
+    const allowed = new Set(typeKey.split(","))
+    return list.filter((e) => allowed.has(e.type))
+  }, [eventsQuery.data, typeKey])
   const rows = useMemo(() => {
     let list = allEvents
     if (variant === "staff") list = list.filter((e) => e.status !== "draft" || e.can_manage)
@@ -228,8 +236,35 @@ export function EventsWorkspace({
     },
   ]
 
+  // At most four filters per page. MD schedule only matters on the company-wide
+  // management page (on MD's Desk every event is on the MD's schedule), and that
+  // page drops Format to stay within four. Type is hidden when a page shows one type.
+  const showMdScheduleFilter = variant === "manage" && scope === "all"
+  const typeOptions = eventTypes ?? EVENT_TYPES
+  const formatFilter: DataTableFilter<CalendarEvent> = {
+    key: "format",
+    label: "Format",
+    mode: "custom",
+    options: EVENT_LOCATION_TYPES.map((l) => ({ value: l, label: EVENT_LOCATION_LABELS[l] })),
+    filterFn: (e, values) => values.includes(e.location_type),
+  }
+  const mdScheduleFilter: DataTableFilter<CalendarEvent> = {
+    key: "md_involvement",
+    label: "MD schedule",
+    mode: "custom",
+    options: (["host", "attending", "none"] as const).map((m) => ({ value: m, label: MD_INVOLVEMENT_LABELS[m] })),
+    filterFn: (e, values) => values.includes(e.md_involvement),
+  }
   const filters: DataTableFilter<CalendarEvent>[] = [
-    { key: "type", label: "Type", options: EVENT_TYPES.map((t) => ({ value: t, label: EVENT_TYPE_LABELS[t] })) },
+    ...(typeOptions.length > 1
+      ? [
+          {
+            key: "type",
+            label: "Type",
+            options: typeOptions.map((t) => ({ value: t, label: EVENT_TYPE_LABELS[t] })),
+          },
+        ]
+      : []),
     {
       key: "status",
       label: "Status",
@@ -243,20 +278,7 @@ export function EventsWorkspace({
       label: "Audience",
       options: EVENT_VISIBILITIES.map((v) => ({ value: v, label: EVENT_VISIBILITY_LABELS[v] })),
     },
-    ...(variant === "manage"
-      ? [
-          {
-            key: "md_involvement",
-            label: "MD schedule",
-            mode: "custom" as const,
-            options: (["host", "attending", "none"] as const).map((m) => ({
-              value: m,
-              label: MD_INVOLVEMENT_LABELS[m],
-            })),
-            filterFn: (e: CalendarEvent, values: string[]) => values.includes(e.md_involvement),
-          },
-        ]
-      : []),
+    showMdScheduleFilter ? mdScheduleFilter : formatFilter,
   ]
 
   const rowActions: RowAction<CalendarEvent>[] = [
@@ -363,10 +385,11 @@ export function EventsWorkspace({
       </StatGrid>
     )
 
-  const tabDefs: DataTableTab[] = [
-    ...extraTabs.map(({ key, label, icon: tabIcon }) => ({ key, label, icon: tabIcon })),
-    ...tabs.map((key) => ({ key, label: TAB_LABELS[key].label, icon: TAB_LABELS[key].icon })),
-  ]
+  const tabDefs: DataTableTab[] = tabs.map((key) => ({
+    key,
+    label: TAB_LABELS[key].label,
+    icon: TAB_LABELS[key].icon,
+  }))
   const error = eventsQuery.error instanceof Error ? eventsQuery.error.message : null
 
   return (
@@ -377,7 +400,7 @@ export function EventsWorkspace({
       backLink={backLink}
       tabs={tabDefs}
       activeTab={tab}
-      onTabChange={setTab}
+      onTabChange={(key) => setTab(key as TabKey)}
       stats={statCards}
       actions={
         <div className="flex items-center gap-2">
@@ -396,9 +419,7 @@ export function EventsWorkspace({
         </div>
       }
     >
-      {activeExtra ? (
-        activeExtra.render()
-      ) : tab === "calendar" ? (
+      {tab === "calendar" ? (
         <div className="space-y-2">
           {error && (
             <div className="border-destructive/40 text-destructive flex items-center justify-between gap-2 rounded-lg border p-3 text-sm">

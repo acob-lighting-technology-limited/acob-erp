@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { PROJECT_PRIORITIES } from "@/lib/projects/priority"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 
@@ -29,6 +30,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
       description,
       status,
       portfolio_id,
+      priority,
     } = body
 
     if (!project_name || !location || !deployment_start_date || !deployment_end_date) {
@@ -36,6 +38,10 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         { error: "Project name, location, start date, and end date are required" },
         { status: 400 }
       )
+    }
+
+    if (priority !== undefined && !PROJECT_PRIORITIES.includes(priority)) {
+      return NextResponse.json({ error: "Priority must be critical, high, medium or low" }, { status: 400 })
     }
 
     // Update project using authenticated user's client cast to any
@@ -53,6 +59,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
         description,
         status,
         updated_at: new Date().toISOString(),
+        ...(priority !== undefined ? { priority } : {}),
       })
       .eq("id", params.id)
       .select()

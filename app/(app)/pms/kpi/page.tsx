@@ -1,13 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
-import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
 import { getCurrentUserPmsData } from "../_lib"
-import { CycleSelector } from "../_components/cycle-selector"
 import { TASK_WEIGHT_DEFAULT, isTaskInCycle } from "@/lib/tasks/scoring"
 import { EmployeeKpiTabs } from "./_components/employee-kpi-tabs"
-
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
-}
 
 type GoalCycleRow = {
   id: string
@@ -52,8 +46,8 @@ type KpiTableTask = {
 
 type KpiTableRow = {
   cycle: string
-  goal: string
-  goal_progress_pct: string
+  rating: string
+  earned: string
   effective_kpi_pct: string
   linked_tasks: string
   weight: string
@@ -69,9 +63,14 @@ function toQuarterLabel(dateString?: string | null) {
   return `Q${quarter} ${date.getFullYear()}`
 }
 
-export default async function PmsKpiPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
-  const { cycle_id } = await searchParams
-  const { score, cycles, activeCycleId, goalSummary, profile } = await getCurrentUserPmsData(cycle_id)
+export default async function PmsKpiPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cycle_id?: string; tab?: string }>
+}) {
+  const { cycle_id, tab } = await searchParams
+  const effectiveCycleId = cycle_id ?? "all"
+  const { score, cycles, activeCycleId, goalSummary, profile } = await getCurrentUserPmsData(effectiveCycleId)
   const supabase = await createClient()
 
   const goalIds = score.breakdown.goals.map((goal) => goal.goal_id).filter((id): id is string => Boolean(id))
@@ -172,49 +171,53 @@ export default async function PmsKpiPage({ searchParams }: { searchParams: Promi
     }
   }
 
-  const rows: KpiTableRow[] = score.breakdown.goals.map((goal) => ({
-    cycle: goalCycleByGoalId.get(goal.goal_id) || "Current",
-    goal: goal.title,
-    goal_progress_pct: `${goal.goal_progress_pct}%`,
-    effective_kpi_pct: `${goal.effective_kpi_pct}%`,
-    linked_tasks: `${goal.linked_tasks_completed}/${goal.linked_tasks_total}`,
-    // Total task weight in this group: how much of the score it could move.
-    weight: String(goal.priority_weight),
-    __goalId: goal.goal_id,
-    __tasks: tasksByGoalId.get(goal.goal_id) || [],
-  }))
+  const rows: KpiTableRow[] = score.breakdown.goals.map((goal) => {
+    const goalTasks = tasksByGoalId.get(goal.goal_id) || []
+    const ratedTasks = goalTasks.filter((t) => typeof t.rating === "number" && t.rating > 0)
+    const avgRating =
+      ratedTasks.length > 0
+        ? (ratedTasks.reduce((acc, t) => acc + (t.rating || 0), 0) / ratedTasks.length).toFixed(1)
+        : null
+
+    const earnedPoints = goalTasks.reduce((acc, t) => {
+      if (!t.weight || t.rating == null) return acc
+      return acc + (t.weight * t.rating) / 5
+    }, 0)
+    const roundedEarned = Math.round(earnedPoints * 100) / 100
+
+    let resolvedCycle = goalCycleByGoalId.get(goal.goal_id)
+    if (!resolvedCycle || resolvedCycle === "Current") {
+      const firstTaskWithDate = goalTasks.find((t) => t.dueDate)
+      if (firstTaskWithDate?.dueDate) {
+        resolvedCycle = toQuarterLabel(firstTaskWithDate.dueDate)
+      } else {
+        resolvedCycle = goal.goal_id ? "Goal" : "Ad-hoc"
+      }
+    }
+
+    return {
+      cycle: resolvedCycle,
+      rating: avgRating ? `${avgRating}/5` : "Unrated",
+      earned: `${roundedEarned} / ${goal.priority_weight}`,
+      effective_kpi_pct: `${goal.effective_kpi_pct}%`,
+      linked_tasks: `${goal.linked_tasks_completed}/${goal.linked_tasks_total}`,
+      weight: String(goal.priority_weight),
+      __goalId: goal.goal_id,
+      __tasks: goalTasks,
+    }
+  })
 
   return (
-    <EmployeeKpiTabs department={profile?.department || null}>
-      <PmsTablePage
-        title="PMS KPI"
-        description="Track your goal progress, task weights, and effective KPI attainment for the review cycle."
-        backHref="/pms"
-        backLabel="Back to PMS"
-        icon="kpi"
-        cycles={cycles}
-        activeCycleId={activeCycleId}
-        summaryCards={[
-          { label: "KPI Score", value: formatPercent(score.kpi_score) },
-          { label: "Approved Goals", value: goalSummary.approved },
-          { label: "Completed Goals", value: goalSummary.completed },
-        ]}
-        tableTitle="KPI Task Breakdown"
-        tableDescription={`Your scored tasks in ${score.cycle_name}, grouped by goal. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
-        rows={rows}
-        columns={[
-          { key: "cycle", label: "Cycle" },
-          { key: "goal", label: "Goal" },
-          { key: "goal_progress_pct", label: "Group Score" },
-          { key: "effective_kpi_pct", label: "Effective KPI" },
-          { key: "linked_tasks", label: "Completed / Scored" },
-          { key: "weight", label: "Total Weight" },
-        ]}
-        searchPlaceholder="Search goal or KPI row..."
-        filterKey="cycle"
-        filterLabel="Cycle"
-        filterAllLabel="All Cycles"
-      />
-    </EmployeeKpiTabs>
+    <EmployeeKpiTabs
+      department={profile?.department || null}
+      initialTab={tab}
+      cycles={cycles}
+      activeCycleId={activeCycleId}
+      kpiScore={score.kpi_score}
+      approvedGoals={goalSummary.approved}
+      completedGoals={goalSummary.completed}
+      cycleName={score.cycle_name || (effectiveCycleId === "all" ? "All Quarters" : "Active Cycle")}
+      rows={rows}
+    />
   )
 }

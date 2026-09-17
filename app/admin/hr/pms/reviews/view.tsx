@@ -396,11 +396,6 @@ export function AdminPmsReviewsPage({
     cycleLabel: "Quarter",
   })
 
-  const reviewTypeOptions = useMemo(
-    () => Array.from(new Set(canonicalReviews.map((r) => r.cycle?.review_type).filter(Boolean) as string[])).sort(),
-    [canonicalReviews]
-  )
-
   // ─── Derived: department rows ─────────────────────────────────────────────
 
   const deptRows = useMemo((): DeptRow[] => {
@@ -693,7 +688,7 @@ export function AdminPmsReviewsPage({
                 <span>{r.submitted}</span>
                 <span className="text-muted-foreground">{pct}%</span>
               </div>
-              <Progress value={pct} className="h-1.5" />
+              <Progress value={pct} />
             </div>
           )
         },
@@ -726,6 +721,8 @@ export function AdminPmsReviewsPage({
 
   // ─── Filters ──────────────────────────────────────────────────────────────
 
+  // Four filters max (AGENTS.md). The cycle filters already carry Review Type, so the
+  // duplicate review-type dropdown was removed.
   const individualFilters: DataTableFilter<ReviewRow>[] = useMemo(
     () => [
       {
@@ -745,16 +742,8 @@ export function AdminPmsReviewsPage({
         ],
         placeholder: "All Statuses",
       },
-      {
-        key: "review_type",
-        label: "Review Type",
-        mode: "custom",
-        options: reviewTypeOptions.map((t) => ({ value: t, label: t })),
-        filterFn: (row, selected) => selected.includes(row.cycle?.review_type ?? ""),
-        placeholder: "All Types",
-      },
     ],
-    [departmentOptions, individualCycleFilters, reviewTypeOptions]
+    [departmentOptions, individualCycleFilters]
   )
 
   const deptFilters: DataTableFilter<DeptRow>[] = useMemo(

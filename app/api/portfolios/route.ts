@@ -25,14 +25,14 @@ type ProjectRow = {
   deployment_end_date: string | null
   status: string | null
   tasks: ProjectHealthTask[] | null
+  plans: { id: string }[] | null
 }
 
 /**
  * GET /api/portfolios
  *
- * Returns each portfolio with its projects' health rolled up. Progress is
- * derived from the tasks on every read — nothing about delivery is stored, so
- * a portfolio can never report a figure its own tasks disagree with.
+ * Returns each portfolio with its projects' progress rolled up. Progress is
+ * derived from the tasks on every read — nothing is stored, so it cannot drift.
  */
 export async function GET(request: NextRequest) {
   const rl = await rateLimit(`portfolios:${getClientId(request)}`, { limit: 60, windowSec: 60 })
@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
         .from("projects")
         .select(
           `id, project_name, portfolio_id, deployment_start_date, deployment_end_date, status,
-           tasks:tasks(id, status, weight, rating, is_archived, due_date, task_end_date)`
+           tasks:tasks(id, status, rating, is_archived, due_date, task_end_date, plan_id),
+           plans:implementation_plans(id)`
         )
         .order("project_name", { ascending: true }),
     ])
@@ -71,17 +72,15 @@ export async function GET(request: NextRequest) {
     }
 
     const withHealth = (portfolioId: string) => {
-      const rows = projectsByPortfolio.get(portfolioId) || []
-      const health = rows.map((project) => ({
+      const health = (projectsByPortfolio.get(portfolioId) || []).map((project) => ({
         id: project.id,
         project_name: project.project_name,
-        // The lifecycle status the PM set by hand, kept distinct from the
-        // derived health status the roll-up computes below.
         lifecycle_status: project.status,
         ...computeProjectHealth({
           startDate: project.deployment_start_date,
           endDate: project.deployment_end_date,
           tasks: project.tasks || [],
+          planIds: (project.plans || []).map((plan) => plan.id),
           today,
         }),
       }))

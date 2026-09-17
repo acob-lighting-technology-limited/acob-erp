@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { PROJECT_PRIORITIES } from "@/lib/projects/priority"
 import { createClient } from "@/lib/supabase/server"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
@@ -46,8 +47,11 @@ export async function GET(request: NextRequest) {
           rating,
           is_archived,
           due_date,
-          task_end_date
-        )
+          task_end_date,
+          plan_id,
+          completed_at
+        ),
+        plans:implementation_plans(id)
       `
       )
       .order("project_name", { ascending: true })
@@ -93,6 +97,7 @@ export async function POST(request: NextRequest) {
       description,
       status,
       portfolio_id,
+      priority,
     } = body
 
     if (!project_name || !location || !deployment_start_date || !deployment_end_date) {
@@ -100,6 +105,10 @@ export async function POST(request: NextRequest) {
         { error: "Project name, location, start date, and end date are required" },
         { status: 400 }
       )
+    }
+
+    if (priority !== undefined && !PROJECT_PRIORITIES.includes(priority)) {
+      return NextResponse.json({ error: "Priority must be critical, high, medium or low" }, { status: 400 })
     }
 
     const { data: project, error } = await (supabase as any)
@@ -115,6 +124,7 @@ export async function POST(request: NextRequest) {
         portfolio_id: portfolio_id || null,
         description,
         status: status || "planning",
+        ...(priority !== undefined ? { priority } : {}),
         created_by: user.id,
       })
       .select()

@@ -389,6 +389,55 @@ export function ChallengesView({
         pagination={{ pageSize: 25 }}
         stickyToolbar
         viewToggle
+        contactsView
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        mobileRow={{
+          title: (row) => row.title,
+          subtitle: (row) => `${row.department} · Week ${row.week_number}, ${row.year}`,
+          trailing: (row) => getStatusBadge(row.status),
+          detail: {
+            title: (row) => row.title,
+            subtitle: (row) => row.department,
+            badges: (row) => getStatusBadge(row.status),
+            fields: (row) => [
+              { label: "Department", value: row.department },
+              { label: "Week", value: `Week ${row.week_number}, ${row.year}` },
+              { label: "Resolution / Mitigation", value: row.resolution_note || "No note yet", fullWidth: true },
+            ],
+            actions: (row) =>
+              isAdminContext && canEditChallenge(row)
+                ? [{ label: "Update Challenge", icon: Pencil, onClick: () => handleOpenEdit(row) }]
+                : [],
+          },
+        }}
+        cardRenderer={(row) => (
+          <div className="bg-card flex h-full flex-col gap-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-foreground text-sm font-medium">{row.title}</p>
+              {getStatusBadge(row.status)}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {row.department} · Week {row.week_number}, {row.year}
+            </p>
+            {row.resolution_note && (
+              <p className="text-muted-foreground bg-muted/30 border-border/40 rounded border p-1.5 text-xs">
+                <span className="text-foreground/80 font-semibold">Resolution / Mitigation: </span>
+                {row.resolution_note}
+              </p>
+            )}
+            {isAdminContext && canEditChallenge(row) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-auto h-8 w-full gap-1 text-xs"
+                onClick={() => handleOpenEdit(row)}
+              >
+                <Pencil className="h-3 w-3" />
+                Update
+              </Button>
+            )}
+          </div>
+        )}
       />
 
       {/* Edit Challenge Dialog */}

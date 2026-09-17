@@ -2,7 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { toLocalISODate } from "@/lib/utils/date"
 import { deriveUnifiedAttendanceStatus, normalizeStoredAttendanceStatus } from "@/lib/hr/attendance-status"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
-import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
+import {
+  computeAttendanceDay,
+  getEffectiveAttendanceStartDate,
+  isPositiveAttendanceStatus,
+  netDayHoursFor,
+} from "@/lib/hr/attendance-ssot"
 import { pickCurrentCycle, getCoveredQuarterlyCycles, isQuarterlyCycle, rollupQuarterlyScores } from "@/lib/pms/cadence"
 import { computeWeightedTaskScore, isTaskInCycle } from "@/lib/tasks/scoring"
 
@@ -147,6 +152,9 @@ function weightedScore(
 }
 
 async function getCycleWindow(supabase: SupabaseClient, cycleId?: string | null): Promise<ReviewCycleRow | null> {
+  if (cycleId === "all" || cycleId === "__all__") {
+    return null
+  }
   if (cycleId) {
     const { data } = await supabase
       .from("review_cycles")
@@ -351,6 +359,14 @@ export async function computeIndividualPerformanceScore(
     .select("id, status, date, clock_in, clock_out, total_hours, waived")
     .eq("user_id", params.userId)
 
+  const earliestRecordQuery = supabase
+    .from("attendance_records")
+    .select("date")
+    .eq("user_id", params.userId)
+    .order("date", { ascending: true })
+    .limit(1)
+    .maybeSingle<{ date: string }>()
+
   if (cycle) {
     leaveRequestQuery = leaveRequestQuery.gte("end_date", cycle.start_date).lte("start_date", cycle.end_date)
     attendanceQuery = attendanceQuery.gte("date", cycle.start_date).lte("date", cycle.end_date)
@@ -374,10 +390,23 @@ export async function computeIndividualPerformanceScore(
   const [
     { data: approvedLeaves },
     { data: attendance },
+    { data: earliestRecord },
     { data: exemptionPeriods },
     { data: holidayRows },
     { data: closureRows },
-  ] = await Promise.all([leaveRequestQuery, attendanceQuery, exemptionQuery, holidayQuery, closureQuery])
+  ] = await Promise.all([
+    leaveRequestQuery,
+    attendanceQuery,
+    earliestRecordQuery,
+    exemptionQuery,
+    holidayQuery,
+    closureQuery,
+  ])
+
+  const effectiveAttendanceStartDate = getEffectiveAttendanceStartDate({
+    earliestLogDate: earliestRecord?.date ?? null,
+    isExempt: Boolean(profile?.attendance_exempt),
+  })
 
   // date → early-closure time (org-wide). Missing table/permission is non-fatal.
   const closureByDate = new Map<string, string>()
@@ -430,6 +459,29 @@ export async function computeIndividualPerformanceScore(
       const dow = d.getDay()
       if (dow !== 0 && dow !== 6) workdays.push(toLocalISODate(d))
     }
+  } else if (params.cycleId === "all" || params.cycleId === "__all__") {
+    const { data: allCycles } = await supabase
+      .from("review_cycles")
+      .select("start_date, end_date, review_type, name")
+      .order("start_date", { ascending: true })
+
+    if (allCycles && allCycles.length > 0) {
+      const targetCycles = allCycles.filter((c) => isQuarterlyCycle(c.review_type, c.name))
+      const cyclesToUse = targetCycles.length > 0 ? targetCycles : allCycles
+      const workdaySet = new Set<string>()
+
+      for (const c of cyclesToUse) {
+        if (!c.start_date || !c.end_date) continue
+        const rangeEnd = c.end_date < todayIso ? c.end_date : todayIso
+        for (let d = new Date(c.start_date); toLocalISODate(d) <= rangeEnd; d.setDate(d.getDate() + 1)) {
+          const dow = d.getDay()
+          if (dow !== 0 && dow !== 6) {
+            workdaySet.add(toLocalISODate(d))
+          }
+        }
+      }
+      workdays.push(...Array.from(workdaySet).sort())
+    }
   }
 
   if (workdays.length > 0) {
@@ -442,6 +494,7 @@ export async function computeIndividualPerformanceScore(
     const dailyRecords: AttendanceBreakdownDay[] = []
 
     for (const day of workdays) {
+      if (!effectiveAttendanceStartDate || day < effectiveAttendanceStartDate) continue
       if (holidayDateSet.has(day)) continue
       if (leaveDateSet.has(day)) continue
       if (Boolean(profile?.attendance_exempt) || exemptionDateSet.has(day)) continue
@@ -449,8 +502,8 @@ export async function computeIndividualPerformanceScore(
       const row = recordByDate.get(day)
       const rawStoredStatus = String((row as { status?: string | null })?.status || "").toLowerCase()
 
-      // Approved Leave Without Pay (LWP): exclude from scorable days so it doesn't penalize attendance score
-      if (rawStoredStatus === "leave_without_pay" || rawStoredStatus === "lwp") continue
+      // Approved Leave Without Pay (LWOP): exclude from scorable days so it doesn't penalize attendance score
+      if (rawStoredStatus === "leave_without_pay" || rawStoredStatus === "lwop") continue
 
       // Skip today if the employee is still clocked in (unfinished day).
       if (day === todayIso && row?.clock_in && !row?.clock_out) {
@@ -487,14 +540,16 @@ export async function computeIndividualPerformanceScore(
       )
 
       // Hours-lost model, shared with payroll and HR reports via the SSOT.
-      // LEWP forgives the early-out hours only — never the late arrival.
+      // LEWP/LWP/IWP forgives corresponding penalty brackets.
       const dayResult = computeAttendanceDay({
         status,
         clockIn: row.clock_in,
         clockOut: row.clock_out,
         policy,
         earlyCloseTime: earlyClose ?? null,
-        earlyOutApproved: rawStoredStatus === "early_departure_with_permission",
+        earlyOutApproved: rawStoredStatus === "early_departure_with_permission" || rawStoredStatus === "lewp",
+        incompleteApproved: rawStoredStatus === "incomplete_with_permission" || rawStoredStatus === "iwp",
+        latenessApproved: rawStoredStatus === "lateness_with_permission" || rawStoredStatus === "lwp",
       })
       creditSum += dayResult.hoursWorked / netDay
 
@@ -503,22 +558,7 @@ export async function computeIndividualPerformanceScore(
         latePenaltyStepsTotal += dayResult.lateBracket
       }
 
-      const normalizedStatus = String(status || "").toLowerCase()
-
-      // "Positive" days: the employee turned up. `present` and `late` were
-      // both missing from this list, so the count shown on the dashboard bore
-      // no relation to the days actually worked.
-      if (
-        normalizedStatus === "present" ||
-        normalizedStatus === "late" ||
-        normalizedStatus === "early" ||
-        normalizedStatus === "early_closure" ||
-        normalizedStatus === "absence_with_permission" ||
-        normalizedStatus === "awp" ||
-        normalizedStatus === "absent_with_permission" ||
-        rawStoredStatus === "absence_with_permission" ||
-        rawStoredStatus === "awp"
-      ) {
+      if (isPositiveAttendanceStatus(status) || isPositiveAttendanceStatus(rawStoredStatus)) {
         presentDays++
       }
 

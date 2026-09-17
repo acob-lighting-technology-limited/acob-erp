@@ -1,16 +1,17 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
   AlertTriangle,
-  BarChart3,
-  ExternalLink,
+  Clock,
+  ArrowRight,
   FolderCog,
-  FolderGit2,
   FolderKanban,
+  BarChart3,
+  LayoutDashboard,
   Layers,
   Plus,
   RefreshCw,
@@ -18,43 +19,40 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ColumnHelp, DataTable, DataTablePage } from "@/components/ui/data-table"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
-import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
-import { PROJECT_HEALTH_LABELS, PROJECT_METRIC_HELP, type ProjectHealthStatus } from "@/lib/projects/health"
+import { cn } from "@/lib/utils"
+import {
+  PROJECT_HEALTH_LABELS,
+  PROJECT_METRIC_HELP,
+  plural,
+  type PortfolioHealth,
+  type ProjectHealth,
+} from "@/lib/projects/health"
+import {
+  HealthBadge,
+  PortfolioStatusBadge,
+  WorkDoneCell,
+  WorkDoneText,
+  plansText,
+} from "@/components/projects/project-summary"
 import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
 import { DeletePortfolioDialog } from "./delete-portfolio-dialog"
 import { PortfolioDialog } from "./portfolio-dialog"
 import { PortfolioProjectsDialog } from "./portfolio-projects-dialog"
-import { PortfolioAnalytics } from "./portfolio-analytics"
-import { projectHref } from "./project-href"
+import { PortfolioOverview } from "./portfolio-overview"
+import { ProjectCharts, type ChartsProject } from "@/components/projects/project-charts"
+import type { ProjectHealthTask } from "@/lib/projects/health"
+import { portfolioHref, projectHref } from "@/lib/projects/links"
+import { useRouter } from "next/navigation"
 
-export type ProjectHealthRow = {
+export type ProjectHealthRow = ProjectHealth & {
   id: string
   project_name: string
   lifecycle_status: string | null
-  deliveryPct: number | null
-  qualityPct: number | null
-  timeElapsedPct: number | null
-  variancePct: number | null
-  status: ProjectHealthStatus
-  overdueCount: number
-  totalWeight: number
-  taskCount: number
-}
-
-type PortfolioRollup = {
-  projectCount: number
-  onTrack: number
-  atRisk: number
-  behindSchedule: number
-  completed: number
-  overdueCount: number
-  deliveryPct: number | null
-  qualityPct: number | null
 }
 
 export type Portfolio = {
@@ -64,134 +62,75 @@ export type Portfolio = {
   description: string | null
   status: "active" | "on_hold" | "closed"
   projects: ProjectHealthRow[]
-  rollup: PortfolioRollup
+  rollup: PortfolioHealth
 }
 
-function healthBadge(status: ProjectHealthStatus) {
-  switch (status) {
-    case "on_track":
-      return <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500">On Track</Badge>
-    case "at_risk":
-      return <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">At Risk</Badge>
-    case "behind_schedule":
-      return <Badge className="border-red-500/20 bg-red-500/10 text-red-500">Behind Schedule</Badge>
-    case "completed":
-      return <Badge className="border-blue-500/20 bg-blue-500/10 text-blue-500">Completed</Badge>
-  }
-}
-
-const PROJECT_TABLE_HEADERS = [
-  { label: "Elapsed", help: PROJECT_METRIC_HELP.elapsed },
-  { label: "Delivered", help: PROJECT_METRIC_HELP.delivery },
-  { label: "Quality", help: PROJECT_METRIC_HELP.quality },
-  { label: "Variance", help: PROJECT_METRIC_HELP.variance },
-  { label: "Overdue", help: PROJECT_METRIC_HELP.overdue },
-  { label: "Health", help: PROJECT_METRIC_HELP.health },
-]
-
-/** The project rows shown when a portfolio is expanded. */
+/**
+ * The projects shown when a portfolio row is expanded — a short list that
+ * links to each project's own page, where its plans are managed.
+ */
 function PortfolioProjects({
+  portfolioId,
   projects,
   isAdmin,
   onManage,
   onAddProject,
 }: {
+  portfolioId: string
   projects: ProjectHealthRow[]
   isAdmin: boolean
   onManage?: () => void
   onAddProject?: () => void
 }) {
-  const actions =
-    onManage || onAddProject ? (
-      <div className="flex flex-wrap justify-end gap-2">
-        {onManage && (
-          <Button type="button" variant="outline" size="sm" onClick={onManage}>
-            <FolderCog className="mr-2 h-4 w-4" />
-            Manage Projects
-          </Button>
-        )}
-        {onAddProject && (
-          <Button type="button" size="sm" onClick={onAddProject}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
-        )}
-      </div>
-    ) : null
-
-  if (projects.length === 0) {
-    return (
-      <div className="space-y-2">
-        <p className="text-muted-foreground rounded-lg border border-dashed py-6 text-center text-sm">
+  return (
+    <div className="space-y-3 p-2">
+      {projects.length === 0 ? (
+        <p className="text-muted-foreground rounded-lg border border-dashed py-8 text-center text-sm">
           No projects in this portfolio yet.
         </p>
-        {actions}
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      {actions}
-      <div className="bg-background overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead className="bg-muted/50 text-muted-foreground text-xs">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Project</th>
-              {PROJECT_TABLE_HEADERS.map((header) => (
-                <th key={header.label} className="px-3 py-2 text-left font-medium">
-                  <span className="inline-flex items-center gap-1">
-                    {header.label}
-                    <ColumnHelp label={header.label} text={header.help} />
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((project) => (
-              <tr key={project.id} className="border-t">
-                <td className="px-3 py-2 font-medium">
-                  <Link
-                    href={projectHref(project.project_name, isAdmin)}
-                    className="text-foreground hover:text-primary inline-flex items-center gap-1.5 font-medium transition-colors hover:underline"
-                  >
-                    {project.project_name}
-                    <ExternalLink className="text-muted-foreground h-3 w-3 opacity-70" />
-                  </Link>
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    {project.taskCount} task{project.taskCount === 1 ? "" : "s"}
-                  </span>
-                </td>
-                <td className="text-muted-foreground px-3 py-2">
-                  {project.timeElapsedPct === null ? "-" : `${project.timeElapsedPct}%`}
-                </td>
-                <td className="px-3 py-2">
-                  <div className="w-24">
-                    <Progress value={project.deliveryPct ?? 0} className="h-1.5" />
-                    <span className="text-muted-foreground text-[11px]">{project.deliveryPct ?? 0}%</span>
-                  </div>
-                </td>
-                <td className="px-3 py-2">{project.qualityPct === null ? "-" : `${project.qualityPct}%`}</td>
-                <td
-                  className={
-                    project.variancePct !== null && project.variancePct < 0 ? "px-3 py-2 text-red-500" : "px-3 py-2"
-                  }
-                >
-                  {project.variancePct === null ? "-" : `${project.variancePct > 0 ? "+" : ""}${project.variancePct}%`}
-                </td>
-                <td className="px-3 py-2">
-                  {project.overdueCount > 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400">{project.overdueCount}</span>
-                  ) : (
-                    <span className="text-muted-foreground">0</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">{healthBadge(project.status)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      ) : (
+        <ul className="bg-card divide-y rounded-lg border">
+          {projects.map((project) => (
+            <li key={project.id}>
+              <Link
+                href={projectHref(project.id, isAdmin)}
+                className="group hover:bg-muted/40 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{project.project_name}</span>
+                <HealthBadge status={project.status} />
+                <span className="text-muted-foreground text-xs">
+                  <WorkDoneText health={project} />
+                </span>
+                {plansText(project) && <span className="text-muted-foreground text-xs">{plansText(project)}</span>}
+                <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button asChild variant="ghost" size="sm">
+          <Link href={portfolioHref(portfolioId, isAdmin)}>
+            Open portfolio
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+        {(onManage || onAddProject) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {onManage && (
+              <Button type="button" variant="outline" size="sm" onClick={onManage}>
+                <FolderCog className="mr-2 h-4 w-4" />
+                Manage Projects
+              </Button>
+            )}
+            {onAddProject && (
+              <Button type="button" size="sm" onClick={onAddProject}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Project
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -212,9 +151,9 @@ interface PortfoliosContentProps {
 }
 
 export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosContentProps = {}) {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<string>("portfolios")
-  const [focusedPortfolioId, setFocusedPortfolioId] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editing, setEditing] = useState<Portfolio | null>(null)
   const [deleting, setDeleting] = useState<Portfolio | null>(null)
@@ -224,14 +163,15 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   const tabs = useMemo<DataTableTab[]>(
     () => [
       { key: "portfolios", label: "Portfolios", icon: Layers },
-      { key: "analytics", label: "Analytics", icon: BarChart3 },
+      { key: "overview", label: "Overview", icon: LayoutDashboard },
+      { key: "charts", label: "Charts", icon: BarChart3 },
     ],
     []
   )
 
   const { data, isLoading, error, refetch } = useQuery<{
     data: Portfolio[]
-    unassigned: { projects: ProjectHealthRow[]; rollup: PortfolioRollup }
+    unassigned: { projects: ProjectHealthRow[]; rollup: PortfolioHealth }
   }>({
     queryKey: ["portfolios"],
     queryFn: async () => {
@@ -243,16 +183,49 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   })
 
   const rows = useMemo(() => data?.data ?? [], [data])
+
+  // The charts need each task's dates, which the portfolio rollup leaves out, so
+  // they read the projects list — only once the Charts tab is opened.
+  const { data: chartProjects = [], isLoading: chartsLoading } = useQuery({
+    queryKey: ["projects", "charts"],
+    enabled: activeTab === "charts",
+    queryFn: async (): Promise<ChartsProject[]> => {
+      const res = await apiFetch("/api/projects", { cache: "no-store" })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to load projects")
+      return (
+        (payload.data || []) as Array<{
+          id: string
+          project_name: string
+          deployment_start_date: string | null
+          deployment_end_date: string | null
+          portfolio?: { id: string; name: string } | null
+          tasks?: ProjectHealthTask[] | null
+        }>
+      ).map((project) => ({
+        id: project.id,
+        project_name: project.project_name,
+        portfolioId: project.portfolio?.id ?? null,
+        portfolioName: project.portfolio?.name ?? null,
+        startDate: project.deployment_start_date,
+        endDate: project.deployment_end_date,
+        tasks: project.tasks || [],
+      }))
+    },
+  })
   // Read from the live rows so the dialog reflects each add/remove once refetched.
   const managing = useMemo(() => rows.find((row) => row.id === managingId) ?? null, [rows, managingId])
   const refreshPortfolios = () => queryClient.invalidateQueries({ queryKey: ["portfolios"] })
 
+  // Counted across unassigned projects too, so the numbers match the Overview tab.
   const stats = useMemo(() => {
-    const projectCount = rows.reduce((sum, row) => sum + row.rollup.projectCount, 0)
-    const atRisk = rows.reduce((sum, row) => sum + row.rollup.atRisk + row.rollup.behindSchedule, 0)
-    const overdue = rows.reduce((sum, row) => sum + row.rollup.overdueCount, 0)
-    return { portfolios: rows.length, projectCount, atRisk, overdue }
-  }, [rows])
+    const rollups = [...rows.map((row) => row.rollup), ...(data?.unassigned ? [data.unassigned.rollup] : [])]
+    return {
+      projectCount: rollups.reduce((sum, r) => sum + r.projectCount, 0),
+      needAttention: rollups.reduce((sum, r) => sum + r.atRisk + r.behindSchedule, 0),
+      pastDue: rollups.reduce((sum, r) => sum + r.overdueCount, 0),
+    }
+  }, [rows, data])
 
   const columns = useMemo<DataTableColumn<Portfolio>[]>(
     () => [
@@ -263,7 +236,13 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         accessor: (r) => r.name,
         render: (r) => (
           <div className="space-y-1">
-            <p className="text-foreground font-semibold">{r.code ? `${r.code} — ${r.name}` : r.name}</p>
+            <Link
+              href={portfolioHref(r.id, isAdmin)}
+              onClick={(e) => e.stopPropagation()}
+              className="text-foreground hover:text-primary font-semibold hover:underline"
+            >
+              {r.code ? `${r.code} — ${r.name}` : r.name}
+            </Link>
             {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
           </div>
         ),
@@ -276,40 +255,40 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         accessor: (r) => r.rollup.projectCount,
         render: (r) => (
           <div className="text-xs">
-            <p className="text-foreground font-medium">{r.rollup.projectCount} total</p>
+            <p className="text-foreground font-medium">
+              {r.rollup.completed} of {plural(r.rollup.projectCount, "project")} done
+            </p>
             <p className="text-muted-foreground">
-              {r.rollup.onTrack} on track · {r.rollup.atRisk} at risk · {r.rollup.behindSchedule} behind
+              {[
+                r.rollup.onTrack && `${r.rollup.onTrack} on time`,
+                r.rollup.atRisk && `${r.rollup.atRisk} slipping`,
+                r.rollup.behindSchedule && `${r.rollup.behindSchedule} behind`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </div>
         ),
       },
       {
-        key: "delivery",
-        label: "Delivery / Quality",
-        description: PROJECT_METRIC_HELP.portfolioDeliveryQuality,
+        key: "progress",
+        label: "Work done",
+        description: PROJECT_METRIC_HELP.workDone,
         sortable: true,
-        accessor: (r) => r.rollup.deliveryPct ?? 0,
-        render: (r) =>
-          r.rollup.deliveryPct === null ? (
-            <span className="text-muted-foreground text-xs">No tasks</span>
-          ) : (
-            <div className="w-32 space-y-1">
-              <Progress value={r.rollup.deliveryPct} className="h-1.5" />
-              <p className="text-muted-foreground text-[11px]">
-                {r.rollup.deliveryPct}% delivered · {r.rollup.qualityPct ?? 0}% quality
-              </p>
-            </div>
-          ),
+        accessor: (r) => r.rollup.workDonePct ?? -1,
+        render: (r) => <WorkDoneCell health={r.rollup} />,
       },
       {
         key: "overdue",
-        label: "Overdue Tasks",
-        description: PROJECT_METRIC_HELP.overdue,
+        label: "Tasks past due",
+        description: PROJECT_METRIC_HELP.pastDue,
         sortable: true,
         accessor: (r) => r.rollup.overdueCount,
         render: (r) =>
           r.rollup.overdueCount > 0 ? (
-            <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-500">{r.rollup.overdueCount}</Badge>
+            <Badge className="border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400">
+              {r.rollup.overdueCount}
+            </Badge>
           ) : (
             <span className="text-muted-foreground text-xs">None</span>
           ),
@@ -320,14 +299,10 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         description: PROJECT_METRIC_HELP.portfolioStatus,
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => (
-          <Badge variant="outline" className="capitalize">
-            {r.status.replaceAll("_", " ")}
-          </Badge>
-        ),
+        render: (r) => <PortfolioStatusBadge status={r.status} />,
       },
     ],
-    []
+    [isAdmin]
   )
 
   const filters = useMemo<DataTableFilter<Portfolio>[]>(
@@ -337,7 +312,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         label: "Status",
         options: [
           { value: "active", label: "Active" },
-          { value: "on_hold", label: "On Hold" },
+          { value: "on_hold", label: "On hold" },
           { value: "closed", label: "Closed" },
         ],
       },
@@ -347,7 +322,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         options: [
           { value: "at_risk", label: PROJECT_HEALTH_LABELS.at_risk },
           { value: "behind_schedule", label: PROJECT_HEALTH_LABELS.behind_schedule },
-          { value: "overdue", label: "Overdue tasks" },
+          { value: "overdue", label: "Tasks past due" },
         ],
         mode: "custom",
         filterFn: (row, selected) =>
@@ -362,7 +337,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   return (
     <DataTablePage
       title="Project Portfolios"
-      description="Programmes and client groupings, each holding its own projects. Progress is derived from project tasks."
+      description="Groups of related projects. Progress is counted from each project's tasks."
       icon={Layers}
       backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/projects", label: "Back to Projects" }}
       tabs={tabs}
@@ -392,47 +367,41 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         <StatGrid>
           <StatCard
             variant="compact"
-            title="Portfolios"
-            value={stats.portfolios}
-            icon={Layers}
-            iconBgColor="bg-violet-500/10"
-            iconColor="text-violet-500"
-          />
-          <StatCard
-            variant="compact"
-            title="At Risk / Behind"
-            value={stats.atRisk}
-            icon={AlertTriangle}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Overdue Tasks"
-            value={stats.overdue}
-            icon={FolderGit2}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
-          />
-          <StatCard
-            variant="compact"
             title="Projects"
             value={stats.projectCount}
             icon={FolderKanban}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
           />
+          <StatCard
+            variant="compact"
+            title="Need attention"
+            value={stats.needAttention}
+            tooltip="Projects that are Slipping or Behind"
+            icon={AlertTriangle}
+            iconBgColor={stats.needAttention > 0 ? "bg-amber-500/10" : "bg-slate-500/10"}
+            iconColor={stats.needAttention > 0 ? "text-amber-500" : "text-slate-500"}
+          />
+          <StatCard
+            variant="compact"
+            title="Tasks past due"
+            value={stats.pastDue}
+            tooltip={PROJECT_METRIC_HELP.pastDue}
+            icon={Clock}
+            iconBgColor={stats.pastDue > 0 ? "bg-red-500/10" : "bg-slate-500/10"}
+            iconColor={stats.pastDue > 0 ? "text-red-500" : "text-slate-500"}
+          />
         </StatGrid>
       }
     >
-      {activeTab === "analytics" ? (
-        <PortfolioAnalytics
-          rows={rows}
-          unassigned={data?.unassigned?.rollup}
-          isAdmin={isAdmin}
-          focusedPortfolioId={focusedPortfolioId}
-          onFocusPortfolio={setFocusedPortfolioId}
-        />
+      {activeTab === "charts" ? (
+        chartsLoading ? (
+          <div className="bg-muted/40 h-64 animate-pulse rounded-xl" />
+        ) : (
+          <ProjectCharts projects={chartProjects} filterBy="portfolio" />
+        )
+      ) : activeTab === "overview" ? (
+        <PortfolioOverview rows={rows} unassigned={data?.unassigned} isAdmin={isAdmin} />
       ) : (
         <DataTable<Portfolio>
           data={rows}
@@ -458,12 +427,8 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
           mobileRow={{
             title: (r) => (r.code ? `${r.code} — ${r.name}` : r.name),
             subtitle: (r) =>
-              `${r.rollup.projectCount} projects · ${r.rollup.deliveryPct ?? 0}% delivery · ${r.rollup.overdueCount} overdue`,
-            trailing: (r) => (
-              <Badge variant="outline" className="text-[10px] capitalize">
-                {r.status.replaceAll("_", " ")}
-              </Badge>
-            ),
+              `${plural(r.rollup.projectCount, "project")} · ${r.rollup.doneCount} of ${plural(r.rollup.taskCount, "task")} done`,
+            trailing: (r) => <PortfolioStatusBadge status={r.status} />,
             onSelect: isAdmin ? (r) => setEditing(r) : undefined,
           }}
           cardRenderer={(r) => (
@@ -473,24 +438,21 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
                   <p className="text-sm font-semibold">{r.code ? `${r.code} — ${r.name}` : r.name}</p>
                   {r.description && <p className="text-muted-foreground line-clamp-1 text-xs">{r.description}</p>}
                 </div>
-                <Badge variant="outline" className="capitalize">
-                  {r.status.replaceAll("_", " ")}
-                </Badge>
+                <PortfolioStatusBadge status={r.status} />
               </div>
               <div className="flex items-center justify-between border-t pt-2 text-xs">
-                <span className="text-muted-foreground">{r.rollup.projectCount} projects</span>
-                <span className="text-muted-foreground">{r.rollup.deliveryPct ?? 0}% delivery</span>
+                <span className="text-muted-foreground">{plural(r.rollup.projectCount, "project")}</span>
+                <span className="text-muted-foreground">
+                  {r.rollup.doneCount} of {plural(r.rollup.taskCount, "task")} done
+                </span>
               </div>
             </div>
           )}
           rowActions={[
             {
-              label: "View Analytics",
-              icon: BarChart3,
-              onClick: (r) => {
-                setFocusedPortfolioId(r.id)
-                setActiveTab("analytics")
-              },
+              label: "Open portfolio",
+              icon: ArrowRight,
+              onClick: (r: Portfolio) => router.push(portfolioHref(r.id, isAdmin)),
             },
             ...(isAdmin
               ? [
@@ -510,6 +472,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
             render: (r) => (
               <div className="bg-muted/20 rounded-lg border p-2">
                 <PortfolioProjects
+                  portfolioId={r.id}
                   projects={r.projects}
                   isAdmin={isAdmin}
                   onManage={isAdmin ? () => setManagingId(r.id) : undefined}

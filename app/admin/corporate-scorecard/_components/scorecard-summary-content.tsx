@@ -117,7 +117,7 @@ export function ScorecardSummaryContent({
             <span className="text-muted-foreground text-xs">No data</span>
           ) : (
             <div className="w-32 space-y-1">
-              <Progress value={r.attainmentPct} className="h-1.5" />
+              <Progress value={r.attainmentPct} />
               <span className="text-muted-foreground text-[11px]">{r.attainmentPct}%</span>
             </div>
           ),
@@ -222,7 +222,7 @@ export function ScorecardSummaryContent({
                 <span>Attainment</span>
                 <span className="font-semibold">{r.attainmentPct != null ? `${r.attainmentPct}%` : "No data"}</span>
               </div>
-              {r.attainmentPct != null && <Progress value={r.attainmentPct} className="h-1.5" />}
+              {r.attainmentPct != null && <Progress value={r.attainmentPct} />}
             </div>
           </div>
         )}

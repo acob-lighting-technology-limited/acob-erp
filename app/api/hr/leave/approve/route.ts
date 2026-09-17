@@ -8,6 +8,7 @@ import {
   formatLeaveReference,
   getLeavePolicy,
   getLeaveRequestSegments,
+  leaveStageLabel,
   notifyUsers,
   syncAttendanceForApprovedLeave,
 } from "@/lib/hr/leave-workflow"
@@ -108,23 +109,6 @@ function normalizeAction(body: { action?: string; status?: string }) {
 
 function inferCurrentStageCode(leaveRequest: LeaveRequestApprovalRow) {
   return leaveRequest.current_stage_code || leaveRequest.approval_stage
-}
-
-function humanStage(stageCode: string) {
-  switch (stageCode) {
-    case "pending_reliever":
-      return "Reliever"
-    case "pending_department_lead":
-      return "Department Lead"
-    case "pending_admin_hr_lead":
-      return "Admin and HR Lead"
-    case "pending_hcs":
-      return "HCS"
-    case "pending_md":
-      return "MD"
-    default:
-      return stageCode.replaceAll("_", " ")
-  }
 }
 
 export async function PATCH(request: NextRequest) {
@@ -293,7 +277,7 @@ export async function PATCH(request: NextRequest) {
       await notifyUsers(supabaseAdmin, {
         userIds: [typedLeaveRequest.user_id],
         title: "Leave request rejected",
-        message: `Your leave request for ${leaveTypeName} (${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}) was rejected at the ${humanStage(stageCode)} stage by ${actorName}.`,
+        message: `Your leave request for ${leaveTypeName} (${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}) was rejected at the ${leaveStageLabel(stageCode)} stage by ${actorName}.`,
         actorId: actorProfileId,
         linkUrl: "/leave",
         entityId: leave_request_id,
@@ -307,7 +291,7 @@ export async function PATCH(request: NextRequest) {
           { label: "Leave Type", value: leaveTypeName },
           { label: "Duration", value: `${typedLeaveRequest.days_count} day(s)` },
           { label: "Period", value: `${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}` },
-          { label: "Rejected At", value: humanStage(stageCode) },
+          { label: "Rejected At", value: leaveStageLabel(stageCode) },
           { label: "Rejected By", value: actorName },
           { label: "Reason / Comments", value: comments || "No comments provided" },
         ],
@@ -431,7 +415,7 @@ export async function PATCH(request: NextRequest) {
           { label: "Start Date", value: typedLeaveRequest.start_date },
           { label: "End Date", value: typedLeaveRequest.end_date },
           { label: "Resumption Date", value: typedLeaveRequest.resume_date || "-" },
-          { label: "Final Approver", value: `${actorName} (${humanStage(stageCode)})` },
+          { label: "Final Approver", value: `${actorName} (${leaveStageLabel(stageCode)})` },
           ...(comments ? [{ label: "Approver Feedback", value: comments }] : []),
         ],
         ctaLabel: "View Approved Leave",
@@ -508,13 +492,13 @@ export async function PATCH(request: NextRequest) {
     // 1. Notify Requester of endorsement
     await notifyUsers(supabaseAdmin, {
       userIds: [leaveRequest.user_id],
-      title: `${humanStage(stageCode)} approved your leave request`,
-      message: `${actorName} endorsed your leave request at the ${humanStage(stageCode)} stage. Your request has moved to ${humanStage(nextStage.stage_code)} for review.`,
+      title: `${leaveStageLabel(stageCode)} approved your leave request`,
+      message: `${actorName} endorsed your leave request at the ${leaveStageLabel(stageCode)} stage. Your request has moved to ${leaveStageLabel(nextStage.stage_code)} for review.`,
       actorId: actorProfileId,
       linkUrl: "/leave",
       entityId: leave_request_id,
       emailEvent: "approval_required",
-      emailSubject: `Leave Request Endorsed at ${humanStage(stageCode)}${refSuffix}`,
+      emailSubject: `Leave Request Endorsed at ${leaveStageLabel(stageCode)}${refSuffix}`,
       emailTitle: `Leave Request Endorsed`,
       badgeText: "Endorsed — In Progress",
       badgeVariant: "info",
@@ -523,9 +507,9 @@ export async function PATCH(request: NextRequest) {
         { label: "Leave Type", value: leaveTypeName },
         { label: "Duration", value: `${typedLeaveRequest.days_count} day(s)` },
         { label: "Period", value: `${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}` },
-        { label: "Endorsed By", value: `${actorName} (${humanStage(stageCode)})` },
+        { label: "Endorsed By", value: `${actorName} (${leaveStageLabel(stageCode)})` },
         ...(comments ? [{ label: "Endorsement Notes", value: comments }] : []),
-        { label: "Next Pending Stage", value: humanStage(nextStage.stage_code) },
+        { label: "Next Pending Stage", value: leaveStageLabel(nextStage.stage_code) },
       ],
       ctaLabel: "Track Request Status",
     })
@@ -534,7 +518,7 @@ export async function PATCH(request: NextRequest) {
     await notifyUsers(supabaseAdmin, {
       userIds: [nextStage.approver_user_id],
       title: "Leave request awaiting your approval",
-      message: `${requesterName} has a leave request for ${leaveTypeName} (${typedLeaveRequest.days_count} day(s), ${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}) awaiting your endorsement at ${humanStage(nextStage.stage_code)}.`,
+      message: `${requesterName} has a leave request for ${leaveTypeName} (${typedLeaveRequest.days_count} day(s), ${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}) awaiting your endorsement at ${leaveStageLabel(nextStage.stage_code)}.`,
       actorId: actorProfileId,
       linkUrl: "/leave",
       entityId: leave_request_id,
@@ -551,7 +535,7 @@ export async function PATCH(request: NextRequest) {
         { label: "Duration", value: `${typedLeaveRequest.days_count} day(s)` },
         { label: "Period", value: `${typedLeaveRequest.start_date} to ${typedLeaveRequest.end_date}` },
         { label: "Resumption Date", value: typedLeaveRequest.resume_date || "-" },
-        { label: "Previous Endorsement", value: `${actorName} (${humanStage(stageCode)})` },
+        { label: "Previous Endorsement", value: `${actorName} (${leaveStageLabel(stageCode)})` },
         ...(comments ? [{ label: "Previous Approver Notes", value: comments }] : []),
       ],
       ctaLabel: "Review & Endorse",

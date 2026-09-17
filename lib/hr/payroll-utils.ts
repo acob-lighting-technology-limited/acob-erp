@@ -462,16 +462,19 @@ export interface PayrollAttendanceRecord {
 export function derivePayrollAttendance(params: {
   userId: string
   attendanceExempt: boolean
+  effectiveAttendanceStartDate?: string | null
   workdayDates: string[]
   attendanceByDate: Map<string, PayrollAttendanceRecord>
   ctx: PayrollDayContext
   policy: AttendancePolicy
 }): { missedHours: number; absentDays: number } {
-  const { userId, attendanceExempt, workdayDates, attendanceByDate, ctx, policy } = params
+  const { userId, attendanceExempt, effectiveAttendanceStartDate, workdayDates, attendanceByDate, ctx, policy } = params
   let missedHoursCount = 0
   let absentDaysCount = 0
 
   for (const date of workdayDates) {
+    if (effectiveAttendanceStartDate && date < effectiveAttendanceStartDate) continue
+    if (!effectiveAttendanceStartDate && !attendanceByDate.get(date)) continue
     const rec = attendanceByDate.get(date) || null
     const closeTime = ctx.earlyCloseTime(date)
     const lateRes = ctx.lateResumptionTime(date)

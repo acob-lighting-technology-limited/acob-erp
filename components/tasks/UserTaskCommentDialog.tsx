@@ -57,8 +57,8 @@ export function UserTaskCommentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Comment</DialogTitle>
-          <DialogDescription>Post progress notes and updates for this task.</DialogDescription>
+          <DialogTitle>Add Activity</DialogTitle>
+          <DialogDescription>Post activity notes and progress updates for this task.</DialogDescription>
         </DialogHeader>
         {selectedTask && (
           <div className="space-y-3">
@@ -74,23 +74,23 @@ export function UserTaskCommentDialog({
             </Card>
 
             <section className="space-y-2">
-              <h3 className="text-sm font-semibold">Comment</h3>
+              <h3 className="text-sm font-semibold">Activity Note</h3>
               <Textarea
                 value={newComment}
                 onChange={(event) => setNewComment(event.target.value)}
-                placeholder="Add a comment or progress note..."
+                placeholder="Add an activity note or progress update..."
                 className="min-h-[96px] text-xs"
               />
               <Button size="sm" onClick={onAddComment} disabled={isSaving || !newComment.trim()} className="gap-2">
                 <Send className="h-3.5 w-3.5" />
-                Post Comment
+                Post Activity
               </Button>
             </section>
 
             <section className="space-y-2">
               <h3 className="flex items-center gap-2 text-sm font-semibold">
                 <MessageSquare className="h-3.5 w-3.5" />
-                Recent Comments
+                Recent Activities
               </h3>
               {commentUpdates.length > 0 ? (
                 <div className="max-h-52 space-y-3 overflow-y-auto pr-1">
@@ -108,8 +108,8 @@ export function UserTaskCommentDialog({
                 </div>
               ) : (
                 <EmptyState
-                  title="No comments yet"
-                  description="Comments will appear here after posting."
+                  title="No activities yet"
+                  description="Activities will appear here after posting."
                   icon={MessageSquare}
                   className="border-0 px-0 py-2"
                 />

@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { isTaskOverdue as isTaskPastDeadline } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
 import { createClient } from "@/lib/supabase/client"
@@ -135,48 +136,65 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     }
   }
 
-  const loadTaskUpdates = async (taskId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("task_updates")
-        .select("id, content, update_type, created_at, user_id")
-        .eq("task_id", taskId)
-        .order("created_at", { ascending: false })
+  const loadTaskUpdates = useCallback(
+    async (taskId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("task_updates")
+          .select("id, content, update_type, created_at, user_id")
+          .eq("task_id", taskId)
+          .order("created_at", { ascending: false })
 
-      if (error) throw error
+        if (error) throw error
 
-      const rows = (data as TaskUpdateRow[] | null) || []
-      const userIds = Array.from(new Set(rows.map((entry) => entry.user_id).filter(Boolean))) as string[]
-      const { data: profiles } =
-        userIds.length > 0
-          ? await supabase.from("profiles").select("id, first_name, last_name").in("id", userIds)
-          : { data: [] }
-      const profileMap = new Map(
-        ((profiles as Array<{ id: string; first_name: string; last_name: string }> | null) || []).map((profile) => [
-          profile.id,
-          { first_name: profile.first_name, last_name: profile.last_name },
-        ])
-      )
+        const rows = (data as TaskUpdateRow[] | null) || []
+        const userIds = Array.from(new Set(rows.map((entry) => entry.user_id).filter(Boolean))) as string[]
+        const { data: profiles } =
+          userIds.length > 0
+            ? await supabase.from("profiles").select("id, first_name, last_name").in("id", userIds)
+            : { data: [] }
+        const profileMap = new Map(
+          ((profiles as Array<{ id: string; first_name: string; last_name: string }> | null) || []).map((profile) => [
+            profile.id,
+            { first_name: profile.first_name, last_name: profile.last_name },
+          ])
+        )
 
-      const normalizedUpdates = rows.map((entry) => ({
-        id: entry.id,
-        content: entry.content,
-        update_type: entry.update_type,
-        created_at: entry.created_at,
-        user: entry.user_id ? profileMap.get(entry.user_id) : undefined,
-      }))
-      setTaskUpdates(normalizedUpdates)
-    } catch (error) {
-      log.error("Error loading task updates:", error)
-      setTaskUpdates([])
+        const normalizedUpdates = rows.map((entry) => ({
+          id: entry.id,
+          content: entry.content,
+          update_type: entry.update_type,
+          created_at: entry.created_at,
+          user: entry.user_id ? profileMap.get(entry.user_id) : undefined,
+        }))
+        setTaskUpdates(normalizedUpdates)
+      } catch (error) {
+        log.error("Error loading task updates:", error)
+        setTaskUpdates([])
+      }
+    },
+    [supabase]
+  )
+
+  const openTaskDetails = useCallback(
+    async (task: Task) => {
+      setSelectedTask(task)
+      await loadTaskUpdates(task.id)
+      setIsDetailsOpen(true)
+    },
+    [loadTaskUpdates]
+  )
+
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const taskIdParam = searchParams.get("task") || searchParams.get("taskId")
+    if (taskIdParam && tasks.length > 0) {
+      const match = tasks.find((t) => t.id === taskIdParam)
+      if (match) {
+        void openTaskDetails(match)
+      }
     }
-  }
-
-  const openTaskDetails = async (task: Task) => {
-    setSelectedTask(task)
-    await loadTaskUpdates(task.id)
-    setIsDetailsOpen(true)
-  }
+  }, [searchParams, tasks, openTaskDetails])
 
   // Status changes go through TaskStatusControl directly against the API now
   // — this used to be a second path (updateTaskStatus/handleUpdateStatus) that

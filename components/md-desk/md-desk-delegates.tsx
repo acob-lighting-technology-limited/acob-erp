@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { Eye, Pencil, Trash2, UserPlus } from "lucide-react"
+import { Eye, Pencil, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { DataTable } from "@/components/ui/data-table"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import { StatCard } from "@/components/ui/stat-card"
+import { StatGrid } from "@/components/ui/stat-grid"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatWATDate } from "@/lib/utils/date"
@@ -15,7 +17,7 @@ import { useEventOptions } from "@/components/events/use-events"
 import { AddDelegateDialog } from "./add-delegate-dialog"
 import { removeDelegate, saveDelegate, useMdDeskDelegates } from "./use-md-desk"
 
-export function MdDeskDelegates() {
+export function MdDeskDelegates({ basePath }: { basePath: string }) {
   const queryClient = useQueryClient()
   const { data, isLoading, error, refetch } = useMdDeskDelegates()
   const optionsQuery = useEventOptions()
@@ -87,24 +89,50 @@ export function MdDeskDelegates() {
       ]
     : []
 
+  const editors = delegates.filter((d) => d.can_edit).length
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold">Delegates</h2>
-          <p className="text-muted-foreground text-sm">
-            People who share MD&apos;s Desk — they see the MD&apos;s private events and the approvals queue.
-            {!canManage && " Only the MD can change this list."}
-          </p>
-        </div>
-        {canManage && (
+    <DataTablePage
+      title="Delegates"
+      description={`People who share MD's Desk — they see the MD's private events and the approvals queue.${
+        canManage ? "" : " Only the MD can change this list."
+      }`}
+      icon={Users}
+      backLink={{ href: basePath, label: "Back to MD's Desk" }}
+      actions={
+        canManage ? (
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <UserPlus className="mr-1.5 h-4 w-4" aria-hidden />
             Add delegate
           </Button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+      stats={
+        <StatGrid>
+          <StatCard
+            title="Delegates"
+            value={delegates.length}
+            icon={Users}
+            iconBgColor="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+          <StatCard
+            title="Can edit"
+            value={editors}
+            icon={ShieldCheck}
+            iconBgColor="bg-emerald-500/10"
+            iconColor="text-emerald-500"
+          />
+          <StatCard
+            title="View only"
+            value={delegates.length - editors}
+            icon={Eye}
+            iconBgColor="bg-amber-500/10"
+            iconColor="text-amber-500"
+          />
+        </StatGrid>
+      }
+    >
       <DataTable<MdDeskDelegate>
         data={delegates}
         columns={columns}
@@ -120,6 +148,44 @@ export function MdDeskDelegates() {
         contactsView
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        cardRenderer={(d) => (
+          <div className="bg-card flex h-full flex-col gap-3 rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{d.name}</p>
+                <p className="text-muted-foreground truncate text-sm">{d.department || "General"}</p>
+              </div>
+              <Badge variant={d.can_edit ? "default" : "secondary"}>{d.can_edit ? "Can edit" : "View only"}</Badge>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Added by</span>
+                <span className="truncate">{d.granted_by_name || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Added</span>
+                <span>{formatWATDate(d.created_at)}</span>
+              </div>
+            </div>
+            {canManage && (
+              <div className="mt-auto flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => void toggleEdit(d)}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                  {d.can_edit ? "Make view only" : "Allow edit"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => void remove(d)}
+                  aria-label={`Remove ${d.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
         mobileRow={{
           title: (d) => d.name,
           subtitle: (d) => `${d.department || "General"} · Added ${formatWATDate(d.created_at)}`,
@@ -157,6 +223,6 @@ export function MdDeskDelegates() {
         staff={(optionsQuery.data?.staff ?? []).filter((s) => !delegates.some((d) => d.profile_id === s.id))}
         onSaved={refresh}
       />
-    </div>
+    </DataTablePage>
   )
 }

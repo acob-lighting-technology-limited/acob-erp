@@ -183,6 +183,7 @@ export const QUERY_KEYS = {
   eventOptions: () => ["event-options"],
   mdDeskOverview: () => ["md-desk-overview"],
   mdDeskDelegates: () => ["md-desk-delegates"],
+  mdDeskTaskReviews: () => ["md-desk-task-reviews"],
 
   // Security
   adminSecurityEmployees: () => ["admin-security-employees"],

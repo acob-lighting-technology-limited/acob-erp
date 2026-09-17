@@ -7,6 +7,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
+import { DateTimeRangeFilter, describeDateTimeRange, type DateTimeRange } from "@/components/ui/date-time-range-filter"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
@@ -81,17 +82,6 @@ const CATEGORY_FILTER_OPTIONS = [
 // Default view hides system/background noise — real signal only, until the
 // admin explicitly opts into seeing it.
 const DEFAULT_CATEGORY_FILTER_VALUES = ["normal", "review"]
-
-const MATCH_STATUS_FILTER_OPTIONS = [
-  { value: "matched", label: "Matched to Employee" },
-  { value: "unmatched", label: "Unmatched (e.g. tv, security)" },
-]
-
-// Default shows both — rows from hotspot accounts that aren't a real employee
-// email (shared/device accounts like "tv" or "security") are visible by
-// default, per the requirement that nothing gets silently dropped. This
-// filter just lets an admin narrow to employees-only when they want to.
-const DEFAULT_MATCH_STATUS_FILTER_VALUES = ["matched", "unmatched"]
 
 function ReviewBadge() {
   return (
@@ -297,6 +287,9 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
   // row (and "Clear all") pick these up automatically instead of needing a
   // hand-rolled pill row. `options` on each filter provides the label lookup
   // the pills use to render human-readable text.
+  // Date and time window as one filter; the table allows at most four (AGENTS.md).
+  const period: DateTimeRange = { ...dateRange, ...timeRange }
+  const periodValue = `${period.start_date}|${period.end_date}|${period.start_time}|${period.end_time}`
   const tableFilters: DataTableFilter<NetworkActivityRecord>[] = [
     {
       key: "category",
@@ -310,20 +303,6 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
       // Normal + Review so System/Background noise stays hidden until
       // explicitly selected.
       defaultValues: DEFAULT_CATEGORY_FILTER_VALUES,
-    },
-    {
-      key: "match_status",
-      label: "Match Status",
-      options: MATCH_STATUS_FILTER_OPTIONS,
-      placeholder: "All",
-      icon: <Users className="text-muted-foreground h-4 w-4" />,
-      mode: "custom",
-      filterFn: (row, selected) => selected.includes(row.user_id ? "matched" : "unmatched"),
-      // Client-side filter over already-fetched records — shows both by
-      // default so shared/device hotspot accounts (no employee email match)
-      // are visible, not silently dropped; this only lets an admin narrow
-      // down to employees-only when they want a clean view.
-      defaultValues: DEFAULT_MATCH_STATUS_FILTER_VALUES,
     },
     {
       key: "employee",
@@ -371,77 +350,23 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
       ),
     },
     {
-      key: "start_date",
-      label: "Start Date",
-      options: dateRange.start_date ? [{ value: dateRange.start_date, label: dateRange.start_date }] : [],
+      key: "period",
+      label: "Date & time",
+      options: [{ value: periodValue, label: describeDateTimeRange(period) }],
       mode: "custom",
       filterFn: () => true,
       render: (_values, onChange) => (
-        <Input
-          type="date"
-          aria-label="Start Date"
-          value={dateRange.start_date}
-          onChange={(e) => {
-            const next = e.target.value
-            setDateRange((f) => ({ ...f, start_date: next }))
-            onChange(next ? [next] : [])
-          }}
-        />
-      ),
-    },
-    {
-      key: "end_date",
-      label: "End Date",
-      options: dateRange.end_date ? [{ value: dateRange.end_date, label: dateRange.end_date }] : [],
-      mode: "custom",
-      filterFn: () => true,
-      render: (_values, onChange) => (
-        <Input
-          type="date"
-          aria-label="End Date"
-          value={dateRange.end_date}
-          onChange={(e) => {
-            const next = e.target.value
-            setDateRange((f) => ({ ...f, end_date: next }))
-            onChange(next ? [next] : [])
-          }}
-        />
-      ),
-    },
-    {
-      key: "start_time",
-      label: "Start Time",
-      options: timeRange.start_time ? [{ value: timeRange.start_time, label: timeRange.start_time }] : [],
-      mode: "custom",
-      filterFn: () => true,
-      render: (_values, onChange) => (
-        <Input
-          type="time"
-          aria-label="Start Time"
-          value={timeRange.start_time}
-          onChange={(e) => {
-            const next = e.target.value
-            setTimeRange((f) => ({ ...f, start_time: next }))
-            onChange(next ? [next] : [])
-          }}
-        />
-      ),
-    },
-    {
-      key: "end_time",
-      label: "End Time",
-      options: timeRange.end_time ? [{ value: timeRange.end_time, label: timeRange.end_time }] : [],
-      mode: "custom",
-      filterFn: () => true,
-      render: (_values, onChange) => (
-        <Input
-          type="time"
-          aria-label="End Time"
-          value={timeRange.end_time}
-          onChange={(e) => {
-            const next = e.target.value
-            setTimeRange((f) => ({ ...f, end_time: next }))
-            onChange(next ? [next] : [])
+        <DateTimeRangeFilter
+          value={period}
+          onChange={(next) => {
+            setDateRange({ start_date: next.start_date, end_date: next.end_date })
+            setTimeRange({ start_time: next.start_time, end_time: next.end_time })
+            const isDefault =
+              next.start_date === toLocalISODate() &&
+              next.end_date === toLocalISODate() &&
+              !next.start_time &&
+              !next.end_time
+            onChange(isDefault ? [] : [`${next.start_date}|${next.end_date}|${next.start_time}|${next.end_time}`])
           }}
         />
       ),
@@ -454,14 +379,16 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
   function handleDataTableFilterChange(values: Record<string, string[]>) {
     if (!("employee" in values) && selectedUserIds.length > 0) setSelectedUserIds([])
     if (!("department" in values) && selectedDepartmentId) setSelectedDepartmentId("")
-    if (!("start_date" in values) && dateRange.start_date !== toLocalISODate()) {
-      setDateRange((f) => ({ ...f, start_date: toLocalISODate() }))
+    if (
+      !("period" in values) &&
+      (dateRange.start_date !== toLocalISODate() ||
+        dateRange.end_date !== toLocalISODate() ||
+        timeRange.start_time ||
+        timeRange.end_time)
+    ) {
+      setDateRange({ start_date: toLocalISODate(), end_date: toLocalISODate() })
+      setTimeRange({ start_time: "", end_time: "" })
     }
-    if (!("end_date" in values) && dateRange.end_date !== toLocalISODate()) {
-      setDateRange((f) => ({ ...f, end_date: toLocalISODate() }))
-    }
-    if (!("start_time" in values) && timeRange.start_time) setTimeRange((f) => ({ ...f, start_time: "" }))
-    if (!("end_time" in values) && timeRange.end_time) setTimeRange((f) => ({ ...f, end_time: "" }))
   }
 
   function handleExportSelect(id: string) {

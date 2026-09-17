@@ -85,11 +85,11 @@ export function TicketDetailContent({
         body: JSON.stringify({ comment: newComment }),
       })
       const payload = (await response.json().catch(() => null)) as { error?: string } | null
-      if (!response.ok) throw new Error(payload?.error || "Failed to add comment")
-      toast.success("Comment added")
+      if (!response.ok) throw new Error(payload?.error || "Failed to add activity")
+      toast.success("Activity added")
       window.location.reload()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to add comment")
+      toast.error(error instanceof Error ? error.message : "Failed to add activity")
     } finally {
       setIsSaving(false)
     }
@@ -166,16 +166,16 @@ export function TicketDetailContent({
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Comments</CardTitle>
+              <CardTitle>Activities</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea
                 value={newComment}
                 onChange={(event) => setNewComment(event.target.value)}
-                placeholder="Add a comment"
+                placeholder="Add an activity note or update..."
               />
               <Button onClick={addComment} disabled={isSaving || !newComment.trim()}>
-                Add Comment
+                Add Activity
               </Button>
               {comments.map((comment) => (
                 <div key={comment.id} className="rounded-lg border p-3">

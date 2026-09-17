@@ -471,7 +471,7 @@ export function PmsMetricTabsPage({
       Object.fromEntries([
         ["S/N", index + 1],
         ...columnKeys.map((col) => [
-          col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+          col === "cycle" ? "Quarter" : col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
           asString((row as Record<string, unknown>)[col]),
         ]),
       ])
@@ -490,7 +490,7 @@ export function PmsMetricTabsPage({
     () =>
       columnKeys.map((col, index) => ({
         key: col,
-        label: col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        label: col === "cycle" ? "Quarter" : col.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
         sortable: true,
         accessor: (row) => asString(row[col]),
         hideOnMobile: index >= 2 || MOBILE_HIDDEN_COLS.has(col),
@@ -547,7 +547,7 @@ export function PmsMetricTabsPage({
 
     result.push({
       key: "cycle",
-      label: "Cycle",
+      label: "Quarter",
       options: visibleCycles.map((cycle) => ({
         value: cycle.id,
         label: cycleOptionLabel(cycle, visibleCycles),
@@ -566,7 +566,9 @@ export function PmsMetricTabsPage({
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={visibleCycles.length === 0 ? "No cycles for this cadence" : "Select Cycle"} />
+              <SelectValue
+                placeholder={visibleCycles.length === 0 ? "No quarters for this cadence" : "Select Quarter"}
+              />
             </SelectTrigger>
             <SelectContent>
               {visibleCycles.map((cycle) => (
@@ -693,7 +695,7 @@ export function PmsMetricTabsPage({
           />
           <StatCard
             variant="compact"
-            title="Active Cycle"
+            title="Active Quarter"
             value={data?.cycles.find((c) => c.id === cycleId)?.name || "Current"}
             icon={Icon}
             iconBgColor="bg-amber-500/10"

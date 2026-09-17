@@ -140,7 +140,7 @@ function PlanCard({
           <span className="text-muted-foreground">Progress</span>
           <span>{plan.progress_pct || 0}%</span>
         </div>
-        <Progress value={plan.progress_pct || 0} className="h-2" />
+        <Progress value={plan.progress_pct || 0} />
       </div>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" onClick={() => onView(plan)}>
@@ -226,8 +226,6 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
     cycleKey: "review_cycle",
     cycleLabel: "Quarter",
   })
-
-  const focusOptions = useMemo(() => Object.entries(FOCUS_LABELS).map(([value, label]) => ({ value, label })), [])
 
   function resetForm() {
     setSelectedEmployee("")
@@ -409,7 +407,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         accessor: (plan) => plan.progress_pct || 0,
         render: (plan) => (
           <div className="flex items-center gap-2">
-            <Progress value={plan.progress_pct || 0} className="h-2 w-20" />
+            <Progress value={plan.progress_pct || 0} className="w-20" />
             <span className="text-muted-foreground text-xs">{plan.progress_pct || 0}%</span>
           </div>
         ),
@@ -437,6 +435,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
     [cycleNameMap]
   )
 
+  // Four filters max (AGENTS.md): Department, Status, Review Type, Quarter.
   const filters: DataTableFilter<DevelopmentPlan>[] = useMemo(
     () => [
       {
@@ -459,14 +458,8 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         placeholder: "All Statuses",
       },
       ...cycleFilters,
-      {
-        key: "focus_area",
-        label: "Focus Area",
-        options: focusOptions,
-        placeholder: "All Focus Areas",
-      },
     ],
-    [cycleFilters, departmentOptions, focusOptions]
+    [cycleFilters, departmentOptions]
   )
 
   const rowActions: RowAction<DevelopmentPlan>[] = [

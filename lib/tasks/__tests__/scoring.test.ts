@@ -1,12 +1,6 @@
 import { strict as assert } from "node:assert"
 import { test } from "node:test"
-import {
-  computeProjectProgress,
-  computeWeightedTaskScore,
-  isTaskInCycle,
-  isTaskScorable,
-  isTaskUnresolved,
-} from "../scoring"
+import { computeWeightedTaskScore, isTaskInCycle, isTaskScorable, isTaskUnresolved } from "../scoring"
 
 test("a task earns its weight scaled by its rating", () => {
   const { score, earnedPoints, availablePoints } = computeWeightedTaskScore([
@@ -108,16 +102,6 @@ test("no assigned work is null, not zero", () => {
   assert.equal(computeWeightedTaskScore([]).score, null)
 })
 
-test("project delivery and quality are separate numbers", () => {
-  // Everything delivered, but rated badly: delivery is full, quality is not.
-  const progress = computeProjectProgress([
-    { status: "completed", weight: 5, rating: 2 },
-    { status: "completed", weight: 5, rating: 2 },
-  ])
-  assert.equal(progress.deliveryPct, 100)
-  assert.equal(progress.qualityPct, 40)
-})
-
 test("out-of-range weights are clamped rather than trusted", () => {
   const { availablePoints } = computeWeightedTaskScore([
     { status: "completed", weight: 999, rating: 5 },
@@ -162,14 +146,4 @@ test("a project's quality counts unfinished work, an employee's KPI does not", (
   assert.equal(computeWeightedTaskScore(tasks).score, 100)
   // The project has half its planned work untouched and must not read perfect.
   assert.equal(computeWeightedTaskScore(tasks, { countUnresolvedAsZero: true }).score, 50)
-})
-
-test("project delivery still counts unfinished work in the denominator", () => {
-  const progress = computeProjectProgress([
-    { status: "completed", weight: 5, rating: 5 },
-    { status: "pending", weight: 5, rating: null },
-  ])
-  assert.equal(progress.totalWeight, 10)
-  assert.equal(progress.completedWeight, 5)
-  assert.equal(progress.deliveryPct, 50)
 })

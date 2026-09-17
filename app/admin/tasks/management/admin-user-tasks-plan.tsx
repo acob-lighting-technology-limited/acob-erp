@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from "react"
 import { Calendar, CheckCircle2, Layers, Star, TrendingUp, Users, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,7 @@ import {
   taskCycleAnchor,
   computeWeightedTaskScore,
 } from "@/lib/tasks/scoring"
+import type { TaskExportMeta } from "@/lib/tasks/export"
 import type { Task, employee, UserProfile } from "./admin-tasks-content"
 import { AdminTaskStatusBadge } from "./admin-tasks-content"
 
@@ -53,6 +54,12 @@ export interface UserPlanRow {
   tasks: Task[]
 }
 
+/** What the page-header Export button needs from the plan table, read at click time. */
+export interface UserPlanExportContext {
+  rows: UserPlanRow[]
+  meta: TaskExportMeta
+}
+
 // Stable default: a fresh [] each render changes hook deps and can loop effects.
 const EMPTY_CYCLES: ReviewCycleOption[] = []
 
@@ -64,6 +71,7 @@ interface AdminUserTasksPlanProps {
   userProfile: UserProfile
   onOpenTaskDialog: (task?: Task) => void
   onOpenReviewDialog: (task: Task) => void
+  exportContextRef?: MutableRefObject<UserPlanExportContext | null>
 }
 
 function addDaysToDate(date: Date, days: number): Date {
@@ -99,6 +107,7 @@ export function AdminUserTasksPlan({
   userProfile: _userProfile,
   onOpenTaskDialog,
   onOpenReviewDialog,
+  exportContextRef,
 }: AdminUserTasksPlanProps) {
   const currentWeekInfo = useMemo(() => getCurrentOfficeWeek(), [])
   const staffAvatars = useStaffAvatars()
@@ -497,10 +506,38 @@ export function AdminUserTasksPlan({
     ]
   }, [departments, periodOptions])
 
-  const handlePeriodFilterChange = (fv: Record<string, string[]>) => {
-    const p = fv["period"]?.[0] || "all"
-    setSelectedPeriod(p)
-  }
+  // Export mirrors the table: its filtered/sorted row ids, resolved against the
+  // latest rows (a period change can alter figures without changing the ids).
+  const [visibleRowIds, setVisibleRowIds] = useState<string[]>([])
+  const [filterValues, setFilterValues] = useState<Record<string, string[]>>({})
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const handlePeriodFilterChange = useCallback((fv: Record<string, string[]>) => {
+    setSelectedPeriod(fv["period"]?.[0] || "all")
+    setFilterValues(fv)
+  }, [])
+
+  const handleProcessedRows = useCallback((rows: UserPlanRow[]) => setVisibleRowIds(rows.map((r) => r.id)), [])
+
+  useEffect(() => {
+    if (!exportContextRef) return
+    const byId = new Map(userPlanRows.map((r) => [r.id, r]))
+    const activityLabels: Record<string, string> = {
+      with_tasks: "Has Tasks in Period",
+      without_tasks: "No Tasks in Period",
+    }
+    const filterSummary: string[] = []
+    if (filterValues.department?.length) filterSummary.push(`Department: ${filterValues.department.join(", ")}`)
+    if (filterValues.activity?.length) {
+      filterSummary.push(`Task Activity: ${filterValues.activity.map((v) => activityLabels[v] ?? v).join(", ")}`)
+    }
+    if (searchQuery.trim()) filterSummary.push(`Search: "${searchQuery.trim()}"`)
+
+    exportContextRef.current = {
+      rows: visibleRowIds.map((id) => byId.get(id)).filter((r): r is UserPlanRow => Boolean(r)),
+      meta: { periodLabel: dateBounds.description, filters: filterSummary },
+    }
+  }, [exportContextRef, userPlanRows, visibleRowIds, filterValues, searchQuery, dateBounds])
 
   return (
     <div className="space-y-4">
@@ -564,6 +601,8 @@ export function AdminUserTasksPlan({
         filters={filters}
         onFilterChange={handlePeriodFilterChange}
         onFilterValuesChange={handlePeriodFilterChange}
+        onSearchChange={setSearchQuery}
+        onProcessedDataChange={handleProcessedRows}
         emptyTitle="No Employees Found"
         emptyDescription="No employees match the current filters or department scope."
         emptyIcon={Users}
