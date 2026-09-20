@@ -813,7 +813,13 @@ export function AdminSidebar({
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
         {groupedNavigation.map((section) => (
           <div key={section.key} className="space-y-0.5">
-            {!isCollapsed && (
+            {isCollapsed ? (
+              // Collapsed the headings are gone, so a rule stands in for them —
+              // otherwise the rail is one undifferentiated column of icons.
+              section.key !== "overview" && (
+                <div className="mx-1.5 my-1.5 border-t border-[var(--admin-sidebar-border)]" />
+              )
+            ) : (
               <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
