@@ -334,7 +334,7 @@ const adminNavigation: NavItem[] = [
   {
     section: "management",
     name: "Corporate Services",
-    href: "/admin/corporate-services/scorecard",
+    href: "/admin/corporate-services",
     icon: Briefcase,
     roles: ["developer", "super_admin", "admin"],
     children: [
@@ -517,7 +517,7 @@ const adminNavigation: NavItem[] = [
   {
     section: "compliance",
     name: "System & Security",
-    href: "/admin/audit-logs",
+    href: "/admin/security",
     icon: ShieldCheck,
     roles: ["developer", "super_admin", "admin"],
     children: [
@@ -578,7 +578,7 @@ const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
   "/admin/accounts": ["/admin/finance", "/admin/payments"],
   "/admin/finance": ["/admin/payments"],
   // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
-  "/admin/corporate-services/scorecard": ["/admin/corporate-scorecard"],
+  "/admin/corporate-services": ["/admin/corporate-scorecard"],
 }
 
 function getRouteMatchLength(targetHref: string, pathname: string, deptId?: string): number {

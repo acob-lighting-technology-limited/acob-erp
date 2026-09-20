@@ -156,7 +156,7 @@ const navigationSections: NavSectionDef[] = [
       { name: "Projects", href: "/projects", icon: FolderKanban },
       {
         name: "Corporate Services",
-        href: "/admin/corporate-services/scorecard",
+        href: "/admin/corporate-services",
         icon: Briefcase,
         adminOnly: true,
         children: [

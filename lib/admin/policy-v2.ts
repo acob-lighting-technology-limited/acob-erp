@@ -203,6 +203,8 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/project")) return "projects.main"
   if (pathname.startsWith("/admin/security/bypass-override")) return "security.bypassOverride"
   if (pathname.startsWith("/admin/security/network-activity")) return "security.networkActivity"
+  // Group root, redirects to the audit log — gate it as the page it lands on.
+  if (pathname.startsWith("/admin/security")) return "auditlogs.main"
   if (pathname.startsWith("/admin/reports")) {
     if (pathname.includes("/weekly-reports")) return "reports.weekly"
     return "reports.other"
