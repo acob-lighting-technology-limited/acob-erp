@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
+  BookUser,
   Briefcase,
   CalendarDays,
   ChevronsUpDown,
@@ -23,7 +24,6 @@ import {
   Ticket,
   TrendingUp,
   User,
-  UserCheck,
   Users,
   Wrench,
   FolderKanban,
@@ -108,7 +108,7 @@ const navigationSections: NavSectionDef[] = [
     label: "Overview",
     items: [
       { name: "Dashboard", href: "/profile", icon: LayoutDashboard },
-      { name: "Directory", href: "/directory", icon: Users },
+      { name: "Directory", href: "/directory", icon: BookUser },
       { name: "Calendar", href: "/calendar", icon: CalendarDays },
     ],
   },
@@ -119,7 +119,7 @@ const navigationSections: NavSectionDef[] = [
       {
         name: "HR",
         href: "/hr",
-        icon: UserCheck,
+        icon: Users,
         children: [
           { name: "Attendance", href: "/attendance" },
           { name: "Leave", href: "/leave" },
