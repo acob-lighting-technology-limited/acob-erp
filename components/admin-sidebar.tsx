@@ -476,10 +476,13 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Broadcast", href: "/admin/communications/broadcast" },
       {
-        name: "General Meeting",
+        // Not to be confused with Reports > General Meeting, which is the
+        // reports themselves. This branch is the mail-out and the reminders
+        // that go with them.
+        name: "Meeting Mail",
         href: "/admin/communications/meetings",
         children: [
-          { name: "Reports", href: "/admin/communications/meetings/mail" },
+          { name: "Report Mail-out", href: "/admin/communications/meetings/mail" },
           { name: "Reminders", href: "/admin/communications/meetings/reminders" },
         ],
       },
