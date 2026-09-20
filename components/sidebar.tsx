@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
   Briefcase,
@@ -52,6 +52,8 @@ import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
+import { findActiveBranchHref } from "@/lib/nav/match"
+import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import { useSidebar } from "./sidebar-context"
 
 interface SidebarProps {
@@ -78,8 +80,6 @@ interface SidebarProps {
   showMdDesk?: boolean
 }
 
-type NavSubChild = { name: string; href: string }
-type NavChild = { name: string; href: string; children?: NavSubChild[] }
 type NavItemDef = {
   name: string
   href: string
@@ -231,7 +231,7 @@ const MD_DESK_NAV_ITEM: NavItemDef = {
   children: mdDeskNavChildren("/md-desk"),
 }
 
-const NAV_ROUTE_ALIASES: Record<string, string[]> = {
+const NAV_ROUTE_ALIASES: RouteAliases = {
   "/tools": ["/feedback"],
 }
 
@@ -310,13 +310,6 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     router.push("/auth/login")
   }
 
-  const isNavItemActive = (href: string): boolean => {
-    if (!pathname) return false
-    if (pathname === href || pathname.startsWith(`${href}/`)) return true
-    const aliases = NAV_ROUTE_ALIASES[href] || []
-    return aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`))
-  }
-
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
   )
@@ -374,6 +367,13 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     }
   })
 
+  // One winner, so a parent and its child never highlight at the same time —
+  // the admin sidebar has always scored matches this way.
+  const activeTopLevelHref = useMemo(() => {
+    const items = visibleSections.flatMap((section) => section.items)
+    return findActiveBranchHref(items, pathname, NAV_ROUTE_ALIASES, (href) => href === "/profile")
+  }, [visibleSections, pathname])
+
   const labelCls = cn(
     "min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out",
     isCollapsed ? "max-w-0 opacity-0" : "max-w-full opacity-100"
@@ -394,14 +394,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             {section.items.map((item) => {
               const hasChildren = !isCollapsed && item.children && item.children.length > 0
               const isOpen = openSections.has(item.href)
-              const isActive = isNavItemActive(item.href)
-              const hasActiveChild = item.children?.some(
-                (child) =>
-                  pathname === child.href ||
-                  pathname?.startsWith(child.href + "/") ||
-                  child.children?.some((gc) => pathname === gc.href || pathname?.startsWith(gc.href + "/"))
-              )
-              const highlighted = isActive || Boolean(hasActiveChild)
+              const highlighted = item.href === activeTopLevelHref
               const activeCls = "bg-primary text-primary-foreground shadow-sm"
               const inactiveCls = "text-muted-foreground hover:bg-accent hover:text-foreground"
 
