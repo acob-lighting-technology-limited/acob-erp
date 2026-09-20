@@ -20,7 +20,6 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
-  Target,
   Ticket,
   TrendingUp,
   User,
@@ -161,16 +160,6 @@ const navigationSections: NavSectionDef[] = [
       // Portfolios as its own first child, so parent and child led to the
       // same page.
       { name: "Projects", href: "/projects", icon: FolderKanban },
-      {
-        name: "Corporate Services",
-        href: "/admin/corporate-services",
-        icon: Target,
-        adminOnly: true,
-        children: [
-          { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
-          { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
-        ],
-      },
     ],
   },
   {
