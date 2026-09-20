@@ -232,6 +232,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/cbt2",
+        destination: "/cbt/identity",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

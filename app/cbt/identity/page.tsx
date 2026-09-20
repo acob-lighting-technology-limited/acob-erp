@@ -665,7 +665,7 @@ export default function Cbt2Page() {
               <Brain className="h-6 w-6 text-white" />
             </div>
             <div>
-              <CardTitle className="text-3xl">CBT Verification</CardTitle>
+              <CardTitle className="text-3xl">CBT Identity Verification</CardTitle>
               <CardDescription className="text-slate-300">
                 Select your review cycle, email address, and verify using your last name and date of birth. Know your
                 password instead? Use the standard{" "}

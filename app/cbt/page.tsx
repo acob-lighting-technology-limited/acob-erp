@@ -701,7 +701,12 @@ export default function CbtPage() {
             <div>
               <CardTitle className="text-3xl">CBT Login Verification</CardTitle>
               <CardDescription>
-                Select your review cycle, email address, and enter your password to proceed to the instructions.
+                Select your review cycle, email address, and enter your password to proceed to the instructions. No
+                password? Verify with your last name and date of birth on the{" "}
+                <a href="/cbt/identity" className="underline">
+                  identity verification
+                </a>{" "}
+                page.
               </CardDescription>
             </div>
           </div>

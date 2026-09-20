@@ -19,7 +19,7 @@ const StartSchema = z
   })
   .superRefine((data, ctx) => {
     // Two verification paths: password (the primary /cbt flow) or last
-    // name + date of birth (the /cbt2 fallback for candidates who don't
+    // name + date of birth (the /cbt/identity fallback for candidates who don't
     // know/have a password). Exactly one must be fully supplied. profiles.
     // birthday is stored as MM-DD only (no year), so year isn't collected —
     // day + month is the full comparison.
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Fallback verification for candidates who don't know/have a password
-      // (the /cbt2 flow): last name + date of birth, matched against the
+      // (the /cbt/identity flow): last name + date of birth, matched against the
       // profile on file — same check the original /cbt used before password
       // auth was added.
       const isLastNameMatch =
