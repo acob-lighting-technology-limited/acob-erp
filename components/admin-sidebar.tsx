@@ -348,10 +348,17 @@ const adminNavigation: NavItem[] = [
     href: "/admin/portfolios",
     icon: Layers,
     roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Portfolios", href: "/admin/portfolios" },
-      { name: "Projects", href: "/admin/project" },
-    ],
+  },
+  {
+    // Sibling of Portfolios, not a child of it. They are separate consoles with
+    // separate route keys (portfolios.main / projects.main); the old wrapper
+    // listed Portfolios as its own first child, so parent and child led to the
+    // same page.
+    section: "management",
+    name: "Projects",
+    href: "/admin/project",
+    icon: FolderKanban,
+    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "management",

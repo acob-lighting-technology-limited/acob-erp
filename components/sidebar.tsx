@@ -149,15 +149,11 @@ const navigationSections: NavSectionDef[] = [
           { name: "Assets", href: "/assets" },
         ],
       },
-      {
-        name: "Portfolios",
-        href: "/portfolios",
-        icon: Layers,
-        children: [
-          { name: "Portfolios", href: "/portfolios" },
-          { name: "Projects", href: "/projects" },
-        ],
-      },
+      { name: "Portfolios", href: "/portfolios", icon: Layers },
+      // Sibling of Portfolios, not a child of it. The old wrapper listed
+      // Portfolios as its own first child, so parent and child led to the
+      // same page.
+      { name: "Projects", href: "/projects", icon: FolderKanban },
       {
         name: "Corporate Services",
         href: "/admin/corporate-services/scorecard",
