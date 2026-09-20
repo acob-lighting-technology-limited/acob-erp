@@ -356,7 +356,7 @@ const adminNavigation: NavItem[] = [
     // same page.
     section: "management",
     name: "Projects",
-    href: "/admin/project",
+    href: "/admin/projects",
     icon: FolderKanban,
     roles: ["developer", "super_admin", "admin"],
   },

@@ -35,8 +35,8 @@ import {
   formatCapacity,
 } from "@/components/projects/project-summary"
 import { ProjectCharts } from "@/components/projects/project-charts"
-import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
-import { ProjectPlanBoard } from "@/app/admin/project/_components/project-plan-board"
+import { ProjectDialogs } from "@/app/admin/projects/_components/project-dialogs"
+import { ProjectPlanBoard } from "@/app/admin/projects/_components/project-plan-board"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { PROJECT_METRIC_HELP, formatTimeUsed, plural } from "@/lib/projects/health"
 import { portfolioHref, projectsListHref } from "@/lib/projects/links"

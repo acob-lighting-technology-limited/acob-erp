@@ -198,8 +198,9 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/corporate-scorecard") || pathname.startsWith("/admin/corporate-services"))
     return "scorecard.main"
   if (pathname.startsWith("/admin/portfolios")) return "portfolios.main"
-  // The Projects console lives at the singular /admin/project — the sidebar
-  // labels it "Projects" but the route was never pluralised.
+  // Matches /admin/projects and the legacy singular /admin/project stub. Must
+  // stay below the /admin/portfolios rule above, which it would not shadow but
+  // reads more clearly in that order.
   if (pathname.startsWith("/admin/project")) return "projects.main"
   if (pathname.startsWith("/admin/security/bypass-override")) return "security.bypassOverride"
   if (pathname.startsWith("/admin/security/network-activity")) return "security.networkActivity"

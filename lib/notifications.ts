@@ -214,7 +214,7 @@ export async function notifyProjectDelayed(params: {
     title: "Project behind schedule",
     message: `"${params.projectName}" is behind: ${params.reason}.`,
     priority: "high",
-    linkUrl: `/admin/project`,
+    linkUrl: `/admin/projects`,
     entityType: "project",
     entityId: params.projectId,
   })
