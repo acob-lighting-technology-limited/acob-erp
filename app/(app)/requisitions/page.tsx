@@ -1,17 +1,37 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
-import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
+import { useState, useEffect, useCallback } from "react"
+import {
+  DataTablePage,
+  DataTable,
+  type DataTableColumn,
+  type DataTableFilter,
+  type DataTableTab,
+} from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
-import { Plus, FileCheck2, Clock, CheckCircle2, AlertCircle, RefreshCw, Siren, Building2 } from "lucide-react"
+import { Plus, FileCheck2, Clock, CheckCircle2, AlertCircle, RefreshCw, Siren, Wallet, Building2 } from "lucide-react"
 import type { Requisition } from "@/lib/requisitions/types"
 import { getStageLabel } from "@/lib/requisitions/workflow"
-import { NewRequisitionDialog } from "@/app/(app)/requisitions/_components/new-requisition-dialog"
+import { NewRequisitionDialog } from "./_components/new-requisition-dialog"
+import { createClient } from "@/lib/supabase/client"
+import { apiFetch } from "@/lib/api-client"
+import { formatWATDate } from "@/lib/utils/date"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
+const TABS: DataTableTab[] = [
+  { key: "my", label: "My Requisitions" },
+  { key: "approvals", label: "Pending Approvals" },
+  { key: "all", label: "All Requisitions" },
+]
+
+/**
+ * The stage pill. Extracted so the table cell, the mobile row and the card all
+ * render the same thing — they previously showed three different summaries of
+ * the same state, and the card's was a bare lowercase stage label.
+ */
 function StageBadge({ requisition }: { requisition: Requisition }) {
   if (requisition.status === "approved") {
     return (
@@ -34,46 +54,64 @@ function StageBadge({ requisition }: { requisition: Requisition }) {
   )
 }
 
-interface DeptRequisitionsContentProps {
-  deptId: string
-  deptName: string
-  userId: string
+function formatNaira(amount: number | string | null | undefined, decimals = 2) {
+  return `₦${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: decimals })}`
 }
 
-export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequisitionsContentProps) {
+export default function RequisitionListPage() {
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState<string>("my")
   const [rows, setRows] = useState<Requisition[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false)
+  // A requisition is always raised for the requester's own department, so the
+  // dialog shows it read-only rather than asking them to type it.
+  const [userDepartment, setUserDepartment] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from("profiles").select("department").eq("id", user.id).single()
+      setUserDepartment(data?.department ?? null)
+    })()
+  }, [])
 
   const fetchRequisitions = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/requisitions")
+      let url = "/api/requisitions"
+      if (activeTab === "my") {
+        url += "?user_only=true"
+      } else if (activeTab === "approvals") {
+        url += "?status=pending"
+      }
+
+      const res = await apiFetch(url)
       const json = await res.json()
 
       if (!res.ok) {
         throw new Error(json.error || json.message || "Failed to load requisitions")
       }
 
-      // Lock to this department console's department
-      const allRows: Requisition[] = json.data || []
-      const scopedRows = allRows.filter((r) => r.department?.toLowerCase() === deptName.toLowerCase())
-
-      setRows(scopedRows)
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch department requisitions")
+      setRows(json.data || [])
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to fetch requisitions")
     } finally {
       setIsLoading(false)
     }
-  }, [deptName])
+  }, [activeTab])
 
   useEffect(() => {
     fetchRequisitions()
   }, [fetchRequisitions])
 
+  // Stats computation
   const totalCount = rows.length
   const pendingCount = rows.filter((r) => r.status === "pending").length
   const approvedCount = rows.filter((r) => r.status === "approved").length
@@ -87,7 +125,10 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
       accessor: (r) => r.requisition_number,
       render: (r) => (
         <div className="flex flex-col gap-0.5">
-          <Link href={`/requisitions/${r.id}`} className="text-primary font-mono font-bold hover:underline">
+          <Link
+            href={`/requisitions/${r.id}`}
+            className="font-mono font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+          >
             {r.requisition_number}
           </Link>
           {r.is_emergency && (
@@ -100,20 +141,12 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
       initialWidth: 140,
     },
     {
-      key: "requester",
-      label: "Requester",
-      sortable: true,
-      accessor: (r) => r.requester?.full_name || "",
-      render: (r) => <span className="text-xs font-semibold">{r.requester?.full_name || "Unknown"}</span>,
-      initialWidth: 170,
-    },
-    {
       key: "project_name",
       label: "Project",
       sortable: true,
       accessor: (r) => r.project_name,
       render: (r) => <span className="text-xs font-medium">{r.project_name}</span>,
-      initialWidth: 160,
+      initialWidth: 180,
     },
     {
       key: "funding_category_name",
@@ -125,55 +158,44 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
       hideOnMobile: true,
     },
     {
-      key: "amount",
-      label: "Amount (₦)",
+      key: "department",
+      label: "Department",
       sortable: true,
-      accessor: (r) => Number(r.amount) || 0,
-      render: (r) => (
-        <span className="font-mono text-xs font-semibold">
-          ₦{(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}
-        </span>
-      ),
+      accessor: (r) => r.department,
+      render: (r) => <span className="text-xs">{r.department}</span>,
       initialWidth: 130,
     },
     {
-      key: "status",
-      label: "Status",
+      key: "amount",
+      label: "Amount (₦)",
       sortable: true,
-      accessor: (r) => r.status,
+      accessor: (r) => r.amount,
       render: (r) => (
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            r.status === "approved"
-              ? "bg-emerald-500/10 text-emerald-600"
-              : r.status === "rejected"
-                ? "bg-red-500/10 text-red-600"
-                : "bg-amber-500/10 text-amber-600"
-          }`}
-        >
-          {r.status.toUpperCase()}
+        <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          {formatNaira(r.amount)}
         </span>
       ),
-      initialWidth: 110,
+      initialWidth: 140,
     },
     {
-      key: "stage",
-      label: "Approval Stage",
+      key: "status",
+      label: "Stage / Status",
       sortable: true,
-      accessor: (r) => r.current_stage_code,
+      accessor: (r) => r.status,
       render: (r) => <StageBadge requisition={r} />,
-      initialWidth: 180,
+      initialWidth: 200,
     },
     {
-      key: "actions",
-      label: "Action",
-      render: (r) => (
-        <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
-          <Link href={`/requisitions/${r.id}`}>View Form</Link>
-        </Button>
-      ),
-      initialWidth: 100,
+      key: "created_at",
+      label: "Date",
+      sortable: true,
+      accessor: (r) => r.created_at,
+      render: (r) => <span className="text-muted-foreground text-xs">{formatWATDate(r.created_at)}</span>,
+      initialWidth: 120,
     },
+    // No "Action" column: it held a second link to `/requisitions/[id]`, which the
+    // requisition number in the first column already is — and the row itself now
+    // opens the form.
   ]
 
   const filters: DataTableFilter<Requisition>[] = [
@@ -220,10 +242,15 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
 
   return (
     <DataTablePage
-      title={`${deptName} Requisitions`}
-      description={`Manage and track payment request forms for ${deptName}.`}
+      title="Requisition Portal"
+      description="Create, track, and approve digital ACOB payment request forms."
       icon={FileCheck2}
-      backLink={{ href: `/dept/${deptId}`, label: `Back to ${deptName} Console` }}
+      backLink={{ href: "/profile", label: "Back to Home" }}
+      tabs={TABS}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      spacing="tight"
+      actionsPlacement="inline-always"
       stats={
         <StatGrid>
           <StatCard
@@ -244,9 +271,9 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
           />
           <StatCard
             variant="compact"
-            title="Total Amount (₦)"
-            value={`₦${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`}
-            icon={FileCheck2}
+            title="Total Amount"
+            value={formatNaira(totalAmount, 0)}
+            icon={Wallet}
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
           />
@@ -261,12 +288,14 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
         </StatGrid>
       }
       actions={
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchRequisitions} className="gap-1 text-xs">
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchRequisitions}>
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button size="sm" onClick={() => setIsCreateOpen(true)} className="gap-1 text-xs">
-            <Plus className="h-4 w-4" /> New Requisition
+          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">New Requisition</span>
           </Button>
         </div>
       }
@@ -275,12 +304,12 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
         data={rows}
         columns={columns}
         getRowId={(r) => r.id}
-        searchPlaceholder="Search requisition #, requester, project..."
+        searchPlaceholder="Search requisition #, project, purpose, department..."
         searchFn={(row, q) =>
           row.requisition_number.toLowerCase().includes(q) ||
           row.project_name.toLowerCase().includes(q) ||
-          (row.requester?.full_name || "").toLowerCase().includes(q) ||
-          (row.funding_category_name || "").toLowerCase().includes(q)
+          row.purpose.toLowerCase().includes(q) ||
+          row.department.toLowerCase().includes(q)
         }
         filters={filters}
         isLoading={isLoading}
@@ -290,20 +319,30 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
         stickyToolbar
         viewToggle
         contactsView
+        // Eight columns of form data: a table where it fits, the row list where it
+        // does not.
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          // An emergency requisition is the one that cannot wait in the queue.
           title: (r) => r.purpose,
-          subtitle: (r) =>
-            `${r.requisition_number} · ${r.project_name || r.department} · ₦${(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}`,
+          subtitle: (r) => `${r.requisition_number} · ${r.project_name || r.department} · ${formatNaira(r.amount)}`,
           trailing: (r) => <StageBadge requisition={r} />,
+          // A requisition's detail is a whole form on its own route, so the row
+          // navigates there rather than opening a sheet that could only ever show
+          // a summary of it.
           onSelect: (r) => router.push(`/requisitions/${r.id}`),
         }}
+        emptyTitle="No requisitions"
+        emptyDescription="Requisitions you raise or need to approve will appear here."
+        emptyIcon={FileCheck2}
+        skeletonRows={6}
+        urlSync
         cardRenderer={(r) => (
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground font-mono text-xs font-bold">{r.requisition_number}</span>
               <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                ₦{(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                {formatNaira(r.amount)}
               </span>
             </div>
             <div>
@@ -326,7 +365,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
       <NewRequisitionDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
-        userDepartment={deptName}
+        userDepartment={userDepartment}
         onSuccess={fetchRequisitions}
       />
     </DataTablePage>

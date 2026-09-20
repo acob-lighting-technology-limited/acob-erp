@@ -25,7 +25,7 @@ export default async function AccountsPage() {
     {
       title: "Requisitions",
       description: "Submit purchase and funding requests, track department endorsements, and check payout progress.",
-      href: "/requisition",
+      href: "/requisitions",
       icon: ClipboardCheck,
       badge:
         requisitions.pendingCount > 0 ? `${requisitions.pendingCount} In Review` : `${requisitions.totalCount} Total`,

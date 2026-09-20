@@ -149,7 +149,7 @@ export default function AdminRequisitionsPage() {
       render: (r) => (
         <div className="flex flex-col gap-0.5">
           <Link
-            href={`/requisition/${r.id}`}
+            href={`/requisitions/${r.id}`}
             className="font-mono font-bold text-emerald-700 hover:underline dark:text-emerald-400"
           >
             {r.requisition_number}
@@ -254,7 +254,7 @@ export default function AdminRequisitionsPage() {
       label: "Action",
       render: (r) => (
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/requisition/${r.id}`} className="gap-1 text-xs">
+          <Link href={`/requisitions/${r.id}`} className="gap-1 text-xs">
             <Eye className="h-3.5 w-3.5" /> View Form
           </Link>
         </Button>
