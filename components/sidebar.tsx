@@ -80,7 +80,18 @@ interface SidebarProps {
 
 type NavSubChild = { name: string; href: string }
 type NavChild = { name: string; href: string; children?: NavSubChild[] }
-type NavItemDef = { name: string; href: string; icon: React.ElementType; children?: NavChild[] }
+type NavItemDef = {
+  name: string
+  href: string
+  icon: React.ElementType
+  children?: NavChild[]
+  /**
+   * The item points into the /admin shell. Hidden unless the viewer can enter
+   * it — /admin bounces everyone else back to /profile (see AdminLayout), so
+   * showing the link to ordinary staff is a guaranteed dead end.
+   */
+  adminOnly?: boolean
+}
 type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
 
 /**
@@ -151,6 +162,7 @@ const navigationSections: NavSectionDef[] = [
         name: "Corporate Services",
         href: "/admin/corporate-services/scorecard",
         icon: Briefcase,
+        adminOnly: true,
         children: [
           { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
           { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
@@ -356,11 +368,13 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     : null
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
-  const visibleSections: NavSectionDef[] = showMdDesk
-    ? navigationSections.map((section) =>
-        section.key === "management" ? { ...section, items: [MD_DESK_NAV_ITEM, ...section.items] } : section
-      )
-    : navigationSections
+  const visibleSections: NavSectionDef[] = navigationSections.map((section) => {
+    const items = section.items.filter((item) => !item.adminOnly || canAccessAdmin)
+    return {
+      ...section,
+      items: showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items,
+    }
+  })
 
   const labelCls = cn(
     "min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out",
