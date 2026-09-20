@@ -1123,9 +1123,12 @@ export function AdminSidebar({
               asChild
               className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
             >
-              <Link href="/admin/settings" className="flex w-full items-center gap-2">
+              {/* Personal settings. Org settings are already a Compliance nav
+                  item, so this menu no longer duplicates them under the same
+                  word. */}
+              <Link href="/settings" className="flex w-full items-center gap-2">
                 <Settings className="h-4 w-4" />
-                Settings
+                My Settings
               </Link>
             </DropdownMenuItem>
             {deptConsoles
