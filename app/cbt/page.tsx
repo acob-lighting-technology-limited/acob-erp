@@ -57,6 +57,34 @@ type ResultData = {
   total_questions: number
 }
 
+type VerifyMode = "password" | "identity"
+
+const MONTH_OPTIONS = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+]
+
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => String(i + 1))
+
+const EMPTY_FORM = {
+  company_email: "",
+  review_cycle_id: "",
+  password: "",
+  last_name: "",
+  dob_day: "",
+  dob_month: "",
+}
+
 export default function CbtPage() {
   const [candidateOptions, setCandidateOptions] = useState<CandidateOption[]>([])
   const [cycles, setCycles] = useState<ReviewCycleOption[]>([])
@@ -70,11 +98,21 @@ export default function CbtPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showPassword, setShowPassword] = useState(false)
   const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({})
-  const [form, setForm] = useState({
-    company_email: "",
-    review_cycle_id: "",
-    password: "",
-  })
+  const [verifyMode, setVerifyMode] = useState<VerifyMode>("password")
+  const [form, setForm] = useState(EMPTY_FORM)
+
+  // ?verify=identity deep-links straight to the date-of-birth form, which is
+  // what the retired /cbt/identity route now redirects to. Read from the URL
+  // rather than useSearchParams so the page needs no Suspense boundary.
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("verify") === "identity") {
+        setVerifyMode("identity")
+      }
+    } catch {
+      // A malformed query string is not worth failing the page over.
+    }
+  }, [])
 
   const resetToStart = useCallback(() => {
     setResult(null)
@@ -82,11 +120,7 @@ export default function CbtPage() {
     try {
       localStorage.removeItem("acob_cbt_state")
     } catch (e) {}
-    setForm({
-      company_email: "",
-      review_cycle_id: "",
-      password: "",
-    })
+    setForm(EMPTY_FORM)
   }, [])
 
   useEffect(() => {
@@ -356,10 +390,18 @@ export default function CbtPage() {
   const startSession = async () => {
     setStarting(true)
     try {
+      const credentials =
+        verifyMode === "password"
+          ? { password: form.password }
+          : { last_name: form.last_name, dob_day: form.dob_day, dob_month: form.dob_month }
       const response = await apiFetch("/api/hr/performance/cbt/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          company_email: form.company_email,
+          review_cycle_id: form.review_cycle_id,
+          ...credentials,
+        }),
       })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || "Failed to start CBT")
@@ -537,11 +579,7 @@ export default function CbtPage() {
               onClick={() => {
                 if (session.is_completed) {
                   setSession(null)
-                  setForm({
-                    company_email: "",
-                    review_cycle_id: "",
-                    password: "",
-                  })
+                  setForm(EMPTY_FORM)
                 } else {
                   setTestStarted(true)
                 }
@@ -685,7 +723,9 @@ export default function CbtPage() {
     )
   }
 
-  const isFormValid = Boolean(form.company_email && form.review_cycle_id && form.password)
+  const hasCredentials =
+    verifyMode === "password" ? Boolean(form.password) : Boolean(form.last_name && form.dob_day && form.dob_month)
+  const isFormValid = Boolean(form.company_email && form.review_cycle_id && hasCredentials)
 
   return (
     <main className="bg-background text-foreground relative flex min-h-screen items-center justify-center p-6">
@@ -699,14 +739,10 @@ export default function CbtPage() {
               <Brain className="text-primary h-6 w-6" />
             </div>
             <div>
-              <CardTitle className="text-3xl">CBT Login Verification</CardTitle>
+              <CardTitle className="text-3xl">CBT Verification</CardTitle>
               <CardDescription>
-                Select your review cycle, email address, and enter your password to proceed to the instructions. No
-                password? Verify with your last name and date of birth on the{" "}
-                <a href="/cbt/identity" className="underline">
-                  identity verification
-                </a>{" "}
-                page.
+                Select your review cycle and email address, then verify with your password — or with your last name and
+                date of birth if you do not have one.
               </CardDescription>
             </div>
           </div>
@@ -753,25 +789,82 @@ export default function CbtPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                  className="h-10 pr-10"
-                  placeholder="Enter your password"
-                />
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor={verifyMode === "password" ? "password" : "last_name"}>
+                  {verifyMode === "password" ? "Password" : "Last name and date of birth"}
+                </Label>
                 <button
                   type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setVerifyMode((mode) => (mode === "password" ? "identity" : "password"))}
+                  className="text-muted-foreground hover:text-foreground text-xs underline transition"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {verifyMode === "password" ? "No password?" : "Use password instead"}
                 </button>
               </div>
+
+              {verifyMode === "password" ? (
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                    className="h-10 pr-10"
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Input
+                    id="last_name"
+                    value={form.last_name}
+                    onChange={(event) => setForm((current) => ({ ...current, last_name: event.target.value }))}
+                    className="h-10"
+                    placeholder="Enter last name"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Select
+                      value={form.dob_day}
+                      onValueChange={(value) => setForm((current) => ({ ...current, dob_day: value }))}
+                    >
+                      <SelectTrigger aria-label="Day of birth">
+                        <SelectValue placeholder="Day (DD)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DAY_OPTIONS.map((day) => (
+                          <SelectItem key={day} value={day}>
+                            {day.padStart(2, "0")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={form.dob_month}
+                      onValueChange={(value) => setForm((current) => ({ ...current, dob_month: value }))}
+                    >
+                      <SelectTrigger aria-label="Month of birth">
+                        <SelectValue placeholder="Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONTH_OPTIONS.map((month) => (
+                          <SelectItem key={month.value} value={month.value}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
