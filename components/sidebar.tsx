@@ -19,6 +19,7 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
+  Target,
   Ticket,
   TrendingUp,
   User,
@@ -153,7 +154,7 @@ const navigationSections: NavSectionDef[] = [
       {
         name: "Corporate Services",
         href: "/admin/corporate-services",
-        icon: Briefcase,
+        icon: Target,
         adminOnly: true,
         children: [
           { name: "Scorecard", href: "/admin/corporate-services/scorecard" },

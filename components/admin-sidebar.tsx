@@ -387,7 +387,7 @@ const adminNavigation: NavItem[] = [
     section: "management",
     name: "Corporate Services",
     href: "/admin/corporate-services",
-    icon: Briefcase,
+    icon: Target,
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
