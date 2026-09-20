@@ -1116,7 +1116,7 @@ export function AdminSidebar({
             >
               <Link href="/profile" className="flex w-full items-center gap-2">
                 <User className="h-4 w-4" />
-                Go to Dashboard
+                Dashboard
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem

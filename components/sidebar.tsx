@@ -602,7 +602,9 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             className="z-[70] w-[var(--radix-dropdown-menu-trigger-width)] min-w-52"
           >
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex w-full items-center gap-2">
+              {/* /profile is the staff dashboard and is already the "Dashboard"
+                  nav item; the actual profile lives under settings. */}
+              <Link href="/settings/profile" className="flex w-full items-center gap-2">
                 <User className="h-4 w-4" />
                 Profile
               </Link>
