@@ -197,6 +197,14 @@ function buildDeptNavigation(deptId: string): NavItem[] {
     },
     {
       section: "operations",
+      name: "Reports",
+      href: `${base}/reports`,
+      icon: FileBarChart,
+      roles: [],
+      children: [{ name: "Weekly", href: `${base}/reports/weekly-reports` }],
+    },
+    {
+      section: "operations",
       name: "Correspondence",
       href: `${base}/correspondence`,
       icon: FileCode2,
@@ -229,14 +237,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       href: `${base}/feedback`,
       icon: MessageSquare,
       roles: [],
-    },
-    {
-      section: "operations",
-      name: "Reports",
-      href: `${base}/reports`,
-      icon: FileBarChart,
-      roles: [],
-      children: [{ name: "Weekly", href: `${base}/reports/weekly-reports` }],
     },
   ]
 }
@@ -338,15 +338,6 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
-    // Operations, not Management: tasks are day-to-day work, and the staff shell
-    // has always listed them there.
-    section: "operations",
-    name: "Tasks",
-    href: "/admin/tasks",
-    icon: ClipboardList,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
     // Finance only. Purchasing, Inventory and Assets used to hang off this item
     // three levels deep; each is its own domain with its own top-level route and
     // its own grantable route key, so each is now its own nav item.
@@ -427,6 +418,15 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
+    // Operations, not Management: tasks are day-to-day work, and the staff shell
+    // has always listed them there.
+    section: "operations",
+    name: "Tasks",
+    href: "/admin/tasks",
+    icon: ClipboardList,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
     section: "operations",
     name: "Help Desk",
     href: "/admin/help-desk",
@@ -470,13 +470,6 @@ const adminNavigation: NavItem[] = [
   },
   {
     section: "operations",
-    name: "Tools",
-    href: "/admin/tools",
-    icon: Wrench,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
     name: "Communications",
     href: "/admin/communications",
     icon: Megaphone,
@@ -498,13 +491,6 @@ const adminNavigation: NavItem[] = [
   },
   {
     section: "operations",
-    name: "Notifications",
-    href: "/admin/notifications",
-    icon: Bell,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
     name: "Documentation",
     href: "/admin/documentation",
     icon: FileText,
@@ -523,6 +509,20 @@ const adminNavigation: NavItem[] = [
     name: "Feedback",
     href: "/admin/feedback",
     icon: MessageSquare,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "operations",
+    name: "Tools",
+    href: "/admin/tools",
+    icon: Wrench,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "operations",
+    name: "Notifications",
+    href: "/admin/notifications",
+    icon: Bell,
     roles: ["developer", "super_admin", "admin"],
   },
   {
