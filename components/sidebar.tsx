@@ -52,6 +52,7 @@ import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
+import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import { useSidebar } from "./sidebar-context"
@@ -131,16 +132,7 @@ const navigationSections: NavSectionDef[] = [
         name: "PMS",
         href: "/pms",
         icon: TrendingUp,
-        children: [
-          { name: "Goals", href: "/pms/goals" },
-          { name: "KPI", href: "/pms/kpi" },
-          { name: "Reviews", href: "/pms/reviews" },
-          { name: "Peer Feedback", href: "/pms/peer-feedback" },
-          { name: "Development Plans", href: "/pms/development-plans" },
-          { name: "Behaviour", href: "/pms/behaviour" },
-          { name: "CBT", href: "/pms/cbt" },
-          { name: "Attendance", href: "/pms/attendance" },
-        ],
+        children: pmsNavChildren("/pms", { staffOnly: true }),
       },
       {
         name: "Accounts",

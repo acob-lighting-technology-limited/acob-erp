@@ -61,6 +61,7 @@ import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion } from "framer-motion"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
+import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import {
@@ -145,19 +146,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       href: `${base}/hr/pms`,
       icon: TrendingUp,
       roles: [],
-      children: [
-        { name: "Analytics", href: `${base}/hr/pms/analytics` },
-        { name: "Cycles", href: `${base}/hr/pms/cycles` },
-        { name: "Goals", href: `${base}/hr/pms/goals` },
-        { name: "KPI", href: `${base}/hr/pms/kpi` },
-        { name: "Reviews", href: `${base}/hr/pms/reviews` },
-        { name: "Peer Feedback", href: `${base}/hr/pms/peer-feedback` },
-        { name: "Development Plans", href: `${base}/hr/pms/development-plans` },
-        { name: "Behaviour", href: `${base}/hr/pms/behaviour` },
-        { name: "Competencies", href: `${base}/hr/pms/competencies` },
-        { name: "CBT", href: `${base}/hr/pms/cbt` },
-        { name: "Attendance", href: `${base}/hr/pms/attendance` },
-      ],
+      children: pmsNavChildren(`${base}/hr/pms`),
     },
     {
       section: "management",
@@ -323,19 +312,7 @@ const adminNavigation: NavItem[] = [
     href: "/admin/hr/pms",
     icon: TrendingUp,
     roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Analytics", href: "/admin/hr/pms/analytics" },
-      { name: "Cycles", href: "/admin/hr/pms/cycles" },
-      { name: "Goals", href: "/admin/hr/pms/goals" },
-      { name: "KPI", href: "/admin/hr/pms/kpi" },
-      { name: "Reviews", href: "/admin/hr/pms/reviews" },
-      { name: "Peer Feedback", href: "/admin/hr/pms/peer-feedback" },
-      { name: "Development Plans", href: "/admin/hr/pms/development-plans" },
-      { name: "Behaviour", href: "/admin/hr/pms/behaviour" },
-      { name: "Competencies", href: "/admin/hr/pms/competencies" },
-      { name: "CBT", href: "/admin/hr/pms/cbt" },
-      { name: "Attendance", href: "/admin/hr/pms/attendance" },
-    ],
+    children: pmsNavChildren("/admin/hr/pms"),
   },
   {
     // Finance only. Purchasing, Inventory and Assets used to hang off this item
