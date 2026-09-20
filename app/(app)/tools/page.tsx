@@ -59,7 +59,7 @@ const tools = [
   {
     name: "Media & PDF Suite",
     description: "Download, convert, compress media, and manage PDF documents",
-    href: "/tools/test",
+    href: "/tools/media",
     icon: Video,
     tag: "Utility",
     subLabel: "PDF & media tools",

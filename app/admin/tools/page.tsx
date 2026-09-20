@@ -31,7 +31,7 @@ const tools = [
   {
     name: "Media & PDF Suite",
     description: "Download, convert, compress media, and manage PDF documents",
-    href: "/tools/test",
+    href: "/tools/media",
     icon: Video,
     color: "text-indigo-500",
     bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
