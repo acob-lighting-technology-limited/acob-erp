@@ -177,6 +177,8 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/payroll")) return "payroll.main"
   if (pathname.startsWith("/admin/hr/payroll")) return "payroll.main"
   if (pathname.startsWith("/admin/hr/employees/payroll")) return "payroll.main"
+  // Must stay above the /admin/hr fallthrough below.
+  if (pathname.startsWith("/admin/hr/job-descriptions")) return "jobdescriptions.main"
   if (pathname.startsWith("/admin/hr/pms/cbt/question")) return "hr.pms.cbt.manage"
   if (/^\/admin\/hr\/pms\/cbt\/[^/]+$/.test(pathname)) return "hr.pms.cbt.manage"
   if (pathname.startsWith("/admin/hr/pms")) return "hr.pms"

@@ -299,7 +299,7 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Employees", href: "/admin/hr/employees" },
       { name: "Departments", href: "/admin/hr/departments" },
-      { name: "Job Descriptions", href: "/admin/job-descriptions" },
+      { name: "Job Descriptions", href: "/admin/hr/job-descriptions" },
       { name: "Attendance", href: "/admin/hr/attendance" },
       { name: "Leave", href: "/admin/hr/leave" },
       { name: "Lunch Register", href: "/admin/hr/lunch" },
