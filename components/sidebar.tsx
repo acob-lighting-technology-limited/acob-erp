@@ -120,7 +120,7 @@ const navigationSections: NavSectionDef[] = [
           { name: "Attendance", href: "/attendance" },
           { name: "Leave", href: "/leave" },
           { name: "Lunch", href: "/lunch" },
-          { name: "Shared Resources", href: "/resources" },
+          { name: "Resource Booking", href: "/resources" },
         ],
       },
       {

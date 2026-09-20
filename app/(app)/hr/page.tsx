@@ -55,7 +55,7 @@ export default async function HrPage() {
       hoverText: "group-hover:text-orange-500",
     },
     {
-      title: "Shared Resources",
+      title: "Resource Booking",
       description: "Reserve pool vehicles, conference rooms, and company facilities for official tasks.",
       href: "/resources",
       icon: Car,
