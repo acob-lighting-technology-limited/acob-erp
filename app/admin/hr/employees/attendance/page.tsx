@@ -1,7 +1,6 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { AttendanceReportsPage } from "@/app/admin/hr/attendance/view"
-
-export default function AttendancePage() {
-  return <AttendanceReportsPage />
+/** Canonical route is /admin/hr/attendance, which owns the hr.attendance key. */
+export default function Page() {
+  redirect("/admin/hr/attendance")
 }

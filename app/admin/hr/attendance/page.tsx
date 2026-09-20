@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation"
+"use client"
 
-export default function Page() {
-  redirect("/admin/hr/employees/attendance")
+import { AttendanceReportsPage } from "./view"
+
+export default function AttendancePage() {
+  return <AttendanceReportsPage />
 }

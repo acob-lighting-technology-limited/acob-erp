@@ -182,6 +182,9 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/hr/pms")) return "hr.pms"
   if (pathname.startsWith("/admin/hr/leave")) return "hr.leave"
   if (pathname.startsWith("/admin/hr/attendance")) return "hr.attendance"
+  // Legacy path, now a redirect stub. Resolved here so the stub gates the same
+  // way as the route it forwards to, rather than falling through to hr.main.
+  if (pathname.startsWith("/admin/hr/employees/attendance")) return "hr.attendance"
   // Fleet and Resources are the same "Resource Booking" feature — both gate on hr.fleet.
   if (pathname.startsWith("/admin/hr/fleet")) return "hr.fleet"
   if (pathname.startsWith("/admin/hr/resources")) return "hr.fleet"
