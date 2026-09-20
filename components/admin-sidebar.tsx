@@ -182,7 +182,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       children: [{ name: "Issues", href: `${base}/assets/issues` }],
     },
     {
-      section: "management",
+      section: "operations",
       name: "Tasks",
       href: `${base}/tasks`,
       icon: ClipboardList,
@@ -361,7 +361,9 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
   },
   {
-    section: "management",
+    // Operations, not Management: tasks are day-to-day work, and the staff shell
+    // has always listed them there.
+    section: "operations",
     name: "Tasks",
     href: "/admin/tasks",
     icon: ClipboardList,

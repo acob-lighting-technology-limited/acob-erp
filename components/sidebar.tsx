@@ -95,13 +95,15 @@ type NavItemDef = {
 type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
 
 /**
- * Section keys/labels mirror the admin + dept sidebars so the same feature sits
- * under the same heading on every surface.
+ * Section keys and labels match adminSections in admin-sidebar.tsx, so the same
+ * feature sits under the same heading on every surface. Keep them in step: the
+ * staff shell has no Compliance section, but the sections it does have use the
+ * same keys and the same order.
  */
 const navigationSections: NavSectionDef[] = [
   {
-    key: "workspace",
-    label: "Workspace",
+    key: "overview",
+    label: "Overview",
     items: [
       { name: "Dashboard", href: "/profile", icon: LayoutDashboard },
       { name: "Directory", href: "/directory", icon: Users },
@@ -387,7 +389,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
         {visibleSections.map((section) => (
           <div key={section.key} className="space-y-0.5">
             {isCollapsed ? (
-              section.key !== "workspace" && <div className="mx-1.5 my-1.5 border-t" />
+              section.key !== "overview" && <div className="mx-1.5 my-1.5 border-t" />
             ) : (
               <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
             )}
