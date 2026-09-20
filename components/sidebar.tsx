@@ -235,10 +235,6 @@ const CBT_NAV_ITEM: NavItemDef = {
   description: "Computer Based Test — sit the test",
   href: "/cbt",
   icon: Brain,
-  children: [
-    { name: "Sign in with password", href: "/cbt" },
-    { name: "Verify by identity", href: "/cbt/identity", description: "Last name and date of birth" },
-  ],
 }
 
 const allNavItems: NavItemDef[] = navigationSections.flatMap((section) => section.items)

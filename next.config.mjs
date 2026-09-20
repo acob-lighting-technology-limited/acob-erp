@@ -233,7 +233,12 @@ const nextConfig = {
       },
       {
         source: "/cbt2",
-        destination: "/cbt/identity",
+        destination: "/cbt?verify=identity",
+        permanent: true,
+      },
+      {
+        source: "/cbt/identity",
+        destination: "/cbt?verify=identity",
         permanent: true,
       },
       {
