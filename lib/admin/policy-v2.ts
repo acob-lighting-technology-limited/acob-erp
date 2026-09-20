@@ -179,8 +179,14 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/hr/employees/payroll")) return "payroll.main"
   // Must stay above the /admin/hr fallthrough below.
   if (pathname.startsWith("/admin/hr/job-descriptions")) return "jobdescriptions.main"
+  // PMS is its own console at /admin/pms. The /admin/hr/pms paths are the
+  // pre-move URLs, redirected in next.config.mjs, and resolve identically so a
+  // stale link is gated the same way. Both must stay above the /admin/hr
+  // fallthrough below.
+  if (pathname.startsWith("/admin/pms/cbt/question")) return "hr.pms.cbt.manage"
   if (pathname.startsWith("/admin/hr/pms/cbt/question")) return "hr.pms.cbt.manage"
-  if (/^\/admin\/hr\/pms\/cbt\/[^/]+$/.test(pathname)) return "hr.pms.cbt.manage"
+  if (/^\/admin\/(?:hr\/)?pms\/cbt\/[^/]+$/.test(pathname)) return "hr.pms.cbt.manage"
+  if (pathname.startsWith("/admin/pms")) return "hr.pms"
   if (pathname.startsWith("/admin/hr/pms")) return "hr.pms"
   if (pathname.startsWith("/admin/hr/leave")) return "hr.leave"
   if (pathname.startsWith("/admin/hr/attendance")) return "hr.attendance"

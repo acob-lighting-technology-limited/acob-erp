@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
+import { PmsTablePage } from "@/app/admin/pms/_components/pms-table-page"
 import { computeIndividualPerformanceScore } from "@/lib/performance/scoring"
 import { computeAttendanceDay } from "@/lib/hr/attendance-ssot"
 import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"

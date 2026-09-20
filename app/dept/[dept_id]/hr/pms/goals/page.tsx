@@ -3,7 +3,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
-import { AdminGoalsContent } from "@/app/admin/hr/pms/goals/admin-goals-content"
+import { AdminGoalsContent } from "@/app/admin/pms/goals/admin-goals-content"
 import type { Goal } from "@/app/(app)/goals/page"
 
 type GoalWithCycle = Goal & {

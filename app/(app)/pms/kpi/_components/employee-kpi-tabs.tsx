@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { BarChart2, Building2, Target } from "lucide-react"
-import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
+import { PmsTablePage } from "@/app/admin/pms/_components/pms-table-page"
 import type { DataTableTab } from "@/components/ui/data-table"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
 import type { ReviewCycleOption } from "@/app/(app)/pms/_lib"

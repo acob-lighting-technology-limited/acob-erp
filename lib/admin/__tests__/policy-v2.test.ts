@@ -111,8 +111,8 @@ test("admin global context cannot access audit logs", () => {
 test("route resolver maps critical override routes", () => {
   assert.equal(resolveAdminRouteKeyV2("/admin/audit-logs"), "auditlogs.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/communications/meetings/mail"), "communications.meetings")
-  assert.equal(resolveAdminRouteKeyV2("/admin/hr/pms/cbt/question"), "hr.pms.cbt.manage")
-  assert.equal(resolveAdminRouteKeyV2("/admin/hr/pms/cbt/abc123"), "hr.pms.cbt.manage")
+  assert.equal(resolveAdminRouteKeyV2("/admin/pms/cbt/question"), "hr.pms.cbt.manage")
+  assert.equal(resolveAdminRouteKeyV2("/admin/pms/cbt/abc123"), "hr.pms.cbt.manage")
   // Leave & Attendance are split out of hr.main; Resources folds into the Resource Booking grant (hr.fleet).
   assert.equal(resolveAdminRouteKeyV2("/admin/hr/leave"), "hr.leave")
   assert.equal(resolveAdminRouteKeyV2("/admin/hr/attendance"), "hr.attendance")
@@ -175,4 +175,20 @@ test("security routes are grantable to a plain admin", () => {
   assert.equal(canAccessRouteV2(adminSecurityContext, "security.networkActivity"), true)
   assert.equal(canAccessRouteV2(adminSecurityContext, "security.bypassOverride"), true)
   assert.equal(canAccessRouteV2(leadContext, "security.networkActivity"), false)
+})
+
+test("resolveAdminRouteKeyV2: PMS resolves the same at /admin/pms and the legacy /admin/hr/pms", () => {
+  assert.equal(resolveAdminRouteKeyV2("/admin/pms"), "hr.pms")
+  assert.equal(resolveAdminRouteKeyV2("/admin/pms/goals"), "hr.pms")
+  assert.equal(resolveAdminRouteKeyV2("/admin/hr/pms"), "hr.pms")
+  assert.equal(resolveAdminRouteKeyV2("/admin/hr/pms/goals"), "hr.pms")
+  // The CBT management carve-out applies on both spellings.
+  assert.equal(resolveAdminRouteKeyV2("/admin/pms/cbt/question"), "hr.pms.cbt.manage")
+  assert.equal(resolveAdminRouteKeyV2("/admin/hr/pms/cbt/question"), "hr.pms.cbt.manage")
+  assert.equal(resolveAdminRouteKeyV2("/admin/pms/cbt/some-cycle"), "hr.pms.cbt.manage")
+  assert.equal(resolveAdminRouteKeyV2("/admin/hr/pms/cbt/some-cycle"), "hr.pms.cbt.manage")
+  // The plain CBT list is not the management surface.
+  assert.equal(resolveAdminRouteKeyV2("/admin/pms/cbt"), "hr.pms")
+  // Moving PMS out must not have shadowed the HR fallthrough.
+  assert.equal(resolveAdminRouteKeyV2("/admin/hr/employees"), "hr.main")
 })

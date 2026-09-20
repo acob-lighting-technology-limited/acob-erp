@@ -1,5 +1,5 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
-import { AdminPeerFeedbackPage as AdminPmsPeerFeedbackPage } from "@/app/admin/hr/pms/peer-feedback/view"
+import { AdminPeerFeedbackPage as AdminPmsPeerFeedbackPage } from "@/app/admin/pms/peer-feedback/view"
 
 interface Props {
   params: Promise<{ dept_id: string }>

@@ -137,6 +137,16 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/admin/hr/pms",
+        destination: "/admin/pms",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/pms/:path*",
+        destination: "/admin/pms/:path*",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

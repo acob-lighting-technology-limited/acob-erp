@@ -4,7 +4,7 @@ import { useState } from "react"
 import { BarChart2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
-import { PmsMetricTabsPage } from "@/app/admin/hr/pms/_components/pms-metric-tabs-page"
+import { PmsMetricTabsPage } from "@/app/admin/pms/_components/pms-metric-tabs-page"
 
 interface DeptPmsKpiViewProps {
   deptId: string

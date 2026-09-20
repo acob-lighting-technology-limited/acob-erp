@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PmsTablePage } from "@/app/admin/hr/pms/_components/pms-table-page"
+import { PmsTablePage } from "@/app/admin/pms/_components/pms-table-page"
 import { formatCycleLabel } from "@/lib/pms/cadence"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { getCurrentUserPmsData } from "../_lib"

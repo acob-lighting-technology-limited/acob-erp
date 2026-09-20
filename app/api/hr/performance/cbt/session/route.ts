@@ -568,7 +568,7 @@ export async function PATCH(request: NextRequest) {
     // they're targeted at specific candidates for fun, not part of the real
     // assessment, so they shouldn't move an actual performance evaluation.
     // Tracked in cbt_details and reviewed separately at
-    // /admin/hr/pms/cbt/extra/scores.
+    // /admin/pms/cbt/extra/scores.
     const bonusQuestionIds = (questions || []).filter((q) => q.is_bonus).map((q) => q.id)
     const bonusTotalQuestions = bonusQuestionIds.length
     const bonusCorrectAnswers = bonusQuestionIds.reduce((count, questionId) => {

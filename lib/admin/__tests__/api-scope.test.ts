@@ -105,7 +105,7 @@ test("readDeptContextId: ignores Referer on a router prefetch", () => {
 })
 
 test("readDeptContextId: non-dept Referer yields no context", () => {
-  const h = new Headers({ referer: `${ORIGIN}/admin/hr/pms/behaviour`, "sec-fetch-dest": "empty" })
+  const h = new Headers({ referer: `${ORIGIN}/admin/pms/behaviour`, "sec-fetch-dest": "empty" })
   assert.equal(readDeptContextId(h), null)
 })
 
