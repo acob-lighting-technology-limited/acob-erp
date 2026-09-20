@@ -111,7 +111,20 @@ interface AdminSidebarProps {
 /**
  * Builds dept-scoped navigation for the /dept/[deptId]/ shell.
  * Hrefs point to /dept/[id]/... so clicking a nav item stays in the dept shell.
- * Only the pages that exist in the dept surface are included.
+ *
+ * What belongs here: the admin nav, minus anything org-wide. A department lead
+ * manages their own department, so a domain is included when it can be
+ * meaningfully scoped to one department and left out when it cannot. That is
+ * why HR is here but its Departments child is not, and why these are absent:
+ *
+ *  - Settings, System & Security, Developer — org-wide by definition.
+ *  - Notifications, Events, Tools, Corporate Services — single org-wide
+ *    consoles with nothing department-shaped to scope to.
+ *  - Portfolios, Projects, Purchasing, Inventory — cross-department by nature;
+ *    a portfolio or a purchase order does not belong to one department.
+ *
+ * Add a domain here only once its pages exist under /dept/[dept_id]/ and its
+ * queries are scoped by requireDeptScope.
  */
 function buildDeptNavigation(deptId: string): NavItem[] {
   const base = `/dept/${deptId}`

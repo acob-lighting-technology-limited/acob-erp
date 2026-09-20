@@ -112,6 +112,9 @@ const navigationSections: NavSectionDef[] = [
     items: [
       { name: "Dashboard", href: "/profile", icon: LayoutDashboard },
       { name: "Directory", href: "/directory", icon: BookUser },
+      // "Calendar" here, "Events" on the admin sidebar — same EventsWorkspace
+      // component, deliberately different names. Staff see what they can attend;
+      // admins plan what the company runs.
       { name: "Calendar", href: "/calendar", icon: CalendarDays },
     ],
   },
