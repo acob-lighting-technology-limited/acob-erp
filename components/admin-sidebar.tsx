@@ -273,6 +273,12 @@ type NavItem = {
   retargeted?: boolean
 }
 
+/**
+ * Management runs people -> performance -> money -> procurement and stock ->
+ * delivery -> governance, and Operations runs day-to-day work first, then the
+ * things that report on it. navigationSections in sidebar.tsx lists the same
+ * items in the same relative order; keep them in step.
+ */
 const adminNavigation: NavItem[] = [
   {
     section: "overview",
@@ -330,35 +336,6 @@ const adminNavigation: NavItem[] = [
       { name: "CBT", href: "/admin/hr/pms/cbt" },
       { name: "Attendance", href: "/admin/hr/pms/attendance" },
     ],
-  },
-  {
-    section: "management",
-    name: "Corporate Services",
-    href: "/admin/corporate-services",
-    icon: Briefcase,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
-      { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
-    ],
-  },
-  {
-    section: "management",
-    name: "Portfolios",
-    href: "/admin/portfolios",
-    icon: Layers,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    // Sibling of Portfolios, not a child of it. They are separate consoles with
-    // separate route keys (portfolios.main / projects.main); the old wrapper
-    // listed Portfolios as its own first child, so parent and child led to the
-    // same page.
-    section: "management",
-    name: "Projects",
-    href: "/admin/projects",
-    icon: FolderKanban,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     // Operations, not Management: tasks are day-to-day work, and the staff shell
@@ -419,6 +396,35 @@ const adminNavigation: NavItem[] = [
     icon: Package,
     roles: ["developer", "super_admin", "admin"],
     children: [{ name: "Issues", href: "/admin/assets/issues" }],
+  },
+  {
+    section: "management",
+    name: "Portfolios",
+    href: "/admin/portfolios",
+    icon: Layers,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    // Sibling of Portfolios, not a child of it. They are separate consoles with
+    // separate route keys (portfolios.main / projects.main); the old wrapper
+    // listed Portfolios as its own first child, so parent and child led to the
+    // same page.
+    section: "management",
+    name: "Projects",
+    href: "/admin/projects",
+    icon: FolderKanban,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "management",
+    name: "Corporate Services",
+    href: "/admin/corporate-services",
+    icon: Briefcase,
+    roles: ["developer", "super_admin", "admin"],
+    children: [
+      { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
+      { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
+    ],
   },
   {
     section: "operations",
