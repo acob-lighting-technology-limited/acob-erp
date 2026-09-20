@@ -127,12 +127,12 @@ const navigationSections: NavSectionDef[] = [
         href: "/hr",
         icon: Users,
         children: [
-          { name: "Attendance", href: "/attendance" },
-          { name: "Leave", href: "/leave" },
+          { name: "Attendance", href: "/hr/attendance" },
+          { name: "Leave", href: "/hr/leave" },
           // "Lunch" here, "Lunch Register" on the admin sidebar — deliberately
           // different. Staff vote on the menu; admin marks who ate.
-          { name: "Lunch", href: "/lunch" },
-          { name: "Resource Booking", href: "/resources" },
+          { name: "Lunch", href: "/hr/lunch" },
+          { name: "Resource Booking", href: "/hr/resources" },
         ],
       },
       {

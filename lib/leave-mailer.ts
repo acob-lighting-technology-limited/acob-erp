@@ -76,7 +76,7 @@ function buildDetailsCard(title: string, details?: LeaveWorkflowDetail[]): strin
 }
 
 function buildEmailHtml(payload: Omit<LeaveWorkflowEmailPayload, "to" | "subject">) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://matrix.acoblighting.com"}${payload.ctaPath || "/leave"}`
+  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://matrix.acoblighting.com"}${payload.ctaPath || "/hr/leave"}`
   const buttonLabel = payload.ctaLabel || "Open Leave Portal"
 
   const badgeHtml = payload.badgeText

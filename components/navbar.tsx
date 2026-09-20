@@ -219,13 +219,13 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/leave" className="cursor-pointer">
+              <Link href="/hr/leave" className="cursor-pointer">
                 <Calendar className="mr-2 h-4 w-4" />
                 Leave
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/attendance" className="cursor-pointer">
+              <Link href="/hr/attendance" className="cursor-pointer">
                 <Clock className="mr-2 h-4 w-4" />
                 Attendance
               </Link>
@@ -420,7 +420,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             Help Desk
           </Link>
           <Link
-            href="/leave"
+            href="/hr/leave"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
               isAdminMode
@@ -432,7 +432,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             Leave
           </Link>
           <Link
-            href="/attendance"
+            href="/hr/attendance"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
               isAdminMode

@@ -255,7 +255,7 @@ export async function notifyAttendanceInApp(client: NotifyClient, params: Notify
       p_title: "Attendance Record Updated",
       p_message: message,
       p_priority: "normal",
-      p_link_url: "/attendance",
+      p_link_url: "/hr/attendance",
       p_actor_id: params.actorId,
       p_entity_type: "attendance_record",
       p_entity_id: params.entityId ?? null,

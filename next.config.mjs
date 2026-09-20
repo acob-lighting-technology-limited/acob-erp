@@ -157,6 +157,36 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/attendance",
+        destination: "/hr/attendance",
+        permanent: true,
+      },
+      {
+        source: "/leave",
+        destination: "/hr/leave",
+        permanent: true,
+      },
+      {
+        source: "/leave/:path*",
+        destination: "/hr/leave/:path*",
+        permanent: true,
+      },
+      {
+        source: "/lunch",
+        destination: "/hr/lunch",
+        permanent: true,
+      },
+      {
+        source: "/resources",
+        destination: "/hr/resources",
+        permanent: true,
+      },
+      {
+        source: "/fleet",
+        destination: "/hr/resources",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

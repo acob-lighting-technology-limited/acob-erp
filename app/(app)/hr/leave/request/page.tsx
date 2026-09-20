@@ -144,7 +144,7 @@ export default function LeaveRequestPage() {
     },
     onSuccess: () => {
       toast.success("Leave request submitted")
-      router.push("/leave")
+      router.push("/hr/leave")
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "An error occurred")
@@ -161,7 +161,7 @@ export default function LeaveRequestPage() {
       <PageHeader
         title="Submit Leave Request"
         description="Reliever approval is required before supervisor and HR review."
-        backLink={{ href: "/leave", label: "Back to leave management" }}
+        backLink={{ href: "/hr/leave", label: "Back to leave management" }}
       />
 
       <Card>

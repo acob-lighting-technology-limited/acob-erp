@@ -447,7 +447,7 @@ export async function GET(request: NextRequest) {
           ? `/admin/hr/leave/approve?requestId=${id}`
           : tier === "lead"
             ? `/dept/${scope.primaryDeptId}/hr/leave`
-            : `/leave`
+            : `/hr/leave`
       results.push({
         id,
         type: "leave",

@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const od = getOneDriveService()
-      const filePath = `/attendance/selfies/${yyyy}/${mm}/${user.id}-${today}-out.jpg`
+      const filePath = `/hr/attendance/selfies/${yyyy}/${mm}/${user.id}-${today}-out.jpg`
       const result = await od.uploadFile(filePath, selfieBuffer, "image/jpeg")
       selfieOutUrl = (result as { webUrl?: string }).webUrl ?? null
     } catch (odErr) {

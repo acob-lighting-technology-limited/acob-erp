@@ -1,4 +1,4 @@
-import { FleetContent } from "../fleet/fleet-content"
+import { FleetContent } from "./fleet-content"
 
 export default function ResourcesPage() {
   return <FleetContent />

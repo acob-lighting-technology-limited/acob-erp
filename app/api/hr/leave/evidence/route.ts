@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest) {
         title: "Leave request ready for approval",
         message: "Required evidence has been completed. The leave request has entered approval workflow.",
         actorId: user.id,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         entityId: leave_request_id,
         emailEvent: "ready_for_approval",
       })

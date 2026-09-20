@@ -75,7 +75,7 @@ export function NeedsAttention({
       description: overdueTasks > 0 ? "Needs immediate action" : "All caught up",
     },
     {
-      href: "/leave",
+      href: "/hr/leave",
       hint: "Your annual leave days remaining for this year",
       title: "Leave Left",
       value: `${annualLeaveRemaining}d`,

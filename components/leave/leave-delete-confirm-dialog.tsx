@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import type { LeaveRequest } from "@/app/(app)/leave/page"
+import type { LeaveRequest } from "@/app/(app)/hr/leave/page"
 
 interface LeaveDeleteConfirmDialogProps {
   request: LeaveRequest | null

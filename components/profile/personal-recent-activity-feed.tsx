@@ -33,9 +33,9 @@ const activityRouteMap: Record<string, string> = {
   assets: "/assets",
   asset_assignment: "/assets",
   asset_assignments: "/assets",
-  attendance: "/attendance",
-  leave_request: "/leave",
-  leave_requests: "/leave",
+  attendance: "/hr/attendance",
+  leave_request: "/hr/leave",
+  leave_requests: "/hr/leave",
   payment: "/payments",
   payments: "/payments",
 }

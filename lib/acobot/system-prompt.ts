@@ -20,7 +20,7 @@ export interface AcobotPromptContext {
   isDepartmentLead?: boolean
   /** Whether the user has any admin-level access. */
   isAdminLike?: boolean
-  /** The page the user is currently on, e.g. "/leave" or "/admin/hr/employees". */
+  /** The page the user is currently on, e.g. "/hr/leave" or "/admin/hr/employees". */
   currentPath?: string | null
 }
 
@@ -107,8 +107,11 @@ const DEPT_PAGE_DESCRIPTIONS: Array<[string, string]> = [
 ]
 
 const STAFF_PAGE_DESCRIPTIONS: Array<[string, string]> = [
-  ["/leave", "Leave — request leave, view your leave balances, track approval status, and see your request history."],
-  ["/attendance", "Attendance — your daily clock-in/out records, lateness flags, and monthly attendance summary."],
+  [
+    "/hr/leave",
+    "Leave — request leave, view your leave balances, track approval status, and see your request history.",
+  ],
+  ["/hr/attendance", "Attendance — your daily clock-in/out records, lateness flags, and monthly attendance summary."],
   [
     "/tasks",
     "Tasks — tasks assigned to you (individual, group, or department). Post updates, mark complete, and view deadlines.",
@@ -347,7 +350,7 @@ Frame your guidance for this surface. If they ask "how do I do this?" or "what i
 6. You cannot perform actions (submit leave, close a ticket, clock in, add an employee). You answer and, where useful, point to the page where they can act.
 
 ## Linking rule (IMPORTANT)
-Whenever you point the user to a page, write it as a **clickable markdown link** using the route, e.g. \`[Leave](/leave)\`, \`[update your signature](/tools/signature)\`, \`[Assets](/assets)\`. NEVER write a bare page name like "go to Signature" or a bare path like \`/signature\` on its own — always wrap it as \`[label](/route)\` so the user can click it. Only link to routes from the list below.
+Whenever you point the user to a page, write it as a **clickable markdown link** using the route, e.g. \`[Leave](/hr/leave)\`, \`[update your signature](/tools/signature)\`, \`[Assets](/assets)\`. NEVER write a bare page name like "go to Signature" or a bare path like \`/signature\` on its own — always wrap it as \`[label](/route)\` so the user can click it. Only link to routes from the list below.
 
 ## Matrix modules and their real routes (only ever cite routes from this list)
 

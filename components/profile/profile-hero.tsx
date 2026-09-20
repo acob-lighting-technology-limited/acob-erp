@@ -110,7 +110,7 @@ function AttendanceChip({ attendance }: { attendance: AttendanceItem[] }) {
 
   return (
     <Link
-      href="/attendance"
+      href="/hr/attendance"
       className="bg-background/60 hover:bg-accent flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
       title="View attendance"
     >

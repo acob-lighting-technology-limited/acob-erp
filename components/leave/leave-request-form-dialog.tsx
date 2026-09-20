@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { CalendarDays, Plus, X } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
-import type { LeaveType, LeaveBalance } from "@/app/(app)/leave/page"
+import type { LeaveType, LeaveBalance } from "@/app/(app)/hr/leave/page"
 import {
   countWeekdays,
   getTodayLocalIsoDate,
@@ -84,7 +84,8 @@ function parseIsoLocalDate(value: string) {
 
 function formatSegmentLabel(segment: LeaveSegment, holidays: HolidaySet) {
   const days = countWeekdays(segment.start_date, segment.end_date, holidays)
-  const range = segment.start_date === segment.end_date ? segment.start_date : `${segment.start_date} to ${segment.end_date}`
+  const range =
+    segment.start_date === segment.end_date ? segment.start_date : `${segment.start_date} to ${segment.end_date}`
   return `${range} (${days} day${days === 1 ? "" : "s"} deducted)`
 }
 
@@ -221,7 +222,8 @@ export function LeaveRequestFormDialog({
     const range = endIso === pendingRangeStartIso ? pendingRangeStartIso : `${pendingRangeStartIso} to ${endIso}`
     const breakdown = segmentsBreakdown([{ start_date: pendingRangeStartIso, end_date: endIso }], holidaySet)
     const parts = [`${breakdown.workingDays} day${breakdown.workingDays === 1 ? "" : "s"} deducted`]
-    if (breakdown.weekendDays > 0) parts.push(`${breakdown.weekendDays} weekend day${breakdown.weekendDays === 1 ? "" : "s"} free`)
+    if (breakdown.weekendDays > 0)
+      parts.push(`${breakdown.weekendDays} weekend day${breakdown.weekendDays === 1 ? "" : "s"} free`)
     for (const holidayIso of breakdown.holidayDates) {
       parts.push(`${holidayNames.get(holidayIso) || "public holiday"} free`)
     }
@@ -341,7 +343,8 @@ export function LeaveRequestFormDialog({
                       department_approved: "bg-red-100 text-red-900 font-medium dark:bg-red-950/60 dark:text-red-300",
                       department_pending:
                         "bg-amber-100 text-amber-900 font-medium dark:bg-amber-950/60 dark:text-amber-300",
-                      committed: "bg-emerald-100 text-emerald-900 font-medium dark:bg-emerald-950/60 dark:text-emerald-300",
+                      committed:
+                        "bg-emerald-100 text-emerald-900 font-medium dark:bg-emerald-950/60 dark:text-emerald-300",
                       selected_range: "bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300",
                     }}
                     className="mx-auto"
@@ -450,8 +453,8 @@ export function LeaveRequestFormDialog({
                 ) : null}
                 {formData.segments.length === 0 ? (
                   <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
-                    No date ranges added yet. Pick dates on the calendar above and click &quot;Add range&quot;. Add
-                    more than one range for disjoint dates (e.g. 1st-3rd and 5th-7th).
+                    No date ranges added yet. Pick dates on the calendar above and click &quot;Add range&quot;. Add more
+                    than one range for disjoint dates (e.g. 1st-3rd and 5th-7th).
                   </p>
                 ) : (
                   <ul className="space-y-1.5">
