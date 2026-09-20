@@ -299,7 +299,6 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Employees", href: "/admin/hr/employees" },
       { name: "Departments", href: "/admin/hr/departments" },
-      { name: "Onboarding", href: "/admin/onboarding" },
       { name: "Job Descriptions", href: "/admin/job-descriptions" },
       { name: "Attendance", href: "/admin/hr/attendance" },
       { name: "Leave", href: "/admin/hr/leave" },
@@ -528,6 +527,10 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Users", href: "/admin/settings/users" },
+      // Lists every account and its sign-in state, and resolves to settings.main
+      // for exactly that reason. It sat under HR, where its visibility was
+      // controlled by a grant unrelated to the item it appeared beside.
+      { name: "Onboarding", href: "/admin/onboarding" },
       { name: "Roles", href: "/admin/settings/roles" },
       { name: "Company", href: "/admin/settings/company" },
       { name: "Attendance Policy", href: "/admin/settings/attendance" },
