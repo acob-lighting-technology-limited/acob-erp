@@ -57,18 +57,25 @@ export type AdminRouteKeyV2 =
   | "tools.main"
   | "unknown"
 
-/** Routes that can be explicitly granted to an admin user. Excludes system-only routes. */
+/**
+ * Routes that can be explicitly granted to an admin user. Excludes system-only
+ * routes, and routes no pathname ever resolves to.
+ *
+ * "hr.resources" and "finance.main" are deliberately absent: resolveAdminRouteKeyV2
+ * maps /admin/hr/resources to "hr.fleet" and /admin/finance to "accounts.main",
+ * so neither key was ever produced by a request. Granting one did nothing on its
+ * own. Both remain in AdminRouteKeyV2 and are still honoured as alternatives in
+ * canAccessRouteV2, so any grant made before this change keeps working.
+ */
 export const GRANTABLE_ADMIN_ROUTES: AdminRouteKeyV2[] = [
   "hr.main",
   "hr.fleet",
-  "hr.resources",
   "hr.leave",
   "hr.attendance",
   "hr.pms",
   "hr.pms.cbt.manage",
   "jobdescriptions.main",
   "accounts.main",
-  "finance.main",
   "payroll.main",
   "purchasing.main",
   "assets.main",
