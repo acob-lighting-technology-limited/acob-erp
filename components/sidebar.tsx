@@ -187,7 +187,7 @@ const navigationSections: NavSectionDef[] = [
               { name: "Challenges", href: "/reports/general-meeting/challenges" },
               { name: "KSS", href: "/reports/general-meeting/kss" },
               { name: "Minutes of Meeting", href: "/reports/general-meeting/minutes-of-meeting" },
-              { name: "Weekly Reports", href: "/reports/general-meeting/weekly-reports" },
+              { name: "Weekly", href: "/reports/general-meeting/weekly-reports" },
             ],
           },
         ],

@@ -234,7 +234,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       href: `${base}/reports`,
       icon: FileBarChart,
       roles: [],
-      children: [{ name: "Weekly Reports", href: `${base}/reports/weekly` }],
+      children: [{ name: "Weekly", href: `${base}/reports/weekly` }],
     },
   ]
 }
@@ -447,7 +447,7 @@ const adminNavigation: NavItem[] = [
           { name: "Challenges", href: "/admin/reports/general-meeting/challenges" },
           { name: "KSS", href: "/admin/reports/general-meeting/kss" },
           { name: "Minutes of Meeting", href: "/admin/reports/general-meeting/minutes-of-meeting" },
-          { name: "Weekly Reports", href: "/admin/reports/general-meeting/weekly-reports" },
+          { name: "Weekly", href: "/admin/reports/general-meeting/weekly-reports" },
           { name: "Records", href: "/admin/reports/general-meeting/records" },
         ],
       },
