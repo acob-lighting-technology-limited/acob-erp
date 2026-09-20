@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Bell,
-  Boxes,
   Briefcase,
   CalendarDays,
   ChevronsUpDown,
@@ -26,7 +25,6 @@ import {
   FileCode2,
   Megaphone,
   Package,
-  ShoppingCart,
   Wrench,
   ShieldCheck,
   FlaskConical,
@@ -332,9 +330,9 @@ const adminNavigation: NavItem[] = [
     children: pmsNavChildren("/admin/pms"),
   },
   {
-    // Finance only. Purchasing, Inventory and Assets used to hang off this item
-    // three levels deep; each is its own domain with its own top-level route and
-    // its own grantable route key, so each is now its own nav item.
+    // Accounts now also surfaces Purchasing and Inventory as nested groups
+    // so the financial workflow (accounts → purchase → stock) is one coherent
+    // node in the sidebar rather than three separate top-level items.
     section: "management",
     name: "Accounts",
     href: "/admin/accounts",
@@ -347,31 +345,25 @@ const adminNavigation: NavItem[] = [
       { name: "Invoices", href: "/admin/accounts/invoices" },
       { name: "Payroll", href: "/admin/payroll" },
       { name: "Finance Reports", href: "/admin/accounts/reports" },
-    ],
-  },
-  {
-    section: "management",
-    name: "Purchasing",
-    href: "/admin/purchasing",
-    icon: ShoppingCart,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Orders", href: "/admin/purchasing/orders" },
-      { name: "Receipts", href: "/admin/purchasing/receipts" },
-      { name: "Suppliers", href: "/admin/purchasing/suppliers" },
-    ],
-  },
-  {
-    section: "management",
-    name: "Inventory",
-    href: "/admin/inventory",
-    icon: Boxes,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Products", href: "/admin/inventory/products" },
-      { name: "Categories", href: "/admin/inventory/categories" },
-      { name: "Warehouses", href: "/admin/inventory/warehouses" },
-      { name: "Movements", href: "/admin/inventory/movements" },
+      {
+        name: "Purchasing",
+        href: "/admin/purchasing",
+        children: [
+          { name: "Orders", href: "/admin/purchasing/orders" },
+          { name: "Receipts", href: "/admin/purchasing/receipts" },
+          { name: "Suppliers", href: "/admin/purchasing/suppliers" },
+        ],
+      },
+      {
+        name: "Inventory",
+        href: "/admin/inventory",
+        children: [
+          { name: "Products", href: "/admin/inventory/products" },
+          { name: "Categories", href: "/admin/inventory/categories" },
+          { name: "Warehouses", href: "/admin/inventory/warehouses" },
+          { name: "Movements", href: "/admin/inventory/movements" },
+        ],
+      },
     ],
   },
   {

@@ -203,14 +203,6 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
   const birthdayLabel = formatBirthdayLabel(profile.birthday)
 
   const desigAndDept = [profile.designation, profile.department].filter(Boolean).join(" · ")
-  const employmentInfo = employmentDate ? `Employment Date: ${employmentDate}${tenure ? ` · ${tenure}` : ""}` : null
-  const confirmationInfo = confirmationDate
-    ? `Confirmation Date: ${confirmationDate}`
-    : profile.employment_date
-      ? "Probation (Pending Confirmation)"
-      : null
-
-  const identityLine = [profile.designation, profile.department, employmentInfo, confirmationInfo].filter(Boolean)
 
   const renderAvatar = (sizeClass: string) => (
     <div className="group relative shrink-0">
@@ -286,18 +278,44 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
                     Dept Lead
                   </Badge>
                 )}
+                {confirmationDate ? (
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+                  >
+                    Confirmed
+                  </Badge>
+                ) : profile.employment_date ? (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+                  >
+                    Probation (Pending Confirmation)
+                  </Badge>
+                ) : null}
               </div>
             </div>
           </div>
 
           {/* Full-width identity details */}
-          {(desigAndDept || employmentInfo || confirmationInfo) && (
-            <div className="space-y-0.5 pt-0.5 text-xs">
+          {(desigAndDept || employmentDate || confirmationDate) && (
+            <div className="space-y-1 pt-0.5 text-xs">
               {desigAndDept && <p className="text-foreground/90 text-sm font-medium">{desigAndDept}</p>}
-              {(employmentInfo || confirmationInfo) && (
-                <p className="text-muted-foreground">
-                  {[employmentInfo, confirmationInfo].filter(Boolean).join(" · ")}
-                </p>
+              {(employmentDate || confirmationDate) && (
+                <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+                  {employmentDate && (
+                    <span>
+                      Employment Date: <span className="text-foreground/80 font-medium">{employmentDate}</span>
+                      {tenure && <span className="text-muted-foreground ml-1">({tenure})</span>}
+                    </span>
+                  )}
+                  {employmentDate && confirmationDate && <span className="opacity-30">·</span>}
+                  {confirmationDate && (
+                    <span>
+                      Confirmed: <span className="text-foreground/80 font-medium">{confirmationDate}</span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -341,16 +359,42 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
                     Dept Lead
                   </Badge>
                 )}
+                {confirmationDate ? (
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-500/30 bg-emerald-500/10 text-xs font-medium text-emerald-700 dark:text-emerald-400"
+                  >
+                    Confirmed
+                  </Badge>
+                ) : profile.employment_date ? (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-700 dark:text-amber-400"
+                  >
+                    Probation (Pending Confirmation)
+                  </Badge>
+                ) : null}
               </div>
-              {identityLine.length > 0 && (
-                <p className="text-muted-foreground mt-2 flex flex-wrap gap-x-1.5 text-sm">
-                  {identityLine.map((part, i) => (
-                    <span key={i} className="flex items-center gap-1.5">
-                      {i > 0 && <span className="opacity-30">·</span>}
-                      {part}
+
+              {desigAndDept && (
+                <p className="text-foreground/90 mt-2 text-sm font-medium sm:text-base">{desigAndDept}</p>
+              )}
+
+              {(employmentDate || confirmationDate) && (
+                <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 text-xs sm:text-sm">
+                  {employmentDate && (
+                    <span>
+                      Employment Date: <span className="text-foreground/80 font-medium">{employmentDate}</span>
+                      {tenure && <span className="text-muted-foreground ml-1">({tenure})</span>}
                     </span>
-                  ))}
-                </p>
+                  )}
+                  {employmentDate && confirmationDate && <span className="opacity-30">·</span>}
+                  {confirmationDate && (
+                    <span>
+                      Confirmed: <span className="text-foreground/80 font-medium">{confirmationDate}</span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
