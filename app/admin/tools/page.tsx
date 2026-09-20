@@ -7,7 +7,7 @@ const tools = [
   {
     name: "Email Signature",
     description: "Generate professional employee email signatures",
-    href: "/tools/signature",
+    href: "/admin/tools/signature",
     icon: FileSignature,
     color: "text-blue-500",
     bgColor: "bg-blue-50 dark:bg-blue-950/30",
@@ -15,7 +15,7 @@ const tools = [
   {
     name: "10th Anniversary Signature",
     description: "Generate the temporary anniversary version of the employee email signature",
-    href: "/tools/signature-anniversary",
+    href: "/admin/tools/signature-anniversary",
     icon: FileSignature,
     color: "text-amber-600",
     bgColor: "bg-amber-50 dark:bg-amber-950/30",
@@ -23,7 +23,7 @@ const tools = [
   {
     name: "Watermark Studio",
     description: "Apply branded watermarks to uploaded media",
-    href: "/tools/watermark",
+    href: "/admin/tools/watermark",
     icon: Droplet,
     color: "text-teal-500",
     bgColor: "bg-teal-50 dark:bg-teal-950/30",
@@ -31,7 +31,7 @@ const tools = [
   {
     name: "Media & PDF Suite",
     description: "Download, convert, compress media, and manage PDF documents",
-    href: "/tools/media",
+    href: "/admin/tools/media",
     icon: Video,
     color: "text-indigo-500",
     bgColor: "bg-indigo-50 dark:bg-indigo-950/30",

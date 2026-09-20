@@ -511,6 +511,12 @@ const adminNavigation: NavItem[] = [
     href: "/admin/tools",
     icon: Wrench,
     roles: ["developer", "super_admin", "admin"],
+    children: [
+      { name: "Signature", href: "/admin/tools/signature" },
+      { name: "Signature Anniversary", href: "/admin/tools/signature-anniversary" },
+      { name: "Watermark", href: "/admin/tools/watermark" },
+      { name: "Media & PDF Suite", href: "/admin/tools/media" },
+    ],
   },
   {
     section: "operations",
