@@ -106,7 +106,7 @@ export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
               },
               context: {
                 source: "ui",
-                route: "/feedback",
+                route: "/tools/feedback",
               },
             },
             { failOpen: true }

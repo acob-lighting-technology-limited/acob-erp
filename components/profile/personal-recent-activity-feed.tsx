@@ -20,7 +20,7 @@ export interface PersonalRecentActivityItem {
 const activityRouteMap: Record<string, string> = {
   task: "/tasks",
   tasks: "/tasks",
-  feedback: "/feedback",
+  feedback: "/tools/feedback",
   profile: "/profile",
   profiles: "/profile",
   user_documentation: "/documentation/personal",

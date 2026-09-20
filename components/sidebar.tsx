@@ -216,7 +216,7 @@ const navigationSections: NavSectionDef[] = [
           { name: "My Job Description", href: "/tools/job-description" },
           { name: "Watermark", href: "/tools/watermark" },
           { name: "Media & PDF Suite", href: "/tools/media" },
-          { name: "Feedback", href: "/feedback" },
+          { name: "Feedback", href: "/tools/feedback" },
         ],
       },
     ],
@@ -233,9 +233,9 @@ const MD_DESK_NAV_ITEM: NavItemDef = {
   children: mdDeskNavChildren("/md-desk"),
 }
 
-const NAV_ROUTE_ALIASES: RouteAliases = {
-  "/tools": ["/feedback"],
-}
+// Feedback used to sit at /feedback and needed an alias to highlight Tools.
+// It is a real child of /tools now, so nothing here is aliased.
+const NAV_ROUTE_ALIASES: RouteAliases = {}
 
 export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
   const pathname = usePathname()

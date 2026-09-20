@@ -384,7 +384,7 @@ export async function notifyFeedbackResponse(params: {
     title: "Response to your feedback",
     message: params.responsePreview,
     priority: "normal",
-    linkUrl: `/feedback`,
+    linkUrl: `/tools/feedback`,
     actorId: params.responseBy,
     entityType: "feedback",
     entityId: params.feedbackId,

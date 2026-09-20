@@ -227,6 +227,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/feedback",
+        destination: "/tools/feedback",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

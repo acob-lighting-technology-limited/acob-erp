@@ -62,7 +62,7 @@ export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditMod
           },
           context: {
             source: "ui",
-            route: "/feedback",
+            route: "/tools/feedback",
           },
         },
         { failOpen: true }
