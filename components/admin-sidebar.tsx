@@ -255,7 +255,7 @@ function normalizeAdminRoutes(routes: string[] | null | undefined): AdminRouteKe
 }
 
 type NavSubChild = { name: string; href: string }
-type NavChild = { name: string; href: string; children?: NavSubChild[] }
+type NavChild = { name: string; href: string; children?: NavSubChild[]; retargeted?: boolean }
 type NavItem = {
   section: string
   name: string
@@ -263,6 +263,14 @@ type NavItem = {
   icon: React.ElementType
   roles: string[]
   children?: NavChild[]
+  /**
+   * The viewer cannot open this branch's own page, so `href` was retargeted to
+   * the first descendant they can reach. The expanded row then toggles instead
+   * of navigating — following it would land on a page whose name does not match
+   * the label. The collapsed rail still uses `href`, since toggling is not
+   * available there.
+   */
+  retargeted?: boolean
 }
 
 const adminNavigation: NavItem[] = [
@@ -748,6 +756,7 @@ export function AdminSidebar({
       kept.push({
         ...child,
         href: selfAllowed ? child.href : grandchildren![0].href,
+        retargeted: !selfAllowed,
         children: grandchildren?.length ? grandchildren : undefined,
       })
     }
@@ -761,7 +770,12 @@ export function AdminSidebar({
         const children = filterNavChildren(item.children)
         const selfAllowed = canAccessRoute(item.roles, item.href)
         if (!selfAllowed && !children) return acc
-        acc.push({ ...item, href: selfAllowed ? item.href : children![0].href, children })
+        acc.push({
+          ...item,
+          href: selfAllowed ? item.href : children![0].href,
+          retargeted: !selfAllowed,
+          children,
+        })
         return acc
       }, [])
 
@@ -867,14 +881,26 @@ export function AdminSidebar({
                         highlighted ? activeCls : inactiveCls
                       )}
                     >
-                      <Link
-                        href={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex flex-1 items-center gap-2.5 px-3 py-2"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="flex-1 overflow-hidden whitespace-nowrap">{item.name}</span>
-                      </Link>
+                      {item.retargeted ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(item.href)}
+                          className="flex flex-1 items-center gap-2.5 px-3 py-2 text-left"
+                          aria-expanded={isOpen}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1 overflow-hidden whitespace-nowrap">{item.name}</span>
+                        </button>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="flex flex-1 items-center gap-2.5 px-3 py-2"
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1 overflow-hidden whitespace-nowrap">{item.name}</span>
+                        </Link>
+                      )}
                       <button
                         onClick={() => toggleSection(item.href)}
                         className="flex items-center px-2 py-2"
@@ -936,13 +962,24 @@ export function AdminSidebar({
                                   childHighlighted ? activeCls : inactiveCls
                                 )}
                               >
-                                <Link
-                                  href={child.href}
-                                  onClick={() => setIsMobileMenuOpen(false)}
-                                  className="flex flex-1 items-center px-2 py-1.5"
-                                >
-                                  {child.name}
-                                </Link>
+                                {child.retargeted ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSubSection(child.href)}
+                                    className="flex flex-1 items-center px-2 py-1.5 text-left"
+                                    aria-expanded={isSubOpen}
+                                  >
+                                    {child.name}
+                                  </button>
+                                ) : (
+                                  <Link
+                                    href={child.href}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex flex-1 items-center px-2 py-1.5"
+                                  >
+                                    {child.name}
+                                  </Link>
+                                )}
                                 <button
                                   onClick={() => toggleSubSection(child.href)}
                                   className="flex items-center px-1.5 py-1.5"
