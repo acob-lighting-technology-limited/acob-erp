@@ -55,7 +55,7 @@ export default function AdminGeneralMeetingReportsPage() {
       subLabel: "Weekly presentations & slides",
     },
     {
-      title: "Minutes of Meeting",
+      title: "Minutes",
       description: "Upload and store weekly Minutes of Meeting PDFs for reference and mailing.",
       href: "/admin/reports/general-meeting/minutes-of-meeting",
       icon: Users,

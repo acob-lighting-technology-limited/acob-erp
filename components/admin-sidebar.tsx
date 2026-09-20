@@ -451,7 +451,7 @@ const adminNavigation: NavItem[] = [
           { name: "Action Tracker", href: "/admin/reports/general-meeting/action-tracker" },
           { name: "Challenges", href: "/admin/reports/general-meeting/challenges" },
           { name: "KSS", description: "Keep, Stop, Start", href: "/admin/reports/general-meeting/kss" },
-          { name: "Minutes of Meeting", href: "/admin/reports/general-meeting/minutes-of-meeting" },
+          { name: "Minutes", href: "/admin/reports/general-meeting/minutes-of-meeting" },
           { name: "Weekly", href: "/admin/reports/general-meeting/weekly-reports" },
           { name: "Records", href: "/admin/reports/general-meeting/records" },
         ],

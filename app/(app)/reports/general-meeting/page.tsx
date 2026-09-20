@@ -59,7 +59,7 @@ export default function PortalGeneralMeetingPage() {
       hoverText: "group-hover:text-indigo-500",
     },
     {
-      title: "Minutes of Meeting",
+      title: "Minutes",
       description: "Upload and access weekly Minutes of Meeting PDFs for future reference.",
       href: "/reports/general-meeting/minutes-of-meeting",
       icon: Users,
