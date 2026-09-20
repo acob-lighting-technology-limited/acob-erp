@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ClipboardList,
   FileCode2,
-  FileCheck2,
   FileBarChart,
   FileText,
   Landmark,
