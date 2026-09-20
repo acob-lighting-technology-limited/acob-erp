@@ -478,6 +478,15 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
+    // Sits between Documentation and the compliance block, matching where the
+    // dept shell puts it. Gated by its own feedback.main route key.
+    section: "operations",
+    name: "Feedback",
+    href: "/admin/feedback",
+    icon: MessageSquare,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
     section: "compliance",
     name: "System & Security",
     href: "/admin/audit-logs",
@@ -538,8 +547,6 @@ const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
   "/admin/finance": ["/admin/payments"],
   // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
   "/admin/corporate-services/scorecard": ["/admin/corporate-scorecard"],
-  // Tools — feedback is surfaced through tools.
-  "/admin/tools": ["/admin/feedback"],
 }
 
 function getRouteMatchLength(targetHref: string, pathname: string, deptId?: string): number {
