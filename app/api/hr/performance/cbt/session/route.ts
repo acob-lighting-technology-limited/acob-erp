@@ -259,6 +259,18 @@ export async function POST(request: NextRequest) {
       if (!isDobMatch) {
         return NextResponse.json({ error: "The date of birth entered does not match our records." }, { status: 400 })
       }
+
+      // Record the verification the same way the password branch does. This is
+      // the weaker of the two checks, so leaving it untraced meant the path
+      // most worth auditing was the one with no audit trail.
+      await writeLoginLog({
+        supabase,
+        headers: request.headers,
+        userId: profile.id,
+        authMethod: "dob",
+        source: REAUTH_SOURCE,
+        userEmail: company_email,
+      })
     }
 
     // 0. Check for existing submitted attempt
