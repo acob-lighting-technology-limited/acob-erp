@@ -209,7 +209,7 @@ const navigationSections: NavSectionDef[] = [
         children: [
           { name: "Signature", href: "/tools/signature" },
           { name: "Signature Anniversary", href: "/tools/signature-anniversary" },
-          { name: "Job Description", href: "/tools/job-description" },
+          { name: "My Job Description", href: "/tools/job-description" },
           { name: "Watermark", href: "/tools/watermark" },
           { name: "Media & PDF Suite", href: "/tools/media" },
           { name: "Feedback", href: "/feedback" },

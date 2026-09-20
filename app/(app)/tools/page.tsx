@@ -45,7 +45,7 @@ const tools = [
     hoverText: "group-hover:text-teal-500",
   },
   {
-    name: "Job Description",
+    name: "My Job Description",
     description: "View, edit, and print your job description from the tools workspace",
     href: "/tools/job-description",
     icon: Briefcase,
