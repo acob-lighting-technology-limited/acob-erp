@@ -5,8 +5,6 @@ import { MissingAvatarBanner } from "@/components/profile/missing-avatar-banner"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveDeptConsoles } from "@/lib/dept/consoles"
-import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { canAccessCbt, getCbtSettings, resolveCbtAccessScope } from "@/lib/cbt-config"
 import { redirect } from "next/navigation"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
@@ -35,13 +33,6 @@ export async function AppLayout({ children }: AppLayoutProps) {
   const deptConsoles = await resolveDeptConsoles(typedSupabase, profile)
   const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
 
-  // Sitting the test is a grant configured in /admin/settings/cbt, not a role,
-  // so resolve it the same way the /cbt layout and middleware do. Without this
-  // the nav would offer a link that bounces most people straight back out.
-  const cbtDb = getServiceRoleClientOrFallback(supabase)
-  const [cbtScope, cbtSettings] = await Promise.all([resolveCbtAccessScope(cbtDb, data.user.id), getCbtSettings(cbtDb)])
-  const showCbt = canAccessCbt(cbtScope, cbtSettings)
-
   const userData = {
     email: data.user.email,
     user_metadata: data.user.user_metadata,
@@ -55,7 +46,6 @@ export async function AppLayout({ children }: AppLayoutProps) {
         canAccessAdmin={canAccessAdmin}
         deptConsoles={deptConsoles}
         showMdDesk={isMdDeskMember === true}
-        showCbt={showCbt}
       />
       <SidebarContent>
         <MissingAvatarBanner hasAvatar={Boolean(profile?.avatar_path)} />
