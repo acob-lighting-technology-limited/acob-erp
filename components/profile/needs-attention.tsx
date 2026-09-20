@@ -93,7 +93,7 @@ export function NeedsAttention({
       description: openTickets > 0 ? "Awaiting resolution" : "No open tickets",
     },
     {
-      href: "/payments",
+      href: "/accounts/payments",
       hint: "Payments with status Due or Overdue",
       title: "Payments",
       value: duePayments,

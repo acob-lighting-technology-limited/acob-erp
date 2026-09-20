@@ -220,11 +220,17 @@ export function AssetsCard({ assets }: { assets: Asset[] }) {
   const visible = assets.slice(0, MAX_ASSETS)
 
   return (
-    <ListCard title="My Assets" icon={Package} count={assets.length} viewAllHref="/assets" viewAllLabel="All assets">
+    <ListCard
+      title="My Assets"
+      icon={Package}
+      count={assets.length}
+      viewAllHref="/accounts/assets"
+      viewAllLabel="All assets"
+    >
       {visible.length > 0 ? (
         <ul className="divide-y border-t">
           {visible.map((asset) => (
-            <Row key={`${asset.id}-${asset.assignment_type ?? "own"}`} href="/assets">
+            <Row key={`${asset.id}-${asset.assignment_type ?? "own"}`} href="/accounts/assets">
               <p className="truncate text-sm font-medium">
                 {asset.asset_type}
                 {asset.asset_model ? ` — ${asset.asset_model}` : ""}
@@ -264,7 +270,7 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
       title="Lunch History"
       icon={Utensils}
       count={thisMonthLogs.length}
-      viewAllHref="/payroll"
+      viewAllHref="/accounts/payroll"
       viewAllLabel={`${currentMonthName} Logs`}
     >
       <div className="bg-muted/30 flex items-center justify-between border-t border-b px-4 py-3 text-sm">

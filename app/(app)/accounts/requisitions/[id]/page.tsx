@@ -100,7 +100,7 @@ export default function RequisitionDetailPage({ params }: { params: Promise<{ id
         <h3 className="text-lg font-bold">Requisition Not Found</h3>
         <p className="text-muted-foreground text-xs">{error || "The requested requisition does not exist."}</p>
         <Button asChild variant="outline" size="sm">
-          <Link href="/requisitions" className="gap-2">
+          <Link href="/accounts/requisitions" className="gap-2">
             <ArrowLeft className="h-4 w-4" /> Back to Requisitions
           </Link>
         </Button>
@@ -113,7 +113,7 @@ export default function RequisitionDetailPage({ params }: { params: Promise<{ id
       {/* Header back button (Hidden on Print) */}
       <div className="flex items-center justify-between print:hidden">
         <Button variant="ghost" size="sm" asChild className="gap-2 text-xs">
-          <Link href="/requisitions">
+          <Link href="/accounts/requisitions">
             <ArrowLeft className="h-4 w-4" /> Back to Requisitions
           </Link>
         </Button>

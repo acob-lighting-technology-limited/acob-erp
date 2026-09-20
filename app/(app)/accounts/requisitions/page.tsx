@@ -126,7 +126,7 @@ export default function RequisitionListPage() {
       render: (r) => (
         <div className="flex flex-col gap-0.5">
           <Link
-            href={`/requisitions/${r.id}`}
+            href={`/accounts/requisitions/${r.id}`}
             className="font-mono font-bold text-emerald-700 hover:underline dark:text-emerald-400"
           >
             {r.requisition_number}
@@ -193,7 +193,7 @@ export default function RequisitionListPage() {
       render: (r) => <span className="text-muted-foreground text-xs">{formatWATDate(r.created_at)}</span>,
       initialWidth: 120,
     },
-    // No "Action" column: it held a second link to `/requisitions/[id]`, which the
+    // No "Action" column: it held a second link to `/accounts/requisitions/[id]`, which the
     // requisition number in the first column already is — and the row itself now
     // opens the form.
   ]
@@ -330,7 +330,7 @@ export default function RequisitionListPage() {
           // A requisition's detail is a whole form on its own route, so the row
           // navigates there rather than opening a sheet that could only ever show
           // a summary of it.
-          onSelect: (r) => router.push(`/requisitions/${r.id}`),
+          onSelect: (r) => router.push(`/accounts/requisitions/${r.id}`),
         }}
         emptyTitle="No requisitions"
         emptyDescription="Requisitions you raise or need to approve will appear here."
@@ -355,7 +355,7 @@ export default function RequisitionListPage() {
             <div className="border-border/40 flex items-center justify-between gap-2 border-t pt-2">
               <StageBadge requisition={r} />
               <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
-                <Link href={`/requisitions/${r.id}`}>View form</Link>
+                <Link href={`/accounts/requisitions/${r.id}`}>View form</Link>
               </Button>
             </div>
           </div>

@@ -284,7 +284,7 @@ export async function notifyAssetAssigned(params: {
     title: "New asset assigned to you",
     message: `${params.assetName} (${params.assetCode}) has been assigned to you`,
     priority: "normal",
-    linkUrl: `/assets`,
+    linkUrl: `/accounts/assets`,
     actorId: params.assignedBy,
     entityType: "asset",
     entityId: params.assetId,

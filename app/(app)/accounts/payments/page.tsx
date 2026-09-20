@@ -147,7 +147,7 @@ export default async function DepartmentPaymentsPage() {
       initialDepartments={paymentsData.departments}
       initialError={paymentsData.loadError}
       currentUser={paymentsData.currentUser}
-      basePath="/payments"
+      basePath="/accounts/payments"
     />
   )
 }

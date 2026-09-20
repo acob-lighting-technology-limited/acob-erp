@@ -187,6 +187,46 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/requisition",
+        destination: "/accounts/requisitions",
+        permanent: true,
+      },
+      {
+        source: "/requisition/:path*",
+        destination: "/accounts/requisitions/:path*",
+        permanent: true,
+      },
+      {
+        source: "/requisitions",
+        destination: "/accounts/requisitions",
+        permanent: true,
+      },
+      {
+        source: "/requisitions/:path*",
+        destination: "/accounts/requisitions/:path*",
+        permanent: true,
+      },
+      {
+        source: "/payments",
+        destination: "/accounts/payments",
+        permanent: true,
+      },
+      {
+        source: "/payments/:path*",
+        destination: "/accounts/payments/:path*",
+        permanent: true,
+      },
+      {
+        source: "/payroll",
+        destination: "/accounts/payroll",
+        permanent: true,
+      },
+      {
+        source: "/assets",
+        destination: "/accounts/assets",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

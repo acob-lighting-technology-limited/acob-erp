@@ -117,7 +117,7 @@ const STAFF_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "Tasks — tasks assigned to you (individual, group, or department). Post updates, mark complete, and view deadlines.",
   ],
   ["/help-desk", "Help Desk — raise a new support ticket or track your existing tickets."],
-  ["/assets", "Assets — equipment and devices currently assigned to you."],
+  ["/accounts/assets", "Assets — equipment and devices currently assigned to you."],
   [
     "/profile",
     "Profile — your personal details: name, designation, department, contact info, birthday, and address. Edit from here.",
@@ -126,7 +126,7 @@ const STAFF_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "/notifications",
     "Notifications — your alerts (approvals, task updates, asset events, mentions, announcements). NOT where you manage assets or tasks.",
   ],
-  ["/payments", "Payments — your payment history and payslips."],
+  ["/accounts/payments", "Payments — your payment history and payslips."],
   ["/correspondence", "Correspondence — official letters and memos sent to or from you."],
   ["/documentation", "Documentation & Resources — company documents, policies, and resources."],
   ["/pms", "PMS — your performance targets, behaviour self-assessment, peer feedback, and review cycle."],
@@ -228,7 +228,7 @@ function getAdminGuidance(path: string, isDeptConsole: boolean): string {
 - **Export**: Download any tab's data with the Export button.`
   }
 
-  if (p.includes("/assets")) {
+  if (p.includes("/accounts/assets")) {
     return `
 ## ${surface} — Assets page guidance
 - **Assigned To column**: Shows the assignee name for individual assignments, the department name for department-wide assignments, or the office name for office-wide assignments.
@@ -350,7 +350,7 @@ Frame your guidance for this surface. If they ask "how do I do this?" or "what i
 6. You cannot perform actions (submit leave, close a ticket, clock in, add an employee). You answer and, where useful, point to the page where they can act.
 
 ## Linking rule (IMPORTANT)
-Whenever you point the user to a page, write it as a **clickable markdown link** using the route, e.g. \`[Leave](/hr/leave)\`, \`[update your signature](/tools/signature)\`, \`[Assets](/assets)\`. NEVER write a bare page name like "go to Signature" or a bare path like \`/signature\` on its own — always wrap it as \`[label](/route)\` so the user can click it. Only link to routes from the list below.
+Whenever you point the user to a page, write it as a **clickable markdown link** using the route, e.g. \`[Leave](/hr/leave)\`, \`[update your signature](/tools/signature)\`, \`[Assets](/accounts/assets)\`. NEVER write a bare page name like "go to Signature" or a bare path like \`/signature\` on its own — always wrap it as \`[label](/route)\` so the user can click it. Only link to routes from the list below.
 
 ## Matrix modules and their real routes (only ever cite routes from this list)
 
