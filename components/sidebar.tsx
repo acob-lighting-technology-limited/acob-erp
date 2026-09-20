@@ -119,6 +119,8 @@ const navigationSections: NavSectionDef[] = [
         children: [
           { name: "Attendance", href: "/attendance" },
           { name: "Leave", href: "/leave" },
+          // "Lunch" here, "Lunch Register" on the admin sidebar — deliberately
+          // different. Staff vote on the menu; admin marks who ate.
           { name: "Lunch", href: "/lunch" },
           { name: "Resource Booking", href: "/resources" },
         ],
