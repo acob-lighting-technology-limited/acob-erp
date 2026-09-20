@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
   BookUser,
+  Brain,
   Briefcase,
   CalendarDays,
   ChevronsUpDown,
@@ -80,6 +81,8 @@ interface SidebarProps {
   deptConsoles?: DeptConsole[]
   /** The viewer is the MD or an MD's Desk delegate. */
   showMdDesk?: boolean
+  /** The viewer has been granted CBT access in /admin/settings/cbt. */
+  showCbt?: boolean
 }
 
 type NavItemDef = {
@@ -223,6 +226,21 @@ const navigationSections: NavSectionDef[] = [
   },
 ]
 
+// Grant-gated (configured in /admin/settings/cbt), so it is added per viewer
+// rather than listed in navigationSections — same pattern as MD's Desk.
+// It is a standalone surface outside the app shell, which is why it is its own
+// item rather than a child of PMS > CBT (that one is the viewer's results).
+const CBT_NAV_ITEM: NavItemDef = {
+  name: "CBT",
+  description: "Computer Based Test — sit the test",
+  href: "/cbt",
+  icon: Brain,
+  children: [
+    { name: "Sign in with password", href: "/cbt" },
+    { name: "Verify by identity", href: "/cbt/identity", description: "Last name and date of birth" },
+  ],
+}
+
 const allNavItems: NavItemDef[] = navigationSections.flatMap((section) => section.items)
 
 // Membership-gated (the MD + delegates), so it is added per viewer rather than listed in navigationSections.
@@ -237,7 +255,14 @@ const MD_DESK_NAV_ITEM: NavItemDef = {
 // It is a real child of /tools now, so nothing here is aliased.
 const NAV_ROUTE_ALIASES: RouteAliases = {}
 
-export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
+export function Sidebar({
+  user,
+  profile,
+  canAccessAdmin,
+  deptConsoles = [],
+  showMdDesk = false,
+  showCbt = false,
+}: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -363,9 +388,10 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
 
   const visibleSections: NavSectionDef[] = navigationSections.map((section) => {
     const items = section.items.filter((item) => !item.adminOnly || canAccessAdmin)
+    const withMdDesk = showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items
     return {
       ...section,
-      items: showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items,
+      items: showCbt && section.key === "operations" ? [...withMdDesk, CBT_NAV_ITEM] : withMdDesk,
     }
   })
 
