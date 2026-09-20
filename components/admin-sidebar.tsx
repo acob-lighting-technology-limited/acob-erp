@@ -131,7 +131,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
         // department, so the org-wide department list belongs to /admin only.
         { name: "Attendance", href: `${base}/hr/attendance` },
         { name: "Leave", href: `${base}/hr/leave` },
-        { name: "Rooms & Offices", href: `${base}/hr/office-location` },
+        { name: "Offices & Rooms", href: `${base}/hr/offices-rooms` },
       ],
     },
     {
@@ -304,7 +304,7 @@ const adminNavigation: NavItem[] = [
       { name: "Leave", href: "/admin/hr/leave" },
       { name: "Lunch Register", href: "/admin/hr/lunch" },
       { name: "Resource Booking", href: "/admin/hr/resources" },
-      { name: "Rooms & Offices", href: "/admin/hr/office-location" },
+      { name: "Offices & Rooms", href: "/admin/hr/offices-rooms" },
       { name: "Site Locations", href: "/admin/hr/site-locations" },
     ],
   },

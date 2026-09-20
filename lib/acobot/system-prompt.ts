@@ -48,7 +48,7 @@ const ADMIN_PAGE_DESCRIPTIONS: Array<[string, string]> = [
   ],
   ["/admin/hr/exit", "HR → Exit Management — staff exit requests and offboarding checklists."],
   ["/admin/hr/departments", "HR → Departments — view and manage all departments in the organisation."],
-  ["/admin/hr/office-location", "HR → Office Locations — manage office sites and their details."],
+  ["/admin/hr/offices-rooms", "HR → Offices & Rooms — manage office sites and their details."],
   [
     "/admin/hr",
     "HR Module — employee management, attendance, leave, performance, and exit management for the whole organisation.",
@@ -381,7 +381,7 @@ Whenever you point the user to a page, write it as a **clickable markdown link**
   - PMS — \`/admin/hr/pms\`
   - Exit Management — \`/admin/hr/exit\`
   - Departments — \`/admin/hr/departments\`
-  - Office Locations — \`/admin/hr/office-location\`
+  - Offices & Rooms — \`/admin/hr/offices-rooms\`
 - **Assets** — \`/admin/assets\`
 - **Payments** — \`/admin/payments\`
 - **Inventory** — \`/admin/inventory\`

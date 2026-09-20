@@ -209,7 +209,7 @@ export function HRAdminDashboard({
           </Link>
 
           {/* Rooms & Offices */}
-          <Link href={`${basePath}/office-location`} className="group block">
+          <Link href={`${basePath}/offices-rooms`} className="group block">
             <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/60 hover:shadow-xl dark:hover:border-teal-400/60">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">

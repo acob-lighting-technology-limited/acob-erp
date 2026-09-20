@@ -28,7 +28,7 @@ const LocationSchema = z.object({
 
 // Office locations — org-wide list, admin-only can manage (pure dept leads get
 // a read-only, department-filtered view). Matches AGENTS.md's
-// "app/admin/hr/office-location" org-wide exception, gated on isAdminLike.
+// "app/admin/hr/offices-rooms" org-wide exception, gated on isAdminLike.
 export async function GET() {
   const scopeResult = await requireApiAdminScope()
   if (!scopeResult.ok) return scopeResult.response
