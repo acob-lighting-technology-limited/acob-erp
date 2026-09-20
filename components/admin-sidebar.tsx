@@ -153,16 +153,13 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       ],
     },
     {
-      // Split out of HR — it had grown to 11 sub-items nested three levels
-      // deep. Routes are unchanged (still /hr/pms/*), only the sidebar
-      // grouping moved.
       section: "management",
       name: "PMS",
       description: "Performance Management System",
-      href: `${base}/hr/pms`,
+      href: `${base}/pms`,
       icon: TrendingUp,
       roles: [],
-      children: pmsNavChildren(`${base}/hr/pms`),
+      children: pmsNavChildren(`${base}/pms`),
     },
     {
       section: "management",

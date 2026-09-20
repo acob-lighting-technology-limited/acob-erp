@@ -8,5 +8,5 @@ interface Props {
 export default async function DeptPmsCbtQuestionPage({ params }: Props) {
   const { dept_id } = await params
   const scope = await requireDeptScope(dept_id)
-  return <CbtQuestionManager basePath={`/dept/${dept_id}/hr/pms/cbt`} lockDepartment={scope.deptName} />
+  return <CbtQuestionManager basePath={`/dept/${dept_id}/pms/cbt`} lockDepartment={scope.deptName} />
 }

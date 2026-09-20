@@ -10,5 +10,5 @@ export default async function DeptPmsReviewCyclePage({ params }: Props) {
   await requireDeptScope(dept_id)
   // AdminPmsReviewCyclePage reads cycleId via useParams() — the dept route
   // exposes the same [cycleId] segment so no params are forwarded.
-  return <AdminPmsReviewCyclePage backLinkHref={`/dept/${dept_id}/hr/pms/reviews`} />
+  return <AdminPmsReviewCyclePage backLinkHref={`/dept/${dept_id}/pms/reviews`} />
 }

@@ -49,7 +49,7 @@ export function DeptPmsKpiView({ deptId, deptName }: DeptPmsKpiViewProps) {
           departments={[deptName]}
           initialDepartment={deptName}
           lockedDepartment={deptName}
-          backLink={{ href: `/dept/${deptId}/hr/pms`, label: "Back to PMS" }}
+          backLink={{ href: `/dept/${deptId}/pms`, label: "Back to PMS" }}
         />
       ) : (
         <PmsMetricTabsPage
@@ -57,7 +57,7 @@ export function DeptPmsKpiView({ deptId, deptName }: DeptPmsKpiViewProps) {
           title="PMS KPI"
           description={`KPI appraisal scores for ${deptName}`}
           iconKey="kpi"
-          backLinkHref={`/dept/${deptId}/hr/pms`}
+          backLinkHref={`/dept/${deptId}/pms`}
           attendanceBasePath={`/dept/${deptId}/hr/attendance`}
         />
       )}

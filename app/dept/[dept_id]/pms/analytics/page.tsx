@@ -8,5 +8,5 @@ interface Props {
 export default async function DeptPmsAnalyticsPage({ params }: Props) {
   const { dept_id } = await params
   await requireDeptScope(dept_id)
-  return <AdminPmsAnalyticsPage backLinkHref={`/dept/${dept_id}/hr/pms`} />
+  return <AdminPmsAnalyticsPage backLinkHref={`/dept/${dept_id}/pms`} />
 }

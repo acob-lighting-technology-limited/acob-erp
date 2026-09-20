@@ -1,16 +1,16 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
-import { AdminPmsAttendancePage } from "@/app/admin/pms/attendance/view"
+import { AdminPmsBehaviourPage } from "@/app/admin/pms/behaviour/view"
 
 interface Props {
   params: Promise<{ dept_id: string }>
 }
 
-export default async function DeptPmsAttendancePage({ params }: Props) {
+export default async function DeptPmsBehaviourPage({ params }: Props) {
   const { dept_id } = await params
   await requireDeptScope(dept_id)
   return (
-    <AdminPmsAttendancePage
-      backLinkHref={`/dept/${dept_id}/hr/pms`}
+    <AdminPmsBehaviourPage
+      backLinkHref={`/dept/${dept_id}/pms`}
       attendanceBasePath={`/dept/${dept_id}/hr/attendance`}
     />
   )

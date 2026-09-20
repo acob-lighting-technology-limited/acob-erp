@@ -210,7 +210,7 @@ function CycleCard({ row, onView }: { row: CycleRow; onView?: (row: CycleRow) =>
 
 export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
   const isLeadView = Boolean(deptId)
-  const basePath = deptId ? `/dept/${deptId}/hr/pms/cbt` : "/admin/pms/cbt"
+  const basePath = deptId ? `/dept/${deptId}/pms/cbt` : "/admin/pms/cbt"
   const router = useRouter()
   const [tab, setTab] = useState<TabKey>("individual")
   const [selectedCycleId, setSelectedCycleId] = useState("all")
@@ -705,7 +705,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
       title="PMS CBT"
       description="Review CBT results by employee, department, or cycle, then open the question manager to add or edit CBT tests."
       icon={Brain}
-      backLink={{ href: deptId ? `/dept/${deptId}/hr/pms` : "/admin/pms", label: "Back to PMS" }}
+      backLink={{ href: deptId ? `/dept/${deptId}/pms` : "/admin/pms", label: "Back to PMS" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(value) => setTab(value as TabKey)}

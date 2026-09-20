@@ -143,7 +143,7 @@ function QuestionCard({
 }
 
 interface CbtQuestionManagerProps {
-  /** The parent PMS CBT index route, e.g. "/admin/pms/cbt" or "/dept/[id]/hr/pms/cbt". */
+  /** The parent PMS CBT index route, e.g. "/admin/pms/cbt" or "/dept/[id]/pms/cbt". */
   basePath: string
   /**
    * When set, this page is being used by a department lead: the Department

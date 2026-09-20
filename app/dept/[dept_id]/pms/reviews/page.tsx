@@ -9,9 +9,6 @@ export default async function DeptPmsReviewsPage({ params }: Props) {
   const { dept_id } = await params
   await requireDeptScope(dept_id)
   return (
-    <AdminPmsReviewsPage
-      backLinkHref={`/dept/${dept_id}/hr/pms`}
-      reviewCycleBasePath={`/dept/${dept_id}/hr/pms/reviews`}
-    />
+    <AdminPmsReviewsPage backLinkHref={`/dept/${dept_id}/pms`} reviewCycleBasePath={`/dept/${dept_id}/pms/reviews`} />
   )
 }

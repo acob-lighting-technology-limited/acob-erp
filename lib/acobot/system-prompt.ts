@@ -265,7 +265,7 @@ function getAdminGuidance(path: string, isDeptConsole: boolean): string {
 - **Export**: Download ticket data as CSV.`
   }
 
-  if (p.includes("/hr/pms")) {
+  if (p.includes("/pms")) {
     return `
 ## ${surface} — PMS (Performance Management) page guidance
 - **Tabs**: KPI Targets | Behaviour | Peer Feedback | Calibration.

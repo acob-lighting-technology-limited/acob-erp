@@ -8,5 +8,5 @@ interface Props {
 export default async function DeptPmsPeerFeedbackPage({ params }: Props) {
   const { dept_id } = await params
   await requireDeptScope(dept_id)
-  return <AdminPmsPeerFeedbackPage backLinkHref={`/dept/${dept_id}/hr/pms`} />
+  return <AdminPmsPeerFeedbackPage backLinkHref={`/dept/${dept_id}/pms`} />
 }

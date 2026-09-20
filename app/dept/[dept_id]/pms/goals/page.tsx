@@ -51,8 +51,8 @@ export default async function DeptPmsGoalsPage({ params }: Props) {
       cycles={cycles}
       canCreateGoal={true}
       managedDepartments={managedDepartments}
-      backLinkHref={`/dept/${dept_id}/hr/pms`}
-      goalsBasePath={`/dept/${dept_id}/hr/pms/goals`}
+      backLinkHref={`/dept/${dept_id}/pms`}
+      goalsBasePath={`/dept/${dept_id}/pms/goals`}
     />
   )
 }

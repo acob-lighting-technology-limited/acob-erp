@@ -147,6 +147,16 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/dept/:dept_id/hr/pms",
+        destination: "/dept/:dept_id/pms",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/hr/pms/:path*",
+        destination: "/dept/:dept_id/pms/:path*",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

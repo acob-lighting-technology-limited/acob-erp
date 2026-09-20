@@ -84,7 +84,7 @@ test("readDeptContextId: explicit header is trusted even on a document navigatio
 })
 
 test("readDeptContextId: falls back to Referer for plain XHR", () => {
-  const h = new Headers({ referer: `${ORIGIN}/dept/dept-accounts/hr/pms/behaviour`, "sec-fetch-dest": "empty" })
+  const h = new Headers({ referer: `${ORIGIN}/dept/dept-accounts/pms/behaviour`, "sec-fetch-dest": "empty" })
   assert.equal(readDeptContextId(h), "dept-accounts")
 })
 
