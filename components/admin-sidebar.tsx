@@ -541,7 +541,7 @@ const adminNavigation: NavItem[] = [
       { name: "Roles", href: "/admin/settings/roles" },
       { name: "Company", href: "/admin/settings/company" },
       { name: "Attendance Policy", href: "/admin/settings/attendance" },
-      { name: "CBT Settings", href: "/admin/settings/cbt" },
+      { name: "CBT", href: "/admin/settings/cbt" },
       { name: "Mail", href: "/admin/settings/mail" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],
