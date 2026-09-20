@@ -61,6 +61,8 @@ import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion } from "framer-motion"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
+import { findActiveBranchHref } from "@/lib/nav/match"
+import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import {
   canAccessRouteV2,
   resolveAdminRouteKeyV2,
@@ -254,8 +256,6 @@ function normalizeAdminRoutes(routes: string[] | null | undefined): AdminRouteKe
   ).filter((value): value is AdminRouteKeyV2 => GRANTABLE_ADMIN_ROUTES.includes(value as AdminRouteKeyV2))
 }
 
-type NavSubChild = { name: string; href: string }
-type NavChild = { name: string; href: string; children?: NavSubChild[]; retargeted?: boolean }
 type NavItem = {
   section: string
   name: string
@@ -576,45 +576,12 @@ const adminSections = [
   { key: "compliance", label: "Compliance" },
 ]
 
-const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
+const ADMIN_ROUTE_ALIASES: RouteAliases = {
   // Accounts — legacy /admin/finance and /admin/payments/* redirect into accounts.
   "/admin/accounts": ["/admin/finance", "/admin/payments"],
   "/admin/finance": ["/admin/payments"],
   // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
   "/admin/corporate-services": ["/admin/corporate-scorecard"],
-}
-
-function getRouteMatchLength(targetHref: string, pathname: string, deptId?: string): number {
-  const isRootDashboard = targetHref === "/admin" || (deptId && targetHref === `/dept/${deptId}`)
-  if (isRootDashboard) {
-    return pathname === targetHref ? targetHref.length + 1000 : 0
-  }
-  if (pathname === targetHref) return targetHref.length + 1000
-  if (pathname.startsWith(`${targetHref}/`)) return targetHref.length
-
-  const aliases = ADMIN_ROUTE_ALIASES[targetHref] || []
-  for (const alias of aliases) {
-    if (pathname === alias) return alias.length + 1000
-    if (pathname.startsWith(`${alias}/`)) return alias.length
-  }
-  return 0
-}
-
-function getItemMatchScore(item: NavItem, pathname: string, deptId?: string): number {
-  let best = getRouteMatchLength(item.href, pathname, deptId)
-  if (item.children) {
-    for (const child of item.children) {
-      const childScore = getRouteMatchLength(child.href, pathname, deptId)
-      if (childScore > best) best = childScore
-      if (child.children) {
-        for (const gc of child.children) {
-          const gcScore = getRouteMatchLength(gc.href, pathname, deptId)
-          if (gcScore > best) best = gcScore
-        }
-      }
-    }
-  }
-  return best
 }
 
 export function AdminSidebar({
@@ -800,20 +767,8 @@ export function AdminSidebar({
     .filter((section) => section.items.length > 0)
 
   const activeTopLevelHref = useMemo(() => {
-    if (!pathname) return null
-
-    let bestHref: string | null = null
-    let bestScore = 0
-
-    for (const item of activeNavigation) {
-      const score = getItemMatchScore(item, pathname, deptId)
-      if (score > bestScore) {
-        bestScore = score
-        bestHref = item.href
-      }
-    }
-
-    return bestHref
+    const shellRoot = deptId ? `/dept/${deptId}` : "/admin"
+    return findActiveBranchHref(activeNavigation, pathname, ADMIN_ROUTE_ALIASES, (href) => href === shellRoot)
   }, [pathname, activeNavigation, deptId])
 
   // True for roles that can access the /admin shell (developer / admin / super_admin).
