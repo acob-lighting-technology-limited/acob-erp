@@ -305,6 +305,12 @@ serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+    if (!(await isEdgeSystemEmailEnabled(supabase, "attendance"))) {
+      return new Response(JSON.stringify({ success: true, skipped: "attendance email disabled in Mail Settings" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
+
     const settingRow = must(
       await supabase.from("system_settings").select("value").eq("key", SETTINGS_KEY).maybeSingle(),
       "report settings"

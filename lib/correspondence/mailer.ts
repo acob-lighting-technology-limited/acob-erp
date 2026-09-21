@@ -1,4 +1,6 @@
 import { sendNotificationEmailsIndividuallyWithRetry } from "@/lib/notifications/email-gateway"
+import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
+import { createClient } from "@/lib/supabase/server"
 import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 
 export interface CorrespondenceApprovalEmailPayload {
@@ -142,6 +144,13 @@ export async function sendCorrespondenceApprovalEmail(payload: CorrespondenceApp
 export async function sendCorrespondenceDecisionEmail(payload: CorrespondenceDecisionEmailPayload) {
   const recipients = Array.from(new Set(payload.to.map((e) => e.trim().toLowerCase()).filter(Boolean)))
   if (!recipients.length) return
+
+  // The caller resolves approvers and originators to bare addresses, so there
+  // is no user id to check a personal preference against - only the
+  // system-wide switch applies.
+  const supabase = await createClient()
+  if (!(await isSystemNotificationChannelEnabled(supabase, "approvals", "email"))) return
+
   const typeLabel = getTypeLabel(payload.letterType)
   const decisionLabel = getDecisionLabel(payload.decision)
   await sendNotificationEmailsIndividuallyWithRetry({

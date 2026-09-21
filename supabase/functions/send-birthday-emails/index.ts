@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { sendEmail } from "../_shared/email.ts"
+import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 import { writeEdgeAuditLog } from "../_shared/audit.ts"
 import { EDGE_MAIL_ROUTING, EDGE_SENDERS } from "../_shared/senders.ts"
 
@@ -103,6 +104,12 @@ serve(async (req) => {
     if (!authHeader) return new Response("Unauthorized", { status: 401 })
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+    if (!(await isEdgeSystemEmailEnabled(supabase, "birthdays"))) {
+      return new Response(JSON.stringify({ success: true, skipped: "birthday email disabled in Mail Settings" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      })
+    }
 
     // Optional test override: { testEmail, testName } sends a single preview and skips logging.
     const body = await req.json().catch(() => ({}))

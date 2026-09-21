@@ -13,8 +13,20 @@ const log = logger("tasks-mailer")
  * Only the task events where the recipient has to act are emailed. Status
  * changes they merely need to know about (updated, completed, blocked) stay
  * in-app, so the inbox stream stays worth reading.
+ *
+ * A moved deadline is on the acting side of that line. It changes the date the
+ * person is working to and the date they are scored against, and the in-app
+ * notification alone was not reaching them: of the task updates sent in the
+ * month to 20 Sep 2026, roughly one in five was ever opened.
  */
-export type TaskEmailKind = "assigned" | "awaiting_review" | "due_soon" | "needs_rating" | "overdue" | "failed"
+export type TaskEmailKind =
+  | "assigned"
+  | "awaiting_review"
+  | "deadline_changed"
+  | "due_soon"
+  | "needs_rating"
+  | "overdue"
+  | "failed"
 
 interface TaskEmailInput {
   kind: TaskEmailKind
@@ -32,6 +44,8 @@ interface TaskEmailInput {
   /** overdue: last day to act, e.g. "Mon 21 Sep", and how many working days that is. */
   actByLabel?: string
   workingDaysLeft?: number
+  /** deadline_changed: the deadline being replaced. The new one is on the task. */
+  previousDeadline?: string | null
 }
 
 export interface TaskEmailTask {
@@ -82,7 +96,10 @@ function senderFor(task: TaskEmailTask, assigner: TaskEmailPerson | undefined): 
 }
 
 function buildContent(
-  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays" | "actByLabel" | "workingDaysLeft">,
+  input: Pick<
+    TaskEmailInput,
+    "kind" | "daysRemaining" | "waitingDays" | "actByLabel" | "workingDaysLeft" | "previousDeadline"
+  >,
   task: TaskEmailTask,
   people: Map<string, TaskEmailPerson>
 ) {
@@ -107,6 +124,26 @@ function buildContent(
         ctaLabel: "Review task",
         ctaPath: "/admin/tasks",
       }
+    case "deadline_changed": {
+      const previous = (input.previousDeadline || "").slice(0, 10)
+      const next = (task.task_end_date || task.due_date || "").slice(0, 10)
+      const moved = previous && next ? (next > previous ? "later" : "earlier") : null
+      return {
+        subject: `Deadline changed to ${next || "a new date"}: ${title}`,
+        heading: "The deadline on your task has moved",
+        intro:
+          (assigner ? `${assigner} changed the deadline on this task` : "The deadline on this task has changed") +
+          (previous ? ` from ${previous}` : "") +
+          (next ? ` to ${next}` : "") +
+          "." +
+          (moved === "earlier"
+            ? " You have less time than before, so check it still fits your week."
+            : " Your task list and your KPI now both use the new date.") +
+          " If the new date does not work, say so now rather than at the deadline.",
+        ctaLabel: "Open my tasks",
+        ctaPath: "/tasks",
+      }
+    }
     case "due_soon": {
       // Only ever sent on the day itself. Mailing three days out, then two,
       // then one, trains people to ignore the stream before the day that
@@ -225,7 +262,10 @@ function buildHtml(params: {
  * Kept separate from sending so the template can be previewed without a send.
  */
 export function renderTaskEmail(
-  input: Pick<TaskEmailInput, "kind" | "daysRemaining" | "waitingDays" | "actByLabel" | "workingDaysLeft">,
+  input: Pick<
+    TaskEmailInput,
+    "kind" | "daysRemaining" | "waitingDays" | "actByLabel" | "workingDaysLeft" | "previousDeadline"
+  >,
   task: TaskEmailTask,
   people: Map<string, TaskEmailPerson>,
   recipient: TaskEmailPerson | undefined
@@ -243,6 +283,9 @@ export function renderTaskEmail(
     ["Deadline", deadline || "Not set"],
     ["Assigned by", fullName(assigner) || "—"],
   ]
+  if (input.kind === "deadline_changed" && input.previousDeadline) {
+    details.push(["Previous deadline", input.previousDeadline.slice(0, 10)])
+  }
   if (input.kind === "awaiting_review" || input.kind === "needs_rating") {
     details.push(["Assignee", fullName(task.assigned_to ? people.get(task.assigned_to) : undefined) || "—"])
   }

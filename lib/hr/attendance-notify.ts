@@ -4,6 +4,7 @@ import { normalizeDepartmentName, DEPT_ADMIN_HR } from "@/shared/departments"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { ATTENDANCE_STATUS_LABELS, type UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { sendAttendanceMail, type AttendanceMailDetail } from "@/lib/hr/attendance-mailer"
+import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 
 const log = logger("attendance-notify")
 
@@ -135,7 +136,11 @@ async function resolveAdminHrLeadEmails(client: NotifyClient): Promise<string[]>
  */
 export async function notifyAttendanceMail(client: NotifyClient, params: NotifyAttendanceMailParams): Promise<void> {
   try {
-    // Gated by the admin-configurable toggle in Attendance Policy Settings.
+    // Two gates, deliberately. Attendance Policy Settings is the HR-facing
+    // switch for this stream; Mail Settings is the system-wide one that every
+    // other module answers to, and this stream had no row in it until now.
+    if (!(await isSystemNotificationChannelEnabled(client, "attendance", "email"))) return
+
     const policy = await loadAttendancePolicy(client)
     if (policy.emailNotificationsEnabled === false) return
 

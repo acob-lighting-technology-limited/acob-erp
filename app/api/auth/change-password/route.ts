@@ -97,6 +97,10 @@ export async function POST(req: Request) {
         profile?.full_name || `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || user.email || "User"
 
       try {
+        // Deliberately ungated. A password change notice is how someone finds
+        // out their account was taken over, so it must not be switchable off
+        // from Mail Settings or from a personal preference - same reasoning as
+        // email_mandatory on the "system" key.
         await sendNotificationEmail({
           to: [recipientEmail],
           subject: withSubjectPrefix("Security", "Your ACOB Account Password Has Been Changed"),
