@@ -378,8 +378,8 @@ export function OfficeLocationsPage({
 
   return (
     <DataTablePage
-      title="Rooms & Offices"
-      description="Manage company rooms, office spaces, and employee seat allocations."
+      title="Offices & Rooms"
+      description="Manage company office spaces, rooms, and employee seat allocations."
       icon={MapPin}
       backLink={{ href: backLinkHref ?? "/admin/hr", label: "Back to HR" }}
       actions={
