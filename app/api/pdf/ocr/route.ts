@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run } from "@/lib/shell/run"
 import { readFile, unlink, writeFile, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
 import { callDocumentService, isDocumentServiceConfigured } from "@/lib/pdf/document-service"
 import { PDFDocument } from "pdf-lib"
-
-const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -53,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     let tesseractAvailable = false
     try {
-      await execAsync("which tesseract")
+      await run("which", ["tesseract"])
       tesseractAvailable = true
     } catch (e) {}
 
@@ -88,14 +85,26 @@ export async function POST(request: NextRequest) {
 
     await writeFile(tempFile, buffer)
 
-    const imageCommand = `pdftoppm -png -r 300 "${tempFile}" "${path.join(outputDir, "page")}"`
-    await execAsync(imageCommand, { maxBuffer: 50 * 1024 * 1024, timeout: 300000 })
+    await run("pdftoppm", ["-png", "-r", "300", tempFile, path.join(outputDir, "page")], {
+      maxBuffer: 50 * 1024 * 1024,
+      timeout: 300000,
+    })
 
     let imageFiles = (await require("fs").promises.readdir(outputDir)).filter((f: string) => f.endsWith(".png")).sort()
 
     if (imageFiles.length === 0) {
-      const gsCommand = `gs -dNOPAUSE -dBATCH -sDEVICE=pngalpha -r300 -sOutputFile="${path.join(outputDir, "page-%d.png")}" "${tempFile}"`
-      await execAsync(gsCommand, { maxBuffer: 50 * 1024 * 1024, timeout: 300000 })
+      await run(
+        "gs",
+        [
+          "-dNOPAUSE",
+          "-dBATCH",
+          "-sDEVICE=pngalpha",
+          "-r300",
+          `-sOutputFile=${path.join(outputDir, "page-%d.png")}`,
+          tempFile,
+        ],
+        { maxBuffer: 50 * 1024 * 1024, timeout: 300000 }
+      )
       const gsFiles = (await require("fs").promises.readdir(outputDir)).filter((f: string) => f.endsWith(".png")).sort()
       if (gsFiles.length === 0) {
         throw new Error("Failed to convert PDF pages to images")
@@ -107,9 +116,11 @@ export async function POST(request: NextRequest) {
 
     for (const imgFile of imageFiles) {
       const imgPath = path.join(outputDir, imgFile)
-      const ocrCommand = `tesseract "${imgPath}" stdout -l eng`
       try {
-        const { stdout } = await execAsync(ocrCommand, { maxBuffer: 10 * 1024 * 1024, timeout: 60000 })
+        const { stdout } = await run("tesseract", [imgPath, "stdout", "-l", "eng"], {
+          maxBuffer: 10 * 1024 * 1024,
+          timeout: 60000,
+        })
         allText.push(stdout.trim())
       } catch (e) {
         console.error(`OCR failed for ${imgFile}:`, e)

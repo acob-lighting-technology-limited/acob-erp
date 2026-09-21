@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run } from "@/lib/shell/run"
 import { readFile, unlink, writeFile } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
 import { hasBinary } from "@/lib/pdf/binaries"
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx"
-
-const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -100,8 +97,7 @@ export async function POST(request: NextRequest) {
       try {
         if (!(await hasBinary("libreoffice"))) throw new Error("libreoffice not found")
         const docOutputFile = path.join(tempDir, `pdf_to_doc_${timestamp}.doc`)
-        const convertCommand = `libreoffice --headless --convert-to doc --outdir "${tempDir}" "${outputFile}"`
-        await execAsync(convertCommand, {
+        await run("libreoffice", ["--headless", "--convert-to", "doc", "--outdir", tempDir, outputFile], {
           maxBuffer: 50 * 1024 * 1024,
           timeout: 60000,
         })

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run } from "@/lib/shell/run"
 import { readFile, unlink, writeFile } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
+import { logger } from "@/lib/logger"
 
-const execAsync = promisify(exec)
+const log = logger("compress-video")
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
 
     const tempDir = tmpdir()
     const timestamp = Date.now()
-    const originalExt = path.extname(file.name) || ".mp4"
+    // Comes from the uploaded filename, so constrain it rather than trusting it.
+    const rawExt = path.extname(file.name).toLowerCase()
+    const originalExt = /^\.[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : ".mp4"
     tempFile = path.join(tempDir, `compress_${timestamp}_input${originalExt}`)
     outputFile = path.join(tempDir, `compress_${timestamp}_output.mp4`)
 
@@ -77,44 +79,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid compression mode or parameters" }, { status: 400 })
     }
 
-    const command = `ffmpeg -i "${tempFile}" -c:v libx264 -crf ${crf} -preset medium -c:a aac -b:a 128k -y "${outputFile}" 2>&1`
+    // Arguments as an array: no shell, so nothing in these paths is parsed.
+    const singlePassArgs = [
+      "-i",
+      tempFile,
+      "-c:v",
+      "libx264",
+      "-crf",
+      String(crf),
+      "-preset",
+      "medium",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "128k",
+      "-y",
+      outputFile,
+    ]
 
     if (targetSizeBytes) {
       const bitrate = Math.max(100, Math.floor((targetSizeBytes * 8) / 60))
-      const pass1Log = path.join(tempDir, `compress_${timestamp}_pass1.log`)
-      const pass2Log = path.join(tempDir, `compress_${timestamp}_pass2.log`)
       const nullOutput = process.platform === "win32" ? "NUL" : "/dev/null"
-
-      const pass1Command = `ffmpeg -i "${tempFile}" -c:v libx264 -b:v ${bitrate}k -pass 1 -an -f null ${nullOutput} 2>"${pass1Log}"`
-      const pass2Command = `ffmpeg -i "${tempFile}" -c:v libx264 -b:v ${bitrate}k -pass 2 -c:a aac -b:a 128k -y "${outputFile}" 2>"${pass2Log}"`
+      const passBase = ["-i", tempFile, "-c:v", "libx264", "-b:v", `${bitrate}k`]
 
       try {
-        console.log("Executing pass 1:", pass1Command)
-        await execAsync(pass1Command, {
+        // The old form redirected stderr into a log file that was deleted
+        // without ever being read; execFile returns it instead.
+        await run("ffmpeg", [...passBase, "-pass", "1", "-an", "-f", "null", nullOutput], {
           maxBuffer: 50 * 1024 * 1024,
           timeout: 300000,
         })
 
-        console.log("Executing pass 2:", pass2Command)
-        await execAsync(pass2Command, {
+        await run("ffmpeg", [...passBase, "-pass", "2", "-c:a", "aac", "-b:a", "128k", "-y", outputFile], {
           maxBuffer: 50 * 1024 * 1024,
           timeout: 300000,
         })
-
-        try {
-          if (existsSync(pass1Log)) await unlink(pass1Log)
-          if (existsSync(pass2Log)) await unlink(pass2Log)
-        } catch (e) {}
       } catch (passError: any) {
-        console.log("Two-pass encoding failed, falling back to single-pass:", passError.message)
-        await execAsync(command, {
+        log.warn({ err: passError?.message }, "Two-pass encoding failed, falling back to single-pass")
+        await run("ffmpeg", singlePassArgs, {
           maxBuffer: 50 * 1024 * 1024,
           timeout: 300000,
         })
       }
     } else {
-      console.log("Executing compression command:", command)
-      await execAsync(command, {
+      await run("ffmpeg", singlePassArgs, {
         maxBuffer: 50 * 1024 * 1024,
         timeout: 300000,
       })

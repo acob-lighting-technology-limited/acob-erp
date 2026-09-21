@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run } from "@/lib/shell/run"
 import { readFile, unlink, writeFile, readdir, mkdir, rmdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
@@ -8,8 +7,6 @@ import { tmpdir } from "os"
 import { hasBinary } from "@/lib/pdf/binaries"
 import { callDocumentService, isDocumentServiceConfigured } from "@/lib/pdf/document-service"
 import JSZip from "jszip"
-
-const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -38,7 +35,16 @@ export async function POST(request: NextRequest) {
 
     await writeFile(tempFile, buffer)
 
-    let command: string
+    // format becomes a pdftoppm flag and a ghostscript device name, both of
+    // which used to be interpolated into a shell string. Allowlisted.
+    const FORMAT_DEVICES: Record<string, string> = { png: "png16m", jpeg: "jpeg", jpg: "jpeg", tiff: "tiff24nc" }
+    const formatKey = String(format || "png").toLowerCase()
+    if (!(formatKey in FORMAT_DEVICES)) {
+      return NextResponse.json({ error: "Unsupported image format." }, { status: 400 })
+    }
+
+    let binary: string
+    let commandArgs: string[]
     let usePoppler = false
 
     // Preferred path: the document service, which has poppler. It returns a zip
@@ -64,23 +70,33 @@ export async function POST(request: NextRequest) {
 
     if (usePoppler) {
       const outputPrefix = path.join(outputDir, "page")
-      command = `pdftoppm -${format} "${tempFile}" "${outputPrefix}"`
+      binary = "pdftoppm"
+      commandArgs = [`-${formatKey}`, tempFile, outputPrefix]
     } else {
       const gsAvailable = await hasBinary("gs")
 
       if (gsAvailable) {
         let device = "jpeg"
         let ext = "jpg"
-        if (format === "png") {
+        if (formatKey === "png") {
           device = "pngalpha"
           ext = "png"
-        } else if (format === "webp") {
+        } else if (formatKey === "webp") {
           device = "pngalpha"
           ext = "png"
         }
 
         const outputPattern = path.join(outputDir, `page-%d.${ext}`)
-        command = `gs -dNOPAUSE -dBATCH -dSAFER -sDEVICE=${device} -r150 -sOutputFile="${outputPattern}" "${tempFile}"`
+        binary = "gs"
+        commandArgs = [
+          "-dNOPAUSE",
+          "-dBATCH",
+          "-dSAFER",
+          `-sDEVICE=${device}`,
+          "-r150",
+          `-sOutputFile=${outputPattern}`,
+          tempFile,
+        ]
       } else {
         return NextResponse.json(
           { error: "PDF to image conversion requires pdftoppm or ghostscript." },
@@ -89,11 +105,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("Executing conversion command:", command)
-    await execAsync(command, {
-      maxBuffer: 50 * 1024 * 1024,
-      timeout: 300000,
-    })
+    await run(binary, commandArgs, { maxBuffer: 50 * 1024 * 1024, timeout: 300000 })
 
     const files = await readdir(outputDir)
     const imageFiles = files

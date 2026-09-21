@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run } from "@/lib/shell/run"
 import { readFile, unlink, writeFile } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
-
-const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -19,6 +16,13 @@ export async function POST(request: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: "File is required" }, { status: 400 })
+    }
+
+    // format lands in the output path, which used to be interpolated into a
+    // shell string. Allowlisted rather than trusted.
+    const ALLOWED_FORMATS = ["mp4", "webm", "mkv", "mov", "avi"]
+    if (format && !ALLOWED_FORMATS.includes(format.toLowerCase())) {
+      return NextResponse.json({ error: "Unsupported output format." }, { status: 400 })
     }
 
     if (!format) {
@@ -36,14 +40,12 @@ export async function POST(request: NextRequest) {
 
     await writeFile(tempFile, buffer)
 
-    const command = `ffmpeg -i "${tempFile}" -c:v libx264 -c:a aac -preset medium -y "${outputFile}" 2>&1`
-
-    console.log("Executing conversion command:", command)
-
-    const { stdout, stderr } = await execAsync(command, {
-      maxBuffer: 50 * 1024 * 1024,
-      timeout: 300000,
-    })
+    // Arguments as an array: no shell, so these paths are never parsed.
+    const { stdout, stderr } = await run(
+      "ffmpeg",
+      ["-i", tempFile, "-c:v", "libx264", "-c:a", "aac", "-preset", "medium", "-y", outputFile],
+      { maxBuffer: 50 * 1024 * 1024, timeout: 300000 }
+    )
 
     if (!existsSync(outputFile)) {
       throw new Error("Conversion failed - output file not found")
