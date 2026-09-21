@@ -124,7 +124,7 @@ export function PaymentsTable({
   initialDepartments = [],
   initialError = null,
   currentUser,
-  basePath = currentUser.isAdmin ? "/admin/finance/payments" : "/payments",
+  basePath = currentUser.isAdmin ? "/admin/finance/payments" : "/accounts/payments",
 }: PaymentsTableProps) {
   const router = useRouter()
   const queryClient = useQueryClient()

@@ -2,16 +2,16 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
+  BookUser,
   Briefcase,
   CalendarDays,
   ChevronsUpDown,
   ChevronRight,
   ClipboardList,
   FileCode2,
-  FileCheck2,
   FileBarChart,
   FileText,
   Landmark,
@@ -22,7 +22,6 @@ import {
   Ticket,
   TrendingUp,
   User,
-  UserCheck,
   Users,
   Wrench,
   FolderKanban,
@@ -52,6 +51,9 @@ import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
+import { pmsNavChildren } from "@/lib/pms/sections"
+import { findActiveBranchHref } from "@/lib/nav/match"
+import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import { useSidebar } from "./sidebar-context"
 
 interface SidebarProps {
@@ -78,22 +80,38 @@ interface SidebarProps {
   showMdDesk?: boolean
 }
 
-type NavSubChild = { name: string; href: string }
-type NavChild = { name: string; href: string; children?: NavSubChild[] }
-type NavItemDef = { name: string; href: string; icon: React.ElementType; children?: NavChild[] }
+type NavItemDef = {
+  name: string
+  href: string
+  icon: React.ElementType
+  /** Expansion or gloss for an abbreviated name, shown on hover. */
+  description?: string
+  children?: NavChild[]
+  /**
+   * The item points into the /admin shell. Hidden unless the viewer can enter
+   * it — /admin bounces everyone else back to /profile (see AdminLayout), so
+   * showing the link to ordinary staff is a guaranteed dead end.
+   */
+  adminOnly?: boolean
+}
 type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
 
 /**
- * Section keys/labels mirror the admin + dept sidebars so the same feature sits
- * under the same heading on every surface.
+ * Section keys and labels match adminSections in admin-sidebar.tsx, so the same
+ * feature sits under the same heading on every surface. Keep them in step: the
+ * staff shell has no Compliance section, but the sections it does have use the
+ * same keys and the same order.
  */
 const navigationSections: NavSectionDef[] = [
   {
-    key: "workspace",
-    label: "Workspace",
+    key: "overview",
+    label: "Overview",
     items: [
       { name: "Dashboard", href: "/profile", icon: LayoutDashboard },
-      { name: "Directory", href: "/directory", icon: Users },
+      { name: "Directory", href: "/directory", icon: BookUser },
+      // "Calendar" here, "Events" on the admin sidebar — same EventsWorkspace
+      // component, deliberately different names. Staff see what they can attend;
+      // admins plan what the company runs.
       { name: "Calendar", href: "/calendar", icon: CalendarDays },
     ],
   },
@@ -103,59 +121,41 @@ const navigationSections: NavSectionDef[] = [
     items: [
       {
         name: "HR",
+        description: "Human Resources",
         href: "/hr",
-        icon: UserCheck,
+        icon: Users,
         children: [
-          { name: "Attendance", href: "/attendance" },
-          { name: "Leave", href: "/leave" },
-          { name: "Lunch", href: "/lunch" },
-          { name: "Shared Resources", href: "/resources" },
+          { name: "Attendance", href: "/hr/attendance" },
+          { name: "Leave", href: "/hr/leave" },
+          // "Lunch" here, "Lunch Register" on the admin sidebar — deliberately
+          // different. Staff vote on the menu; admin marks who ate.
+          { name: "Lunch", href: "/hr/lunch" },
+          { name: "Resource Booking", href: "/hr/resources" },
         ],
       },
       {
         name: "PMS",
+        description: "Performance Management System",
         href: "/pms",
         icon: TrendingUp,
-        children: [
-          { name: "Goals", href: "/pms/goals" },
-          { name: "KPI", href: "/pms/kpi" },
-          { name: "Reviews", href: "/pms/reviews" },
-          { name: "Peer Feedback", href: "/pms/peer-feedback" },
-          { name: "Development Plans", href: "/pms/development-plans" },
-          { name: "Behaviour", href: "/pms/behaviour" },
-          { name: "CBT", href: "/pms/cbt" },
-          { name: "Attendance", href: "/pms/attendance" },
-        ],
+        children: pmsNavChildren("/pms", { staffOnly: true }),
       },
       {
         name: "Accounts",
         href: "/accounts",
         icon: Landmark,
         children: [
-          { name: "Requisitions", href: "/requisition" },
-          { name: "Payments", href: "/payments" },
-          { name: "Payroll", href: "/payroll" },
-          { name: "Assets", href: "/assets" },
+          { name: "Requisitions", href: "/accounts/requisitions" },
+          { name: "Payments", href: "/accounts/payments" },
+          { name: "Payroll", href: "/accounts/payroll" },
+          { name: "Assets", href: "/accounts/assets" },
         ],
       },
-      {
-        name: "Portfolios",
-        href: "/portfolios",
-        icon: Layers,
-        children: [
-          { name: "Portfolios", href: "/portfolios" },
-          { name: "Projects", href: "/projects" },
-        ],
-      },
-      {
-        name: "Corporate Services",
-        href: "/admin/corporate-services/scorecard",
-        icon: Briefcase,
-        children: [
-          { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
-          { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
-        ],
-      },
+      { name: "Portfolios", href: "/portfolios", icon: Layers },
+      // Sibling of Portfolios, not a child of it. The old wrapper listed
+      // Portfolios as its own first child, so parent and child led to the
+      // same page.
+      { name: "Projects", href: "/projects", icon: FolderKanban },
     ],
   },
   {
@@ -176,8 +176,8 @@ const navigationSections: NavSectionDef[] = [
               { name: "Action Tracker", href: "/reports/general-meeting/action-tracker" },
               { name: "Challenges", href: "/reports/general-meeting/challenges" },
               { name: "KSS", href: "/reports/general-meeting/kss" },
-              { name: "Minutes of Meeting", href: "/reports/general-meeting/minutes-of-meeting" },
-              { name: "Weekly Reports", href: "/reports/general-meeting/weekly-reports" },
+              { name: "Minutes", href: "/reports/general-meeting/minutes-of-meeting" },
+              { name: "Weekly", href: "/reports/general-meeting/weekly-reports" },
             ],
           },
         ],
@@ -201,10 +201,10 @@ const navigationSections: NavSectionDef[] = [
         children: [
           { name: "Signature", href: "/tools/signature" },
           { name: "Signature Anniversary", href: "/tools/signature-anniversary" },
-          { name: "Job Description", href: "/tools/job-description" },
+          { name: "My Job Description", href: "/tools/job-description" },
           { name: "Watermark", href: "/tools/watermark" },
-          { name: "Media & PDF Suite", href: "/tools/test" },
-          { name: "Feedback", href: "/feedback" },
+          { name: "Media & PDF Suite", href: "/tools/media" },
+          { name: "Feedback", href: "/tools/feedback" },
         ],
       },
     ],
@@ -221,9 +221,9 @@ const MD_DESK_NAV_ITEM: NavItemDef = {
   children: mdDeskNavChildren("/md-desk"),
 }
 
-const NAV_ROUTE_ALIASES: Record<string, string[]> = {
-  "/tools": ["/feedback"],
-}
+// Feedback used to sit at /feedback and needed an alias to highlight Tools.
+// It is a real child of /tools now, so nothing here is aliased.
+const NAV_ROUTE_ALIASES: RouteAliases = {}
 
 export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
   const pathname = usePathname()
@@ -300,13 +300,6 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     router.push("/auth/login")
   }
 
-  const isNavItemActive = (href: string): boolean => {
-    if (!pathname) return false
-    if (pathname === href || pathname.startsWith(`${href}/`)) return true
-    const aliases = NAV_ROUTE_ALIASES[href] || []
-    return aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`))
-  }
-
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
   )
@@ -356,11 +349,21 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     : null
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
-  const visibleSections: NavSectionDef[] = showMdDesk
-    ? navigationSections.map((section) =>
-        section.key === "management" ? { ...section, items: [MD_DESK_NAV_ITEM, ...section.items] } : section
-      )
-    : navigationSections
+  const visibleSections: NavSectionDef[] = navigationSections.map((section) => {
+    const items = section.items.filter((item) => !item.adminOnly || canAccessAdmin)
+    const withMdDesk = showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items
+    return {
+      ...section,
+      items: withMdDesk,
+    }
+  })
+
+  // One winner, so a parent and its child never highlight at the same time —
+  // the admin sidebar has always scored matches this way.
+  const activeTopLevelHref = useMemo(() => {
+    const items = visibleSections.flatMap((section) => section.items)
+    return findActiveBranchHref(items, pathname, NAV_ROUTE_ALIASES, (href) => href === "/profile")
+  }, [visibleSections, pathname])
 
   const labelCls = cn(
     "min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-in-out",
@@ -375,21 +378,14 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
         {visibleSections.map((section) => (
           <div key={section.key} className="space-y-0.5">
             {isCollapsed ? (
-              section.key !== "workspace" && <div className="mx-1.5 my-1.5 border-t" />
+              section.key !== "overview" && <div className="mx-1.5 my-1.5 border-t" />
             ) : (
               <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
               const hasChildren = !isCollapsed && item.children && item.children.length > 0
               const isOpen = openSections.has(item.href)
-              const isActive = isNavItemActive(item.href)
-              const hasActiveChild = item.children?.some(
-                (child) =>
-                  pathname === child.href ||
-                  pathname?.startsWith(child.href + "/") ||
-                  child.children?.some((gc) => pathname === gc.href || pathname?.startsWith(gc.href + "/"))
-              )
-              const highlighted = isActive || Boolean(hasActiveChild)
+              const highlighted = item.href === activeTopLevelHref
               const activeCls = "bg-primary text-primary-foreground shadow-sm"
               const inactiveCls = "text-muted-foreground hover:bg-accent hover:text-foreground"
 
@@ -440,7 +436,11 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           <span className={labelCls}>{item.name}</span>
                         </Link>
                       </TooltipTrigger>
-                      {isCollapsed && <TooltipContent side="right">{item.name}</TooltipContent>}
+                      {isCollapsed && (
+                        <TooltipContent side="right">
+                          {item.description ? `${item.name} — ${item.description}` : item.name}
+                        </TooltipContent>
+                      )}
                     </Tooltip>
                   )}
 
@@ -590,12 +590,9 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             className="z-[70] w-[var(--radix-dropdown-menu-trigger-width)] min-w-52"
           >
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex w-full items-center gap-2">
-                <User className="h-4 w-4" />
-                Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+              {/* One entry only: /settings redirects to /settings/profile, so a
+                  separate "Profile" item led to the same page. The dashboard is
+                  the first nav item, so it needs no entry here either. */}
               <Link href="/settings" className="flex w-full items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Settings

@@ -382,8 +382,6 @@ export async function updateSession(request: NextRequest) {
   const isCbtPageOrSessionApi =
     pathname === "/cbt" ||
     pathname.startsWith("/cbt/") ||
-    pathname === "/cbt2" ||
-    pathname.startsWith("/cbt2/") ||
     pathname === "/api/hr/performance/cbt/session" ||
     pathname.startsWith("/api/hr/performance/cbt/session/")
 

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
-import type { LeaveRequest } from "@/app/(app)/leave/page"
+import type { LeaveRequest } from "@/app/(app)/hr/leave/page"
 
 const STAGE_LABELS: Record<string, string> = {
   pending_reliever: "Waiting Reliever",

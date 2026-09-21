@@ -58,6 +58,9 @@ import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { motion } from "framer-motion"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
+import { pmsNavChildren } from "@/lib/pms/sections"
+import { findActiveBranchHref } from "@/lib/nav/match"
+import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import {
   canAccessRouteV2,
   resolveAdminRouteKeyV2,
@@ -104,7 +107,20 @@ interface AdminSidebarProps {
 /**
  * Builds dept-scoped navigation for the /dept/[deptId]/ shell.
  * Hrefs point to /dept/[id]/... so clicking a nav item stays in the dept shell.
- * Only the pages that exist in the dept surface are included.
+ *
+ * What belongs here: the admin nav, minus anything org-wide. A department lead
+ * manages their own department, so a domain is included when it can be
+ * meaningfully scoped to one department and left out when it cannot. That is
+ * why HR is here but its Departments child is not, and why these are absent:
+ *
+ *  - Settings, System & Security, Developer — org-wide by definition.
+ *  - Notifications, Events, Tools, Corporate Services — single org-wide
+ *    consoles with nothing department-shaped to scope to.
+ *  - Portfolios, Projects, Purchasing, Inventory — cross-department by nature;
+ *    a portfolio or a purchase order does not belong to one department.
+ *
+ * Add a domain here only once its pages exist under /dept/[dept_id]/ and its
+ * queries are scoped by requireDeptScope.
  */
 function buildDeptNavigation(deptId: string): NavItem[] {
   const base = `/dept/${deptId}`
@@ -119,6 +135,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
     {
       section: "management",
       name: "HR",
+      description: "Human Resources",
       href: `${base}/hr`,
       icon: Users,
       roles: [],
@@ -128,31 +145,17 @@ function buildDeptNavigation(deptId: string): NavItem[] {
         // department, so the org-wide department list belongs to /admin only.
         { name: "Attendance", href: `${base}/hr/attendance` },
         { name: "Leave", href: `${base}/hr/leave` },
-        { name: "Rooms & Offices", href: `${base}/hr/office-location` },
+        { name: "Offices & Rooms", href: `${base}/hr/offices-rooms` },
       ],
     },
     {
-      // Split out of HR — it had grown to 11 sub-items nested three levels
-      // deep. Routes are unchanged (still /hr/pms/*), only the sidebar
-      // grouping moved.
       section: "management",
       name: "PMS",
-      href: `${base}/hr/pms`,
+      description: "Performance Management System",
+      href: `${base}/pms`,
       icon: TrendingUp,
       roles: [],
-      children: [
-        { name: "Analytics", href: `${base}/hr/pms/analytics` },
-        { name: "Cycles", href: `${base}/hr/pms/cycles` },
-        { name: "Goals", href: `${base}/hr/pms/goals` },
-        { name: "KPI", href: `${base}/hr/pms/kpi` },
-        { name: "Reviews", href: `${base}/hr/pms/reviews` },
-        { name: "Peer Feedback", href: `${base}/hr/pms/peer-feedback` },
-        { name: "Development Plans", href: `${base}/hr/pms/development-plans` },
-        { name: "Behaviour", href: `${base}/hr/pms/behaviour` },
-        { name: "Competencies", href: `${base}/hr/pms/competencies` },
-        { name: "CBT", href: `${base}/hr/pms/cbt` },
-        { name: "Attendance", href: `${base}/hr/pms/attendance` },
-      ],
+      children: pmsNavChildren(`${base}/pms`),
     },
     {
       section: "management",
@@ -174,7 +177,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       ],
     },
     {
-      section: "management",
+      section: "operations",
       name: "Tasks",
       href: `${base}/tasks`,
       icon: ClipboardList,
@@ -186,6 +189,14 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       href: `${base}/help-desk`,
       icon: Ticket,
       roles: [],
+    },
+    {
+      section: "operations",
+      name: "Reports",
+      href: `${base}/reports`,
+      icon: FileBarChart,
+      roles: [],
+      children: [{ name: "Weekly", href: `${base}/reports/weekly-reports` }],
     },
     {
       section: "operations",
@@ -222,14 +233,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       icon: MessageSquare,
       roles: [],
     },
-    {
-      section: "operations",
-      name: "Reports",
-      href: `${base}/reports`,
-      icon: FileBarChart,
-      roles: [],
-      children: [{ name: "Weekly Reports", href: `${base}/reports/weekly` }],
-    },
   ]
 }
 
@@ -248,17 +251,38 @@ function normalizeAdminRoutes(routes: string[] | null | undefined): AdminRouteKe
   ).filter((value): value is AdminRouteKeyV2 => GRANTABLE_ADMIN_ROUTES.includes(value as AdminRouteKeyV2))
 }
 
-type NavSubChild = { name: string; href: string }
-type NavChild = { name: string; href: string; children?: NavSubChild[] }
 type NavItem = {
   section: string
   name: string
   href: string
   icon: React.ElementType
   roles: string[]
+  /** Expansion or gloss for an abbreviated name, shown on hover. */
+  description?: string
   children?: NavChild[]
+  /**
+   * The viewer cannot open this branch's own page, so `href` was retargeted to
+   * the first descendant they can reach. The expanded row then toggles instead
+   * of navigating — following it would land on a page whose name does not match
+   * the label. The collapsed rail still uses `href`, since toggling is not
+   * available there.
+   */
+  retargeted?: boolean
 }
 
+/**
+ * Management runs people -> performance -> money -> what the money bought ->
+ * delivery -> governance, and Operations runs day-to-day work first, then the
+ * things that report on it. navigationSections in sidebar.tsx lists the same
+ * items in the same relative order; keep them in step.
+ *
+ * Purchasing and Inventory sit inside Accounts rather than beside it, so the
+ * accounts -> purchase -> stock workflow reads as one node. They keep their own
+ * grantable route keys, and filterNavChildren gates each one separately, so a
+ * viewer granted only inventory.main still sees Inventory and nothing else —
+ * with the Accounts row rendering as a toggle rather than a link, since it
+ * would otherwise point at a page whose name does not match the label.
+ */
 const adminNavigation: NavItem[] = [
   {
     section: "overview",
@@ -279,79 +303,39 @@ const adminNavigation: NavItem[] = [
   {
     section: "management",
     name: "HR",
+    description: "Human Resources",
     href: "/admin/hr",
     icon: Users,
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Employees", href: "/admin/hr/employees" },
       { name: "Departments", href: "/admin/hr/departments" },
-      { name: "Onboarding", href: "/admin/onboarding" },
-      { name: "Job Descriptions", href: "/admin/job-descriptions" },
-      { name: "Attendance", href: "/admin/hr/employees/attendance" },
+      { name: "Job Descriptions", href: "/admin/hr/job-descriptions" },
+      { name: "Attendance", href: "/admin/hr/attendance" },
       { name: "Leave", href: "/admin/hr/leave" },
-      { name: "Lunch Register", href: "/admin/hr/employees/lunch" },
-      // Resource Booking — /admin/hr/resources is a re-export of the same page.
-      { name: "Resource Booking", href: "/admin/hr/fleet" },
-      { name: "Rooms & Offices", href: "/admin/hr/office-location" },
+      { name: "Lunch Register", href: "/admin/hr/lunch" },
+      { name: "Resource Booking", href: "/admin/hr/resources" },
+      { name: "Offices & Rooms", href: "/admin/hr/offices-rooms" },
       { name: "Site Locations", href: "/admin/hr/site-locations" },
     ],
   },
   {
     // Split out of HR — it had grown to 11 sub-items nested three levels
-    // deep. Routes are unchanged (still /admin/hr/pms/*), only the sidebar
+    // deep. Routes are unchanged (still /admin/pms/*), only the sidebar
     // grouping moved.
     section: "management",
     name: "PMS",
-    href: "/admin/hr/pms",
+    description: "Performance Management System",
+    href: "/admin/pms",
     icon: TrendingUp,
     roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Analytics", href: "/admin/hr/pms/analytics" },
-      { name: "Cycles", href: "/admin/hr/pms/cycles" },
-      { name: "Goals", href: "/admin/hr/pms/goals" },
-      { name: "KPI", href: "/admin/hr/pms/kpi" },
-      { name: "Reviews", href: "/admin/hr/pms/reviews" },
-      { name: "Peer Feedback", href: "/admin/hr/pms/peer-feedback" },
-      { name: "Development Plans", href: "/admin/hr/pms/development-plans" },
-      { name: "Behaviour", href: "/admin/hr/pms/behaviour" },
-      { name: "Competencies", href: "/admin/hr/pms/competencies" },
-      { name: "CBT", href: "/admin/hr/pms/cbt" },
-      { name: "Attendance", href: "/admin/hr/pms/attendance" },
-    ],
+    children: pmsNavChildren("/admin/pms"),
   },
   {
-    section: "management",
-    name: "Corporate Services",
-    href: "/admin/corporate-services/scorecard",
-    icon: Briefcase,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
-      { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
-    ],
-  },
-  {
-    section: "management",
-    name: "Portfolios",
-    href: "/admin/portfolios",
-    icon: Layers,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Portfolios", href: "/admin/portfolios" },
-      { name: "Projects", href: "/admin/project" },
-    ],
-  },
-  {
-    section: "management",
-    name: "Tasks",
-    href: "/admin/tasks",
-    icon: ClipboardList,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    // Single item with an expansion, mirroring HR. Each descendant keeps its own
-    // grantable route key — the sidebar filters children individually (see
-    // filterNavChildren), so nesting them here does not collapse the gates.
+    // Accounts also surfaces Purchasing, Inventory and Assets as nested groups
+    // so the financial workflow (accounts → purchase → stock → what it bought)
+    // is one coherent node rather than four separate top-level items. This
+    // matches the staff sidebar, which has always listed Assets under Accounts.
     section: "management",
     name: "Accounts",
     href: "/admin/accounts",
@@ -374,11 +358,6 @@ const adminNavigation: NavItem[] = [
         ],
       },
       {
-        name: "Assets",
-        href: "/admin/assets",
-        children: [{ name: "Issues", href: "/admin/assets/issues" }],
-      },
-      {
         name: "Inventory",
         href: "/admin/inventory",
         children: [
@@ -388,7 +367,50 @@ const adminNavigation: NavItem[] = [
           { name: "Movements", href: "/admin/inventory/movements" },
         ],
       },
+      {
+        name: "Assets",
+        href: "/admin/assets",
+        children: [{ name: "Issues", href: "/admin/assets/issues" }],
+      },
     ],
+  },
+  {
+    section: "management",
+    name: "Portfolios",
+    href: "/admin/portfolios",
+    icon: Layers,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    // Sibling of Portfolios, not a child of it. They are separate consoles with
+    // separate route keys (portfolios.main / projects.main); the old wrapper
+    // listed Portfolios as its own first child, so parent and child led to the
+    // same page.
+    section: "management",
+    name: "Projects",
+    href: "/admin/projects",
+    icon: FolderKanban,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "management",
+    name: "Corporate Services",
+    href: "/admin/corporate-services",
+    icon: Target,
+    roles: ["developer", "super_admin", "admin"],
+    children: [
+      { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
+      { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
+    ],
+  },
+  {
+    // Operations, not Management: tasks are day-to-day work, and the staff shell
+    // has always listed them there.
+    section: "operations",
+    name: "Tasks",
+    href: "/admin/tasks",
+    icon: ClipboardList,
+    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
@@ -418,8 +440,8 @@ const adminNavigation: NavItem[] = [
           { name: "Action Tracker", href: "/admin/reports/general-meeting/action-tracker" },
           { name: "Challenges", href: "/admin/reports/general-meeting/challenges" },
           { name: "KSS", href: "/admin/reports/general-meeting/kss" },
-          { name: "Minutes of Meeting", href: "/admin/reports/general-meeting/minutes-of-meeting" },
-          { name: "Weekly Reports", href: "/admin/reports/general-meeting/weekly-reports" },
+          { name: "Minutes", href: "/admin/reports/general-meeting/minutes-of-meeting" },
+          { name: "Weekly", href: "/admin/reports/general-meeting/weekly-reports" },
           { name: "Records", href: "/admin/reports/general-meeting/records" },
         ],
       },
@@ -434,13 +456,6 @@ const adminNavigation: NavItem[] = [
   },
   {
     section: "operations",
-    name: "Tools",
-    href: "/admin/tools",
-    icon: Wrench,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
     name: "Communications",
     href: "/admin/communications",
     icon: Megaphone,
@@ -448,21 +463,17 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Broadcast", href: "/admin/communications/broadcast" },
       {
-        name: "General Meeting",
+        // Not to be confused with Reports > General Meeting, which is the
+        // reports themselves. This branch is the mail-out and the reminders
+        // that go with them.
+        name: "Meeting Mail",
         href: "/admin/communications/meetings",
         children: [
-          { name: "Reports", href: "/admin/communications/meetings/mail" },
+          { name: "Report Mail-out", href: "/admin/communications/meetings/mail" },
           { name: "Reminders", href: "/admin/communications/meetings/reminders" },
         ],
       },
     ],
-  },
-  {
-    section: "operations",
-    name: "Notifications",
-    href: "/admin/notifications",
-    icon: Bell,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
@@ -478,9 +489,38 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
+    // Sits between Documentation and the compliance block, matching where the
+    // dept shell puts it. Gated by its own feedback.main route key.
+    section: "operations",
+    name: "Feedback",
+    href: "/admin/feedback",
+    icon: MessageSquare,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "operations",
+    name: "Tools",
+    href: "/admin/tools",
+    icon: Wrench,
+    roles: ["developer", "super_admin", "admin"],
+    children: [
+      { name: "Signature", href: "/admin/tools/signature" },
+      { name: "Signature Anniversary", href: "/admin/tools/signature-anniversary" },
+      { name: "Watermark", href: "/admin/tools/watermark" },
+      { name: "Media & PDF Suite", href: "/admin/tools/media" },
+    ],
+  },
+  {
+    section: "operations",
+    name: "Notifications",
+    href: "/admin/notifications",
+    icon: Bell,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
     section: "compliance",
     name: "System & Security",
-    href: "/admin/audit-logs",
+    href: "/admin/security",
     icon: ShieldCheck,
     roles: ["developer", "super_admin", "admin"],
     children: [
@@ -497,10 +537,14 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Users", href: "/admin/settings/users" },
+      // Lists every account and its sign-in state, and resolves to settings.main
+      // for exactly that reason. It sat under HR, where its visibility was
+      // controlled by a grant unrelated to the item it appeared beside.
+      { name: "Onboarding", href: "/admin/onboarding" },
       { name: "Roles", href: "/admin/settings/roles" },
       { name: "Company", href: "/admin/settings/company" },
-      { name: "Attendance Policy", href: "/admin/settings/attendance" },
-      { name: "CBT Settings", href: "/admin/settings/cbt" },
+      { name: "Attendance", href: "/admin/settings/attendance" },
+      { name: "CBT", href: "/admin/settings/cbt" },
       { name: "Mail", href: "/admin/settings/mail" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],
@@ -532,47 +576,12 @@ const adminSections = [
   { key: "compliance", label: "Compliance" },
 ]
 
-const ADMIN_ROUTE_ALIASES: Record<string, string[]> = {
+const ADMIN_ROUTE_ALIASES: RouteAliases = {
   // Accounts — legacy /admin/finance and /admin/payments/* redirect into accounts.
   "/admin/accounts": ["/admin/finance", "/admin/payments"],
   "/admin/finance": ["/admin/payments"],
   // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
-  "/admin/corporate-services/scorecard": ["/admin/corporate-scorecard"],
-  // Tools — feedback is surfaced through tools.
-  "/admin/tools": ["/admin/feedback"],
-}
-
-function getRouteMatchLength(targetHref: string, pathname: string, deptId?: string): number {
-  const isRootDashboard = targetHref === "/admin" || (deptId && targetHref === `/dept/${deptId}`)
-  if (isRootDashboard) {
-    return pathname === targetHref ? targetHref.length + 1000 : 0
-  }
-  if (pathname === targetHref) return targetHref.length + 1000
-  if (pathname.startsWith(`${targetHref}/`)) return targetHref.length
-
-  const aliases = ADMIN_ROUTE_ALIASES[targetHref] || []
-  for (const alias of aliases) {
-    if (pathname === alias) return alias.length + 1000
-    if (pathname.startsWith(`${alias}/`)) return alias.length
-  }
-  return 0
-}
-
-function getItemMatchScore(item: NavItem, pathname: string, deptId?: string): number {
-  let best = getRouteMatchLength(item.href, pathname, deptId)
-  if (item.children) {
-    for (const child of item.children) {
-      const childScore = getRouteMatchLength(child.href, pathname, deptId)
-      if (childScore > best) best = childScore
-      if (child.children) {
-        for (const gc of child.children) {
-          const gcScore = getRouteMatchLength(gc.href, pathname, deptId)
-          if (gcScore > best) best = gcScore
-        }
-      }
-    }
-  }
-  return best
+  "/admin/corporate-services": ["/admin/corporate-scorecard"],
 }
 
 export function AdminSidebar({
@@ -727,6 +736,7 @@ export function AdminSidebar({
       kept.push({
         ...child,
         href: selfAllowed ? child.href : grandchildren![0].href,
+        retargeted: !selfAllowed,
         children: grandchildren?.length ? grandchildren : undefined,
       })
     }
@@ -740,7 +750,12 @@ export function AdminSidebar({
         const children = filterNavChildren(item.children)
         const selfAllowed = canAccessRoute(item.roles, item.href)
         if (!selfAllowed && !children) return acc
-        acc.push({ ...item, href: selfAllowed ? item.href : children![0].href, children })
+        acc.push({
+          ...item,
+          href: selfAllowed ? item.href : children![0].href,
+          retargeted: !selfAllowed,
+          children,
+        })
         return acc
       }, [])
 
@@ -752,20 +767,8 @@ export function AdminSidebar({
     .filter((section) => section.items.length > 0)
 
   const activeTopLevelHref = useMemo(() => {
-    if (!pathname) return null
-
-    let bestHref: string | null = null
-    let bestScore = 0
-
-    for (const item of activeNavigation) {
-      const score = getItemMatchScore(item, pathname, deptId)
-      if (score > bestScore) {
-        bestScore = score
-        bestHref = item.href
-      }
-    }
-
-    return bestHref
+    const shellRoot = deptId ? `/dept/${deptId}` : "/admin"
+    return findActiveBranchHref(activeNavigation, pathname, ADMIN_ROUTE_ALIASES, (href) => href === shellRoot)
   }, [pathname, activeNavigation, deptId])
 
   // True for roles that can access the /admin shell (developer / admin / super_admin).
@@ -825,7 +828,13 @@ export function AdminSidebar({
       <nav className="scrollbar-custom flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
         {groupedNavigation.map((section) => (
           <div key={section.key} className="space-y-0.5">
-            {!isCollapsed && (
+            {isCollapsed ? (
+              // Collapsed the headings are gone, so a rule stands in for them —
+              // otherwise the rail is one undifferentiated column of icons.
+              section.key !== "overview" && (
+                <div className="mx-1.5 my-1.5 border-t border-[var(--admin-sidebar-border)]" />
+              )
+            ) : (
               <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
@@ -846,14 +855,26 @@ export function AdminSidebar({
                         highlighted ? activeCls : inactiveCls
                       )}
                     >
-                      <Link
-                        href={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex flex-1 items-center gap-2.5 px-3 py-2"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span className="flex-1 overflow-hidden whitespace-nowrap">{item.name}</span>
-                      </Link>
+                      {item.retargeted ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(item.href)}
+                          className="flex flex-1 items-center gap-2.5 px-3 py-2 text-left"
+                          aria-expanded={isOpen}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1 overflow-hidden whitespace-nowrap">{item.name}</span>
+                        </button>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="flex flex-1 items-center gap-2.5 px-3 py-2"
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1 overflow-hidden whitespace-nowrap">{item.name}</span>
+                        </Link>
+                      )}
                       <button
                         onClick={() => toggleSection(item.href)}
                         className="flex items-center px-2 py-2"
@@ -891,7 +912,11 @@ export function AdminSidebar({
                           </span>
                         </Link>
                       </TooltipTrigger>
-                      {isCollapsed && <TooltipContent side="right">{item.name}</TooltipContent>}
+                      {isCollapsed && (
+                        <TooltipContent side="right">
+                          {item.description ? `${item.name} — ${item.description}` : item.name}
+                        </TooltipContent>
+                      )}
                     </Tooltip>
                   )}
 
@@ -915,13 +940,24 @@ export function AdminSidebar({
                                   childHighlighted ? activeCls : inactiveCls
                                 )}
                               >
-                                <Link
-                                  href={child.href}
-                                  onClick={() => setIsMobileMenuOpen(false)}
-                                  className="flex flex-1 items-center px-2 py-1.5"
-                                >
-                                  {child.name}
-                                </Link>
+                                {child.retargeted ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSubSection(child.href)}
+                                    className="flex flex-1 items-center px-2 py-1.5 text-left"
+                                    aria-expanded={isSubOpen}
+                                  >
+                                    {child.name}
+                                  </button>
+                                ) : (
+                                  <Link
+                                    href={child.href}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex flex-1 items-center px-2 py-1.5"
+                                  >
+                                    {child.name}
+                                  </Link>
+                                )}
                                 <button
                                   onClick={() => toggleSubSection(child.href)}
                                   className="flex items-center px-1.5 py-1.5"
@@ -1048,7 +1084,7 @@ export function AdminSidebar({
             >
               <Link href="/profile" className="flex w-full items-center gap-2">
                 <User className="h-4 w-4" />
-                Go to Dashboard
+                Dashboard
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -1058,6 +1094,17 @@ export function AdminSidebar({
               <Link href="/admin/settings" className="flex w-full items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              asChild
+              className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
+            >
+              {/* Personal settings, which the admin shell otherwise has no route
+                  to. Distinct from the org settings above, hence the label. */}
+              <Link href="/settings" className="flex w-full items-center gap-2">
+                <User className="h-4 w-4" />
+                My Settings
               </Link>
             </DropdownMenuItem>
             {deptConsoles

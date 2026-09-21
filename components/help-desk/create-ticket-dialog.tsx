@@ -167,7 +167,7 @@ export function CreateTicketDialog({
                 approval. Use that form instead of a help desk ticket.
               </p>
               <Link
-                href="/requisition"
+                href="/accounts/requisitions"
                 className="text-primary mt-2 inline-flex items-center gap-1 font-medium hover:underline"
               >
                 Go to Requisitions

@@ -84,7 +84,7 @@ test("readDeptContextId: explicit header is trusted even on a document navigatio
 })
 
 test("readDeptContextId: falls back to Referer for plain XHR", () => {
-  const h = new Headers({ referer: `${ORIGIN}/dept/dept-accounts/hr/pms/behaviour`, "sec-fetch-dest": "empty" })
+  const h = new Headers({ referer: `${ORIGIN}/dept/dept-accounts/pms/behaviour`, "sec-fetch-dest": "empty" })
   assert.equal(readDeptContextId(h), "dept-accounts")
 })
 
@@ -105,7 +105,7 @@ test("readDeptContextId: ignores Referer on a router prefetch", () => {
 })
 
 test("readDeptContextId: non-dept Referer yields no context", () => {
-  const h = new Headers({ referer: `${ORIGIN}/admin/hr/pms/behaviour`, "sec-fetch-dest": "empty" })
+  const h = new Headers({ referer: `${ORIGIN}/admin/pms/behaviour`, "sec-fetch-dest": "empty" })
   assert.equal(readDeptContextId(h), null)
 })
 

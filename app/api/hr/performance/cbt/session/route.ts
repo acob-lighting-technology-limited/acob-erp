@@ -19,7 +19,7 @@ const StartSchema = z
   })
   .superRefine((data, ctx) => {
     // Two verification paths: password (the primary /cbt flow) or last
-    // name + date of birth (the /cbt2 fallback for candidates who don't
+    // name + date of birth (the /cbt date-of-birth fallback for candidates who don't
     // know/have a password). Exactly one must be fully supplied. profiles.
     // birthday is stored as MM-DD only (no year), so year isn't collected —
     // day + month is the full comparison.
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Fallback verification for candidates who don't know/have a password
-      // (the /cbt2 flow): last name + date of birth, matched against the
+      // (the date-of-birth flow): last name + date of birth, matched against the
       // profile on file — same check the original /cbt used before password
       // auth was added.
       const isLastNameMatch =
@@ -259,6 +259,18 @@ export async function POST(request: NextRequest) {
       if (!isDobMatch) {
         return NextResponse.json({ error: "The date of birth entered does not match our records." }, { status: 400 })
       }
+
+      // Record the verification the same way the password branch does. This is
+      // the weaker of the two checks, so leaving it untraced meant the path
+      // most worth auditing was the one with no audit trail.
+      await writeLoginLog({
+        supabase,
+        headers: request.headers,
+        userId: profile.id,
+        authMethod: "dob",
+        source: REAUTH_SOURCE,
+        userEmail: company_email,
+      })
     }
 
     // 0. Check for existing submitted attempt
@@ -568,7 +580,7 @@ export async function PATCH(request: NextRequest) {
     // they're targeted at specific candidates for fun, not part of the real
     // assessment, so they shouldn't move an actual performance evaluation.
     // Tracked in cbt_details and reviewed separately at
-    // /admin/hr/pms/cbt/extra/scores.
+    // /admin/pms/cbt/extra/scores.
     const bonusQuestionIds = (questions || []).filter((q) => q.is_bonus).map((q) => q.id)
     const bonusTotalQuestions = bonusQuestionIds.length
     const bonusCorrectAnswers = bonusQuestionIds.reduce((count, questionId) => {

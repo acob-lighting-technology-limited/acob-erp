@@ -39,7 +39,7 @@ import {
   WorkDoneText,
   plansText,
 } from "@/components/projects/project-summary"
-import { ProjectDialogs } from "@/app/admin/project/_components/project-dialogs"
+import { ProjectDialogs } from "@/app/admin/projects/_components/project-dialogs"
 import { DeletePortfolioDialog } from "./delete-portfolio-dialog"
 import { PortfolioDialog } from "./portfolio-dialog"
 import { PortfolioProjectsDialog } from "./portfolio-projects-dialog"

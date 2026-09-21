@@ -25,7 +25,7 @@ export default async function AdminPortfoliosPage() {
   if (!scope) redirect("/profile")
 
   // Project manager options for creating a project straight into a portfolio —
-  // the same active-staff list /admin/project offers.
+  // the same active-staff list /admin/projects offers.
   const { data: profiles, error: profilesError } = await getServiceRoleClientOrFallback(supabase as DbClient)
     .from("profiles")
     .select("id, first_name, last_name, full_name, department")

@@ -27,7 +27,12 @@ import {
   type HolidaySet,
   type LeaveSegmentInput,
 } from "@/lib/hr/leave-days"
-import { getHolidaySet, getLeaveRequestSegments, notifyUsers, syncAttendanceForApprovedLeave } from "@/lib/hr/leave-workflow"
+import {
+  getHolidaySet,
+  getLeaveRequestSegments,
+  notifyUsers,
+  syncAttendanceForApprovedLeave,
+} from "@/lib/hr/leave-workflow"
 
 const log = logger("leave-holiday-recalc")
 
@@ -215,7 +220,7 @@ async function repriceSingleRequest(
       message: isRefund
         ? `A public holiday now falls inside your approved leave (${newStartDate} to ${newEndDate}), so ${magnitude} day(s) went back to your balance. Your dates and resumption date are unchanged unless shown below.`
         : `A public holiday inside your leave (${newStartDate} to ${newEndDate}) was removed, so ${magnitude} day(s) were deducted again. Your dates are unchanged.`,
-      linkUrl: "/leave",
+      linkUrl: "/hr/leave",
       details: [
         { label: "Period", value: `${newStartDate} to ${newEndDate}` },
         { label: "Days deducted", value: `${previousDays} -> ${newDays}` },

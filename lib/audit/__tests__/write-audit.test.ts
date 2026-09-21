@@ -33,7 +33,7 @@ test("writeAuditLog fail-open returns null", async () => {
       action: "create",
       entityType: "feedback",
       entityId: "1",
-      context: { source: "ui", route: "/feedback" },
+      context: { source: "ui", route: "/tools/feedback" },
     },
     { failOpen: true }
   )

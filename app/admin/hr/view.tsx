@@ -118,7 +118,7 @@ export function HRAdminDashboard({
         />
         <StatCard
           variant="compact"
-          title="Rooms & Offices"
+          title="Offices & Rooms"
           value={stats.totalOfficeLocations}
           icon={MapPin}
           description="Active rooms and offices"
@@ -208,8 +208,8 @@ export function HRAdminDashboard({
             </div>
           </Link>
 
-          {/* Rooms & Offices */}
-          <Link href={`${basePath}/office-location`} className="group block">
+          {/* Offices & Rooms */}
+          <Link href={`${basePath}/offices-rooms`} className="group block">
             <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/60 hover:shadow-xl dark:hover:border-teal-400/60">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
@@ -221,7 +221,7 @@ export function HRAdminDashboard({
                       iconClassName="h-5 w-5"
                     />
                     <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-teal-500">
-                      Rooms & Offices
+                      Offices & Rooms
                     </h3>
                   </div>
                   <Badge
@@ -234,7 +234,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">View rooms and assigned employees</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Rooms & Offices</span>
+                <span className="text-muted-foreground text-[11px] font-medium">Offices & Rooms</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-teal-500"

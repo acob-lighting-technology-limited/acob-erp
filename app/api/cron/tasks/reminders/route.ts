@@ -388,7 +388,7 @@ async function sendProjectDelayReminders(supabase: Supabase, today: string): Pro
       message: `"${project.project_name}" is behind: ${describeAttention(health)}.`,
       entityType: "project",
       entityId: project.id,
-      linkUrl: "/admin/project",
+      linkUrl: "/admin/projects",
       priority: "high",
     })
     if (ok) sent++

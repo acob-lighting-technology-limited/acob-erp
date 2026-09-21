@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
             p_title: title,
             p_message: message,
             p_priority: isEmergency ? "urgent" : "normal",
-            p_link_url: `/requisition/${newReq.id}`,
+            p_link_url: `/accounts/requisitions/${newReq.id}`,
             p_actor_id: user.id,
             p_entity_type: "requisition",
             p_entity_id: newReq.id,

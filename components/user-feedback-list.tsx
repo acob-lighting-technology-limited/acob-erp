@@ -89,7 +89,7 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
             },
             context: {
               source: "ui",
-              route: "/feedback",
+              route: "/tools/feedback",
             },
           },
           { failOpen: true }

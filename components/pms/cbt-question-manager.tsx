@@ -143,7 +143,7 @@ function QuestionCard({
 }
 
 interface CbtQuestionManagerProps {
-  /** The parent PMS CBT index route, e.g. "/admin/hr/pms/cbt" or "/dept/[id]/hr/pms/cbt". */
+  /** The parent PMS CBT index route, e.g. "/admin/pms/cbt" or "/dept/[id]/pms/cbt". */
   basePath: string
   /**
    * When set, this page is being used by a department lead: the Department
@@ -472,7 +472,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
           </Button>
           {!lockDepartment && (
             <Button asChild variant="outline" size="sm">
-              <Link href="/admin/hr/pms/cycles">Manage Cycles</Link>
+              <Link href="/admin/pms/cycles">Manage Cycles</Link>
             </Button>
           )}
           <Button size="sm" onClick={openCreateModal}>

@@ -161,7 +161,7 @@ export async function PATCH() {
             userIds: [request.user_id],
             title: "Your leave request lapsed",
             message: `Your ${leaveTypeName} request (${period}) was cancelled because it was still waiting on ${holder} when the leave start date arrived. It was not approved, so this time is not recorded as leave. If you still need it, submit a new request.`,
-            linkUrl: "/leave",
+            linkUrl: "/hr/leave",
             entityId: request.id,
             emailEvent: "lapsed",
             badgeText: "Cancelled — Not Approved in Time",
@@ -221,7 +221,7 @@ export async function PATCH() {
           userIds: [request.current_approver_user_id],
           title: "Leave approval SLA reminder",
           message: `Leave request ${formatLeaveReference(request.id)} is due soon. Please review before SLA breach.`,
-          linkUrl: "/leave",
+          linkUrl: "/hr/leave",
           entityId: request.id,
           emailEvent: "sla_reminder",
         })

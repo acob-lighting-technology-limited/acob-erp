@@ -16,7 +16,7 @@ export default async function HrPage() {
     {
       title: "Attendance",
       description: "Clock in and out, monitor monthly work hours, and view historical timesheets.",
-      href: "/attendance",
+      href: "/hr/attendance",
       icon: Clock,
       badge: todayAttendance.isClockedIn ? "Clocked In" : todayAttendance.clockOut ? "Clocked Out" : "Not Clocked In",
       subLabel: todayAttendance.totalHours
@@ -30,7 +30,7 @@ export default async function HrPage() {
     {
       title: "Leave Management",
       description: "Apply for annual, casual, or medical leave, track approval stages, and submit evidence.",
-      href: "/leave",
+      href: "/hr/leave",
       icon: Calendar,
       badge: `${leave.annualRemainingDays} Days Annual`,
       subLabel:
@@ -45,7 +45,7 @@ export default async function HrPage() {
     {
       title: "Lunch Program",
       description: "Check daily menus, vote on catered options, submit meal ratings, and track orders.",
-      href: "/lunch",
+      href: "/hr/lunch",
       icon: Utensils,
       badge: lunch.hasVoted ? "Submitted" : lunch.hasMenuToday ? "Menu Available" : "No Menu Today",
       subLabel: lunch.hasVoted ? "Choice recorded" : "Daily Menu & Voting",
@@ -55,9 +55,9 @@ export default async function HrPage() {
       hoverText: "group-hover:text-orange-500",
     },
     {
-      title: "Shared Resources",
+      title: "Resource Booking",
       description: "Reserve pool vehicles, conference rooms, and company facilities for official tasks.",
-      href: "/resources",
+      href: "/hr/resources",
       icon: Car,
       badge: bookings.activeCount > 0 ? `${bookings.activeCount} Active` : "Available",
       subLabel: "Vehicles & Meeting Rooms",

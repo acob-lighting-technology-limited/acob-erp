@@ -4,17 +4,28 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Award, Brain, CheckCircle2, Clock3, MessageSquare, ShieldCheck, Target, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { pmsNavChildren } from "@/lib/pms/sections"
 
+const PMS_NAV_ICONS: Record<string, React.ElementType> = {
+  goals: CheckCircle2,
+  kpi: Target,
+  reviews: Award,
+  "peer-feedback": MessageSquare,
+  "development-plans": Award,
+  behaviour: ShieldCheck,
+  cbt: Brain,
+  attendance: Clock3,
+}
+
+// Order comes from PMS_SECTIONS so this sub-nav and the sidebar, which are on
+// screen together, cannot drift apart.
 const PMS_NAV_ITEMS = [
   { label: "Overview", href: "/pms", icon: TrendingUp },
-  { label: "KPI", href: "/pms/kpi", icon: Target },
-  { label: "Goals", href: "/pms/goals", icon: CheckCircle2 },
-  { label: "Attendance", href: "/pms/attendance", icon: Clock3 },
-  { label: "CBT", href: "/pms/cbt", icon: Brain },
-  { label: "Behaviour", href: "/pms/behaviour", icon: ShieldCheck },
-  { label: "Reviews", href: "/pms/reviews", icon: Award },
-  { label: "Development Plans", href: "/pms/development-plans", icon: Award },
-  { label: "Peer Feedback", href: "/pms/peer-feedback", icon: MessageSquare },
+  ...pmsNavChildren("/pms", { staffOnly: true }).map((child) => ({
+    label: child.name,
+    href: child.href,
+    icon: PMS_NAV_ICONS[child.href.split("/").pop() || ""] ?? TrendingUp,
+  })),
 ]
 
 /**

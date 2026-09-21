@@ -137,6 +137,161 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/admin/hr/pms",
+        destination: "/admin/pms",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/pms/:path*",
+        destination: "/admin/pms/:path*",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/hr/pms",
+        destination: "/dept/:dept_id/pms",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/hr/pms/:path*",
+        destination: "/dept/:dept_id/pms/:path*",
+        permanent: true,
+      },
+      {
+        source: "/attendance",
+        destination: "/hr/attendance",
+        permanent: true,
+      },
+      {
+        source: "/leave",
+        destination: "/hr/leave",
+        permanent: true,
+      },
+      {
+        source: "/leave/:path*",
+        destination: "/hr/leave/:path*",
+        permanent: true,
+      },
+      {
+        source: "/lunch",
+        destination: "/hr/lunch",
+        permanent: true,
+      },
+      {
+        source: "/resources",
+        destination: "/hr/resources",
+        permanent: true,
+      },
+      {
+        source: "/fleet",
+        destination: "/hr/resources",
+        permanent: true,
+      },
+      {
+        source: "/requisition",
+        destination: "/accounts/requisitions",
+        permanent: true,
+      },
+      {
+        source: "/requisition/:path*",
+        destination: "/accounts/requisitions/:path*",
+        permanent: true,
+      },
+      {
+        source: "/requisitions",
+        destination: "/accounts/requisitions",
+        permanent: true,
+      },
+      {
+        source: "/requisitions/:path*",
+        destination: "/accounts/requisitions/:path*",
+        permanent: true,
+      },
+      {
+        source: "/payments",
+        destination: "/accounts/payments",
+        permanent: true,
+      },
+      {
+        source: "/payments/:path*",
+        destination: "/accounts/payments/:path*",
+        permanent: true,
+      },
+      {
+        source: "/payroll",
+        destination: "/accounts/payroll",
+        permanent: true,
+      },
+      {
+        source: "/assets",
+        destination: "/accounts/assets",
+        permanent: true,
+      },
+      {
+        source: "/feedback",
+        destination: "/tools/feedback",
+        permanent: true,
+      },
+      {
+        source: "/cbt2",
+        destination: "/cbt?verify=identity",
+        permanent: true,
+      },
+      {
+        source: "/cbt/identity",
+        destination: "/cbt?verify=identity",
+        permanent: true,
+      },
+      {
+        source: "/tools/test",
+        destination: "/tools/media",
+        permanent: true,
+      },
+      {
+        source: "/admin/project",
+        destination: "/admin/projects",
+        permanent: true,
+      },
+      {
+        source: "/admin/project/:path*",
+        destination: "/admin/projects/:path*",
+        permanent: true,
+      },
+      {
+        source: "/admin/job-descriptions",
+        destination: "/admin/hr/job-descriptions",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/employees/attendance",
+        destination: "/admin/hr/attendance",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/employees/lunch",
+        destination: "/admin/hr/lunch",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/fleet",
+        destination: "/admin/hr/resources",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/office-location",
+        destination: "/admin/hr/offices-rooms",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/hr/office-location",
+        destination: "/dept/:dept_id/hr/offices-rooms",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/reports/weekly",
+        destination: "/dept/:dept_id/reports/weekly-reports",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,

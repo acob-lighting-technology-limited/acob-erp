@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Plus, FileCheck2, Clock, CheckCircle2, AlertCircle, RefreshCw, Siren, Building2 } from "lucide-react"
 import type { Requisition } from "@/lib/requisitions/types"
 import { getStageLabel } from "@/lib/requisitions/workflow"
-import { NewRequisitionDialog } from "@/app/(app)/requisition/_components/new-requisition-dialog"
+import { NewRequisitionDialog } from "@/app/(app)/accounts/requisitions/_components/new-requisition-dialog"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -87,7 +87,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
       accessor: (r) => r.requisition_number,
       render: (r) => (
         <div className="flex flex-col gap-0.5">
-          <Link href={`/requisition/${r.id}`} className="text-primary font-mono font-bold hover:underline">
+          <Link href={`/accounts/requisitions/${r.id}`} className="text-primary font-mono font-bold hover:underline">
             {r.requisition_number}
           </Link>
           {r.is_emergency && (
@@ -169,7 +169,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
       label: "Action",
       render: (r) => (
         <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
-          <Link href={`/requisition/${r.id}`}>View Form</Link>
+          <Link href={`/accounts/requisitions/${r.id}`}>View Form</Link>
         </Button>
       ),
       initialWidth: 100,
@@ -296,7 +296,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
           subtitle: (r) =>
             `${r.requisition_number} · ${r.project_name || r.department} · ₦${(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}`,
           trailing: (r) => <StageBadge requisition={r} />,
-          onSelect: (r) => router.push(`/requisition/${r.id}`),
+          onSelect: (r) => router.push(`/accounts/requisitions/${r.id}`),
         }}
         cardRenderer={(r) => (
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
@@ -316,7 +316,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
             <div className="border-border/40 flex items-center justify-between gap-2 border-t pt-2">
               <StageBadge requisition={r} />
               <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
-                <Link href={`/requisition/${r.id}`}>View form</Link>
+                <Link href={`/accounts/requisitions/${r.id}`}>View form</Link>
               </Button>
             </div>
           </div>

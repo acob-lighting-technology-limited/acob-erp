@@ -54,7 +54,7 @@ function buildDetailsCard(title: string, details: AttendanceMailDetail[]): strin
 }
 
 function buildEmailHtml(payload: Omit<AttendanceMailPayload, "to" | "subject">) {
-  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://matrix.acoblighting.com"}${payload.ctaPath || "/attendance"}`
+  const ctaUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://matrix.acoblighting.com"}${payload.ctaPath || "/hr/attendance"}`
 
   return (
     "<!DOCTYPE html>" +

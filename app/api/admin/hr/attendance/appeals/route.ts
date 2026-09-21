@@ -311,7 +311,7 @@ export async function PATCH(request: NextRequest) {
             ? `Your attendance appeal for ${appeal.appeal_date} has been approved. Status updated to ${appeal.requested_status}.`
             : `Your attendance appeal for ${appeal.appeal_date} has been rejected.${resolutionNote ? ` Note: ${resolutionNote}` : ""}`,
         p_priority: "normal",
-        p_link_url: "/attendance",
+        p_link_url: "/hr/attendance",
         p_actor_id: scope.userId,
         p_entity_type: "attendance_appeal",
         p_entity_id: appeal.id,

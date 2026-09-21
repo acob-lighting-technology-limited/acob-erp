@@ -20,7 +20,7 @@ export interface PersonalRecentActivityItem {
 const activityRouteMap: Record<string, string> = {
   task: "/tasks",
   tasks: "/tasks",
-  feedback: "/feedback",
+  feedback: "/tools/feedback",
   profile: "/profile",
   profiles: "/profile",
   user_documentation: "/documentation/personal",
@@ -29,15 +29,15 @@ const activityRouteMap: Record<string, string> = {
   help_desk_tickets: "/help-desk",
   correspondence_record: "/correspondence",
   correspondence_records: "/correspondence",
-  asset: "/assets",
-  assets: "/assets",
-  asset_assignment: "/assets",
-  asset_assignments: "/assets",
-  attendance: "/attendance",
-  leave_request: "/leave",
-  leave_requests: "/leave",
-  payment: "/payments",
-  payments: "/payments",
+  asset: "/accounts/assets",
+  assets: "/accounts/assets",
+  asset_assignment: "/accounts/assets",
+  asset_assignments: "/accounts/assets",
+  attendance: "/hr/attendance",
+  leave_request: "/hr/leave",
+  leave_requests: "/hr/leave",
+  payment: "/accounts/payments",
+  payments: "/accounts/payments",
 }
 
 function resolveActivityRoute(moduleKey: string): string {

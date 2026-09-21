@@ -1,4 +1,4 @@
-import type { LeaveBalance, LeaveRequest, LeaveType } from "@/app/(app)/leave/page"
+import type { LeaveBalance, LeaveRequest, LeaveType } from "@/app/(app)/hr/leave/page"
 import { toLocalISODate } from "@/lib/utils/date"
 import {
   countLeaveDays,
@@ -191,7 +191,10 @@ export function segmentsBreakdown(segments: LeaveSegment[], holidays: HolidaySet
 /** Client-side estimate of end/resume date across all committed segments (server is authoritative). */
 export function segmentsPreview(segments: LeaveSegment[], holidays: HolidaySet = NO_HOLIDAYS) {
   if (!segments.length) return { endDate: "", resumeDate: "" }
-  const endDate = segments.reduce((latest, segment) => (segment.end_date > latest ? segment.end_date : latest), segments[0].end_date)
+  const endDate = segments.reduce(
+    (latest, segment) => (segment.end_date > latest ? segment.end_date : latest),
+    segments[0].end_date
+  )
   return { endDate, resumeDate: nextWorkingDayAfter(endDate, holidays) }
 }
 

@@ -15,7 +15,13 @@ export type LoginLogSource = "auth_login" | "auth_callback" | "auth_confirm" | "
 
 export const REAUTH_SOURCE: LoginLogSource = "reauth"
 
-export type LoginAuthMethod = "password" | "otp"
+/**
+ * "dob" is the CBT date-of-birth verification — a candidate proving who they
+ * are with their last name and birthday rather than a password. It is a weaker
+ * check than the other two, so it is recorded distinctly rather than folded
+ * into "password". Mirrored by the dev_login_logs_auth_method_chk constraint.
+ */
+export type LoginAuthMethod = "password" | "otp" | "dob"
 
 export interface WriteLoginLogParams {
   supabase: SupabaseClient

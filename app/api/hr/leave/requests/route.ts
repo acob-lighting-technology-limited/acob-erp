@@ -997,7 +997,7 @@ export async function POST(request: NextRequest) {
           : `${requesterName} submitted a leave request for ${leaveType.name} (${effectiveDays} day(s), ${start_date} to ${endDate}) awaiting your endorsement.`,
         actorId: user.id,
         entityId: newRequest.id,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         emailSubject: isRelieverStage
           ? `Action Required: Leave Relief Confirmation for ${requesterName}${refSuffix}`
           : `Action Required: Leave Request Awaiting Your Approval — ${requesterName}${refSuffix}`,
@@ -1031,7 +1031,7 @@ export async function POST(request: NextRequest) {
         }.`,
         actorId: user.id,
         entityId: newRequest.id,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         emailSubject: `Leave Request Submitted Successfully${refSuffix}`,
         emailTitle: "Leave Request Submitted",
         badgeText: "Submitted — Pending Review",
@@ -1060,7 +1060,7 @@ export async function POST(request: NextRequest) {
         message: `Your leave request for ${leaveType.name} (${start_date} to ${endDate}) requires supporting documentation before it can proceed to approvals.`,
         actorId: user.id,
         entityId: newRequest.id,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         emailSubject: `Action Required: Supporting Evidence Needed for Leave Request${refSuffix}`,
         emailTitle: "Supporting Evidence Required",
         badgeText: "Evidence Required",
@@ -1235,7 +1235,7 @@ export async function PATCH(request: NextRequest) {
         message: `${reqName} has designated you as reliever for ${ltName} (${existingRequest.days_count} day(s), ${existingRequest.start_date} to ${existingRequest.end_date}). Review the handover note and confirm coverage so the workflow can proceed.`,
         actorId: user.id,
         entityId: existingRequest.id,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         emailSubject: `Action Required: Leave Relief Reassigned to You — ${reqName}${refSuffix}`,
         emailTitle: "Leave Relief Confirmation Required",
         badgeText: "Relief Required",
@@ -1467,7 +1467,7 @@ export async function PATCH(request: NextRequest) {
         message: `${reqName} updated their leave request for ${leaveType.name} (${targetDays} day(s), ${targetStartDate} to ${endDate}). Review the updated details and confirm.`,
         actorId: user.id,
         entityId: updatedRequest.id,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         emailSubject: isRelieverStage
           ? `Action Required: Updated Leave Relief for ${reqName}${refSuffix}`
           : `Action Required: Updated Leave Request — ${reqName}${refSuffix}`,
@@ -1590,7 +1590,7 @@ export async function DELETE(request: NextRequest) {
         title: "Leave request cancelled",
         message: `${callerName} cancelled their pending leave request (${existingRequest.start_date} to ${existingRequest.end_date}). Your reliever commitment has been released.`,
         actorId: user.id,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         entityId: id,
         emailEvent: "approval_required",
         emailSubject: `Reliever Duty Released — ${callerName}${refSuffix}`,

@@ -447,7 +447,7 @@ export async function GET(request: NextRequest) {
           ? `/admin/hr/leave/approve?requestId=${id}`
           : tier === "lead"
             ? `/dept/${scope.primaryDeptId}/hr/leave`
-            : `/leave`
+            : `/hr/leave`
       results.push({
         id,
         type: "leave",
@@ -511,7 +511,7 @@ export async function GET(request: NextRequest) {
     // --- Office locations ---------------------------------------------------
     for (const o of (officeRes?.data || []) as Array<Record<string, unknown>>) {
       const id = String(o.id)
-      const href = tier === "admin" ? `/admin/hr/office-location` : `/dept/${scope.primaryDeptId}/hr/office-location`
+      const href = tier === "admin" ? `/admin/hr/offices-rooms` : `/dept/${scope.primaryDeptId}/hr/offices-rooms`
       results.push({
         id,
         type: "office_location",

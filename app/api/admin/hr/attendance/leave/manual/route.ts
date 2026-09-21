@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
         title: "Leave recorded on your behalf",
         message: `Approved leave for ${leaveTypeName} was recorded on your behalf by ${adminName} for ${effectiveStartDate} to ${effectiveEndDate} (${days_count} day(s)).`,
         actorId: scope.userId,
-        linkUrl: "/leave",
+        linkUrl: "/hr/leave",
         entityId: created.id,
         emailEvent: "approved",
         emailSubject: `Leave Recorded on Your Behalf — ${leaveTypeName}${refSuffix}`,

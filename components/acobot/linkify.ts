@@ -1,8 +1,8 @@
 /**
  * Render-time safety net for AcoBot answers.
  *
- * The model is told to format pages as markdown links ([Leave](/leave)), but it
- * sometimes slips and emits a bare path (`/leave`), a backticked path (`` `/leave` ``),
+ * The model is told to format pages as markdown links ([Leave](/hr/leave)), but it
+ * sometimes slips and emits a bare path (`/hr/leave`), a backticked path (`` `/hr/leave` ``),
  * or just a bold page name (**Leave**). This converts all of those into proper
  * clickable markdown links so navigation always works — without double-wrapping
  * paths that are already linked.
@@ -14,17 +14,17 @@ const ROUTE_LABELS: Array<[path: string, label: string]> = [
   ["/notifications", "Notifications"],
   ["/correspondence", "Correspondence"],
   ["/documentation", "Documentation"],
-  ["/attendance", "Attendance"],
+  ["/hr/attendance", "Attendance"],
   ["/signature", "Signature"],
-  ["/resources", "Resources"],
-  ["/payments", "Payments"],
+  ["/hr/resources", "Resources"],
+  ["/accounts/payments", "Payments"],
   ["/settings", "Settings"],
   ["/reviews", "Reviews"],
   ["/reports", "Reports"],
   ["/directory", "Directory"],
   ["/profile", "Profile"],
-  ["/assets", "Assets"],
-  ["/leave", "Leave"],
+  ["/accounts/assets", "Assets"],
+  ["/hr/leave", "Leave"],
   ["/tasks", "Tasks"],
   ["/goals", "Goals"],
   ["/fleet", "Resource Booking"],

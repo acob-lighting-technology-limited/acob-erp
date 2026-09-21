@@ -57,18 +57,25 @@ export type AdminRouteKeyV2 =
   | "tools.main"
   | "unknown"
 
-/** Routes that can be explicitly granted to an admin user. Excludes system-only routes. */
+/**
+ * Routes that can be explicitly granted to an admin user. Excludes system-only
+ * routes, and routes no pathname ever resolves to.
+ *
+ * "hr.resources" and "finance.main" are deliberately absent: resolveAdminRouteKeyV2
+ * maps /admin/hr/resources to "hr.fleet" and /admin/finance to "accounts.main",
+ * so neither key was ever produced by a request. Granting one did nothing on its
+ * own. Both remain in AdminRouteKeyV2 and are still honoured as alternatives in
+ * canAccessRouteV2, so any grant made before this change keeps working.
+ */
 export const GRANTABLE_ADMIN_ROUTES: AdminRouteKeyV2[] = [
   "hr.main",
   "hr.fleet",
-  "hr.resources",
   "hr.leave",
   "hr.attendance",
   "hr.pms",
   "hr.pms.cbt.manage",
   "jobdescriptions.main",
   "accounts.main",
-  "finance.main",
   "payroll.main",
   "purchasing.main",
   "assets.main",
@@ -165,16 +172,27 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/finance")) return "accounts.main"
   if (pathname.startsWith("/admin/help-desk")) return "helpdesk.main"
   // Payroll owns its own key. The two legacy HR paths still resolve here so the
-  // redirect stubs behave identically to the new /admin/payroll route — this
-  // must stay above the /admin/hr fallthrough below.
+  // redirects behave identically to the new /admin/payroll route — this must
+  // stay above the /admin/hr fallthrough below.
   if (pathname.startsWith("/admin/payroll")) return "payroll.main"
   if (pathname.startsWith("/admin/hr/payroll")) return "payroll.main"
   if (pathname.startsWith("/admin/hr/employees/payroll")) return "payroll.main"
+  // Must stay above the /admin/hr fallthrough below.
+  if (pathname.startsWith("/admin/hr/job-descriptions")) return "jobdescriptions.main"
+  // PMS is its own console at /admin/pms. The /admin/hr/pms paths are the
+  // pre-move URLs, redirected in next.config.mjs, and resolve identically as
+  // defence in depth. Both must stay above the /admin/hr fallthrough below.
+  if (pathname.startsWith("/admin/pms/cbt/question")) return "hr.pms.cbt.manage"
   if (pathname.startsWith("/admin/hr/pms/cbt/question")) return "hr.pms.cbt.manage"
-  if (/^\/admin\/hr\/pms\/cbt\/[^/]+$/.test(pathname)) return "hr.pms.cbt.manage"
+  if (/^\/admin\/(?:hr\/)?pms\/cbt\/[^/]+$/.test(pathname)) return "hr.pms.cbt.manage"
+  if (pathname.startsWith("/admin/pms")) return "hr.pms"
   if (pathname.startsWith("/admin/hr/pms")) return "hr.pms"
   if (pathname.startsWith("/admin/hr/leave")) return "hr.leave"
   if (pathname.startsWith("/admin/hr/attendance")) return "hr.attendance"
+  // Pre-rename path. It is redirected in next.config.mjs before middleware ever
+  // sees it, so this is defence in depth: if that redirect is ever dropped, the
+  // path still gates as attendance rather than falling through to hr.main.
+  if (pathname.startsWith("/admin/hr/employees/attendance")) return "hr.attendance"
   // Fleet and Resources are the same "Resource Booking" feature — both gate on hr.fleet.
   if (pathname.startsWith("/admin/hr/fleet")) return "hr.fleet"
   if (pathname.startsWith("/admin/hr/resources")) return "hr.fleet"
@@ -186,11 +204,14 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/corporate-scorecard") || pathname.startsWith("/admin/corporate-services"))
     return "scorecard.main"
   if (pathname.startsWith("/admin/portfolios")) return "portfolios.main"
-  // The Projects console lives at the singular /admin/project — the sidebar
-  // labels it "Projects" but the route was never pluralised.
+  // Matches /admin/projects and the legacy singular /admin/project stub. Must
+  // stay below the /admin/portfolios rule above, which it would not shadow but
+  // reads more clearly in that order.
   if (pathname.startsWith("/admin/project")) return "projects.main"
   if (pathname.startsWith("/admin/security/bypass-override")) return "security.bypassOverride"
   if (pathname.startsWith("/admin/security/network-activity")) return "security.networkActivity"
+  // Group root, redirects to the audit log — gate it as the page it lands on.
+  if (pathname.startsWith("/admin/security")) return "auditlogs.main"
   if (pathname.startsWith("/admin/reports")) {
     if (pathname.includes("/weekly-reports")) return "reports.weekly"
     return "reports.other"
@@ -223,7 +244,7 @@ export function getRoutePolicyV2(route: AdminRouteKeyV2): RoutePolicyV2 {
     case "hr.resources":
       return { visibility: "none", mutations: "none", adminOnly: true, domain: "hr" }
     case "hr.pms.cbt.manage":
-      // Department leads set their own team's CBT from /dept/[id]/hr/pms/cbt —
+      // Department leads set their own team's CBT from /dept/[id]/pms/cbt —
       // they own the assessment for their department, so this is dept-scoped
       // rather than admin-only. Global admins still reach it via PMS/HR grants.
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "hr" }

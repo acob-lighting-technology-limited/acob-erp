@@ -696,7 +696,7 @@ function buildNotificationRows(params: {
   entityId?: string
   emailEvent?: LeaveEmailEvent
 }) {
-  const actionUrl = params.linkUrl || "/leave"
+  const actionUrl = params.linkUrl || "/hr/leave"
   const { type, category } = resolveLeaveNotificationType(params.emailEvent)
   return params.userIds.map((userId) => ({
     user_id: userId,

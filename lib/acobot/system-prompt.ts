@@ -20,7 +20,7 @@ export interface AcobotPromptContext {
   isDepartmentLead?: boolean
   /** Whether the user has any admin-level access. */
   isAdminLike?: boolean
-  /** The page the user is currently on, e.g. "/leave" or "/admin/hr/employees". */
+  /** The page the user is currently on, e.g. "/hr/leave" or "/admin/hr/employees". */
   currentPath?: string | null
 }
 
@@ -43,12 +43,12 @@ const ADMIN_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "HR → Leave — org-wide leave requests and balances. Filter by status or department; use the Approval Queue tab to approve/reject requests; Export to download records.",
   ],
   [
-    "/admin/hr/pms",
+    "/admin/pms",
     "HR → Performance Management (PMS) — KPI targets, behaviour assessments, peer feedback, and calibration cycles.",
   ],
   ["/admin/hr/exit", "HR → Exit Management — staff exit requests and offboarding checklists."],
   ["/admin/hr/departments", "HR → Departments — view and manage all departments in the organisation."],
-  ["/admin/hr/office-location", "HR → Office Locations — manage office sites and their details."],
+  ["/admin/hr/offices-rooms", "HR → Offices & Rooms — manage office sites and their details."],
   [
     "/admin/hr",
     "HR Module — employee management, attendance, leave, performance, and exit management for the whole organisation.",
@@ -107,14 +107,17 @@ const DEPT_PAGE_DESCRIPTIONS: Array<[string, string]> = [
 ]
 
 const STAFF_PAGE_DESCRIPTIONS: Array<[string, string]> = [
-  ["/leave", "Leave — request leave, view your leave balances, track approval status, and see your request history."],
-  ["/attendance", "Attendance — your daily clock-in/out records, lateness flags, and monthly attendance summary."],
+  [
+    "/hr/leave",
+    "Leave — request leave, view your leave balances, track approval status, and see your request history.",
+  ],
+  ["/hr/attendance", "Attendance — your daily clock-in/out records, lateness flags, and monthly attendance summary."],
   [
     "/tasks",
     "Tasks — tasks assigned to you (individual, group, or department). Post updates, mark complete, and view deadlines.",
   ],
   ["/help-desk", "Help Desk — raise a new support ticket or track your existing tickets."],
-  ["/assets", "Assets — equipment and devices currently assigned to you."],
+  ["/accounts/assets", "Assets — equipment and devices currently assigned to you."],
   [
     "/profile",
     "Profile — your personal details: name, designation, department, contact info, birthday, and address. Edit from here.",
@@ -123,7 +126,7 @@ const STAFF_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "/notifications",
     "Notifications — your alerts (approvals, task updates, asset events, mentions, announcements). NOT where you manage assets or tasks.",
   ],
-  ["/payments", "Payments — your payment history and payslips."],
+  ["/accounts/payments", "Payments — your payment history and payslips."],
   ["/correspondence", "Correspondence — official letters and memos sent to or from you."],
   ["/documentation", "Documentation & Resources — company documents, policies, and resources."],
   ["/pms", "PMS — your performance targets, behaviour self-assessment, peer feedback, and review cycle."],
@@ -225,7 +228,7 @@ function getAdminGuidance(path: string, isDeptConsole: boolean): string {
 - **Export**: Download any tab's data with the Export button.`
   }
 
-  if (p.includes("/assets")) {
+  if (p.includes("/accounts/assets")) {
     return `
 ## ${surface} — Assets page guidance
 - **Assigned To column**: Shows the assignee name for individual assignments, the department name for department-wide assignments, or the office name for office-wide assignments.
@@ -265,7 +268,7 @@ function getAdminGuidance(path: string, isDeptConsole: boolean): string {
 - **Export**: Download ticket data as CSV.`
   }
 
-  if (p.includes("/hr/pms")) {
+  if (p.includes("/pms")) {
     return `
 ## ${surface} — PMS (Performance Management) page guidance
 - **Tabs**: KPI Targets | Behaviour | Peer Feedback | Calibration.
@@ -347,7 +350,7 @@ Frame your guidance for this surface. If they ask "how do I do this?" or "what i
 6. You cannot perform actions (submit leave, close a ticket, clock in, add an employee). You answer and, where useful, point to the page where they can act.
 
 ## Linking rule (IMPORTANT)
-Whenever you point the user to a page, write it as a **clickable markdown link** using the route, e.g. \`[Leave](/leave)\`, \`[update your signature](/tools/signature)\`, \`[Assets](/assets)\`. NEVER write a bare page name like "go to Signature" or a bare path like \`/signature\` on its own — always wrap it as \`[label](/route)\` so the user can click it. Only link to routes from the list below.
+Whenever you point the user to a page, write it as a **clickable markdown link** using the route, e.g. \`[Leave](/hr/leave)\`, \`[update your signature](/tools/signature)\`, \`[Assets](/accounts/assets)\`. NEVER write a bare page name like "go to Signature" or a bare path like \`/signature\` on its own — always wrap it as \`[label](/route)\` so the user can click it. Only link to routes from the list below.
 
 ## Matrix modules and their real routes (only ever cite routes from this list)
 
@@ -378,10 +381,10 @@ Whenever you point the user to a page, write it as a **clickable markdown link**
   - Employees — \`/admin/hr/employees\`
   - Attendance — \`/admin/hr/attendance\`
   - Leave — \`/admin/hr/leave\`
-  - PMS — \`/admin/hr/pms\`
+  - PMS — \`/admin/pms\`
   - Exit Management — \`/admin/hr/exit\`
   - Departments — \`/admin/hr/departments\`
-  - Office Locations — \`/admin/hr/office-location\`
+  - Offices & Rooms — \`/admin/hr/offices-rooms\`
 - **Assets** — \`/admin/assets\`
 - **Payments** — \`/admin/payments\`
 - **Inventory** — \`/admin/inventory\`

@@ -25,7 +25,7 @@ export default async function AccountsPage() {
     {
       title: "Requisitions",
       description: "Submit purchase and funding requests, track department endorsements, and check payout progress.",
-      href: "/requisition",
+      href: "/accounts/requisitions",
       icon: ClipboardCheck,
       badge:
         requisitions.pendingCount > 0 ? `${requisitions.pendingCount} In Review` : `${requisitions.totalCount} Total`,
@@ -39,7 +39,7 @@ export default async function AccountsPage() {
       title: "Payments",
       description:
         "View department payment vouchers, disbursement dates, payment categories, and official payment receipts.",
-      href: "/payments",
+      href: "/accounts/payments",
       icon: CreditCard,
       badge: `${payments.totalCount} Vouchers`,
       subLabel: "Disbursements & Receipts",
@@ -52,7 +52,7 @@ export default async function AccountsPage() {
       title: "My Payroll",
       description:
         "Access your monthly pay slips, salary breakdowns, allowances, statutory deductions, and compensation details.",
-      href: "/payroll",
+      href: "/accounts/payroll",
       icon: Wallet,
       badge: payroll.latestStatus ? payroll.latestStatus.toUpperCase() : "Payslips",
       subLabel: payroll.latestPeriodName || "Salary & Pay Slips",
@@ -65,7 +65,7 @@ export default async function AccountsPage() {
       title: "Assigned Assets",
       description:
         "Track physical equipment, workstations, devices, and company assets assigned to you or report issues.",
-      href: "/assets",
+      href: "/accounts/assets",
       icon: Building2,
       badge: `${assets.assignedCount} Assets`,
       subLabel: "Equipment & Custody",

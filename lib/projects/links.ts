@@ -4,7 +4,7 @@
  */
 
 export function projectHref(projectId: string, isAdmin: boolean) {
-  return `${isAdmin ? "/admin/project" : "/projects"}/${projectId}`
+  return `${isAdmin ? "/admin/projects" : "/projects"}/${projectId}`
 }
 
 export function portfolioHref(portfolioId: string, isAdmin: boolean) {
@@ -12,7 +12,7 @@ export function portfolioHref(portfolioId: string, isAdmin: boolean) {
 }
 
 export function projectsListHref(isAdmin: boolean) {
-  return isAdmin ? "/admin/project" : "/projects"
+  return isAdmin ? "/admin/projects" : "/projects"
 }
 
 export function portfoliosListHref(isAdmin: boolean) {

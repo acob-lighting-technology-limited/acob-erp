@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
-import type { LeaveBalance, LeaveType } from "@/app/(app)/leave/page"
+import type { LeaveBalance, LeaveType } from "@/app/(app)/hr/leave/page"
 
 const ELIGIBILITY_VARIANT: Record<string, "default" | "destructive" | "secondary" | "outline"> = {
   eligible: "default",

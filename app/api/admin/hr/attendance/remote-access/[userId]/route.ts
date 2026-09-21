@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const od = getOneDriveService()
     const ext = photoFile.type === "image/png" ? "png" : photoFile.type === "image/webp" ? "webp" : "jpg"
-    const filePath = `/attendance/face-references/${userId}.${ext}`
+    const filePath = `/hr/attendance/face-references/${userId}.${ext}`
     const result = await od.uploadFile(filePath, photoBuffer, photoFile.type)
     faceReferenceUrl = (result as { webUrl?: string }).webUrl ?? ""
     if (!faceReferenceUrl) throw new Error("No URL returned from OneDrive")

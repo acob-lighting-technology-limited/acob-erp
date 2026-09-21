@@ -23,7 +23,7 @@ export default async function DeptReportsPage({ params }: Props) {
       />
       <PageSection title="Reports" className="space-y-4">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <Link href={`/dept/${dept_id}/reports/weekly`} className="group block">
+          <Link href={`/dept/${dept_id}/reports/weekly-reports`} className="group block">
             <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-500/60 hover:shadow-xl dark:hover:border-indigo-400/60">
               <div className="space-y-2.5">
                 <div className="flex items-start justify-between gap-3">

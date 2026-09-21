@@ -1,0 +1,288 @@
+"use client"
+
+import { useMemo, useState } from "react"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { PageHeader, PageWrapper } from "@/components/layout"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FormFieldGroup } from "@/components/ui/patterns"
+import { apiFetch } from "@/lib/api-client"
+import { endDateForWeekdaySpan, holidaySetFrom } from "@/components/leave/leave-data"
+import type { LeaveCalendarData } from "@/components/leave/leave-data"
+import { nextWorkingDayAfter } from "@/lib/hr/leave-days"
+
+type LeaveTypeOption = {
+  id: string
+  name: string
+  max_days?: number | null
+  eligibility_status?: "eligible" | "not_eligible" | "missing_evidence"
+  eligibility_reason?: string | null
+}
+
+async function fetchLeaveTypes(): Promise<LeaveTypeOption[]> {
+  const response = await apiFetch("/api/hr/leave/types")
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload.error || "Failed to load leave types")
+  return payload.data || []
+}
+
+async function fetchLeaveCalendar(): Promise<LeaveCalendarData> {
+  const response = await apiFetch("/api/hr/leave/calendar")
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload.error || "Failed to load leave calendar")
+  return (payload.data || { blackout_months: [12, 1], department_booked_dates: [], holidays: [] }) as LeaveCalendarData
+}
+
+async function fetchRelievers(): Promise<{ value: string; label: string }[]> {
+  const response = await apiFetch("/api/hr/leave/relievers")
+  const payload = await response.json()
+  if (!response.ok) throw new Error(payload.error || "Failed to load relievers")
+  return payload.data || []
+}
+
+function clampDays(nextValue: number, maxDays?: number | null) {
+  const normalized = Number.isFinite(nextValue) && nextValue > 0 ? Math.floor(nextValue) : 1
+  if (maxDays && maxDays > 0) {
+    return Math.min(normalized, maxDays)
+  }
+  return normalized
+}
+
+export default function LeaveRequestPage() {
+  const router = useRouter()
+  const [formData, setFormData] = useState({
+    leave_type_id: "",
+    start_date: "",
+    days_count: 1,
+    reliever_identifier: "",
+    reason: "",
+    handover_file: null as File | null,
+  })
+
+  const { data: leaveTypes = [], isLoading: loadingTypes } = useQuery({
+    queryKey: QUERY_KEYS.leaveTypes(),
+    queryFn: fetchLeaveTypes,
+  })
+
+  const { data: relieverOptions = [] } = useQuery({
+    queryKey: ["leave-relievers"],
+    queryFn: fetchRelievers,
+  })
+
+  const { data: leaveCalendar } = useQuery({
+    queryKey: ["leave-calendar"],
+    queryFn: fetchLeaveCalendar,
+  })
+
+  // Holidays inside the requested span push the end date out, so asking for
+  // five days always yields five deductible days off.
+  const holidaySet = useMemo(
+    () => holidaySetFrom(leaveCalendar || { blackout_months: [], department_booked_dates: [], holidays: [] }),
+    [leaveCalendar]
+  )
+
+  const selectedLeaveType = useMemo(
+    () => leaveTypes.find((leaveType) => leaveType.id === formData.leave_type_id),
+    [leaveTypes, formData.leave_type_id]
+  )
+  const allowedDays = selectedLeaveType?.max_days || undefined
+
+  const previewEnd = endDateForWeekdaySpan(formData.start_date, Number(formData.days_count), holidaySet)
+
+  const previewResume = previewEnd ? nextWorkingDayAfter(previewEnd, holidaySet) : ""
+
+  const canSubmit =
+    Boolean(formData.leave_type_id) &&
+    Boolean(formData.start_date) &&
+    formData.reliever_identifier.trim().length > 0 &&
+    formData.reason.trim().length > 0 &&
+    Boolean(formData.handover_file)
+
+  const { mutate: submitRequest, isPending: loading } = useMutation({
+    mutationFn: async (body: typeof formData) => {
+      let handoverChecklistUrl: string | null = null
+
+      if (body.handover_file) {
+        const uploadPayload = new FormData()
+        uploadPayload.set("file", body.handover_file)
+        uploadPayload.set("document_type", "handover_document")
+        const uploadRes = await apiFetch("/api/hr/leave/evidence/upload", {
+          method: "POST",
+          body: uploadPayload,
+        })
+        const uploadJson = await uploadRes.json().catch(() => ({}))
+        if (!uploadRes.ok || !uploadJson?.data?.file_url) {
+          throw new Error(uploadJson?.error || "Failed to upload handover document")
+        }
+        handoverChecklistUrl = String(uploadJson.data.file_url)
+      }
+
+      const segmentEnd = endDateForWeekdaySpan(body.start_date, Number(body.days_count), holidaySet)
+      const payload = {
+        leave_type_id: body.leave_type_id,
+        segments: [{ start_date: body.start_date, end_date: segmentEnd || body.start_date }],
+        reliever_identifier: body.reliever_identifier,
+        reason: body.reason,
+        handover_checklist_url: handoverChecklistUrl,
+      }
+
+      const response = await apiFetch("/api/hr/leave/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const resData = await response.json()
+      if (!response.ok) throw new Error(resData.error || "Failed to submit leave request")
+      return resData
+    },
+    onSuccess: () => {
+      toast.success("Leave request submitted")
+      router.push("/hr/leave")
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "An error occurred")
+    },
+  })
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    submitRequest(formData)
+  }
+
+  return (
+    <PageWrapper maxWidth="form">
+      <PageHeader
+        title="Submit Leave Request"
+        description="Reliever approval is required before supervisor and HR review."
+        backLink={{ href: "/hr/leave", label: "Back to leave management" }}
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Leave Request Form</CardTitle>
+          <CardDescription>Provide all required details so your approval flow can start immediately.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <FormFieldGroup label="Leave Type">
+              <Select
+                value={formData.leave_type_id}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    leave_type_id: value,
+                    days_count: clampDays(
+                      prev.days_count,
+                      leaveTypes.find((leaveType) => leaveType.id === value)?.max_days
+                    ),
+                  }))
+                }
+                disabled={loadingTypes}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingTypes ? "Loading leave types..." : "Select leave type"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {leaveTypes.map((leaveType) => (
+                    <SelectItem
+                      key={leaveType.id}
+                      value={leaveType.id}
+                      disabled={leaveType.eligibility_status === "not_eligible"}
+                    >
+                      {leaveType.name}
+                      {leaveType.max_days ? ` (${leaveType.max_days} days)` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedLeaveType?.max_days ? (
+                <p className="text-muted-foreground text-xs">
+                  Maximum allowed for this leave: {selectedLeaveType.max_days} day(s)
+                </p>
+              ) : null}
+              {selectedLeaveType?.eligibility_reason && (
+                <p className="text-muted-foreground text-xs">{selectedLeaveType.eligibility_reason}</p>
+              )}
+            </FormFieldGroup>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormFieldGroup label="Start Date">
+                <Input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, start_date: e.target.value }))}
+                />
+              </FormFieldGroup>
+              <FormFieldGroup label="Days">
+                <Input
+                  type="number"
+                  min={1}
+                  max={allowedDays}
+                  value={formData.days_count}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      days_count: clampDays(Number(e.target.value || 1), allowedDays),
+                    }))
+                  }
+                />
+              </FormFieldGroup>
+            </div>
+
+            <div className="rounded border p-3 text-sm">
+              <p>Computed End Date: {previewEnd || "-"}</p>
+              <p>Computed Resume Date: {previewResume || "-"}</p>
+            </div>
+
+            <FormFieldGroup label="Reliever" required>
+              <SearchableSelect
+                value={formData.reliever_identifier}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, reliever_identifier: value }))}
+                options={relieverOptions}
+                placeholder="Select reliever from your department"
+                searchPlaceholder="Search your department..."
+              />
+            </FormFieldGroup>
+
+            <FormFieldGroup label="Reason" required>
+              <Textarea
+                value={formData.reason}
+                onChange={(e) => setFormData((prev) => ({ ...prev, reason: e.target.value }))}
+                rows={3}
+              />
+            </FormFieldGroup>
+
+            <FormFieldGroup
+              label="Handover Document"
+              required
+              description="Upload your formal handover document (PDF, Word, or Excel) detailing coverage."
+            >
+              <Input
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                onChange={(e) => setFormData((prev) => ({ ...prev, handover_file: e.target.files?.[0] || null }))}
+              />
+              {formData.handover_file && (
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Selected: {formData.handover_file.name} ({Math.max(1, Math.round(formData.handover_file.size / 1024))}{" "}
+                  KB)
+                </p>
+              )}
+            </FormFieldGroup>
+
+            <Button type="submit" disabled={loading || loadingTypes || !canSubmit}>
+              {loading ? "Submitting..." : "Submit"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </PageWrapper>
+  )
+}

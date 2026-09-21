@@ -9,9 +9,9 @@ const quickActions = [
     icon: FileSignature,
     description: "Create professional signature",
   },
-  { name: "Submit Feedback", href: "/feedback", icon: MessageSquare, description: "Share your thoughts" },
+  { name: "Submit Feedback", href: "/tools/feedback", icon: MessageSquare, description: "Share your thoughts" },
   { name: "Watermark Tool", href: "/tools/watermark", icon: Droplet, description: "Add watermarks to images" },
-  { name: "Payments", href: "/payments", icon: CreditCard, description: "Manage department payments" },
+  { name: "Payments", href: "/accounts/payments", icon: CreditCard, description: "Manage department payments" },
 ]
 
 export function QuickActionsCard() {

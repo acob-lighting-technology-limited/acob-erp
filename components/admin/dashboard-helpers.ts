@@ -250,7 +250,7 @@ export const secondaryModules: ModuleAction[] = [
   {
     title: "Job Descriptions",
     description: "View employee job descriptions",
-    href: "/admin/job-descriptions",
+    href: "/admin/hr/job-descriptions",
     icon: Briefcase,
     color: "bg-pink-500",
     roles: ["developer", "super_admin", "admin"],

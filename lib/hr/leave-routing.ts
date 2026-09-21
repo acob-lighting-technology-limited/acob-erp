@@ -443,7 +443,7 @@ export async function notifyStageApprover(params: {
     message: params.message,
     actorId: params.actorId,
     entityId: params.entityId,
-    linkUrl: params.linkUrl || "/leave",
+    linkUrl: params.linkUrl || "/hr/leave",
     emailEvent: "approval_required",
     emailSubject: params.emailSubject,
     emailTitle: params.emailTitle,
