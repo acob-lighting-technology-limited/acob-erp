@@ -92,7 +92,6 @@ export async function GET(request: NextRequest) {
         kpi_id,
         project_id,
         plan_id,
-        group_id,
         weight,
         rating,
         rated_by,
@@ -309,20 +308,11 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Work with nobody responsible for it is not a task. Department-wide
-    // assignment is the one shape that legitimately has no named person; every
-    // other kind needs at least one. Five such rows already exist in the data,
-    // and they belong to nobody's list and nobody's score.
-    if (payload.assignment_type !== "department" && targetUserIds.length === 0) {
+    // Work with nobody responsible for it is not a task. There is no longer a
+    // department-wide shape that opts out of this: a task for a whole team is a
+    // multi-assign, which names every person it lands on.
+    if (targetUserIds.length === 0) {
       return apiError("A task must be assigned to at least one person", ApiErrorCode.MISSING_REQUIRED_FIELD, 400)
-    }
-
-    if (payload.assignment_type === "department" && !resolvedDepartment) {
-      return apiError(
-        "A department-wide task must specify the department it belongs to",
-        ApiErrorCode.MISSING_REQUIRED_FIELD,
-        400
-      )
     }
 
     // Validate scope if assigner is a department lead
@@ -373,15 +363,13 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString()
 
-    // ── Fan-Out Logic: If multiple assignees, create 1 task row per assignee ──
+    // ── Fan-Out: several assignees means several independent tasks ──
+    // Picking three people in the dialog is a shortcut for opening it three
+    // times, nothing more. The rows are not linked: each person owns their own
+    // task with its own number, deadline, status and rating, and a lead editing
+    // one of them changes that one person's task and no one else's.
     if (targetUserIds.length > 1) {
-      // One piece of work assigned to several people is one thing to the lead
-      // who created it. The shared group id keeps that true, so archiving or
-      // editing the set does not leave orphaned copies on other people's lists.
-      const fanOutGroupId = targetUserIds.length > 1 ? crypto.randomUUID() : null
-
       const insertPayloads = targetUserIds.map((targetId) => ({
-        group_id: fanOutGroupId,
         title: payload.title,
         description: payload.description || null,
         priority: payload.priority,
@@ -480,10 +468,7 @@ export async function POST(request: NextRequest) {
       status: payload.status,
       due_date: payload.due_date || null,
       department: resolvedDepartment,
-      assignment_type: (primaryAssignee ? "individual" : payload.assignment_type) as
-        | "individual"
-        | "multiple"
-        | "department",
+      assignment_type: "individual" as const,
       assigned_to: primaryAssignee,
       assigned_by: user.id,
       assigned_at: primaryAssignee ? now : null,

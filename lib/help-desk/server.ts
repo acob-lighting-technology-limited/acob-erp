@@ -4,7 +4,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { BUSINESS_HOUR_START, BUSINESS_HOUR_END, HELP_DESK_SLA } from "@/lib/org-config"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { TaskStatus, TaskAssignmentType } from "@/lib/tasks/constants"
+import type { TaskStatus } from "@/lib/tasks/constants"
 
 /** Minimal profile shape used in help-desk access-control helpers */
 export interface ProfileLike {
@@ -281,8 +281,12 @@ function normalizeTaskStatusFromTicket(ticketStatus: string): TaskStatus | null 
   }
 }
 
-function normalizeTaskAssignmentType(ticket: HelpDeskTicketRow): TaskAssignmentType {
-  return ticket.handling_mode === "individual" && ticket.assigned_to ? "individual" : "department"
+// A ticket still sitting in the help-desk queue has no owner yet, so it mirrors
+// to a task with a null `assigned_to`. That keeps it off every personal list
+// until someone picks it up — the queue itself lives in the help-desk module,
+// which is why tasks no longer carry a department-wide assignment type.
+function normalizeTaskAssignee(ticket: HelpDeskTicketRow): string | null {
+  return ticket.handling_mode === "individual" ? (ticket.assigned_to ?? null) : null
 }
 
 function normalizeTaskDueDate(value: string | null | undefined): string | null {
@@ -327,13 +331,13 @@ export async function syncHelpDeskTicketTask(params: {
     existingTask = data ?? null
   }
 
-  const assignmentType = normalizeTaskAssignmentType(params.ticket)
+  const assignedTo = normalizeTaskAssignee(params.ticket)
   const taskPayload = {
     title: params.ticket.title,
     description: params.ticket.description ?? null,
     priority: params.ticket.priority,
     status: taskStatus,
-    assigned_to: assignmentType === "individual" ? params.ticket.assigned_to : null,
+    assigned_to: assignedTo,
     assigned_by: params.ticket.assigned_by || params.ticket.created_by || params.ticket.requester_id || params.actorId,
     department: params.ticket.service_department || params.ticket.requester_department || null,
     due_date: normalizeTaskDueDate(params.ticket.sla_target_at),
@@ -344,7 +348,7 @@ export async function syncHelpDeskTicketTask(params: {
         : null,
     source_type: "help_desk" as const,
     source_id: params.ticket.id,
-    assignment_type: assignmentType,
+    assignment_type: "individual" as const,
     goal_id: null,
   }
 
