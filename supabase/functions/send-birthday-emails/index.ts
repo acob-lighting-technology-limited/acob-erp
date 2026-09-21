@@ -7,7 +7,7 @@ import { EDGE_MAIL_ROUTING, EDGE_SENDERS } from "../_shared/senders.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-const DEFAULT_SENDER = EDGE_SENDERS.system
+const DEFAULT_SENDER = EDGE_SENDERS.company
 const TIME_ZONE = "Africa/Lagos"
 
 const corsHeaders = {
