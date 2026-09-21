@@ -46,7 +46,16 @@ import {
   plansText,
 } from "@/components/projects/project-summary"
 import { ProjectsOverview, type OverviewProject } from "@/components/projects/projects-overview"
-import { ProjectCharts, type ChartsProject } from "@/components/projects/project-charts"
+import dynamic from "next/dynamic"
+import type { ChartsProject } from "@/components/projects/project-charts"
+
+// recharts is one of the heaviest things in the bundle and the charts sit
+// below the fold behind a toggle, so it is fetched when they are first shown
+// rather than on page load. ssr:false because recharts measures the DOM.
+const ProjectCharts = dynamic(() => import("@/components/projects/project-charts").then((m) => m.ProjectCharts), {
+  ssr: false,
+  loading: () => <div className="bg-muted/40 h-[320px] w-full animate-pulse rounded-lg" />,
+})
 import { toLocalISODate } from "@/lib/utils/date"
 import { projectHref } from "@/lib/projects/links"
 import Link from "next/link"

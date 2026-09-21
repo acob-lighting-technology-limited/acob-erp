@@ -2,9 +2,6 @@
 
 import { logger } from "@/lib/logger"
 import { format, parseISO, isValid } from "date-fns"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
-import * as XLSX from "@e965/xlsx"
 import { toast } from "sonner"
 
 const log = logger("payment-export")
@@ -86,6 +83,9 @@ export function usePaymentExport(
   const exportToExcel = async () => {
     try {
       const dataToExport = getExportData()
+      // Loaded on demand. Both export libraries are large and most people who
+      // open Payments never export, so they do not belong in the page bundle.
+      const XLSX = await import("@e965/xlsx")
       const ws = XLSX.utils.json_to_sheet(dataToExport)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "Payments")
@@ -110,6 +110,10 @@ export function usePaymentExport(
 
   const exportToPDF = async () => {
     try {
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ])
       const doc = new jsPDF({ orientation: "landscape" })
       doc.setFontSize(16)
       doc.text("Payments Report", 14, 15)
