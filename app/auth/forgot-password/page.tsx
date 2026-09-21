@@ -4,32 +4,18 @@ import type React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
+import { AuthField, AuthNotice } from "@/components/auth/auth-form-parts"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 
 import { toast } from "sonner"
-import { ArrowLeft, Mail } from "lucide-react"
-import Image from "next/image"
-import { useTheme } from "next-themes"
-import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
+import { Mail } from "lucide-react"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  const { resolvedTheme } = useTheme()
-
-  // Default to light logo for SSR to prevent hydration mismatch
-  const logoSrc = !mounted
-    ? getSeasonalLogoPaths("light").navbar
-    : getSeasonalLogoPaths(resolvedTheme === "dark" ? "dark" : "light").navbar
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,88 +41,72 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br p-4 md:p-6">
-      <div className="w-full max-w-lg">
-        <div className="flex flex-col gap-6">
-          <Card className="border-2 shadow-xl">
-            <CardHeader className="pb-4">
-              <div className="mb-4 flex justify-center">
-                <Image src={logoSrc} alt="ACOB Lighting" width={220} height={56} priority className="h-14 w-auto" />
+    <AuthShell>
+      <Card className={authCardClassName}>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            {emailSent ? "Check your email" : "Forgot password?"}
+          </CardTitle>
+          <CardDescription className="text-sm">
+            {emailSent
+              ? "We've sent a password reset link to your inbox"
+              : "Enter your company email and we'll send you a reset link"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 pb-8">
+          {emailSent ? (
+            <>
+              <AuthNotice variant="success">
+                A reset link is on its way to {email}. It can take a minute — check your spam folder too.
+              </AuthNotice>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => setEmailSent(false)}
+                  variant="outline"
+                  className="h-12 w-full rounded-xl text-sm font-semibold"
+                >
+                  Send another email
+                </Button>
+                <Link
+                  href="/auth/login"
+                  className="text-muted-foreground hover:text-foreground block text-center text-sm underline-offset-4 hover:underline"
+                >
+                  Back to login
+                </Link>
               </div>
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                {emailSent ? "Check your email" : "Forgot password?"}
-              </CardTitle>
-              <CardDescription className="text-sm">
-                {emailSent
-                  ? "We've sent a password reset link to your inbox"
-                  : "Enter your company email and we'll send you a reset link"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pb-8">
-              {emailSent ? (
-                <div className="space-y-6">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
-                    <p className="text-sm text-green-800 dark:text-green-200">
-                      Check your email inbox for a password reset link. If you don&apos;t see it, check your spam
-                      folder.
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    <Button onClick={() => setEmailSent(false)} variant="outline" className="h-11 w-full">
-                      Send Another Email
-                    </Button>
-                    <Link href="/auth/login" className="block">
-                      <Button variant="ghost" className="h-11 w-full">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Login
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleResetPassword}>
-                  <div className="flex flex-col gap-5">
-                    <div className="grid gap-3">
-                      <Label htmlFor="email" className="text-sm font-medium">
-                        Company Email
-                      </Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="a.nmanma@org.acoblighting.com"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="h-11 text-base"
-                        autoFocus
-                        autoComplete="email"
-                      />
-                      <p className="text-muted-foreground text-xs">
-                        Enter the email address associated with your account
-                      </p>
-                    </div>
+            </>
+          ) : (
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              <AuthField
+                id="email"
+                type="email"
+                label="Company email"
+                icon={Mail}
+                placeholder="a.nmanma@org.acoblighting.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoFocus
+                autoComplete="email"
+                hint="The address associated with your account."
+              />
+              <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" loading={isLoading}>
+                Send reset link
+              </Button>
+              <Link
+                href="/auth/login"
+                className="text-muted-foreground hover:text-foreground block text-center text-sm underline-offset-4 hover:underline"
+              >
+                Back to login
+              </Link>
+            </form>
+          )}
+        </CardContent>
+      </Card>
 
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                      Send Reset Link
-                    </Button>
-
-                    <Link href="/auth/login" className="block">
-                      <Button variant="ghost" className="h-11 w-full">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Login
-                      </Button>
-                    </Link>
-                  </div>
-                </form>
-              )}
-            </CardContent>
-          </Card>
-
-          <p className="text-muted-foreground text-center text-xs">
-            Having trouble? Contact your system administrator or IT support.
-          </p>
-        </div>
-      </div>
-    </div>
+      <p className="text-muted-foreground mt-6 text-center text-xs">
+        Having trouble? Contact your system administrator or IT support.
+      </p>
+    </AuthShell>
   )
 }
