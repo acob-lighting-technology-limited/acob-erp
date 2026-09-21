@@ -24,7 +24,6 @@ import {
   FileBarChart,
   FileCode2,
   Megaphone,
-  Package,
   Wrench,
   ShieldCheck,
   FlaskConical,
@@ -171,15 +170,12 @@ function buildDeptNavigation(deptId: string): NavItem[] {
         { name: "Bills", href: `${base}/accounts/bills` },
         { name: "Invoices", href: `${base}/accounts/invoices` },
         { name: "Finance Reports", href: `${base}/accounts/reports` },
+        {
+          name: "Assets",
+          href: `${base}/assets`,
+          children: [{ name: "Issues", href: `${base}/assets/issues` }],
+        },
       ],
-    },
-    {
-      section: "management",
-      name: "Assets",
-      href: `${base}/assets`,
-      icon: Package,
-      roles: [],
-      children: [{ name: "Issues", href: `${base}/assets/issues` }],
     },
     {
       section: "operations",
@@ -337,9 +333,10 @@ const adminNavigation: NavItem[] = [
     children: pmsNavChildren("/admin/pms"),
   },
   {
-    // Accounts now also surfaces Purchasing and Inventory as nested groups
-    // so the financial workflow (accounts → purchase → stock) is one coherent
-    // node in the sidebar rather than three separate top-level items.
+    // Accounts also surfaces Purchasing, Inventory and Assets as nested groups
+    // so the financial workflow (accounts → purchase → stock → what it bought)
+    // is one coherent node rather than four separate top-level items. This
+    // matches the staff sidebar, which has always listed Assets under Accounts.
     section: "management",
     name: "Accounts",
     href: "/admin/accounts",
@@ -371,15 +368,12 @@ const adminNavigation: NavItem[] = [
           { name: "Movements", href: "/admin/inventory/movements" },
         ],
       },
+      {
+        name: "Assets",
+        href: "/admin/assets",
+        children: [{ name: "Issues", href: "/admin/assets/issues" }],
+      },
     ],
-  },
-  {
-    section: "management",
-    name: "Assets",
-    href: "/admin/assets",
-    icon: Package,
-    roles: ["developer", "super_admin", "admin"],
-    children: [{ name: "Issues", href: "/admin/assets/issues" }],
   },
   {
     section: "management",
