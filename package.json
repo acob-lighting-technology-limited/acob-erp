@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "commit": "cz",
     "type-check": "tsc --noEmit",
+    "test": "npm run test:audit && npm run test:admin-scope && npm run test:meeting-week && npm run test:attendance && npm run test:task-scoring && npm run test:project-health && npm run test:scorecard",
     "test:audit": "tsx --test lib/audit/__tests__/*.test.ts",
     "test:admin-scope": "tsx --test lib/admin/__tests__/*.test.ts",
     "test:meeting-week": "tsx --test lib/__tests__/*.test.ts",
