@@ -432,7 +432,7 @@ export function ProjectPlanBoard({
       assigned_to: task.assigned_to || "",
       department: task.department || "",
       due_date: task.due_date || "",
-      assignment_type: (task.assignment_type as "individual" | "multiple" | "department") || "individual",
+      assignment_type: (task.assignment_type as "individual" | "multiple") || "individual",
       assigned_users: task.assigned_to ? [task.assigned_to] : [],
       project_id: project.id,
       plan_id: task.plan_id || "",

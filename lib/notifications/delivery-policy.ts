@@ -14,6 +14,12 @@ export const NOTIFICATION_KEYS = [
   // so they had no delivery policy of their own until push needed one.
   "approvals",
   "tasks",
+  // Mail that sent outside any policy until 20 Sep 2026. The admin page claims
+  // to govern notifications system-wide, so a stream with no key here was one
+  // it silently could not switch off.
+  "payroll",
+  "attendance",
+  "birthdays",
 ] as const
 
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]

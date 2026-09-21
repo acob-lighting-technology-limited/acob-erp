@@ -5,6 +5,9 @@
 
 const ORG_CODE = "ACOB"
 
+/** Registered company name — mirrors ORG_LEGAL_NAME in lib/org-config.ts. */
+const ORG_LEGAL_NAME = Deno.env.get("ORG_LEGAL_NAME") || "ACOB Lighting Technology Limited"
+
 /** Shared notifications mailbox all subsystem senders send from. */
 export const SENDER_ADDRESS = Deno.env.get("NOTIFICATION_SENDER_EMAIL") || "notifications@acoblighting.com"
 
@@ -18,9 +21,24 @@ export function edgeSender(label: string): string {
 // them sent from the same address, which is what mail clients actually thread,
 // filter, and score. The subsystem belongs in the subject; where a reply goes
 // belongs in Reply-To (see EDGE_REPLY_TO).
+//
+// The display name is the PLATFORM, not the legal entity — see the rationale on
+// ORG_NOTIFICATION_SENDER in lib/org-config.ts. The legal entity stays in the
+// email footer.
+//
+// ORG_NOTIFICATION_SENDER accepts a full "Label <address>" string and mirrors the
+// Next app's env var of the same name. The two runtimes read different secret
+// stores (Vercel vs Supabase), so setting it in only one place makes the app and
+// the edge functions disagree — set it in both, or neither.
 export const EDGE_SENDERS = {
-  /** The single identity for every automated notification. */
-  system: edgeSender(`${ORG_CODE} Lighting Technology Limited`),
+  /** The platform speaking: every automated notification. */
+  system: Deno.env.get("ORG_NOTIFICATION_SENDER") || edgeSender(`${ORG_CODE} Matrix`),
+  /**
+   * The company speaking, under its registered name — birthday wishes and exit
+   * notices, which are institutional acts rather than system notifications.
+   * Mirrors ORG_EMAIL_SENDERS.company. Do not widen it to other mail.
+   */
+  company: edgeSender(ORG_LEGAL_NAME),
 } as const
 
 /** Monitored mailboxes replies are routed to, per module. */

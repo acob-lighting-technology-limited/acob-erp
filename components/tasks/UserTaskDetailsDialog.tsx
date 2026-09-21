@@ -5,18 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  MessageSquare,
-  AlertTriangle,
-  Send,
-  Building2,
-  CalendarDays,
-  Target,
-  User,
-  Gauge,
-  Star,
-  Users,
-} from "lucide-react"
+import { MessageSquare, AlertTriangle, Send, Building2, CalendarDays, Target, User, Gauge, Star } from "lucide-react"
 import type { Task } from "@/types/task"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
@@ -84,9 +73,7 @@ export function UserTaskDetailsDialog({
 
   const assignedToName = selectedTask.assigned_to_user
     ? formatFullName(selectedTask.assigned_to_user.first_name, selectedTask.assigned_to_user.last_name)
-    : selectedTask.assignment_type === "department"
-      ? `${selectedTask.department || "The department"} · whole department`
-      : "Nobody"
+    : "Nobody"
 
   const dueLabel = selectedTask.due_date ? formatWATDate(selectedTask.due_date) : "No deadline"
   const startLabel = selectedTask.task_start_date ? formatWATDate(selectedTask.task_start_date) : null
@@ -254,11 +241,6 @@ export function UserTaskDetailsDialog({
                       {selectedTask.reviewed_at && (
                         <span className="text-muted-foreground"> · {formatWATDateTime(selectedTask.reviewed_at)}</span>
                       )}
-                    </DetailField>
-                  )}
-                  {selectedTask.group_id && (
-                    <DetailField icon={Users} label="Shared task">
-                      Assigned to several people
                     </DetailField>
                   )}
                 </DetailFieldGrid>

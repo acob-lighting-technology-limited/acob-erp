@@ -287,12 +287,16 @@ export async function GET(request: NextRequest) {
 
     const html = renderAlertHtml(title, lines)
     const subject = `Meeting Reminder Failed to Send — ${new Date(failures[0].since).toLocaleDateString("en-GB", { timeZone: "Africa/Lagos" })}`
+    // Deliberately ungated: this is the alarm that fires when the mail system
+    // itself is failing, sent to the developers who fix it, not a notification
+    // stream staff receive. Gating it behind Mail Settings would let one bad
+    // toggle silence the warning that the toggles are broken.
     // One email per recipient, so nobody sees the others' addresses.
     let emailed = 0
     for (const email of emails) {
       const result = await sendNotificationEmailWithRetry({
         from: ORG_EMAIL_SENDERS.system,
-        ...ORG_MAIL_ROUTING.Meetings,
+        ...ORG_MAIL_ROUTING["System Health"],
         to: [email],
         subject,
         html,

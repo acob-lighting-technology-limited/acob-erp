@@ -14,6 +14,7 @@ export type NotificationModule =
   | "Payroll"
   | "Correspondence"
   | "Security"
+  | "System Health"
 
 export function withSubjectPrefix(moduleName: NotificationModule, subject: string): string {
   return String(subject || "").trim() || "Notification"

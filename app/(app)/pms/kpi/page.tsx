@@ -145,13 +145,10 @@ export default async function PmsKpiPage({
       // it never included.
       if (cycleStart && cycleEnd && !isTaskInCycle(task, cycleStart, cycleEnd)) continue
 
-      const assignmentType = String(task.assignment_type || "")
-      const isIndividualTaskForUser = assignmentType === "individual" && task.assigned_to === currentUserId
-      const isDepartmentTaskForUser =
-        assignmentType === "department" && Boolean(currentUserDepartment) && task.department === currentUserDepartment
+      const isIndividualTaskForUser = task.assigned_to === currentUserId
       const hasCompletionByUser = completedTaskIds.has(task.id)
 
-      if (!isIndividualTaskForUser && !isDepartmentTaskForUser && !hasCompletionByUser) {
+      if (!isIndividualTaskForUser && !hasCompletionByUser) {
         continue
       }
 
@@ -163,7 +160,7 @@ export default async function PmsKpiPage({
         description: task.description,
         status: task.status || "pending",
         dueDate: task.task_end_date || task.due_date,
-        assignmentType: assignmentType || "department",
+        assignmentType: "individual",
         weight: task.weight ?? TASK_WEIGHT_DEFAULT,
         rating: task.rating,
       })

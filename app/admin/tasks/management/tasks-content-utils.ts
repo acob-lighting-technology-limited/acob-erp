@@ -6,8 +6,6 @@ import type { employee, UserProfile } from "./admin-tasks-content"
 
 export type SupabaseClient = GenericSupabaseClient
 
-type NotificationPriority = "low" | "medium" | "high" | "urgent"
-
 export async function enrichTaskWithUsers(supabase: SupabaseClient, task: Task): Promise<Task> {
   const taskData: Task = { ...task }
   if (task.assignment_type === "individual" && task.assigned_to) {
@@ -19,24 +17,6 @@ export async function enrichTaskWithUsers(supabase: SupabaseClient, task: Task):
     taskData.assigned_to_user = data || undefined
   }
   return taskData
-}
-
-export function buildDepartmentLeadMap(activeEmployees: employee[]): Map<string, employee[]> {
-  const map = new Map<string, employee[]>()
-  for (const member of activeEmployees) {
-    if (!member.is_department_lead) continue
-    const depts = new Set<string>()
-    if (member.department) depts.add(member.department)
-    for (const d of member.lead_departments || []) {
-      if (d) depts.add(d)
-    }
-    for (const dept of Array.from(depts)) {
-      const rows = map.get(dept) || []
-      rows.push(member)
-      map.set(dept, rows)
-    }
-  }
-  return map
 }
 
 export function applyTaskFilters(
@@ -96,7 +76,7 @@ export function validateTaskForm(form: TaskFormState): string | null {
   if (!form.title.trim()) return "Please enter a task title"
   if (!form.kpi_id?.trim()) return "Please select a Corporate KPI for this task"
   const hasAssignee = form.assigned_to || (form.assigned_users && form.assigned_users.length > 0)
-  if (!hasAssignee && form.assignment_type !== "department") {
+  if (!hasAssignee) {
     return "Please select at least one assignee for this task"
   }
   if (form.task_start_date && form.task_end_date) {
@@ -135,28 +115,4 @@ export async function persistTaskCreate(
   const { data: newTask, error: taskError } = await supabase.from("tasks").insert(taskData).select().single()
   if (taskError) throw taskError
   return newTask
-}
-
-export async function sendUpdateNotifications(form: TaskFormState, selectedTask: Task, userId: string) {
-  const { notifyTaskAssigned, notifyTaskUpdated } = await import("@/lib/notifications")
-  if (form.assignment_type === "individual") {
-    const isNewAssignment = selectedTask.assigned_to !== form.assigned_to
-    if (isNewAssignment && form.assigned_to) {
-      await notifyTaskAssigned({
-        userId: form.assigned_to,
-        taskId: selectedTask.id,
-        taskTitle: form.title,
-        assignedBy: userId,
-        priority: form.priority as NotificationPriority,
-      })
-    } else if (form.assigned_to) {
-      await notifyTaskUpdated({
-        userId: form.assigned_to,
-        taskId: selectedTask.id,
-        taskTitle: form.title,
-        updatedBy: userId,
-        changeDescription: "Task details updated by admin",
-      })
-    }
-  }
 }

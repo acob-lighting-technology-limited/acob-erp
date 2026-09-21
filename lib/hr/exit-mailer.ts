@@ -158,15 +158,16 @@ export async function sendExitNotificationEmail(payload: ExitNotificationPayload
   const names = employees.map((e) => e.fullName).join(", ")
   const isBulk = employees.length > 1
   const html = buildExitEmailHtml(payload)
-  // The From line already says ACOB Lighting Technology Limited; repeating it
-  // here just spends the mobile subject preview on nothing.
+  // Exit notices send as the company (ORG_EMAIL_SENDERS.company), so the From
+  // line already carries the company name; repeating it in the subject just
+  // spends the mobile preview on nothing.
   const subject = isBulk
     ? `Staff Exit Notification — ${employees.length} staff`
     : `Staff Exit Notification — ${employees[0].fullName}`
 
   try {
     const result = await sendNotificationEmailsIndividuallyWithRetry({
-      from: payload.from ?? ORG_EMAIL_SENDERS.system,
+      from: payload.from ?? ORG_EMAIL_SENDERS.company,
       ...ORG_MAIL_ROUTING["Exit"],
       to: recipients,
       subject,

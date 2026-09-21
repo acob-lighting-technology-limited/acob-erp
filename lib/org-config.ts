@@ -31,6 +31,12 @@ export const ORG_EMAIL_DOMAINS: readonly string[] = [ORG_PRIMARY_DOMAIN, ORG_STA
 /** Short company code prefix used in employee numbers and asset IDs */
 export const ORG_CODE = process.env.NEXT_PUBLIC_ORG_CODE ?? "ACOB"
 
+/**
+ * Registered company name. Used where the COMPANY is the speaker — the sender
+ * name on birthday and exit mail, and the footer of every email.
+ */
+export const ORG_LEGAL_NAME = process.env.NEXT_PUBLIC_ORG_LEGAL_NAME ?? "ACOB Lighting Technology Limited"
+
 /** IT/ICT contact email shown in system emails */
 export const ORG_ICT_EMAIL = process.env.NEXT_PUBLIC_ORG_ICT_EMAIL ?? `ict@${ORG_PRIMARY_DOMAIN}`
 
@@ -47,9 +53,20 @@ export const ORG_ACCOUNTS_EMAIL = process.env.ORG_ACCOUNTS_EMAIL ?? `accounts@${
  */
 export const ORG_CORPORATE_SERVICES_EMAIL = process.env.ORG_CORPORATE_SERVICES_EMAIL ?? `a.peter@${ORG_PRIMARY_DOMAIN}`
 
-/** Sender display name + address used for all outbound notification emails */
+/**
+ * Sender display name + address used for all outbound notification emails.
+ *
+ * The display name is the PLATFORM ("ACOB Matrix"), not the legal entity. Every
+ * recipient already works here, so the registered company name carries no signal
+ * in a From line — it just repeats, and at 31 characters it is truncated in the
+ * sender column on mobile. Naming the platform tells the reader which system is
+ * speaking and distinguishes automated mail from correspondence a colleague sent.
+ *
+ * The legal entity still appears once per email, in the footer, which is where
+ * it belongs. Do not move it back into the From line.
+ */
 export const ORG_NOTIFICATION_SENDER =
-  process.env.ORG_NOTIFICATION_SENDER ?? `${ORG_CODE} Lighting Technology Limited <notifications@${ORG_PRIMARY_DOMAIN}>`
+  process.env.ORG_NOTIFICATION_SENDER ?? `${ORG_CODE} Matrix <notifications@${ORG_PRIMARY_DOMAIN}>`
 
 // ---------------------------------------------------------------------------
 // Outbound email sender identities ("From" display names)
@@ -68,18 +85,34 @@ export function orgSender(label: string): string {
   return `${label} <${ORG_SENDER_ADDRESS}>`
 }
 
-// All automated mail sends under ONE identity. Recipients learn to trust a
-// single sender; the subsystem is conveyed by the subject line, and replies are
-// routed by Reply-To (see ORG_MAIL_ROUTING) rather than by the display name. Per-
-// subsystem display names bought nothing — every one of them sent from the same
-// address, which is what mail clients actually thread, filter, and score.
+// The display name answers ONE question: who is speaking? There are exactly
+// three answers, and nothing else earns a name of its own.
 //
-// Two exceptions use a department display name (orgDepartmentSenderBare), because
-// there the department genuinely is who is speaking: Communications broadcasts,
-// and task mail, since every task is issued by a department.
+//   the platform    -> ORG_EMAIL_SENDERS.system   ("ACOB Matrix")
+//   a department    -> orgDepartmentSenderBare()  ("ACOB Accounts")
+//   the company     -> ORG_EMAIL_SENDERS.company  (registered name)
+//
+// What this deliberately excludes is a name per SUBSYSTEM ("ACOB Leave", "ACOB
+// Assets", "ACOB Payroll"). Those bought nothing: every one of them sent from
+// the same address, which is what mail clients actually thread, filter and
+// score, so they were routing metadata wearing a display name. The subsystem
+// belongs in the subject; where a reply goes belongs in Reply-To (see
+// ORG_MAIL_ROUTING). Do not reintroduce them.
 export const ORG_EMAIL_SENDERS = {
-  /** The single identity for every automated notification (env-overridable). */
+  /** The platform speaking: every automated notification (env-overridable). */
   system: ORG_NOTIFICATION_SENDER,
+  /**
+   * The company speaking, under its registered name. Reserved for mail that is
+   * an institutional act rather than a system notification — birthday wishes,
+   * staff exit notices and the welcome letter, whose own text reads "We are
+   * excited to welcome you to ACOB Lighting Technology Limited". "ACOB Matrix
+   * wishes you a happy birthday" names the wrong speaker; the company is the
+   * one sending those.
+   *
+   * Do not widen this to ordinary notifications. If a subsystem merely feels
+   * important, that is not the company speaking.
+   */
+  company: `${ORG_LEGAL_NAME} <${ORG_SENDER_ADDRESS}>`,
 } as const
 
 /** RFC 2919 List-Id for a module, e.g. "<leave.acoblighting.com>". */
@@ -122,6 +155,14 @@ export const ORG_MAIL_ROUTING: Record<
   Payroll: { replyTo: ORG_ACCOUNTS_EMAIL, listId: listId("payroll") },
   Correspondence: { replyTo: ORG_CORPORATE_SERVICES_EMAIL, listId: listId("correspondence") },
   Security: { replyTo: ORG_ICT_EMAIL, listId: listId("security") },
+  /**
+   * Operational alarms about the platform itself — a cron that stopped, mail
+   * that failed to go out. These go to whoever fixes the system, never to the
+   * department whose feature happened to break: HR cannot action a failed
+   * cron. Kept off the affected feature's stream so an alarm is never filtered
+   * away with the mail it is warning about.
+   */
+  "System Health": { replyTo: ORG_ICT_EMAIL, listId: listId("health") },
 }
 
 /**

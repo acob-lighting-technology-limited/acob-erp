@@ -61,20 +61,10 @@ export async function loadUserTasks(
       ? await supabase.from("tasks").select("*").in("id", multiTaskIds).eq("is_archived", false)
       : { data: [] }
 
-  // 3. Work assigned to the whole department. Help-desk tickets are excluded:
-  //    they have their own queue and would otherwise appear twice.
-  const { data: departmentTasks } = userProfile?.department
-    ? await supabase
-        .from("tasks")
-        .select("*")
-        .eq("is_archived", false)
-        .eq("department", userProfile.department)
-        .eq("assignment_type", "department")
-        .neq("source_type", "help_desk")
-        .neq("category", "weekly_action")
-    : { data: [] }
-
-  const allTasks = [...(directTasks || []), ...(multiTasks || []), ...(departmentTasks || [])].filter(
+  // Department-wide assignment is gone. Work for a whole team is fanned out
+  // into one row per person, so it arrives through the direct query above and
+  // each person is scored on their own copy.
+  const allTasks = [...(directTasks || []), ...(multiTasks || [])].filter(
     (task) => String(task.source_type || "") !== "action_item"
   )
   const uniqueTasks = Array.from(new Map(allTasks.map((task) => [task.id, task])).values()) as Task[]

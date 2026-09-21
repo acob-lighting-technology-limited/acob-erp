@@ -9,6 +9,8 @@ import { payslipFromBreakdown } from "@/lib/hr/payslip-types"
 import type { PayrollComputedRow } from "@/lib/hr/payroll-compute"
 import { renderPayslipEmail } from "@/lib/email-templates/payslip"
 import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
+import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
+import { createClient } from "@/lib/supabase/server"
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 import { ORG_MAIL_ROUTING } from "@/lib/org-config"
 
@@ -23,6 +25,11 @@ export type SendPayslipResult = { sent: true; recipient: string } | { sent: fals
 
 export async function sendPayslipEmail({ period, row, protect = true }: SendPayslipParams): Promise<SendPayslipResult> {
   if (!row.breakdown) return { sent: false, reason: "No payroll figures for this employee" }
+
+  const supabase = await createClient()
+  if (!(await isSystemNotificationChannelEnabled(supabase, "payroll", "email"))) {
+    return { sent: false, reason: "Payroll email is switched off in Mail Settings" }
+  }
 
   const recipient = (row.company_email || "").trim()
   if (!recipient || !recipient.includes("@")) {

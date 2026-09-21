@@ -88,14 +88,6 @@ function isTaskAssignedToUser(task: Task, user: employee): boolean {
   ) {
     return true
   }
-  if (
-    task.assignment_type === "department" &&
-    task.department &&
-    user.department &&
-    task.department.toLowerCase() === user.department.toLowerCase()
-  ) {
-    return true
-  }
   return false
 }
 

@@ -206,11 +206,9 @@ export async function computeIndividualPerformanceScore(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("department, attendance_exempt")
+    .select("attendance_exempt")
     .eq("id", params.userId)
-    .maybeSingle<{ department?: string | null; attendance_exempt?: boolean | null }>()
-
-  const userDepartment = profile?.department || null
+    .maybeSingle<{ attendance_exempt?: boolean | null }>()
 
   // The MD's own tasks have no one above them to rate them honestly, so they
   // are left out of the MD's KPI (see lib/tasks/rating-authority.ts).
@@ -241,23 +239,20 @@ export async function computeIndividualPerformanceScore(
   const TASK_FIELDS =
     "id, goal_id, title, status, weight, rating, assignment_type, assigned_to, assigned_by, department, task_end_date, due_date, created_at, is_archived"
 
-  const [{ data: assignedTasks }, { data: departmentTasks }, { data: completedTasks }] = await Promise.all([
+  // Only work with this person's name on it. There is no department-wide query
+  // here any more: it pulled in every task filed under their department and,
+  // through the fallback below, credited or penalised the whole team for one
+  // person's row. A task for several people is fanned out into one row each, so
+  // each of them is scored on their own copy and nobody carries someone else's.
+  const [{ data: assignedTasks }, { data: completedTasks }] = await Promise.all([
     supabase.from("tasks").select(TASK_FIELDS).eq("assigned_to", params.userId).eq("is_archived", false),
-    userDepartment
-      ? supabase
-          .from("tasks")
-          .select(TASK_FIELDS)
-          .eq("department", userDepartment)
-          .in("assignment_type", ["multiple", "department"])
-          .eq("is_archived", false)
-      : Promise.resolve({ data: [] as TaskScoreRow[] }),
     userCompletedTaskIds.size > 0
       ? supabase.from("tasks").select(TASK_FIELDS).in("id", Array.from(userCompletedTaskIds)).eq("is_archived", false)
       : Promise.resolve({ data: [] as TaskScoreRow[] }),
   ])
 
   const tasksById = new Map<string, TaskScoreRow>()
-  for (const row of [...(assignedTasks || []), ...(departmentTasks || []), ...(completedTasks || [])]) {
+  for (const row of [...(assignedTasks || []), ...(completedTasks || [])]) {
     if (row?.id) tasksById.set(row.id, row as TaskScoreRow)
   }
 
@@ -266,18 +261,9 @@ export async function computeIndividualPerformanceScore(
     if (cycle && !isTaskInCycle(task, cycle.start_date, cycle.end_date)) continue
     if (userIsMd && task.assigned_to === params.userId && task.assigned_by === params.userId) continue
 
-    // Department- and multi-assigned work only counts for this employee when
-    // they are the named assignee or individually recorded their completion.
-    const assignmentType = String(task.assignment_type || "individual")
-    if (assignmentType === "individual") {
-      if (task.assigned_to !== params.userId) continue
-    } else if (
-      task.assigned_to !== params.userId &&
-      !userCompletedTaskIds.has(task.id) &&
-      !(userDepartment && task.department === userDepartment)
-    ) {
-      continue
-    }
+    // A task counts for this employee when they are the named assignee, or when
+    // they individually recorded their own completion of it.
+    if (task.assigned_to !== params.userId && !userCompletedTaskIds.has(task.id)) continue
 
     scorableTasks.push(task)
   }
