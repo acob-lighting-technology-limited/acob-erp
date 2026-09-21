@@ -172,17 +172,16 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/finance")) return "accounts.main"
   if (pathname.startsWith("/admin/help-desk")) return "helpdesk.main"
   // Payroll owns its own key. The two legacy HR paths still resolve here so the
-  // redirect stubs behave identically to the new /admin/payroll route — this
-  // must stay above the /admin/hr fallthrough below.
+  // redirects behave identically to the new /admin/payroll route — this must
+  // stay above the /admin/hr fallthrough below.
   if (pathname.startsWith("/admin/payroll")) return "payroll.main"
   if (pathname.startsWith("/admin/hr/payroll")) return "payroll.main"
   if (pathname.startsWith("/admin/hr/employees/payroll")) return "payroll.main"
   // Must stay above the /admin/hr fallthrough below.
   if (pathname.startsWith("/admin/hr/job-descriptions")) return "jobdescriptions.main"
   // PMS is its own console at /admin/pms. The /admin/hr/pms paths are the
-  // pre-move URLs, redirected in next.config.mjs, and resolve identically so a
-  // stale link is gated the same way. Both must stay above the /admin/hr
-  // fallthrough below.
+  // pre-move URLs, redirected in next.config.mjs, and resolve identically as
+  // defence in depth. Both must stay above the /admin/hr fallthrough below.
   if (pathname.startsWith("/admin/pms/cbt/question")) return "hr.pms.cbt.manage"
   if (pathname.startsWith("/admin/hr/pms/cbt/question")) return "hr.pms.cbt.manage"
   if (/^\/admin\/(?:hr\/)?pms\/cbt\/[^/]+$/.test(pathname)) return "hr.pms.cbt.manage"
@@ -190,8 +189,9 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname.startsWith("/admin/hr/pms")) return "hr.pms"
   if (pathname.startsWith("/admin/hr/leave")) return "hr.leave"
   if (pathname.startsWith("/admin/hr/attendance")) return "hr.attendance"
-  // Legacy path, now a redirect stub. Resolved here so the stub gates the same
-  // way as the route it forwards to, rather than falling through to hr.main.
+  // Pre-rename path. It is redirected in next.config.mjs before middleware ever
+  // sees it, so this is defence in depth: if that redirect is ever dropped, the
+  // path still gates as attendance rather than falling through to hr.main.
   if (pathname.startsWith("/admin/hr/employees/attendance")) return "hr.attendance"
   // Fleet and Resources are the same "Resource Booking" feature — both gate on hr.fleet.
   if (pathname.startsWith("/admin/hr/fleet")) return "hr.fleet"

@@ -242,6 +242,56 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/tools/test",
+        destination: "/tools/media",
+        permanent: true,
+      },
+      {
+        source: "/admin/project",
+        destination: "/admin/projects",
+        permanent: true,
+      },
+      {
+        source: "/admin/project/:path*",
+        destination: "/admin/projects/:path*",
+        permanent: true,
+      },
+      {
+        source: "/admin/job-descriptions",
+        destination: "/admin/hr/job-descriptions",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/employees/attendance",
+        destination: "/admin/hr/attendance",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/employees/lunch",
+        destination: "/admin/hr/lunch",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/fleet",
+        destination: "/admin/hr/resources",
+        permanent: true,
+      },
+      {
+        source: "/admin/hr/office-location",
+        destination: "/admin/hr/offices-rooms",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/hr/office-location",
+        destination: "/dept/:dept_id/hr/offices-rooms",
+        permanent: true,
+      },
+      {
+        source: "/dept/:dept_id/reports/weekly",
+        destination: "/dept/:dept_id/reports/weekly-reports",
+        permanent: true,
+      },
+      {
         source: "/admin/finance",
         destination: "/admin/accounts",
         permanent: true,
