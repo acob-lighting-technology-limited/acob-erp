@@ -8,7 +8,7 @@ import {
 } from "@/lib/notifications/email-gateway"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { logger } from "@/lib/logger"
-import { ORG_EMAIL_SENDERS } from "@/lib/org-config"
+import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 
 const log = logger("api-send-onboarding-emails")
 
@@ -57,6 +57,7 @@ export async function POST(req: Request) {
             // Speaks as the company, matching the letter's own voice — see the
             // welcome send in app/api/admin/approve-user/route.ts.
             from: ORG_EMAIL_SENDERS.company,
+            ...ORG_MAIL_ROUTING.Onboarding,
             to: welcome.recipients,
             subject: welcome.subject,
             html: welcome.html,
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
       if (sendInternal && internal && internal.recipients.length > 0) {
         try {
           const result = await sendNotificationEmailsIndividuallyWithRetry({
+            ...ORG_MAIL_ROUTING.Onboarding,
             to: internal.recipients,
             subject: internal.subject,
             html: internal.html,

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 import { sendNotificationEmail } from "@/lib/notifications/email-gateway"
+import { ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 import { renderPasswordChangedEmail } from "@/lib/email-templates/password-changed"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -102,6 +103,7 @@ export async function POST(req: Request) {
         // from Mail Settings or from a personal preference - same reasoning as
         // email_mandatory on the "system" key.
         await sendNotificationEmail({
+          ...ORG_MAIL_ROUTING.Security,
           to: [recipientEmail],
           subject: withSubjectPrefix("Security", "Your ACOB Account Password Has Been Changed"),
           html: renderPasswordChangedEmail({
