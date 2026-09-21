@@ -51,7 +51,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { NavLabelTooltip } from "@/components/nav-label-tooltip"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
@@ -222,7 +221,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       roles: [],
       children: [
         { name: "Policies", href: `${base}/documentation/policies` },
-        { name: "SOPs", description: "Standard Operating Procedures", href: `${base}/documentation/sops` },
+        { name: "SOPs", href: `${base}/documentation/sops` },
         { name: "Personal", href: `${base}/documentation/personal` },
         { name: "Department", href: `${base}/documentation/department` },
       ],
@@ -440,7 +439,7 @@ const adminNavigation: NavItem[] = [
         children: [
           { name: "Action Tracker", href: "/admin/reports/general-meeting/action-tracker" },
           { name: "Challenges", href: "/admin/reports/general-meeting/challenges" },
-          { name: "KSS", description: "Keep, Stop, Start", href: "/admin/reports/general-meeting/kss" },
+          { name: "KSS", href: "/admin/reports/general-meeting/kss" },
           { name: "Minutes", href: "/admin/reports/general-meeting/minutes-of-meeting" },
           { name: "Weekly", href: "/admin/reports/general-meeting/weekly-reports" },
           { name: "Records", href: "/admin/reports/general-meeting/records" },
@@ -484,7 +483,7 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Policies", href: "/admin/documentation/policies" },
-      { name: "SOPs", description: "Standard Operating Procedures", href: "/admin/documentation/sops" },
+      { name: "SOPs", href: "/admin/documentation/sops" },
       { name: "Personal", href: "/admin/documentation/personal" },
       { name: "Department", href: "/admin/documentation/department" },
     ],
@@ -973,18 +972,16 @@ export function AdminSidebar({
                                 </button>
                               </div>
                             ) : (
-                              <NavLabelTooltip description={child.description}>
-                                <Link
-                                  href={child.href}
-                                  onClick={() => setIsMobileMenuOpen(false)}
-                                  className={cn(
-                                    "flex min-h-[32px] items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
-                                    isChildActive ? activeCls : inactiveCls
-                                  )}
-                                >
-                                  {child.name}
-                                </Link>
-                              </NavLabelTooltip>
+                              <Link
+                                href={child.href}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className={cn(
+                                  "flex min-h-[32px] items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
+                                  isChildActive ? activeCls : inactiveCls
+                                )}
+                              >
+                                {child.name}
+                              </Link>
                             )}
 
                             {hasSubChildren && isSubOpen && (
@@ -993,18 +990,17 @@ export function AdminSidebar({
                                   const isGcActive =
                                     pathname === grandchild.href || pathname?.startsWith(grandchild.href + "/")
                                   return (
-                                    <NavLabelTooltip key={grandchild.href} description={grandchild.description}>
-                                      <Link
-                                        href={grandchild.href}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                        className={cn(
-                                          "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
-                                          isGcActive ? activeCls : inactiveCls
-                                        )}
-                                      >
-                                        {grandchild.name}
-                                      </Link>
-                                    </NavLabelTooltip>
+                                    <Link
+                                      key={grandchild.href}
+                                      href={grandchild.href}
+                                      onClick={() => setIsMobileMenuOpen(false)}
+                                      className={cn(
+                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        isGcActive ? activeCls : inactiveCls
+                                      )}
+                                    >
+                                      {grandchild.name}
+                                    </Link>
                                   )
                                 })}
                               </div>

@@ -4,18 +4,11 @@
  * matching live here rather than being copied into each component.
  */
 
-export type NavSubChild = {
-  name: string
-  href: string
-  /** Expansion or gloss for an abbreviated name, shown on hover. */
-  description?: string
-}
+export type NavSubChild = { name: string; href: string }
 
 export type NavChild = {
   name: string
   href: string
-  /** Expansion or gloss for an abbreviated name, shown on hover. */
-  description?: string
   children?: NavSubChild[]
   /**
    * The viewer cannot open this branch's own page, so `href` was retargeted to
