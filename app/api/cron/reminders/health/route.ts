@@ -296,7 +296,7 @@ export async function GET(request: NextRequest) {
     for (const email of emails) {
       const result = await sendNotificationEmailWithRetry({
         from: ORG_EMAIL_SENDERS.system,
-        ...ORG_MAIL_ROUTING.Meetings,
+        ...ORG_MAIL_ROUTING["System Health"],
         to: [email],
         subject,
         html,

@@ -103,9 +103,11 @@ export const ORG_EMAIL_SENDERS = {
   system: ORG_NOTIFICATION_SENDER,
   /**
    * The company speaking, under its registered name. Reserved for mail that is
-   * an institutional act rather than a system notification — birthday wishes
-   * and staff exit notices. "ACOB Matrix wishes you a happy birthday" names the
-   * wrong speaker; the company is the one sending those.
+   * an institutional act rather than a system notification — birthday wishes,
+   * staff exit notices and the welcome letter, whose own text reads "We are
+   * excited to welcome you to ACOB Lighting Technology Limited". "ACOB Matrix
+   * wishes you a happy birthday" names the wrong speaker; the company is the
+   * one sending those.
    *
    * Do not widen this to ordinary notifications. If a subsystem merely feels
    * important, that is not the company speaking.
@@ -153,6 +155,14 @@ export const ORG_MAIL_ROUTING: Record<
   Payroll: { replyTo: ORG_ACCOUNTS_EMAIL, listId: listId("payroll") },
   Correspondence: { replyTo: ORG_CORPORATE_SERVICES_EMAIL, listId: listId("correspondence") },
   Security: { replyTo: ORG_ICT_EMAIL, listId: listId("security") },
+  /**
+   * Operational alarms about the platform itself — a cron that stopped, mail
+   * that failed to go out. These go to whoever fixes the system, never to the
+   * department whose feature happened to break: HR cannot action a failed
+   * cron. Kept off the affected feature's stream so an alarm is never filtered
+   * away with the mail it is warning about.
+   */
+  "System Health": { replyTo: ORG_ICT_EMAIL, listId: listId("health") },
 }
 
 /**
