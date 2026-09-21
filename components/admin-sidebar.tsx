@@ -276,10 +276,17 @@ type NavItem = {
 }
 
 /**
- * Management runs people -> performance -> money -> procurement and stock ->
+ * Management runs people -> performance -> money -> what the money bought ->
  * delivery -> governance, and Operations runs day-to-day work first, then the
  * things that report on it. navigationSections in sidebar.tsx lists the same
  * items in the same relative order; keep them in step.
+ *
+ * Purchasing and Inventory sit inside Accounts rather than beside it, so the
+ * accounts -> purchase -> stock workflow reads as one node. They keep their own
+ * grantable route keys, and filterNavChildren gates each one separately, so a
+ * viewer granted only inventory.main still sees Inventory and nothing else —
+ * with the Accounts row rendering as a toggle rather than a link, since it
+ * would otherwise point at a page whose name does not match the label.
  */
 const adminNavigation: NavItem[] = [
   {
