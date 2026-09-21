@@ -9,11 +9,15 @@ import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
 import { canAssignToDepartment, canAssignToProfile } from "@/lib/tasks/assignment-scope"
 import { TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
-import { TASK_ASSIGNMENT_TYPES } from "@/lib/tasks/constants"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
 
 const log = logger("task-detail-route")
 
+// assignment_type is deliberately absent too. It is a creation-time choice
+// between "one person" and "several", and "several" only ever meant "make one
+// task each". Every stored row belongs to exactly one person, so letting the
+// edit form post "multiple" back could only mislabel the row.
+//
 // status is deliberately absent: this route used to accept it and spread it
 // straight into the update with no rating check and no reviewer-role check,
 // which meant the edit form's status dropdown could send a task to
@@ -26,7 +30,6 @@ const UpdateTaskSchema = z.object({
   priority: z.string().trim().min(1).optional(),
   due_date: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
-  assignment_type: z.enum(TASK_ASSIGNMENT_TYPES).optional(),
   assigned_to: z.string().uuid().optional().nullable(),
   goal_id: z.string().uuid().optional().nullable(),
   kpi_id: z.string().uuid().optional().nullable(),
@@ -45,6 +48,12 @@ type ProfileRecord = {
   department?: string | null
   is_department_lead?: boolean | null
   lead_departments?: string[] | null
+}
+
+/** A date column, an ISO timestamp and the form's "YYYY-MM-DD" all mean the same day. */
+function normalizeDate(value: string | null | undefined): string | null {
+  if (!value) return null
+  return value.slice(0, 10)
 }
 
 function isAdminProfile(scope: AdminScope | null) {
@@ -127,13 +136,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return apiError("Task not found", ApiErrorCode.NOT_FOUND, 404)
     }
 
-    const finalAssignmentType = payload.assignment_type || existingTask.assignment_type || "individual"
-    const finalAssignedTo =
-      finalAssignmentType === "individual" ? (payload.assigned_to ?? existingTask.assigned_to ?? null) : null
+    const finalAssignedTo = payload.assigned_to ?? existingTask.assigned_to ?? null
     let finalDepartment = payload.department ?? existingTask.department ?? null
 
-    const assignmentFieldsTouched =
-      payload.assignment_type !== undefined || payload.assigned_to !== undefined || payload.department !== undefined
+    const assignmentFieldsTouched = payload.assigned_to !== undefined || payload.department !== undefined
 
     if (!isAdmin && isLead) {
       if (assignmentFieldsTouched && finalAssignedTo) {
@@ -204,17 +210,61 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     )
 
     // The edit form resends every field, so compare the saved row, not the payload.
-    // The in-app notification for this is still sent client-side by the admin page.
+    //
+    // All of this runs server-side. It used to be fired from the lead's browser
+    // after the PATCH returned, which meant closing the tab or losing signal in
+    // that window saved the edit and silently dropped the notification — in the
+    // month to 20 Sep 2026, three edits to other people's tasks went out with
+    // nobody told. Here it cannot be lost by navigating away.
     const newAssigneeId = updatedTask.assigned_to as string | null
-    if (newAssigneeId && newAssigneeId !== existingTask.assigned_to && newAssigneeId !== user.id) {
-      after(() =>
-        sendTaskEmail(supabase, {
-          kind: "assigned",
-          taskId: updatedTask.id,
-          recipientIds: [newAssigneeId],
-          replyToUserId: user.id,
+    const reassigned = Boolean(newAssigneeId) && newAssigneeId !== existingTask.assigned_to
+    const previousDueDate = (existingTask.due_date as string | null) || null
+    const newDueDate = (updatedTask.due_date as string | null) || null
+    const deadlineMoved = normalizeDate(newDueDate) !== normalizeDate(previousDueDate)
+
+    // Nobody needs telling about their own edit.
+    if (newAssigneeId && newAssigneeId !== user.id) {
+      const priority = String(updatedTask.priority || "")
+      const notifyPriority = priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal"
+
+      try {
+        await supabase.rpc("create_notification", {
+          p_user_id: newAssigneeId,
+          p_type: reassigned ? "task_assigned" : "task_updated",
+          p_category: "tasks",
+          p_title: reassigned
+            ? "New task assigned to you"
+            : deadlineMoved
+              ? "Deadline changed on your task"
+              : "Task updated",
+          p_message: reassigned
+            ? (updatedTask.title as string)
+            : deadlineMoved
+              ? `"${updatedTask.title}" — deadline now ${normalizeDate(newDueDate) || "not set"}`
+              : `"${updatedTask.title}" — details updated`,
+          p_priority: notifyPriority,
+          p_link_url: "/tasks",
+          p_actor_id: user.id,
+          p_entity_type: "task",
+          p_entity_id: updatedTask.id,
         })
-      )
+      } catch (notifyErr) {
+        log.error({ err: String(notifyErr), taskId: updatedTask.id }, "Task update notification failed")
+      }
+
+      // A moved deadline changes the date they are scored against, so it is
+      // emailed as well as shown in-app. Cosmetic edits stay in-app only.
+      if (reassigned || deadlineMoved) {
+        after(() =>
+          sendTaskEmail(supabase, {
+            kind: reassigned ? "assigned" : "deadline_changed",
+            taskId: updatedTask.id,
+            recipientIds: [newAssigneeId],
+            replyToUserId: user.id,
+            previousDeadline: reassigned ? null : previousDueDate,
+          })
+        )
+      }
     }
 
     return NextResponse.json({ data: updatedTask })
@@ -259,15 +309,11 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
     const now = new Date().toISOString()
 
-    // Deleting one row of a multi-assign fan-out used to leave its siblings on
-    // everyone else's list, because the lead created what they thought was one
-    // task and the system made several. Archive the whole group.
-    const { data: target } = await supabase
-      .from("tasks")
-      .select("id, group_id")
-      .eq("id", params.id)
-      .maybeSingle<{ id: string; group_id: string | null }>()
-
+    // One row, one task. This used to archive every row sharing a fan-out
+    // group id, on the theory that a multi-assign was one thing the lead had
+    // created. It is not: the table lists each assignee's task under its own
+    // work item number, and deleting the one in front of you should not clear
+    // three other people's lists.
     const archivePayload = {
       is_archived: true,
       archived_by: user.id,
@@ -276,15 +322,14 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       updated_at: now,
     }
 
-    const archiveQuery = target?.group_id
-      ? supabase.from("tasks").update(archivePayload).eq("group_id", target.group_id)
-      : supabase.from("tasks").update(archivePayload).eq("id", params.id)
-
-    const { data: archivedRows, error } = await archiveQuery.select()
+    const { data: archivedTask, error } = await supabase
+      .from("tasks")
+      .update(archivePayload)
+      .eq("id", params.id)
+      .select()
+      .maybeSingle()
 
     if (error) return apiError(error.message, ApiErrorCode.DATABASE_ERROR, 500)
-
-    const archivedTask = (archivedRows || []).find((row) => row.id === params.id) ?? archivedRows?.[0] ?? null
 
     await writeAuditLog(
       supabase,
@@ -297,8 +342,6 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
           is_archived: true,
           archived_by: user.id,
           archived_at: now,
-          group_id: target?.group_id ?? null,
-          archived_count: archivedRows?.length ?? 1,
         },
         context: { actorId: user.id, source: "api", route: "/api/tasks/[id]" },
       },
@@ -308,7 +351,6 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     return NextResponse.json({
       success: true,
       data: archivedTask,
-      archived_count: archivedRows?.length ?? 1,
     })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in task DELETE")

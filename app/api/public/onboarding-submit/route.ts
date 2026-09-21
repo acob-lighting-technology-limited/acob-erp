@@ -4,6 +4,7 @@ import { z } from "zod"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { checkRequestSize } from "@/lib/api/request-size"
 import { sendNotificationEmail } from "@/lib/notifications/email-gateway"
+import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING, ORG_HR_EMAIL } from "@/lib/org-config"
 import { renderOnboardingSubmissionEmail } from "@/lib/email-templates/onboarding-submission"
 import { formatName } from "@/lib/utils"
@@ -167,6 +168,10 @@ async function notifyHROfSubmission(
 
     const hrEmail = (hrDept?.email || ORG_HR_EMAIL || "").trim().toLowerCase()
     if (!hrEmail || !hrEmail.includes("@")) return
+
+    // Goes to the HR mailbox, not to a user, so only the system-wide switch
+    // applies - but it is onboarding mail and belongs under that key.
+    if (!(await isSystemNotificationChannelEnabled(supabase, "onboarding", "email"))) return
 
     const subject = `Onboarding Form Submitted — ${applicant.first_name} ${applicant.last_name}`
     const html = renderOnboardingSubmissionEmail({

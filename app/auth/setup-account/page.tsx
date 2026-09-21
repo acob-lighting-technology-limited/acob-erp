@@ -4,16 +4,12 @@ import type React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { FormFieldGroup } from "@/components/ui/patterns"
+import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
+import { AuthField, AuthNotice, AuthOtpInput, AuthPasswordField } from "@/components/auth/auth-form-parts"
 import Link from "next/link"
-import { useState, useEffect, useRef, useCallback, Suspense } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 
-import { ArrowLeft, UserPlus, CheckCircle2, Lock, Eye, EyeOff, CheckCircle, KeyRound } from "lucide-react"
-import Image from "next/image"
-import { useTheme } from "next-themes"
-import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
+import { Mail, Lock } from "lucide-react"
 import { formValidation } from "@/lib/validation"
 import { useSearchParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -39,29 +35,17 @@ function SetupAccountContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [isRecoveryMode, setIsRecoveryMode] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""])
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
   const [sendCount, setSendCount] = useState(0)
   const [resendCooldown, setResendCooldown] = useState(0)
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([])
-  const { resolvedTheme } = useTheme()
-
-  // Default to light logo for SSR to prevent hydration mismatch
-  const logoSrc = !mounted
-    ? getSeasonalLogoPaths("light").navbar
-    : getSeasonalLogoPaths(resolvedTheme === "dark" ? "dark" : "light").navbar
 
   useEffect(() => {
-    setMounted(true)
-
     const supabase = createClient()
 
     // Check if we already have a session (came via /auth/callback)
@@ -143,47 +127,6 @@ function SetupAccountContent() {
     await sendSetupEmail()
   }
 
-  // OTP digit handlers
-  const handleOtpChange = useCallback(
-    (index: number, value: string) => {
-      if (!/^\d*$/.test(value)) return // only digits
-      const newDigits = [...otpDigits]
-      newDigits[index] = value.slice(-1)
-      setOtpDigits(newDigits)
-      // Auto-focus next input
-      if (value && index < 5) {
-        otpRefs.current[index + 1]?.focus()
-      }
-    },
-    [otpDigits]
-  )
-
-  const handleOtpKeyDown = useCallback(
-    (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
-        otpRefs.current[index - 1]?.focus()
-      }
-    },
-    [otpDigits]
-  )
-
-  const handleOtpPaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      e.preventDefault()
-      const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
-      if (pasted.length > 0) {
-        const newDigits = [...otpDigits]
-        for (let i = 0; i < pasted.length; i++) {
-          newDigits[i] = pasted[i]
-        }
-        setOtpDigits(newDigits)
-        const focusIndex = Math.min(pasted.length, 5)
-        otpRefs.current[focusIndex]?.focus()
-      }
-    },
-    [otpDigits]
-  )
-
   const handleVerifyOtp = async () => {
     const code = otpDigits.join("")
     if (code.length !== 6) {
@@ -219,7 +162,6 @@ function SetupAccountContent() {
       log.error("OTP Verification Error:", err)
       toast.error(err instanceof Error ? err.message : "Invalid or expired code. Please try again.")
       setOtpDigits(["", "", "", "", "", ""])
-      otpRefs.current[0]?.focus()
     } finally {
       setIsVerifyingOtp(false)
     }
@@ -272,262 +214,159 @@ function SetupAccountContent() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br p-4 md:p-6">
-      <div className="w-full max-w-6xl">
-        <div className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_420px] xl:gap-8">
-          <Card className="border-2 shadow-xl">
-            <CardHeader className="pb-4">
-              <div className="mb-4 flex justify-center lg:hidden">
-                <Image src={logoSrc} alt="ACOB Lighting" width={220} height={56} priority className="h-14 w-auto" />
-              </div>
-              <CardTitle className="text-2xl font-bold tracking-tight lg:text-3xl">
-                {isSuccess
-                  ? "Account activated"
-                  : token || isRecoveryMode
-                    ? isRecoveryMode
-                      ? "Reset your password"
-                      : "Create your password"
-                    : emailSent
-                      ? "Check your email"
-                      : "Set up your account"}
-              </CardTitle>
-              <CardDescription className="text-sm">
-                {isSuccess
-                  ? "Your account is now active. Redirecting to login..."
-                  : token || isRecoveryMode
-                    ? isRecoveryMode
-                      ? "Enter a new password to continue."
-                      : "Create a secure password to activate your account."
-                    : emailSent
-                      ? `If ${email} has an account, a setup code is on its way.`
-                      : "Enter your company email to get started."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pb-8">
-              {isSuccess ? (
-                <div className="space-y-6">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
-                    <p className="text-sm text-green-800 dark:text-green-200">
-                      You can now log in with your new password. Redirecting to login page...
-                    </p>
-                  </div>
-                  <Link href="/auth/login" className="block">
-                    <Button className="h-11 w-full">Go to Login</Button>
-                  </Link>
-                </div>
-              ) : token || isRecoveryMode ? (
-                <form onSubmit={handleCreatePassword}>
-                  <div className="flex flex-col gap-5">
-                    <div className="grid gap-3">
-                      <Label htmlFor="password">New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                          className="h-11 pr-10"
-                          autoFocus
-                          minLength={6}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="grid gap-3">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          required
-                          className="h-11 pr-10"
-                          minLength={6}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
-                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                    </div>
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                      Activate Account
-                    </Button>
-                  </div>
-                </form>
-              ) : emailSent ? (
-                <div className="space-y-6">
-                  <div className="border-border bg-muted/50 rounded-lg border p-4">
-                    <div className="flex gap-3">
-                      <CheckCircle2 className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
-                      <div className="text-muted-foreground space-y-1 text-sm">
-                        <p className="text-foreground font-medium">Setup code requested for {email}</p>
-                        <p>
-                          If that address has an account, a 6-digit code and a setup link are on their way. Enter the
-                          code below, or click the link in the email.
-                        </p>
-                        <p>No email after a few minutes? The address may not have an account yet — contact HR.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* OTP Input */}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2 text-sm font-medium">
-                        <KeyRound className="h-4 w-4" />
-                        Verification Code
-                      </Label>
-                      <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
-                        {otpDigits.map((digit, i) => (
-                          <input
-                            key={i}
-                            ref={(el) => {
-                              otpRefs.current[i] = el
-                            }}
-                            type="text"
-                            inputMode="numeric"
-                            maxLength={1}
-                            value={digit}
-                            onChange={(e) => handleOtpChange(i, e.target.value)}
-                            onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                            className="border-input bg-background focus:ring-primary/20 h-14 w-12 rounded-lg border-2 text-center text-2xl font-bold transition-all focus:border-green-500 focus:ring-2 focus:outline-none"
-                            autoFocus={i === 0}
-                          />
-                        ))}
-                      </div>
-                      <p className="text-muted-foreground text-center text-xs">
-                        Check your inbox (and spam folder) for the code
-                      </p>
-                    </div>
-
-                    <Button
-                      onClick={handleVerifyOtp}
-                      className="h-11 w-full text-base font-semibold"
-                      disabled={otpDigits.join("").length !== 6 || isVerifyingOtp}
-                    >
-                      {isVerifyingOtp ? "Verifying..." : "Verify & Continue"}
-                    </Button>
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background text-muted-foreground px-2">or click the link in the email</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Button
-                      onClick={() => {
-                        setOtpDigits(["", "", "", "", "", ""])
-                        void sendSetupEmail()
-                      }}
-                      variant="outline"
-                      className="h-11 w-full"
-                      loading={isLoading}
-                      disabled={resendCooldown > 0 || sendCount >= MAX_SEND_ATTEMPTS}
-                    >
-                      {sendCount >= MAX_SEND_ATTEMPTS
-                        ? "Resend limit reached — contact HR"
-                        : resendCooldown > 0
-                          ? `Didn't receive it? Resend in ${resendCooldown}s`
-                          : "Didn't receive it? Send again"}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setEmailSent(false)
-                        setOtpDigits(["", "", "", "", "", ""])
-                      }}
-                      variant="ghost"
-                      className="h-11 w-full"
-                    >
-                      Use a different email
-                    </Button>
-                    <Link href="/auth/login" className="block">
-                      <Button variant="ghost" className="h-11 w-full">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Login
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleSetupAccount}>
-                  <div className="flex flex-col gap-5">
-                    <FormFieldGroup label="Company Email" className="grid gap-3">
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="a.nmanma@org.acoblighting.com"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="h-11 text-base"
-                        autoFocus
-                        autoComplete="email"
-                      />
-                    </FormFieldGroup>
-
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                      Send Setup Link
-                    </Button>
-
-                    <Link href="/auth/login" className="block">
-                      <Button variant="ghost" className="h-11 w-full">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Login
-                      </Button>
-                    </Link>
-                  </div>
-                </form>
-              )}
-              <p className="text-muted-foreground mt-4 text-center text-sm">
-                Already have a password?{" "}
-                <Link href="/auth/login" className="text-primary font-medium underline-offset-4 hover:underline">
-                  Sign in
-                </Link>
+    <AuthShell
+      tagline="Secure onboarding for authorized employees to access operations, reporting, and administrative tools."
+      highlights={[
+        "Use your registered company email.",
+        "Complete OTP or setup-link verification first.",
+        "Create a strong password to activate your account.",
+      ]}
+    >
+      <Card className={authCardClassName}>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            {isSuccess
+              ? "Account activated"
+              : token || isRecoveryMode
+                ? isRecoveryMode
+                  ? "Reset your password"
+                  : "Create your password"
+                : emailSent
+                  ? "Check your email"
+                  : "Set up your account"}
+          </CardTitle>
+          <CardDescription className="text-sm">
+            {isSuccess
+              ? "Your account is now active. Redirecting to login..."
+              : token || isRecoveryMode
+                ? isRecoveryMode
+                  ? "Enter a new password to continue."
+                  : "Create a secure password to activate your account."
+                : emailSent
+                  ? `If ${email} has an account, a setup code is on its way.`
+                  : "Enter your company email to get started."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 pb-8">
+          {isSuccess ? (
+            <>
+              <AuthNotice variant="success">
+                You can now sign in with your new password. Taking you to the login page…
+              </AuthNotice>
+              <Button asChild className="h-12 w-full rounded-xl text-sm font-semibold">
+                <Link href="/auth/login">Go to login</Link>
+              </Button>
+            </>
+          ) : token || isRecoveryMode ? (
+            <form onSubmit={handleCreatePassword} className="space-y-5">
+              <AuthPasswordField
+                id="password"
+                label="New password"
+                icon={Lock}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoFocus
+                minLength={6}
+                autoComplete="new-password"
+                placeholder="At least 6 characters"
+              />
+              <AuthPasswordField
+                id="confirmPassword"
+                label="Confirm password"
+                icon={Lock}
+                revealLabel="password confirmation"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                placeholder="Repeat your password"
+              />
+              <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" loading={isLoading}>
+                Activate account
+              </Button>
+            </form>
+          ) : emailSent ? (
+            <div className="space-y-6">
+              <p className="text-muted-foreground text-sm leading-6">
+                Enter the 6-digit code sent to <span className="text-foreground font-medium">{email}</span>, or use the
+                setup link in the same email. Nothing after a few minutes? The address may not have an account yet —
+                contact HR.
               </p>
-            </CardContent>
-          </Card>
 
-          <aside className="bg-card text-card-foreground hidden rounded-2xl border p-8 shadow-xl lg:flex lg:flex-col lg:justify-between">
-            <div className="space-y-8">
-              <Image src={logoSrc} alt="ACOB Lighting" width={260} height={66} className="h-14 w-auto" />
               <div className="space-y-3">
-                <h2 className="text-2xl font-semibold tracking-tight">Matrix</h2>
-                <p className="text-muted-foreground text-sm leading-6">
-                  Secure onboarding for authorized employees to access operations, reporting, and administrative tools.
-                </p>
+                <AuthOtpInput digits={otpDigits} onChange={setOtpDigits} onComplete={() => void handleVerifyOtp()} />
+                <Button
+                  onClick={handleVerifyOtp}
+                  className="h-12 w-full rounded-xl text-sm font-semibold"
+                  loading={isVerifyingOtp}
+                  disabled={otpDigits.join("").length !== 6}
+                >
+                  Verify and continue
+                </Button>
               </div>
-              <div className="text-muted-foreground space-y-3 text-sm">
-                <p className="border-primary/70 text-foreground border-l-2 pl-3">Use your registered company email.</p>
-                <p className="border-primary/70 border-l-2 pl-3">Complete OTP or setup-link verification first.</p>
-                <p className="border-primary/70 border-l-2 pl-3">Create a strong password to activate your account.</p>
+
+              <div className="border-border/60 flex flex-col items-center gap-3 border-t pt-5 text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpDigits(["", "", "", "", "", ""])
+                    void sendSetupEmail()
+                  }}
+                  disabled={resendCooldown > 0 || sendCount >= MAX_SEND_ATTEMPTS || isLoading}
+                  className="text-primary disabled:text-muted-foreground underline-offset-4 hover:underline disabled:no-underline"
+                >
+                  {sendCount >= MAX_SEND_ATTEMPTS
+                    ? "Resend limit reached — contact HR"
+                    : resendCooldown > 0
+                      ? `Resend code in ${resendCooldown}s`
+                      : "Resend code"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailSent(false)
+                    setOtpDigits(["", "", "", "", "", ""])
+                  }}
+                  className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+                >
+                  Use a different email
+                </button>
               </div>
             </div>
-            <p className="text-muted-foreground text-xs">ACOB Lighting Technology Limited</p>
-          </aside>
-        </div>
-      </div>
-    </div>
+          ) : (
+            <form onSubmit={handleSetupAccount} className="space-y-5">
+              <AuthField
+                id="email"
+                type="email"
+                label="Company email"
+                icon={Mail}
+                placeholder="a.nmanma@org.acoblighting.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoFocus
+                autoComplete="email"
+                hint="We'll send a 6-digit code and a setup link to this address."
+              />
+              <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" loading={isLoading}>
+                Send setup code
+              </Button>
+            </form>
+          )}
+
+          {!isSuccess && (
+            <p className="text-muted-foreground border-border/60 border-t pt-5 text-center text-sm">
+              Already have a password?{" "}
+              <Link href="/auth/login" className="text-primary font-medium underline-offset-4 hover:underline">
+                Sign in
+              </Link>
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </AuthShell>
   )
 }
 

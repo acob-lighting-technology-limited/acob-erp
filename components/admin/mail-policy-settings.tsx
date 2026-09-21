@@ -30,6 +30,9 @@ const MODULE_LABELS: Record<string, string> = {
   system: "System",
   approvals: "Approvals",
   tasks: "Tasks",
+  payroll: "Payroll",
+  attendance: "Attendance",
+  birthdays: "Birthdays",
 }
 
 async function fetchMailPolicies(): Promise<PolicyRow[]> {

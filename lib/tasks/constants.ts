@@ -11,7 +11,11 @@ export const TASK_STATUSES = [
 
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
-export const TASK_ASSIGNMENT_TYPES = ["individual", "multiple", "department"] as const
+// Department-wide assignment was retired: work assigned to "the department"
+// belonged to nobody's list and nobody's score. A task for a whole team is now
+// a multi-assign, which fans out one row per person so everyone is measured on
+// the same footing.
+export const TASK_ASSIGNMENT_TYPES = ["individual", "multiple"] as const
 export type TaskAssignmentType = (typeof TASK_ASSIGNMENT_TYPES)[number]
 
 export interface TaskStatusConfig {

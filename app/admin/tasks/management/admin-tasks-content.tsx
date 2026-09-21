@@ -42,12 +42,7 @@ import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
-import {
-  filterByDepartments,
-  buildDepartmentLeadMap,
-  validateTaskForm,
-  sendUpdateNotifications,
-} from "./tasks-content-utils"
+import { filterByDepartments, validateTaskForm } from "./tasks-content-utils"
 import { filterAssignableTaskDepartments, filterAssignableTaskUsers } from "@/lib/tasks/assignment-scope"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { AdminUserTasksPlan, type UserPlanExportContext } from "./admin-user-tasks-plan"
@@ -332,7 +327,8 @@ export function AdminTasksContent({
         })
         const payload = (await response.json().catch(() => null)) as { error?: string } | null
         if (!response.ok) throw new Error(payload?.error || "Failed to update task")
-        await sendUpdateNotifications(activeTaskForm, selectedTask, userId)
+        // The assignee's notification and any deadline email are raised by the
+        // PATCH route itself, so they survive this tab closing.
         toast.success(`${selectedTask.work_item_number || "Task"} updated`)
       } else {
         const response = await apiFetch("/api/tasks", {
@@ -392,26 +388,14 @@ export function AdminTasksContent({
     [tasks]
   )
 
-  const departmentLeadMap = buildDepartmentLeadMap(activeEmployees)
   const staffAvatars = useStaffAvatars()
 
-  const workflowOwnerLabel = useCallback(
-    (task: Task) => {
-      if (task.assigned_to_user) {
-        return `${formatName(task.assigned_to_user.first_name)} ${formatName(task.assigned_to_user.last_name)}`
-      }
-      if (task.assignment_type === "department") {
-        const dept = task.department || ""
-        if (!dept) return "Department"
-        const leads = departmentLeadMap.get(dept) || []
-        return leads.length === 0
-          ? `${dept} (Unassigned)`
-          : leads.map((l) => `${formatName(l.first_name)} ${formatName(l.last_name)}`).join(", ")
-      }
-      return "Unassigned"
-    },
-    [departmentLeadMap]
-  )
+  const workflowOwnerLabel = useCallback((task: Task) => {
+    if (task.assigned_to_user) {
+      return `${formatName(task.assigned_to_user.first_name)} ${formatName(task.assigned_to_user.last_name)}`
+    }
+    return "Unassigned"
+  }, [])
 
   const columns: DataTableColumn<Task>[] = useMemo(
     () => [
@@ -982,8 +966,8 @@ export function AdminTasksContent({
             <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
               <p className="text-foreground font-semibold">1. Multi-Assignment & Individual Tasks</p>
               <p className="text-muted-foreground">
-                When assigning a task to multiple team members or a whole department, individual task instances are
-                generated. Each employee has direct, separate accountability.
+                When assigning a task to multiple team members, individual task instances are generated. Each employee
+                has direct, separate accountability.
               </p>
             </div>
             <div className="bg-muted/20 space-y-1 rounded-lg border p-3">

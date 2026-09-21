@@ -39,12 +39,7 @@ async function getTasksData() {
   )
 
   return {
-    tasks: tasks.map((task) => ({
-      ...task,
-      // Department-wide work is progressed from the department queue, not from
-      // an individual's list.
-      can_change_status: task.assignment_type === "department" ? false : task.can_change_status,
-    })) as Task[],
+    tasks: tasks as Task[],
     userId: user.id,
     userProfile: userProfile ?? null,
   }

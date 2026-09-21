@@ -853,10 +853,30 @@ For any leave workflow event, always use `notifyUsers` from `lib/hr/leave-workfl
 ## Email Identity, Routing, and Subjects — Single Source of Truth
 
 **One sender for all automated mail.** Every automated notification sends as
-**`ACOB Lighting Technology Limited <notifications@acoblighting.com>`**. There are
+**`ACOB Matrix <notifications@acoblighting.com>`**. There are
 no per-subsystem display names — they all sent from the same address anyway, which
 is what mail clients thread, filter, and score, so the names bought nothing and
 forced a naming argument for every new subsystem.
+
+The display name answers exactly one question — **who is speaking?** — and there are
+only three valid answers:
+
+| Speaker | Display name | Used by |
+|---|---|---|
+| The platform | `ACOB Matrix` | every automated notification (the default) |
+| A department | `ACOB <Department>` | task mail, Communications broadcasts |
+| The company | `ACOB Lighting Technology Limited` | birthday wishes, staff exit notices |
+
+The platform default is deliberate: every recipient already works here, so the
+registered company name carried no signal on routine mail — it just repeated on every
+payroll, attendance and task email, and at 31 characters it was truncated in the
+mobile sender column. It still appears in the footer of every email.
+
+What this standard forbids is a name per **subsystem** ("ACOB Leave", "ACOB Assets",
+"ACOB Payroll"). Those bought nothing — all sent from the same address, which is what
+mail clients thread, filter and score, so they were routing metadata wearing a display
+name, and they forced a naming argument for every new subsystem. The three names above
+are not subsystems; they are distinct speakers. Do not add a fourth without one.
 
 **Never hardcode a "From", Reply-To, or List-Id as a string literal.** Each runtime
 has exactly one place for them:

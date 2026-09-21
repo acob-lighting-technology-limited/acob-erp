@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
+import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -103,6 +104,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const sendResult = await sendNotificationEmailWithRetry({
+      // This is renderWelcomeEmail — the same letter approve-user sends — so it
+      // takes the same speaker and routing. Sending one letter under two
+      // different From names depending on which route triggered it is a bug.
+      from: ORG_EMAIL_SENDERS.company,
+      ...ORG_MAIL_ROUTING.Onboarding,
       to: [profile.personal_email],
       subject: "Welcome to ACOB - Official Company Email & Matrix Setup",
       html: emailHtml,

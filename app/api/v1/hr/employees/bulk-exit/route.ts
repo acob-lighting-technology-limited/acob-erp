@@ -148,7 +148,7 @@ export async function POST(request: Request) {
       )
       // Exit notices send under the single org identity like every other
       // automated mail; replies route to the HR mailbox via ORG_MAIL_ROUTING.
-      const exitEmailSender = ORG_EMAIL_SENDERS.system
+      const exitEmailSender = ORG_EMAIL_SENDERS.company
 
       // All active staff — include additional_email so no one is missed
       const { data: activeStaff } = await dataClient

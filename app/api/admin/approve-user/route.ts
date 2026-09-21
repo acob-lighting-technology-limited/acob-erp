@@ -13,6 +13,7 @@ import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 
 const log = logger("approve-user")
 
@@ -445,6 +446,14 @@ export async function POST(req: Request) {
         const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
         if (onboardingMailEnabled) {
           const result = await sendNotificationEmailWithRetry({
+            // The welcome letter speaks as the company ("We are excited to
+            // welcome you to ..."), not as the platform. Same speaker as
+            // birthday mail — see ORG_EMAIL_SENDERS in lib/org-config.ts.
+            from: ORG_EMAIL_SENDERS.company,
+            // Technical setup questions are routed in-body to ICT Support; a
+            // reply is therefore about the job, not the login, so it lands
+            // with HR rather than in the unread notifications mailbox.
+            ...ORG_MAIL_ROUTING.Onboarding,
             to: emailPreview.welcome.recipients,
             subject: emailPreview.welcome.subject,
             html: emailPreview.welcome.html,
@@ -476,6 +485,7 @@ export async function POST(req: Request) {
         const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
         if (onboardingMailEnabled && emailPreview.internal.recipients.length > 0) {
           const result = await sendNotificationEmailsIndividuallyWithRetry({
+            ...ORG_MAIL_ROUTING.Onboarding,
             to: emailPreview.internal.recipients,
             subject: emailPreview.internal.subject,
             html: emailPreview.internal.html,

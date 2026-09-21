@@ -4,13 +4,13 @@ import type React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
+import { AuthNotice, AuthPasswordField } from "@/components/auth/auth-form-parts"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { Lock, CheckCircle, Eye, EyeOff } from "lucide-react"
+import { Lock } from "lucide-react"
 import { AuthPageSkeleton } from "@/components/skeletons"
 
 export default function ResetPasswordPage() {
@@ -18,8 +18,6 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isChecking, setIsChecking] = useState(true)
   const router = useRouter()
@@ -92,111 +90,89 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br p-4 md:p-6">
-      <div className="w-full max-w-lg">
-        <div className="flex flex-col gap-6">
-          <Card className="border-2 shadow-xl">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold tracking-tight">
-                {isSuccess ? "Password reset" : "Create new password"}
-              </CardTitle>
-              <CardDescription className="text-sm">
-                {isSuccess ? "You can now sign in with your new password" : "Choose a strong password for your account"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pb-8">
-              {isSuccess ? (
-                <div className="space-y-6">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
-                    <p className="text-sm text-green-800 dark:text-green-200">
-                      You can now log in with your new password. Redirecting to login page...
-                    </p>
+    <AuthShell>
+      <Card className={authCardClassName}>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            {isSuccess ? "Password reset" : "Create new password"}
+          </CardTitle>
+          <CardDescription className="text-sm">
+            {isSuccess ? "You can now sign in with your new password" : "Choose a strong password for your account"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 pb-8">
+          {isSuccess ? (
+            <>
+              <AuthNotice variant="success">
+                You can now sign in with your new password. Taking you to the login page…
+              </AuthNotice>
+              <Button asChild className="h-12 w-full rounded-xl text-sm font-semibold">
+                <Link href="/auth/login">Go to login</Link>
+              </Button>
+            </>
+          ) : (
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              <AuthPasswordField
+                id="password"
+                label="New password"
+                icon={Lock}
+                placeholder="Enter new password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoFocus
+                minLength={6}
+                autoComplete="new-password"
+                hint="At least 6 characters."
+              />
+              <AuthPasswordField
+                id="confirmPassword"
+                label="Confirm new password"
+                icon={Lock}
+                revealLabel="password confirmation"
+                placeholder="Confirm new password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={6}
+                autoComplete="new-password"
+              />
+              {password.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex gap-1.5">
+                    <span
+                      className={`h-1 flex-1 rounded-full ${password.length >= 6 ? "bg-primary" : "bg-destructive/60"}`}
+                    />
+                    <span className={`h-1 flex-1 rounded-full ${password.length >= 8 ? "bg-primary" : "bg-muted"}`} />
+                    <span
+                      className={`h-1 flex-1 rounded-full ${/[A-Z]/.test(password) && /\d/.test(password) ? "bg-primary" : "bg-muted"}`}
+                    />
                   </div>
-                  <Link href="/auth/login" className="block">
-                    <Button className="h-11 w-full">Go to Login</Button>
-                  </Link>
+                  <p className="text-muted-foreground text-xs">
+                    {password.length < 6
+                      ? "Too short"
+                      : password.length < 8
+                        ? "Okay"
+                        : /[A-Z]/.test(password) && /\d/.test(password)
+                          ? "Strong"
+                          : "Good — add an uppercase letter and a number"}
+                  </p>
                 </div>
-              ) : (
-                <form onSubmit={handleResetPassword}>
-                  <div className="flex flex-col gap-5">
-                    <div className="grid gap-3">
-                      <Label htmlFor="password" className="text-sm font-medium">
-                        New Password
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Enter new password"
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="h-11 pr-10 text-base"
-                          autoFocus
-                          minLength={6}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                      <p className="text-muted-foreground text-xs">Must be at least 6 characters long</p>
-                    </div>
-
-                    <div className="grid gap-3">
-                      <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                        Confirm New Password
-                      </Label>
-                      <div className="relative">
-                        <Input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="Confirm new password"
-                          required
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="h-11 pr-10 text-base"
-                          minLength={6}
-                          autoComplete="new-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
-                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {error && (
-                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30">
-                        <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-                      </div>
-                    )}
-
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                      Reset Password
-                    </Button>
-
-                    <Link href="/auth/login" className="block">
-                      <Button variant="ghost" className="h-11 w-full">
-                        Cancel
-                      </Button>
-                    </Link>
-                  </div>
-                </form>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
+              {error && <AuthNotice>{error}</AuthNotice>}
+              <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" loading={isLoading}>
+                Reset password
+              </Button>
+              <Link
+                href="/auth/login"
+                className="text-muted-foreground hover:text-foreground block text-center text-sm underline-offset-4 hover:underline"
+              >
+                Cancel
+              </Link>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </AuthShell>
   )
 }

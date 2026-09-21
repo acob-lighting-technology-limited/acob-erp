@@ -65,7 +65,7 @@ const taskFormSchema = z.object({
   assigned_to: z.string().optional(),
   department: z.string().optional(),
   due_date: z.string().optional(),
-  assignment_type: z.enum(["individual", "multiple", "department"]).default("individual"),
+  assignment_type: z.enum(["individual", "multiple"]).default("individual"),
   goal_id: z.string().optional().nullable(),
   kpi_id: z.string().min(1, "Corporate KPI is required"),
   project_id: z.string().optional().nullable(),
@@ -86,7 +86,7 @@ export interface TaskFormState {
   assigned_to: string
   department: string
   due_date: string
-  assignment_type: "individual" | "multiple" | "department"
+  assignment_type: "individual" | "multiple"
   assigned_users: string[]
   project_id: string
   plan_id: string

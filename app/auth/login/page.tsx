@@ -5,17 +5,19 @@ import type React from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { FormFieldGroup } from "@/components/ui/patterns"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
-import { KeyRound, Mail, ArrowLeft, Eye, EyeOff } from "lucide-react"
-import Image from "next/image"
-import { useTheme } from "next-themes"
-import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
+import { KeyRound, Mail, Lock } from "lucide-react"
+import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
+import {
+  AuthField,
+  AuthMethodSwitch,
+  AuthNotice,
+  AuthOtpInput,
+  AuthPasswordField,
+} from "@/components/auth/auth-form-parts"
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
@@ -30,27 +32,7 @@ export default function LoginPage() {
   const [step, setStep] = useState<"credentials" | "otp">("credentials")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const searchParams = useSearchParams()
-  const { resolvedTheme } = useTheme()
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([])
-
-  // Default to light logo for SSR to prevent hydration mismatch
-  const logoSrc = !mounted
-    ? getSeasonalLogoPaths("light").navbar
-    : getSeasonalLogoPaths(resolvedTheme === "dark" ? "dark" : "light").navbar
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Auto-focus first OTP box when entering OTP step
-  useEffect(() => {
-    if (step === "otp") {
-      otpRefs.current[0]?.focus()
-    }
-  }, [step])
 
   // Handle hash-based auth handoff (e.g. developer impersonation magic links)
   // after middleware redirects unauthenticated requests back to /auth/login.
@@ -120,49 +102,6 @@ export default function LoginPage() {
       cancelled = true
     }
   }, [searchParams])
-
-  const handleOtpChange = (index: number, value: string) => {
-    // Only allow digits
-    const digit = value.replace(/\D/g, "").slice(-1)
-    const newDigits = [...otpDigits]
-    newDigits[index] = digit
-    setOtpDigits(newDigits)
-
-    // Auto-advance to next input
-    if (digit && index < 5) {
-      otpRefs.current[index + 1]?.focus()
-    }
-
-    // Auto-submit when all 6 digits are filled
-    if (digit && index === 5 && newDigits.every((d) => d !== "")) {
-      handleVerifyOTP(undefined, newDigits.join(""))
-    }
-  }
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus()
-    }
-  }
-
-  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault()
-    const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
-    if (paste.length === 0) return
-    const newDigits = [...otpDigits]
-    for (let i = 0; i < paste.length && i < 6; i++) {
-      newDigits[i] = paste[i]
-    }
-    setOtpDigits(newDigits)
-    // Focus the next empty box or the last one
-    const nextEmpty = newDigits.findIndex((d) => d === "")
-    otpRefs.current[nextEmpty === -1 ? 5 : nextEmpty]?.focus()
-
-    // Auto-submit if all filled
-    if (newDigits.every((d) => d !== "")) {
-      handleVerifyOTP(undefined, newDigits.join(""))
-    }
-  }
 
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -287,261 +226,133 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="from-background via-background to-muted/20 flex min-h-screen w-full items-center justify-center bg-gradient-to-br p-4 md:p-6">
-      <div className="w-full max-w-6xl">
-        <div className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1fr)_420px] xl:gap-8">
-          <Card className="border-2 shadow-xl">
-            <CardHeader className="pb-4">
-              <div className="mb-4 flex justify-center lg:hidden">
-                <Image src={logoSrc} alt="ACOB Lighting" width={220} height={56} priority className="h-14 w-auto" />
-              </div>
-              <CardTitle className="text-2xl font-bold tracking-tight lg:text-3xl">
-                {step === "credentials" ? "Welcome back" : "Check your email"}
-              </CardTitle>
-              <CardDescription className="text-sm">
-                {step === "credentials" ? "Sign in to Matrix." : `We sent a 6-digit code to ${email}`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pb-8">
-              {step === "credentials" ? (
-                <div className="space-y-5">
-                  {/* Login Method Tabs */}
-                  <div className="bg-muted grid grid-cols-2 gap-1 rounded-lg p-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginMethod("password")
-                        setError(null)
-                      }}
-                      className={`flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all ${
-                        loginMethod === "password"
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <KeyRound className="h-3.5 w-3.5" />
-                      Password
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginMethod("otp")
-                        setError(null)
-                      }}
-                      className={`flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all ${
-                        loginMethod === "otp"
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Mail className="h-3.5 w-3.5" />
-                      One-Time Code
-                    </button>
-                  </div>
+    <AuthShell
+      highlights={[
+        "Use your company email domain to sign in.",
+        "Choose password or one-time code based on your access setup.",
+        "Contact Admin and HR if your account has not been provisioned.",
+      ]}
+    >
+      <Card className={authCardClassName}>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            {step === "credentials" ? "Welcome back" : "Check your email"}
+          </CardTitle>
+          <CardDescription className="text-sm">
+            {step === "credentials" ? "Sign in to Matrix." : `We sent a 6-digit code to ${email}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 pb-8">
+          {step === "credentials" ? (
+            <>
+              <AuthMethodSwitch
+                value={loginMethod}
+                onChange={(value) => {
+                  setLoginMethod(value as "password" | "otp")
+                  setError(null)
+                }}
+                options={[
+                  { value: "password", label: "Password", icon: KeyRound },
+                  { value: "otp", label: "One-Time Code", icon: Mail },
+                ]}
+              />
 
-                  {/* Password Login Form */}
-                  {loginMethod === "password" ? (
-                    <form onSubmit={handlePasswordLogin}>
-                      <div className="flex flex-col gap-5">
-                        <FormFieldGroup label="Company Email" className="grid gap-3">
-                          <Input
-                            id="email"
-                            name="email"
-                            type="email"
-                            placeholder="a.nmanma@org.acoblighting.com"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="h-11 text-base"
-                            autoComplete="username"
-                          />
-                        </FormFieldGroup>
-                        <div className="grid gap-3">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="password" className="text-sm font-medium">
-                              Password
-                            </Label>
-                            <Link
-                              href="/auth/forgot-password"
-                              className="text-primary text-xs underline-offset-4 hover:underline"
-                            >
-                              Forgot password?
-                            </Link>
-                          </div>
-                          <div className="relative">
-                            <Input
-                              id="password"
-                              name="password"
-                              type={showPassword ? "text" : "password"}
-                              placeholder="Enter your password"
-                              required
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              className="h-11 pr-12 text-base"
-                              autoComplete="current-password"
-                            />
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-                              <button
-                                type="button"
-                                aria-label={showPassword ? "Hide password" : "Show password"}
-                                aria-pressed={showPassword}
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => setShowPassword((current) => !current)}
-                                className="text-muted-foreground hover:text-foreground inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors"
-                              >
-                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                        {error && (
-                          <p
-                            role="alert"
-                            aria-live="polite"
-                            className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30"
-                          >
-                            {error}
-                          </p>
-                        )}
-                        <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                          Login with Password
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    /* OTP Login Form */
-                    <form onSubmit={handleRequestOTP}>
-                      <div className="flex flex-col gap-5">
-                        <div className="grid gap-3">
-                          <Label htmlFor="email-otp" className="text-sm font-medium">
-                            Company Email
-                          </Label>
-                          <Input
-                            id="email-otp"
-                            type="email"
-                            placeholder="a.nmanma@org.acoblighting.com"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="h-11 text-base"
-                            autoComplete="email"
-                          />
-                        </div>
-                        {error && (
-                          <p
-                            role="alert"
-                            aria-live="polite"
-                            className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30"
-                          >
-                            {error}
-                          </p>
-                        )}
-                        <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                          Send One-Time Code
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-
-                  {/* First Time Setup Link */}
-                  <p className="text-muted-foreground text-center text-sm">
-                    First time?{" "}
-                    <Link
-                      href="/auth/setup-account"
-                      className="text-primary font-medium underline-offset-4 hover:underline"
-                    >
-                      Set up your account
-                    </Link>
-                  </p>
-                </div>
-              ) : (
-                /* OTP Verification Form */
-                <form onSubmit={(e) => handleVerifyOTP(e)}>
-                  <div className="flex flex-col gap-6">
-                    {/* 6 Individual OTP Boxes */}
-                    <div>
-                      <Label className="mb-3 block text-sm font-medium">One-Time Password</Label>
-                      <div className="flex justify-center gap-3">
-                        {otpDigits.map((digit, index) => (
-                          <input
-                            key={index}
-                            ref={(el) => {
-                              otpRefs.current[index] = el
-                            }}
-                            type="text"
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            maxLength={1}
-                            value={digit}
-                            onChange={(e) => handleOtpChange(index, e.target.value)}
-                            onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                            onPaste={index === 0 ? handleOtpPaste : undefined}
-                            className="border-input bg-background ring-offset-background focus-visible:ring-ring h-14 w-12 rounded-lg border-2 text-center font-mono text-2xl font-bold transition-all focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                          />
-                        ))}
-                      </div>
-                      <p className="text-muted-foreground mt-3 text-center text-xs">
-                        Check your email inbox for the 6-digit code
-                      </p>
-                    </div>
-
-                    {error && (
-                      <p
-                        role="alert"
-                        aria-live="polite"
-                        className="rounded-md bg-red-50 p-3 text-sm text-red-500 dark:bg-red-950/30"
+              {loginMethod === "password" ? (
+                <form onSubmit={handlePasswordLogin} className="space-y-5">
+                  <AuthField
+                    id="email"
+                    name="email"
+                    type="email"
+                    label="Company email"
+                    icon={Mail}
+                    placeholder="a.nmanma@org.acoblighting.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="username"
+                  />
+                  <AuthPasswordField
+                    id="password"
+                    name="password"
+                    label="Password"
+                    icon={Lock}
+                    placeholder="Enter your password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    action={
+                      <Link
+                        href="/auth/forgot-password"
+                        className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
                       >
-                        {error}
-                      </p>
-                    )}
-                    <Button type="submit" className="h-11 w-full text-base font-semibold" loading={isLoading}>
-                      Verify &amp; Sign In
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setStep("credentials")
-                        setOtpDigits(["", "", "", "", "", ""])
-                        setError(null)
-                      }}
-                      className="h-11 w-full text-base"
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Back to Login
-                    </Button>
-                  </div>
+                        Forgot password?
+                      </Link>
+                    }
+                  />
+                  {error && <AuthNotice>{error}</AuthNotice>}
+                  <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" loading={isLoading}>
+                    Sign in
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleRequestOTP} className="space-y-5">
+                  <AuthField
+                    id="email-otp"
+                    type="email"
+                    label="Company email"
+                    icon={Mail}
+                    placeholder="a.nmanma@org.acoblighting.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                    hint="We'll email you a 6-digit code instead of a password."
+                  />
+                  {error && <AuthNotice>{error}</AuthNotice>}
+                  <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" loading={isLoading}>
+                    Send one-time code
+                  </Button>
                 </form>
               )}
-            </CardContent>
-          </Card>
 
-          <aside className="bg-card text-card-foreground hidden rounded-2xl border p-8 shadow-xl lg:flex lg:flex-col lg:justify-between">
-            <div className="space-y-8">
-              <Image src={logoSrc} alt="ACOB Lighting" width={260} height={66} className="h-14 w-auto" />
-              <div className="space-y-3">
-                <h2 className="text-2xl font-semibold tracking-tight">Matrix</h2>
-                <p className="text-muted-foreground text-sm leading-6">
-                  Secure access for authorized employees across operations, reporting, and administrative workflows.
-                </p>
-              </div>
-              <div className="text-muted-foreground space-y-3 text-sm">
-                <p className="border-primary/70 text-foreground border-l-2 pl-3">
-                  Use your company email domain to sign in.
-                </p>
-                <p className="border-primary/70 border-l-2 pl-3">
-                  Choose password or one-time code based on your access setup.
-                </p>
-                <p className="border-primary/70 border-l-2 pl-3">
-                  Contact Admin and HR if your account has not been provisioned.
-                </p>
-              </div>
-            </div>
-            <p className="text-muted-foreground text-xs">ACOB Lighting Technology Limited</p>
-          </aside>
-        </div>
-      </div>
-    </div>
+              <p className="text-muted-foreground border-border/60 border-t pt-5 text-center text-sm">
+                First time here?{" "}
+                <Link
+                  href="/auth/setup-account"
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Set up your account
+                </Link>
+              </p>
+            </>
+          ) : (
+            <form onSubmit={(e) => handleVerifyOTP(e)} className="space-y-6">
+              <AuthOtpInput
+                digits={otpDigits}
+                onChange={setOtpDigits}
+                onComplete={(code) => handleVerifyOTP(undefined, code)}
+              />
+              {error && <AuthNotice>{error}</AuthNotice>}
+              <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" loading={isLoading}>
+                Verify and sign in
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("credentials")
+                  setOtpDigits(["", "", "", "", "", ""])
+                  setError(null)
+                }}
+                className="text-muted-foreground hover:text-foreground w-full text-center text-sm underline-offset-4 hover:underline"
+              >
+                Use a different email
+              </button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </AuthShell>
   )
 }
 

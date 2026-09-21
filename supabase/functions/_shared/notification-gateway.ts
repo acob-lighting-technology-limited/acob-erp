@@ -12,6 +12,9 @@ export type NotificationModule =
   | "Communications"
   | "Reports"
 
+// Mirrors NOTIFICATION_KEYS in lib/notifications/delivery-policy.ts. Both sides
+// read the same notification_delivery_policies rows, so a key added there and
+// not here is a stream the edge runtime cannot gate.
 export type NotificationKey =
   | "onboarding"
   | "help_desk"
@@ -21,6 +24,11 @@ export type NotificationKey =
   | "communications"
   | "reports"
   | "system"
+  | "approvals"
+  | "tasks"
+  | "payroll"
+  | "attendance"
+  | "birthdays"
 
 interface SendEdgeNotificationEmailInput {
   to: Array<string | null | undefined>
