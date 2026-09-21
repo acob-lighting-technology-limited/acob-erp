@@ -594,14 +594,9 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             className="z-[70] w-[var(--radix-dropdown-menu-trigger-width)] min-w-52"
           >
             <DropdownMenuItem asChild>
-              {/* /profile is the staff dashboard and is already the "Dashboard"
-                  nav item; the actual profile lives under settings. */}
-              <Link href="/settings/profile" className="flex w-full items-center gap-2">
-                <User className="h-4 w-4" />
-                Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+              {/* One entry only: /settings redirects to /settings/profile, so a
+                  separate "Profile" item led to the same page. The dashboard is
+                  the first nav item, so it needs no entry here either. */}
               <Link href="/settings" className="flex w-full items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Settings
