@@ -100,7 +100,7 @@ function QuestionCard({
     <div className="space-y-3 rounded-xl border p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="font-semibold text-white">{question.prompt}</p>
+          <p className="text-foreground font-semibold">{question.prompt}</p>
           <p className="text-muted-foreground text-xs">{cycleName}</p>
           <p className="text-muted-foreground text-xs">Targeted: {question.targeted_emails?.join(", ") || "None"}</p>
           <p className="text-muted-foreground text-xs">Correct answer: Option {question.correct_option}</p>
@@ -110,18 +110,18 @@ function QuestionCard({
         </Badge>
       </div>
 
-      <div className="grid gap-2 text-sm text-slate-300">
+      <div className="text-muted-foreground grid gap-2 text-sm">
         <p>
-          <span className="font-medium text-white">A:</span> {question.option_a}
+          <span className="text-foreground font-medium">A:</span> {question.option_a}
         </p>
         <p>
-          <span className="font-medium text-white">B:</span> {question.option_b}
+          <span className="text-foreground font-medium">B:</span> {question.option_b}
         </p>
         <p>
-          <span className="font-medium text-white">C:</span> {question.option_c}
+          <span className="text-foreground font-medium">C:</span> {question.option_c}
         </p>
         <p>
-          <span className="font-medium text-white">D:</span> {question.option_d}
+          <span className="text-foreground font-medium">D:</span> {question.option_d}
         </p>
       </div>
 
@@ -549,36 +549,36 @@ export default function AdminPmsCbtExtraQuestionPage() {
             <div className="grid gap-4 text-sm md:grid-cols-2">
               <div className="space-y-2">
                 <p>
-                  <span className="font-medium text-white">Cycle:</span>{" "}
+                  <span className="text-foreground font-medium">Cycle:</span>{" "}
                   {cycleNameById.get(question.review_cycle_id || "") || "-"}
                 </p>
                 <p>
-                  <span className="font-medium text-white">Target Candidates:</span>{" "}
+                  <span className="text-foreground font-medium">Target Candidates:</span>{" "}
                   {question.targeted_emails?.join(", ") || "-"}
                 </p>
                 <p>
-                  <span className="font-medium text-white">Option A:</span> {question.option_a}
+                  <span className="text-foreground font-medium">Option A:</span> {question.option_a}
                 </p>
                 <p>
-                  <span className="font-medium text-white">Option B:</span> {question.option_b}
+                  <span className="text-foreground font-medium">Option B:</span> {question.option_b}
                 </p>
                 <p>
-                  <span className="font-medium text-white">Option C:</span> {question.option_c}
+                  <span className="text-foreground font-medium">Option C:</span> {question.option_c}
                 </p>
                 <p>
-                  <span className="font-medium text-white">Option D:</span> {question.option_d}
+                  <span className="text-foreground font-medium">Option D:</span> {question.option_d}
                 </p>
               </div>
               <div className="space-y-2">
                 <p>
-                  <span className="font-medium text-white">Correct Answer:</span> Option {question.correct_option}
+                  <span className="text-foreground font-medium">Correct Answer:</span> Option {question.correct_option}
                 </p>
                 <p>
-                  <span className="font-medium text-white">Status:</span>{" "}
+                  <span className="text-foreground font-medium">Status:</span>{" "}
                   {question.is_active === false ? "Inactive" : "Active"}
                 </p>
                 <p>
-                  <span className="font-medium text-white">Explanation:</span> {question.explanation || "-"}
+                  <span className="text-foreground font-medium">Explanation:</span> {question.explanation || "-"}
                 </p>
               </div>
             </div>
@@ -624,12 +624,12 @@ export default function AdminPmsCbtExtraQuestionPage() {
           if (!open) resetForm()
         }}
       >
-        <DialogContent className="max-w-2xl border-white/10 bg-neutral-950 text-white">
+        <DialogContent className="border-border bg-card text-foreground max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl text-white">
+            <DialogTitle className="text-foreground text-xl">
               {editingQuestion ? "Edit CBT Bonus Question" : "Add CBT Bonus Question"}
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               {editingQuestion
                 ? "Update the selected CBT bonus question and manage targeted candidates."
                 : "Add a new CBT bonus question and choose targeted candidates."}
@@ -639,15 +639,15 @@ export default function AdminPmsCbtExtraQuestionPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-white">Cycle</Label>
+                <Label className="text-foreground">Cycle</Label>
                 <Select
                   value={form.review_cycle_id}
                   onValueChange={(value) => setForm((current) => ({ ...current, review_cycle_id: value }))}
                 >
-                  <SelectTrigger className="border-white/10 bg-neutral-900 text-white">
+                  <SelectTrigger className="border-border bg-muted text-foreground">
                     <SelectValue placeholder="Select cycle" />
                   </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-neutral-900 text-white">
+                  <SelectContent className="border-border bg-muted text-foreground">
                     {cycles
                       .filter((cycle) => !cycle.review_type || cycle.review_type.toLowerCase() === "quarterly")
                       .map((cycle) => (
@@ -660,7 +660,7 @@ export default function AdminPmsCbtExtraQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white">Target Candidate Emails</Label>
+                <Label className="text-foreground">Target Candidate Emails</Label>
                 <SearchableMultiSelect
                   label="Target Candidate Emails"
                   values={form.targeted_emails}
@@ -668,13 +668,13 @@ export default function AdminPmsCbtExtraQuestionPage() {
                   onChange={(values) => setForm((current) => ({ ...current, targeted_emails: values }))}
                   placeholder="Select candidates..."
                   searchPlaceholder="Search emails..."
-                  className="border-white/10 bg-neutral-900 text-white"
+                  className="border-border bg-muted text-foreground"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="prompt" className="text-white">
+              <Label htmlFor="prompt" className="text-foreground">
                 Question
               </Label>
               <Textarea
@@ -682,57 +682,57 @@ export default function AdminPmsCbtExtraQuestionPage() {
                 rows={3}
                 value={form.prompt}
                 onChange={(event) => setForm((current) => ({ ...current, prompt: event.target.value }))}
-                className="border-white/10 bg-neutral-900 text-white"
+                className="border-border bg-muted text-foreground"
                 required
               />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="option_a" className="text-white">
+                <Label htmlFor="option_a" className="text-foreground">
                   Option A
                 </Label>
                 <Input
                   id="option_a"
                   value={form.option_a}
                   onChange={(event) => setForm((current) => ({ ...current, option_a: event.target.value }))}
-                  className="border-white/10 bg-neutral-900 text-white"
+                  className="border-border bg-muted text-foreground"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="option_b" className="text-white">
+                <Label htmlFor="option_b" className="text-foreground">
                   Option B
                 </Label>
                 <Input
                   id="option_b"
                   value={form.option_b}
                   onChange={(event) => setForm((current) => ({ ...current, option_b: event.target.value }))}
-                  className="border-white/10 bg-neutral-900 text-white"
+                  className="border-border bg-muted text-foreground"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="option_c" className="text-white">
+                <Label htmlFor="option_c" className="text-foreground">
                   Option C
                 </Label>
                 <Input
                   id="option_c"
                   value={form.option_c}
                   onChange={(event) => setForm((current) => ({ ...current, option_c: event.target.value }))}
-                  className="border-white/10 bg-neutral-900 text-white"
+                  className="border-border bg-muted text-foreground"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="option_d" className="text-white">
+                <Label htmlFor="option_d" className="text-foreground">
                   Option D
                 </Label>
                 <Input
                   id="option_d"
                   value={form.option_d}
                   onChange={(event) => setForm((current) => ({ ...current, option_d: event.target.value }))}
-                  className="border-white/10 bg-neutral-900 text-white"
+                  className="border-border bg-muted text-foreground"
                   required
                 />
               </div>
@@ -740,17 +740,17 @@ export default function AdminPmsCbtExtraQuestionPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-white">Correct Answer</Label>
+                <Label className="text-foreground">Correct Answer</Label>
                 <Select
                   value={form.correct_option}
                   onValueChange={(value: "A" | "B" | "C" | "D") =>
                     setForm((current) => ({ ...current, correct_option: value }))
                   }
                 >
-                  <SelectTrigger className="border-white/10 bg-neutral-900 text-white">
+                  <SelectTrigger className="border-border bg-muted text-foreground">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-neutral-900 text-white">
+                  <SelectContent className="border-border bg-muted text-foreground">
                     <SelectItem value="A">Option A</SelectItem>
                     <SelectItem value="B">Option B</SelectItem>
                     <SelectItem value="C">Option C</SelectItem>
@@ -760,15 +760,15 @@ export default function AdminPmsCbtExtraQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-white">Status</Label>
+                <Label className="text-foreground">Status</Label>
                 <Select
                   value={form.is_active ? "active" : "inactive"}
                   onValueChange={(value) => setForm((current) => ({ ...current, is_active: value === "active" }))}
                 >
-                  <SelectTrigger className="border-white/10 bg-neutral-900 text-white">
+                  <SelectTrigger className="border-border bg-muted text-foreground">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="border-white/10 bg-neutral-900 text-white">
+                  <SelectContent className="border-border bg-muted text-foreground">
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
@@ -777,7 +777,7 @@ export default function AdminPmsCbtExtraQuestionPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="explanation" className="text-white">
+              <Label htmlFor="explanation" className="text-foreground">
                 Explanation
               </Label>
               <Textarea
@@ -785,7 +785,7 @@ export default function AdminPmsCbtExtraQuestionPage() {
                 rows={2}
                 value={form.explanation}
                 onChange={(event) => setForm((current) => ({ ...current, explanation: event.target.value }))}
-                className="border-white/10 bg-neutral-900 text-white"
+                className="border-border bg-muted text-foreground"
               />
             </div>
 
@@ -798,7 +798,7 @@ export default function AdminPmsCbtExtraQuestionPage() {
                   resetForm()
                 }}
                 disabled={saving}
-                className="border-white/10 bg-neutral-900 text-white hover:bg-neutral-800 hover:text-white"
+                className="border-border bg-muted text-foreground hover:bg-muted hover:text-foreground"
               >
                 Cancel
               </Button>
@@ -806,7 +806,6 @@ export default function AdminPmsCbtExtraQuestionPage() {
                 type="submit"
                 loading={saving}
                 disabled={!form.review_cycle_id || form.targeted_emails.length === 0}
-                className="bg-white text-black hover:bg-slate-200 hover:text-black"
               >
                 {editingQuestion ? "Save Changes" : "Add Question"}
               </Button>
