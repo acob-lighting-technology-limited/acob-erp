@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run, parseHttpUrl } from "@/lib/shell/run"
+import { findNewestFile } from "@/lib/media/temp-files"
 import { readFile, unlink, mkdir, readdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
 import JSZip from "jszip"
-
-const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   const tempDir = path.join(tmpdir(), "song-batch-downloads")
@@ -48,13 +46,26 @@ export async function POST(request: NextRequest) {
       const url = validUrls[i]
       const outputTemplate = path.join(batchDir, `song_${i + 1}.%(ext)s`)
 
-      try {
-        const command = `yt-dlp -x --audio-format mp3 --audio-quality 0 -o "${outputTemplate}" --no-warnings "${url}"`
+      const target = parseHttpUrl(url)
+      if (!target) continue
 
-        await execAsync(command, {
-          maxBuffer: 50 * 1024 * 1024,
-          timeout: 120000,
-        })
+      try {
+        // argv array, so the URL is never parsed as shell syntax.
+        await run(
+          "yt-dlp",
+          [
+            "-x",
+            "--audio-format",
+            "mp3",
+            "--audio-quality",
+            "0",
+            "-o",
+            outputTemplate,
+            "--no-warnings",
+            target.toString(),
+          ],
+          { maxBuffer: 50 * 1024 * 1024, timeout: 120000 }
+        )
 
         await new Promise((resolve) => setTimeout(resolve, 500))
         const dirFiles = await readdir(batchDir)
@@ -62,16 +73,9 @@ export async function POST(request: NextRequest) {
         if (downloadedFile) {
           files.push(path.join(batchDir, downloadedFile))
         } else {
-          try {
-            const { stdout: mp3Stdout } = await execAsync(
-              `find "${batchDir}" -name "*.mp3" -type f -mmin -2 2>/dev/null | head -1`
-            )
-            const foundFile = mp3Stdout.trim()
-            if (foundFile && !files.includes(foundFile)) {
-              files.push(foundFile)
-            }
-          } catch (e) {
-            console.error(`Error finding file for ${url}:`, e)
+          const foundFile = await findNewestFile(batchDir, { extensions: [".mp3"], withinMs: 2 * 60 * 1000 })
+          if (foundFile && !files.includes(foundFile)) {
+            files.push(foundFile)
           }
         }
       } catch (error: any) {
