@@ -10,7 +10,6 @@
  * of being resolved from the database via resolveAdminScope.
  */
 import { AdminSidebar } from "@/components/admin-sidebar"
-import { AdminContextRibbon } from "@/components/admin-context-ribbon"
 import { AdminScopeProvider } from "@/components/admin-scope-context"
 import { SidebarContent } from "@/components/sidebar-content"
 import type { ClientAdminScope } from "@/components/admin-scope-context"
@@ -44,13 +43,6 @@ export function DeptLayout({ scope, user, profile, deptName, children }: DeptLay
       <AdminSidebar user={user} profile={profile} adminScopeMode="lead" deptId={scope.managedDepartmentIds[0]} />
       <SidebarContent>
         <div className="min-h-screen bg-[var(--admin-content-bg)] pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">
-          <AdminContextRibbon
-            role={(profile?.role ?? "employee") as UserRole}
-            department={deptName}
-            scopeMode="lead"
-            isAdminLike={scope.isAdminLike}
-            managedDepartments={scope.managedDepartments}
-          />
           <AdminScopeProvider scope={scope}>{children}</AdminScopeProvider>
         </div>
       </SidebarContent>

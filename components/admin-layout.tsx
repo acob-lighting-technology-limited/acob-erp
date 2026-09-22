@@ -1,5 +1,4 @@
 import { AdminSidebar } from "@/components/admin-sidebar"
-import { AdminContextRibbon } from "@/components/admin-context-ribbon"
 import { AdminScopeProvider } from "@/components/admin-scope-context"
 import { SidebarContent } from "@/components/sidebar-content"
 import { AcoBot } from "@/components/acobot/acobot"
@@ -70,13 +69,6 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
       />
       <SidebarContent>
         <div className="min-h-screen bg-[var(--admin-content-bg)] pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">
-          <AdminContextRibbon
-            role={profile.role}
-            department={profile.department}
-            scopeMode={scope.scopeMode}
-            isAdminLike={scope.isAdminLike}
-            managedDepartments={scope.managedDepartments}
-          />
           <AdminScopeProvider scope={clientScope}>{children}</AdminScopeProvider>
         </div>
       </SidebarContent>

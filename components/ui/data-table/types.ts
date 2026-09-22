@@ -350,6 +350,7 @@ export interface DataTablePageProps {
   description?: string
   icon?: LucideIcon
   backLink?: { href: string; label: string }
+  breadcrumbs?: Array<{ label: string; href?: string }> | false
   actions?: ReactNode
   tabs?: DataTableTab[]
   activeTab?: string
