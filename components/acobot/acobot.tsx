@@ -62,6 +62,8 @@ export function AcoBot({ userName }: AcoBotProps) {
     }
   }, [])
 
+  const [customError, setCustomError] = useState<string | null>(null)
+
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop, error, setInput } = useChat({
     api: "/api/acobot",
     // Route through apiFetch so the x-csrf-token header is attached — the
@@ -70,6 +72,21 @@ export function AcoBot({ userName }: AcoBotProps) {
     fetch: apiFetch,
     // Send the page the user is on so ACOBot can answer with route context.
     body: { currentPath: pathname },
+    onResponse: async (res) => {
+      if (!res.ok) {
+        try {
+          const data = (await res.clone().json()) as { error?: string }
+          if (data?.error) setCustomError(data.error)
+        } catch {
+          setCustomError(null)
+        }
+      } else {
+        setCustomError(null)
+      }
+    },
+    onError: (err) => {
+      setCustomError((prev) => prev || err.message || "Something went wrong. Please try again.")
+    },
   })
 
   const visibleMessages = messages.filter((m) => m.role === "user" || m.role === "assistant")
@@ -231,9 +248,9 @@ export function AcoBot({ userName }: AcoBotProps) {
                 </div>
               )}
 
-              {error && (
+              {(error || customError) && (
                 <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-xl border px-3 py-2 text-center text-xs">
-                  {error.message || "Something went wrong. Please try again."}
+                  {customError || error?.message || "Something went wrong. Please try again."}
                 </div>
               )}
 
@@ -251,7 +268,10 @@ export function AcoBot({ userName }: AcoBotProps) {
             {/* Input */}
             <form
               id="acobot-form"
-              onSubmit={handleSubmit}
+              onSubmit={(e) => {
+                setCustomError(null)
+                handleSubmit(e)
+              }}
               className={cn(
                 "border-border bg-background flex items-center gap-2 px-3 py-2.5",
                 visibleMessages.length === 0 ? "" : "border-t"
