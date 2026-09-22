@@ -5,6 +5,8 @@ import { logger } from "@/lib/logger"
 import { EventWriteSchema, describeEventDbError, type EventsResponse } from "@/lib/events/types"
 import { getEventsSession, loadEvents, parseRange, resolveDepartmentMembers } from "@/lib/events/server"
 import { auditEventValues, eventRowFromInput, uniqueIds } from "@/lib/events/write"
+import { generateEventOccurrences } from "@/lib/events/recurrence"
+import { toLocalISODate } from "@/lib/utils/date"
 
 export const dynamic = "force-dynamic"
 const log = logger("api-events")
@@ -42,35 +44,105 @@ export async function POST(request: NextRequest) {
   }
   const input = parsed.data
 
-  const { data: created, error } = await session.supabase
-    .from("events")
-    .insert({ ...eventRowFromInput(input), created_by: session.userId })
-    .select("id")
-    .single()
+  const recurrence = input.recurrence
+  const isRecurring = Boolean(recurrence && recurrence.frequency !== "none")
 
-  if (error || !created) {
+  let scheduledRanges: Array<{ start_at: string; end_at: string }> = [
+    { start_at: input.start_at, end_at: input.end_at },
+  ]
+  let skippedHolidaysList: string[] = []
+
+  if (isRecurring && recurrence) {
+    const holidayDates = new Set<string>()
+    if (recurrence.skip_holidays) {
+      try {
+        const startIsoDate = toLocalISODate(new Date(input.start_at))
+        const [holidayCalendarRes, holidayEventsRes] = await Promise.all([
+          session.supabase.from("holiday_calendar").select("holiday_date").gte("holiday_date", startIsoDate),
+          session.supabase
+            .from("events")
+            .select("start_at, end_at")
+            .eq("type", "holiday")
+            .neq("status", "cancelled")
+            .gte("end_at", input.start_at),
+        ])
+
+        if (holidayCalendarRes.data) {
+          for (const row of holidayCalendarRes.data as Array<{ holiday_date: string }>) {
+            if (row.holiday_date) holidayDates.add(row.holiday_date)
+          }
+        }
+        if (holidayEventsRes.data) {
+          for (const row of holidayEventsRes.data as Array<{ start_at: string; end_at: string }>) {
+            const dateIso = toLocalISODate(new Date(row.start_at))
+            holidayDates.add(dateIso)
+          }
+        }
+      } catch (err) {
+        log.warn({ err }, "Could not fetch holidays for recurrence check")
+      }
+    }
+
+    const occurrences = generateEventOccurrences({
+      start_at: input.start_at,
+      end_at: input.end_at,
+      all_day: input.all_day,
+      frequency: recurrence.frequency,
+      count: recurrence.count,
+      until: recurrence.until,
+      holidayDates,
+      skip_holidays: recurrence.skip_holidays,
+    })
+
+    scheduledRanges = occurrences.scheduled
+    skippedHolidaysList = occurrences.skippedHolidays
+
+    if (scheduledRanges.length === 0) {
+      return NextResponse.json(
+        { error: "All recurrence dates fall on public holidays and were skipped." },
+        { status: 400 }
+      )
+    }
+  }
+
+  const baseRow = eventRowFromInput(input)
+  const rowsToInsert = scheduledRanges.map((range) => ({
+    ...baseRow,
+    start_at: range.start_at,
+    end_at: range.end_at,
+    created_by: session.userId,
+  }))
+
+  const { data: created, error } = await session.supabase.from("events").insert(rowsToInsert).select("id")
+
+  if (error || !created || created.length === 0) {
     const described = describeEventDbError(error)
     if (described.status === 500) log.error({ err: error }, "Failed to create event")
     return NextResponse.json({ error: described.message }, { status: described.status })
   }
 
-  const eventId = String(created.id)
+  const eventIds = created.map((r: { id: string }) => String(r.id))
+  const primaryEventId = eventIds[0]
   let inviteWarning: string | null = null
-  try {
-    const departmentMembers = await resolveDepartmentMembers(session, input.invite_department_ids)
-    const rows = uniqueIds([...input.attendee_ids, ...departmentMembers]).map((profile_id) => ({
-      event_id: eventId,
-      profile_id,
-    }))
-    if (rows.length) {
-      const { error: attendeeError } = await session.supabase.from("event_attendees").insert(rows)
-      if (attendeeError) throw attendeeError
+
+  if (input.attendee_ids.length > 0 || input.invite_department_ids.length > 0) {
+    try {
+      const departmentMembers = await resolveDepartmentMembers(session, input.invite_department_ids)
+      const attendeeProfileIds = uniqueIds([...input.attendee_ids, ...departmentMembers])
+      if (attendeeProfileIds.length > 0) {
+        const attendeeRows = eventIds.flatMap((eid) =>
+          attendeeProfileIds.map((profile_id) => ({
+            event_id: eid,
+            profile_id,
+          }))
+        )
+        const { error: attendeeError } = await session.supabase.from("event_attendees").insert(attendeeRows)
+        if (attendeeError) throw attendeeError
+      }
+    } catch (err) {
+      log.error({ err, primaryEventId }, "Events created but invitees failed to save")
+      inviteWarning = "Event saved, but the invite list could not be saved. Edit the event to add invitees."
     }
-  } catch (err) {
-    // The event exists; tell the user the invite list needs another try rather
-    // than failing the whole request and leaving them to create a duplicate.
-    log.error({ err, eventId }, "Event created but invitees failed to save")
-    inviteWarning = "Event saved, but the invite list could not be saved. Edit the event to add invitees."
   }
 
   await writeAuditLog(
@@ -78,12 +150,30 @@ export async function POST(request: NextRequest) {
     {
       action: "create",
       entityType: "event",
-      entityId: eventId,
+      entityId: primaryEventId,
       newValues: auditEventValues(input),
       context: { actorId: session.userId, source: "api", route: "/api/events" },
     },
     { failOpen: true }
   )
 
-  return NextResponse.json({ id: eventId, warning: inviteWarning }, { status: 201 })
+  let recurrenceMessage: string | null = null
+  if (isRecurring) {
+    if (skippedHolidaysList.length > 0) {
+      recurrenceMessage = `Created ${scheduledRanges.length} recurring occurrences (${skippedHolidaysList.length} skipped on public holidays).`
+    } else {
+      recurrenceMessage = `Created ${scheduledRanges.length} recurring occurrences.`
+    }
+  }
+
+  return NextResponse.json(
+    {
+      id: primaryEventId,
+      count: scheduledRanges.length,
+      skipped_holidays: skippedHolidaysList,
+      message: recurrenceMessage,
+      warning: inviteWarning,
+    },
+    { status: 201 }
+  )
 }

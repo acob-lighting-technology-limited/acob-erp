@@ -39,7 +39,16 @@ export function useEventOptions() {
   })
 }
 
-export async function saveEvent(payload: unknown, id?: string): Promise<{ id: string; warning: string | null }> {
+export async function saveEvent(
+  payload: unknown,
+  id?: string
+): Promise<{
+  id: string
+  warning: string | null
+  message?: string | null
+  count?: number
+  skipped_holidays?: string[]
+}> {
   const res = await apiFetch(id ? `/api/events/${id}` : "/api/events", {
     method: id ? "PATCH" : "POST",
     headers: { "Content-Type": "application/json" },
