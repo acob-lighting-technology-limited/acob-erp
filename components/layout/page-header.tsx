@@ -1,9 +1,6 @@
 import Link from "next/link"
 import { ArrowLeft, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Breadcrumbs, type BreadcrumbItem } from "./breadcrumbs"
-
-export type { BreadcrumbItem }
 
 interface BackLink {
   href: string
@@ -19,8 +16,6 @@ interface PageHeaderProps {
   icon?: LucideIcon
   /** Back navigation link */
   backLink?: BackLink
-  /** Explicit breadcrumbs trail, or false to suppress automatic breadcrumbs */
-  breadcrumbs?: BreadcrumbItem[] | false
   /** Actions (buttons, dropdowns) shown on the right */
   actions?: React.ReactNode
   /**
@@ -65,7 +60,6 @@ export function PageHeader({
   description,
   icon: Icon,
   backLink,
-  breadcrumbs,
   actions,
   actionsPlacement = "inline",
   className,
@@ -93,7 +87,6 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0 flex-1 space-y-1">
-        {breadcrumbs !== false && <Breadcrumbs items={Array.isArray(breadcrumbs) ? breadcrumbs : undefined} />}
         {backLink && (
           <Link
             href={backLink.href}

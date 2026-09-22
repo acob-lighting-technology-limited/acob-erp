@@ -20,7 +20,6 @@ export function DataTablePage({
   description,
   icon,
   backLink,
-  breadcrumbs,
   actions,
   tabs,
   activeTab,
@@ -43,7 +42,6 @@ export function DataTablePage({
         description={description}
         icon={icon}
         backLink={backLink}
-        breadcrumbs={breadcrumbs}
         actions={actions}
         actionsPlacement={actionsPlacement}
       />

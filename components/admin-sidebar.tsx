@@ -8,7 +8,6 @@ import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  Bell,
   Briefcase,
   CalendarDays,
   ChevronsUpDown,
@@ -24,7 +23,6 @@ import {
   FileBarChart,
   FileCode2,
   Megaphone,
-  Wrench,
   ShieldCheck,
   FlaskConical,
   User,
@@ -480,35 +478,6 @@ const adminNavigation: NavItem[] = [
       { name: "Personal", href: "/admin/documentation/personal" },
       { name: "Department", href: "/admin/documentation/department" },
     ],
-  },
-  {
-    // Sits between Documentation and the compliance block, matching where the
-    // dept shell puts it. Gated by its own feedback.main route key.
-    section: "operations",
-    name: "Feedback",
-    href: "/admin/feedback",
-    icon: MessageSquare,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
-    name: "Tools",
-    href: "/admin/tools",
-    icon: Wrench,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Signature", href: "/admin/tools/signature" },
-      { name: "Signature Anniversary", href: "/admin/tools/signature-anniversary" },
-      { name: "Watermark", href: "/admin/tools/watermark" },
-      { name: "Media & PDF Suite", href: "/admin/tools/media" },
-    ],
-  },
-  {
-    section: "operations",
-    name: "Notifications",
-    href: "/admin/notifications",
-    icon: Bell,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "compliance",
