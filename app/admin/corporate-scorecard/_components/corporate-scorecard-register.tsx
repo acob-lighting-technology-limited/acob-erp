@@ -163,15 +163,15 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
           ),
       },
       {
-        key: "measure",
-        label: "KPI Measure",
+        key: "target_text",
+        label: "2026 Target",
         sortable: true,
         resizable: true,
         initialWidth: 320,
-        accessor: (r) => r.measure,
+        accessor: (r) => r.target_text,
         render: (r) => (
           <div className="flex flex-col gap-0.5">
-            <span className="text-xs leading-snug font-medium">{r.measure}</span>
+            <span className="text-xs leading-snug font-medium">{r.target_text}</span>
             <span className="text-muted-foreground text-[11px]">
               {r.perspective} · {r.strategic_objective}
             </span>
@@ -190,10 +190,13 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         ),
       },
       {
-        key: "target_text",
-        label: "2026 Target",
-        accessor: (r) => r.target_text,
-        render: (r) => <span className="text-xs">{r.target_text}</span>,
+        key: "measure",
+        label: "KPI Measure",
+        sortable: true,
+        resizable: true,
+        initialWidth: 260,
+        accessor: (r) => r.measure,
+        render: (r) => <span className="text-xs leading-snug font-medium">{r.measure}</span>,
         hideOnMobile: true,
       },
       {
@@ -500,14 +503,16 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-semibold">{r.measure}</p>
-                <p className="text-muted-foreground text-xs">{r.perspective}</p>
+                <p className="text-sm font-semibold">{r.target_text}</p>
+                <p className="text-muted-foreground text-xs">{r.measure}</p>
               </div>
               <Badge variant="outline">{r.core_departments.length} depts</Badge>
             </div>
-            <p className="text-muted-foreground line-clamp-2 text-xs">{r.strategic_objective}</p>
+            <p className="text-muted-foreground line-clamp-2 text-xs">
+              {r.perspective} · {r.strategic_objective}
+            </p>
             <div className="flex items-center justify-between border-t pt-2 text-[10px]">
-              <span>Target: {r.target_text}</span>
+              <span className="text-muted-foreground">Pillar: {r.strategic_priority}</span>
               <div className="flex items-center gap-1">
                 <Button
                   size="sm"
