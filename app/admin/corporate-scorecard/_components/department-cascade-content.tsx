@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { ClipboardEdit, PlusCircle, Target } from "lucide-react"
@@ -30,6 +30,7 @@ import { formatWATDate } from "@/lib/utils/date"
 type CascadeRow = {
   assignment_id: string
   kpi_id: string
+  department?: string
   source_sn: number
   perspective: string
   strategic_priority?: string
@@ -79,6 +80,7 @@ export interface DepartmentCascadeContentProps {
   tabs?: DataTableTab[]
   activeTab?: string
   onTabChange?: (tab: string) => void
+  onDepartmentChange?: (dept: string) => void
 }
 
 export function DepartmentCascadeContent({
@@ -90,6 +92,7 @@ export function DepartmentCascadeContent({
   tabs,
   activeTab,
   onTabChange,
+  onDepartmentChange,
 }: DepartmentCascadeContentProps) {
   const queryClient = useQueryClient()
   const activeDepartment = lockedDepartment || initialDepartment || departments[0] || ""
@@ -97,11 +100,50 @@ export function DepartmentCascadeContent({
   const [editingRow, setEditingRow] = useState<CascadeRow | null>(null)
   const [recordingRow, setRecordingRow] = useState<CascadeRow | null>(null)
 
+  const [filterValues, setFilterValues] = useState<Record<string, string[]>>(() => ({
+    ...(!lockedDepartment && department && department !== "all" ? { department: [department] } : {}),
+  }))
+
+  const handleFilterValuesChange = useCallback(
+    (nextFilters: Record<string, string[]>) => {
+      setFilterValues(nextFilters)
+      const nextDept = nextFilters.department?.[0]
+      if (nextDept) {
+        if (nextDept !== department) {
+          setDepartment(nextDept)
+          onDepartmentChange?.(nextDept)
+        }
+      } else {
+        if (department !== "all") {
+          setDepartment("all")
+          onDepartmentChange?.("all")
+        }
+      }
+    },
+    [department, onDepartmentChange]
+  )
+
   useEffect(() => {
     if (lockedDepartment && department !== lockedDepartment) {
       setDepartment(lockedDepartment)
     }
   }, [lockedDepartment, department])
+
+  useEffect(() => {
+    if (!lockedDepartment && department) {
+      setFilterValues((prev) => {
+        const currentInFilter = prev.department?.[0]
+        if (department === "all" && currentInFilter) {
+          const { department: _, ...rest } = prev
+          return rest
+        }
+        if (department !== "all" && currentInFilter !== department) {
+          return { ...prev, department: [department] }
+        }
+        return prev
+      })
+    }
+  }, [department, lockedDepartment])
 
   const queryKey = ["corporate-scorecard-department", department]
 
@@ -136,6 +178,21 @@ export function DepartmentCascadeContent({
 
   const columns = useMemo<DataTableColumn<CascadeRow>[]>(
     () => [
+      ...(department === "all"
+        ? [
+            {
+              key: "department",
+              label: "Department",
+              sortable: true,
+              accessor: (r: CascadeRow) => r.department || "",
+              render: (r: CascadeRow) => (
+                <Badge variant="outline" className="text-xs font-medium">
+                  {r.department}
+                </Badge>
+              ),
+            },
+          ]
+        : []),
       {
         key: "strategic_priority",
         label: "Pillar",
@@ -235,11 +292,25 @@ export function DepartmentCascadeContent({
         render: (r) => ragBadge(r.capped_pct != null ? ragStatus(r.capped_pct) : null),
       },
     ],
-    []
+    [department]
   )
 
   const filters = useMemo<DataTableFilter<CascadeRow>[]>(
     () => [
+      ...(!lockedDepartment && departments.length > 0
+        ? [
+            {
+              key: "department",
+              label: "Department",
+              options: departments.map((d) => ({ value: d, label: d })),
+              multi: false,
+              filterFn: (row: CascadeRow, selected: string[]) => {
+                if (!selected || selected.length === 0) return true
+                return selected.includes(row.department || department)
+              },
+            },
+          ]
+        : []),
       {
         key: "role",
         label: "Role",
@@ -264,7 +335,7 @@ export function DepartmentCascadeContent({
         options: pillarOptions,
       },
     ],
-    [pillarOptions]
+    [departments, lockedDepartment, department, pillarOptions]
   )
 
   return (
@@ -286,22 +357,7 @@ export function DepartmentCascadeContent({
               {lockedDepartment}
             </Badge>
           </div>
-        ) : (
-          <div className="w-full max-w-[260px]">
-            <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select a department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )
+        ) : undefined
       }
       stats={
         <StatGrid>
@@ -310,7 +366,7 @@ export function DepartmentCascadeContent({
             title="Department Attainment"
             value={departmentAttainment != null ? `${departmentAttainment}%` : "No data"}
             icon={Target}
-            description="CORE KPIs only"
+            description={department === "all" ? "All Departments (CORE)" : "CORE KPIs only"}
           />
           <StatCard variant="compact" title="CORE KPIs" value={coreRows.length} description="Scored" />
           <StatCard
@@ -332,6 +388,8 @@ export function DepartmentCascadeContent({
         data={rows}
         columns={columns}
         filters={filters}
+        filterValues={filterValues}
+        onFilterValuesChange={handleFilterValuesChange}
         getRowId={(r) => r.assignment_id}
         searchPlaceholder="Search KPI or objective..."
         searchFn={(row, query) =>
