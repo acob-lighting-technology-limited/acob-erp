@@ -4,7 +4,21 @@ import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
-import { BarChart3, ClipboardList, Edit, Layers, Plus, Target, Trash2, UserCog, Users } from "lucide-react"
+import {
+  AlertTriangle,
+  BarChart3,
+  ClipboardList,
+  Clock,
+  Edit,
+  Layers,
+  ListTodo,
+  Plus,
+  Target,
+  Trash2,
+  TrendingUp,
+  UserCog,
+  Users,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -17,13 +31,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
+import { formatWATDate } from "@/lib/utils/date"
 import { CreateKpiDialog, EditKpiDialog, ArchiveKpiDialog, PERSPECTIVES } from "./kpi-dialogs"
 
-type Assignment = { id: string; department: string; role: "core" | "support" }
+type Assignment = {
+  id: string
+  department: string
+  role: "core" | "support"
+  target_value?: number | null
+  target_unit?: string | null
+  department_target?: string | null
+  proposed_action?: string | null
+  latest_actual?: {
+    actual_value: number | null
+    milestones_completed: number | null
+    milestones_total: number | null
+    note: string | null
+    recorded_at: string
+  } | null
+  raw_pct?: number | null
+  capped_pct?: number | null
+  status?: "green" | "amber" | "red" | null
+}
 
 type RegisterRow = {
   id: string
@@ -38,6 +72,18 @@ type RegisterRow = {
   core_departments: string[]
   support_departments: string[]
   assignments: Assignment[]
+  overall_attainment?: number | null
+  overall_status?: "green" | "amber" | "red" | null
+  pacing?: {
+    status: "ahead" | "on_pace" | "behind" | "no_data"
+    elapsedPct: number
+    label: string
+  } | null
+  task_stats?: {
+    total: number
+    completed: number
+    in_progress: number
+  } | null
 }
 
 export interface CorporateScorecardRegisterProps {
@@ -254,36 +300,184 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
           { label: "Archive KPI", icon: Trash2, onClick: (r) => setArchivingRow(r), variant: "destructive" },
         ]}
         expandable={{
-          render: (r) => (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  Strategic Priority
-                </p>
-                <p className="mt-1 text-sm">{r.strategic_priority}</p>
-                <p className="text-muted-foreground mt-3 text-xs font-semibold tracking-wide uppercase">
-                  2026 Annual Target
-                </p>
-                <p className="mt-1 text-sm">{r.target_text}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  Supporting Departments
-                </p>
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {r.support_departments.length === 0 ? (
-                    <span className="text-muted-foreground text-xs">None</span>
-                  ) : (
-                    r.support_departments.map((d) => (
-                      <Badge key={d} variant="outline" className="text-[10px]">
-                        {d}
+          render: (r) => {
+            const pacing = r.pacing
+            const taskStats = r.task_stats || { total: 0, completed: 0, in_progress: 0 }
+
+            return (
+              <div className="bg-card/60 space-y-4 rounded-lg border p-4 text-xs">
+                {/* Top Summary Banner: Pacing & Overall Attainment */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                      2026 Timeline Pacing:
+                    </span>
+                    {pacing?.status === "ahead" && (
+                      <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-600">
+                        <TrendingUp className="h-3 w-3" /> Ahead of schedule ({pacing.elapsedPct}% of year)
                       </Badge>
-                    ))
-                  )}
+                    )}
+                    {pacing?.status === "on_pace" && (
+                      <Badge className="gap-1 border-blue-500/30 bg-blue-500/10 text-[11px] text-blue-600">
+                        <Clock className="h-3 w-3" /> On pace ({pacing.elapsedPct}% of year)
+                      </Badge>
+                    )}
+                    {pacing?.status === "behind" && (
+                      <Badge className="gap-1 border-red-500/30 bg-red-500/10 text-[11px] text-red-600">
+                        <AlertTriangle className="h-3 w-3" /> Behind schedule ({pacing.elapsedPct}% of year)
+                      </Badge>
+                    )}
+                    {(!pacing || pacing.status === "no_data") && (
+                      <Badge variant="outline" className="text-muted-foreground text-[11px]">
+                        No actuals logged yet ({pacing?.elapsedPct ?? 0}% of year elapsed)
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground text-[11px] font-medium">Overall CORE Attainment:</span>
+                    {r.overall_attainment != null ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-24">
+                          <Progress value={r.overall_attainment} />
+                        </div>
+                        <span className="text-foreground text-xs font-semibold">{r.overall_attainment}%</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs italic">Awaiting updates</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Department Ownership & Execution Matrix */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                      Department Responsibilities & Quotas (RACI)
+                    </p>
+                    <span className="text-muted-foreground text-[11px]">
+                      Only CORE owners drive the scorecard score
+                    </span>
+                  </div>
+
+                  <div className="bg-background/50 overflow-x-auto rounded-md border">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-muted/50 text-muted-foreground text-[11px] font-medium">
+                        <tr>
+                          <th className="px-3 py-2">Department</th>
+                          <th className="px-3 py-2">Role</th>
+                          <th className="px-3 py-2">Department Quota / Deliverable</th>
+                          <th className="px-3 py-2">Latest Progress</th>
+                          <th className="px-3 py-2">Attainment</th>
+                          <th className="px-3 py-2">Proposed Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {r.assignments.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="text-muted-foreground px-3 py-4 text-center">
+                              No departments assigned yet. Use &ldquo;Manage Departments&rdquo; to assign ownership.
+                            </td>
+                          </tr>
+                        ) : (
+                          r.assignments.map((a) => {
+                            const isCore = a.role === "core"
+                            const quotaDisplay =
+                              a.target_value != null
+                                ? `${a.target_value} ${a.target_unit || ""}`.trim()
+                                : a.department_target || r.target_text
+
+                            return (
+                              <tr key={a.id} className={isCore ? "bg-background" : "bg-muted/10 opacity-80"}>
+                                <td className="px-3 py-2 font-medium">{a.department}</td>
+                                <td className="px-3 py-2">
+                                  {isCore ? (
+                                    <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
+                                      CORE
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px]">
+                                      SUPPORT
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="text-muted-foreground max-w-xs px-3 py-2">{quotaDisplay}</td>
+                                <td className="px-3 py-2">
+                                  {a.latest_actual ? (
+                                    <div className="flex flex-col">
+                                      <span className="text-foreground font-medium">
+                                        {a.latest_actual.actual_value != null
+                                          ? `${a.latest_actual.actual_value}`
+                                          : a.latest_actual.milestones_completed != null
+                                            ? `${a.latest_actual.milestones_completed}/${a.latest_actual.milestones_total} milestones`
+                                            : "Recorded"}
+                                      </span>
+                                      {a.latest_actual.recorded_at && (
+                                        <span className="text-muted-foreground text-[10px]">
+                                          {formatWATDate(a.latest_actual.recorded_at)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground text-[11px] italic">No data</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {a.capped_pct != null ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-16">
+                                        <Progress value={a.capped_pct} />
+                                      </div>
+                                      <span className="text-[11px] font-medium">{a.capped_pct}%</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground text-[11px]">-</span>
+                                  )}
+                                </td>
+                                <td
+                                  className="text-muted-foreground max-w-sm truncate px-3 py-2"
+                                  title={a.proposed_action || ""}
+                                >
+                                  {a.proposed_action || "Not yet defined"}
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Operational Evidence & Tasks Summary */}
+                <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <ListTodo className="text-primary h-4 w-4" />
+                    <span className="text-foreground font-semibold">Operational Evidence:</span>
+                    <span>
+                      {taskStats.total > 0 ? (
+                        <>
+                          <strong className="text-foreground">{taskStats.total}</strong> active task
+                          {taskStats.total === 1 ? "" : "s"} tagged to this KPI ({taskStats.completed} completed,{" "}
+                          {taskStats.in_progress} in progress).
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          No tasks currently tagged to this corporate KPI in PMS/Tasks.
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <Link
+                    href="/tasks"
+                    className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
+                  >
+                    View Tasks
+                  </Link>
                 </div>
               </div>
-            </div>
-          ),
+            )
+          },
         }}
         viewToggle
         contactsView

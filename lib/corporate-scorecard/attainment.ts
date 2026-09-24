@@ -148,3 +148,48 @@ export function rollupByPerspective(rows: KpiRollupRow[]): PerspectiveRollup[] {
 export function companyAttainment(perspectives: PerspectiveRollup[]): number | null {
   return averageCappedPct(perspectives.map((p) => p.attainmentPct))
 }
+
+export type PacingStatus = "ahead" | "on_pace" | "behind" | "no_data"
+
+export type PacingResult = {
+  status: PacingStatus
+  elapsedPct: number
+  label: string
+}
+
+/**
+ * Evaluates whether current attainment is on pace relative to elapsed time in the target year.
+ */
+export function computePacingStatus(
+  cappedPct: number | null | undefined,
+  now: Date = new Date(),
+  targetYear = 2026
+): PacingResult {
+  const currentYear = now.getFullYear()
+  if (currentYear < targetYear) {
+    return { status: "on_pace", elapsedPct: 0, label: `Scheduled for ${targetYear}` }
+  }
+  if (currentYear > targetYear) {
+    if (cappedPct == null) return { status: "no_data", elapsedPct: 100, label: "Target year ended" }
+    return cappedPct >= RAG_GREEN_THRESHOLD
+      ? { status: "ahead", elapsedPct: 100, label: "Goal Achieved" }
+      : { status: "behind", elapsedPct: 100, label: "Target year ended" }
+  }
+
+  const start = new Date(targetYear, 0, 1).getTime()
+  const end = new Date(targetYear, 11, 31, 23, 59, 59).getTime()
+  const current = Math.min(Math.max(now.getTime(), start), end)
+  const elapsedPct = Math.round(((current - start) / (end - start)) * 100)
+
+  if (cappedPct == null) {
+    return { status: "no_data", elapsedPct, label: `${elapsedPct}% of year elapsed` }
+  }
+
+  if (cappedPct >= elapsedPct + 5) {
+    return { status: "ahead", elapsedPct, label: "Ahead of schedule" }
+  }
+  if (cappedPct >= elapsedPct - 15) {
+    return { status: "on_pace", elapsedPct, label: "On pace" }
+  }
+  return { status: "behind", elapsedPct, label: "Behind schedule" }
+}
