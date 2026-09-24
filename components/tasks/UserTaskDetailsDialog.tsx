@@ -13,7 +13,7 @@ import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { formatWATDateTime, formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { isTaskOverdue } from "@/lib/tasks/overdue"
 import { cn, formatFullName } from "@/lib/utils"
-import { TASK_RATING_LABELS, TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
+import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import {
   DetailActionBar,
   DetailCallout,
@@ -224,7 +224,7 @@ export function UserTaskDetailsDialog({
                   </DetailField>
                   <DetailField icon={Star} label="Rating">
                     {selectedTask.rating ? (
-                      `${selectedTask.rating}/5 — ${TASK_RATING_LABELS[selectedTask.rating]}`
+                      `${selectedTask.rating}/5`
                     ) : (
                       <span className="text-muted-foreground">Not yet rated</span>
                     )}

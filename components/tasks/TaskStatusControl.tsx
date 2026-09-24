@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
-import { TASK_RATING_LABELS, TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
+import { TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import type { Task } from "@/types/task"
 
 /**
@@ -252,11 +252,10 @@ export function TaskStatusControl({
                       type="button"
                       variant={rating === value ? "default" : "outline"}
                       size="sm"
-                      className="h-auto flex-col gap-0.5 py-2"
+                      className="h-10 w-full min-w-0 text-sm font-semibold"
                       onClick={() => setRating(value)}
                     >
-                      <span className="text-sm font-semibold">{value}</span>
-                      <span className="text-[10px] leading-tight opacity-80">{TASK_RATING_LABELS[value]}</span>
+                      {value}
                     </Button>
                   )
                 )}

@@ -15,13 +15,7 @@ import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
 import { formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
-import {
-  TASK_RATING_LABELS,
-  TASK_RATING_MAX,
-  TASK_RATING_MIN,
-  TASK_WEIGHT_DEFAULT,
-  isValidRating,
-} from "@/lib/tasks/scoring"
+import { TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT, isValidRating } from "@/lib/tasks/scoring"
 
 export interface TaskReviewEmployee {
   id: string
@@ -340,7 +334,7 @@ export function TaskReviewDecisionDialog({
               {actionType === "approve" && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Performance Rating *</Label>
-                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-5">
+                  <div className="grid grid-cols-5 gap-1.5">
                     {Array.from({ length: TASK_RATING_MAX - TASK_RATING_MIN + 1 }, (_, i) => TASK_RATING_MIN + i).map(
                       (value) => (
                         <Button
@@ -348,13 +342,10 @@ export function TaskReviewDecisionDialog({
                           type="button"
                           variant={rating === value ? "default" : "outline"}
                           size="sm"
-                          className="h-auto w-full min-w-0 flex-col gap-0.5 px-1 py-2 text-center whitespace-normal"
+                          className="h-10 w-full min-w-0 text-sm font-semibold"
                           onClick={() => setRating(value)}
                         >
-                          <span className="text-sm font-semibold">{value}</span>
-                          <span className="w-full text-[10px] leading-tight text-balance opacity-80">
-                            {TASK_RATING_LABELS[value]}
-                          </span>
+                          {value}
                         </Button>
                       )
                     )}
