@@ -223,7 +223,13 @@ export function HelpDeskContent({
       accessor: (ticket) => ticket.title,
       render: (ticket) => (
         <div className="flex flex-col">
-          <span className="line-clamp-1 font-medium">{ticket.title}</span>
+          <button
+            type="button"
+            onClick={() => void openTicketDetails(ticket.id)}
+            className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
+          >
+            {ticket.title}
+          </button>
           <span className="text-muted-foreground text-[10px] uppercase">{ticket.service_department}</span>
         </div>
       ),
@@ -694,6 +700,49 @@ export function HelpDeskContent({
               },
             ],
           },
+        }}
+        expandable={{
+          render: (ticket) => (
+            <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Description</span>
+                <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
+                  {ticket.description || "No description provided."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Service Dept</span>
+                  <span className="font-medium">{ticket.service_department}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Request Type</span>
+                  <span className="font-medium capitalize">{ticket.request_type || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Created</span>
+                  <span className="font-medium">{formatWATDate(ticket.created_at)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Goal</span>
+                  <span className="font-medium">{ticket.goal_title || "—"}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 border-t pt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={() => void openTicketDetails(ticket.id)}
+                >
+                  <Headset className="h-3.5 w-3.5" />
+                  View Full Ticket & Comments {(ticket.comment_count || 0) > 0 ? `(${ticket.comment_count})` : ""}
+                </Button>
+              </div>
+            </div>
+          ),
         }}
         emptyTitle="No tickets"
         emptyDescription="Tickets you raise or are assigned appear here."

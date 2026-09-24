@@ -306,6 +306,52 @@ export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
             </div>
           </div>
         )}
+        expandable={{
+          render: (row) => (
+            <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+              <div className="space-y-1">
+                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  Feedback Description
+                </span>
+                <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
+                  {row.description || "No description provided."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                    Category / Type
+                  </span>
+                  <span className="font-medium capitalize">{row.feedback_type.replaceAll("_", " ")}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Status</span>
+                  <span className="font-medium capitalize">{row.status.replaceAll("_", " ")}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Submitted</span>
+                  <span className="font-medium">{formatWATDate(row.created_at)}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 border-t pt-2.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={() => {
+                    setSelectedFeedback(row)
+                    setShowEditModal(true)
+                  }}
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  Edit Feedback
+                </Button>
+              </div>
+            </div>
+          ),
+        }}
         rowActions={[
           {
             label: "Edit",

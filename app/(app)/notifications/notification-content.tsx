@@ -589,6 +589,64 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
             </div>
           )
         }}
+        expandable={{
+          render: (n) => (
+            <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+              <div className="space-y-1">
+                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  Notification Message
+                </span>
+                <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">{n.message}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Category</span>
+                  <span className="font-medium capitalize">{n.category}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Priority</span>
+                  <span className="font-medium capitalize">{n.priority}</span>
+                </div>
+                {n.actor_name && (
+                  <div>
+                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">From</span>
+                    <span className="font-medium">{n.actor_name}</span>
+                  </div>
+                )}
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Received</span>
+                  <span className="font-medium">{formatWATDate(n.created_at)}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 border-t pt-2.5">
+                {n.action_url && (
+                  <Button size="sm" className="gap-1.5 text-xs" onClick={() => void openNotification(n)}>
+                    Open Destination
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {!n.read ? (
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => void markAsRead(n.id)}>
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Mark Read
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() => void markAsUnread(n.id)}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    Mark Unread
+                  </Button>
+                )}
+              </div>
+            </div>
+          ),
+        }}
         urlSync
       />
     </DataTablePage>
