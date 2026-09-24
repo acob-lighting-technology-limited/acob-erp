@@ -7,6 +7,7 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -952,16 +953,21 @@ export function LunchRegisterPage({
       render: (row) => {
         const count = row.viewers?.length ?? 0
         return (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1.5 px-2 text-xs font-semibold text-blue-600 hover:bg-blue-500/10 hover:text-blue-700"
-            onClick={() => setViewersMenu(row)}
-            title="Click to view list of staff who viewed this menu"
-          >
-            <Eye className="h-3.5 w-3.5" />
-            {count}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1.5 px-2 text-xs font-semibold text-blue-600 hover:bg-blue-500/10 hover:text-blue-700"
+                onClick={() => setViewersMenu(row)}
+                aria-label="Click to view list of staff who viewed this menu"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {count}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Click to view list of staff who viewed this menu</TooltipContent>
+          </Tooltip>
         )
       },
     },
@@ -1228,30 +1234,40 @@ export function LunchRegisterPage({
       options: [],
       render: () => (
         <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={() => adjustDate(-1)}
-            title="Previous day"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => adjustDate(-1)}
+                aria-label="Previous day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Previous day</TooltipContent>
+          </Tooltip>
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="border-input bg-background h-9 rounded-md border px-3 py-1.5 text-sm"
           />
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={() => adjustDate(1)}
-            title="Next day"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => adjustDate(1)}
+                aria-label="Next day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Next day</TooltipContent>
+          </Tooltip>
         </div>
       ),
     },
@@ -1723,30 +1739,40 @@ export function LunchRegisterPage({
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Label className="text-sm font-medium">Date</Label>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => adjustDate(-1)}
-                title="Previous day"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => adjustDate(-1)}
+                    aria-label="Previous day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Previous day</TooltipContent>
+              </Tooltip>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="border-input bg-background h-9 rounded-md border px-3 py-1.5 text-sm"
               />
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => adjustDate(1)}
-                title="Next day"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => adjustDate(1)}
+                    aria-label="Next day"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Next day</TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
