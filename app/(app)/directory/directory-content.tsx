@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -82,23 +83,28 @@ function CopyValue({ value, className, muted }: { value: string | null; classNam
   }
 
   return (
-    <button
-      type="button"
-      onClick={copy}
-      title="Click to copy"
-      className={cn(
-        "hover:text-primary inline-flex max-w-full items-center gap-1.5 text-left transition-colors",
-        muted && "text-muted-foreground",
-        className
-      )}
-    >
-      <span className="truncate">{value}</span>
-      {copied ? (
-        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-      ) : (
-        <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" />
-      )}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={copy}
+          aria-label={copied ? "Copied" : "Click to copy"}
+          className={cn(
+            "hover:text-primary inline-flex max-w-full items-center gap-1.5 text-left transition-colors",
+            muted && "text-muted-foreground",
+            className
+          )}
+        >
+          <span className="truncate">{value}</span>
+          {copied ? (
+            <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          ) : (
+            <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{copied ? "Copied to clipboard!" : "Click to copy"}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -375,23 +381,29 @@ export function DirectoryContent() {
               because the viewport crossed `md`. Shown on the same condition as that
               badge too, so the two never disagree about which metrics exist. */}
           {(stats.leads > 0 || leadsOnly) && (
-            <button
-              type="button"
-              onClick={() => setFilterValues((prev) => ({ ...prev, is_department_lead: leadsOnly ? [] : ["lead"] }))}
-              aria-pressed={leadsOnly}
-              title={leadsOnly ? "Show everyone" : "Show department leads only"}
-              className="rounded-xl text-left transition-colors"
-            >
-              <StatCard
-                variant="compact"
-                title={leadsOnly ? "Leads · filtered" : "Department Leads"}
-                value={stats.leads}
-                icon={ShieldCheck}
-                iconBgColor="bg-emerald-500/10"
-                iconColor="text-emerald-500"
-                className={cn("h-full", leadsOnly && "border-primary/50 bg-primary/5")}
-              />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilterValues((prev) => ({ ...prev, is_department_lead: leadsOnly ? [] : ["lead"] }))
+                  }
+                  aria-pressed={leadsOnly}
+                  className="rounded-xl text-left transition-colors"
+                >
+                  <StatCard
+                    variant="compact"
+                    title={leadsOnly ? "Leads · filtered" : "Department Leads"}
+                    value={stats.leads}
+                    icon={ShieldCheck}
+                    iconBgColor="bg-emerald-500/10"
+                    iconColor="text-emerald-500"
+                    className={cn("h-full", leadsOnly && "border-primary/50 bg-primary/5")}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{leadsOnly ? "Show everyone" : "Show department leads only"}</TooltipContent>
+            </Tooltip>
           )}
           {stats.offices > 0 && (
             <StatCard

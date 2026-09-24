@@ -125,9 +125,17 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   }, [userProfile])
 
   // Whether this user may approve, rate, reject or reassign a given task.
-  // Department leads and administrators may review tasks within their scope,
-  // including tasks assigned to themselves.
+  // In the personal "My Tasks" board, an assignee acts strictly as an employee,
+  // not as an administrative reviewer. Reviewer actions (completed, failed, reassigned, cancelled)
+  // are performed via the department / admin console or review dialog.
   const canReviewTask = (task: Task) => {
+    if (
+      task.assigned_to === userId ||
+      (Array.isArray(task.assigned_users) &&
+        task.assigned_users.some((u) => (typeof u === "string" ? u === userId : u.id === userId)))
+    ) {
+      return false
+    }
     const role = String(userProfile?.role || "").toLowerCase()
     if (["admin", "super_admin", "developer"].includes(role)) return true
     if (!userProfile?.is_department_lead) return false
