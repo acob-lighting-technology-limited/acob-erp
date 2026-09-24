@@ -131,7 +131,7 @@ export function SearchableSelect({
                 </span>
                 <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
                   {option.icon && <span className="flex-shrink-0">{option.icon}</span>}
-                  <span className="truncate">{option.label}</span>
+                  <span className="truncate whitespace-nowrap">{option.label}</span>
                 </div>
               </button>
             )
@@ -144,7 +144,7 @@ export function SearchableSelect({
   )
 
   const contentClassName =
-    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-md border shadow-md"
+    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] min-w-[max(var(--radix-popover-trigger-width),14rem)] w-max max-w-[min(calc(100vw-2rem),24rem)] overflow-hidden rounded-md border shadow-md"
 
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>

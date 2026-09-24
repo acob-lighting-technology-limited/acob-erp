@@ -189,7 +189,7 @@ export function TaskStatusControl({
     <>
       <Select value={current} onValueChange={handleSelect} disabled={isSaving || isTerminal || options.length === 0}>
         <SelectTrigger
-          className={cn(size === "sm" ? "h-8 text-xs" : "h-9 text-sm", "w-full min-w-[9.5rem]", className)}
+          className={cn(size === "sm" ? "h-8 text-xs" : "h-9 text-sm", "w-full min-w-[10.5rem]", className)}
           aria-label="Task status"
         >
           {isSaving ? (
