@@ -58,7 +58,7 @@ const DECISIONS: Array<{
     unavailableReason: "Requires submission",
     icon: CheckCircle2,
     className: "border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400",
-    available: (task) => task.status === "submitted_for_review",
+    available: (task) => ["submitted_for_review", "in_progress", "pending", "unable_to_complete"].includes(task.status),
   },
   {
     id: "rework",
@@ -67,7 +67,7 @@ const DECISIONS: Array<{
     unavailableReason: "Requires submission",
     icon: RotateCcw,
     className: "border-purple-500/30 text-purple-700 hover:bg-purple-500/10 dark:text-purple-400",
-    available: (task) => ["submitted_for_review", "unable_to_complete", "in_progress"].includes(task.status),
+    available: (task) => ["submitted_for_review", "unable_to_complete"].includes(task.status),
   },
   {
     id: "reassign",
@@ -291,20 +291,14 @@ export function TaskReviewDecisionDialog({
                 <SelectValue placeholder="Select a decision..." />
               </SelectTrigger>
               <SelectContent>
-                {DECISIONS.map((decision) => {
-                  const blockedReason =
-                    decision.id === "approve" && ratingBlockedReason
-                      ? ratingBlockedReason
-                      : decision.available(task)
-                        ? null
-                        : decision.unavailableReason
-                  return (
-                    <SelectItem key={decision.id} value={decision.id} disabled={Boolean(blockedReason)}>
-                      {decision.label}
-                      {blockedReason ? ` (${blockedReason})` : ""}
-                    </SelectItem>
-                  )
-                })}
+                {DECISIONS.filter((decision) => {
+                  if (decision.id === "approve" && ratingBlockedReason) return false
+                  return decision.available(task)
+                }).map((decision) => (
+                  <SelectItem key={decision.id} value={decision.id}>
+                    {decision.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {actionType && (
