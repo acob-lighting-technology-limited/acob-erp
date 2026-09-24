@@ -4,11 +4,16 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { CreateRiskSchema, RISK_COLUMNS, type RiskRow } from "@/lib/risk-register/model"
-import { filterRisksToScope, leadsDepartment, notifyControlOwner } from "@/lib/risk-register/server"
+import {
+  filterRisksToScope,
+  involvedDepartments,
+  leadsDepartment,
+  notifyControlOwner,
+} from "@/lib/risk-register/server"
 
 const log = logger("corporate-services:risk-register")
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const scope = await getRequestScope()
     if (!scope) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -25,7 +30,13 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to load the risk register" }, { status: 500 })
     }
 
-    return NextResponse.json({ data: filterRisksToScope((data || []) as RiskRow[], scope) })
+    let scoped = filterRisksToScope((data || []) as RiskRow[], scope)
+    const targetDept = request.nextUrl.searchParams.get("department")
+    if (targetDept) {
+      scoped = scoped.filter((r) => r.department === targetDept || involvedDepartments(r).includes(targetDept))
+    }
+
+    return NextResponse.json({ data: scoped })
   } catch (err: unknown) {
     log.error({ err: String(err) }, "Failed to fetch risk register")
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })

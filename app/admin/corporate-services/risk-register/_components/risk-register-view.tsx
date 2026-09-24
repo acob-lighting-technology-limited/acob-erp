@@ -48,6 +48,8 @@ interface RiskRegisterViewProps {
   raisableDepartments: string[]
   currentUserId: string
   isAdminLike: boolean
+  lockedDepartment?: string
+  backLink?: { href: string; label: string }
 }
 
 const QUERY_KEY = ["corporate-services-risk-register"]
@@ -74,6 +76,8 @@ export function RiskRegisterView({
   raisableDepartments,
   currentUserId,
   isAdminLike,
+  lockedDepartment,
+  backLink,
 }: RiskRegisterViewProps) {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState("register")
@@ -82,10 +86,15 @@ export function RiskRegisterView({
   const [deleting, setDeleting] = useState<RiskRow | null>(null)
   const today = toLocalISODate()
 
+  const queryKey = lockedDepartment ? ["corporate-services-risk-register", lockedDepartment] : QUERY_KEY
+
   const { data, isLoading, error, refetch } = useQuery<{ data: RiskRow[] }>({
-    queryKey: QUERY_KEY,
+    queryKey,
     queryFn: async () => {
-      const res = await apiFetch("/api/corporate-services/risk-register", { cache: "no-store" })
+      const url = lockedDepartment
+        ? `/api/corporate-services/risk-register?department=${encodeURIComponent(lockedDepartment)}`
+        : "/api/corporate-services/risk-register"
+      const res = await apiFetch(url, { cache: "no-store" })
       if (!res.ok) throw new Error("Failed to load the risk register")
       return res.json()
     },
@@ -227,14 +236,20 @@ export function RiskRegisterView({
   ]
 
   const filters: DataTableFilter<RiskRow>[] = [
-    {
-      key: "department",
-      label: "Department",
-      options: departmentNames.map((d) => ({ value: d, label: d })),
-      mode: "custom",
-      filterFn: (r, values) =>
-        [r.department, ...r.supporting_departments, ...r.control_owner_departments].some((d) => values.includes(d)),
-    },
+    ...(lockedDepartment
+      ? []
+      : [
+          {
+            key: "department",
+            label: "Department",
+            options: departmentNames.map((d) => ({ value: d, label: d })),
+            mode: "custom" as const,
+            filterFn: (r: RiskRow, values: string[]) =>
+              [r.department, ...r.supporting_departments, ...r.control_owner_departments].some((d) =>
+                values.includes(d)
+              ),
+          },
+        ]),
     {
       key: "rating",
       label: "Rating",
@@ -271,9 +286,13 @@ export function RiskRegisterView({
   return (
     <DataTablePage
       title="Risk Register"
-      description="Departmental risks, their inherent rating, control owners and mitigation plans."
+      description={
+        lockedDepartment
+          ? `Risk register, inherent ratings, and mitigation plans for ${lockedDepartment}.`
+          : "Departmental risks, their inherent rating, control owners and mitigation plans."
+      }
       icon={ShieldAlert}
-      backLink={{ href: "/admin/corporate-services/scorecard", label: "Back to Scorecard" }}
+      backLink={backLink || { href: "/admin/corporate-services/scorecard", label: "Back to Scorecard" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}

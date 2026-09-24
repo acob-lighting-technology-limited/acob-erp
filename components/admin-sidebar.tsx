@@ -175,6 +175,17 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       ],
     },
     {
+      section: "management",
+      name: "Corporate Services",
+      href: `${base}/corporate-services`,
+      icon: Target,
+      roles: [],
+      children: [
+        { name: "Scorecard", href: `${base}/corporate-services/scorecard` },
+        { name: "Risk Register", href: `${base}/corporate-services/risk-register` },
+      ],
+    },
+    {
       section: "operations",
       name: "Tasks",
       href: `${base}/tasks`,
