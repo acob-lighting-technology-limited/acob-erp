@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { stripHtmlToText } from "./composer-utils"
 
 const log = logger("broadcast-form")
@@ -409,93 +410,172 @@ export function BroadcastForm({
           <div className="space-y-2">
             <Label>Message Body (rich text)</Label>
             <div className="bg-muted/50 flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 p-2">
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => runEditorCommand("bold")}
-              >
-                <Bold className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => runEditorCommand("italic")}
-              >
-                <Italic className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => runEditorCommand("underline")}
-              >
-                <Underline className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => runEditorCommand("insertUnorderedList")}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => runEditorCommand("insertOrderedList")}
-              >
-                <ListOrdered className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => {
-                  saveCurrentSelection()
-                  setLinkDialogOpen(true)
-                }}
-                title="Insert web link"
-              >
-                <Link2 className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={handlePreparedByMailLink}
-                title="Link selected text to the Prepared by email"
-              >
-                <Mail className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => runEditorCommand("bold")}
+                    aria-label="Bold"
+                  >
+                    <Bold className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Bold</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => runEditorCommand("italic")}
+                    aria-label="Italic"
+                  >
+                    <Italic className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Italic</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => runEditorCommand("underline")}
+                    aria-label="Underline"
+                  >
+                    <Underline className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Underline</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => runEditorCommand("insertUnorderedList")}
+                    aria-label="Bulleted list"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Bulleted list</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => runEditorCommand("insertOrderedList")}
+                    aria-label="Numbered list"
+                  >
+                    <ListOrdered className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Numbered list</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      saveCurrentSelection()
+                      setLinkDialogOpen(true)
+                    }}
+                    aria-label="Insert web link"
+                  >
+                    <Link2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Insert web link</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={handlePreparedByMailLink}
+                    aria-label="Link selected text to the Prepared by email"
+                  >
+                    <Mail className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Link selected text to the Prepared by email</p>
+                </TooltipContent>
+              </Tooltip>
+
               <div className="bg-border mx-1 h-5 w-px" />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => runEditorCommand("undo")}
-              >
-                <Undo2 className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => runEditorCommand("redo")}
-              >
-                <Redo2 className="h-4 w-4" />
-              </Button>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => runEditorCommand("undo")}
+                    aria-label="Undo"
+                  >
+                    <Undo2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Undo</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => runEditorCommand("redo")}
+                    aria-label="Redo"
+                  >
+                    <Redo2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Redo</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div className="relative">
               {isBodyEmpty && (

@@ -26,6 +26,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn, formatName } from "@/lib/utils"
 import { logger } from "@/lib/logger"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -309,36 +310,57 @@ export function AdminReferenceGeneratorContent({
             if (simulatedRef !== r.reference_number) {
               return (
                 <span className="flex flex-wrap items-center gap-x-1 font-medium">
-                  <span
-                    className="cursor-pointer hover:underline"
-                    onClick={() => copyToClipboard(r.reference_number!)}
-                    title="Click to copy original reference"
-                  >
-                    {r.reference_number}
-                  </span>
-                  <span
-                    className="text-muted-foreground cursor-pointer text-xs font-normal hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      copyToClipboard(simulatedRef)
-                    }}
-                    title="Click to copy simulated reference"
-                  >
-                    ({simulatedRef})
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium hover:underline"
+                        onClick={() => copyToClipboard(r.reference_number!)}
+                      >
+                        {r.reference_number}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Click to copy original reference</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground cursor-pointer border-0 bg-transparent p-0 text-left text-xs font-normal hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          copyToClipboard(simulatedRef)
+                        }}
+                      >
+                        ({simulatedRef})
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Click to copy simulated reference</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </span>
               )
             }
           }
         }
         return (
-          <span
-            className="cursor-pointer font-medium hover:underline"
-            onClick={() => copyToClipboard(r.reference_number!)}
-            title="Click to copy reference"
-          >
-            {r.reference_number}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="cursor-pointer border-0 bg-transparent p-0 text-left font-medium hover:underline"
+                onClick={() => copyToClipboard(r.reference_number!)}
+              >
+                {r.reference_number}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Click to copy reference</p>
+            </TooltipContent>
+          </Tooltip>
         )
       },
     },
@@ -356,15 +378,23 @@ export function AdminReferenceGeneratorContent({
       initialWidth: 90,
       hideOnMobile: true,
       accessor: (r) => getDepartmentShortCode(r.department_name || r.assigned_department_name),
-      render: (r) => (
-        <Badge
-          variant="secondary"
-          className="font-mono text-[11px]"
-          title={r.department_name || r.assigned_department_name || undefined}
-        >
-          {getDepartmentShortCode(r.department_name || r.assigned_department_name)}
-        </Badge>
-      ),
+      render: (r) => {
+        const fullDeptName = r.department_name || r.assigned_department_name
+        const badge = (
+          <Badge variant="secondary" className="cursor-default font-mono text-[11px]">
+            {getDepartmentShortCode(fullDeptName)}
+          </Badge>
+        )
+        if (!fullDeptName) return badge
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>{badge}</TooltipTrigger>
+            <TooltipContent>
+              <p>{fullDeptName}</p>
+            </TooltipContent>
+          </Tooltip>
+        )
+      },
     },
     {
       key: "status",
