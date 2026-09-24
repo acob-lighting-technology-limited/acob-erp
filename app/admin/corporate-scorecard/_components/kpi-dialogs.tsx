@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -31,6 +31,16 @@ export const STANDARD_PILLARS = [
   "Regulatory & Compliance",
 ] as const
 
+export type RegisterAssignment = {
+  id?: string
+  department: string
+  role: "core" | "support"
+  target_value?: number | null
+  target_unit?: string | null
+  department_target?: string | null
+  proposed_action?: string | null
+}
+
 export type RegisterRow = {
   id: string
   source_sn: number
@@ -43,6 +53,7 @@ export type RegisterRow = {
   direction: string
   core_departments: string[]
   support_departments: string[]
+  assignments?: RegisterAssignment[]
 }
 
 interface CreateKpiDialogProps {
@@ -346,7 +357,26 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
   const [targetText, setTargetText] = useState<string>("")
   const [measureType, setMeasureType] = useState<"count" | "percentage" | "currency" | "milestone">("count")
   const [direction, setDirection] = useState<"at_least" | "at_most">("at_least")
+  const [assignments, setAssignments] = useState<RegisterAssignment[]>([])
+  const [newDept, setNewDept] = useState<string>("")
+  const [newRole, setNewRole] = useState<"core" | "support">("core")
   const [isSaving, setIsSaving] = useState(false)
+
+  const { data: deptData } = useQuery<{ data: Array<{ name: string }> }>({
+    queryKey: ["departments-all"],
+    queryFn: async () => {
+      const res = await apiFetch("/api/departments", { cache: "no-store" })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to load departments")
+      return payload
+    },
+    enabled: row !== null,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const allDepartments = useMemo(() => {
+    return (deptData?.data ?? []).map((d) => d.name).sort((a, b) => a.localeCompare(b))
+  }, [deptData])
 
   useEffect(() => {
     if (row) {
@@ -363,10 +393,79 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
       setTargetText(row.target_text)
       setMeasureType((row.measure_type as any) || "count")
       setDirection((row.direction as any) || "at_least")
+      setNewDept("")
+      setNewRole("core")
+
+      if (row.assignments && row.assignments.length > 0) {
+        setAssignments(
+          row.assignments.map((a) => ({
+            id: a.id,
+            department: a.department,
+            role: a.role,
+            target_value: a.target_value ?? null,
+            target_unit: a.target_unit ?? "",
+            department_target: a.department_target ?? "",
+            proposed_action: a.proposed_action ?? "",
+          }))
+        )
+      } else {
+        const fallback: RegisterAssignment[] = [
+          ...(row.core_departments || []).map((dept) => ({
+            department: dept,
+            role: "core" as const,
+            target_value: null,
+            target_unit: "",
+            department_target: "",
+            proposed_action: "",
+          })),
+          ...(row.support_departments || []).map((dept) => ({
+            department: dept,
+            role: "support" as const,
+            target_value: null,
+            target_unit: "",
+            department_target: "",
+            proposed_action: "",
+          })),
+        ]
+        setAssignments(fallback)
+      }
     }
   }, [row])
 
+  const unassignedDepartments = useMemo(() => {
+    const assignedSet = new Set(assignments.map((a) => a.department.toLowerCase()))
+    return allDepartments.filter((d) => !assignedSet.has(d.toLowerCase()))
+  }, [allDepartments, assignments])
+
   const effectivePillar = strategicPriority === "custom" ? customPillar.trim() : strategicPriority
+
+  function addDepartment() {
+    if (!newDept) return
+    if (assignments.some((a) => a.department.toLowerCase() === newDept.toLowerCase())) {
+      toast.error(`${newDept} is already assigned to this KPI`)
+      return
+    }
+    setAssignments([
+      ...assignments,
+      {
+        department: newDept,
+        role: newRole,
+        target_value: null,
+        target_unit: "",
+        department_target: "",
+        proposed_action: "",
+      },
+    ])
+    setNewDept("")
+  }
+
+  function removeDepartment(index: number) {
+    setAssignments(assignments.filter((_, i) => i !== index))
+  }
+
+  function updateAssignment(index: number, patch: Partial<RegisterAssignment>) {
+    setAssignments((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
+  }
 
   async function handleSubmit() {
     if (!row || !effectivePillar || !strategicObjective.trim() || !measure.trim() || !targetText.trim()) {
@@ -387,13 +486,24 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
           target_text: targetText.trim(),
           measure_type: measureType,
           direction,
+          assignments: assignments.map((a) => ({
+            department: a.department,
+            role: a.role,
+            target_value:
+              a.target_value !== null && a.target_value !== undefined && !isNaN(Number(a.target_value))
+                ? Number(a.target_value)
+                : null,
+            target_unit: a.target_unit?.trim() || null,
+            department_target: a.department_target?.trim() || null,
+            proposed_action: a.proposed_action?.trim() || null,
+          })),
         }),
       })
 
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to update Corporate KPI")
 
-      toast.success("Corporate KPI updated successfully")
+      toast.success("Corporate KPI and departmental commitments updated successfully")
       onOpenChange(false)
       onChanged()
     } catch (err) {
@@ -405,11 +515,11 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
   return (
     <Dialog open={row !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[580px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[680px]">
         <DialogHeader>
-          <DialogTitle>Edit Corporate KPI</DialogTitle>
+          <DialogTitle>Edit Corporate KPI #{row?.source_sn}</DialogTitle>
           <DialogDescription>
-            Modify KPI #{row?.source_sn} details, Strategic Pillar, and annual target.
+            Update corporate targets, strategic alignments, and departmental accountability quotas.
           </DialogDescription>
         </DialogHeader>
 
@@ -476,8 +586,13 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Annual Corporate Target *</Label>
-            <Input value={targetText} onChange={(e) => setTargetText(e.target.value)} className="h-9" />
+            <Label className="text-xs font-medium">Annual Corporate Target (Master Strategy Statement) *</Label>
+            <Input
+              value={targetText}
+              onChange={(e) => setTargetText(e.target.value)}
+              placeholder="e.g. At least 5 portfolio projects awarded by 31/12/2026"
+              className="h-9"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -504,10 +619,188 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="at_least">At least (Higher is better)</SelectItem>
-                  <SelectItem value="at_most">At most (Reduction / Cost reduction)</SelectItem>
+                  <SelectItem value="at_most">At most (Reduction / Cost control)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Department Ownership & Accountability Matrix */}
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-xs font-semibold">Department Quotas & Accountability (RACI)</Label>
+                <p className="text-muted-foreground text-[11px]">
+                  Assign Core owners and Support contributors. Define explicit numerical quotas and action commitments.
+                </p>
+              </div>
+              <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40">
+                  {assignments.filter((a) => a.role === "core").length} Core
+                </Badge>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950/40">
+                  {assignments.filter((a) => a.role === "support").length} Support
+                </Badge>
+              </div>
+            </div>
+
+            {assignments.length === 0 ? (
+              <div className="text-muted-foreground rounded-md border border-dashed p-4 text-center text-xs">
+                No departments currently assigned. Use the selector below to assign an owning or supporting department.
+              </div>
+            ) : (
+              <div className="max-h-72 space-y-2.5 overflow-y-auto pr-1">
+                {assignments.map((assignment, index) => {
+                  const isCore = assignment.role === "core"
+                  return (
+                    <div
+                      key={assignment.department}
+                      className={`space-y-2.5 rounded-lg border p-3 text-xs transition-colors ${
+                        isCore
+                          ? "border-emerald-200/80 bg-emerald-50/20 dark:border-emerald-900/60 dark:bg-emerald-950/10"
+                          : "border-border/70 bg-card"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-foreground text-xs font-semibold">{assignment.department}</span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
+                              isCore
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
+                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300"
+                            }`}
+                          >
+                            {isCore ? "Core Owner" : "Support"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className={`h-7 px-2 text-[11px] ${
+                              isCore
+                                ? "bg-emerald-100/50 font-bold text-emerald-700 dark:bg-emerald-900/40"
+                                : "text-muted-foreground"
+                            }`}
+                            onClick={() => updateAssignment(index, { role: "core" })}
+                          >
+                            Core
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className={`h-7 px-2 text-[11px] ${
+                              !isCore
+                                ? "bg-blue-100/50 font-bold text-blue-700 dark:bg-blue-900/40"
+                                : "text-muted-foreground"
+                            }`}
+                            onClick={() => updateAssignment(index, { role: "support" })}
+                          >
+                            Support
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground hover:text-destructive h-7 w-7 p-0"
+                            onClick={() => removeDepartment(index)}
+                            title="Remove department assignment"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-[11px] font-medium">
+                            Department Quota / Target Value
+                          </Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="e.g. 5 or 100"
+                            className="h-8 text-xs"
+                            value={assignment.target_value ?? ""}
+                            onChange={(e) =>
+                              updateAssignment(index, {
+                                target_value: e.target.value === "" ? null : Number(e.target.value),
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-muted-foreground text-[11px] font-medium">Target Unit</Label>
+                          <Input
+                            placeholder="e.g. Projects, %, ₦"
+                            className="h-8 text-xs"
+                            value={assignment.target_unit ?? ""}
+                            onChange={(e) => updateAssignment(index, { target_unit: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-[11px] font-medium">
+                          Action Commitment / Deliverable Plan
+                        </Label>
+                        <Input
+                          placeholder="e.g. Conduct outreach, qualify leads, and submit competitive bids"
+                          className="h-8 text-xs"
+                          value={assignment.proposed_action ?? ""}
+                          onChange={(e) => updateAssignment(index, { proposed_action: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Add department bar */}
+            {unassignedDepartments.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-2">
+                <Select value={newDept} onValueChange={setNewDept}>
+                  <SelectTrigger className="h-8 min-w-[180px] flex-1 text-xs">
+                    <SelectValue placeholder="Select department to add..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unassignedDepartments.map((dept) => (
+                      <SelectItem key={dept} value={dept} className="text-xs">
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={newRole} onValueChange={(v) => setNewRole(v as "core" | "support")}>
+                  <SelectTrigger className="h-8 w-28 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="core" className="text-xs">
+                      Core Owner
+                    </SelectItem>
+                    <SelectItem value="support" className="text-xs">
+                      Support
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-8 gap-1 text-xs"
+                  onClick={addDepartment}
+                  disabled={!newDept}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
