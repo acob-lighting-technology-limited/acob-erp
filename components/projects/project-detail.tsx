@@ -26,6 +26,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { DataTablePage, type DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { EmptyState } from "@/components/ui/patterns/empty-state"
 import {
   HealthBadge,
@@ -230,13 +231,17 @@ export function ProjectDetail({
                 </span>
               )}
               {health.averageRating !== null && (
-                <span
-                  className="text-muted-foreground inline-flex items-center gap-1 text-xs"
-                  title={PROJECT_METRIC_HELP.rating}
-                >
-                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  {health.averageRating} average rating
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground inline-flex cursor-help items-center gap-1 text-xs">
+                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      {health.averageRating} average rating
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{PROJECT_METRIC_HELP.rating}</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
             <ProjectProgress health={health} />

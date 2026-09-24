@@ -5,6 +5,7 @@ import { Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ColumnHelp } from "@/components/ui/data-table"
 import { Progress } from "@/components/ui/progress"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { PROJECT_PRIORITY_LABELS, normalizePriority, type ProjectPriority } from "@/lib/projects/priority"
 import {
@@ -249,13 +250,17 @@ export function ProjectSummary({
               </span>
             )}
             {health.averageRating !== null && (
-              <span
-                className="text-muted-foreground inline-flex items-center gap-1 text-xs"
-                title={PROJECT_METRIC_HELP.rating}
-              >
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                {health.averageRating} average rating
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground inline-flex cursor-help items-center gap-1 text-xs">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    {health.averageRating} average rating
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{PROJECT_METRIC_HELP.rating}</p>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
           <ProjectProgress health={health} />
