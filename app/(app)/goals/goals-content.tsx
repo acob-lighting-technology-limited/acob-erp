@@ -344,6 +344,59 @@ export function GoalsContent({
             </div>
           </div>
         )}
+        expandable={{
+          render: (row) => (
+            <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  Goal Description
+                </span>
+                <p className="bg-background rounded border p-2.5 leading-relaxed">
+                  {row.description || "No description provided."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Department</span>
+                  <span className="font-medium">{row.department || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Cycle</span>
+                  <span className="font-medium">{row.cycleLabel !== "-" ? row.cycleLabel : "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Due Date</span>
+                  <span className="font-medium">{row.due_date ? formatWATDate(row.due_date) : "No due date"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Linked Tasks</span>
+                  <span className="font-medium">
+                    {(row.linked_tasks?.length || 0) > 0
+                      ? `${row.linked_tasks!.length} task${row.linked_tasks!.length === 1 ? "" : "s"}`
+                      : "No linked tasks"}
+                  </span>
+                </div>
+              </div>
+
+              {canCreateGoal && (
+                <div className="flex gap-2 border-t pt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() => {
+                      window.location.href = `/admin/tasks?goal_id=${encodeURIComponent(row.id)}`
+                    }}
+                  >
+                    <ListPlus className="h-3.5 w-3.5" />
+                    Create Task under Goal
+                  </Button>
+                </div>
+              )}
+            </div>
+          ),
+        }}
         rowActions={
           canCreateGoal
             ? [
