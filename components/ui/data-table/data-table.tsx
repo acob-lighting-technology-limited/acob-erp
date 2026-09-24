@@ -51,6 +51,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -1067,35 +1068,40 @@ export function DataTable<TData>({
                 aria-label="View mode"
               >
                 {viewOptions.map(({ key, label, Icon, hint }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setManualViewMode(key)}
-                    className={cn(
-                      "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors md:flex-none",
-                      // While the body is CSS-resolved, so is the pressed state —
-                      // otherwise the highlight says "Table" for a frame on a phone
-                      // that is already showing the list.
-                      responsivePair
-                        ? cn(
-                            key === "contacts"
-                              ? "bg-muted text-foreground md:text-muted-foreground shadow-xs md:bg-transparent md:shadow-none"
-                              : "text-muted-foreground hover:text-foreground",
-                            key === "list" && "md:bg-muted md:text-foreground md:shadow-xs"
-                          )
-                        : viewMode === key
-                          ? "bg-muted text-foreground shadow-xs"
-                          : "text-muted-foreground hover:text-foreground"
-                    )}
-                    title={hint}
-                    aria-label={`${label} view`}
-                    // aria-pressed cannot vary by media query; it reports the
-                    // desktop mode, which is what the first paint renders.
-                    aria-pressed={responsivePair ? key === "list" : viewMode === key}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    <span className={cn(contactsAvailable ? "inline" : "hidden lg:inline")}>{label}</span>
-                  </button>
+                  <Tooltip key={key}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setManualViewMode(key)}
+                        className={cn(
+                          "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors md:flex-none",
+                          // While the body is CSS-resolved, so is the pressed state —
+                          // otherwise the highlight says "Table" for a frame on a phone
+                          // that is already showing the list.
+                          responsivePair
+                            ? cn(
+                                key === "contacts"
+                                  ? "bg-muted text-foreground md:text-muted-foreground shadow-xs md:bg-transparent md:shadow-none"
+                                  : "text-muted-foreground hover:text-foreground",
+                                key === "list" && "md:bg-muted md:text-foreground md:shadow-xs"
+                              )
+                            : viewMode === key
+                              ? "bg-muted text-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                        )}
+                        aria-label={`${label} view`}
+                        // aria-pressed cannot vary by media query; it reports the
+                        // desktop mode, which is what the first paint renders.
+                        aria-pressed={responsivePair ? key === "list" : viewMode === key}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        <span className={cn(contactsAvailable ? "inline" : "hidden lg:inline")}>{label}</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p>{hint || `${label} view`}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 ))}
               </div>
             )}

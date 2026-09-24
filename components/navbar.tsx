@@ -36,6 +36,7 @@ import { useTheme } from "next-themes"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { cn, getInitials } from "@/lib/utils"
 import { getSeasonalLogoPaths, isTemporary2026LogoPeriod } from "@/lib/seasonal-branding"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface NavbarProps {
   user?: {
@@ -272,20 +273,26 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
         {/* Left side - Collapse Button and Logo (aligned with sidebar edge) */}
         {sidebarContext && (
           <div className="hidden h-full items-center lg:flex">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-full w-10 rounded-none",
-                isAdminMode &&
-                  "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
-              )}
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-full w-10 rounded-none",
+                    isAdminMode &&
+                      "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                  )}
+                  onClick={() => setIsCollapsed(!isCollapsed)}
+                  aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                >
+                  {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{isCollapsed ? "Expand sidebar" : "Collapse sidebar"}</p>
+              </TooltipContent>
+            </Tooltip>
             <Link href={dashboardHref} className="flex h-full items-center px-4">
               <Image
                 key={logoSrc}
