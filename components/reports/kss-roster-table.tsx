@@ -8,6 +8,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Input } from "@/components/ui/input"
@@ -735,16 +736,21 @@ export function KssRosterTable({
           }
           if (doc.signed_url) {
             return (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-primary h-7 gap-1.5 px-2 text-xs font-normal hover:underline"
-                onClick={() => void handleDownload(doc, row, presenterName)}
-                title={`Download ${doc.file_name}`}
-              >
-                <FileText className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                <span className="max-w-[150px] truncate font-medium">{doc.file_name}</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary h-7 gap-1.5 px-2 text-xs font-normal hover:underline"
+                    onClick={() => void handleDownload(doc, row, presenterName)}
+                    aria-label={`Download ${doc.file_name}`}
+                  >
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                    <span className="max-w-[150px] truncate font-medium">{doc.file_name}</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">{`Download ${doc.file_name}`}</TooltipContent>
+              </Tooltip>
             )
           }
           return (

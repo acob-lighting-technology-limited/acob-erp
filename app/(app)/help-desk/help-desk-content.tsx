@@ -6,6 +6,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -268,20 +269,27 @@ export function HelpDeskContent({
       accessor: (ticket) => ticket.comment_count || 0,
       render: (ticket) =>
         (ticket.comment_count || 0) > 0 ? (
-          <button
-            type="button"
-            className="inline-flex"
-            onClick={(event) => {
-              event.stopPropagation()
-              void openTicketDetails(ticket.id)
-            }}
-            title="View comments"
-          >
-            <Badge variant="outline" className="gap-1 text-xs">
-              <MessageSquare className="h-3 w-3" />
-              {ticket.comment_count}
-            </Badge>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void openTicketDetails(ticket.id)
+                }}
+                aria-label="View comments"
+              >
+                <Badge variant="outline" className="hover:bg-muted/80 cursor-pointer gap-1 text-xs">
+                  <MessageSquare className="h-3 w-3" />
+                  {ticket.comment_count}
+                </Badge>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              View {ticket.comment_count} comment{ticket.comment_count === 1 ? "" : "s"} & details
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <span className="text-muted-foreground text-xs">-</span>
         ),
