@@ -236,7 +236,15 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       resizable: true,
       initialWidth: 300,
       accessor: (t) => t.title,
-      render: (t) => <span className="line-clamp-1 font-medium">{t.title}</span>,
+      render: (t) => (
+        <button
+          type="button"
+          onClick={() => void openTaskDetails(t)}
+          className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
+        >
+          {t.title}
+        </button>
+      ),
     },
     {
       key: "goal",
@@ -547,6 +555,91 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             </div>
           </div>
         )}
+        expandable={{
+          render: (t) => (
+            <div className="grid grid-cols-1 gap-6 p-4 text-xs md:grid-cols-2">
+              <div className="space-y-3">
+                <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
+                  Description & Scope
+                </h4>
+                <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
+                  {t.description || "No description provided."}
+                </div>
+
+                {t.unable_to_complete_reason && (
+                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-800 dark:text-amber-300">
+                    <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
+                    {t.unable_to_complete_reason}
+                  </div>
+                )}
+
+                {t.failure_reason && (
+                  <div className="rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-rose-800 dark:text-rose-300">
+                    <span className="mb-0.5 block font-semibold">Failure Note:</span>
+                    {t.failure_reason}
+                  </div>
+                )}
+
+                {t.extension_reason && (
+                  <div className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-blue-800 dark:text-blue-300">
+                    <span className="mb-0.5 block font-semibold">Extension Reason:</span>
+                    {t.extension_reason}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
+                  Context & Details
+                </h4>
+                <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Strategic Goal:</span>
+                    <span className="font-medium">{t.goal_title || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Corporate KPI:</span>
+                    <span className="font-medium">{t.kpi_measure || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Assigned By:</span>
+                    <span className="font-medium">
+                      {t.assigned_by_user
+                        ? formatFullName(t.assigned_by_user.first_name, t.assigned_by_user.last_name)
+                        : "System"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Department:</span>
+                    <span className="font-medium">{t.department || t.assigned_to_user?.department || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Start Date:</span>
+                    <span>{t.task_start_date ? formatWATDate(t.task_start_date) : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px]">Due Date:</span>
+                    <span className={isTaskOverdue(t) ? "text-destructive font-semibold" : "font-medium"}>
+                      {t.due_date ? formatWATDate(t.due_date) : "No deadline"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    onClick={() => void openTaskDetails(t)}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    View Details & Comments {(t.comment_count || 0) > 0 ? `(${t.comment_count})` : ""}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ),
+        }}
         emptyTitle="No tasks"
         emptyDescription="Tasks assigned to you will appear here."
         emptyIcon={ClipboardList}
