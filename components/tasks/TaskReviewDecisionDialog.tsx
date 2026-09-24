@@ -227,7 +227,7 @@ export function TaskReviewDecisionDialog({
         onOpenChange(v)
       }}
     >
-      <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
+      <DialogContent className="flex max-h-[90vh] min-h-[min(540px,85vh)] w-[95vw] max-w-xl flex-col overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Task Review & Governance</DialogTitle>
           <DialogDescription>Review task status, grant approvals, reassign, or extend timelines.</DialogDescription>
