@@ -624,6 +624,49 @@ export function FleetContent() {
                 : [],
           },
         }}
+        expandable={{
+          render: (row) => (
+            <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                    Booking Reason / Purpose
+                  </span>
+                  <p className="bg-background rounded border p-2.5 leading-relaxed">
+                    {row.reason || "No reason provided."}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                    Admin Decision Note
+                  </span>
+                  <p className="bg-background rounded border p-2.5 leading-relaxed">
+                    {row.admin_note || "No review note."}
+                  </p>
+                </div>
+              </div>
+
+              {row.attachments && row.attachments.length > 0 && (
+                <div className="border-t pt-2.5">
+                  <span className="text-muted-foreground mb-1.5 block text-[10px] font-semibold uppercase">
+                    Attachments ({row.attachments.length})
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {row.attachments.map((file, idx) => (
+                      <span
+                        key={file.id || idx}
+                        className="bg-background flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs"
+                      >
+                        <Paperclip className="text-muted-foreground h-3 w-3" />
+                        <span>{file.file_name}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ),
+        }}
         emptyTitle="No bookings"
         emptyDescription="Applications you submit, and those you can see, appear here."
         emptyIcon={Car}
