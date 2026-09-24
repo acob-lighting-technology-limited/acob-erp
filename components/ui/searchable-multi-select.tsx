@@ -98,7 +98,7 @@ export function SearchableMultiSelect({
   }, [portal, open])
 
   const contentClassName =
-    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 flex max-h-[360px] min-w-[max(var(--radix-popover-trigger-width),14rem)] w-max max-w-[min(calc(100vw-2rem),24rem)] flex-col overflow-hidden rounded-md border shadow-md"
+    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 flex max-h-[360px] w-[var(--radix-popover-trigger-width)] min-w-[14rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-md border shadow-md"
 
   const renderContent = () => (
     <>
