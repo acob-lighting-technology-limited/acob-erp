@@ -184,6 +184,7 @@ export function AdminTasksContent({
   const assignableEmployees = scopedAssignableEmployees.length > 0 ? scopedAssignableEmployees : activeEmployees
   const [departments] = useState<string[]>(initialDepartments)
   const goals = useMemo(() => (Array.isArray(initialGoals) ? initialGoals : []), [initialGoals])
+  const projects = useMemo(() => (Array.isArray(initialProjects) ? initialProjects : []), [initialProjects])
   const departmentOptions = useMemo(() => (Array.isArray(departments) ? departments : []), [departments])
   const scopedAssignableDepartments = filterAssignableTaskDepartments(assignerProfile, departments)
   const [isLoading, setIsLoading] = useState(false)
@@ -927,6 +928,7 @@ export function AdminTasksContent({
         scopedAssignableEmployees={assignableEmployees}
         scopedAssignableDepartments={scopedAssignableDepartments}
         initialGoals={goals}
+        initialProjects={projects}
       />
 
       <TaskReviewDecisionDialog
