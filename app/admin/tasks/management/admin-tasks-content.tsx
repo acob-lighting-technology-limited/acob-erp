@@ -939,6 +939,7 @@ export function AdminTasksContent({
           isSelfRatingBlocked({
             userId: userProfile.id,
             assigneeIds: [reviewTask.assigned_to],
+            isLeadOrAdmin: true,
           })
             ? SELF_RATING_BLOCKED_REASON
             : null

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { isTaskOverdue as isTaskPastDeadline } from "@/lib/tasks/overdue"
+import { isTaskOverdue as isTaskPastDeadline, isTaskEscalated } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
@@ -67,8 +67,35 @@ interface TasksContentProps {
 /** Read-only status pill for the row list and cards, where the whole row is
  * already the tap target and an inline control inside it would fight for taps.
  * The editable `TaskStatusControl` lives in the table cell and the detail sheet. */
-function TaskStatusPill({ status }: { status: string }) {
+function TaskStatusPill({ task }: { task: Task }) {
+  const status = task.status || "pending"
   const cfg = TASK_STATUS_CONFIG[status as TaskStatus] || TASK_STATUS_CONFIG.pending
+  const today = toLocalISODate()
+  const isEscalated = isTaskEscalated(task, today)
+  const isOverdue = isTaskPastDeadline(task, today)
+
+  if (isEscalated) {
+    return (
+      <Badge
+        variant="destructive"
+        className="border-rose-500/30 bg-rose-500/15 text-[10px] whitespace-nowrap text-rose-700 dark:text-rose-400"
+      >
+        {cfg.label} · Escalated
+      </Badge>
+    )
+  }
+
+  if (isOverdue) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-500/30 bg-amber-500/15 text-[10px] whitespace-nowrap text-amber-700 dark:text-amber-400"
+      >
+        {cfg.label} · Grace
+      </Badge>
+    )
+  }
+
   return (
     <Badge variant={cfg.badgeVariant} className={cn("text-[10px] whitespace-nowrap capitalize", cfg.color)}>
       {cfg.label}
@@ -90,17 +117,16 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   const [isPostingComment, setIsPostingComment] = useState(false)
   const supabase = createClient()
 
-  // Whether this user may approve, rate, reject or reassign a given task. The
-  // control offers those decisions inline, so it needs to know per row.
+  const isLeadOrAdminUser = useMemo(() => {
+    const role = String(userProfile?.role || "").toLowerCase()
+    if (["admin", "super_admin", "developer"].includes(role)) return true
+    return Boolean(userProfile?.is_department_lead)
+  }, [userProfile])
+
+  // Whether this user may approve, rate, reject or reassign a given task.
+  // Department leads and administrators may review tasks within their scope,
+  // including tasks assigned to themselves.
   const canReviewTask = (task: Task) => {
-    // An assignee viewing their own task acts strictly as an employee, not as a reviewer.
-    if (
-      task.assigned_to === userId ||
-      (Array.isArray(task.assigned_users) &&
-        task.assigned_users.some((u) => (typeof u === "string" ? u === userId : u.id === userId)))
-    ) {
-      return false
-    }
     const role = String(userProfile?.role || "").toLowerCase()
     if (["admin", "super_admin", "developer"].includes(role)) return true
     if (!userProfile?.is_department_lead) return false
@@ -110,7 +136,13 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
   }
 
   const ratingBlockedReasonFor = (task: Task) =>
-    isSelfRatingBlocked({ userId, assigneeIds: [task.assigned_to] }) ? SELF_RATING_BLOCKED_REASON : null
+    isSelfRatingBlocked({
+      userId,
+      assigneeIds: [task.assigned_to],
+      isLeadOrAdmin: isLeadOrAdminUser,
+    })
+      ? SELF_RATING_BLOCKED_REASON
+      : null
 
   const stats = useMemo(
     () => ({
@@ -120,6 +152,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       submitted: tasks.filter((t) => t.status === "submitted_for_review").length,
       completed: tasks.filter((t) => t.status === "completed").length,
       overdue: tasks.filter(isTaskOverdue).length,
+      escalated: tasks.filter((t) => isTaskEscalated(t, toLocalISODate())).length,
     }),
     [tasks]
   )
@@ -391,6 +424,28 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         return vals.includes(String(row.weight ?? TASK_WEIGHT_DEFAULT))
       },
     },
+    {
+      key: "urgency",
+      label: "Urgency",
+      options: [
+        { value: "on_track", label: "On Track" },
+        { value: "overdue_grace", label: "In Grace Period" },
+        { value: "escalated", label: "Escalated Overdue" },
+      ],
+      mode: "custom",
+      filterFn: (row, vals) => {
+        if (vals.length === 0) return true
+        const today = toLocalISODate()
+        const isEscalated = isTaskEscalated(row, today)
+        const isOverdue = isTaskPastDeadline(row, today)
+        return vals.some((val) => {
+          if (val === "escalated") return isEscalated
+          if (val === "overdue_grace") return isOverdue && !isEscalated
+          if (val === "on_track") return !isOverdue
+          return false
+        })
+      },
+    },
   ]
 
   return (
@@ -488,13 +543,13 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             ]
               .filter(Boolean)
               .join(" · "),
-          trailing: (t) => <TaskStatusPill status={t.status} />,
+          trailing: (t) => <TaskStatusPill task={t} />,
           detail: {
             title: (t) => t.title,
             subtitle: (t) => t.work_item_number || undefined,
             badges: (t) => (
               <>
-                <TaskStatusPill status={t.status} />
+                <TaskStatusPill task={t} />
                 <Badge
                   variant="outline"
                   className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(t.weight))}
@@ -536,7 +591,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                 <span className="text-foreground line-clamp-2 text-sm font-semibold">{t.title}</span>
                 <span className="text-muted-foreground block font-mono text-xs">{t.work_item_number || "---"}</span>
               </div>
-              <TaskStatusPill status={t.status} />
+              <TaskStatusPill task={t} />
             </div>
             <div className="text-muted-foreground grid gap-1 text-xs">
               <div className="flex items-center gap-1.5">
@@ -582,6 +637,18 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                   <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
                     Description & Scope
                   </h4>
+
+                  {isTaskEscalated(t, toLocalISODate()) && (
+                    <div className="border-destructive/40 bg-destructive/10 text-destructive rounded border p-2.5 dark:text-rose-400">
+                      <span className="mb-0.5 flex items-center gap-1.5 font-semibold">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Overdue Escalation:
+                      </span>
+                      Deadline and grace period have expired without submission. Action required by Lead: extend
+                      deadline, reassign, or mark as failed.
+                    </div>
+                  )}
+
                   <div className="bg-muted/40 rounded-lg border p-3 leading-relaxed whitespace-pre-wrap">
                     {t.description || "No description provided."}
                   </div>

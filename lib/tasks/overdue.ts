@@ -149,3 +149,20 @@ export function nonWorkingDaysFor(holidays: HolidaySet, leaveDates: Iterable<str
   for (const date of leaveDates) combined.add(date)
   return combined
 }
+
+/**
+ * True once an open task has exhausted its working-days grace period without submission.
+ * Closed tasks and tasks reported blocked or awaiting review are not escalated.
+ */
+export function isTaskEscalated(
+  task: DeadlineSource & { status?: string | null },
+  todayIso: string,
+  nonWorkingDays: HolidaySet = NO_HOLIDAYS
+): boolean {
+  if (isTerminalStatus(task.status)) return false
+  const status = String(task.status || "").toLowerCase()
+  if (status === "unable_to_complete" || status === "submitted_for_review") return false
+  const deadline = taskDeadline(task)
+  if (!deadline || deadline >= todayIso) return false
+  return isGraceExhausted(deadline, todayIso, nonWorkingDays)
+}

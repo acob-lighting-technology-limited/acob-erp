@@ -161,11 +161,12 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const canReview = isLeadOrAdmin || isProjectManager
     const isAssignee = task.assigned_to === user.id || Boolean(assignments && assignments.length > 0)
     const isAssigner = task.assigned_by === user.id
-    // A reviewer who is also an assignee cannot judge their own work - an
-    // administrator rates it from the admin side instead.
+    // A regular employee cannot rate their own work, but department leads and
+    // administrators are authorized to review and rate tasks assigned to themselves.
     const selfRatingBlocked = isSelfRatingBlocked({
       userId: user.id,
       assigneeIds: isAssignee ? [user.id] : [],
+      isLeadOrAdmin,
     })
 
     if (!isAssignee && !isAssigner && !canReview) {
@@ -276,10 +277,22 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       if (parsed.data.extension_reason) {
         updatePayload.extension_reason = parsed.data.extension_reason
       }
-      // If task was unable_to_complete or expired and is now extended, move back to in_progress
+      // If task was unable_to_complete or expired/failed and is now extended/reopened, move back to in_progress
       if (nextStatus === "in_progress") {
         updatePayload.status = "in_progress"
+        if (oldStatus === "failed") {
+          updatePayload.failure_reason = null
+        }
       }
+    }
+
+    if (oldStatus === "failed" && nextStatus === "in_progress") {
+      if (!canReview) {
+        return apiError("Only department leads or administrators can reopen failed tasks", ApiErrorCode.FORBIDDEN, 403)
+      }
+      updatePayload.failure_reason = null
+      updatePayload.reviewed_by = user.id
+      updatePayload.reviewed_at = now
     }
 
     const { data: updatedTask, error: updateError } = await supabase

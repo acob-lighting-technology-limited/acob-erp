@@ -40,7 +40,7 @@ interface TaskReviewDecisionDialogProps {
   onSuccess: () => void
 }
 
-type DecisionId = "approve" | "rework" | "reassign" | "fail" | "extend"
+type DecisionId = "approve" | "rework" | "reassign" | "fail" | "extend" | "reopen"
 
 const DECISIONS: Array<{
   id: DecisionId
@@ -88,13 +88,22 @@ const DECISIONS: Array<{
     available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
   },
   {
+    id: "reopen",
+    label: "Reopen / Pardon",
+    description: "Reopen a previously failed task back to in-progress with an updated deadline.",
+    unavailableReason: "Only failed tasks can be reopened.",
+    icon: RotateCcw,
+    className: "border-amber-500/30 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400",
+    available: (task) => task.status === "failed",
+  },
+  {
     id: "fail",
-    label: "Reject",
-    description: "Terminal. The task scores zero at its full weight.",
+    label: "Mark as Failed",
+    description: "Terminal write-off. The task scores zero at its full weight.",
     unavailableReason: "This task is already closed.",
     icon: XCircle,
     className: "border-rose-500/30 text-rose-700 hover:bg-rose-500/10 dark:text-rose-400",
-    available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
+    available: (task) => !["completed", "reassigned", "cancelled", "failed"].includes(task.status),
   },
 ]
 
@@ -172,9 +181,9 @@ export function TaskReviewDecisionDialog({
       } else if (actionType === "fail") {
         payload = {
           status: "failed",
-          reason: comment || "Rejected by lead/admin",
+          reason: comment || "Marked as failed by lead/admin",
         }
-      } else if (actionType === "extend") {
+      } else if (actionType === "extend" || actionType === "reopen") {
         if (!newDueDate) {
           toast.error("Please specify a new due date")
           setIsSubmitting(false)
@@ -183,7 +192,8 @@ export function TaskReviewDecisionDialog({
         payload = {
           status: "in_progress",
           due_date: newDueDate,
-          extension_reason: comment || "Deadline extended by lead/admin",
+          extension_reason:
+            comment || (actionType === "reopen" ? "Reopened by lead/admin" : "Deadline extended by lead/admin"),
         }
       }
 
@@ -319,9 +329,11 @@ export function TaskReviewDecisionDialog({
                 </div>
               )}
 
-              {(actionType === "extend" || actionType === "reassign") && (
+              {(actionType === "extend" || actionType === "reassign" || actionType === "reopen") && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">New Due Date {actionType === "extend" && "*"}</Label>
+                  <Label className="text-xs font-medium">
+                    New Due Date {(actionType === "extend" || actionType === "reopen") && "*"}
+                  </Label>
                   <Input
                     type="date"
                     value={newDueDate}

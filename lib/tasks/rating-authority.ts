@@ -20,7 +20,7 @@
  */
 
 export const SELF_RATING_BLOCKED_REASON =
-  "You can't approve or rate your own task. An administrator rates it from Admin › Tasks."
+  "You can't approve or rate your own task. Your department lead or an administrator reviews it."
 
 export type TaskReviewerProfile = {
   role?: string | null
@@ -38,11 +38,13 @@ export function isLeadForTaskDepartment(
   return profile.department === taskDepartment || leadDepartments.includes(taskDepartment)
 }
 
-/** True when this user is an assignee of the task, whoever they are. */
+/** True when this user is a regular assignee of the task and not a lead or administrator. */
 export function isSelfRatingBlocked(params: {
   userId: string | null | undefined
   assigneeIds: ReadonlyArray<string | null | undefined>
+  isLeadOrAdmin?: boolean
 }): boolean {
   if (!params.userId) return false
+  if (params.isLeadOrAdmin) return false
   return params.assigneeIds.some((id) => Boolean(id) && id === params.userId)
 }
