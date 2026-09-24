@@ -34,6 +34,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
@@ -270,14 +271,20 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       initialWidth: 300,
       accessor: (t) => t.title,
       render: (t) => (
-        <button
-          type="button"
-          onClick={() => void openTaskDetails(t)}
-          title={t.title}
-          className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
-        >
-          {t.title}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => void openTaskDetails(t)}
+              className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
+            >
+              {t.title}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-md">
+            {t.title}
+          </TooltipContent>
+        </Tooltip>
       ),
     },
     {
@@ -372,20 +379,26 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       // from a different button. This is one click through to that tab.
       render: (t) =>
         (t.comment_count || 0) > 0 ? (
-          <button
-            type="button"
-            className="inline-flex"
-            onClick={(event) => {
-              event.stopPropagation()
-              void openTaskDetails(t)
-            }}
-            title="View comments"
-          >
-            <Badge variant="outline" className="gap-1 text-xs">
-              <MessageSquare className="h-3 w-3" />
-              {t.comment_count}
-            </Badge>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void openTaskDetails(t)
+                }}
+              >
+                <Badge variant="outline" className="hover:bg-muted/80 cursor-pointer gap-1 text-xs">
+                  <MessageSquare className="h-3 w-3" />
+                  {t.comment_count}
+                </Badge>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              View {t.comment_count} comment{t.comment_count === 1 ? "" : "s"} & details
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <span className="text-muted-foreground text-xs">-</span>
         ),
@@ -464,6 +477,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             icon={ClipboardList}
             iconBgColor="bg-blue-500/10"
             iconColor="text-blue-500"
+            tooltip="All active tasks assigned to you across all statuses"
           />
           <StatCard
             variant="compact"
@@ -472,6 +486,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             icon={Clock}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
+            tooltip="Tasks waiting to be started"
           />
           <StatCard
             variant="compact"
@@ -480,6 +495,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             icon={Clock}
             iconBgColor="bg-sky-500/10"
             iconColor="text-sky-500"
+            tooltip="Tasks currently underway"
           />
           <StatCard
             variant="compact"
@@ -488,6 +504,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             icon={Send}
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
+            tooltip="Tasks submitted and awaiting review"
           />
           <StatCard
             variant="compact"
@@ -496,6 +513,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             icon={CheckCircle2}
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
+            tooltip="Tasks successfully completed"
           />
           {stats.overdue > 0 && (
             <StatCard
@@ -505,6 +523,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               icon={AlertTriangle}
               iconBgColor="bg-rose-500/10"
               iconColor="text-rose-500"
+              tooltip="Tasks that have passed their deadline"
             />
           )}
         </StatGrid>
@@ -621,15 +640,22 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                   </span>
                   <h3 className="text-foreground text-sm leading-snug font-semibold">{t.title}</h3>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0 gap-1.5 self-start text-xs"
-                  onClick={() => void openTaskDetails(t)}
-                >
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  View Details & Comments {(t.comment_count || 0) > 0 ? `(${t.comment_count})` : ""}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 gap-1.5 self-start text-xs"
+                      onClick={() => void openTaskDetails(t)}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      View Details & Comments {(t.comment_count || 0) > 0 ? `(${t.comment_count})` : ""}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Open task modal to view full history, attachments & comments
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
