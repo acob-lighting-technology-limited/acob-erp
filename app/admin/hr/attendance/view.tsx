@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { DailyRosterView } from "./_components/daily-roster-view"
 import { CalendarView } from "./_components/calendar-view"
 import type { EmployeeOption } from "./_components/calendar-view"
@@ -590,15 +591,20 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
               </span>
               <span className="text-xs">{daySourceLabel(day)}</span>
               <div className="flex items-center justify-end gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={() => openHistory(day)}
-                  title="View edit history"
-                >
-                  <Info className="h-3.5 w-3.5" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => openHistory(day)}
+                      aria-label="View edit history"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">View edit history</TooltipContent>
+                </Tooltip>
                 {!day.isOnLeave && (
                   <Button
                     variant="ghost"
@@ -1052,29 +1058,49 @@ export function AttendanceReportsPage({
       onTabChange={(t) => setActiveTab(t as AttendanceTab)}
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setReportDialogOpen(true)} size="sm" title="Reports">
-            <Mail className="h-4 w-4 sm:mr-1.5" />
-            <span className="hidden sm:inline">Reports</span>
-            <span className="sr-only sm:hidden">Reports</span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" onClick={() => setReportDialogOpen(true)} size="sm" aria-label="Reports">
+                <Mail className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Reports</span>
+                <span className="sr-only sm:hidden">Reports</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Attendance Reports</TooltipContent>
+          </Tooltip>
           {!lockedDepartment && (
-            <Button variant="outline" onClick={() => setManagerOpen(true)} size="sm" title="Attendance Manager">
-              <Settings2 className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Attendance Manager</span>
-              <span className="sr-only sm:hidden">Attendance Manager</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={() => setManagerOpen(true)}
+                  size="sm"
+                  aria-label="Attendance Manager"
+                >
+                  <Settings2 className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Attendance Manager</span>
+                  <span className="sr-only sm:hidden">Attendance Manager</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Attendance Manager</TooltipContent>
+            </Tooltip>
           )}
-          <Button
-            variant="outline"
-            onClick={() => setIsExportOpen(true)}
-            disabled={reports.length === 0}
-            size="sm"
-            title="Export"
-          >
-            <Download className="h-4 w-4 sm:mr-1.5" />
-            <span className="hidden sm:inline">Export</span>
-            <span className="sr-only sm:hidden">Export</span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={() => setIsExportOpen(true)}
+                disabled={reports.length === 0}
+                size="sm"
+                aria-label="Export"
+              >
+                <Download className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Export</span>
+                <span className="sr-only sm:hidden">Export</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Export Attendance Data</TooltipContent>
+          </Tooltip>
         </div>
       }
       stats={

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Dialog,
   DialogContent,
@@ -484,15 +485,20 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <Label className="text-sm font-medium">Date</Label>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={() => shiftDate(-1)}
-            title="Previous day"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => shiftDate(-1)}
+                aria-label="Previous day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Previous day</TooltipContent>
+          </Tooltip>
           <input
             type="date"
             value={rosterDate}
@@ -500,16 +506,21 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
             onChange={(e) => setRosterDate(e.target.value)}
             className="border-input bg-background rounded-md border px-3 py-1.5 text-sm"
           />
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={() => shiftDate(1)}
-            disabled={rosterDate >= todayIso}
-            title="Next day"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => shiftDate(1)}
+                disabled={rosterDate >= todayIso}
+                aria-label="Next day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Next day</TooltipContent>
+          </Tooltip>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()}>
           Refresh
