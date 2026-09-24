@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { CreatePaymentDialog } from "./create-payment-dialog"
 import { ExportColumnsDialog } from "./export-columns-dialog"
@@ -470,67 +471,86 @@ export function PaymentsTable({
       align: "right",
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="h-8 w-8"
-            onClick={(event) => {
-              event.stopPropagation()
-              router.push(`${basePath}/${row.id}`, { scroll: false })
-            }}
-            title="View"
-            aria-label="View payment"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-8 w-8"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  router.push(`${basePath}/${row.id}`, { scroll: false })
+                }}
+                aria-label="View payment"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">View payment</TooltipContent>
+          </Tooltip>
+
           {row.documents?.some((doc) => doc.document_type === "invoice") ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              className="h-8 w-8"
-              onClick={(event) => {
-                event.stopPropagation()
-                void handlePrintDocument(row, "invoice")
-              }}
-              title="Download invoice"
-              aria-label="Download invoice"
-            >
-              <FileText className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    void handlePrintDocument(row, "invoice")
+                  }}
+                  aria-label="Download invoice"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Download invoice</TooltipContent>
+            </Tooltip>
           ) : null}
+
           {row.documents?.some((doc) => doc.document_type === "receipt") ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              className="h-8 w-8"
-              onClick={(event) => {
-                event.stopPropagation()
-                void handlePrintDocument(row, "receipt")
-              }}
-              title="Download receipt"
-              aria-label="Download receipt"
-            >
-              <Receipt className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    void handlePrintDocument(row, "receipt")
+                  }}
+                  aria-label="Download receipt"
+                >
+                  <Receipt className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Download receipt</TooltipContent>
+            </Tooltip>
           ) : null}
+
           {row.payment_type === "one-time" && !row.hasReceipt ? (
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              className="h-8 w-8"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleOpenReceiptUpload(row)
-              }}
-              title="Upload missing receipt"
-              aria-label="Upload missing receipt"
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleOpenReceiptUpload(row)
+                  }}
+                  aria-label="Upload missing receipt"
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Upload missing receipt</TooltipContent>
+            </Tooltip>
           ) : null}
         </div>
       ),
