@@ -20,6 +20,8 @@ const SurveySubmissionSchema = z.object({
   isAnonymous: z.boolean().default(false),
 })
 
+export const dynamic = "force-dynamic"
+
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -31,21 +33,17 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: existingSurvey, error } = await supabase
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const { data: existingSurvey } = await dataClient
       .from("system_satisfaction_surveys")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle()
 
-    if (error) {
-      log.error({ err: String(error) }, "Failed to fetch user survey")
-      return NextResponse.json({ error: "Failed to fetch survey response" }, { status: 500 })
-    }
-
     return NextResponse.json({ data: existingSurvey || null })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled survey GET error")
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ data: null })
   }
 }
 

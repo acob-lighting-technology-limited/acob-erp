@@ -4,6 +4,7 @@ import { AcoBot } from "@/components/acobot/acobot"
 import { MissingAvatarBanner } from "@/components/profile/missing-avatar-banner"
 import { SystemSurveyPrompt } from "@/components/survey/system-survey-prompt"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveDeptConsoles } from "@/lib/dept/consoles"
 import { redirect } from "next/navigation"
@@ -33,6 +34,13 @@ export async function AppLayout({ children }: AppLayoutProps) {
   // dept = scoped view. A lead may hold several departments.
   const deptConsoles = await resolveDeptConsoles(typedSupabase, profile)
   const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
+  const dataClient = getServiceRoleClientOrFallback(supabase)
+  const { data: existingSurvey } = await dataClient
+    .from("system_satisfaction_surveys")
+    .select("id")
+    .eq("user_id", data.user.id)
+    .maybeSingle()
+  const hasCompletedSurvey = Boolean(existingSurvey)
 
   const userData = {
     email: data.user.email,
@@ -53,7 +61,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
         <div className="pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">{children}</div>
       </SidebarContent>
       <AcoBot userName={profile?.first_name ?? profile?.full_name ?? null} />
-      <SystemSurveyPrompt />
+      <SystemSurveyPrompt hasCompletedSurvey={hasCompletedSurvey} />
     </div>
   )
 }
