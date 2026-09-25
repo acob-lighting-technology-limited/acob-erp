@@ -8,6 +8,7 @@ import {
   ragStatus,
   rollupByPerspective,
   averageCappedPct,
+  resolveEffectiveActual,
   type Direction,
   type MeasureType,
 } from "@/lib/corporate-scorecard/attainment"
@@ -76,12 +77,16 @@ export async function GET(request: NextRequest) {
   }
 
   const kpiIds = Array.from(new Set(rows.map((r) => r.kpi_id)))
-  const { data: actualRows } = await supabase
-    .from("kpi_actuals")
-    .select("kpi_id, department, actual_value, milestones_completed, milestones_total, recorded_at")
-    .in("kpi_id", kpiIds)
-    .order("recorded_at", { ascending: false })
-    .returns<ActualRow[]>()
+
+  const [{ data: actualRows }, { data: taskRows }] = await Promise.all([
+    supabase
+      .from("kpi_actuals")
+      .select("kpi_id, department, actual_value, milestones_completed, milestones_total, recorded_at, is_override")
+      .in("kpi_id", kpiIds)
+      .order("recorded_at", { ascending: false })
+      .returns<ActualRow[]>(),
+    supabase.from("tasks").select("id, kpi_id, department, status").in("kpi_id", kpiIds).eq("is_archived", false),
+  ])
 
   // Most recent actual per (kpi, department) pair.
   const latestByKey = new Map<string, ActualRow>()
@@ -90,22 +95,70 @@ export async function GET(request: NextRequest) {
     if (!latestByKey.has(key)) latestByKey.set(key, row)
   }
 
+  const taskStatsByKey = new Map<string, { total: number; completed: number; inProgress: number }>()
+  for (const t of taskRows || []) {
+    if (!t.kpi_id || !t.department) continue
+    const key = `${t.kpi_id}:${t.department}`
+    const stat = taskStatsByKey.get(key) || { total: 0, completed: 0, inProgress: 0 }
+    stat.total += 1
+    if (t.status === "completed") stat.completed += 1
+    else if (t.status === "in_progress") stat.inProgress += 1
+    taskStatsByKey.set(key, stat)
+  }
+
   const perKpiRows = rows.map((row) => {
     const kpi = row.corporate_kpis!
-    const latest = latestByKey.get(`${row.kpi_id}:${row.department}`) ?? null
+    const latestManual = latestByKey.get(`${row.kpi_id}:${row.department}`) ?? null
+    const taskStat = taskStatsByKey.get(`${row.kpi_id}:${row.department}`) ?? null
+
+    let autoDetected: {
+      value: number | null
+      milestones_completed?: number | null
+      milestones_total?: number | null
+      taskStats?: { total: number; completed: number; inProgress: number } | null
+    } | null = null
+
+    if (taskStat && taskStat.total > 0) {
+      if (kpi.measure_type === "milestone") {
+        autoDetected = {
+          value: null,
+          milestones_completed: taskStat.completed,
+          milestones_total: Math.max(taskStat.total, Number(row.target_value) || 3),
+          taskStats: taskStat,
+        }
+      } else if (kpi.measure_type === "percentage") {
+        autoDetected = {
+          value: Math.round((taskStat.completed / taskStat.total) * 100),
+          taskStats: taskStat,
+        }
+      } else {
+        autoDetected = {
+          value: taskStat.completed,
+          taskStats: taskStat,
+        }
+      }
+    }
+
+    const resolved = resolveEffectiveActual({
+      manualActual: latestManual,
+      autoDetected,
+    })
+
     const attainment = computeAttainment({
       measureType: kpi.measure_type,
       direction: kpi.direction,
       targetValue: row.target_value,
-      actualValue: latest?.actual_value ?? null,
-      milestonesCompleted: latest?.milestones_completed ?? null,
-      milestonesTotal: latest?.milestones_total ?? null,
+      actualValue: resolved.effectiveActual,
+      milestonesCompleted: resolved.effectiveMilestonesCompleted,
+      milestonesTotal: resolved.effectiveMilestonesTotal,
     })
+
     return {
       department: row.department,
       perspective: kpi.perspective,
       strategicObjective: kpi.strategic_objective,
       cappedPct: attainment.cappedPct,
+      hasData: resolved.source !== "none",
     }
   })
 

@@ -3,7 +3,12 @@ import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
-import { computeAttainment, type Direction, type MeasureType } from "@/lib/corporate-scorecard/attainment"
+import {
+  computeAttainment,
+  resolveEffectiveActual,
+  type Direction,
+  type MeasureType,
+} from "@/lib/corporate-scorecard/attainment"
 
 const log = logger("corporate-scorecard-department")
 
@@ -36,14 +41,23 @@ type ActualRow = {
   milestones_completed: number | null
   milestones_total: number | null
   note: string | null
+  is_override?: boolean | null
   recorded_at: string
+}
+
+type TaskRow = {
+  id: string
+  kpi_id: string | null
+  department: string | null
+  status: string | null
 }
 
 /**
  * GET /api/corporate-scorecard/departments/[department]
  *
  * One department's cascade (or all departments when department is "all"):
- * every KPI assigned with role, confirmed target, latest actual, and attainment.
+ * every KPI assigned with role, confirmed target, latest actual, live task auto-derivation,
+ * and effective attainment.
  */
 export async function GET(request: NextRequest, props: { params: Promise<{ department: string }> }) {
   const params = await props.params
@@ -87,7 +101,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
 
   let actualQuery = supabase
     .from("kpi_actuals")
-    .select("kpi_id, department, actual_value, milestones_completed, milestones_total, note, recorded_at")
+    .select("kpi_id, department, actual_value, milestones_completed, milestones_total, note, recorded_at, is_override")
     .in("kpi_id", kpiIds)
     .order("recorded_at", { ascending: false })
 
@@ -95,8 +109,20 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
     actualQuery = actualQuery.eq("department", department)
   }
 
-  const { data: actualRows } =
-    kpiIds.length > 0 ? await actualQuery.returns<ActualRow[]>() : { data: [] as ActualRow[] }
+  let taskQuery = supabase
+    .from("tasks")
+    .select("id, kpi_id, department, status")
+    .in("kpi_id", kpiIds)
+    .eq("is_archived", false)
+
+  if (!isAll) {
+    taskQuery = taskQuery.eq("department", department)
+  }
+
+  const [{ data: actualRows }, { data: taskRows }] = await Promise.all([
+    kpiIds.length > 0 ? actualQuery.returns<ActualRow[]>() : Promise.resolve({ data: [] as ActualRow[] }),
+    kpiIds.length > 0 ? taskQuery.returns<TaskRow[]>() : Promise.resolve({ data: [] as TaskRow[] }),
+  ])
 
   const latestActualByKey = new Map<string, ActualRow>()
   for (const row of actualRows || []) {
@@ -104,18 +130,64 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
     if (!latestActualByKey.has(key)) latestActualByKey.set(key, row)
   }
 
+  const taskStatsByKey = new Map<string, { total: number; completed: number; inProgress: number }>()
+  for (const t of taskRows || []) {
+    if (!t.kpi_id || !t.department) continue
+    const key = `${t.kpi_id}:${t.department}`
+    const stat = taskStatsByKey.get(key) || { total: 0, completed: 0, inProgress: 0 }
+    stat.total += 1
+    if (t.status === "completed") stat.completed += 1
+    else if (t.status === "in_progress") stat.inProgress += 1
+    taskStatsByKey.set(key, stat)
+  }
+
   const data = (assignments || [])
     .filter((a) => a.corporate_kpis)
     .map((a) => {
       const kpi = a.corporate_kpis!
-      const latestActual = latestActualByKey.get(`${a.kpi_id}:${a.department}`) ?? null
+      const latestManual = latestActualByKey.get(`${a.kpi_id}:${a.department}`) ?? null
+      const taskStat = taskStatsByKey.get(`${a.kpi_id}:${a.department}`) ?? null
+
+      let autoDetected: {
+        value: number | null
+        milestones_completed?: number | null
+        milestones_total?: number | null
+        taskStats?: { total: number; completed: number; inProgress: number } | null
+      } | null = null
+
+      if (taskStat && taskStat.total > 0) {
+        if (kpi.measure_type === "milestone") {
+          autoDetected = {
+            value: null,
+            milestones_completed: taskStat.completed,
+            milestones_total: Math.max(taskStat.total, Number(a.target_value) || 3),
+            taskStats: taskStat,
+          }
+        } else if (kpi.measure_type === "percentage") {
+          autoDetected = {
+            value: Math.round((taskStat.completed / taskStat.total) * 100),
+            taskStats: taskStat,
+          }
+        } else {
+          autoDetected = {
+            value: taskStat.completed,
+            taskStats: taskStat,
+          }
+        }
+      }
+
+      const resolved = resolveEffectiveActual({
+        manualActual: latestManual,
+        autoDetected,
+      })
+
       const attainment = computeAttainment({
         measureType: kpi.measure_type,
         direction: kpi.direction,
         targetValue: a.target_value,
-        actualValue: latestActual?.actual_value ?? null,
-        milestonesCompleted: latestActual?.milestones_completed ?? null,
-        milestonesTotal: latestActual?.milestones_total ?? null,
+        actualValue: resolved.effectiveActual,
+        milestonesCompleted: resolved.effectiveMilestonesCompleted,
+        milestonesTotal: resolved.effectiveMilestonesTotal,
       })
 
       return {
@@ -135,7 +207,13 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
         target_unit: a.target_unit,
         department_target: a.department_target,
         proposed_action: a.proposed_action,
-        latest_actual: latestActual,
+        latest_actual: latestManual,
+        effective_actual: resolved.effectiveActual,
+        effective_milestones_completed: resolved.effectiveMilestonesCompleted,
+        effective_milestones_total: resolved.effectiveMilestonesTotal,
+        source: resolved.source,
+        is_override: resolved.isOverride,
+        task_stats: resolved.taskStats ?? null,
         raw_pct: attainment.rawPct,
         capped_pct: attainment.cappedPct,
       }

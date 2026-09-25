@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { ClipboardEdit, PlusCircle, Target } from "lucide-react"
+import { ClipboardEdit, PlusCircle, RotateCcw, Target, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -50,6 +50,17 @@ type CascadeRow = {
     milestones_total: number | null
     note: string | null
     recorded_at: string
+    is_override?: boolean
+  } | null
+  effective_actual?: number | null
+  effective_milestones_completed?: number | null
+  effective_milestones_total?: number | null
+  source?: "auto" | "manual" | "none"
+  is_override?: boolean
+  task_stats?: {
+    total: number
+    completed: number
+    inProgress: number
   } | null
   raw_pct: number | null
   capped_pct: number | null
@@ -164,7 +175,9 @@ export function DepartmentCascadeContent({
   const coreRows = useMemo(() => rows.filter((r) => r.role === "core"), [rows])
 
   const departmentAttainment = useMemo(() => averageCappedPct(coreRows.map((r) => r.capped_pct)), [coreRows])
-  const recordedCount = coreRows.filter((r) => r.latest_actual !== null).length
+  const recordedCount = coreRows.filter(
+    (r) => r.latest_actual !== null || (r.source === "auto" && r.capped_pct !== null)
+  ).length
 
   const pillarOptions = useMemo(() => {
     const set = new Set<string>()
@@ -264,6 +277,40 @@ export function DepartmentCascadeContent({
               {r.department_target && r.target_text && r.department_target !== r.target_text ? (
                 <span className="text-muted-foreground text-[10px]">Corp: {r.target_text}</span>
               ) : null}
+            </div>
+          )
+        },
+      },
+      {
+        key: "actual",
+        label: "Actual",
+        accessor: (r) => r.effective_actual ?? r.latest_actual?.actual_value ?? -1,
+        render: (r) => {
+          let actualDisplay: string | null = null
+          if (r.measure_type === "milestone") {
+            const completed = r.effective_milestones_completed ?? r.latest_actual?.milestones_completed
+            const total = r.effective_milestones_total ?? r.latest_actual?.milestones_total
+            if (completed != null) actualDisplay = `${completed} / ${total ?? 3} ms`
+          } else if (r.effective_actual != null) {
+            actualDisplay = `${r.effective_actual} ${r.target_unit || ""}`.trim()
+          } else if (r.latest_actual?.actual_value != null) {
+            actualDisplay = `${r.latest_actual.actual_value} ${r.target_unit || ""}`.trim()
+          }
+
+          if (!actualDisplay) return <span className="text-muted-foreground text-xs">No data</span>
+
+          return (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-medium">{actualDisplay}</span>
+              {r.source === "auto" && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                  <Zap className="h-3 w-3" />
+                  Auto ({r.task_stats?.completed || 0} tasks)
+                </span>
+              )}
+              {r.source === "manual" && r.is_override && (
+                <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">✏️ Adjusted</span>
+              )}
             </div>
           )
         },
@@ -377,9 +424,9 @@ export function DepartmentCascadeContent({
           />
           <StatCard
             variant="compact"
-            title="Recorded"
+            title="Active / Tracked"
             value={`${recordedCount}/${coreRows.length}`}
-            description="CORE KPIs with an actual"
+            description="CORE KPIs with live or manual actual"
           />
         </StatGrid>
       }
@@ -408,7 +455,7 @@ export function DepartmentCascadeContent({
             ? undefined
             : [
                 { label: "Edit Target", icon: ClipboardEdit, onClick: (r) => setEditingRow(r) },
-                { label: "Record Actual", icon: PlusCircle, onClick: (r) => setRecordingRow(r) },
+                { label: "Record / Override Actual", icon: PlusCircle, onClick: (r) => setRecordingRow(r) },
               ]
         }
         expandable={{
@@ -421,18 +468,30 @@ export function DepartmentCascadeContent({
                   This Department&apos;s Target
                 </p>
                 <p className="mt-1 text-sm">{r.department_target || "Not yet confirmed"}</p>
+                {r.task_stats && r.task_stats.total > 0 && (
+                  <div className="mt-3 rounded-md border border-blue-500/20 bg-blue-500/5 p-2 text-xs">
+                    <p className="flex items-center gap-1 text-[10px] font-semibold text-blue-700 uppercase dark:text-blue-300">
+                      <Zap className="h-3 w-3" /> Live Task Breakdown
+                    </p>
+                    <p className="mt-0.5 text-blue-900 dark:text-blue-100">
+                      {r.task_stats.completed} completed · {r.task_stats.inProgress} in progress · {r.task_stats.total}{" "}
+                      total linked tasks
+                    </p>
+                  </div>
+                )}
               </div>
               <div>
                 <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Proposed Action</p>
                 <p className="mt-1 text-sm">{r.proposed_action || "Not yet defined"}</p>
-                {r.latest_actual?.note && (
+                {r.latest_actual && (
                   <>
                     <p className="text-muted-foreground mt-3 text-xs font-semibold tracking-wide uppercase">
-                      Latest Note
+                      Latest Recorded Actual
                     </p>
-                    <p className="mt-1 text-sm">{r.latest_actual.note}</p>
+                    <p className="mt-1 text-sm">{r.latest_actual.note || "No note recorded"}</p>
                     <p className="text-muted-foreground mt-1 text-[11px]">
                       Recorded {formatWATDate(r.latest_actual.recorded_at)}
+                      {r.is_override ? " (Manual Override)" : ""}
                     </p>
                   </>
                 )}
@@ -484,7 +543,7 @@ export function DepartmentCascadeContent({
 
       <RecordActualDialog
         row={recordingRow}
-        department={department}
+        department={recordingRow?.department || department}
         onOpenChange={(open) => !open && setRecordingRow(null)}
         onSaved={() => {
           setRecordingRow(null)
@@ -629,9 +688,56 @@ function RecordActualDialog({
   const [milestonesTotal, setMilestonesTotal] = useState("3")
   const [note, setNote] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   const open = row !== null
   const isMilestone = row?.measure_type === "milestone"
+  const targetDepartment = row?.department || department
+
+  useEffect(() => {
+    if (!row) return
+    if (row.latest_actual) {
+      setActualValue(row.latest_actual.actual_value != null ? String(row.latest_actual.actual_value) : "")
+      setMilestonesCompleted(
+        row.latest_actual.milestones_completed != null ? String(row.latest_actual.milestones_completed) : ""
+      )
+      setMilestonesTotal(row.latest_actual.milestones_total != null ? String(row.latest_actual.milestones_total) : "3")
+      setNote(row.latest_actual.note || "")
+    } else if (row.source === "auto") {
+      setActualValue(row.effective_actual != null ? String(row.effective_actual) : "")
+      setMilestonesCompleted(
+        row.effective_milestones_completed != null ? String(row.effective_milestones_completed) : ""
+      )
+      setMilestonesTotal(row.effective_milestones_total != null ? String(row.effective_milestones_total) : "3")
+      setNote("")
+    } else {
+      setActualValue("")
+      setMilestonesCompleted("")
+      setMilestonesTotal("3")
+      setNote("")
+    }
+  }, [row])
+
+  async function handleResetToAuto() {
+    if (!row) return
+    setIsResetting(true)
+    try {
+      const res = await apiFetch(
+        `/api/corporate-scorecard/actuals?kpi_id=${row.kpi_id}&department=${encodeURIComponent(targetDepartment)}`,
+        {
+          method: "DELETE",
+        }
+      )
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.error || "Failed to reset to auto-derivation")
+      toast.success("Manual override removed. Scorecard resynced to live tasks.")
+      onSaved()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reset override")
+    } finally {
+      setIsResetting(false)
+    }
+  }
 
   async function handleSave() {
     if (!row) return
@@ -651,16 +757,17 @@ function RecordActualDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kpi_id: row.kpi_id,
-          department,
+          department: targetDepartment,
           actual_value: isMilestone ? null : Number(actualValue),
           milestones_completed: isMilestone ? Number(milestonesCompleted) : null,
           milestones_total: isMilestone ? Number(milestonesTotal || 3) : null,
           note: note.trim() || null,
+          is_override: true,
         }),
       })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to record")
-      toast.success("Progress recorded")
+      toast.success("Progress saved as manual override")
       setActualValue("")
       setMilestonesCompleted("")
       setNote("")
@@ -674,11 +781,45 @@ function RecordActualDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px]">
+      <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Record Progress</DialogTitle>
-          <DialogDescription>{row?.measure}</DialogDescription>
+          <DialogTitle>Record / Override Actual</DialogTitle>
+          <DialogDescription>
+            {row?.measure} · <span className="text-foreground font-medium">{targetDepartment}</span>
+          </DialogDescription>
         </DialogHeader>
+
+        {row?.source === "auto" && (
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-700 dark:text-blue-300">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <Zap className="h-3.5 w-3.5" />
+              <span>Live Task Derivation Active</span>
+            </div>
+            <p className="mt-1">
+              Detected <strong>{row.task_stats?.completed || 0} completed</strong> of {row.task_stats?.total || 0} tasks
+              for this KPI in {targetDepartment}.
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-[11px]">
+              Saving a value below will set a managerial override.
+            </p>
+          </div>
+        )}
+
+        {row?.source === "manual" && row.is_override && (
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-center justify-between font-semibold">
+              <span>✏️ Manual Managerial Override Active</span>
+            </div>
+            <p className="mt-1">
+              A manual actual of <strong>{row.effective_actual ?? row.latest_actual?.actual_value}</strong> is currently
+              in effect
+              {row.latest_actual?.recorded_at ? ` (saved ${formatWATDate(row.latest_actual.recorded_at)})` : ""}.
+              {row.task_stats && row.task_stats.total > 0 && (
+                <> Live system tracks {row.task_stats.completed} completed tasks.</>
+              )}
+            </p>
+          </div>
+        )}
 
         {isMilestone ? (
           <div className="grid grid-cols-2 gap-3">
@@ -719,26 +860,40 @@ function RecordActualDialog({
         )}
 
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium">Note (optional)</Label>
+          <Label className="text-xs font-medium">Note / Rationale (optional)</Label>
           <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Context for this figure..."
+            placeholder="Context or reason for this adjustment..."
             className="min-h-[60px] text-xs"
           />
         </div>
 
-        <p className="text-muted-foreground text-[11px]">
-          This adds a new entry to this KPI&apos;s history — it does not overwrite the previous one.
-        </p>
+        <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+          {row?.is_override && row?.latest_actual ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleResetToAuto()}
+              disabled={isSaving || isResetting}
+              className="border-blue-500/20 text-blue-600 hover:bg-blue-50 sm:mr-auto dark:border-blue-500/40 dark:text-blue-400 dark:hover:bg-blue-950"
+            >
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              {isResetting ? "Resetting..." : "Reset to Live Auto"}
+            </Button>
+          ) : (
+            <div />
+          )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleSave()} disabled={isSaving}>
-            {isSaving ? "Saving..." : "Record"}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving || isResetting}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleSave()} disabled={isSaving || isResetting}>
+              {isSaving ? "Saving..." : "Save Override"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

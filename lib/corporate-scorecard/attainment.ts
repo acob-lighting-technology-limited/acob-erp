@@ -98,6 +98,93 @@ export function averageCappedPct(values: Array<number | null | undefined>): numb
   return round(present.reduce((sum, v) => sum + v, 0) / present.length)
 }
 
+export type ActualSource = "auto" | "manual" | "none"
+
+export type ResolvedActual = {
+  effectiveActual: number | null
+  effectiveMilestonesCompleted: number | null
+  effectiveMilestonesTotal: number | null
+  source: ActualSource
+  isOverride: boolean
+  autoValue: number | null
+  manualValue: number | null
+  taskStats?: {
+    total: number
+    completed: number
+    inProgress: number
+  } | null
+  note?: string | null
+}
+
+/**
+ * Resolves effective actual by combining auto-detected system data (tasks)
+ * with any manual managerial override.
+ */
+export function resolveEffectiveActual(params: {
+  manualActual?: {
+    actual_value: number | null
+    milestones_completed: number | null
+    milestones_total: number | null
+    is_override?: boolean | null
+    note?: string | null
+  } | null
+  autoDetected?: {
+    value: number | null
+    milestones_completed?: number | null
+    milestones_total?: number | null
+    taskStats?: { total: number; completed: number; inProgress: number } | null
+  } | null
+}): ResolvedActual {
+  const manual = params.manualActual
+  const auto = params.autoDetected
+
+  const hasManualValue = manual && (manual.actual_value != null || manual.milestones_completed != null)
+
+  if (hasManualValue) {
+    return {
+      effectiveActual: manual.actual_value ?? null,
+      effectiveMilestonesCompleted: manual.milestones_completed ?? null,
+      effectiveMilestonesTotal: manual.milestones_total ?? null,
+      source: "manual",
+      isOverride: manual.is_override ?? true,
+      autoValue: auto?.value ?? null,
+      manualValue: manual.actual_value ?? null,
+      taskStats: auto?.taskStats ?? null,
+      note: manual.note ?? null,
+    }
+  }
+
+  const hasAutoValue = auto && (auto.value != null || auto.milestones_completed != null)
+
+  if (hasAutoValue) {
+    return {
+      effectiveActual: auto.value ?? null,
+      effectiveMilestonesCompleted: auto.milestones_completed ?? null,
+      effectiveMilestonesTotal: auto.milestones_total ?? null,
+      source: "auto",
+      isOverride: false,
+      autoValue: auto.value ?? null,
+      manualValue: null,
+      taskStats: auto.taskStats ?? null,
+      note: auto.taskStats
+        ? `Derived from ${auto.taskStats.completed} completed task${auto.taskStats.completed === 1 ? "" : "s"}`
+        : null,
+    }
+  }
+
+  return {
+    effectiveActual: null,
+    effectiveMilestonesCompleted: null,
+    effectiveMilestonesTotal: null,
+    source: "none",
+    isOverride: false,
+    autoValue: null,
+    manualValue: null,
+    taskStats: auto?.taskStats ?? null,
+    note: null,
+  }
+}
+
 export type KpiRollupRow = {
   perspective: string
   strategicObjective: string
