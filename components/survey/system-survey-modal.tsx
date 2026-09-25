@@ -175,17 +175,20 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <span className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-lg">
-              <ClipboardList className="text-primary h-4 w-4" />
+      <DialogContent className="border-border/60 bg-card relative max-h-[90vh] max-w-2xl overflow-y-auto p-6 shadow-2xl sm:rounded-2xl">
+        {/* Subtle top gradient accent line */}
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
+
+        <DialogHeader className="pt-1">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
+              <ClipboardList className="h-5 w-5 text-emerald-500" />
             </span>
             <div>
-              <DialogTitle className="text-lg">
+              <DialogTitle className="text-lg font-bold tracking-tight">
                 {existingSurvey ? "Edit Your ERP Satisfaction Survey" : "ACOB Matrix ERP Experience Pulse"}
               </DialogTitle>
-              <DialogDescription className="text-xs">
+              <DialogDescription className="text-muted-foreground text-xs">
                 Help us refine and enhance system features, performance, and daily workflow ease.
               </DialogDescription>
             </div>
