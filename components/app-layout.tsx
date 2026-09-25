@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/sidebar"
 import { SidebarContent } from "@/components/sidebar-content"
 import { AcoBot } from "@/components/acobot/acobot"
 import { MissingAvatarBanner } from "@/components/profile/missing-avatar-banner"
+import { SystemSurveyPrompt } from "@/components/survey/system-survey-prompt"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveDeptConsoles } from "@/lib/dept/consoles"
@@ -52,6 +53,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
         <div className="pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">{children}</div>
       </SidebarContent>
       <AcoBot userName={profile?.first_name ?? profile?.full_name ?? null} />
+      <SystemSurveyPrompt />
     </div>
   )
 }

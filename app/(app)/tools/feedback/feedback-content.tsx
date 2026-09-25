@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
-import { Edit2, FileText, MessageSquare, Plus, Trash2 } from "lucide-react"
+import { Edit2, FileText, MessageSquare, Plus, Star, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -19,11 +19,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { FeedbackForm } from "@/components/feedback-form"
 import { FeedbackEditModal } from "@/components/feedback-edit-modal"
+import { SystemSurveyModal } from "@/components/survey/system-survey-modal"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import type { Feedback } from "./page"
+import type { SystemSatisfactionSurvey } from "@/types/survey"
 import { writeAuditLogClient } from "@/lib/audit/client"
 import { logger } from "@/lib/logger"
 
@@ -31,10 +33,13 @@ const log = logger("feedback-feedback-content")
 
 interface FeedbackContentProps {
   initialFeedback: Feedback[]
+  initialSurvey?: SystemSatisfactionSurvey | null
 }
 
-export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
+export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackContentProps) {
   const [userFeedback, setUserFeedback] = useState<Feedback[]>(initialFeedback)
+  const [userSurvey, setUserSurvey] = useState<SystemSatisfactionSurvey | null>(initialSurvey || null)
+  const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"non_anonymous" | "anonymous">("non_anonymous")
   const [isSubmitOpen, setIsSubmitOpen] = useState(false)
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null)
@@ -232,6 +237,53 @@ export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
         </StatGrid>
       }
     >
+      {/* System Satisfaction Survey Card */}
+      <div className="border-primary/20 from-primary/5 via-card to-card mb-6 rounded-xl border bg-gradient-to-r p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3 sm:items-center">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+              <Star className="h-5 w-5 fill-amber-500" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">ACOB Matrix ERP Experience Pulse</h3>
+                {userSurvey ? (
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-500/30 bg-emerald-50 text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  >
+                    Completed
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                  >
+                    Pending Feedback
+                  </Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {userSurvey
+                  ? `You rated the system ${userSurvey.overall_rating} of 5 stars (${userSurvey.is_anonymous ? "Submitted Anonymously" : "Named Submission"}). Click below to review or update your feedback.`
+                  : "Help us evaluate post-deployment usability, speed, and feature satisfaction with a 2-minute survey."}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant={userSurvey ? "outline" : "default"}
+              size="sm"
+              onClick={() => setIsSurveyModalOpen(true)}
+              className="h-8 gap-1.5 text-xs"
+            >
+              <Star className="h-3.5 w-3.5" />
+              {userSurvey ? "Review / Edit Survey" : "Take Survey (2 min)"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <DataTable<Feedback>
         data={filteredFeedback}
         columns={columns}
@@ -432,6 +484,13 @@ export function FeedbackContent({ initialFeedback }: FeedbackContentProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SystemSurveyModal
+        isOpen={isSurveyModalOpen}
+        onClose={() => setIsSurveyModalOpen(false)}
+        existingSurvey={userSurvey}
+        onSuccess={(updated) => setUserSurvey(updated)}
+      />
     </DataTablePage>
   )
 }
