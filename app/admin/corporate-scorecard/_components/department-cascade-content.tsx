@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { ClipboardEdit, PlusCircle, RotateCcw, Target, Zap } from "lucide-react"
+import { ClipboardEdit, Download, PlusCircle, RotateCcw, Target, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
 import { averageCappedPct, ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
 import { formatWATDate } from "@/lib/utils/date"
+import { exportDepartmentCascadeToExcel, exportDepartmentCascadeToPdf } from "@/lib/corporate-scorecard/export"
 
 type CascadeRow = {
   assignment_id: string
@@ -110,6 +112,7 @@ export function DepartmentCascadeContent({
   const [department, setDepartment] = useState(activeDepartment)
   const [editingRow, setEditingRow] = useState<CascadeRow | null>(null)
   const [recordingRow, setRecordingRow] = useState<CascadeRow | null>(null)
+  const [isExportOpen, setIsExportOpen] = useState(false)
 
   const [filterValues, setFilterValues] = useState<Record<string, string[]>>(() => ({
     ...(!lockedDepartment && department && department !== "all" ? { department: [department] } : {}),
@@ -395,16 +398,20 @@ export function DepartmentCascadeContent({
       activeTab={activeTab}
       onTabChange={onTabChange}
       actions={
-        lockedDepartment ? (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          {lockedDepartment && (
             <Badge
               variant="outline"
               className="border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600"
             >
               {lockedDepartment}
             </Badge>
-          </div>
-        ) : undefined
+          )}
+        </div>
       }
       stats={
         <StatGrid>
@@ -548,6 +555,20 @@ export function DepartmentCascadeContent({
         onSaved={() => {
           setRecordingRow(null)
           void queryClient.invalidateQueries({ queryKey })
+        }}
+      />
+
+      <ExportOptionsDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        title={`Export ${department === "all" ? "All Departments" : department} KPIs`}
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+        ]}
+        onSelect={(id) => {
+          if (id === "excel") void exportDepartmentCascadeToExcel(rows, department)
+          else if (id === "pdf") void exportDepartmentCascadeToPdf(rows, department)
         }}
       />
     </DataTablePage>

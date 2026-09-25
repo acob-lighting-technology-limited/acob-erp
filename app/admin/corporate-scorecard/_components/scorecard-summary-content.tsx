@@ -1,17 +1,20 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { BarChart3, Eye, TrendingUp } from "lucide-react"
+import { BarChart3, Download, Eye, TrendingUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableTab } from "@/components/ui/data-table"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
+import { exportSummaryToExcel, exportSummaryToPdf } from "@/lib/corporate-scorecard/export"
 
 type PerspectiveRollup = {
   perspective: string
@@ -65,6 +68,7 @@ export function ScorecardSummaryContent({
   onTabChange,
 }: ScorecardSummaryContentProps = {}) {
   const router = useRouter()
+  const [isExportOpen, setIsExportOpen] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery<SummaryResponse>({
     queryKey: ["corporate-scorecard-summary"],
@@ -141,6 +145,12 @@ export function ScorecardSummaryContent({
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}
+      actions={
+        <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)}>
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
+      }
       stats={
         <div className="space-y-4">
           <StatGrid>
@@ -226,6 +236,25 @@ export function ScorecardSummaryContent({
             </div>
           </div>
         )}
+      />
+
+      <ExportOptionsDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        title="Export Executive Summary"
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+        ]}
+        onSelect={(id) => {
+          const exportData = {
+            companyPct,
+            perspectives,
+            departments,
+          }
+          if (id === "excel") void exportSummaryToExcel(exportData)
+          else if (id === "pdf") void exportSummaryToPdf(exportData)
+        }}
       />
     </DataTablePage>
   )

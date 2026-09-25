@@ -9,6 +9,7 @@ import {
   BarChart3,
   ClipboardList,
   Clock,
+  Download,
   Edit,
   Layers,
   ListTodo,
@@ -23,6 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import {
   Dialog,
   DialogContent,
@@ -37,6 +39,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
+import { exportScorecardRegisterToExcel, exportScorecardRegisterToPdf } from "@/lib/corporate-scorecard/export"
 import { CreateKpiDialog, EditKpiDialog, ArchiveKpiDialog, PERSPECTIVES } from "./kpi-dialogs"
 
 type Assignment = {
@@ -102,6 +105,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
   const queryKey = ["corporate-scorecard-register"]
   const [managingRow, setManagingRow] = useState<RegisterRow | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isExportOpen, setIsExportOpen] = useState(false)
   const [editingRow, setEditingRow] = useState<RegisterRow | null>(null)
   const [archivingRow, setArchivingRow] = useState<RegisterRow | null>(null)
 
@@ -251,10 +255,16 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
       activeTab={activeTab}
       onTabChange={onTabChange}
       actions={
-        <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Corporate KPI
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Corporate KPI
+          </Button>
+        </div>
       }
       stats={
         <StatGrid>
@@ -565,6 +575,20 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         row={rows.find((r) => r.id === archivingRow?.id) ?? archivingRow}
         onOpenChange={(open) => !open && setArchivingRow(null)}
         onChanged={() => void queryClient.invalidateQueries({ queryKey })}
+      />
+
+      <ExportOptionsDialog
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        title="Export Master KPI Register"
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "pdf", label: "PDF", icon: "pdf" },
+        ]}
+        onSelect={(id) => {
+          if (id === "excel") void exportScorecardRegisterToExcel(rows)
+          else if (id === "pdf") void exportScorecardRegisterToPdf(rows)
+        }}
       />
     </DataTablePage>
   )
