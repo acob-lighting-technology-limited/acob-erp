@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Star, ShieldCheck, EyeOff, Check, Loader2, Clock } from "lucide-react"
+import { Star, ShieldCheck, EyeOff, Check, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -174,7 +174,7 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && (onSnooze ? onSnooze() : onClose())}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -364,39 +364,22 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
             <Switch id="anonymous-mode" checked={isAnonymous} onCheckedChange={setIsAnonymous} />
           </div>
 
-          <DialogFooter className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-            {onSnooze ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onSnooze}
-                disabled={isSubmitting}
-                className="text-muted-foreground hover:text-foreground h-8 justify-start gap-1.5 text-xs"
-              >
-                <Clock className="h-3.5 w-3.5" />
-                Remind me in 3 hours
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting} className="h-8 text-xs">
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting} className="h-8 min-w-[120px] text-xs">
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Saving...
-                  </>
-                ) : existingSurvey ? (
-                  "Update Response"
-                ) : (
-                  "Submit Survey"
-                )}
-              </Button>
-            </div>
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting} className="h-8 text-xs">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="h-8 min-w-[120px] text-xs">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : existingSurvey ? (
+                "Update Response"
+              ) : (
+                "Submit Survey"
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

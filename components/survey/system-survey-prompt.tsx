@@ -7,10 +7,6 @@ import { logger } from "@/lib/logger"
 
 const log = logger("system-survey-prompt")
 
-const SNOOZE_KEY = "acob-survey-snooze-until"
-const SUBMITTED_KEY = "acob-survey-submitted"
-const SNOOZE_MS = 3 * 60 * 60 * 1000 // 3 hours in milliseconds
-
 export function SystemSurveyPrompt() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
@@ -18,18 +14,13 @@ export function SystemSurveyPrompt() {
   useEffect(() => {
     setIsMounted(true)
 
-    // Check localStorage first
+    // Clear any previous snooze key so prompt shows immediately on every reload
     try {
-      const isSubmitted = window.localStorage.getItem(SUBMITTED_KEY) === "true"
-      if (isSubmitted) return
-
-      const snoozeUntil = Number(window.localStorage.getItem(SNOOZE_KEY) || 0)
-      if (Date.now() < snoozeUntil) return
+      window.localStorage.removeItem("acob-survey-snooze-until")
     } catch {
-      // ignore storage error
+      // ignore
     }
 
-    // Check with server if user already submitted a survey
     let cancelled = false
     const checkSurveyStatus = async () => {
       try {
@@ -39,17 +30,12 @@ export function SystemSurveyPrompt() {
 
         if (cancelled) return
 
+        // If user already submitted, do not prompt
         if (payload?.data) {
-          // User already completed the survey
-          try {
-            window.localStorage.setItem(SUBMITTED_KEY, "true")
-          } catch {
-            // ignore
-          }
           return
         }
 
-        // User hasn't completed and is not snoozed — popup centered modal
+        // User hasn't submitted: immediately show centered popup modal
         setIsModalOpen(true)
       } catch (err) {
         log.error({ err: String(err) }, "Failed to verify survey status")
@@ -62,35 +48,17 @@ export function SystemSurveyPrompt() {
     }
   }, [])
 
-  const handleSnooze = () => {
+  const handleClose = () => {
     setIsModalOpen(false)
-    try {
-      const nextTime = Date.now() + SNOOZE_MS
-      window.localStorage.setItem(SNOOZE_KEY, String(nextTime))
-    } catch {
-      // ignore
-    }
   }
 
   const handleSurveySuccess = () => {
     setIsModalOpen(false)
-    try {
-      window.localStorage.setItem(SUBMITTED_KEY, "true")
-    } catch {
-      // ignore
-    }
   }
 
   if (!isMounted) {
     return null
   }
 
-  return (
-    <SystemSurveyModal
-      isOpen={isModalOpen}
-      onClose={handleSnooze}
-      onSnooze={handleSnooze}
-      onSuccess={handleSurveySuccess}
-    />
-  )
+  return <SystemSurveyModal isOpen={isModalOpen} onClose={handleClose} onSuccess={handleSurveySuccess} />
 }
