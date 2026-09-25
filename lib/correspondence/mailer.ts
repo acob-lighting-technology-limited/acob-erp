@@ -149,7 +149,7 @@ export async function sendCorrespondenceDecisionEmail(payload: CorrespondenceDec
   // is no user id to check a personal preference against - only the
   // system-wide switch applies.
   const supabase = await createClient()
-  if (!(await isSystemNotificationChannelEnabled(supabase, "approvals", "email"))) return
+  if (!(await isSystemNotificationChannelEnabled(supabase, "correspondence", "email"))) return
 
   const typeLabel = getTypeLabel(payload.letterType)
   const decisionLabel = getDecisionLabel(payload.decision)
