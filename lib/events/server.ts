@@ -266,6 +266,46 @@ export async function loadPendingRsvpCount(session: EventsSession): Promise<numb
   return data?.length ?? 0
 }
 
+export type CalendarBadgeData = {
+  upcomingEvents: Array<{ id: string; created_at: string }>
+  pendingRsvpCount: number
+}
+
+/**
+ * Returns data for calendar notification badges:
+ * - upcomingEvents: future scheduled non-holiday events visible to the caller
+ * - pendingRsvpCount: upcoming events where caller is invited and rsvp is pending
+ */
+export async function loadCalendarBadgeData(session: EventsSession): Promise<CalendarBadgeData> {
+  const now = new Date().toISOString()
+  const [eventsRes, rsvpRes] = await Promise.all([
+    session.supabase
+      .from("events")
+      .select("id, created_at")
+      .eq("status", "scheduled")
+      .neq("type", "holiday")
+      .gt("end_at", now)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    session.supabase
+      .from("event_attendees")
+      .select("id, events!inner(id)")
+      .eq("profile_id", session.userId)
+      .eq("rsvp", "pending")
+      .eq("events.status", "scheduled")
+      .gt("events.end_at", now),
+  ])
+
+  if (eventsRes.error) {
+    log.error({ err: eventsRes.error.message }, "Failed to load upcoming events for badge")
+  }
+
+  return {
+    upcomingEvents: (eventsRes.data ?? []) as Array<{ id: string; created_at: string }>,
+    pendingRsvpCount: rsvpRes.data?.length ?? 0,
+  }
+}
+
 export async function loadEventCapabilities(session: EventsSession): Promise<EventCapabilities> {
   const { supabase, userId } = session
   const [manager, mdDesk, create, profile] = await Promise.all([

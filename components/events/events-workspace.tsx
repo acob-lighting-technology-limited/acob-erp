@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   CalendarDays,
   CalendarRange,
@@ -40,7 +40,7 @@ import { EventCard } from "./event-card"
 import { EventDetailSheet } from "./event-detail-sheet"
 import { EventFormDialog, type EventFormDefaults } from "./event-form-dialog"
 import { EventMonthCalendar } from "./event-month-calendar"
-import { monthGridRange, useEventOptions, useEvents } from "./use-events"
+import { markCalendarAsViewed, monthGridRange, useEventOptions, useEvents } from "./use-events"
 
 const DAY_MS = 86_400_000
 /** List tabs look this far ahead / back; get_md_busy_blocks caps a window at 93 days. */
@@ -108,6 +108,10 @@ export function EventsWorkspace({
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
   const [deleting, setDeleting] = useState<CalendarEvent | null>(null)
+
+  useEffect(() => {
+    markCalendarAsViewed()
+  }, [])
 
   const range = useMemo(() => {
     if (tab === "calendar") return monthGridRange(month.year, month.monthIndex)
@@ -283,8 +287,14 @@ export function EventsWorkspace({
 
   const rowActions: RowAction<CalendarEvent>[] = [
     { label: "View", icon: Eye, onClick: openEvent },
-    { label: "Edit", icon: Pencil, onClick: openEdit, hidden: (e) => !e.can_manage },
-    { label: "Delete", icon: Trash2, onClick: openDelete, variant: "destructive", hidden: (e) => !e.can_manage },
+    { label: "Edit", icon: Pencil, onClick: openEdit, hidden: (e) => variant !== "manage" || !e.can_manage },
+    {
+      label: "Delete",
+      icon: Trash2,
+      onClick: openDelete,
+      variant: "destructive",
+      hidden: (e) => variant !== "manage" || !e.can_manage,
+    },
   ]
 
   const handleExportCsv = () => {
@@ -464,7 +474,7 @@ export function EventsWorkspace({
             <EventCard
               event={event}
               onSelect={openEvent}
-              onEdit={variant === "manage" || event.can_manage ? openEdit : undefined}
+              onEdit={variant === "manage" && event.can_manage ? openEdit : undefined}
             />
           )}
           mobileRow={{
@@ -522,7 +532,7 @@ export function EventsWorkspace({
                   icon: Eye,
                   onClick: () => openEvent(e),
                 },
-                ...(variant === "manage" || e.can_manage
+                ...(variant === "manage" && e.can_manage
                   ? [
                       {
                         label: "Edit Event",
@@ -542,8 +552,8 @@ export function EventsWorkspace({
         event={selected}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onEdit={openEdit}
-        onDelete={openDelete}
+        onEdit={variant === "manage" ? openEdit : undefined}
+        onDelete={variant === "manage" ? openDelete : undefined}
       />
       <EventFormDialog
         open={formOpen}

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { apiFetch } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -51,6 +52,77 @@ export function usePendingRsvpCount() {
     staleTime: 60_000,
     refetchInterval: 120_000,
   })
+}
+
+export const CALENDAR_LAST_VIEWED_KEY = "acob_calendar_last_viewed"
+
+export function markCalendarAsViewed() {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(CALENDAR_LAST_VIEWED_KEY, new Date().toISOString())
+    window.dispatchEvent(new Event("calendar-viewed"))
+  } catch {
+    // ignore
+  }
+}
+
+export function useCalendarBadgeCount() {
+  const [lastViewed, setLastViewed] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      return localStorage.getItem(CALENDAR_LAST_VIEWED_KEY)
+    } catch {
+      return null
+    }
+  })
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        setLastViewed(localStorage.getItem(CALENDAR_LAST_VIEWED_KEY))
+      } catch {
+        // ignore
+      }
+    }
+    window.addEventListener("calendar-viewed", handleUpdate)
+    window.addEventListener("storage", handleUpdate)
+    return () => {
+      window.removeEventListener("calendar-viewed", handleUpdate)
+      window.removeEventListener("storage", handleUpdate)
+    }
+  }, [])
+
+  const query = useQuery({
+    queryKey: QUERY_KEYS.calendarBadgeData(),
+    queryFn: async (): Promise<{
+      upcomingEvents: Array<{ id: string; created_at: string }>
+      pendingRsvpCount: number
+    }> => {
+      const res = await apiFetch("/api/events/badge", { cache: "no-store" })
+      if (!res.ok) return { upcomingEvents: [], pendingRsvpCount: 0 }
+      return res.json()
+    },
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  })
+
+  const count = useMemo(() => {
+    const data = query.data
+    if (!data) return 0
+
+    const upcoming = data.upcomingEvents || []
+    let unviewedCount = 0
+    if (!lastViewed) {
+      unviewedCount = upcoming.length
+    } else {
+      const lastViewedTime = new Date(lastViewed).getTime()
+      unviewedCount = upcoming.filter((e) => new Date(e.created_at).getTime() > lastViewedTime).length
+    }
+
+    return Math.max(unviewedCount, data.pendingRsvpCount || 0)
+  }, [query.data, lastViewed])
+
+  return count
 }
 
 export async function saveEvent(

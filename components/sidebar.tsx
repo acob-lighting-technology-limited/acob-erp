@@ -54,7 +54,7 @@ import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
-import { usePendingRsvpCount } from "@/components/events/use-events"
+import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
 
 interface SidebarProps {
@@ -240,7 +240,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
-  const { data: pendingRsvps } = usePendingRsvpCount()
+  const calendarBadge = useCalendarBadgeCount()
 
   useEffect(() => {
     const handleToggle = (e: Event) => {
@@ -360,8 +360,8 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     const items = section.items
       .filter((item) => !item.adminOnly || canAccessAdmin)
       .map((item) => {
-        if (item.href === "/calendar" && pendingRsvps && pendingRsvps > 0) {
-          return { ...item, badge: pendingRsvps }
+        if (item.href === "/calendar" && calendarBadge > 0) {
+          return { ...item, badge: calendarBadge }
         }
         return item
       })
@@ -449,8 +449,8 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           <span className="relative inline-flex items-center">
                             <item.icon className="h-4 w-4 shrink-0" />
                             {isCollapsed && item.badge != null && item.badge > 0 && (
-                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-rose-500 ring-2">
-                                <span className="sr-only">{item.badge} pending</span>
+                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-emerald-500 ring-2">
+                                <span className="sr-only">{item.badge} unviewed</span>
                               </span>
                             )}
                           </span>
@@ -459,7 +459,9 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                             <span
                               className={cn(
                                 "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
-                                highlighted ? "bg-primary-foreground text-primary" : "bg-rose-500 text-white"
+                                highlighted
+                                  ? "bg-primary-foreground text-primary"
+                                  : "bg-emerald-600 text-white dark:bg-emerald-500"
                               )}
                             >
                               {item.badge > 99 ? "99+" : item.badge}
@@ -470,7 +472,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                       {isCollapsed && (
                         <TooltipContent side="right">
                           {item.description ? `${item.name} — ${item.description}` : item.name}
-                          {item.badge != null && item.badge > 0 && ` (${item.badge} pending)`}
+                          {item.badge != null && item.badge > 0 && ` (${item.badge} unviewed)`}
                         </TooltipContent>
                       )}
                     </Tooltip>

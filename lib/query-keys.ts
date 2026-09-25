@@ -182,6 +182,7 @@ export const QUERY_KEYS = {
   events: (range?: Record<string, unknown>) => (range ? ["events", range] : ["events"]),
   eventOptions: () => ["event-options"],
   pendingRsvpCount: () => ["pending-rsvp-count"],
+  calendarBadgeData: () => ["calendar-badge-data"],
   mdDeskOverview: () => ["md-desk-overview"],
   mdDeskDelegates: () => ["md-desk-delegates"],
   mdDeskTaskReviews: () => ["md-desk-task-reviews"],
