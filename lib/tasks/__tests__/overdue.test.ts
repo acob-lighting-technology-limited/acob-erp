@@ -37,10 +37,14 @@ test("a task with no deadline is never overdue", () => {
   assert.equal(isTaskOverdue({ due_date: null, status: "pending" }, TUE), false)
 })
 
-test("task_end_date wins over due_date", () => {
+test("task_end_date wins over due_date when later", () => {
   assert.equal(taskDeadline({ due_date: THU, task_end_date: MON }), MON)
   assert.equal(taskDeadline({ due_date: THU, task_end_date: null }), THU)
   assert.equal(taskDeadline({ due_date: null, task_end_date: null }), null)
+})
+
+test("extended due_date wins over older task_end_date", () => {
+  assert.equal(taskDeadline({ due_date: MON, task_end_date: THU }), MON)
 })
 
 test("a timestamp-shaped deadline is reduced to its date", () => {

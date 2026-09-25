@@ -85,11 +85,14 @@ export async function POST(request: NextRequest) {
       user_agent: truncate(payload?.userAgent || request.headers.get("user-agent"), 700),
     }
 
+    const entityId = truncate(payload?.route || payload?.href || "client_runtime", 255) || "client_runtime"
+
     const insertPayload = {
       user_id: user?.id || null,
       operation: "error",
       table_name: "frontend",
-      record_id: truncate(payload?.route || payload?.href || null, 255),
+      record_id: entityId,
+      entity_id: entityId,
       status: "error",
       error_details: message,
       metadata,

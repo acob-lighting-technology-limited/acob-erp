@@ -65,13 +65,13 @@ export async function getCurrentUserHrData(): Promise<UserHrSummary> {
       .eq("date", today)
       .maybeSingle(),
     supabase.from("leave_requests").select("id").eq("user_id", user.id).eq("status", "pending"),
-    getLeaveEntitlements(supabase, user.id, { year: currentYear }).catch(() => []),
+    getLeaveEntitlements(dataClient, user.id, { year: currentYear }).catch(() => []),
     dataClient.from("lunch_menus").select("id").eq("date", today).is("archived_at", null).maybeSingle(),
     dataClient
       .from("fleet_bookings")
       .select("id")
-      .eq("user_id", user.id)
-      .gte("end_time", new Date().toISOString())
+      .eq("requester_id", user.id)
+      .gte("end_at", new Date().toISOString())
       .neq("status", "cancelled"),
   ])
 

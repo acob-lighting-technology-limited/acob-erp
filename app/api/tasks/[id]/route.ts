@@ -191,6 +191,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       if (payload.extension_reason) {
         updatePayload.extension_reason = payload.extension_reason
       }
+      if (!payload.task_end_date || payload.task_end_date < payload.due_date) {
+        updatePayload.task_end_date = payload.due_date
+      }
     }
 
     if (assignmentFieldsTouched) {

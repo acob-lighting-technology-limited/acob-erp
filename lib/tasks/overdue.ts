@@ -66,12 +66,17 @@ type DeadlineSource = {
 }
 
 /**
- * The date a task is measured against: `task_end_date` where set, otherwise
- * `due_date` — the same anchor the KPI calculation uses to decide which cycle
- * a task belongs to.
+ * The date a task is measured against: `due_date` or `task_end_date`.
+ * If both exist, the later date is used so that an extended `due_date`
+ * is never curtailed by an older `task_end_date`.
  */
 export function taskDeadline(task: DeadlineSource): string | null {
-  const value = task.task_end_date || task.due_date
+  if (task.due_date && task.task_end_date) {
+    const due = String(task.due_date).slice(0, 10)
+    const end = String(task.task_end_date).slice(0, 10)
+    return due > end ? due : end
+  }
+  const value = task.due_date || task.task_end_date
   return value ? String(value).slice(0, 10) : null
 }
 
