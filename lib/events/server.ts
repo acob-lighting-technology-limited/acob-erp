@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
+import { toLocalISODate } from "@/lib/utils/date"
 import type {
   BusyBlock,
   CalendarEvent,
@@ -93,6 +94,49 @@ export type LoadEventsOptions = {
   includeBusy?: boolean
 }
 
+/** Projects holiday_calendar rows into synthetic read-only CalendarEvent objects. */
+async function mergeHolidays(supabase: SupabaseClient, from: Date, to: Date, target: CalendarEvent[]): Promise<void> {
+  const fromDate = toLocalISODate(from)
+  const toDate = toLocalISODate(new Date(to.getTime() - 1)) // inclusive end
+  const { data: holidayRows } = await supabase
+    .from("holiday_calendar")
+    .select("holiday_date, name, location")
+    .gte("holiday_date", fromDate)
+    .lte("holiday_date", toDate)
+    .eq("is_business_day", false)
+    .order("holiday_date", { ascending: true })
+  for (const h of (holidayRows ?? []) as { holiday_date: string; name: string; location: string }[]) {
+    // Span the entire WAT day: midnight → 23:59:59 +01:00.
+    const dayStart = `${h.holiday_date}T00:00:00+01:00`
+    const dayEnd = `${h.holiday_date}T23:59:59+01:00`
+    target.push({
+      id: `holiday-${h.holiday_date}-${h.location}`,
+      type: "holiday",
+      title: h.name,
+      description: null,
+      start_at: dayStart,
+      end_at: dayEnd,
+      all_day: true,
+      location_type: "physical",
+      room_id: null,
+      room_name: null,
+      venue: null,
+      meeting_url: null,
+      visibility: "company",
+      department_id: null,
+      department_name: null,
+      md_involvement: "none",
+      status: "scheduled",
+      organizer_id: null,
+      organizer_name: null,
+      created_by: "",
+      attendees: [],
+      my_rsvp: null,
+      can_manage: false,
+    })
+  }
+}
+
 export async function loadEvents(
   session: EventsSession,
   { from, to, scope = "all", includeBusy = true }: LoadEventsOptions
@@ -118,7 +162,10 @@ export async function loadEvents(
   if (rows.length === 0) {
     const { data: busy, error: busyError } = await busyPromise
     if (busyError) log.warn({ err: busyError.message }, "Failed to load busy blocks")
-    return { events: [], busy: (busy ?? []) as BusyBlock[] }
+    const emptyEvents: CalendarEvent[] = []
+    // Holidays still need to appear even when there are no calendar events this month.
+    if (scope !== "md") await mergeHolidays(supabase, from, to, emptyEvents)
+    return { events: emptyEvents, busy: (busy ?? []) as BusyBlock[] }
   }
 
   const ids = rows.map((r) => r.id)
@@ -190,6 +237,10 @@ export async function loadEvents(
       can_manage: manageable.has(r.id),
     }
   })
+
+  // Merge public holidays from holiday_calendar as synthetic all-day events.
+  // Done only for the "all" scope — MD's Desk is already a focused personal schedule.
+  if (scope !== "md") await mergeHolidays(supabase, from, to, events)
 
   return { events, busy: (busyRes.data ?? []) as BusyBlock[] }
 }
