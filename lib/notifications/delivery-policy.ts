@@ -20,6 +20,8 @@ export const NOTIFICATION_KEYS = [
   "payroll",
   "attendance",
   "birthdays",
+  "correspondence",
+  "payments",
 ] as const
 
 export type NotificationKey = (typeof NOTIFICATION_KEYS)[number]

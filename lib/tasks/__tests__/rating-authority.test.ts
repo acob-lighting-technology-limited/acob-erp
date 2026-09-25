@@ -2,22 +2,20 @@ import { strict as assert } from "node:assert"
 import { test } from "node:test"
 import { isLeadForTaskDepartment, isSelfRatingBlocked } from "../rating-authority"
 
-test("an assignee cannot rate their own task", () => {
-  assert.equal(isSelfRatingBlocked({ userId: "lead", assigneeIds: ["lead"] }), true)
+test("a regular employee cannot rate their own task", () => {
+  assert.equal(isSelfRatingBlocked({ userId: "staff", assigneeIds: ["staff"], isLeadOrAdmin: false }), true)
 })
 
-test("a group-task member cannot rate the task either", () => {
-  assert.equal(isSelfRatingBlocked({ userId: "lead", assigneeIds: [null, "someone", "lead"] }), true)
+test("a department lead or admin is permitted to rate their own task", () => {
+  assert.equal(isSelfRatingBlocked({ userId: "lead", assigneeIds: ["lead"], isLeadOrAdmin: true }), false)
+})
+
+test("a group-task member who is not a lead cannot rate the task either", () => {
+  assert.equal(isSelfRatingBlocked({ userId: "staff", assigneeIds: [null, "someone", "staff"] }), true)
 })
 
 test("a reviewer who is not an assignee may rate", () => {
   assert.equal(isSelfRatingBlocked({ userId: "lead", assigneeIds: ["staff"] }), false)
-})
-
-test("the MD is not exempt: nobody rates their own task", () => {
-  // The MD used to be able to self-rate, as the one person above every lead.
-  // Review is an admin-side job now, so another administrator does it.
-  assert.equal(isSelfRatingBlocked({ userId: "md", assigneeIds: ["md"] }), true)
 })
 
 test("a missing user id never matches an unassigned task", () => {

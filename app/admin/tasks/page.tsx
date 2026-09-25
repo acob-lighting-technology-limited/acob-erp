@@ -100,7 +100,7 @@ async function getAdminTasksData() {
     if (t.project_id) projectIds.add(t.project_id)
   })
 
-  const [profilesRes, goalsRes, kpisRes, projectsRes] = await Promise.all([
+  const [profilesRes, goalsRes, kpisRes, projectsRes, allProjectsRes] = await Promise.all([
     profileIds.size > 0
       ? dataClient.from("profiles").select("id, first_name, last_name, department").in("id", Array.from(profileIds))
       : { data: [] },
@@ -116,6 +116,7 @@ async function getAdminTasksData() {
     projectIds.size > 0
       ? dataClient.from("projects").select("id, project_name").in("id", Array.from(projectIds))
       : { data: [] },
+    dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
   ])
 
   const profileMap = new Map<string, TaskPersonSummary>(
@@ -207,6 +208,7 @@ async function getAdminTasksData() {
     employee: (employeeResult.data || []) as employee[],
     departments,
     goals: goalRows,
+    projects: (allProjectsRes.data || []) as Array<{ id: string; project_name: string }>,
     cycles: (cyclesRaw || []) as Array<{
       id: string
       name: string
@@ -234,6 +236,7 @@ export default async function AdminTasksPage(props: { searchParams?: Promise<{ g
       initialDepartments={data.departments}
       initialGoals={data.goals}
       initialReviewCycles={data.cycles}
+      initialProjects={data.projects}
       userProfile={data.userProfile}
       initialGoalId={searchParams?.goal_id || ""}
     />

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PROJECT_PRIORITIES } from "@/lib/projects/priority"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 
@@ -23,8 +24,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const dataClient = getServiceRoleClientOrFallback<any>(supabase as any)
+
   try {
-    const { data: projects, error } = await (supabase as any)
+    const { data: projects, error } = await dataClient
       .from("projects")
       .select(
         `

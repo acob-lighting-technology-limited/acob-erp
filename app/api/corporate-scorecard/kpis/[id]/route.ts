@@ -9,6 +9,16 @@ import { apiError, ApiErrorCode } from "@/lib/api/errors"
 
 const log = logger("corporate-scorecard-kpi-id")
 
+const AssignmentItemSchema = z.object({
+  id: z.string().uuid().optional(),
+  department: z.string().trim().min(1),
+  role: z.enum(["core", "support"]),
+  target_value: z.number().nullable().optional(),
+  target_unit: z.string().trim().nullable().optional(),
+  department_target: z.string().trim().nullable().optional(),
+  proposed_action: z.string().trim().nullable().optional(),
+})
+
 const UpdateKpiSchema = z.object({
   perspective: z.enum(["Financial", "Customer", "Internal Process", "Organizational Capacity"]).optional(),
   strategic_priority: z.string().trim().min(1, "Strategic Pillar cannot be empty").max(500).optional(),
@@ -18,6 +28,7 @@ const UpdateKpiSchema = z.object({
   measure_type: z.enum(["count", "percentage", "currency", "milestone"]).optional(),
   direction: z.enum(["at_least", "at_most"]).optional(),
   is_archived: z.boolean().optional(),
+  assignments: z.array(AssignmentItemSchema).optional(),
 })
 
 interface RouteContext {
@@ -56,8 +67,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   const db = getServiceRoleClientOrFallback(supabase)
 
+  const { assignments, ...kpiFields } = parsed.data
+
   const updatePayload = {
-    ...parsed.data,
+    ...kpiFields,
     updated_at: new Date().toISOString(),
   }
 
@@ -66,6 +79,41 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (error || !data) {
     log.error({ err: error?.message, id }, "Failed to update corporate KPI")
     return apiError(error?.message || "Failed to update Corporate KPI", ApiErrorCode.DATABASE_ERROR, 500)
+  }
+
+  if (assignments !== undefined) {
+    const { data: existingAssignments } = await db.from("kpi_assignments").select("id, department").eq("kpi_id", id)
+
+    const incomingDepts = new Set(assignments.map((a) => a.department))
+
+    // Delete assignments no longer present
+    const toDelete = (existingAssignments || []).filter((a) => !incomingDepts.has(a.department))
+    if (toDelete.length > 0) {
+      await db
+        .from("kpi_assignments")
+        .delete()
+        .in(
+          "id",
+          toDelete.map((a) => a.id)
+        )
+    }
+
+    // Upsert incoming assignments
+    for (const a of assignments) {
+      await db.from("kpi_assignments").upsert(
+        {
+          kpi_id: id,
+          department: a.department,
+          role: a.role,
+          target_value: a.target_value ?? null,
+          target_unit: a.target_unit ?? null,
+          department_target: a.department_target ?? null,
+          proposed_action: a.proposed_action ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "kpi_id,department" }
+      )
+    }
   }
 
   return NextResponse.json({ data })

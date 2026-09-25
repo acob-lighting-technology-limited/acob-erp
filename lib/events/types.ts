@@ -157,6 +157,18 @@ const optionalText = z
   .nullable()
   .transform((v) => (v ? v : null))
 
+export const EVENT_RECURRENCE_FREQUENCIES = ["none", "daily", "weekly", "biweekly", "monthly"] as const
+export type EventRecurrenceFrequency = (typeof EVENT_RECURRENCE_FREQUENCIES)[number]
+
+export const EventRecurrenceSchema = z.object({
+  frequency: z.enum(EVENT_RECURRENCE_FREQUENCIES).default("none"),
+  count: z.number().int().min(1).max(52).default(4),
+  until: z.string().optional().nullable(),
+  skip_holidays: z.boolean().default(true),
+})
+
+export type EventRecurrenceInput = z.infer<typeof EventRecurrenceSchema>
+
 export const EventWriteSchema = z
   .object({
     type: z.enum(EVENT_TYPES),
@@ -184,6 +196,8 @@ export const EventWriteSchema = z
     attendee_ids: z.array(z.string().uuid()).max(500).default([]),
     /** Whole departments, expanded into one attendee row per current member. */
     invite_department_ids: z.array(z.string().uuid()).max(50).default([]),
+    /** Optional recurrence options when creating an event series. */
+    recurrence: EventRecurrenceSchema.optional().nullable(),
   })
   .superRefine((v, ctx) => {
     if (new Date(v.end_at).getTime() <= new Date(v.start_at).getTime()) {

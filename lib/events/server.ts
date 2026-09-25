@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
+import { toLocalISODate } from "@/lib/utils/date"
 import type {
   BusyBlock,
   CalendarEvent,
@@ -93,6 +94,49 @@ export type LoadEventsOptions = {
   includeBusy?: boolean
 }
 
+/** Projects holiday_calendar rows into synthetic read-only CalendarEvent objects. */
+async function mergeHolidays(supabase: SupabaseClient, from: Date, to: Date, target: CalendarEvent[]): Promise<void> {
+  const fromDate = toLocalISODate(from)
+  const toDate = toLocalISODate(new Date(to.getTime() - 1)) // inclusive end
+  const { data: holidayRows } = await supabase
+    .from("holiday_calendar")
+    .select("holiday_date, name, location")
+    .gte("holiday_date", fromDate)
+    .lte("holiday_date", toDate)
+    .eq("is_business_day", false)
+    .order("holiday_date", { ascending: true })
+  for (const h of (holidayRows ?? []) as { holiday_date: string; name: string; location: string }[]) {
+    // Span the entire WAT day: midnight → 23:59:59 +01:00.
+    const dayStart = `${h.holiday_date}T00:00:00+01:00`
+    const dayEnd = `${h.holiday_date}T23:59:59+01:00`
+    target.push({
+      id: `holiday-${h.holiday_date}-${h.location}`,
+      type: "holiday",
+      title: h.name,
+      description: null,
+      start_at: dayStart,
+      end_at: dayEnd,
+      all_day: true,
+      location_type: "physical",
+      room_id: null,
+      room_name: null,
+      venue: null,
+      meeting_url: null,
+      visibility: "company",
+      department_id: null,
+      department_name: null,
+      md_involvement: "none",
+      status: "scheduled",
+      organizer_id: null,
+      organizer_name: null,
+      created_by: "",
+      attendees: [],
+      my_rsvp: null,
+      can_manage: false,
+    })
+  }
+}
+
 export async function loadEvents(
   session: EventsSession,
   { from, to, scope = "all", includeBusy = true }: LoadEventsOptions
@@ -118,7 +162,10 @@ export async function loadEvents(
   if (rows.length === 0) {
     const { data: busy, error: busyError } = await busyPromise
     if (busyError) log.warn({ err: busyError.message }, "Failed to load busy blocks")
-    return { events: [], busy: (busy ?? []) as BusyBlock[] }
+    const emptyEvents: CalendarEvent[] = []
+    // Holidays still need to appear even when there are no calendar events this month.
+    if (scope !== "md") await mergeHolidays(supabase, from, to, emptyEvents)
+    return { events: emptyEvents, busy: (busy ?? []) as BusyBlock[] }
   }
 
   const ids = rows.map((r) => r.id)
@@ -191,7 +238,72 @@ export async function loadEvents(
     }
   })
 
+  // Merge public holidays from holiday_calendar as synthetic all-day events.
+  // Done only for the "all" scope — MD's Desk is already a focused personal schedule.
+  if (scope !== "md") await mergeHolidays(supabase, from, to, events)
+
   return { events, busy: (busyRes.data ?? []) as BusyBlock[] }
+}
+
+/**
+ * Count of upcoming scheduled events where the current user is an invitee
+ * and has not responded yet (rsvp = "pending").
+ */
+export async function loadPendingRsvpCount(session: EventsSession): Promise<number> {
+  const now = new Date().toISOString()
+  const { data, error } = await session.supabase
+    .from("event_attendees")
+    .select("id, events!inner(id)")
+    .eq("profile_id", session.userId)
+    .eq("rsvp", "pending")
+    .eq("events.status", "scheduled")
+    .gt("events.end_at", now)
+
+  if (error) {
+    log.error({ err: error.message }, "Failed to count pending RSVPs")
+    return 0
+  }
+  return data?.length ?? 0
+}
+
+export type CalendarBadgeData = {
+  upcomingEvents: Array<{ id: string; created_at: string }>
+  pendingRsvpCount: number
+}
+
+/**
+ * Returns data for calendar notification badges:
+ * - upcomingEvents: future scheduled non-holiday events visible to the caller
+ * - pendingRsvpCount: upcoming events where caller is invited and rsvp is pending
+ */
+export async function loadCalendarBadgeData(session: EventsSession): Promise<CalendarBadgeData> {
+  const now = new Date().toISOString()
+  const [eventsRes, rsvpRes] = await Promise.all([
+    session.supabase
+      .from("events")
+      .select("id, created_at")
+      .eq("status", "scheduled")
+      .neq("type", "holiday")
+      .gt("end_at", now)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    session.supabase
+      .from("event_attendees")
+      .select("id, events!inner(id)")
+      .eq("profile_id", session.userId)
+      .eq("rsvp", "pending")
+      .eq("events.status", "scheduled")
+      .gt("events.end_at", now),
+  ])
+
+  if (eventsRes.error) {
+    log.error({ err: eventsRes.error.message }, "Failed to load upcoming events for badge")
+  }
+
+  return {
+    upcomingEvents: (eventsRes.data ?? []) as Array<{ id: string; created_at: string }>,
+    pendingRsvpCount: rsvpRes.data?.length ?? 0,
+  }
 }
 
 export async function loadEventCapabilities(session: EventsSession): Promise<EventCapabilities> {

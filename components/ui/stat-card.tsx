@@ -1,4 +1,8 @@
+"use client"
+
+import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
 
@@ -36,23 +40,20 @@ export function StatCard({
   tooltip,
   className,
 }: StatCardProps) {
+  let card: React.ReactElement
+
   // `compact` scales down below `sm` rather than being one fixed size. A phone
   // still gets a real card — label *and* value, which a metric pill cannot give
   // you — at roughly two thirds the height, so four of them cost a strip rather
   // than a screenful and the list is still visible underneath.
   if (variant === "compact") {
-    return (
-      <Card className={cn("border", className)} title={tooltip}>
+    card = (
+      <Card className={cn("border", tooltip && "cursor-help", className)}>
         <CardContent className="p-2.5 sm:p-3.5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-muted-foreground truncate text-[10px] leading-tight font-medium sm:text-xs">{title}</p>
-              <p
-                className="text-foreground mt-0.5 truncate text-base leading-tight font-bold sm:text-xl"
-                title={tooltip}
-              >
-                {value}
-              </p>
+              <p className="text-foreground mt-0.5 truncate text-base leading-tight font-bold sm:text-xl">{value}</p>
             </div>
             {Icon && (
               <div className={cn("shrink-0 rounded-md p-1.5 sm:rounded-lg sm:p-2", iconBgColor)}>
@@ -69,11 +70,9 @@ export function StatCard({
         </CardContent>
       </Card>
     )
-  }
-
-  if (variant === "large") {
-    return (
-      <Card className={cn("border", className)} title={tooltip}>
+  } else if (variant === "large") {
+    card = (
+      <Card className={cn("border", tooltip && "cursor-help", className)}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3.5 pt-3.5 pb-2 sm:px-6 sm:pt-6 sm:pb-2">
           <CardTitle className="text-muted-foreground truncate text-xs font-medium sm:text-sm">{title}</CardTitle>
           {Icon && (
@@ -83,9 +82,7 @@ export function StatCard({
           )}
         </CardHeader>
         <CardContent className="px-3.5 pb-3.5 sm:px-6 sm:pb-6">
-          <div className="text-xl font-bold sm:text-3xl" title={tooltip}>
-            {value}
-          </div>
+          <div className="text-xl font-bold sm:text-3xl">{value}</div>
           {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-xs sm:text-sm">{description}</p>}
           {trend && (
             <p className={cn("mt-1 text-xs sm:mt-2 sm:text-sm", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
@@ -96,56 +93,60 @@ export function StatCard({
         </CardContent>
       </Card>
     )
-  }
+  } else {
+    card = (
+      <Card className={cn("border", tooltip && "cursor-help", className)}>
+        {/* Mobile: compact horizontal row with clear, balanced typography */}
+        <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 sm:hidden">
+          <div className="min-w-0">
+            <p className="text-muted-foreground truncate text-xs font-medium">{title}</p>
+            <p className="text-foreground line-clamp-2 text-sm leading-tight font-bold break-words">{value}</p>
+            {description && <p className="text-muted-foreground line-clamp-1 text-[11px]">{description}</p>}
+            {trend && (
+              <p className={cn("text-[11px]", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
+                {trend.value >= 0 ? "+" : ""}
+                {trend.value}% {trend.label}
+              </p>
+            )}
+          </div>
+          {Icon && (
+            <div className={cn("shrink-0 rounded-lg p-1.5", iconBgColor)}>
+              <Icon className={cn("h-4 w-4", iconColor)} />
+            </div>
+          )}
+        </div>
 
-  return (
-    <Card className={cn("border", className)} title={tooltip}>
-      {/* Mobile: compact horizontal row with clear, balanced typography */}
-      <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 sm:hidden">
-        <div className="min-w-0">
-          <p className="text-muted-foreground truncate text-xs font-medium">{title}</p>
-          <p
-            className="text-foreground line-clamp-2 text-sm leading-tight font-bold break-words"
-            title={tooltip || String(value)}
-          >
-            {value}
-          </p>
-          {description && <p className="text-muted-foreground line-clamp-1 text-[11px]">{description}</p>}
+        {/* sm+ : desktop/tablet two-block layout */}
+        <CardHeader className="hidden flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2 sm:flex">
+          <CardTitle className="text-muted-foreground truncate text-sm font-medium">{title}</CardTitle>
+          {Icon && (
+            <div className={cn("rounded-lg p-1.5", iconBgColor)}>
+              <Icon className={cn("h-4 w-4", iconColor)} />
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="hidden px-6 pb-6 sm:block">
+          <div className="line-clamp-2 text-xl font-bold break-words lg:text-2xl">{value}</div>
+          {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">{description}</p>}
           {trend && (
-            <p className={cn("text-[11px]", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
+            <p className={cn("mt-1 text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
               {trend.value >= 0 ? "+" : ""}
               {trend.value}% {trend.label}
             </p>
           )}
-        </div>
-        {Icon && (
-          <div className={cn("shrink-0 rounded-lg p-1.5", iconBgColor)}>
-            <Icon className={cn("h-4 w-4", iconColor)} />
-          </div>
-        )}
-      </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
-      {/* sm+ : desktop/tablet two-block layout */}
-      <CardHeader className="hidden flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2 sm:flex">
-        <CardTitle className="text-muted-foreground truncate text-sm font-medium">{title}</CardTitle>
-        {Icon && (
-          <div className={cn("rounded-lg p-1.5", iconBgColor)}>
-            <Icon className={cn("h-4 w-4", iconColor)} />
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="hidden px-6 pb-6 sm:block">
-        <div className="line-clamp-2 text-xl font-bold break-words lg:text-2xl" title={tooltip || String(value)}>
-          {value}
-        </div>
-        {description && <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">{description}</p>}
-        {trend && (
-          <p className={cn("mt-1 text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
-            {trend.value >= 0 ? "+" : ""}
-            {trend.value}% {trend.label}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  )
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{card}</TooltipTrigger>
+        <TooltipContent side="top">{tooltip}</TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return card
 }

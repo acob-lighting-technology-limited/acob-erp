@@ -40,8 +40,8 @@ const EXCLUDED_STATUSES = new Set(["reassigned", "cancelled"])
  */
 const UNRESOLVED_STATUSES = new Set(["pending", "in_progress", "unable_to_complete"])
 
-/** Task weights are strictly numeric (1–5) and must never display descriptive text labels. */
-
+/** Task ratings and weights are strictly numeric (1–5) and must never display descriptive text labels. */
+/** @deprecated Task ratings are strictly numeric (1–5) without text descriptions. Retained only for legacy compatibility. */
 export const TASK_RATING_LABELS: Record<number, string> = {
   1: "Poor",
   2: "Below expectation",

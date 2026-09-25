@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,15 +110,22 @@ function AttendanceChip({ attendance }: { attendance: AttendanceItem[] }) {
   const clockIn = today?.clock_in ? String(today.clock_in).slice(0, 5) : null
 
   return (
-    <Link
-      href="/hr/attendance"
-      className="bg-background/60 hover:bg-accent flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-      title="View attendance"
-    >
-      <span className={cn("h-2 w-2 shrink-0 rounded-full", dotColor)} aria-hidden="true" />
-      <span>{label}</span>
-      {clockIn && <span className="text-muted-foreground">· in {clockIn}</span>}
-    </Link>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          href="/hr/attendance"
+          className="bg-background/60 hover:bg-accent flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+          aria-label="View attendance"
+        >
+          <span className={cn("h-2 w-2 shrink-0 rounded-full", dotColor)} aria-hidden="true" />
+          <span>{label}</span>
+          {clockIn && <span className="text-muted-foreground">· in {clockIn}</span>}
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>View attendance</p>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -206,22 +214,32 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
 
   const renderAvatar = (sizeClass: string) => (
     <div className="group relative shrink-0">
-      <button
-        type="button"
-        onClick={handleAvatarClick}
-        disabled={isUploading}
-        aria-label={avatarUrl ? "View profile photo" : "Add profile photo"}
-        className="block rounded-full"
-      >
-        <Avatar
-          className={cn("border-background border-2 shadow-md transition-transform group-hover:scale-105", sizeClass)}
-        >
-          {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName || "Profile photo"} />}
-          <AvatarFallback className="bg-primary text-primary-foreground text-lg font-bold sm:text-2xl">
-            {getInitials(profile.first_name, profile.last_name)}
-          </AvatarFallback>
-        </Avatar>
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={handleAvatarClick}
+            disabled={isUploading}
+            aria-label={avatarUrl ? "View profile photo" : "Add profile photo"}
+            className="block rounded-full"
+          >
+            <Avatar
+              className={cn(
+                "border-background border-2 shadow-md transition-transform group-hover:scale-105",
+                sizeClass
+              )}
+            >
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={fullName || "Profile photo"} />}
+              <AvatarFallback className="bg-primary text-primary-foreground text-lg font-bold sm:text-2xl">
+                {getInitials(profile.first_name, profile.last_name)}
+              </AvatarFallback>
+            </Avatar>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{avatarUrl ? "View profile photo" : "Add profile photo"}</p>
+        </TooltipContent>
+      </Tooltip>
 
       <input
         ref={fileInputRef}

@@ -103,6 +103,10 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
   // When searching from inside the dept console (/dept/[id]/…), pass the dept
   // id so the API scopes results to that department and routes links there.
   const deptId = useMemo(() => pathname?.match(/^\/dept\/([^/]+)/)?.[1], [pathname])
+  const isDeptRoute = Boolean(deptId)
+  const isAdminRoute = Boolean(pathname?.startsWith("/admin"))
+  const isScoped = isAdminMode || isAdminRoute || isDeptRoute
+  const scopeMode = isDeptRoute ? "lead" : isAdminRoute || isAdminMode ? "global" : undefined
 
   // Keyboard shortcut: Ctrl+K or Cmd+K
   useEffect(() => {
@@ -148,42 +152,25 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
         variant="outline"
         className={cn(
           "group text-muted-foreground border-input/60 bg-muted/40 hover:bg-muted/80 hover:border-input hover:text-foreground relative h-9.5 w-full justify-start text-sm font-normal transition-all duration-200 sm:pr-12 md:w-64 lg:w-80",
-          isAdminMode &&
-            "border-[var(--navbar-admin-sidebar-border)] bg-[var(--navbar-admin-accent-soft)] text-[var(--navbar-admin-primary)] hover:bg-[var(--navbar-admin-accent-soft)]/80 hover:text-[var(--navbar-admin-primary)]"
+          isScoped &&
+            "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))] bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] text-[var(--navbar-admin-primary,var(--admin-primary))] hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))]/80 hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
         )}
-        style={
-          isAdminMode
-            ? {
-                borderColor: "var(--navbar-admin-sidebar-border)",
-                backgroundColor: "var(--navbar-admin-accent-soft)",
-                color: "var(--navbar-admin-primary)",
-              }
-            : undefined
-        }
         onClick={() => setOpen(true)}
       >
         <Search
           className={cn(
             "text-muted-foreground group-hover:text-foreground mr-2 h-4 w-4 transition-colors",
-            isAdminMode && "text-[var(--navbar-admin-primary)] group-hover:text-[var(--navbar-admin-primary)]"
+            isScoped &&
+              "text-[var(--navbar-admin-primary,var(--admin-primary))] group-hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
           )}
-          style={isAdminMode ? { color: "var(--navbar-admin-primary)" } : undefined}
         />
         <span className="group-hover:text-foreground transition-colors">Search anything...</span>
         <kbd
           className={cn(
             "border-border/60 bg-background/80 text-muted-foreground group-hover:border-border group-hover:bg-background group-hover:text-foreground pointer-events-none absolute top-1.5 right-1.5 hidden h-6 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium transition-colors select-none sm:flex",
-            isAdminMode &&
-              "bg-background/40 group-hover:bg-background/60 border-[var(--navbar-admin-sidebar-border)] text-[var(--navbar-admin-primary)]"
+            isScoped &&
+              "bg-background/40 group-hover:bg-background/60 border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))] text-[var(--navbar-admin-primary,var(--admin-primary))]"
           )}
-          style={
-            isAdminMode
-              ? {
-                  borderColor: "var(--navbar-admin-sidebar-border)",
-                  color: "var(--navbar-admin-primary)",
-                }
-              : undefined
-          }
         >
           <span className="text-xs">⌘</span>K
         </kbd>
@@ -191,27 +178,20 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="max-w-2xl p-0"
-          style={isAdminMode ? { borderColor: "var(--navbar-admin-sidebar-border)" } : undefined}
+          className={cn("max-w-2xl overflow-hidden p-0", isScoped && "admin-shell")}
+          data-scope={scopeMode}
         >
           <DialogHeader className="px-6 pt-6">
-            <DialogTitle style={isAdminMode ? { color: "var(--navbar-admin-primary)" } : undefined}>Search</DialogTitle>
+            <DialogTitle className="text-foreground text-lg font-semibold">Search</DialogTitle>
           </DialogHeader>
           <div className="px-6 pb-4">
             <div className="relative">
-              <Search
-                className={cn(
-                  "text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2",
-                  isAdminMode && ""
-                )}
-                style={isAdminMode ? { color: "var(--navbar-admin-primary)" } : undefined}
-              />
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
               <Input
                 placeholder="Search employees, assets, tasks, tickets, leave, correspondence, payments..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className={cn("pl-9", isAdminMode && "focus-visible:ring-[var(--navbar-admin-primary)]")}
-                style={isAdminMode ? { borderColor: "var(--navbar-admin-sidebar-border)" } : undefined}
+                className="focus-visible:ring-primary focus-visible:border-primary/50 pl-9"
                 autoFocus
               />
               {query && (
@@ -248,38 +228,26 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
             )}
 
             {!loading && results.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {results.map((result) => {
                   const Icon = typeIcons[result.type]
                   return (
                     <button
                       key={`${result.type}-${result.id}`}
                       onClick={() => handleResultClick(result)}
-                      className={cn(
-                        "group flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                        isAdminMode
-                          ? "border-amber-200/80 hover:border-amber-400/80 hover:bg-amber-50 dark:border-amber-900 dark:hover:border-amber-700 dark:hover:bg-amber-950/40"
-                          : "hover:bg-accent hover:text-accent-foreground"
-                      )}
+                      className="group border-border/80 bg-card/60 hover:border-primary/50 hover:bg-primary/5 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-all duration-150 hover:shadow-xs"
                     >
-                      <div
-                        className={cn(
-                          "bg-muted flex h-10 w-10 items-center justify-center rounded-md",
-                          isAdminMode && "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                        )}
-                      >
+                      <div className="bg-primary/10 text-primary group-hover:bg-primary/20 flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors">
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="mb-0.5 flex items-center gap-2">
-                          <p className="truncate text-sm font-semibold">{result.title}</p>
+                          <p className="group-hover:text-primary truncate text-sm font-semibold transition-colors">
+                            {result.title}
+                          </p>
                           <Badge
                             variant="outline"
-                            className={cn(
-                              "text-[11px]",
-                              isAdminMode &&
-                                "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-                            )}
+                            className="border-primary/30 bg-primary/10 text-primary text-[11px] font-medium"
                           >
                             {typeLabels[result.type]}
                           </Badge>
@@ -289,13 +257,8 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
                           <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">{result.description}</p>
                         )}
                       </div>
-                      <span
-                        className={cn(
-                          "text-muted-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100",
-                          isAdminMode && "text-amber-700 dark:text-amber-300"
-                        )}
-                      >
-                        Open
+                      <span className="text-primary shrink-0 text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100">
+                        Open →
                       </span>
                     </button>
                   )

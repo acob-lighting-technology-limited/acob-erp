@@ -9,6 +9,7 @@ import { useState, useEffect } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Download, ExternalLink, X, Loader2 } from "lucide-react"
 import type { FileItem, FileCategory } from "@/lib/onedrive"
 import { FileIcon } from "./file-icon"
@@ -194,15 +195,30 @@ export function FilePreview({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleOpenInOneDrive} title="Open in OneDrive">
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleOpenInOneDrive} aria-label="Open in OneDrive">
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Open in OneDrive</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleDownload} aria-label="Download file">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Download file</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close preview">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Close preview</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </DialogHeader>

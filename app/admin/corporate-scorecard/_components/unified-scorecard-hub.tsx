@@ -60,6 +60,17 @@ export function UnifiedScorecardHub({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
+  function handleDepartmentChange(dept: string) {
+    setSelectedDepartment(dept)
+    const params = new URLSearchParams(searchParams.toString())
+    if (!dept || dept === "all") {
+      params.delete("department")
+    } else {
+      params.set("department", dept)
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   return (
     <>
       {activeTab === "register" && (
@@ -74,6 +85,7 @@ export function UnifiedScorecardHub({
           tabs={SCORECARD_TABS}
           activeTab={activeTab}
           onTabChange={handleTabChange}
+          onDepartmentChange={handleDepartmentChange}
         />
       )}
 

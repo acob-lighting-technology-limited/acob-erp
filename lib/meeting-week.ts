@@ -23,6 +23,26 @@ function getOfficeYearStart(year: number): Date {
   return new Date(year, 0, getAnchorDay(year))
 }
 
+/**
+ * Whole calendar days between two dates, counted from the calendar date
+ * rather than the instant.
+ *
+ * Differencing two Dates in raw milliseconds is wrong across a daylight-saving
+ * boundary: the clock loses or gains an hour, so a span of exactly 203 days
+ * measures 202.96 and Math.floor sends the week number back by one. This
+ * module runs in the browser, so the timezone is the viewer's, not the
+ * server's — Lagos never shifts, but anyone on a device set to a DST zone was
+ * seeing the wrong office week for half the year.
+ *
+ * Date.UTC of the local Y/M/D pins both ends to midnight UTC, which removes
+ * the offset from the subtraction entirely.
+ */
+function wholeDaysBetween(from: Date, to: Date): number {
+  const a = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())
+  const b = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate())
+  return Math.round((b - a) / (24 * 60 * 60 * 1000))
+}
+
 function addDays(date: Date, days: number): Date {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
@@ -32,8 +52,7 @@ function addDays(date: Date, days: number): Date {
 export function getWeeksInOfficeYear(year: number): number {
   const start = getOfficeYearStart(year)
   const nextStart = getOfficeYearStart(year + 1)
-  const diffMs = nextStart.getTime() - start.getTime()
-  return Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))
+  return Math.ceil(wholeDaysBetween(start, nextStart) / 7)
 }
 
 export function getOfficeWeekFromDate(date: Date): { week: number; year: number } {
@@ -46,8 +65,7 @@ export function getOfficeWeekFromDate(date: Date): { week: number; year: number 
     yearStart = getOfficeYearStart(year)
   }
 
-  const diffMs = input.getTime() - yearStart.getTime()
-  const week = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1
+  const week = Math.floor(wholeDaysBetween(yearStart, input) / 7) + 1
 
   return { week, year }
 }
@@ -66,9 +84,7 @@ const REPORTING_ROLLOVER_DAY = 5
 export function getOfficeWeekDay(date: Date = new Date()): number {
   const { week, year } = getOfficeWeekFromDate(date)
   const weekStart = getOfficeWeekMonday(week, year)
-  const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diffDays = Math.round((startOfDay.getTime() - weekStart.getTime()) / (24 * 60 * 60 * 1000))
-  return diffDays + 1
+  return wholeDaysBetween(weekStart, date) + 1
 }
 
 /**

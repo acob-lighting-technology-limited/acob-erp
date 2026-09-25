@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { checkRequestSize } from "@/lib/api/request-size"
@@ -76,7 +77,18 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       return apiError("Task not found", ApiErrorCode.NOT_FOUND, 404)
     }
 
-    return NextResponse.json({ data: task })
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    let projectName: string | null = null
+    if (task.project_id) {
+      const { data: projectRow } = await dataClient
+        .from("projects")
+        .select("project_name")
+        .eq("id", task.project_id)
+        .maybeSingle()
+      projectName = projectRow?.project_name ?? null
+    }
+
+    return NextResponse.json({ data: { ...task, project_name: projectName } })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in task GET")
     return apiError("Failed to fetch task", ApiErrorCode.INTERNAL_ERROR, 500)
@@ -267,7 +279,18 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       }
     }
 
-    return NextResponse.json({ data: updatedTask })
+    let projectName: string | null = null
+    if (updatedTask.project_id) {
+      const dataClient = getServiceRoleClientOrFallback(supabase)
+      const { data: projectRow } = await dataClient
+        .from("projects")
+        .select("project_name")
+        .eq("id", updatedTask.project_id)
+        .maybeSingle()
+      projectName = projectRow?.project_name ?? null
+    }
+
+    return NextResponse.json({ data: { ...updatedTask, project_name: projectName } })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in task PATCH")
     return apiError("Failed to update task", ApiErrorCode.INTERNAL_ERROR, 500)

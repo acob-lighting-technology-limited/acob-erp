@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -730,19 +731,24 @@ export function LeaveDetailDialog({
         <DialogFooter className="bg-muted/20 flex flex-row items-center justify-between gap-2 border-t px-5 py-3 sm:px-6">
           <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
             <span className="hidden sm:inline">Request ID:</span>
-            <button
-              type="button"
-              onClick={() => handleCopy(leave.id, "ID")}
-              className="hover:text-foreground inline-flex items-center gap-1 font-mono transition-colors"
-              title="Click to copy request ID"
-            >
-              <span>{leave.id.slice(0, 8)}...</span>
-              {copiedField === "ID" ? (
-                <Check className="h-3 w-3 text-emerald-600" />
-              ) : (
-                <Copy className="h-3 w-3 opacity-60" />
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(leave.id, "ID")}
+                  className="hover:text-foreground inline-flex items-center gap-1 font-mono transition-colors"
+                  aria-label="Copy request ID"
+                >
+                  <span>{leave.id.slice(0, 8)}...</span>
+                  {copiedField === "ID" ? (
+                    <Check className="h-3 w-3 text-emerald-600" />
+                  ) : (
+                    <Copy className="h-3 w-3 opacity-60" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Click to copy request ID</TooltipContent>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-2">

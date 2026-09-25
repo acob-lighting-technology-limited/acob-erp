@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
-import { TASK_RATING_LABELS, TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
+import { TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import type { Task } from "@/types/task"
 
 /**
@@ -70,10 +70,21 @@ const ORDERED_STATUSES: TaskStatus[] = [
   "cancelled",
 ]
 
-/** "Reject" is the label; `failed` is the stored value. */
 export function statusLabel(status: string): string {
-  if (status === "failed") return "Rejected"
   return TASK_STATUS_CONFIG[status as TaskStatus]?.label ?? status.replaceAll("_", " ")
+}
+
+export function getStatusOptionLabel(value: TaskStatus, currentStatus: TaskStatus): string {
+  if (currentStatus === "submitted_for_review" && value === "in_progress") {
+    return "Return for Changes"
+  }
+  if (currentStatus === "failed" && value === "in_progress") {
+    return "Reopen Task"
+  }
+  if (value === "failed") {
+    return "Mark as Failed"
+  }
+  return statusLabel(value)
 }
 
 export function TaskStatusControl({
@@ -87,7 +98,7 @@ export function TaskStatusControl({
   task: Task
   /** True for a department lead, an admin, or the manager of the task's project. */
   canReview: boolean
-  /** Set when this reviewer may not approve and rate this task (their own task). */
+  /** Set when this reviewer may not approve and rate this task. */
   ratingBlockedReason?: string | null
   onChanged: () => void | Promise<void>
   size?: "default" | "sm"
@@ -104,13 +115,15 @@ export function TaskStatusControl({
   const options = useMemo<StatusOption[]>(() => {
     if (isTerminal) return []
 
-    // When self-rating is blocked, the user is an assignee of this task and
-    // cannot act as its reviewer (they cannot approve, rate, fail, or reassign their own work).
     const effectiveCanReview = canReview && !ratingBlockedReason
     const allowedForEmployee = EMPLOYEE_TRANSITIONS[current] || []
 
     return ORDERED_STATUSES.filter((value) => value !== current)
       .filter((value) => {
+        // If task is failed, only reviewers may reopen to in_progress or reassign/cancel
+        if (current === "failed") {
+          return effectiveCanReview && (value === "in_progress" || value === "reassigned" || value === "cancelled")
+        }
         const reviewerOnly = REVIEWER_ONLY.includes(value)
         if (!effectiveCanReview && (reviewerOnly || !allowedForEmployee.includes(value))) {
           return false
@@ -118,8 +131,14 @@ export function TaskStatusControl({
         return true
       })
       .map((value) => {
+        const isRework = current === "submitted_for_review" && value === "in_progress"
+        const isReopen = current === "failed" && value === "in_progress"
         const requires: StatusOption["requires"] =
-          value === "completed" ? "rating" : value === "failed" || value === "unable_to_complete" ? "reason" : undefined
+          value === "completed"
+            ? "rating"
+            : value === "failed" || value === "unable_to_complete" || isRework || isReopen
+              ? "reason"
+              : undefined
 
         const blockedReason = value === "completed" ? ratingBlockedReason : null
         return { value, blockedReason, requires }
@@ -170,7 +189,7 @@ export function TaskStatusControl({
     <>
       <Select value={current} onValueChange={handleSelect} disabled={isSaving || isTerminal || options.length === 0}>
         <SelectTrigger
-          className={cn(size === "sm" ? "h-8 text-xs" : "h-9 text-sm", "w-full min-w-[9.5rem]", className)}
+          className={cn(size === "sm" ? "h-8 text-xs" : "h-9 text-sm", "w-full min-w-[10.5rem]", className)}
           aria-label="Task status"
         >
           {isSaving ? (
@@ -189,7 +208,7 @@ export function TaskStatusControl({
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value} disabled={Boolean(option.blockedReason)}>
               <span className="flex flex-col">
-                <span>{statusLabel(option.value)}</span>
+                <span>{getStatusOptionLabel(option.value, current)}</span>
                 {option.blockedReason && (
                   <span className="text-muted-foreground text-[11px] leading-tight">{option.blockedReason}</span>
                 )}
@@ -205,12 +224,20 @@ export function TaskStatusControl({
             <DialogTitle>
               {pending?.requires === "rating"
                 ? "Approve and rate"
-                : `Move to ${pending ? statusLabel(pending.value) : ""}`}
+                : current === "submitted_for_review" && pending?.value === "in_progress"
+                  ? "Return for changes"
+                  : current === "failed" && pending?.value === "in_progress"
+                    ? "Reopen task"
+                    : `Move to ${pending ? getStatusOptionLabel(pending.value, current) : ""}`}
             </DialogTitle>
             <DialogDescription>
               {pending?.requires === "rating"
                 ? "Approving a task records how well the work was done. This is what turns its weight into a score."
-                : "A short reason is kept with the task so the decision can be understood later."}
+                : current === "submitted_for_review" && pending?.value === "in_progress"
+                  ? "Send the task back to the employee with instructions for what needs to be corrected."
+                  : current === "failed" && pending?.value === "in_progress"
+                    ? "Reopen this task to in progress so the assignee can continue and submit their work."
+                    : "A short reason is kept with the task so the decision can be understood later."}
             </DialogDescription>
           </DialogHeader>
 
@@ -225,11 +252,10 @@ export function TaskStatusControl({
                       type="button"
                       variant={rating === value ? "default" : "outline"}
                       size="sm"
-                      className="h-auto flex-col gap-0.5 py-2"
+                      className="h-10 w-full min-w-0 text-sm font-semibold"
                       onClick={() => setRating(value)}
                     >
-                      <span className="text-sm font-semibold">{value}</span>
-                      <span className="text-[10px] leading-tight opacity-80">{TASK_RATING_LABELS[value]}</span>
+                      {value}
                     </Button>
                   )
                 )}
@@ -253,7 +279,11 @@ export function TaskStatusControl({
               placeholder={
                 pending?.requires === "rating"
                   ? "Anything worth recording about this work..."
-                  : "Why is this happening?"
+                  : current === "submitted_for_review" && pending?.value === "in_progress"
+                    ? "Specify what changes or corrections are needed..."
+                    : current === "failed" && pending?.value === "in_progress"
+                      ? "Reason for reopening / pardon note..."
+                      : "Why is this happening?"
               }
               className="min-h-[70px] text-xs"
             />

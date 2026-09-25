@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { Repeat } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,23 +19,19 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
-import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toLocalDateTimeInput, toLocalISODate } from "@/lib/utils/date"
 import {
   EVENT_LOCATION_LABELS,
   EVENT_LOCATION_TYPES,
-  EVENT_STATUSES,
-  EVENT_STATUS_LABELS,
   EVENT_TYPES,
   EVENT_TYPE_LABELS,
   EVENT_VISIBILITIES,
   EVENT_VISIBILITY_LABELS,
-  MD_INVOLVEMENTS,
-  MD_INVOLVEMENT_LABELS,
   type CalendarEvent,
   type EventLocationType,
   type EventOptions,
+  type EventRecurrenceFrequency,
   type EventStatus,
   type EventType,
   type EventVisibility,
@@ -62,9 +59,12 @@ type FormState = {
   department_id: string
   md_involvement: MdInvolvement
   organizer_id: string
-  attendee_ids: string[]
-  invite_department_ids: string[]
   description: string
+  // Recurrence (for new events)
+  repeat: EventRecurrenceFrequency
+  repeat_count: number
+  repeat_until: string
+  skip_holidays: boolean
 }
 
 function initialState(event: CalendarEvent | null, defaults?: Partial<FormState>): FormState {
@@ -85,9 +85,12 @@ function initialState(event: CalendarEvent | null, defaults?: Partial<FormState>
       department_id: event.department_id ?? NONE,
       md_involvement: event.md_involvement,
       organizer_id: event.organizer_id ?? NONE,
-      attendee_ids: event.attendees.map((a) => a.profile_id),
-      invite_department_ids: [],
       description: event.description ?? "",
+      repeat: "none",
+      repeat_count: 8,
+      repeat_until: "",
+      skip_holidays: true,
+      ...defaults,
     }
   }
   const start = new Date()
@@ -108,9 +111,11 @@ function initialState(event: CalendarEvent | null, defaults?: Partial<FormState>
     department_id: NONE,
     md_involvement: "none",
     organizer_id: NONE,
-    attendee_ids: [],
-    invite_department_ids: [],
     description: "",
+    repeat: "none",
+    repeat_count: 8,
+    repeat_until: "",
+    skip_holidays: true,
     ...defaults,
   }
 }
@@ -147,7 +152,6 @@ function EventForm({
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
 
   const { capabilities } = options
-  const canSetMd = capabilities.isEventManager || capabilities.canEditMdDesk
 
   const departmentOptions = useMemo(() => {
     const allowed = capabilities.allowedDepartmentIds
@@ -166,6 +170,17 @@ function EventForm({
     [options.rooms]
   )
 
+  const startDayName = useMemo(() => {
+    if (!form.start) return "Monday"
+    try {
+      const d = new Date(form.all_day ? `${form.start}T00:00:00${WAT_OFFSET}` : `${form.start}:00${WAT_OFFSET}`)
+      if (Number.isNaN(d.getTime())) return "Monday"
+      return d.toLocaleDateString("en-US", { weekday: "long", timeZone: "Africa/Lagos" })
+    } catch {
+      return "Monday"
+    }
+  }, [form.start, form.all_day])
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     const range = toIsoRange(form)
@@ -175,6 +190,17 @@ function EventForm({
     }
     setSaving(true)
     try {
+      const isNew = !event
+      const recurrencePayload =
+        isNew && form.repeat !== "none"
+          ? {
+              frequency: form.repeat,
+              count: form.repeat_count,
+              until: form.repeat_until ? form.repeat_until : null,
+              skip_holidays: form.skip_holidays,
+            }
+          : null
+
       const result = await saveEvent(
         {
           type: form.type,
@@ -188,16 +214,22 @@ function EventForm({
           meeting_url: form.meeting_url,
           visibility: form.visibility,
           department_id: form.department_id === NONE ? null : form.department_id,
-          md_involvement: canSetMd ? form.md_involvement : (event?.md_involvement ?? "none"),
+          md_involvement: form.visibility === "private" ? "host" : form.md_involvement,
           status: form.status,
           organizer_id: form.organizer_id === NONE ? null : form.organizer_id,
-          attendee_ids: form.attendee_ids,
-          invite_department_ids: form.invite_department_ids,
+          attendee_ids: event?.attendees.map((a) => a.profile_id) ?? [],
+          invite_department_ids: [],
+          ...(recurrencePayload ? { recurrence: recurrencePayload } : {}),
         },
         event?.id
       )
-      if (result.warning) toast.warning(result.warning)
-      else toast.success(event ? "Event updated" : "Event created")
+      if (result.warning) {
+        toast.warning(result.warning)
+      } else if (result.message) {
+        toast.success(result.message)
+      } else {
+        toast.success(event ? "Event updated" : "Event created")
+      }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.events() })
       onDone()
     } catch (err) {
@@ -215,6 +247,7 @@ function EventForm({
           id="event-title"
           value={form.title}
           onChange={(e) => set("title", e.target.value)}
+          placeholder="e.g. Weekly Operations Sync"
           maxLength={200}
           required
           autoFocus
@@ -238,15 +271,15 @@ function EventForm({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Status</Label>
-          <Select value={form.status} onValueChange={(v) => set("status", v as EventStatus)}>
+          <Label>Format</Label>
+          <Select value={form.location_type} onValueChange={(v) => set("location_type", v as EventLocationType)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {EVENT_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {EVENT_STATUS_LABELS[s]}
+              {EVENT_LOCATION_TYPES.map((l) => (
+                <SelectItem key={l} value={l}>
+                  {EVENT_LOCATION_LABELS[l]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -255,9 +288,12 @@ function EventForm({
       </div>
 
       <div className="flex items-center justify-between rounded-lg border p-3">
-        <Label htmlFor="event-all-day" className="cursor-pointer">
-          All-day event
-        </Label>
+        <div className="space-y-0.5">
+          <Label htmlFor="event-all-day" className="cursor-pointer font-medium">
+            All-day event
+          </Label>
+          <p className="text-muted-foreground text-xs">Event runs the entire day without specific start/end hours.</p>
+        </div>
         <Switch
           id="event-all-day"
           checked={form.all_day}
@@ -296,35 +332,18 @@ function EventForm({
       </div>
       <p className="text-muted-foreground -mt-2 text-xs">Times are West Africa Time (WAT).</p>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {form.location_type !== "virtual" && (
         <div className="space-y-1.5">
-          <Label>Format</Label>
-          <Select value={form.location_type} onValueChange={(v) => set("location_type", v as EventLocationType)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {EVENT_LOCATION_TYPES.map((l) => (
-                <SelectItem key={l} value={l}>
-                  {EVENT_LOCATION_LABELS[l]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Room</Label>
+          <SearchableSelect
+            value={form.room_id}
+            onValueChange={(v) => set("room_id", v || NONE)}
+            options={roomOptions}
+            placeholder="No company room"
+            searchPlaceholder="Search rooms…"
+          />
         </div>
-        {form.location_type !== "virtual" && (
-          <div className="space-y-1.5">
-            <Label>Room</Label>
-            <SearchableSelect
-              value={form.room_id}
-              onValueChange={(v) => set("room_id", v || NONE)}
-              options={roomOptions}
-              placeholder="No company room"
-              searchPlaceholder="Search rooms…"
-            />
-          </div>
-        )}
-      </div>
+      )}
 
       {form.location_type !== "virtual" && (
         <div className="space-y-1.5">
@@ -355,16 +374,7 @@ function EventForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Who can see it</Label>
-          <Select
-            value={form.visibility}
-            onValueChange={(v) =>
-              setForm((f) => ({
-                ...f,
-                visibility: v as EventVisibility,
-                md_involvement: v === "private" && f.md_involvement === "none" ? "host" : f.md_involvement,
-              }))
-            }
-          >
+          <Select value={form.visibility} onValueChange={(v) => set("visibility", v as EventVisibility)}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -395,29 +405,6 @@ function EventForm({
         </div>
       </div>
 
-      {canSetMd && (
-        <div className="space-y-1.5">
-          <Label>MD&apos;s schedule</Label>
-          <Select value={form.md_involvement} onValueChange={(v) => set("md_involvement", v as MdInvolvement)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MD_INVOLVEMENTS.filter((m) => m !== "none" || form.visibility !== "private").map((m) => (
-                <SelectItem key={m} value={m}>
-                  {MD_INVOLVEMENT_LABELS[m]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {form.visibility === "private" && (
-            <p className="text-muted-foreground text-xs">
-              Only the MD, MD&apos;s Desk delegates and invitees see the details. Everyone else sees &ldquo;Busy&rdquo;.
-            </p>
-          )}
-        </div>
-      )}
-
       <div className="space-y-1.5">
         <Label>Organiser (optional)</Label>
         <SearchableSelect
@@ -429,34 +416,77 @@ function EventForm({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label>Invite departments</Label>
-          <SearchableMultiSelect
-            label="Departments"
-            values={form.invite_department_ids}
-            options={options.departments.map((d) => ({ value: d.id, label: d.name }))}
-            onChange={(v) => set("invite_department_ids", v)}
-            placeholder="Add whole departments…"
-            searchPlaceholder="Search departments…"
-          />
+      {!event && (
+        <div className="bg-muted/20 space-y-3 rounded-lg border p-3.5">
+          <div className="flex items-center gap-2">
+            <Repeat className="text-muted-foreground h-4 w-4" />
+            <Label className="font-medium">Recurring Options</Label>
+          </div>
+
+          <div className="space-y-1.5">
+            <Select value={form.repeat} onValueChange={(v) => set("repeat", v as EventRecurrenceFrequency)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Does not repeat</SelectItem>
+                <SelectItem value="weekly">Weekly (every {startDayName})</SelectItem>
+                <SelectItem value="biweekly">Bi-weekly (every 2 weeks on {startDayName})</SelectItem>
+                <SelectItem value="monthly">Monthly (same date each month)</SelectItem>
+                <SelectItem value="daily">Daily (every day)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {form.repeat !== "none" && (
+            <div className="space-y-3 border-t pt-2">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Occurrences</Label>
+                  <Select value={String(form.repeat_count)} onValueChange={(v) => set("repeat_count", Number(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="4">4 occurrences (~1 month)</SelectItem>
+                      <SelectItem value="8">8 occurrences (~2 months)</SelectItem>
+                      <SelectItem value="12">12 occurrences (~1 quarter)</SelectItem>
+                      <SelectItem value="16">16 occurrences (~4 months)</SelectItem>
+                      <SelectItem value="24">24 occurrences (~6 months)</SelectItem>
+                      <SelectItem value="52">52 occurrences (1 year)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="event-repeat-until">Repeat until date (optional)</Label>
+                  <Input
+                    id="event-repeat-until"
+                    type="date"
+                    value={form.repeat_until}
+                    onChange={(e) => set("repeat_until", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-background flex items-center justify-between rounded-md border p-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="event-skip-holidays" className="cursor-pointer text-sm font-medium">
+                    Skip public holidays
+                  </Label>
+                  <p className="text-muted-foreground text-xs">
+                    Occurrences that land on official company holidays are automatically skipped.
+                  </p>
+                </div>
+                <Switch
+                  id="event-skip-holidays"
+                  checked={form.skip_holidays}
+                  onCheckedChange={(checked) => set("skip_holidays", checked)}
+                />
+              </div>
+            </div>
+          )}
         </div>
-        <div className="space-y-1.5">
-          <Label>Invite people</Label>
-          <SearchableMultiSelect
-            label="People"
-            values={form.attendee_ids}
-            options={staffOptions}
-            onChange={(v) => set("attendee_ids", v)}
-            placeholder="Add individuals…"
-            searchPlaceholder="Search staff…"
-          />
-        </div>
-      </div>
-      {form.invite_department_ids.length > 0 && (
-        <p className="text-muted-foreground -mt-2 text-xs">
-          Everyone currently in the selected departments is invited. People who join later are not added.
-        </p>
       )}
 
       <div className="space-y-1.5">

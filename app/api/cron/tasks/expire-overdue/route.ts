@@ -133,13 +133,13 @@ export async function GET(request: NextRequest) {
     const excludedFor = (task: OverdueTaskRow): HolidaySet =>
       nonWorkingDaysFor(holidays, (task.assigned_to && leaveByUser.get(task.assigned_to)) || [])
 
-    const toFail: OverdueTaskRow[] = []
+    const toEscalate: OverdueTaskRow[] = []
     const toWarn: OverdueTaskRow[] = []
     for (const task of overdue) {
       // Grace runs from the deadline, or from the enforcement start date for
       // work that was already late before automatic failing began.
       const anchor = graceStartFor(taskDeadline(task) as string)
-      if (isGraceExhausted(anchor, today, excludedFor(task))) toFail.push(task)
+      if (isGraceExhausted(anchor, today, excludedFor(task))) toEscalate.push(task)
       else toWarn.push(task)
     }
 
@@ -175,54 +175,44 @@ export async function GET(request: NextRequest) {
         message:
           `"${task.title || "Untitled task"}" was due ${deadline} and is still open. ` +
           `Submit it, or have the deadline extended, within ${left} working day${left === 1 ? "" : "s"} ` +
-          `- otherwise it will be recorded as failed. If it is only part done, submit what you have: ` +
-          `rated work earns part of the marks, while an expired task earns none.`,
+          `- otherwise it will be escalated to your lead. If it is only part done, submit what you have: ` +
+          `rated work earns part of the marks, while abandoned work earns none.`,
         priority: "high",
         cooldown: true,
       })
     }
 
-    if (toFail.length > 0) {
-      const now = new Date().toISOString()
-      const { error: updateError } = await supabase
-        .from("tasks")
-        .update({
-          status: "failed",
-          failure_reason: "Deadline passed without completion (recorded automatically)",
-          updated_at: now,
-        })
-        .in(
-          "id",
-          toFail.map((task) => task.id)
-        )
+    // Escalate tasks past grace to the lead / assigner. Tasks are NOT auto-failed;
+    // human supervisors retain authority to extend, reassign, or mark as failed.
+    let escalated = 0
+    for (const task of toEscalate) {
+      const alreadyEscalated = task.assigned_by
+        ? await recentlyNotified(supabase, task.assigned_by, task.id, "task_escalated")
+        : false
 
-      if (updateError) throw updateError
-    }
+      if (!alreadyEscalated) {
+        if (task.assigned_by) {
+          await sendTaskEmail(supabase, {
+            kind: "escalated",
+            taskId: task.id,
+            recipientIds: [task.assigned_by],
+            replyToUserId: task.assigned_to,
+          })
+        }
 
-    // Tell the assignee and whoever set the task. A notification failure must
-    // not undo the expiry that already succeeded, so each one is isolated.
-    let notified = 0
-    for (const task of toFail) {
-      if (task.assigned_to) {
-        await sendTaskEmail(supabase, {
-          kind: "failed",
-          taskId: task.id,
-          recipientIds: [task.assigned_to],
-          replyToUserId: task.assigned_by,
+        escalated += await notifyBoth(supabase, task, {
+          type: "task_escalated",
+          title: "Overdue task escalated",
+          message: `"${task.title || "Untitled task"}" passed its deadline and grace period without completion and has been escalated to the lead for action.`,
+          priority: "high",
+          cooldown: true,
         })
       }
-      notified += await notifyBoth(supabase, task, {
-        type: "task_updated",
-        title: "Task expired",
-        message: `"${task.title || "Untitled task"}" passed its deadline without completion and has been marked as failed.`,
-        priority: "high",
-        cooldown: false,
-      })
     }
 
-    log.info({ expired: toFail.length, notified, warned }, "Overdue tasks processed")
+    log.info({ escalated, warned, totalOverdue: overdue.length }, "Overdue tasks processed")
 
-    return NextResponse.json({ data: { expired: toFail.length, notified, warned } })
+    return NextResponse.json({ data: { escalated, warned, totalOverdue: overdue.length } })
   } catch (error) {
     log.error({ err: String(error) }, "Overdue task expiry failed")
     return NextResponse.json({ error: "Failed to expire overdue tasks" }, { status: 500 })

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Camera, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Dismissal only hides the banner for a day; it returns until a photo is uploaded.
 const DISMISS_KEY = "acob-avatar-banner-dismissed-until"
@@ -97,16 +98,20 @@ export function MissingAvatarBanner({ hasAvatar }: MissingAvatarBannerProps) {
           <Link href="/profile">Upload photo</Link>
         </Button>
       )}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 shrink-0 text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
-        onClick={handleDismiss}
-        aria-label="Remind me tomorrow"
-        title="Remind me tomorrow"
-      >
-        <X className="h-4 w-4" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
+            onClick={handleDismiss}
+            aria-label="Remind me tomorrow"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Remind me tomorrow</TooltipContent>
+      </Tooltip>
     </div>
   )
 }

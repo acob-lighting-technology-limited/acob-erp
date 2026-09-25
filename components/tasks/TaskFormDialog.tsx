@@ -99,6 +99,7 @@ export interface TaskFormState {
 
 // Stable default: a fresh [] each render changes hook deps and can loop effects.
 const EMPTY_GOALS: GoalOption[] = []
+const EMPTY_PROJECTS: ProjectOption[] = []
 
 interface TaskFormDialogProps {
   isOpen: boolean
@@ -111,6 +112,7 @@ interface TaskFormDialogProps {
   scopedAssignableEmployees: employee[]
   scopedAssignableDepartments: string[]
   initialGoals?: GoalOption[]
+  initialProjects?: ProjectOption[]
   assignmentAuthorityLabel?: string
   /** Set when the form is opened from inside a project: the project is fixed. */
   lockedProjectId?: string | null
@@ -131,6 +133,7 @@ export function TaskFormDialog({
   scopedAssignableEmployees,
   scopedAssignableDepartments,
   initialGoals = EMPTY_GOALS,
+  initialProjects = EMPTY_PROJECTS,
   assignmentAuthorityLabel,
   lockedProjectId = null,
   lockedProjectName = null,
@@ -138,7 +141,19 @@ export function TaskFormDialog({
   lockedPlanName = null,
 }: TaskFormDialogProps) {
   const [kpiOptions, setKpiOptions] = useState<KpiOption[]>([])
-  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([])
+  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>(() => {
+    const map = new Map<string, ProjectOption>()
+    for (const p of initialProjects) {
+      map.set(p.id, p)
+    }
+    if (selectedTask?.project_id) {
+      map.set(selectedTask.project_id, {
+        id: selectedTask.project_id,
+        project_name: selectedTask.project_name || "Linked Project",
+      })
+    }
+    return Array.from(map.values())
+  })
   const [isMultiAssign, setIsMultiAssign] = useState(false)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [holidays, setHolidays] = useState<ReadonlySet<string>>(() => new Set())
@@ -302,21 +317,58 @@ export function TaskFormDialog({
     })
   }, [kpiOptions])
 
+  // Keep project options seeded from props and the selected task so the linked project displays immediately
+  useEffect(() => {
+    if (!isOpen) return
+    setProjectOptions((prev) => {
+      const map = new Map<string, ProjectOption>()
+      for (const p of initialProjects) {
+        map.set(p.id, p)
+      }
+      for (const p of prev) {
+        map.set(p.id, p)
+      }
+      if (selectedTask?.project_id) {
+        const existing = map.get(selectedTask.project_id)
+        map.set(selectedTask.project_id, {
+          id: selectedTask.project_id,
+          project_name: selectedTask.project_name || existing?.project_name || "Linked Project",
+        })
+      }
+      return Array.from(map.values())
+    })
+  }, [isOpen, initialProjects, selectedTask?.project_id, selectedTask?.project_name])
+
   // Projects are optional on a task, so a failed load must never block saving.
   useEffect(() => {
     if (!isOpen || lockedProjectId) return
     fetch("/api/projects", { cache: "no-store" })
       .then((res) => res.json())
-      .then((payload) =>
-        setProjectOptions(
-          (payload.data ?? []).map((project: { id: string; project_name: string }) => ({
-            id: project.id,
-            project_name: project.project_name,
-          }))
-        )
-      )
-      .catch(() => setProjectOptions([]))
-  }, [isOpen, lockedProjectId])
+      .then((payload) => {
+        const fetched = (payload.data ?? []).map((project: { id: string; project_name: string }) => ({
+          id: project.id,
+          project_name: project.project_name,
+        }))
+        setProjectOptions((prev) => {
+          const map = new Map<string, ProjectOption>()
+          for (const p of prev) {
+            map.set(p.id, p)
+          }
+          for (const p of fetched) {
+            map.set(p.id, p)
+          }
+          if (selectedTask?.project_id) {
+            const existing = map.get(selectedTask.project_id)
+            map.set(selectedTask.project_id, {
+              id: selectedTask.project_id,
+              project_name: selectedTask.project_name || existing?.project_name || "Linked Project",
+            })
+          }
+          return Array.from(map.values())
+        })
+      })
+      .catch(() => {})
+  }, [isOpen, lockedProjectId, selectedTask?.project_id, selectedTask?.project_name])
 
   const employeeSelectOptions = useMemo(() => {
     return scopedAssignableEmployees.map((member) => ({

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run, parseHttpUrl } from "@/lib/shell/run"
+import { isSafeFormatSelector } from "@/lib/media/temp-files"
 import { readFile, unlink, mkdir, readdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
 import JSZip from "jszip"
-
-const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   const tempDir = path.join(tmpdir(), "batch-downloads")
@@ -48,19 +46,23 @@ export async function POST(request: NextRequest) {
       const url = validUrls[i]
       const outputTemplate = path.join(batchDir, `video_${i + 1}.%(ext)s`)
 
-      try {
-        let command = "yt-dlp"
-        if (format_id) {
-          command += ` -f "${format_id}"`
-        } else {
-          command += ` -f "best"`
-        }
-        command += ` -o "${outputTemplate}" --no-warnings "${url}"`
+      const target = parseHttpUrl(url)
+      if (!target) continue
 
-        await execAsync(command, {
-          maxBuffer: 50 * 1024 * 1024,
-          timeout: 120000,
-        })
+      try {
+        // argv array, so neither the URL nor the format selector is parsed.
+        await run(
+          "yt-dlp",
+          [
+            "-f",
+            isSafeFormatSelector(format_id) ? format_id : "best",
+            "-o",
+            outputTemplate,
+            "--no-warnings",
+            target.toString(),
+          ],
+          { maxBuffer: 50 * 1024 * 1024, timeout: 120000 }
+        )
 
         // Find the downloaded file
         const dirFiles = await readdir(batchDir)

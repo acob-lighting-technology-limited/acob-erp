@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
 import {
   Clock,
@@ -842,7 +842,77 @@ export function AttendanceContent({
             viewToggle
             contactsView
             defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-            stickyToolbar
+            expandable={{
+              render: (row) => {
+                const rowAppeals = appeals
+                  .filter((a) => a.appeal_date === row.date)
+                  .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+                const latestAppeal = rowAppeals[0]
+
+                return (
+                  <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div>
+                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                          Clock In
+                        </span>
+                        <span className="font-mono font-medium">{formatClockTime(row.clock_in)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                          Clock Out
+                        </span>
+                        <span className="font-mono font-medium">{getClockOutLabel(row)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                          Work Hours
+                        </span>
+                        <span className="font-medium">
+                          {row.workHours != null ? `${row.workHours.toFixed(2)} hrs` : "-"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                          Missed Hours
+                        </span>
+                        <span className="font-medium">
+                          {(row.missedHoursValue ?? 0) > 0 ? `${row.missedHoursValue!.toFixed(2)} hrs` : "0.00 hrs"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {latestAppeal ? (
+                      <div className="space-y-2 border-t pt-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground text-[10px] font-semibold uppercase">
+                            Appeal Status:{" "}
+                            <Badge variant="outline" className="ml-1 text-[10px] capitalize">
+                              {latestAppeal.status}
+                            </Badge>
+                          </span>
+                          <span className="text-muted-foreground text-[10px]">
+                            Submitted {formatWATDateTime(latestAppeal.created_at)}
+                          </span>
+                        </div>
+                        <div className="bg-background rounded border p-2.5">
+                          <span className="text-muted-foreground block text-[10px] font-medium">
+                            Your Appeal Reason:
+                          </span>
+                          <p className="mt-0.5 leading-relaxed">{latestAppeal.appeal_reason}</p>
+                        </div>
+                        {latestAppeal.resolution_note && (
+                          <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-900 dark:text-amber-200">
+                            <span className="block font-semibold">Admin Resolution / Note:</span>
+                            <p className="mt-0.5 leading-relaxed">{latestAppeal.resolution_note}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              },
+            }}
             cardRenderer={(row) => {
               const rowAppeals = appeals.filter((a) => a.appeal_date === row.date)
               const pendingAppeal = rowAppeals.find((a) => a.status === "pending")

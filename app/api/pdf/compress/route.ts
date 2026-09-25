@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PDFDocument } from "pdf-lib"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run } from "@/lib/shell/run"
 import { readFile, unlink, writeFile } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
@@ -10,7 +9,6 @@ import { hasBinary } from "@/lib/pdf/binaries"
 import { callDocumentService, isDocumentServiceConfigured } from "@/lib/pdf/document-service"
 import { logger } from "@/lib/logger"
 
-const execAsync = promisify(exec)
 const log = logger("pdf-compress")
 
 export async function POST(request: NextRequest) {
@@ -116,12 +114,29 @@ export async function POST(request: NextRequest) {
         quality = "/prepress"
       }
 
-      const command = `gs -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=${quality} -dColorImageResolution=150 -dGrayImageResolution=150 -dMonoImageResolution=150 -dDownsampleColorImages=true -dDownsampleGrayImages=true -dDownsampleMonoImages=true -dColorImageDownsampleThreshold=1.0 -dGrayImageDownsampleThreshold=1.0 -dMonoImageDownsampleThreshold=1.0 -sOutputFile="${outputFile}" "${tempFile}"`
-
-      console.log("Executing ghostscript compression command:", command)
+      // Arguments as an array: no shell parses these paths.
+      const gsArgs = [
+        "-dNOPAUSE",
+        "-dBATCH",
+        "-dSAFER",
+        "-sDEVICE=pdfwrite",
+        "-dCompatibilityLevel=1.4",
+        `-dPDFSETTINGS=${quality}`,
+        "-dColorImageResolution=150",
+        "-dGrayImageResolution=150",
+        "-dMonoImageResolution=150",
+        "-dDownsampleColorImages=true",
+        "-dDownsampleGrayImages=true",
+        "-dDownsampleMonoImages=true",
+        "-dColorImageDownsampleThreshold=1.0",
+        "-dGrayImageDownsampleThreshold=1.0",
+        "-dMonoImageDownsampleThreshold=1.0",
+        `-sOutputFile=${outputFile}`,
+        tempFile,
+      ]
 
       try {
-        await execAsync(command, {
+        await run("gs", gsArgs, {
           maxBuffer: 50 * 1024 * 1024,
           timeout: 300000,
         })
@@ -131,9 +146,24 @@ export async function POST(request: NextRequest) {
           compressedBytes = new Uint8Array(compressedBuffer)
 
           if (targetSizeBytes && compressedBytes.length > targetSizeBytes) {
-            const aggressiveCommand = `gs -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dColorImageResolution=72 -dGrayImageResolution=72 -dMonoImageResolution=72 -dDownsampleColorImages=true -dDownsampleGrayImages=true -dDownsampleMonoImages=true -sOutputFile="${outputFile}" "${tempFile}"`
+            const aggressiveArgs = [
+              "-dNOPAUSE",
+              "-dBATCH",
+              "-dSAFER",
+              "-sDEVICE=pdfwrite",
+              "-dCompatibilityLevel=1.4",
+              "-dPDFSETTINGS=/screen",
+              "-dColorImageResolution=72",
+              "-dGrayImageResolution=72",
+              "-dMonoImageResolution=72",
+              "-dDownsampleColorImages=true",
+              "-dDownsampleGrayImages=true",
+              "-dDownsampleMonoImages=true",
+              `-sOutputFile=${outputFile}`,
+              tempFile,
+            ]
 
-            await execAsync(aggressiveCommand, {
+            await run("gs", aggressiveArgs, {
               maxBuffer: 50 * 1024 * 1024,
               timeout: 300000,
             })

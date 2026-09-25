@@ -8,7 +8,6 @@ import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  Bell,
   Briefcase,
   CalendarDays,
   ChevronsUpDown,
@@ -24,7 +23,6 @@ import {
   FileBarChart,
   FileCode2,
   Megaphone,
-  Wrench,
   ShieldCheck,
   FlaskConical,
   User,
@@ -60,6 +58,7 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
+import { usePendingRsvpCount } from "@/components/events/use-events"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import {
   canAccessRouteV2,
@@ -177,6 +176,17 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       ],
     },
     {
+      section: "management",
+      name: "Corporate Services",
+      href: `${base}/corporate-services`,
+      icon: Target,
+      roles: [],
+      children: [
+        { name: "Scorecard", href: `${base}/corporate-services/scorecard` },
+        { name: "Risk Register", href: `${base}/corporate-services/risk-register` },
+      ],
+    },
+    {
       section: "operations",
       name: "Tasks",
       href: `${base}/tasks`,
@@ -268,6 +278,7 @@ type NavItem = {
    * available there.
    */
   retargeted?: boolean
+  badge?: number
 }
 
 /**
@@ -380,17 +391,10 @@ const adminNavigation: NavItem[] = [
     href: "/admin/portfolios",
     icon: Layers,
     roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    // Sibling of Portfolios, not a child of it. They are separate consoles with
-    // separate route keys (portfolios.main / projects.main); the old wrapper
-    // listed Portfolios as its own first child, so parent and child led to the
-    // same page.
-    section: "management",
-    name: "Projects",
-    href: "/admin/projects",
-    icon: FolderKanban,
-    roles: ["developer", "super_admin", "admin"],
+    children: [
+      { name: "Portfolios", href: "/admin/portfolios" },
+      { name: "Projects", href: "/admin/projects" },
+    ],
   },
   {
     section: "management",
@@ -489,35 +493,6 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
-    // Sits between Documentation and the compliance block, matching where the
-    // dept shell puts it. Gated by its own feedback.main route key.
-    section: "operations",
-    name: "Feedback",
-    href: "/admin/feedback",
-    icon: MessageSquare,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
-    name: "Tools",
-    href: "/admin/tools",
-    icon: Wrench,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Signature", href: "/admin/tools/signature" },
-      { name: "Signature Anniversary", href: "/admin/tools/signature-anniversary" },
-      { name: "Watermark", href: "/admin/tools/watermark" },
-      { name: "Media & PDF Suite", href: "/admin/tools/media" },
-    ],
-  },
-  {
-    section: "operations",
-    name: "Notifications",
-    href: "/admin/notifications",
-    icon: Bell,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
     section: "compliance",
     name: "System & Security",
     href: "/admin/security",
@@ -599,6 +574,7 @@ export function AdminSidebar({
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
+  const { data: pendingRsvps } = usePendingRsvpCount()
   const supabase = createClient()
 
   // Listen for toggle event from navbar
@@ -750,11 +726,13 @@ export function AdminSidebar({
         const children = filterNavChildren(item.children)
         const selfAllowed = canAccessRoute(item.roles, item.href)
         if (!selfAllowed && !children) return acc
+        const badge = item.href === "/admin/events" && pendingRsvps && pendingRsvps > 0 ? pendingRsvps : undefined
         acc.push({
           ...item,
           href: selfAllowed ? item.href : children![0].href,
           retargeted: !selfAllowed,
           children,
+          badge,
         })
         return acc
       }, [])
@@ -901,7 +879,14 @@ export function AdminSidebar({
                             highlighted ? activeCls : inactiveCls
                           )}
                         >
-                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="relative inline-flex items-center">
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            {isCollapsed && item.badge != null && item.badge > 0 && (
+                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-rose-500 ring-2">
+                                <span className="sr-only">{item.badge} pending</span>
+                              </span>
+                            )}
+                          </span>
                           <span
                             className={cn(
                               "overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-in-out",
@@ -910,11 +895,22 @@ export function AdminSidebar({
                           >
                             {item.name}
                           </span>
+                          {!isCollapsed && item.badge != null && item.badge > 0 && (
+                            <span
+                              className={cn(
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                highlighted ? "bg-primary-foreground text-primary" : "bg-rose-500 text-white"
+                              )}
+                            >
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </span>
+                          )}
                         </Link>
                       </TooltipTrigger>
                       {isCollapsed && (
                         <TooltipContent side="right">
                           {item.description ? `${item.name} — ${item.description}` : item.name}
+                          {item.badge != null && item.badge > 0 && ` (${item.badge} pending)`}
                         </TooltipContent>
                       )}
                     </Tooltip>

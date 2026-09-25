@@ -6,6 +6,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -223,7 +224,13 @@ export function HelpDeskContent({
       accessor: (ticket) => ticket.title,
       render: (ticket) => (
         <div className="flex flex-col">
-          <span className="line-clamp-1 font-medium">{ticket.title}</span>
+          <button
+            type="button"
+            onClick={() => void openTicketDetails(ticket.id)}
+            className="line-clamp-1 text-left font-medium hover:underline focus-visible:outline-none"
+          >
+            {ticket.title}
+          </button>
           <span className="text-muted-foreground text-[10px] uppercase">{ticket.service_department}</span>
         </div>
       ),
@@ -262,20 +269,27 @@ export function HelpDeskContent({
       accessor: (ticket) => ticket.comment_count || 0,
       render: (ticket) =>
         (ticket.comment_count || 0) > 0 ? (
-          <button
-            type="button"
-            className="inline-flex"
-            onClick={(event) => {
-              event.stopPropagation()
-              void openTicketDetails(ticket.id)
-            }}
-            title="View comments"
-          >
-            <Badge variant="outline" className="gap-1 text-xs">
-              <MessageSquare className="h-3 w-3" />
-              {ticket.comment_count}
-            </Badge>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  void openTicketDetails(ticket.id)
+                }}
+                aria-label="View comments"
+              >
+                <Badge variant="outline" className="hover:bg-muted/80 cursor-pointer gap-1 text-xs">
+                  <MessageSquare className="h-3 w-3" />
+                  {ticket.comment_count}
+                </Badge>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              View {ticket.comment_count} comment{ticket.comment_count === 1 ? "" : "s"} & details
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <span className="text-muted-foreground text-xs">-</span>
         ),
@@ -694,6 +708,49 @@ export function HelpDeskContent({
               },
             ],
           },
+        }}
+        expandable={{
+          render: (ticket) => (
+            <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+              <div className="space-y-1.5">
+                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Description</span>
+                <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
+                  {ticket.description || "No description provided."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Service Dept</span>
+                  <span className="font-medium">{ticket.service_department}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Request Type</span>
+                  <span className="font-medium capitalize">{ticket.request_type || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Created</span>
+                  <span className="font-medium">{formatWATDate(ticket.created_at)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Goal</span>
+                  <span className="font-medium">{ticket.goal_title || "—"}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 border-t pt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={() => void openTicketDetails(ticket.id)}
+                >
+                  <Headset className="h-3.5 w-3.5" />
+                  View Full Ticket & Comments {(ticket.comment_count || 0) > 0 ? `(${ticket.comment_count})` : ""}
+                </Button>
+              </div>
+            </div>
+          ),
         }}
         emptyTitle="No tickets"
         emptyDescription="Tickets you raise or are assigned appear here."

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -165,19 +166,26 @@ export function AssetIssuesDialog({
                         : "border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20"
                     }`}
                   >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onToggleIssue(issue)}
-                      className="mt-0.5 h-6 w-6 p-0 hover:bg-transparent"
-                      title={issue.resolved ? "Mark as unresolved" : "Mark as resolved"}
-                    >
-                      {issue.resolved ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-orange-500" />
-                      )}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onToggleIssue(issue)}
+                          className="mt-0.5 h-6 w-6 p-0 hover:bg-transparent"
+                          aria-label={issue.resolved ? "Mark as unresolved" : "Mark as resolved"}
+                        >
+                          {issue.resolved ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <div className="h-5 w-5 rounded-full border-2 border-orange-500" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        {issue.resolved ? "Mark as unresolved" : "Mark as resolved"}
+                      </TooltipContent>
+                    </Tooltip>
                     <div className="min-w-0 flex-1">
                       <p
                         className={`text-sm ${
@@ -202,15 +210,20 @@ export function AssetIssuesDialog({
                         )}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDeleteIssue(issue.id)}
-                      className="h-7 w-7 p-0 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
-                      title="Delete issue"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDeleteIssue(issue.id)}
+                          className="h-7 w-7 p-0 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                          aria-label="Delete issue"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Delete issue</TooltipContent>
+                    </Tooltip>
                   </div>
                 ))
               )}

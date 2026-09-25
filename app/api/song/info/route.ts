@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
-
-const execAsync = promisify(exec)
+import { run, parseHttpUrl } from "@/lib/shell/run"
 
 const MUSIC_PLATFORMS: Record<string, string> = {
   // Spotify
@@ -114,14 +111,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use yt-dlp to extract info
-    const command = `yt-dlp -J --no-warnings "${url}"`
+    // Validated before it reaches the downloader: yt-dlp would otherwise
+    // accept a file:// path or an internal address.
+    const target = parseHttpUrl(url)
+    if (!target) {
+      return NextResponse.json({ error: "Enter a valid http(s) link." }, { status: 400 })
+    }
 
     let stdout: string
     let stderr: string
 
     try {
-      const result = await execAsync(command, {
+      const result = await run("yt-dlp", ["-J", "--no-warnings", target.toString()], {
         maxBuffer: 10 * 1024 * 1024,
         timeout: 30000,
       })
@@ -220,11 +221,11 @@ export async function POST(request: NextRequest) {
         trackCount = info.entries.length
       } else if (info._type === "playlist") {
         try {
-          const playlistCommand = `yt-dlp --flat-playlist -J --no-warnings "${url}"`
-          const { stdout: playlistStdout } = await execAsync(playlistCommand, {
-            maxBuffer: 20 * 1024 * 1024,
-            timeout: 60000,
-          })
+          const { stdout: playlistStdout } = await run(
+            "yt-dlp",
+            ["--flat-playlist", "-J", "--no-warnings", target.toString()],
+            { maxBuffer: 20 * 1024 * 1024, timeout: 60000 }
+          )
           const playlistInfo = JSON.parse(playlistStdout)
           if (playlistInfo.entries) {
             tracks = playlistInfo.entries.slice(0, 100).map((entry: any, index: number) => ({

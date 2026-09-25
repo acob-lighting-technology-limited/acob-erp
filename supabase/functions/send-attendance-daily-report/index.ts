@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { sendEmail } from "../_shared/email.ts"
+import { isEdgeSystemEmailEnabled } from "../_shared/notification-gateway.ts"
 import { EDGE_MAIL_ROUTING, EDGE_SENDERS } from "../_shared/senders.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!

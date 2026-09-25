@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatWATDate, formatWATTime } from "@/lib/utils/date"
@@ -303,15 +304,20 @@ export function LunchMenuViewersDialog({
 
                   {/* Override Action */}
                   {onOverrideVote && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-muted-foreground hover:text-foreground h-7 px-2 text-[11px]"
-                      onClick={() => onOverrideVote(row.id)}
-                      title="Change or set this employee's answer"
-                    >
-                      Override
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-muted-foreground hover:text-foreground h-7 px-2 text-[11px]"
+                          onClick={() => onOverrideVote(row.id)}
+                          aria-label="Change or set this employee's answer"
+                        >
+                          Override
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{"Change or set this employee's answer"}</TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               </div>

@@ -1,11 +1,12 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
-import { MessageSquare, AlertCircle, Clock, XCircle, Eye, ShieldCheck, Mail, UserCog } from "lucide-react"
+import { MessageSquare, AlertCircle, Clock, XCircle, Eye, ShieldCheck, Mail, UserCog, Star } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -264,6 +265,16 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
       description="Centralized portal for managing employee concerns, suggestions and system praise."
       icon={MessageSquare}
       backLink={{ href: "/admin", label: "Back to Admin" }}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+            <Link href="/admin/feedback/surveys">
+              <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+              Satisfaction Surveys
+            </Link>
+          </Button>
+        </div>
+      }
       tabs={hasLeadFeedback ? tabs : undefined}
       activeTab={hasLeadFeedback ? activeTab : undefined}
       onTabChange={(tab) => setActiveTab(tab as "general" | "leads")}

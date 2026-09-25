@@ -26,6 +26,7 @@ export type TaskEmailKind =
   | "due_soon"
   | "needs_rating"
   | "overdue"
+  | "escalated"
   | "failed"
 
 interface TaskEmailInput {
@@ -168,9 +169,20 @@ function buildContent(
         heading: "Your task is past its deadline",
         intro:
           `It is still open, and you have ${days} working day${days === 1 ? "" : "s"} to act. ` +
-          `After ${actBy} it is recorded as failed, which scores zero at full weight. ` +
-          "If it is only part done, submit what you have - rated work still earns marks, an expired task earns none.",
+          `After ${actBy} it will be escalated to your department lead for action. ` +
+          "If it is only part done, submit what you have - rated work still earns marks, while abandoned work earns none.",
         ctaLabel: "Open my tasks",
+        ctaPath: "/tasks",
+      }
+    }
+    case "escalated": {
+      return {
+        subject: `Task past deadline escalated: ${title}`,
+        heading: "An overdue task requires your action",
+        intro:
+          `${assignee || "The assignee"} has not submitted this task and the grace period has expired. ` +
+          "As department lead, please review this task to extend the deadline, reassign it, or mark it as failed.",
+        ctaLabel: "Review task",
         ctaPath: "/tasks",
       }
     }

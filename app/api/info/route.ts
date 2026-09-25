@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
-
-const execAsync = promisify(exec)
+import { run, parseHttpUrl } from "@/lib/shell/run"
 
 const SUPPORTED_PLATFORMS: Record<string, string> = {
   // Video Platforms
@@ -75,15 +72,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 })
     }
 
+    // Validated before it reaches the downloader: yt-dlp will happily take a
+    // file:// path or an internal address otherwise.
+    const target = parseHttpUrl(url)
+    if (!target) {
+      return NextResponse.json({ error: "Enter a valid http(s) link." }, { status: 400 })
+    }
+
     // Get platform name (or use 'Unknown' if not in our list - yt-dlp might still support it)
     const platform = getPlatform(url) || "Unknown"
 
-    // Use yt-dlp to extract video info
-    const command = `yt-dlp -J --no-warnings "${url}"`
-
-    const { stdout, stderr } = await execAsync(command, {
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      timeout: 30000, // 30 second timeout
+    // Arguments as an array, so nothing in the URL can be read as shell.
+    const { stdout, stderr } = await run("yt-dlp", ["-J", "--no-warnings", target.toString()], {
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 30000,
     })
 
     if (stderr && !stdout) {

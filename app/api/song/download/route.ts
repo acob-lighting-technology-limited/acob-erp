@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run, parseHttpUrl } from "@/lib/shell/run"
+import { findNewestFile } from "@/lib/media/temp-files"
 import { readFile, unlink, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
-
-const execAsync = promisify(exec)
 
 const DRM_PROTECTED_PLATFORMS = [
   "spotify.com",
@@ -38,6 +36,11 @@ export async function POST(request: NextRequest) {
 
     if (!url) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 })
+    }
+
+    const target = parseHttpUrl(url)
+    if (!target) {
+      return NextResponse.json({ error: "Enter a valid http(s) link." }, { status: 400 })
     }
 
     if (isDRMProtected(url)) {
@@ -84,11 +87,14 @@ export async function POST(request: NextRequest) {
     let songTitle = title || "song"
     let songArtist = artist || "Unknown"
     try {
-      const infoCommand = `yt-dlp -J --no-warnings "${url}"`
-      const { stdout: infoStdout, stderr: infoStderr } = await execAsync(infoCommand, {
-        maxBuffer: 10 * 1024 * 1024,
-        timeout: 30000,
-      })
+      const { stdout: infoStdout, stderr: infoStderr } = await run(
+        "yt-dlp",
+        ["-J", "--no-warnings", target.toString()],
+        {
+          maxBuffer: 10 * 1024 * 1024,
+          timeout: 30000,
+        }
+      )
 
       if (infoStderr && (infoStderr.includes("[DRM]") || infoStderr.includes("DRM protection"))) {
         const urlObj = new URL(url)
@@ -166,7 +172,8 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     let outputTemplate = path.join(tempDir, `${sanitizedArtist}_${sanitizedTitle}_${timestamp}.%(ext)s`)
 
-    let command = "yt-dlp"
+    // argv array, so nothing in the URL or the title-derived path is parsed.
+    const ytdlpArgs: string[] = []
     let audioBitrate = "0" // Default to best quality
 
     if (format_id && format_id.startsWith("audio_mp3_")) {
@@ -180,18 +187,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    command += ` -x --audio-format mp3 --audio-quality ${audioBitrate}`
+    ytdlpArgs.push("-x", "--audio-format", "mp3", "--audio-quality", audioBitrate)
     outputTemplate = path.join(tempDir, `${sanitizedArtist}_${sanitizedTitle}_${timestamp}.mp3`)
-
-    command += ` -o "${outputTemplate}" --no-warnings "${url}"`
-
-    console.log("Executing command:", command)
+    ytdlpArgs.push("-o", outputTemplate, "--no-warnings", target.toString())
 
     let stdout: string
     let stderr: string
 
     try {
-      const result = await execAsync(command, {
+      const result = await run("yt-dlp", ytdlpArgs, {
         maxBuffer: 50 * 1024 * 1024,
         timeout: 120000,
       })
@@ -259,27 +263,15 @@ export async function POST(request: NextRequest) {
 
     await new Promise((resolve) => setTimeout(resolve, 500))
 
-    try {
-      const { stdout: listStdout } = await execAsync(`ls -t "${tempDir}"/*${timestamp}* 2>/dev/null | head -1`)
-      tempFile = listStdout.trim()
-    } catch (e) {
-      try {
-        const { stdout: mp3Stdout } = await execAsync(
-          `find "${tempDir}" -name "*.mp3" -type f -mmin -2 2>/dev/null | head -1`
-        )
-        tempFile = mp3Stdout.trim()
-      } catch (e2) {
-        try {
-          const { stdout: anyMp3 } = await execAsync(`ls -t "${tempDir}"/*.mp3 2>/dev/null | head -1`)
-          tempFile = anyMp3.trim()
-        } catch (e3) {}
-      }
-    }
+    tempFile =
+      (await findNewestFile(tempDir, { contains: String(timestamp) })) ??
+      (await findNewestFile(tempDir, { extensions: [".mp3"], withinMs: 2 * 60 * 1000 })) ??
+      (await findNewestFile(tempDir, { extensions: [".mp3"] }))
 
     if (!tempFile || !existsSync(tempFile)) {
       let ffmpegInstalled = false
       try {
-        await execAsync("which ffmpeg")
+        await run("which", ["ffmpeg"])
         ffmpegInstalled = true
       } catch (e) {}
 

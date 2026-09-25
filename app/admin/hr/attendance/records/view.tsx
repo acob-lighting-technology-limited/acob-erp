@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Dialog,
   DialogContent,
@@ -322,13 +323,23 @@ export function AdminAttendanceRecordsPage({
       render: (r) => (
         <div className="flex items-center gap-1">
           {r.source === "remote_web" && (
-            <Button variant="ghost" size="sm" onClick={() => setEvidenceRecord(r)} title="View Evidence">
-              <Camera className="h-3 w-3" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={() => setEvidenceRecord(r)} aria-label="View Evidence">
+                  <Camera className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">View Evidence</TooltipContent>
+            </Tooltip>
           )}
-          <Button variant="ghost" size="sm" onClick={() => openEdit(r)}>
-            <Pencil className="h-3 w-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="sm" onClick={() => openEdit(r)} aria-label="Edit record">
+                <Pencil className="h-3 w-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Edit record</TooltipContent>
+          </Tooltip>
         </div>
       ),
       align: "center",

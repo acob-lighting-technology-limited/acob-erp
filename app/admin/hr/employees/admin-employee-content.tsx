@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
@@ -787,24 +788,34 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         hideOnMobile: true,
         render: (r) => (
           <div className="flex flex-col gap-1 text-sm">
-            <button
-              type="button"
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-left"
-              onClick={() => void handleCopyEmail(r.company_email)}
-              title="Click to copy email"
-            >
-              <Mail className="h-3.5 w-3.5 shrink-0" />
-              <span className="max-w-[180px] truncate">{r.company_email}</span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-left"
+                  onClick={() => void handleCopyEmail(r.company_email)}
+                  aria-label="Copy email"
+                >
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <span className="max-w-[180px] truncate">{r.company_email}</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Click to copy email</TooltipContent>
+            </Tooltip>
             {r.additional_email && (
-              <button
-                type="button"
-                className="text-muted-foreground/80 hover:text-foreground ml-5 max-w-[180px] truncate text-left text-xs"
-                onClick={() => void handleCopyEmail(r.additional_email || "")}
-                title="Click to copy additional email"
-              >
-                {r.additional_email}
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-muted-foreground/80 hover:text-foreground ml-5 max-w-[180px] truncate text-left text-xs"
+                    onClick={() => void handleCopyEmail(r.additional_email || "")}
+                    aria-label="Copy additional email"
+                  >
+                    {r.additional_email}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Click to copy additional email</TooltipContent>
+              </Tooltip>
             )}
           </div>
         ),
@@ -888,35 +899,50 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Action",
         render: (r) => (
           <div className="flex items-center justify-end gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => void handleViewEmployeeDetails(r)}
-              title="View Profile"
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => void handleViewEmployeeDetails(r)}
+                  aria-label="View Profile"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">View Profile</TooltipContent>
+            </Tooltip>
             {canManageUsers && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => void handleEditEmployee(r)}
-                title="Edit Employee"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => void handleEditEmployee(r)}
+                    aria-label="Edit Employee"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Edit Employee</TooltipContent>
+              </Tooltip>
             )}
             {canManageUsers && (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" title="More Actions">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More Actions">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">More Actions</TooltipContent>
+                </Tooltip>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setDispatchingEmployee(r)}>
                     <Mail className="text-primary mr-2 h-4 w-4" />
@@ -1292,25 +1318,35 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               <div className="text-muted-foreground space-y-1.5 pt-2 text-xs">
                 <div className="flex items-center gap-2">
                   <Mail className="h-3.5 w-3.5" />
-                  <button
-                    type="button"
-                    className="hover:text-foreground truncate text-left"
-                    onClick={() => void handleCopyEmail(r.company_email)}
-                    title="Click to copy email"
-                  >
-                    {r.company_email}
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="hover:text-foreground truncate text-left"
+                        onClick={() => void handleCopyEmail(r.company_email)}
+                        aria-label="Copy email"
+                      >
+                        {r.company_email}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Click to copy email</TooltipContent>
+                  </Tooltip>
                 </div>
                 {r.additional_email && (
                   <div className="ml-[22px]">
-                    <button
-                      type="button"
-                      className="hover:text-foreground truncate text-left text-[11px]"
-                      onClick={() => void handleCopyEmail(r.additional_email || "")}
-                      title="Click to copy additional email"
-                    >
-                      {r.additional_email}
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="hover:text-foreground truncate text-left text-[11px]"
+                          onClick={() => void handleCopyEmail(r.additional_email || "")}
+                          aria-label="Copy additional email"
+                        >
+                          {r.additional_email}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Click to copy additional email</TooltipContent>
+                    </Tooltip>
                   </div>
                 )}
                 {r.phone_number && (

@@ -32,8 +32,15 @@ async function getFeedbackData() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
 
+  const { data: survey } = await supabase
+    .from("system_satisfaction_surveys")
+    .select("*")
+    .eq("user_id", user.id)
+    .maybeSingle()
+
   return {
     userFeedback: feedback || [],
+    userSurvey: survey || null,
   }
 }
 
@@ -44,7 +51,10 @@ export default async function FeedbackPage() {
     redirect(data.redirect)
   }
 
-  const feedbackData = data as { userFeedback: Feedback[] }
+  const feedbackData = data as {
+    userFeedback: Feedback[]
+    userSurvey: import("@/types/survey").SystemSatisfactionSurvey | null
+  }
 
-  return <FeedbackContent initialFeedback={feedbackData.userFeedback} />
+  return <FeedbackContent initialFeedback={feedbackData.userFeedback} initialSurvey={feedbackData.userSurvey} />
 }

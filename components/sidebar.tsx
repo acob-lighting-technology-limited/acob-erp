@@ -54,6 +54,7 @@ import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
+import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
 
 interface SidebarProps {
@@ -93,6 +94,7 @@ type NavItemDef = {
    * showing the link to ordinary staff is a guaranteed dead end.
    */
   adminOnly?: boolean
+  badge?: number
 }
 type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
 
@@ -151,11 +153,15 @@ const navigationSections: NavSectionDef[] = [
           { name: "Assets", href: "/accounts/assets" },
         ],
       },
-      { name: "Portfolios", href: "/portfolios", icon: Layers },
-      // Sibling of Portfolios, not a child of it. The old wrapper listed
-      // Portfolios as its own first child, so parent and child led to the
-      // same page.
-      { name: "Projects", href: "/projects", icon: FolderKanban },
+      {
+        name: "Portfolios",
+        href: "/portfolios",
+        icon: Layers,
+        children: [
+          { name: "Portfolios", href: "/portfolios" },
+          { name: "Projects", href: "/projects" },
+        ],
+      },
     ],
   },
   {
@@ -234,6 +240,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
+  const calendarBadge = useCalendarBadgeCount()
 
   useEffect(() => {
     const handleToggle = (e: Event) => {
@@ -350,7 +357,14 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
   const visibleSections: NavSectionDef[] = navigationSections.map((section) => {
-    const items = section.items.filter((item) => !item.adminOnly || canAccessAdmin)
+    const items = section.items
+      .filter((item) => !item.adminOnly || canAccessAdmin)
+      .map((item) => {
+        if (item.href === "/calendar" && calendarBadge > 0) {
+          return { ...item, badge: calendarBadge }
+        }
+        return item
+      })
     const withMdDesk = showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items
     return {
       ...section,
@@ -432,13 +446,33 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                             highlighted ? activeCls : inactiveCls
                           )}
                         >
-                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="relative inline-flex items-center">
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            {isCollapsed && item.badge != null && item.badge > 0 && (
+                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-emerald-500 ring-2">
+                                <span className="sr-only">{item.badge} unviewed</span>
+                              </span>
+                            )}
+                          </span>
                           <span className={labelCls}>{item.name}</span>
+                          {!isCollapsed && item.badge != null && item.badge > 0 && (
+                            <span
+                              className={cn(
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                highlighted
+                                  ? "bg-primary-foreground text-primary"
+                                  : "bg-emerald-600 text-white dark:bg-emerald-500"
+                              )}
+                            >
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </span>
+                          )}
                         </Link>
                       </TooltipTrigger>
                       {isCollapsed && (
                         <TooltipContent side="right">
                           {item.description ? `${item.name} — ${item.description}` : item.name}
+                          {item.badge != null && item.badge > 0 && ` (${item.badge} unviewed)`}
                         </TooltipContent>
                       )}
                     </Tooltip>

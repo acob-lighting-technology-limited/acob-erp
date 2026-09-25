@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { exec } from "child_process"
-import { promisify } from "util"
+import { run, parseHttpUrl } from "@/lib/shell/run"
+import { findNewestFile, isSafeFormatSelector } from "@/lib/media/temp-files"
 import { readFile, unlink, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
-
-const execAsync = promisify(exec)
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -19,6 +17,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 })
     }
 
+    const target = parseHttpUrl(url)
+    if (!target) {
+      return NextResponse.json({ error: "Enter a valid http(s) link." }, { status: 400 })
+    }
+
     // Create a temporary directory for downloads
     const tempDir = path.join(tmpdir(), "video-downloads")
     if (!existsSync(tempDir)) {
@@ -28,8 +31,7 @@ export async function POST(request: NextRequest) {
     // Get video info first to get proper title
     let videoTitle = title || "video"
     try {
-      const infoCommand = `yt-dlp -J --no-warnings "${url}"`
-      const { stdout: infoStdout } = await execAsync(infoCommand, {
+      const { stdout: infoStdout } = await run("yt-dlp", ["-J", "--no-warnings", target.toString()], {
         maxBuffer: 10 * 1024 * 1024,
         timeout: 30000,
       })
@@ -52,8 +54,9 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     let outputTemplate = path.join(tempDir, `${sanitizedTitle}_${timestamp}.%(ext)s`)
 
-    // Build yt-dlp command
-    let command = "yt-dlp"
+    // Built as an argv array: no shell, so neither the URL nor the format
+    // selector nor the title-derived output path is ever parsed as syntax.
+    const ytdlpArgs: string[] = []
     let isAudio = false
     let audioBitrate = "0" // Default to best quality
     let sanitizedTitleForAudio = sanitizedTitle // Default to same as video
@@ -76,82 +79,37 @@ export async function POST(request: NextRequest) {
         .substring(0, 100)
         .trim()
       outputTemplate = path.join(tempDir, `${sanitizedTitleForAudio}_${timestamp}.%(ext)s`)
-      command += ` -x --audio-format mp3 --audio-quality ${audioBitrate}`
-    } else if (format_id) {
-      command += ` -f "${format_id}"`
+      ytdlpArgs.push("-x", "--audio-format", "mp3", "--audio-quality", audioBitrate)
+    } else if (isSafeFormatSelector(format_id)) {
+      ytdlpArgs.push("-f", format_id)
     } else {
-      command += ` -f "best"`
+      ytdlpArgs.push("-f", "best")
     }
 
-    command += ` -o "${outputTemplate}" --no-warnings "${url}"`
+    ytdlpArgs.push("-o", outputTemplate, "--no-warnings", target.toString())
 
-    console.log("Executing command:", command)
-
-    // Execute download
-    const { stdout, stderr } = await execAsync(command, {
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
-      timeout: 120000, // 2 minute timeout
+    await run("yt-dlp", ytdlpArgs, {
+      maxBuffer: 50 * 1024 * 1024,
+      timeout: 120000,
     })
 
-    console.log("Download stdout:", stdout)
-    if (stderr) {
-      console.log("Download stderr:", stderr)
-    }
+    // Find the downloaded file. yt-dlp picks the final extension itself, so
+    // the name is not known ahead of time — narrow by the timestamp stamped
+    // into the output template, then by the expected media extensions.
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
-    // Find the downloaded file
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      // List all files in temp directory and find the most recent one matching our pattern
-      try {
-        const { stdout: listStdout } = await execAsync(`ls -t "${tempDir}"/*${timestamp}* 2>/dev/null | head -1`)
-        tempFile = listStdout.trim()
-      } catch (e) {
-        // Continue
-      }
-
-      if (!tempFile || !existsSync(tempFile)) {
-        if (isAudio) {
-          try {
-            const { stdout: mp3Stdout } = await execAsync(
-              `find "${tempDir}" -name "*.mp3" -type f -mmin -2 2>/dev/null | head -1`
-            )
-            tempFile = mp3Stdout.trim()
-          } catch (e) {
-            try {
-              const { stdout: anyMp3 } = await execAsync(`ls -t "${tempDir}"/*.mp3 2>/dev/null | head -1`)
-              tempFile = anyMp3.trim()
-            } catch (e2) {}
-          }
-        } else {
-          try {
-            const { stdout: videoStdout } = await execAsync(
-              `find "${tempDir}" -type f \\( -name "*.mp4" -o -name "*.webm" -o -name "*.mkv" \\) -mmin -2 2>/dev/null | head -1`
-            )
-            tempFile = videoStdout.trim()
-          } catch (e) {
-            try {
-              const { stdout: anyVideo } = await execAsync(`ls -t "${tempDir}"/*.{mp4,webm,mkv} 2>/dev/null | head -1`)
-              tempFile = anyVideo.trim()
-            } catch (e2) {}
-          }
-        }
-      }
-
-      if (!tempFile || !existsSync(tempFile)) {
-        try {
-          const { stdout: recentStdout } = await execAsync(`ls -t "${tempDir}"/* 2>/dev/null | head -1`)
-          tempFile = recentStdout.trim()
-        } catch (e) {}
-      }
-    } catch (err) {
-      console.error("Error finding downloaded file:", err)
-    }
+    tempFile =
+      (await findNewestFile(tempDir, { contains: String(timestamp) })) ??
+      (await findNewestFile(tempDir, {
+        extensions: isAudio ? [".mp3"] : [".mp4", ".webm", ".mkv"],
+        withinMs: 2 * 60 * 1000,
+      })) ??
+      (await findNewestFile(tempDir))
 
     if (!tempFile || !existsSync(tempFile)) {
       let ffmpegInstalled = false
       try {
-        await execAsync("which ffmpeg")
+        await run("which", ["ffmpeg"])
         ffmpegInstalled = true
       } catch (e) {}
 

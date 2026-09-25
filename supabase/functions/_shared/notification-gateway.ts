@@ -29,6 +29,8 @@ export type NotificationKey =
   | "payroll"
   | "attendance"
   | "birthdays"
+  | "correspondence"
+  | "payments"
 
 interface SendEdgeNotificationEmailInput {
   to: Array<string | null | undefined>

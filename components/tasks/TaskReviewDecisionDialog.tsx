@@ -15,13 +15,7 @@ import type { Task } from "@/types/task"
 import { apiFetch } from "@/lib/api-client"
 import { formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
-import {
-  TASK_RATING_LABELS,
-  TASK_RATING_MAX,
-  TASK_RATING_MIN,
-  TASK_WEIGHT_DEFAULT,
-  isValidRating,
-} from "@/lib/tasks/scoring"
+import { TASK_RATING_MAX, TASK_RATING_MIN, TASK_WEIGHT_DEFAULT, isValidRating } from "@/lib/tasks/scoring"
 
 export interface TaskReviewEmployee {
   id: string
@@ -40,7 +34,7 @@ interface TaskReviewDecisionDialogProps {
   onSuccess: () => void
 }
 
-type DecisionId = "approve" | "rework" | "reassign" | "fail" | "extend"
+type DecisionId = "approve" | "rework" | "reassign" | "fail" | "extend" | "reopen"
 
 const DECISIONS: Array<{
   id: DecisionId
@@ -55,25 +49,25 @@ const DECISIONS: Array<{
     id: "approve",
     label: "Approve & Complete",
     description: "Accept the work and rate it — this is what turns its weight into a score.",
-    unavailableReason: "Only work that has been submitted can be approved.",
+    unavailableReason: "Requires submission",
     icon: CheckCircle2,
     className: "border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400",
-    available: (task) => task.status === "submitted_for_review",
+    available: (task) => ["submitted_for_review", "in_progress", "pending", "unable_to_complete"].includes(task.status),
   },
   {
     id: "rework",
     label: "Return for Changes",
     description: "Send it back to the assignee with instructions. Still open, not yet scored.",
-    unavailableReason: "There is nothing to return until the work is submitted or reported blocked.",
+    unavailableReason: "Requires submission",
     icon: RotateCcw,
     className: "border-purple-500/30 text-purple-700 hover:bg-purple-500/10 dark:text-purple-400",
-    available: (task) => ["submitted_for_review", "unable_to_complete", "in_progress"].includes(task.status),
+    available: (task) => ["submitted_for_review", "unable_to_complete"].includes(task.status),
   },
   {
     id: "reassign",
     label: "Reassign",
     description: "Move the work to someone else. Neutral for the original assignee's score.",
-    unavailableReason: "This task is already closed.",
+    unavailableReason: "Task closed",
     icon: UserCheck,
     className: "border-sky-500/30 text-sky-700 hover:bg-sky-500/10 dark:text-sky-400",
     available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
@@ -82,19 +76,28 @@ const DECISIONS: Array<{
     id: "extend",
     label: "Extend Deadline",
     description: "Give more time, with a reason kept on the task.",
-    unavailableReason: "This task is already closed.",
+    unavailableReason: "Task closed",
     icon: Calendar,
     className: "border-blue-500/30 text-blue-700 hover:bg-blue-500/10 dark:text-blue-400",
     available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
   },
   {
+    id: "reopen",
+    label: "Reopen / Pardon",
+    description: "Reopen a previously failed task back to in-progress with an updated deadline.",
+    unavailableReason: "Only failed tasks",
+    icon: RotateCcw,
+    className: "border-amber-500/30 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400",
+    available: (task) => task.status === "failed",
+  },
+  {
     id: "fail",
-    label: "Reject",
-    description: "Terminal. The task scores zero at its full weight.",
-    unavailableReason: "This task is already closed.",
+    label: "Mark as Failed",
+    description: "Terminal write-off. The task scores zero at its full weight.",
+    unavailableReason: "Task closed",
     icon: XCircle,
     className: "border-rose-500/30 text-rose-700 hover:bg-rose-500/10 dark:text-rose-400",
-    available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
+    available: (task) => !["completed", "reassigned", "cancelled", "failed"].includes(task.status),
   },
 ]
 
@@ -172,9 +175,9 @@ export function TaskReviewDecisionDialog({
       } else if (actionType === "fail") {
         payload = {
           status: "failed",
-          reason: comment || "Rejected by lead/admin",
+          reason: comment || "Marked as failed by lead/admin",
         }
-      } else if (actionType === "extend") {
+      } else if (actionType === "extend" || actionType === "reopen") {
         if (!newDueDate) {
           toast.error("Please specify a new due date")
           setIsSubmitting(false)
@@ -183,7 +186,8 @@ export function TaskReviewDecisionDialog({
         payload = {
           status: "in_progress",
           due_date: newDueDate,
-          extension_reason: comment || "Deadline extended by lead/admin",
+          extension_reason:
+            comment || (actionType === "reopen" ? "Reopened by lead/admin" : "Deadline extended by lead/admin"),
         }
       }
 
@@ -217,7 +221,7 @@ export function TaskReviewDecisionDialog({
         onOpenChange(v)
       }}
     >
-      <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
+      <DialogContent className="flex max-h-[90vh] min-h-[min(540px,85vh)] w-[95vw] max-w-xl flex-col overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Task Review & Governance</DialogTitle>
           <DialogDescription>Review task status, grant approvals, reassign, or extend timelines.</DialogDescription>
@@ -281,20 +285,14 @@ export function TaskReviewDecisionDialog({
                 <SelectValue placeholder="Select a decision..." />
               </SelectTrigger>
               <SelectContent>
-                {DECISIONS.map((decision) => {
-                  const blockedReason =
-                    decision.id === "approve" && ratingBlockedReason
-                      ? ratingBlockedReason
-                      : decision.available(task)
-                        ? null
-                        : decision.unavailableReason
-                  return (
-                    <SelectItem key={decision.id} value={decision.id} disabled={Boolean(blockedReason)}>
-                      {decision.label}
-                      {blockedReason ? ` (${blockedReason})` : ""}
-                    </SelectItem>
-                  )
-                })}
+                {DECISIONS.filter((decision) => {
+                  if (decision.id === "approve" && ratingBlockedReason) return false
+                  return decision.available(task)
+                }).map((decision) => (
+                  <SelectItem key={decision.id} value={decision.id}>
+                    {decision.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {actionType && (
@@ -319,9 +317,11 @@ export function TaskReviewDecisionDialog({
                 </div>
               )}
 
-              {(actionType === "extend" || actionType === "reassign") && (
+              {(actionType === "extend" || actionType === "reassign" || actionType === "reopen") && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">New Due Date {actionType === "extend" && "*"}</Label>
+                  <Label className="text-xs font-medium">
+                    New Due Date {(actionType === "extend" || actionType === "reopen") && "*"}
+                  </Label>
                   <Input
                     type="date"
                     value={newDueDate}
@@ -334,7 +334,7 @@ export function TaskReviewDecisionDialog({
               {actionType === "approve" && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium">Performance Rating *</Label>
-                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-5">
+                  <div className="grid grid-cols-5 gap-1.5">
                     {Array.from({ length: TASK_RATING_MAX - TASK_RATING_MIN + 1 }, (_, i) => TASK_RATING_MIN + i).map(
                       (value) => (
                         <Button
@@ -342,13 +342,10 @@ export function TaskReviewDecisionDialog({
                           type="button"
                           variant={rating === value ? "default" : "outline"}
                           size="sm"
-                          className="h-auto w-full min-w-0 flex-col gap-0.5 px-1 py-2 text-center whitespace-normal"
+                          className="h-10 w-full min-w-0 text-sm font-semibold"
                           onClick={() => setRating(value)}
                         >
-                          <span className="text-sm font-semibold">{value}</span>
-                          <span className="w-full text-[10px] leading-tight text-balance opacity-80">
-                            {TASK_RATING_LABELS[value]}
-                          </span>
+                          {value}
                         </Button>
                       )
                     )}

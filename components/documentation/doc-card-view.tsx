@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Eye, Edit2, Trash2, Tag, Paperclip } from "lucide-react"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { Documentation } from "@/app/(app)/documentation/page"
@@ -59,36 +60,48 @@ export function DocCardView({ docs, formatDate, onView, onEdit, onDelete }: DocC
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onView(doc)}
-                className="h-9 w-9 p-0"
-                title="View document"
-                aria-label="View document"
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onEdit(doc)}
-                className="h-9 w-9 p-0"
-                title="Edit document"
-                aria-label="Edit document"
-              >
-                <Edit2 className="h-4 w-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onDelete(doc)}
-                className="h-9 w-9 p-0 text-red-600 hover:text-red-700"
-                title="Delete document"
-                aria-label="Delete document"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onView(doc)}
+                    className="h-9 w-9 p-0"
+                    aria-label="View document"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">View document</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onEdit(doc)}
+                    className="h-9 w-9 p-0"
+                    aria-label="Edit document"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Edit document</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onDelete(doc)}
+                    className="h-9 w-9 p-0 text-red-600 hover:text-red-700"
+                    aria-label="Delete document"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Delete document</TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>

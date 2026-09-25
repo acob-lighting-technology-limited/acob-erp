@@ -324,6 +324,26 @@ export default function PeerFeedbackPage() {
               </div>
             </div>
           )}
+          expandable={{
+            render: (f) => (
+              <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+                <div className="space-y-1">
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                    Feedback Comments
+                  </span>
+                  <p className="bg-background rounded border p-2.5 leading-relaxed">
+                    {f.comments || "No comments left."}
+                  </p>
+                </div>
+                <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[10px]">
+                  <span>
+                    Submitted to {formatName(f.subject)} ({f.subject?.department || "—"})
+                  </span>
+                  <span>{new Date(f.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ),
+          }}
           urlSync
         />
       ) : (
@@ -386,6 +406,45 @@ export default function PeerFeedbackPage() {
               </div>
             </div>
           )}
+          expandable={{
+            render: (f) => (
+              <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div>
+                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                      Collaboration
+                    </span>
+                    <span className="font-medium">{f.collaboration !== null ? `${f.collaboration}%` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Teamwork</span>
+                    <span className="font-medium">{f.teamwork !== null ? `${f.teamwork}%` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                      Communication
+                    </span>
+                    <span className="font-medium">{f.communication !== null ? `${f.communication}%` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                      Professionalism
+                    </span>
+                    <span className="font-medium">{f.professionalism !== null ? `${f.professionalism}%` : "—"}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1 border-t pt-3">
+                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                    Qualitative Feedback
+                  </span>
+                  <p className="bg-background rounded border p-2.5 leading-relaxed">
+                    {f.comments || "No written comments provided."}
+                  </p>
+                </div>
+              </div>
+            ),
+          }}
           urlSync
         />
       )}
