@@ -66,13 +66,18 @@ export type CycleAnchoredTask = {
 /**
  * The date that decides which review cycle a task belongs to.
  *
- * Its deadline — task_end_date, falling back to due_date, and to the creation
- * date only when a task carries no deadline at all. Anchoring on the completion
- * date instead would let late work quietly migrate into the next cycle and
- * leave the cycle it was actually owed in looking better than it was.
+ * Its deadline — due_date or task_end_date (using the later date if both exist),
+ * falling back to the creation date only when a task carries no deadline at all.
+ * Anchoring on the completion date instead would let late work quietly migrate into
+ * the next cycle and leave the cycle it was actually owed in looking better than it was.
  */
 export function taskCycleAnchor(task: CycleAnchoredTask): string | null {
-  const anchor = task.task_end_date || task.due_date || task.created_at
+  if (task.due_date && task.task_end_date) {
+    const due = String(task.due_date).slice(0, 10)
+    const end = String(task.task_end_date).slice(0, 10)
+    return due > end ? due : end
+  }
+  const anchor = task.due_date || task.task_end_date || task.created_at
   return anchor ? anchor.slice(0, 10) : null
 }
 

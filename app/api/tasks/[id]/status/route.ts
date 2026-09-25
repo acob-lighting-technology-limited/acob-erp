@@ -274,6 +274,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         )
       }
       updatePayload.due_date = parsed.data.due_date
+      updatePayload.task_end_date = parsed.data.due_date
       if (parsed.data.extension_reason) {
         updatePayload.extension_reason = parsed.data.extension_reason
       }
