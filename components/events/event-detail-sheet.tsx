@@ -62,7 +62,10 @@ export function EventDetailSheet({
       await respondToEvent(event.id, rsvp)
       setLocalRsvp({ id: event.id, rsvp })
       toast.success(`Response saved: ${EVENT_RSVP_LABELS[rsvp]}`)
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.events() })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.events() }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingRsvpCount() }),
+      ])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save your response")
     } finally {

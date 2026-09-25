@@ -54,6 +54,7 @@ import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
+import { usePendingRsvpCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
 
 interface SidebarProps {
@@ -93,6 +94,7 @@ type NavItemDef = {
    * showing the link to ordinary staff is a guaranteed dead end.
    */
   adminOnly?: boolean
+  badge?: number
 }
 type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
 
@@ -238,6 +240,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
+  const { data: pendingRsvps } = usePendingRsvpCount()
 
   useEffect(() => {
     const handleToggle = (e: Event) => {
@@ -354,7 +357,14 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
   const visibleSections: NavSectionDef[] = navigationSections.map((section) => {
-    const items = section.items.filter((item) => !item.adminOnly || canAccessAdmin)
+    const items = section.items
+      .filter((item) => !item.adminOnly || canAccessAdmin)
+      .map((item) => {
+        if (item.href === "/calendar" && pendingRsvps && pendingRsvps > 0) {
+          return { ...item, badge: pendingRsvps }
+        }
+        return item
+      })
     const withMdDesk = showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items
     return {
       ...section,
@@ -436,13 +446,31 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                             highlighted ? activeCls : inactiveCls
                           )}
                         >
-                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="relative inline-flex items-center">
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            {isCollapsed && item.badge != null && item.badge > 0 && (
+                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-rose-500 ring-2">
+                                <span className="sr-only">{item.badge} pending</span>
+                              </span>
+                            )}
+                          </span>
                           <span className={labelCls}>{item.name}</span>
+                          {!isCollapsed && item.badge != null && item.badge > 0 && (
+                            <span
+                              className={cn(
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                highlighted ? "bg-primary-foreground text-primary" : "bg-rose-500 text-white"
+                              )}
+                            >
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </span>
+                          )}
                         </Link>
                       </TooltipTrigger>
                       {isCollapsed && (
                         <TooltipContent side="right">
                           {item.description ? `${item.name} — ${item.description}` : item.name}
+                          {item.badge != null && item.badge > 0 && ` (${item.badge} pending)`}
                         </TooltipContent>
                       )}
                     </Tooltip>

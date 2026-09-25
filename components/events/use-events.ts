@@ -39,6 +39,20 @@ export function useEventOptions() {
   })
 }
 
+export function usePendingRsvpCount() {
+  return useQuery({
+    queryKey: QUERY_KEYS.pendingRsvpCount(),
+    queryFn: async (): Promise<number> => {
+      const res = await apiFetch("/api/events/pending-rsvp", { cache: "no-store" })
+      if (!res.ok) return 0
+      const body = (await res.json().catch(() => null)) as { count?: number } | null
+      return body?.count ?? 0
+    },
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  })
+}
+
 export async function saveEvent(
   payload: unknown,
   id?: string

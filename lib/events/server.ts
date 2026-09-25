@@ -245,6 +245,27 @@ export async function loadEvents(
   return { events, busy: (busyRes.data ?? []) as BusyBlock[] }
 }
 
+/**
+ * Count of upcoming scheduled events where the current user is an invitee
+ * and has not responded yet (rsvp = "pending").
+ */
+export async function loadPendingRsvpCount(session: EventsSession): Promise<number> {
+  const now = new Date().toISOString()
+  const { data, error } = await session.supabase
+    .from("event_attendees")
+    .select("id, events!inner(id)")
+    .eq("profile_id", session.userId)
+    .eq("rsvp", "pending")
+    .eq("events.status", "scheduled")
+    .gt("events.end_at", now)
+
+  if (error) {
+    log.error({ err: error.message }, "Failed to count pending RSVPs")
+    return 0
+  }
+  return data?.length ?? 0
+}
+
 export async function loadEventCapabilities(session: EventsSession): Promise<EventCapabilities> {
   const { supabase, userId } = session
   const [manager, mdDesk, create, profile] = await Promise.all([

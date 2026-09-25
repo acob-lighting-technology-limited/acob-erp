@@ -58,6 +58,7 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
+import { usePendingRsvpCount } from "@/components/events/use-events"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import {
   canAccessRouteV2,
@@ -277,6 +278,7 @@ type NavItem = {
    * available there.
    */
   retargeted?: boolean
+  badge?: number
 }
 
 /**
@@ -572,6 +574,7 @@ export function AdminSidebar({
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
+  const { data: pendingRsvps } = usePendingRsvpCount()
   const supabase = createClient()
 
   // Listen for toggle event from navbar
@@ -723,11 +726,13 @@ export function AdminSidebar({
         const children = filterNavChildren(item.children)
         const selfAllowed = canAccessRoute(item.roles, item.href)
         if (!selfAllowed && !children) return acc
+        const badge = item.href === "/admin/events" && pendingRsvps && pendingRsvps > 0 ? pendingRsvps : undefined
         acc.push({
           ...item,
           href: selfAllowed ? item.href : children![0].href,
           retargeted: !selfAllowed,
           children,
+          badge,
         })
         return acc
       }, [])
@@ -874,7 +879,14 @@ export function AdminSidebar({
                             highlighted ? activeCls : inactiveCls
                           )}
                         >
-                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="relative inline-flex items-center">
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            {isCollapsed && item.badge != null && item.badge > 0 && (
+                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-rose-500 ring-2">
+                                <span className="sr-only">{item.badge} pending</span>
+                              </span>
+                            )}
+                          </span>
                           <span
                             className={cn(
                               "overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-300 ease-in-out",
@@ -883,11 +895,22 @@ export function AdminSidebar({
                           >
                             {item.name}
                           </span>
+                          {!isCollapsed && item.badge != null && item.badge > 0 && (
+                            <span
+                              className={cn(
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                highlighted ? "bg-primary-foreground text-primary" : "bg-rose-500 text-white"
+                              )}
+                            >
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </span>
+                          )}
                         </Link>
                       </TooltipTrigger>
                       {isCollapsed && (
                         <TooltipContent side="right">
                           {item.description ? `${item.name} — ${item.description}` : item.name}
+                          {item.badge != null && item.badge > 0 && ` (${item.badge} pending)`}
                         </TooltipContent>
                       )}
                     </Tooltip>
