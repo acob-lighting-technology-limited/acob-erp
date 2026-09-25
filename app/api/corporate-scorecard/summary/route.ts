@@ -25,6 +25,7 @@ type AssignmentRow = {
     strategic_objective: string
     measure_type: MeasureType
     direction: Direction
+    target_text: string | null
   } | null
 }
 
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     .from("kpi_assignments")
     .select(
       `kpi_id, department, role, target_value,
-       corporate_kpis!inner ( perspective, strategic_objective, measure_type, direction )`
+       corporate_kpis!inner ( perspective, strategic_objective, measure_type, direction, target_text )`
     )
     .eq("role", "core")
     .eq("corporate_kpis.is_archived", false)
@@ -148,6 +149,7 @@ export async function GET(request: NextRequest) {
       measureType: kpi.measure_type,
       direction: kpi.direction,
       targetValue: row.target_value,
+      targetText: kpi.target_text,
       actualValue: resolved.effectiveActual,
       milestonesCompleted: resolved.effectiveMilestonesCompleted,
       milestonesTotal: resolved.effectiveMilestonesTotal,
@@ -171,21 +173,22 @@ export async function GET(request: NextRequest) {
   )
   const companyPct = averageCappedPct(perspectives.map((p) => p.attainmentPct))
 
-  const byDepartment = new Map<string, number[]>()
+  const byDepartment = new Map<string, { attained: number[]; recordedCount: number }>()
   for (const row of perKpiRows) {
-    const bucket = byDepartment.get(row.department) || []
-    if (row.cappedPct != null) bucket.push(row.cappedPct)
+    const bucket = byDepartment.get(row.department) || { attained: [], recordedCount: 0 }
+    if (row.cappedPct != null) bucket.attained.push(row.cappedPct)
+    if (row.hasData) bucket.recordedCount += 1
     byDepartment.set(row.department, bucket)
   }
 
   const departments = Array.from(byDepartment.entries())
-    .map(([department, values]) => {
-      const attainmentPct = averageCappedPct(values)
+    .map(([department, stat]) => {
+      const attainmentPct = averageCappedPct(stat.attained)
       return {
         department,
         attainmentPct,
         status: attainmentPct != null ? ragStatus(attainmentPct) : null,
-        recordedKpiCount: values.length,
+        recordedKpiCount: Math.max(stat.recordedCount, stat.attained.length),
         coreKpiCount: rows.filter((r) => r.department === department).length,
       }
     })

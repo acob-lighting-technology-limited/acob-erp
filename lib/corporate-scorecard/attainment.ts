@@ -29,6 +29,7 @@ export type AttainmentInput = {
   measureType: MeasureType
   direction: Direction
   targetValue: number | null
+  targetText?: string | null
   actualValue: number | null
   milestonesCompleted: number | null
   milestonesTotal: number | null
@@ -39,6 +40,79 @@ export type Attainment = {
   rawPct: number | null
   /** rawPct capped at 100, for use in any rollup average. */
   cappedPct: number | null
+}
+
+/**
+ * Extracts a numeric target value and unit from human-written KPI target text.
+ * e.g. "At least 6 EPC projects completed by 31/12/2026" -> { targetValue: 6, unit: "projects" }
+ *      "100% compliance with..." -> { targetValue: 100, unit: "%" }
+ *      "At least $5 million..." -> { targetValue: 5, unit: "million" }
+ *      "At least 1,000 units..." -> { targetValue: 1000, unit: "units" }
+ */
+export function extractTargetValueFromText(
+  targetText: string | null | undefined,
+  measureType: MeasureType
+): { targetValue: number | null; unit: string | null } {
+  if (!targetText || !targetText.trim()) {
+    if (measureType === "percentage") return { targetValue: 100, unit: "%" }
+    if (measureType === "milestone") return { targetValue: 3, unit: "milestones" }
+    return { targetValue: null, unit: null }
+  }
+
+  const clean = targetText.trim()
+
+  // 1. Currency patterns like "₦27.2 billion", "$5 million", "₦8 billion"
+  const billMatch = clean.match(/(?:[₦$]|NGN|USD)?\s*([0-9]+(?:\.[0-9]+)?)\s*billion/i)
+  if (billMatch) {
+    return { targetValue: Number(billMatch[1]), unit: "billion" }
+  }
+
+  const millMatch = clean.match(/(?:[₦$]|NGN|USD)?\s*([0-9]+(?:\.[0-9]+)?)\s*million/i)
+  if (millMatch) {
+    return { targetValue: Number(millMatch[1]), unit: "million" }
+  }
+
+  // 2. Percentage patterns like "98%", "100%", "70%", "3.5%"
+  const pctMatches = Array.from(clean.matchAll(/([0-9]+(?:\.[0-9]+)?)\s*%/g))
+  if (pctMatches.length > 0) {
+    const lastVal = Number(pctMatches[pctMatches.length - 1][1])
+    return { targetValue: lastVal, unit: "%" }
+  }
+  if (measureType === "percentage") {
+    return { targetValue: 100, unit: "%" }
+  }
+
+  // 3. Milestones like "All 3 milestones"
+  const msMatch = clean.match(/([0-9]+)\s*milestone/i)
+  if (msMatch) {
+    return { targetValue: Number(msMatch[1]), unit: "milestones" }
+  }
+  if (measureType === "milestone") {
+    return { targetValue: 3, unit: "milestones" }
+  }
+
+  // 4. Remove dates like 31/12/2026, 2026, Q3 so we don't accidentally treat a year/date as a target
+  const withoutDates = clean
+    .replace(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/g, "")
+    .replace(/\b202[0-9]\b/g, "")
+    .replace(/\bQ[1-4]\b/g, "")
+
+  // Check for "Both X"
+  if (/^Both\b/i.test(withoutDates)) {
+    return { targetValue: 2, unit: null }
+  }
+
+  // Comma-separated or regular integer / float
+  const numMatch = withoutDates.match(/(?:at least|minimum of)?\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+(?:\.[0-9]+)?)/i)
+  if (numMatch) {
+    const rawNum = numMatch[1].replace(/,/g, "")
+    const val = Number(rawNum)
+    if (!isNaN(val) && val > 0) {
+      return { targetValue: val, unit: null }
+    }
+  }
+
+  return { targetValue: null, unit: null }
 }
 
 /**
@@ -53,14 +127,28 @@ export function computeAttainment(input: AttainmentInput): Attainment {
   const empty: Attainment = { rawPct: null, cappedPct: null }
 
   if (input.measureType === "milestone") {
-    const total = input.milestonesTotal
+    let total = input.milestonesTotal
+    if (!total || total <= 0) {
+      if (input.targetText) {
+        total = extractTargetValueFromText(input.targetText, "milestone").targetValue || 3
+      } else {
+        total = 3
+      }
+    }
     const completed = input.milestonesCompleted
-    if (!total || total <= 0 || completed == null) return empty
+    if (completed == null) return empty
     const raw = (completed / total) * 100
     return { rawPct: round(raw), cappedPct: round(Math.min(100, raw)) }
   }
 
-  const target = input.targetValue
+  let target = input.targetValue
+  if (target == null && input.targetText) {
+    target = extractTargetValueFromText(input.targetText, input.measureType).targetValue
+  }
+  if (target == null && input.measureType === "percentage") {
+    target = 100
+  }
+
   const actual = input.actualValue
   if (target == null || target <= 0 || actual == null) return empty
 

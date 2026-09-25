@@ -185,6 +185,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
         measureType: kpi.measure_type,
         direction: kpi.direction,
         targetValue: a.target_value,
+        targetText: kpi.target_text,
         actualValue: resolved.effectiveActual,
         milestonesCompleted: resolved.effectiveMilestonesCompleted,
         milestonesTotal: resolved.effectiveMilestonesTotal,
