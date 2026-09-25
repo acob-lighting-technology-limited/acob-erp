@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const now = new Date()
     const year = String(now.getUTCFullYear())
     const month = String(now.getUTCMonth() + 1).padStart(2, "0")
-    const basePath = `/hr/leave/${year}/${month}`
+    const basePath = `/leave/${year}/${month}`
 
     try {
       await onedrive.createFolder(basePath)
