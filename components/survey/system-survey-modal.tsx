@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Star, ShieldCheck, EyeOff, Check, Loader2 } from "lucide-react"
+import { Star, ShieldCheck, EyeOff, Check, Loader2, ClipboardList } from "lucide-react"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -179,7 +179,7 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
         <DialogHeader>
           <div className="flex items-center gap-2">
             <span className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-lg">
-              <Star className="fill-primary text-primary h-4 w-4" />
+              <ClipboardList className="text-primary h-4 w-4" />
             </span>
             <div>
               <DialogTitle className="text-lg">

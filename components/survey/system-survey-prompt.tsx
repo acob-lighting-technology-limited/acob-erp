@@ -1,6 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { ClipboardList } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { SystemSurveyModal } from "./system-survey-modal"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
@@ -8,13 +18,14 @@ import { logger } from "@/lib/logger"
 const log = logger("system-survey-prompt")
 
 export function SystemSurveyPrompt() {
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isPromptOpen, setIsPromptOpen] = useState(false)
+  const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
 
-    // Clear any previous snooze key so prompt shows immediately on every reload
+    // Clear legacy snooze storage
     try {
       window.localStorage.removeItem("acob-survey-snooze-until")
     } catch {
@@ -35,10 +46,10 @@ export function SystemSurveyPrompt() {
           return
         }
 
-        // User hasn't submitted: immediately show centered popup modal
-        setIsModalOpen(true)
+        // Show the compact centered invitation popup on reload
+        setIsPromptOpen(true)
       } catch (err) {
-        log.error({ err: String(err) }, "Failed to verify survey status")
+        log.error({ err: String(err) }, "Failed to check survey status")
       }
     }
 
@@ -48,17 +59,59 @@ export function SystemSurveyPrompt() {
     }
   }, [])
 
-  const handleClose = () => {
-    setIsModalOpen(false)
+  const handleStartSurvey = () => {
+    setIsPromptOpen(false)
+    setIsSurveyModalOpen(true)
   }
 
   const handleSurveySuccess = () => {
-    setIsModalOpen(false)
+    setIsSurveyModalOpen(false)
   }
 
   if (!isMounted) {
     return null
   }
 
-  return <SystemSurveyModal isOpen={isModalOpen} onClose={handleClose} onSuccess={handleSurveySuccess} />
+  return (
+    <>
+      {/* Step 1: Compact Centered Invitation Dialog */}
+      <Dialog open={isPromptOpen} onOpenChange={setIsPromptOpen}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader className="gap-3 text-left">
+            <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-xl">
+              <ClipboardList className="text-primary h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <DialogTitle className="text-base font-semibold">How is your ERP experience?</DialogTitle>
+              <DialogDescription className="text-muted-foreground text-xs leading-relaxed">
+                Help us evaluate system usability, speed, and features with a quick 2-minute pulse check.
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+
+          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPromptOpen(false)}
+              className="h-8 text-xs"
+            >
+              Cancel
+            </Button>
+            <Button type="button" size="sm" onClick={handleStartSurvey} className="h-8 text-xs">
+              Start Survey
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Step 2: Full Questionnaire Modal (Only opened after clicking Start Survey) */}
+      <SystemSurveyModal
+        isOpen={isSurveyModalOpen}
+        onClose={() => setIsSurveyModalOpen(false)}
+        onSuccess={handleSurveySuccess}
+      />
+    </>
+  )
 }
