@@ -441,6 +441,7 @@ const adminNavigation: NavItem[] = [
         name: "General Meeting",
         href: "/admin/reports/general-meeting",
         children: [
+          { name: "Attendance", href: "/admin/reports/general-meeting/attendance" },
           { name: "Action Tracker", href: "/admin/reports/general-meeting/action-tracker" },
           { name: "Challenges", href: "/admin/reports/general-meeting/challenges" },
           { name: "KSS", href: "/admin/reports/general-meeting/kss" },

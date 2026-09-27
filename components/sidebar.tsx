@@ -179,6 +179,7 @@ const navigationSections: NavSectionDef[] = [
             name: "General Meeting",
             href: "/reports/general-meeting",
             children: [
+              { name: "Attendance", href: "/reports/general-meeting/attendance" },
               { name: "Action Tracker", href: "/reports/general-meeting/action-tracker" },
               { name: "Challenges", href: "/reports/general-meeting/challenges" },
               { name: "KSS", href: "/reports/general-meeting/kss" },
