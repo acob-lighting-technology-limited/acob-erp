@@ -22,6 +22,7 @@ import {
 import { Pencil, Mail, Phone, Cake, Home, Camera, Trash2, Loader2 } from "lucide-react"
 import { formatName, cn } from "@/lib/utils"
 import { formatWATDate, formatBirthdayLabel, toLocalISODate, formatDDMMYYYY } from "@/lib/utils/date"
+import { isWeekend } from "@/lib/hr/attendance-utils"
 import { getRoleBadgeColor, getRoleDisplayName } from "@/lib/permissions"
 import { apiFetch } from "@/lib/api-client"
 import type { UserRole } from "@/types/database"
@@ -49,34 +50,55 @@ interface ProfileHeroProps {
   }
   avatarUrl?: string | null
   attendance: AttendanceItem[]
+  todayStatus?: { status: string; clock_in?: string | null } | null
   onAvatarChange?: (url: string | null) => void
   onEdit: () => void
 }
 
 const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
   present: "Present",
+  early: "Early",
   late: "Late",
   lateness_with_permission: "Late (Excused)",
   incomplete_with_permission: "Incomplete (Excused)",
+  early_departure_with_permission: "Early Departure (Excused)",
+  early_departure: "Left Early",
+  early_closure: "Early Closure",
+  late_resumption: "Late Resumption",
   absent: "Absent",
   absent_with_permission: "Absent (Excused)",
   on_leave: "On Leave",
   out_of_station: "Out of Station",
   incomplete: "Clocked In",
   waiver: "Waived",
+  weekend: "Weekend",
+  holiday: "Holiday",
+  exempted: "Exempted",
+  lwop: "Leave Without Pay",
+  not_clocked_in: "Not clocked in",
 }
 
 const ATTENDANCE_DOT_COLORS: Record<string, string> = {
   present: "bg-green-500",
+  early: "bg-green-500",
   late: "bg-amber-500",
   lateness_with_permission: "bg-amber-500",
   incomplete_with_permission: "bg-emerald-500",
+  early_departure_with_permission: "bg-emerald-500",
+  early_departure: "bg-orange-500",
+  early_closure: "bg-blue-500",
+  late_resumption: "bg-sky-500",
   absent: "bg-red-500",
   absent_with_permission: "bg-amber-500",
-  on_leave: "bg-blue-500",
-  out_of_station: "bg-blue-500",
+  on_leave: "bg-purple-500",
+  out_of_station: "bg-indigo-500",
   incomplete: "bg-green-500",
   waiver: "bg-muted-foreground",
+  weekend: "bg-slate-400 dark:bg-slate-500",
+  holiday: "bg-sky-500",
+  exempted: "bg-violet-500",
+  lwop: "bg-rose-500",
+  not_clocked_in: "bg-muted-foreground",
 }
 
 function getInitials(firstName?: string | null, lastName?: string | null): string {
@@ -101,13 +123,22 @@ function getTenureLabel(employmentDate?: string | null): string | null {
   return months > 0 ? `${years}y ${months}mo` : `${years}y`
 }
 
-function AttendanceChip({ attendance }: { attendance: AttendanceItem[] }) {
+function AttendanceChip({
+  attendance,
+  todayStatus,
+}: {
+  attendance: AttendanceItem[]
+  todayStatus?: { status: string; clock_in?: string | null } | null
+}) {
   const todayIso = toLocalISODate()
   const today = attendance.find((record) => record.date === todayIso) || null
 
-  const label = today ? (ATTENDANCE_STATUS_LABELS[today.status] ?? today.status) : "Not clocked in"
-  const dotColor = today ? (ATTENDANCE_DOT_COLORS[today.status] ?? "bg-muted-foreground") : "bg-muted-foreground"
-  const clockIn = today?.clock_in ? String(today.clock_in).slice(0, 5) : null
+  const status =
+    todayStatus?.status ?? (today?.clock_in ? today.status : isWeekend(todayIso) ? "weekend" : "not_clocked_in")
+  const clockIn = todayStatus?.clock_in ?? (today?.clock_in ? String(today.clock_in).slice(0, 5) : null)
+
+  const label = ATTENDANCE_STATUS_LABELS[status] ?? status
+  const dotColor = ATTENDANCE_DOT_COLORS[status] ?? "bg-muted-foreground"
 
   return (
     <Tooltip>
@@ -129,7 +160,7 @@ function AttendanceChip({ attendance }: { attendance: AttendanceItem[] }) {
   )
 }
 
-export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, onEdit }: ProfileHeroProps) {
+export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAvatarChange, onEdit }: ProfileHeroProps) {
   const fullName = [formatName(profile.first_name), formatName(profile.other_names), formatName(profile.last_name)]
     .filter(Boolean)
     .join(" ")
@@ -340,7 +371,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
 
           {/* Bottom actions & status bar */}
           <div className="border-border/40 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5">
-            <AttendanceChip attendance={attendance} />
+            <AttendanceChip attendance={attendance} todayStatus={todayStatus} />
             <Button onClick={onEdit} variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
               <Pencil className="h-3 w-3" />
               Edit Profile
@@ -418,7 +449,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, onAvatarChange, on
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <AttendanceChip attendance={attendance} />
+            <AttendanceChip attendance={attendance} todayStatus={todayStatus} />
             <Button onClick={onEdit} variant="outline" size="sm" className="gap-1.5">
               <Pencil className="h-3 w-3" />
               Edit Profile

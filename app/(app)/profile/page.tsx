@@ -8,10 +8,18 @@ import { getAvatarSignedUrl } from "@/lib/profile-photos"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import type { Task, TaskUserProfile } from "@/types/task"
+import { loadDayContext } from "@/lib/hr/attendance-day-context"
+import { loadAttendancePolicy, toLocalISODate, isWeekend } from "@/lib/hr/attendance-utils"
+import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 
 export const dynamic = "force-dynamic"
 
 export type { Task }
+
+export interface TodayAttendanceStatus {
+  status: string
+  clock_in?: string | null
+}
 
 export interface UserProfile {
   id: string
@@ -36,6 +44,7 @@ export interface UserProfile {
   additional_email?: string | null
   birthday?: string | null
   avatar_path?: string | null
+  attendance_exempt?: boolean | null
 }
 
 export interface Asset {
@@ -402,6 +411,53 @@ async function getProfileData() {
     .returns<AttendanceItem[]>()
   if (attendanceError) loadErrors.push("attendance")
 
+  const todayIso = toLocalISODate()
+  const todayRecord = (attendanceData || []).find((r) => r.date === todayIso) ?? null
+
+  const [dayCtx, policy] = await Promise.all([
+    loadDayContext(dataClient, { userIds: [userId], start: todayIso, end: todayIso }),
+    loadAttendancePolicy(dataClient),
+  ])
+
+  let derivedTodayStatus: string = "not_clocked_in"
+  let todayClockIn: string | null = null
+
+  if (todayRecord?.clock_in) {
+    todayClockIn = todayRecord.clock_in
+    derivedTodayStatus = deriveUnifiedAttendanceStatus(
+      {
+        record: todayRecord,
+        isHoliday: dayCtx.isHoliday(todayIso),
+        isOnLeave: dayCtx.isOnLeave(userId, todayIso),
+        isOnUnpaidLeave: dayCtx.isOnUnpaidLeave(userId, todayIso),
+        isExempted: Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, todayIso),
+        recordDate: todayIso,
+        earlyClosure: dayCtx.earlyCloseTime(todayIso) ? { closeTime: dayCtx.earlyCloseTime(todayIso)! } : null,
+        lateResumption: dayCtx.lateResumptionTime(todayIso)
+          ? { resumptionTime: dayCtx.lateResumptionTime(todayIso)! }
+          : null,
+      },
+      policy
+    )
+  } else if (isWeekend(todayIso)) {
+    derivedTodayStatus = "weekend"
+  } else if (dayCtx.isHoliday(todayIso)) {
+    derivedTodayStatus = "holiday"
+  } else if (dayCtx.isOnUnpaidLeave(userId, todayIso)) {
+    derivedTodayStatus = "lwop"
+  } else if (dayCtx.isOnLeave(userId, todayIso)) {
+    derivedTodayStatus = "on_leave"
+  } else if (Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, todayIso)) {
+    derivedTodayStatus = "exempted"
+  } else {
+    derivedTodayStatus = "not_clocked_in"
+  }
+
+  const todayStatus: TodayAttendanceStatus = {
+    status: derivedTodayStatus,
+    clock_in: todayClockIn,
+  }
+
   const { data: lunchLogsData } = await dataClient
     .from("attendance_lunch_log")
     .select("id, date, cost, company_subsidy, employee_deduction")
@@ -457,6 +513,7 @@ async function getProfileData() {
     leave: leaveData,
     annualLeaveRemaining,
     attendance: attendanceData || [],
+    todayStatus,
     lunchLogs: lunchLogsData || [],
     recentActivity,
     loadError,
@@ -485,6 +542,7 @@ export default async function ProfilePage() {
       leave={profileData.leave}
       annualLeaveRemaining={profileData.annualLeaveRemaining}
       attendance={profileData.attendance}
+      todayStatus={profileData.todayStatus}
       lunchLogs={profileData.lunchLogs || []}
       recentActivity={profileData.recentActivity}
       initialError={profileData.loadError}

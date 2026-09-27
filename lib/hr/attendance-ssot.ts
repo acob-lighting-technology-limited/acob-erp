@@ -106,7 +106,7 @@ export function isCoveredAttendanceStatus(status: string | null | undefined): bo
 export function isPositiveAttendanceStatus(status: string | null | undefined): boolean {
   if (!status) return false
   const s = String(status).toLowerCase().trim()
-  if (s === "absent" || s === "lwop" || s === "leave_without_pay" || s === "no_record") return false
+  if (s === "absent" || s === "lwop" || s === "leave_without_pay" || s === "no_record" || s === "weekend") return false
   if (COVERED_STATUSES.has(s)) return true
   if (s === "present" || s === "late" || s === "early_departure" || s === "incomplete") return true
   return false
@@ -274,12 +274,42 @@ export function computeAttendanceDay(input: AttendanceDayInput): AttendanceDayRe
     return build(0, "Covered day — no hours lost", { covered: true })
   }
 
-  // 2. Unpaid leave (LWOP) costs the full net shift.
+  // 2. Weekend non-working days.
+  if (status === "weekend") {
+    return {
+      status,
+      hoursLost: 0,
+      hoursWorked: 0,
+      isAbsent: false,
+      covered: true,
+      overtimeHours: overtimeHoursFor(clockOut, policy),
+      lateBracket: 0,
+      earlyBracket: 0,
+      breakdown: "Weekend — non-working day",
+    }
+  }
+
+  // 3. No record prior to start date.
+  if (status === "no_record") {
+    return {
+      status,
+      hoursLost: 0,
+      hoursWorked: 0,
+      isAbsent: false,
+      covered: true,
+      overtimeHours: 0,
+      lateBracket: 0,
+      earlyBracket: 0,
+      breakdown: "No record — prior to start date",
+    }
+  }
+
+  // 4. Unpaid leave (LWOP) costs the full net shift.
   if (status === "lwop" || status === "leave_without_pay") {
     return build(netDay, `Leave Without Pay — full day (${netDay}h) lost`)
   }
 
-  // 3. No punches at all.
+  // 5. No punches at all.
   if (status === "absent" || (!clockIn && !clockOut)) {
     return build(netDay, `Absent — full day (${netDay}h) lost`)
   }

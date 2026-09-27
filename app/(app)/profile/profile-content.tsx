@@ -21,6 +21,7 @@ import type {
   LeaveItem,
   AttendanceItem,
   LunchLogItem,
+  TodayAttendanceStatus,
 } from "./page"
 
 const MAX_ACTIVITY_ENTRIES = 12
@@ -36,6 +37,7 @@ interface ProfileContentProps {
   leave: LeaveItem[]
   annualLeaveRemaining?: number
   attendance: AttendanceItem[]
+  todayStatus?: TodayAttendanceStatus | null
   lunchLogs: LunchLogItem[]
   recentActivity: PersonalRecentActivityItem[]
   initialError?: string | null
@@ -52,6 +54,7 @@ export function ProfileContent({
   leave,
   annualLeaveRemaining = 0,
   attendance,
+  todayStatus,
   lunchLogs,
   recentActivity,
   initialError,
@@ -83,6 +86,7 @@ export function ProfileContent({
         profile={profile}
         avatarUrl={avatarUrl}
         attendance={attendance}
+        todayStatus={todayStatus}
         onAvatarChange={setAvatarUrl}
         onEdit={() => setIsEditOpen(true)}
       />

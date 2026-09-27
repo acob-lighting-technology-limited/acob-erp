@@ -1,4 +1,4 @@
-import { isLate } from "@/lib/hr/attendance-utils"
+import { isLate, isWeekend } from "@/lib/hr/attendance-utils"
 import { toLocalISODate } from "@/lib/utils/date"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 
@@ -276,14 +276,20 @@ export function deriveUnifiedAttendanceStatus(
   if (input.isOnLeave) return "on_leave"
   if (input.isExempted) return "exempted"
   const rec = input.record
-  if (!rec) return "absent"
+  if (!rec) {
+    if (input.recordDate && isWeekend(input.recordDate)) return "weekend"
+    return "absent"
+  }
   const explicitStatus = normalizeStoredAttendanceStatus(rec.status)
   // Whole-day permission overrides (LWP/AWP/OOS) — LEWP is handled below because it
   // must not rescue a late arrival, only the early departure.
   if (explicitStatus && isPermissionAttendanceStatus(explicitStatus)) return explicitStatus
   if (rec.waived) return "waiver"
   if (explicitStatus === "waiver") return "waiver"
-  if (!rec.clock_in && !rec.clock_out) return "absent"
+  if (!rec.clock_in && !rec.clock_out) {
+    if (input.recordDate && isWeekend(input.recordDate)) return "weekend"
+    return "absent"
+  }
 
   const today = toLocalISODate()
   const isPastDate = Boolean(input.recordDate && input.recordDate < today)

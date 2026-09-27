@@ -183,6 +183,7 @@ export async function GET(request: NextRequest) {
       const name = formatEmployeeName(p)
 
       const closeTime = ctx.earlyCloseTime(r.date)
+      const lateRes = ctx.lateResumptionTime(r.date)
       const derivedStatus = deriveUnifiedAttendanceStatus(
         {
           record: r,
@@ -192,11 +193,10 @@ export async function GET(request: NextRequest) {
           isExempted: Boolean(p?.attendance_exempt) || ctx.isExempt(r.user_id, r.date),
           recordDate: r.date,
           earlyClosure: closeTime ? { closeTime } : null,
+          lateResumption: lateRes ? { resumptionTime: lateRes } : null,
         },
         policy
       )
-
-      const lateRes = ctx.lateResumptionTime(r.date)
       const editorUserId = editorIdByRecordId.get(r.id)
       const editorProfile = editorUserId ? editorProfileMap.get(editorUserId) : null
       const editorFirstName = editorProfile?.first_name || editorProfile?.full_name?.split(" ")[0] || null
