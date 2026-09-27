@@ -800,7 +800,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "email",
         label: "Email",
         resizable: true,
-        initialWidth: 180,
+        initialWidth: 240,
         accessor: (r) => r.company_email,
         hideOnMobile: true,
         render: (r) => (
@@ -809,12 +809,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex max-w-[160px] items-center gap-1.5 text-left transition-colors"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-left whitespace-nowrap transition-colors"
                   onClick={() => void handleCopyEmail(r.company_email)}
                   aria-label="Copy email"
                 >
                   <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{r.company_email}</span>
+                  <span>{r.company_email}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Click to copy email</TooltipContent>
@@ -824,11 +824,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground/80 hover:text-foreground ml-5 max-w-[140px] truncate text-left text-xs transition-colors"
+                    className="text-muted-foreground/80 hover:text-foreground ml-5 text-left text-xs whitespace-nowrap transition-colors"
                     onClick={() => void handleCopyEmail(r.additional_email || "")}
                     aria-label="Copy additional email"
                   >
-                    <span className="truncate">{r.additional_email}</span>
+                    <span>{r.additional_email}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">Click to copy additional email</TooltipContent>
@@ -844,13 +844,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         accessor: (r) => r.department,
         render: (r) => (
           <div className="flex flex-col items-start gap-1">
-            <span className="block max-w-[140px] truncate text-xs font-medium" title={r.department}>
-              {r.department}
-            </span>
+            <span className="text-xs font-medium whitespace-nowrap">{r.department}</span>
             {r.is_department_lead && (
               <Badge
                 variant="outline"
-                className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:text-amber-400"
               >
                 <Shield className="h-2.5 w-2.5" />
                 Dept Lead
