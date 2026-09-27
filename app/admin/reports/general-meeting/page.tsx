@@ -1,7 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { ClipboardList, FileText, ChevronRight, Presentation, Users, UserCheck, AlertTriangle } from "lucide-react"
+import {
+  ClipboardList,
+  FileText,
+  ChevronRight,
+  Presentation,
+  Users,
+  UserCheck,
+  AlertTriangle,
+  QrCode,
+} from "lucide-react"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { IconFill } from "@/components/ui/icon-fill"
@@ -10,6 +19,18 @@ import { WeekSetupCard } from "./_components/week-setup-card"
 
 export default function AdminGeneralMeetingReportsPage() {
   const reportCards = [
+    {
+      title: "Meeting Attendance",
+      description:
+        "Generate weekly QR & 6-digit codes, print sign-in sheets, and track real-time biometric-verified meeting attendance.",
+      href: "/admin/reports/general-meeting/attendance",
+      icon: QrCode,
+      color: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      fill: "bg-purple-500",
+      hoverBorder: "hover:border-purple-500/60 dark:hover:border-purple-400/60",
+      hoverText: "group-hover:text-purple-500",
+      subLabel: "QR, 6-digit code & roster",
+    },
     {
       title: "Action Tracker Management",
       description: "Oversee project progress, track pending actions across all departments, and manage status updates.",

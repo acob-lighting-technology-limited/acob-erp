@@ -153,6 +153,16 @@ export function WeekSetupCard() {
     )
   }, [weekSetupData])
 
+  const tuesdayIso = useMemo(() => {
+    if (!weekSetupData?.mondayDateIso) return null
+    const d = new Date(`${weekSetupData.mondayDateIso}T00:00:00`)
+    d.setDate(d.getDate() + 1)
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, "0")
+    const dd = String(d.getDate()).padStart(2, "0")
+    return `${yyyy}-${mm}-${dd}`
+  }, [weekSetupData?.mondayDateIso])
+
   const saveMeetingWindow = async () => {
     if (!meetingDateInput) {
       toast.error("Meeting date is required")
@@ -362,6 +372,29 @@ export function WeekSetupCard() {
 
         {showWeekSetup && (
           <div className="space-y-4">
+            {weekSetupData?.isMondayHoliday && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-500/10 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold">⚠️ Public Holiday Notice:</span>
+                  <span>
+                    Monday ({weekSetupData.mondayDateIso}) is {weekSetupData.mondayHolidayName}.
+                  </span>
+                </div>
+                {tuesdayIso && meetingDateInput !== tuesdayIso && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 border-amber-500/40 text-[11px] text-amber-800 hover:bg-amber-100 dark:text-amber-200"
+                    onClick={() => setMeetingDateInput(tuesdayIso)}
+                    disabled={isWeekSetupLocked}
+                  >
+                    Shift to Tuesday ({tuesdayIso})
+                  </Button>
+                )}
+              </div>
+            )}
+
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7 xl:items-end">
               <div className="w-full max-w-[160px]">
                 <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
