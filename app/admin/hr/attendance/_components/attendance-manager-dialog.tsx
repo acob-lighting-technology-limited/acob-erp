@@ -1494,7 +1494,7 @@ function ManualRecordsTab({
     void loadOpenOos()
   }, [loadEntries, loadOpenOos])
 
-  /** First and last calendar day of a YYYY-MM month (weekends are skipped server-side). */
+  /** First and last calendar day of a YYYY-MM month. */
   function monthBounds(ym: string): { start: string; end: string } {
     const [y, m] = ym.split("-").map(Number)
     const start = `${ym}-01`
