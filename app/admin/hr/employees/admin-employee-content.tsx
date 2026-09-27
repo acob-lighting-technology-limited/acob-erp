@@ -760,37 +760,32 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Name",
         sortable: true,
         resizable: true,
-        initialWidth: 210,
+        initialWidth: 260,
         accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <EmployeeAvatar employee={r} size="sm" />
-            <div className="max-w-[155px] min-w-0 space-y-0.5">
-              <div className="flex items-center gap-1.5">
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    "truncate text-sm font-medium",
+                    "font-medium",
                     r.employment_status === "exited" && "text-muted-foreground line-through"
                   )}
-                  title={`${formatName(r.last_name)}, ${formatName(r.first_name)}`}
                 >
                   {formatName(r.last_name)}, {formatName(r.first_name)}
                 </span>
                 {r.is_department_lead && (
                   <Badge
                     variant="outline"
-                    className="shrink-0 gap-0.5 border-amber-500/40 bg-amber-500/10 px-1 py-0 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                    className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium text-amber-600 dark:text-amber-400"
                   >
                     <Shield className="h-2.5 w-2.5" />
                     Lead
                   </Badge>
                 )}
               </div>
-              {r.designation && (
-                <p className="text-muted-foreground truncate text-xs" title={r.designation}>
-                  {r.designation}
-                </p>
-              )}
+              {r.designation && <p className="text-muted-foreground truncate text-xs">{r.designation}</p>}
             </div>
           </div>
         ),
@@ -899,43 +894,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         },
       },
       {
-        key: "status",
-        label: "Status",
-        accessor: (r) => r.employment_status || "active",
-        render: (r) => (
-          <div className="flex flex-col items-start gap-1">
-            <EmployeeStatusBadge status={r.employment_status || "active"} size="sm" />
-            {r.employment_status === "active" && !r.mailbox_credentials_sent_at && (
-              <Badge
-                variant="outline"
-                className="border-amber-500/20 bg-amber-500/10 px-1.5 py-0 text-[10px] font-semibold text-amber-600 shadow-none dark:text-amber-400"
-              >
-                Mailbox Pending
-              </Badge>
-            )}
-          </div>
-        ),
-      },
-      {
         key: "actions",
         label: "Action",
         render: (r) => (
           <div className="flex items-center justify-end gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => void handleViewEmployeeDetails(r)}
-                  aria-label="View Profile"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">View Profile</TooltipContent>
-            </Tooltip>
             {canManageUsers && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -953,38 +915,44 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <TooltipContent side="top">Edit Employee</TooltipContent>
               </Tooltip>
             )}
-            {canManageUsers && (
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More Actions">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">More Actions</TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setDispatchingEmployee(r)}>
-                    <Mail className="text-primary mr-2 h-4 w-4" />
-                    {r.mailbox_credentials_sent_at ? "Resend Webmail Credentials" : "Send Webmail Credentials"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleConvertStaffType(r)}>
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Convert Staff Type
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleChangeStatus(r)}>
-                    <UserCircle className="mr-2 h-4 w-4" />
-                    Change Status
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleViewEmployeeSignature(r as unknown as EmployeeProfile)}>
-                    <FileSignature className="mr-2 h-4 w-4" />
-                    Email Signature
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More Actions">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">More Actions</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void handleViewEmployeeDetails(r)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Profile
+                </DropdownMenuItem>
+                {canManageUsers && (
+                  <>
+                    <DropdownMenuItem onClick={() => setDispatchingEmployee(r)}>
+                      <Mail className="text-primary mr-2 h-4 w-4" />
+                      {r.mailbox_credentials_sent_at ? "Resend Webmail Credentials" : "Send Webmail Credentials"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void handleConvertStaffType(r)}>
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      Convert Staff Type
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void handleChangeStatus(r)}>
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      Change Status
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void handleViewEmployeeSignature(r as unknown as EmployeeProfile)}>
+                      <FileSignature className="mr-2 h-4 w-4" />
+                      Email Signature
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         ),
       },
