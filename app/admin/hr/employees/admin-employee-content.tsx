@@ -775,7 +775,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <span
                   className={cn(
                     "font-medium",
-                    r.employment_status === "exited" && "text-muted-foreground line-through"
+                    activeTab === "all" && r.employment_status === "exited" && "text-muted-foreground line-through"
                   )}
                 >
                   {formatName(r.last_name)}, {formatName(r.first_name)}
@@ -957,6 +957,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       },
     ],
     [
+      activeTab,
       canManageUsers,
       handleCopyEmail,
       handleEditEmployee,
