@@ -186,6 +186,11 @@ function EmployeeAvatar({ employee, size = "md" }: { employee: Employee; size?: 
 
 const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
 
+function getRoleBadgeLabel(role: UserRole): string {
+  if (role === "super_admin") return "S. Admin"
+  return getRoleDisplayName(role)
+}
+
 /**
  * Field contractors on payroll (CTR group without company email). Contract personnel
  * with company email addresses are active platform employees and appear under Employees.
@@ -775,13 +780,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 >
                   {formatName(r.last_name)}, {formatName(r.first_name)}
                 </span>
-                {r.is_department_lead && (
+                {r.role !== "employee" && (
                   <Badge
-                    variant="outline"
-                    className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                    className={cn(
+                      "shrink-0 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap shadow-none",
+                      getRoleBadgeColor(r.role)
+                    )}
                   >
-                    <Shield className="h-2.5 w-2.5" />
-                    Lead
+                    {getRoleBadgeLabel(r.role)}
                   </Badge>
                 )}
               </div>
@@ -837,26 +843,21 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         sortable: true,
         accessor: (r) => r.department,
         render: (r) => (
-          <span className="block max-w-[120px] truncate text-xs" title={r.department}>
-            {r.department}
-          </span>
+          <div className="flex flex-col items-start gap-1">
+            <span className="block max-w-[140px] truncate text-xs font-medium" title={r.department}>
+              {r.department}
+            </span>
+            {r.is_department_lead && (
+              <Badge
+                variant="outline"
+                className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+              >
+                <Shield className="h-2.5 w-2.5" />
+                Dept Lead
+              </Badge>
+            )}
+          </div>
         ),
-      },
-      {
-        key: "role",
-        label: "Role",
-        sortable: true,
-        accessor: (r) => r.role,
-        render: (r) => {
-          if (r.role === "employee") {
-            return <span className="text-muted-foreground text-xs">—</span>
-          }
-          return (
-            <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap shadow-none", getRoleBadgeColor(r.role))}>
-              {getRoleDisplayName(r.role)}
-            </Badge>
-          )
-        },
       },
       {
         key: "employment_type",
@@ -1003,6 +1004,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Role",
         options: roleList.map((r) => ({ value: r, label: getRoleDisplayName(r) })),
         placeholder: "All Roles",
+        mode: "custom",
+        filterFn: (employee, selected) => selected.includes(employee.role),
       },
       // Status and Staff type are deliberately not filters. Both are scopes, and both are
       // now owned by the unified 4-tab strip above: Employees (regular current) / Contract Staff
