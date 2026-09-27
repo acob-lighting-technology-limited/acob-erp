@@ -185,6 +185,7 @@ function EmployeeAvatar({ employee, size = "md" }: { employee: Employee; size?: 
 }
 
 const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
+const ELEVATED_ROLES: UserRole[] = ["super_admin", "admin", "developer"]
 
 function getRoleBadgeLabel(role: UserRole): string {
   if (role === "super_admin") return "S. Admin"
@@ -780,7 +781,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 >
                   {formatName(r.last_name)}, {formatName(r.first_name)}
                 </span>
-                {r.role !== "employee" && (
+                {ELEVATED_ROLES.includes(r.role) && (
                   <Badge
                     className={cn(
                       "shrink-0 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap shadow-none",
@@ -1303,9 +1304,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <EmployeeStatusBadge status={r.employment_status || "active"} size="sm" />
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                <Badge className={getRoleBadgeColor(r.role)}>{getRoleDisplayName(r.role)}</Badge>
-              </div>
+              {ELEVATED_ROLES.includes(r.role) && (
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge className={getRoleBadgeColor(r.role)}>{getRoleDisplayName(r.role)}</Badge>
+                </div>
+              )}
 
               <div className="text-muted-foreground space-y-1.5 pt-2 text-xs">
                 <div className="flex items-center gap-2">
