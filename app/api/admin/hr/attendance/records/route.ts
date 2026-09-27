@@ -153,7 +153,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const editorUserIds = [...new Set(Array.from(editorIdByRecordId.values()).filter(Boolean))]
+    const closureCreatorIds: string[] = []
+    const datesToCheck = allDates.length > 0 ? allDates : startDate ? [startDate as string] : []
+    for (const d of datesToCheck) {
+      const cUid = ctx.earlyCloseCreatedBy(d)
+      if (cUid) closureCreatorIds.push(cUid)
+      const rUid = ctx.lateResumptionCreatedBy(d)
+      if (rUid) closureCreatorIds.push(rUid)
+    }
+
+    const editorUserIds = [
+      ...new Set([...Array.from(editorIdByRecordId.values()), ...closureCreatorIds].filter(Boolean)),
+    ]
     const editorProfileRows =
       editorUserIds.length > 0
         ? await dataClient
@@ -197,7 +208,14 @@ export async function GET(request: NextRequest) {
         },
         policy
       )
-      const editorUserId = editorIdByRecordId.get(r.id)
+      let editorUserId = editorIdByRecordId.get(r.id)
+      if (!editorUserId) {
+        if (derivedStatus === "early_closure") {
+          editorUserId = ctx.earlyCloseCreatedBy(r.date) ?? undefined
+        } else if (derivedStatus === "late_resumption") {
+          editorUserId = ctx.lateResumptionCreatedBy(r.date) ?? undefined
+        }
+      }
       const editorProfile = editorUserId ? editorProfileMap.get(editorUserId) : null
       const editorFirstName = editorProfile?.first_name || editorProfile?.full_name?.split(" ")[0] || null
 
@@ -296,6 +314,16 @@ export async function GET(request: NextRequest) {
             },
             policy
           )
+          let missingEditorUserId: string | undefined
+          if (derivedStatus === "early_closure") {
+            missingEditorUserId = ctx.earlyCloseCreatedBy(day) ?? undefined
+          } else if (derivedStatus === "late_resumption") {
+            missingEditorUserId = ctx.lateResumptionCreatedBy(day) ?? undefined
+          }
+          const missingEditorProfile = missingEditorUserId ? editorProfileMap.get(missingEditorUserId) : null
+          const missingEditorFirstName =
+            missingEditorProfile?.first_name || missingEditorProfile?.full_name?.split(" ")[0] || null
+
           records.push({
             id: `missing-${p.id}-${day}`,
             user_id: p.id,
@@ -320,7 +348,7 @@ export async function GET(request: NextRequest) {
             latitude: null,
             longitude: null,
             site_id: null,
-            editor_first_name: null,
+            editor_first_name: missingEditorFirstName,
             early_closure_time: closeTime,
             late_resumption_time: lateRes,
           })

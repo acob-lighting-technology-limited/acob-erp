@@ -128,23 +128,26 @@ export function labelSource(record: SourceInfo | string | null | undefined): str
   if (inK) kinds.add(inK)
   if (outK) kinds.add(outK)
 
+  // Check if the record status is an administrative/manual override status
+  const isManualStatus =
+    info.status === "waiver" ||
+    info.status === "absent_with_permission" ||
+    info.status === "lateness_with_permission" ||
+    info.status === "incomplete_with_permission" ||
+    info.status === "early_departure_with_permission" ||
+    info.status === "out_of_station" ||
+    info.status === "early_closure" ||
+    info.status === "late_resumption" ||
+    info.waived === true
+
   let baseLabel = "Manual"
-  if (info.source === "manual") {
+  if (info.source === "manual" || isManualStatus) {
     baseLabel = "Manual"
   } else if (kinds.size === 0) {
     // No per-punch data. A row with actual punches but missing per-punch source
     // (legacy/un-backfilled) falls back to the single source column; a row with
     // no punches at all (absent) has no source to show.
     const hasPunch = Boolean(info.clock_in || info.clock_out)
-
-    // Check if the record status is a manual overridden status or waived
-    const isManualStatus =
-      info.status === "waiver" ||
-      info.status === "absent_with_permission" ||
-      info.status === "lateness_with_permission" ||
-      info.status === "incomplete_with_permission" ||
-      info.status === "out_of_station" ||
-      info.waived === true
 
     if (!hasPunch && !isManualStatus && !info.editor_first_name) return "—"
     baseLabel = punchKind(info.source) === "auto" ? "Automated" : "Manual"
