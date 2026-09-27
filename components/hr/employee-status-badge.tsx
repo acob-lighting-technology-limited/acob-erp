@@ -77,7 +77,7 @@ export function EmployeeStatusBadge({
   return (
     <Badge
       variant="outline"
-      className={cn("border font-medium", config.bgColor, config.color, sizeClasses[size], className)}
+      className={cn("border font-medium whitespace-nowrap", config.bgColor, config.color, sizeClasses[size], className)}
     >
       {showIcon && <Icon className={cn("mr-1", size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5")} />}
       {config.label}
