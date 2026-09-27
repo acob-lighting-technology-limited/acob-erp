@@ -1,9 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowRight, ClipboardCheck, Clock, ShieldCheck } from "lucide-react"
+import { Clock, MessageSquareText, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { SystemSurveyModal } from "./system-survey-modal"
 
 interface SystemSurveyPromptProps {
@@ -30,56 +37,45 @@ export function SystemSurveyPrompt({ hasCompletedSurvey = false }: SystemSurveyP
     <>
       {/* Step 1: Survey invitation */}
       <Dialog open={isPromptOpen} onOpenChange={setIsPromptOpen}>
-        <DialogContent className="border-border/60 bg-card max-w-sm overflow-hidden p-6 shadow-2xl sm:rounded-2xl">
-          {/* Subtle top gradient accent line */}
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
-
-          <DialogHeader className="gap-4 pt-1 text-left">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500 shadow-inner">
-              <ClipboardCheck className="h-6 w-6 text-emerald-500" />
+        <DialogContent className="max-w-md overflow-hidden p-0 sm:p-0">
+          <DialogHeader className="flex flex-row items-start gap-3 space-y-0 p-6 pb-4 text-left">
+            <div className="bg-muted text-muted-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-md">
+              <MessageSquareText className="h-5 w-5" aria-hidden="true" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <DialogTitle className="text-foreground text-lg font-bold tracking-tight">
                 How is your Matrix experience?
               </DialogTitle>
-              <DialogDescription className="text-muted-foreground text-xs leading-relaxed">
-                Help us prioritise improvements to the tools you use every day.
+              <DialogDescription className="text-sm leading-5">
+                Your feedback helps us prioritise improvements to the tools you use every day.
               </DialogDescription>
             </div>
           </DialogHeader>
 
-          <div className="border-border/50 flex flex-col items-start gap-2 border-y py-3 text-xs">
-            <span className="text-foreground flex items-center gap-1.5 font-medium">
-              <Clock className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
-              Takes about 2 minutes
-            </span>
-            <span className="text-muted-foreground flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
-              Choose whether to share your name
-            </span>
+          <div className="border-y px-6 py-4">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <div className="text-muted-foreground flex items-center gap-2">
+                <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <dt className="sr-only">Duration</dt>
+                <dd>About 2 minutes</dd>
+              </div>
+              <div className="text-muted-foreground flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <dt className="sr-only">Privacy</dt>
+                <dd>You choose whether to share your name</dd>
+              </div>
+            </dl>
           </div>
 
-          <div className="flex flex-row items-center justify-end gap-2.5 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsPromptOpen(false)}
-              className="text-muted-foreground hover:text-foreground h-9 px-3.5 text-xs"
-            >
-              Maybe Later
+          <DialogFooter className="bg-muted/30 flex flex-row items-center justify-end gap-2 border-t px-6 py-4 sm:space-x-0">
+            <Button type="button" variant="outline" onClick={() => setIsPromptOpen(false)}>
+              Not now
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleStartSurvey}
-              className="h-9 gap-1.5 px-4 text-xs font-medium shadow-sm transition hover:opacity-95"
-            >
-              Start Survey
-              <ArrowRight className="h-3.5 w-3.5" />
+            <Button type="button" onClick={handleStartSurvey}>
+              Give feedback
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
