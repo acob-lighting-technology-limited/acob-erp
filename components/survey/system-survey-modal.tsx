@@ -175,7 +175,7 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="border-border/60 bg-card relative max-h-[90vh] max-w-2xl overflow-y-auto p-6 shadow-2xl sm:rounded-2xl">
+      <DialogContent className="border-border/60 bg-card max-h-[90vh] max-w-2xl overflow-y-auto p-6 shadow-2xl sm:rounded-2xl">
         {/* Subtle top gradient accent line */}
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
 

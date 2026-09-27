@@ -30,7 +30,7 @@ export function SystemSurveyPrompt({ hasCompletedSurvey = false }: SystemSurveyP
     <>
       {/* Step 1: Sleek Centered Invitation Dialog */}
       <Dialog open={isPromptOpen} onOpenChange={setIsPromptOpen}>
-        <DialogContent className="border-border/60 bg-card relative max-w-md overflow-hidden p-6 shadow-2xl sm:rounded-2xl">
+        <DialogContent className="border-border/60 bg-card max-w-md overflow-hidden p-6 shadow-2xl sm:rounded-2xl">
           {/* Subtle top gradient accent line */}
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
 
