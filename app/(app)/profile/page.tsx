@@ -2,16 +2,24 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ProfileContent } from "./profile-content"
-import { buildRecentActivity, normalizeToken } from "@/components/admin/dashboard-helpers"
+import { buildRecentActivity, normalizeToken, isExcludedActivity } from "@/components/admin/dashboard-helpers"
 import type { PersonalRecentActivityItem } from "@/components/profile/personal-recent-activity-feed"
 import { getAvatarSignedUrl } from "@/lib/profile-photos"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import type { Task, TaskUserProfile } from "@/types/task"
+import { loadDayContext } from "@/lib/hr/attendance-day-context"
+import { loadAttendancePolicy, toLocalISODate, isWeekend } from "@/lib/hr/attendance-utils"
+import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 
 export const dynamic = "force-dynamic"
 
 export type { Task }
+
+export interface TodayAttendanceStatus {
+  status: string
+  clock_in?: string | null
+}
 
 export interface UserProfile {
   id: string
@@ -36,6 +44,7 @@ export interface UserProfile {
   additional_email?: string | null
   birthday?: string | null
   avatar_path?: string | null
+  attendance_exempt?: boolean | null
 }
 
 export interface Asset {
@@ -402,6 +411,38 @@ async function getProfileData() {
     .returns<AttendanceItem[]>()
   if (attendanceError) loadErrors.push("attendance")
 
+  const todayIso = toLocalISODate()
+  const todayRecord = (attendanceData || []).find((r) => r.date === todayIso) ?? null
+
+  const [dayCtx, policy] = await Promise.all([
+    loadDayContext(dataClient, { userIds: [userId], start: todayIso, end: todayIso }),
+    loadAttendancePolicy(dataClient),
+  ])
+
+  const unifiedTodayStatus = deriveUnifiedAttendanceStatus(
+    {
+      record: todayRecord,
+      isHoliday: dayCtx.isHoliday(todayIso),
+      isOnLeave: dayCtx.isOnLeave(userId, todayIso),
+      isOnUnpaidLeave: dayCtx.isOnUnpaidLeave(userId, todayIso),
+      isExempted: Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, todayIso),
+      recordDate: todayIso,
+      earlyClosure: dayCtx.earlyCloseTime(todayIso) ? { closeTime: dayCtx.earlyCloseTime(todayIso)! } : null,
+      lateResumption: dayCtx.lateResumptionTime(todayIso)
+        ? { resumptionTime: dayCtx.lateResumptionTime(todayIso)! }
+        : null,
+    },
+    policy
+  )
+
+  const derivedTodayStatus =
+    unifiedTodayStatus === "absent" && !todayRecord?.clock_in ? "not_clocked_in" : unifiedTodayStatus
+
+  const todayStatus: TodayAttendanceStatus = {
+    status: derivedTodayStatus,
+    clock_in: todayRecord?.clock_in ?? null,
+  }
+
   const { data: lunchLogsData } = await dataClient
     .from("attendance_lunch_log")
     .select("id, date, cost, company_subsidy, employee_deduction")
@@ -417,17 +458,14 @@ async function getProfileData() {
     .select(
       "id, user_id, created_at, action, operation, entity_type, table_name, entity_id, metadata, changed_fields, new_values, old_values"
     )
+    .neq("action", "client_error")
+    .neq("entity_type", "ui_runtime")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(50)
     .returns<ActivityLogRow[]>()
 
-  const filteredRawActivity = (rawActivity || [])
-    .filter(
-      (item) =>
-        !["sync", "migrate", "update_schema", "migration"].includes(normalizeToken(item.action || item.operation))
-    )
-    .slice(0, 50)
+  const filteredRawActivity = (rawActivity || []).filter((item) => !isExcludedActivity(item)).slice(0, 50)
 
   const actorMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>([
     [
@@ -457,6 +495,7 @@ async function getProfileData() {
     leave: leaveData,
     annualLeaveRemaining,
     attendance: attendanceData || [],
+    todayStatus,
     lunchLogs: lunchLogsData || [],
     recentActivity,
     loadError,
@@ -485,6 +524,7 @@ export default async function ProfilePage() {
       leave={profileData.leave}
       annualLeaveRemaining={profileData.annualLeaveRemaining}
       attendance={profileData.attendance}
+      todayStatus={profileData.todayStatus}
       lunchLogs={profileData.lunchLogs || []}
       recentActivity={profileData.recentActivity}
       initialError={profileData.loadError}

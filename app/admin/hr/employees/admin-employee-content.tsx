@@ -185,6 +185,12 @@ function EmployeeAvatar({ employee, size = "md" }: { employee: Employee; size?: 
 }
 
 const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
+const ELEVATED_ROLES: UserRole[] = ["super_admin", "admin", "developer"]
+
+function getRoleBadgeLabel(role: UserRole): string {
+  if (role === "super_admin") return "S. Admin"
+  return getRoleDisplayName(role)
+}
 
 /**
  * Field contractors on payroll (CTR group without company email). Contract personnel
@@ -748,33 +754,45 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Emp. No.",
         sortable: true,
         resizable: true,
-        initialWidth: 120,
+        initialWidth: 100,
         accessor: (r) => r.employee_number || "",
         hideOnMobile: true,
-        render: (r) => <span className="text-muted-foreground font-mono text-sm">{r.employee_number || "—"}</span>,
+        render: (r) => (
+          <span className="text-muted-foreground font-mono text-xs whitespace-nowrap">{r.employee_number || "—"}</span>
+        ),
       },
       {
         key: "name",
         label: "Name",
         sortable: true,
         resizable: true,
-        initialWidth: 230,
-        accessor: (r) => `${r.last_name}, ${r.first_name}`,
+        initialWidth: 260,
+        accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
           <div className="flex items-center gap-2.5">
             <EmployeeAvatar employee={r} size="sm" />
-            <div className="flex min-w-0 flex-col">
-              <span
-                className={cn("font-medium", r.employment_status === "exited" && "text-muted-foreground line-through")}
-              >
-                {formatName(r.last_name)}, {formatName(r.first_name)}
-              </span>
-              {r.is_department_lead && (
-                <div className="flex items-center gap-1 text-xs text-amber-600">
-                  <Shield className="h-3 w-3" />
-                  <span>Dept Lead</span>
-                </div>
-              )}
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "font-medium",
+                    activeTab === "all" && r.employment_status === "exited" && "text-muted-foreground line-through"
+                  )}
+                >
+                  {formatName(r.last_name)}, {formatName(r.first_name)}
+                </span>
+                {ELEVATED_ROLES.includes(r.role) && (
+                  <Badge
+                    className={cn(
+                      "shrink-0 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap shadow-none",
+                      getRoleBadgeColor(r.role)
+                    )}
+                  >
+                    {getRoleBadgeLabel(r.role)}
+                  </Badge>
+                )}
+              </div>
+              {r.designation && <p className="text-muted-foreground truncate text-xs">{r.designation}</p>}
             </div>
           </div>
         ),
@@ -783,21 +801,21 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "email",
         label: "Email",
         resizable: true,
-        initialWidth: 220,
+        initialWidth: 240,
         accessor: (r) => r.company_email,
         hideOnMobile: true,
         render: (r) => (
-          <div className="flex flex-col gap-1 text-sm">
+          <div className="flex flex-col gap-0.5 text-xs">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-left"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-left whitespace-nowrap transition-colors"
                   onClick={() => void handleCopyEmail(r.company_email)}
                   aria-label="Copy email"
                 >
                   <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <span className="max-w-[180px] truncate">{r.company_email}</span>
+                  <span>{r.company_email}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Click to copy email</TooltipContent>
@@ -807,11 +825,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground/80 hover:text-foreground ml-5 max-w-[180px] truncate text-left text-xs"
+                    className="text-muted-foreground/80 hover:text-foreground ml-5 text-left text-xs whitespace-nowrap transition-colors"
                     onClick={() => void handleCopyEmail(r.additional_email || "")}
                     aria-label="Copy additional email"
                   >
-                    {r.additional_email}
+                    <span>{r.additional_email}</span>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">Click to copy additional email</TooltipContent>
@@ -825,21 +843,20 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Department",
         sortable: true,
         accessor: (r) => r.department,
-        render: (r) => <span>{r.department}</span>,
-      },
-      {
-        key: "designation",
-        label: "Designation",
-        sortable: true,
-        accessor: (r) => r.designation || "",
-        render: (r) => <span>{r.designation || "—"}</span>,
-      },
-      {
-        key: "role",
-        label: "Role",
-        sortable: true,
-        accessor: (r) => r.role,
-        render: (r) => <Badge className={getRoleBadgeColor(r.role)}>{getRoleDisplayName(r.role)}</Badge>,
+        render: (r) => (
+          <div className="flex flex-col items-start gap-1">
+            <span className="text-xs font-medium whitespace-nowrap">{r.department}</span>
+            {r.is_department_lead && (
+              <Badge
+                variant="outline"
+                className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:text-amber-400"
+              >
+                <Shield className="h-2.5 w-2.5" />
+                Dept Lead
+              </Badge>
+            )}
+          </div>
+        ),
       },
       {
         key: "employment_type",
@@ -873,47 +890,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             display = "Contract Staff"
             badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
           }
-          return <Badge className={badgeColor}>{display}</Badge>
+          return <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap", badgeColor)}>{display}</Badge>
         },
-      },
-      {
-        key: "status",
-        label: "Status",
-        accessor: (r) => r.employment_status || "active",
-        render: (r) => (
-          <div className="flex flex-col items-start gap-1">
-            <EmployeeStatusBadge status={r.employment_status || "active"} size="sm" />
-            {r.employment_status === "active" && !r.mailbox_credentials_sent_at && (
-              <Badge
-                variant="outline"
-                className="border-amber-500/20 bg-amber-500/10 px-1.5 py-0 text-[10px] font-semibold text-amber-600 shadow-none dark:text-amber-400"
-              >
-                Mailbox Pending
-              </Badge>
-            )}
-          </div>
-        ),
       },
       {
         key: "actions",
         label: "Action",
         render: (r) => (
           <div className="flex items-center justify-end gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => void handleViewEmployeeDetails(r)}
-                  aria-label="View Profile"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">View Profile</TooltipContent>
-            </Tooltip>
             {canManageUsers && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -931,43 +915,50 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <TooltipContent side="top">Edit Employee</TooltipContent>
               </Tooltip>
             )}
-            {canManageUsers && (
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More Actions">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">More Actions</TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setDispatchingEmployee(r)}>
-                    <Mail className="text-primary mr-2 h-4 w-4" />
-                    {r.mailbox_credentials_sent_at ? "Resend Webmail Credentials" : "Send Webmail Credentials"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleConvertStaffType(r)}>
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Convert Staff Type
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleChangeStatus(r)}>
-                    <UserCircle className="mr-2 h-4 w-4" />
-                    Change Status
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleViewEmployeeSignature(r as unknown as EmployeeProfile)}>
-                    <FileSignature className="mr-2 h-4 w-4" />
-                    Email Signature
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More Actions">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">More Actions</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void handleViewEmployeeDetails(r)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Profile
+                </DropdownMenuItem>
+                {canManageUsers && (
+                  <>
+                    <DropdownMenuItem onClick={() => setDispatchingEmployee(r)}>
+                      <Mail className="text-primary mr-2 h-4 w-4" />
+                      {r.mailbox_credentials_sent_at ? "Resend Webmail Credentials" : "Send Webmail Credentials"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void handleConvertStaffType(r)}>
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      Convert Staff Type
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void handleChangeStatus(r)}>
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      Change Status
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void handleViewEmployeeSignature(r as unknown as EmployeeProfile)}>
+                      <FileSignature className="mr-2 h-4 w-4" />
+                      Email Signature
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         ),
       },
     ],
     [
+      activeTab,
       canManageUsers,
       handleCopyEmail,
       handleEditEmployee,
@@ -1013,6 +1004,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Role",
         options: roleList.map((r) => ({ value: r, label: getRoleDisplayName(r) })),
         placeholder: "All Roles",
+        mode: "custom",
+        filterFn: (employee, selected) => selected.includes(employee.role),
       },
       // Status and Staff type are deliberately not filters. Both are scopes, and both are
       // now owned by the unified 4-tab strip above: Employees (regular current) / Contract Staff
@@ -1311,9 +1304,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <EmployeeStatusBadge status={r.employment_status || "active"} size="sm" />
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                <Badge className={getRoleBadgeColor(r.role)}>{getRoleDisplayName(r.role)}</Badge>
-              </div>
+              {ELEVATED_ROLES.includes(r.role) && (
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge className={getRoleBadgeColor(r.role)}>{getRoleDisplayName(r.role)}</Badge>
+                </div>
+              )}
 
               <div className="text-muted-foreground space-y-1.5 pt-2 text-xs">
                 <div className="flex items-center gap-2">

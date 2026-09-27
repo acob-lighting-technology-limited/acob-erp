@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
       recordIds.length > 0
         ? dataClient
             .from("audit_logs")
-            .select("entity_id, user_id, created_at")
+            .select("entity_id, user_id, created_at, metadata")
             .eq("entity_type", "attendance_record")
             .in("entity_id", recordIds)
             .order("created_at", { ascending: false })
@@ -145,15 +145,33 @@ export async function GET(request: NextRequest) {
       loadDayContext(dataClient, { userIds, start: minDate, end: maxDate }),
     ])
 
-    // Build audit log lookups to find the latest editor for each record
+    // Build audit log lookups to find the latest manual editor for each record.
+    // Exclude automated system logs (e.g. Hikvision device punches where user_id is the employee).
     const editorIdByRecordId = new Map<string, string>()
-    for (const log of auditLogRows as Array<{ entity_id: string; user_id: string }>) {
-      if (!editorIdByRecordId.has(log.entity_id)) {
+    for (const log of auditLogRows as Array<{
+      entity_id: string
+      user_id: string
+      metadata?: Record<string, unknown> | null
+    }>) {
+      const isSystemLog =
+        log.metadata?.source === "system" || String(log.metadata?.route ?? "").startsWith("/api/devices/")
+      if (!isSystemLog && !editorIdByRecordId.has(log.entity_id)) {
         editorIdByRecordId.set(log.entity_id, log.user_id)
       }
     }
 
-    const editorUserIds = [...new Set(Array.from(editorIdByRecordId.values()).filter(Boolean))]
+    const closureCreatorIds: string[] = []
+    const datesToCheck = allDates.length > 0 ? allDates : startDate ? [startDate as string] : []
+    for (const d of datesToCheck) {
+      const cUid = ctx.earlyCloseCreatedBy(d)
+      if (cUid) closureCreatorIds.push(cUid)
+      const rUid = ctx.lateResumptionCreatedBy(d)
+      if (rUid) closureCreatorIds.push(rUid)
+    }
+
+    const editorUserIds = [
+      ...new Set([...Array.from(editorIdByRecordId.values()), ...closureCreatorIds].filter(Boolean)),
+    ]
     const editorProfileRows =
       editorUserIds.length > 0
         ? await dataClient
@@ -183,6 +201,7 @@ export async function GET(request: NextRequest) {
       const name = formatEmployeeName(p)
 
       const closeTime = ctx.earlyCloseTime(r.date)
+      const lateRes = ctx.lateResumptionTime(r.date)
       const derivedStatus = deriveUnifiedAttendanceStatus(
         {
           record: r,
@@ -192,12 +211,18 @@ export async function GET(request: NextRequest) {
           isExempted: Boolean(p?.attendance_exempt) || ctx.isExempt(r.user_id, r.date),
           recordDate: r.date,
           earlyClosure: closeTime ? { closeTime } : null,
+          lateResumption: lateRes ? { resumptionTime: lateRes } : null,
         },
         policy
       )
-
-      const lateRes = ctx.lateResumptionTime(r.date)
-      const editorUserId = editorIdByRecordId.get(r.id)
+      let editorUserId: string | undefined
+      if (derivedStatus === "early_closure") {
+        editorUserId = ctx.earlyCloseCreatedBy(r.date) ?? editorIdByRecordId.get(r.id)
+      } else if (derivedStatus === "late_resumption") {
+        editorUserId = ctx.lateResumptionCreatedBy(r.date) ?? editorIdByRecordId.get(r.id)
+      } else {
+        editorUserId = editorIdByRecordId.get(r.id)
+      }
       const editorProfile = editorUserId ? editorProfileMap.get(editorUserId) : null
       const editorFirstName = editorProfile?.first_name || editorProfile?.full_name?.split(" ")[0] || null
 
@@ -296,6 +321,16 @@ export async function GET(request: NextRequest) {
             },
             policy
           )
+          let missingEditorUserId: string | undefined
+          if (derivedStatus === "early_closure") {
+            missingEditorUserId = ctx.earlyCloseCreatedBy(day) ?? undefined
+          } else if (derivedStatus === "late_resumption") {
+            missingEditorUserId = ctx.lateResumptionCreatedBy(day) ?? undefined
+          }
+          const missingEditorProfile = missingEditorUserId ? editorProfileMap.get(missingEditorUserId) : null
+          const missingEditorFirstName =
+            missingEditorProfile?.first_name || missingEditorProfile?.full_name?.split(" ")[0] || null
+
           records.push({
             id: `missing-${p.id}-${day}`,
             user_id: p.id,
@@ -320,7 +355,7 @@ export async function GET(request: NextRequest) {
             latitude: null,
             longitude: null,
             site_id: null,
-            editor_first_name: null,
+            editor_first_name: missingEditorFirstName,
             early_closure_time: closeTime,
             late_resumption_time: lateRes,
           })

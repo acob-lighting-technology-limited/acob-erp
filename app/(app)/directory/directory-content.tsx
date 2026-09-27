@@ -518,10 +518,8 @@ export function DirectoryContent() {
           },
         }}
         viewToggle
-        // A directory is a lookup tool: the A–Z contacts list is the right default
-        // on desktop too, with the table there for anyone scanning columns.
         contactsView
-        defaultViewMode="contacts"
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         cardRenderer={(r) => (
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-start justify-between gap-3">

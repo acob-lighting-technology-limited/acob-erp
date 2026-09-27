@@ -70,7 +70,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
   const { data: rpcRows, error: rpcError } = await auditLogsRpcClient.rpc("get_audit_logs_enriched", {
     p_limit: 500,
     p_offset: 0,
-    p_hidden_actions: ["sync", "migrate", "update_schema", "migration"],
+    p_hidden_actions: ["sync", "migrate", "update_schema", "migration", "client_error"],
     p_department_filter: queryDepartmentScope ?? null,
   })
 
@@ -79,7 +79,7 @@ async function getAuditLogsData(): Promise<AuditLogsData> {
     return { kind: "data", logs: [], totalCount: 0, employee: [], departments: [], userProfile }
   }
 
-  const rows = rpcRows ?? []
+  const rows = (rpcRows ?? []).filter((row) => row.action !== "client_error" && row.entity_type !== "ui_runtime")
   const totalCount = rows.length > 0 ? Number(rows[0].total_count ?? rows.length) : 0
 
   // Map RPC rows → AuditLog shape expected by the client component.

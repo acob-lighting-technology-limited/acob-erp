@@ -13,6 +13,13 @@ export function isLate(clockIn: string | null | undefined): boolean {
   return h * 60 + m > 8 * 60 + 20
 }
 
+/** Returns true if the given YYYY-MM-DD date falls on a Saturday or Sunday. */
+export function isWeekend(dateIso: string | null | undefined): boolean {
+  if (!dateIso) return false
+  const dow = new Date(`${dateIso}T00:00:00Z`).getUTCDay()
+  return dow === 0 || dow === 6
+}
+
 /** Parses a "HH:MM" time string into minutes since midnight, or null if invalid. */
 export function timeToMinutes(value: string | null | undefined): number | null {
   if (!value) return null

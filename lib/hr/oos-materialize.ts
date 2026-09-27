@@ -2,15 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { recordAttendanceEvents } from "@/lib/hr/attendance-events"
 import { toLocalISODate } from "@/lib/utils/date"
 
-/** Inclusive list of workday ISO dates between start and end (weekends skipped). */
+/** Inclusive list of ISO dates between start and end (includes weekends for OOS directives). */
 export function oosWorkdays(start: string, end: string): string[] {
   const dates: string[] = []
   const cur = new Date(start + "T00:00:00Z")
   const last = new Date(end + "T00:00:00Z")
   while (cur <= last) {
     const iso = toLocalISODate(cur)
-    const day = new Date(iso + "T12:00:00Z").getUTCDay()
-    if (day !== 0 && day !== 6) dates.push(iso)
+    dates.push(iso)
     cur.setUTCDate(cur.getUTCDate() + 1)
   }
   return dates

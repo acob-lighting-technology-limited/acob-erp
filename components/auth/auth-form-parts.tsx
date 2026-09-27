@@ -38,7 +38,11 @@ export function AuthField({ label, icon: Icon, action, hint, id, ...inputProps }
       </div>
       <div className="relative">
         <Icon className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2" />
-        <Input id={fieldId} {...inputProps} className="h-12 rounded-xl pl-10.5" />
+        <Input
+          id={fieldId}
+          {...inputProps}
+          className="border-input/80 bg-background/60 focus-visible:border-primary focus-visible:ring-primary/30 h-12 rounded-xl pl-10.5 transition-colors"
+        />
       </div>
       {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
     </div>
@@ -68,7 +72,7 @@ export function AuthPasswordField({ revealLabel = "password", ...props }: AuthPa
           id={fieldId}
           {...inputProps}
           type={visible ? "text" : "password"}
-          className="h-12 rounded-xl pr-11 pl-10.5"
+          className="border-input/80 bg-background/60 focus-visible:border-primary focus-visible:ring-primary/30 h-12 rounded-xl pr-11 pl-10.5 transition-colors"
         />
         <button
           type="button"

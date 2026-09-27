@@ -1,4 +1,4 @@
-import { isLate } from "@/lib/hr/attendance-utils"
+import { isLate, isWeekend } from "@/lib/hr/attendance-utils"
 import { toLocalISODate } from "@/lib/utils/date"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 
@@ -269,21 +269,37 @@ export function deriveUnifiedAttendanceStatus(
   },
   policy: AttendancePolicy = DEFAULT_ATTENDANCE_POLICY
 ): UnifiedAttendanceStatus {
+  const rec = input.record
+  const explicitStatus = normalizeStoredAttendanceStatus(rec?.status)
+
+  // 1. Manual duty travel / Out of Station
+  if (explicitStatus === "out_of_station") return "out_of_station"
+
+  // 2. Public Holiday
   if (input.isHoliday) return "holiday"
+
+  // 3. Approved Leave
   // Unpaid leave is checked first: it is still leave, but it must not present as the covered,
   // benign "On Leave" that paid leave gets.
   if (input.isOnUnpaidLeave) return "lwop"
   if (input.isOnLeave) return "on_leave"
+
+  // 4. Exemption
   if (input.isExempted) return "exempted"
-  const rec = input.record
-  if (!rec) return "absent"
-  const explicitStatus = normalizeStoredAttendanceStatus(rec.status)
-  // Whole-day permission overrides (LWP/AWP/OOS) — LEWP is handled below because it
-  // must not rescue a late arrival, only the early departure.
+
+  // 5. Whole-day manual permissions (AWP/LWP) & waivers
+  // LEWP is handled below because it must not rescue a late arrival, only the early departure.
   if (explicitStatus && isPermissionAttendanceStatus(explicitStatus)) return explicitStatus
-  if (rec.waived) return "waiver"
+  if (rec?.waived) return "waiver"
   if (explicitStatus === "waiver") return "waiver"
-  if (!rec.clock_in && !rec.clock_out) return "absent"
+
+  // If no record or empty punches:
+  if (!rec || (!rec.clock_in && !rec.clock_out)) {
+    // 7. Weekend (Saturday / Sunday)
+    if (input.recordDate && isWeekend(input.recordDate)) return "weekend"
+    // 8. Workday unrecorded default
+    return "absent"
+  }
 
   const today = toLocalISODate()
   const isPastDate = Boolean(input.recordDate && input.recordDate < today)

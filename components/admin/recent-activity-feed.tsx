@@ -78,7 +78,9 @@ export function RecentActivityFeed({ activity, showViewAll = true }: RecentActiv
                       <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
                         {item.moduleLabel}
                       </Badge>
-                      <span className="text-muted-foreground text-[10px]">{formatDate(item.createdAt)}</span>
+                      <span className="text-muted-foreground text-[10px]" suppressHydrationWarning>
+                        {formatDate(item.createdAt)}
+                      </span>
                     </div>
                   </div>
                   <ArrowRight className="text-muted-foreground h-3.5 w-3.5 shrink-0" />

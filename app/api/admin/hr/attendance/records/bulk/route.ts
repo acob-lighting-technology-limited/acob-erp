@@ -86,10 +86,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate all dates in the range (skip weekends)
-    const dates = dateRange(start_date, end_date).filter((d) => !isWeekend(d))
+    // Generate all dates in the range. OOS spans weekends (field work / out-of-station directives continue through weekends);
+    // other bulk statuses (waivers, permissions) apply only to workdays.
+    const includeWeekends = status === "out_of_station"
+    const dates = dateRange(start_date, end_date).filter((d) => includeWeekends || !isWeekend(d))
     if (dates.length === 0) {
-      return NextResponse.json({ error: "No workdays found in the specified date range" }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: includeWeekends
+            ? "No dates found in the specified date range"
+            : "No workdays found in the specified date range",
+        },
+        { status: 400 }
+      )
     }
 
     if (

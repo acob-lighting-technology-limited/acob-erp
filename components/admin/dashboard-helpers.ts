@@ -46,6 +46,23 @@ export function normalizeToken(value?: string | null): string {
   return value.trim().toLowerCase().replace(/\s+/g, "_")
 }
 
+export function isExcludedActivity(
+  item?: {
+    action?: string | null
+    operation?: string | null
+    entity_type?: string | null
+    table_name?: string | null
+  } | null
+): boolean {
+  if (!item) return true
+  const action = normalizeToken(item.action || item.operation || "")
+  const entityType = normalizeToken(item.entity_type || item.table_name || "")
+
+  if (["sync", "migrate", "update_schema", "migration", "client_error"].includes(action)) return true
+  if (["ui_runtime", "frontend"].includes(entityType)) return true
+  return false
+}
+
 export function humanizeToken(value?: string | null, fallback = "System"): string {
   if (!value) return fallback
   return value
@@ -144,31 +161,33 @@ export function buildRecentActivity(
   filteredRawActivity: any[],
   actorMap: Map<string, { first_name?: string; last_name?: string; company_email?: string }>
 ): RecentActivityItem[] {
-  return filteredRawActivity.map((item) => {
-    const actor = actorMap.get(item.user_id)
-    const actorName =
-      actor?.first_name && actor?.last_name
-        ? `${formatName(actor.first_name)} ${formatName(actor.last_name)}`
-        : actor?.company_email || "System"
+  return (filteredRawActivity || [])
+    .filter((item) => !isExcludedActivity(item))
+    .map((item) => {
+      const actor = actorMap.get(item.user_id)
+      const actorName =
+        actor?.first_name && actor?.last_name
+          ? `${formatName(actor.first_name)} ${formatName(actor.last_name)}`
+          : actor?.company_email || "System"
 
-    const rawAction = item.action || item.operation || "updated"
-    const moduleKey = normalizeToken(item.entity_type || item.table_name || "system")
-    const moduleLabel = humanizeToken(item.entity_type || item.table_name, "System")
-    const target = extractTargetLabel(item)
-    const changedFields = extractChangedFields(item)
-      .slice(0, 3)
-      .map((field) => humanizeToken(field, field))
-    const changedSummary = changedFields.length > 0 ? ` (${changedFields.join(", ")})` : ""
+      const rawAction = item.action || item.operation || "updated"
+      const moduleKey = normalizeToken(item.entity_type || item.table_name || "system")
+      const moduleLabel = humanizeToken(item.entity_type || item.table_name, "System")
+      const target = extractTargetLabel(item)
+      const changedFields = extractChangedFields(item)
+        .slice(0, 3)
+        .map((field) => humanizeToken(field, field))
+      const changedSummary = changedFields.length > 0 ? ` (${changedFields.join(", ")})` : ""
 
-    return {
-      id: item.id,
-      actorName,
-      actionLabel: `${actionVerb(rawAction)} ${moduleLabel}${target ? `: ${target}` : ""}${changedSummary}`,
-      moduleLabel,
-      moduleKey,
-      createdAt: item.created_at,
-    }
-  })
+      return {
+        id: item.id,
+        actorName,
+        actionLabel: `${actionVerb(rawAction)} ${moduleLabel}${target ? `: ${target}` : ""}${changedSummary}`,
+        moduleLabel,
+        moduleKey,
+        createdAt: item.created_at,
+      }
+    })
 }
 
 export const primaryModules: ModuleAction[] = [

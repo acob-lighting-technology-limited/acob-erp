@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Star, ShieldCheck, EyeOff, Check, Loader2, ClipboardList } from "lucide-react"
+import { Check, EyeOff, Loader2, MessageSquareText, ShieldCheck, Star } from "lucide-react"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
 import type { SystemSatisfactionSurvey } from "@/types/survey"
@@ -23,19 +22,20 @@ import type { SystemSatisfactionSurvey } from "@/types/survey"
 const log = logger("system-survey-modal")
 
 const AVAILABLE_MODULES = [
-  { id: "pms", label: "PMS (Performance)" },
-  { id: "correspondence", label: "Correspondence & Memos" },
-  { id: "hr", label: "HR, Leave & Attendance" },
-  { id: "accounts", label: "Accounts & Payments" },
-  { id: "directory", label: "Employee Directory" },
-  { id: "projects", label: "Projects & Tasks" },
-  { id: "md_desk", label: "MD Desk" },
-]
-
-const TRAINING_OPTIONS = [
-  { value: "adequate", label: "Yes, fully prepared" },
-  { value: "somewhat", label: "Partially, needed more guidance" },
-  { value: "inadequate", label: "No, struggled to get started" },
+  { id: "leave", label: "Leave" },
+  { id: "lunch", label: "Lunch" },
+  { id: "kpi", label: "KPI" },
+  { id: "cbt", label: "CBT" },
+  { id: "projects", label: "Projects" },
+  { id: "tasks", label: "Tasks" },
+  { id: "correspondence", label: "Correspondence" },
+  { id: "documentation", label: "Documentation" },
+  { id: "pms", label: "PMS" },
+  { id: "profile", label: "Profile" },
+  { id: "attendance", label: "Attendance" },
+  { id: "directory", label: "Directory" },
+  { id: "reports", label: "Reports" },
+  { id: "assets", label: "Assets" },
 ]
 
 interface StarPickerProps {
@@ -50,17 +50,20 @@ function StarPicker({ value, onChange, label, description }: StarPickerProps) {
   const displayVal = hoverVal ?? value
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-semibold">{label}</Label>
-        <span className="text-muted-foreground text-xs font-medium">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">{label}</Label>
+          {description && <p className="text-muted-foreground text-sm leading-5">{description}</p>}
+        </div>
+        <span className="text-muted-foreground shrink-0 text-xs font-medium sm:pt-0.5" aria-live="polite">
           {displayVal > 0 ? `${displayVal} of 5` : "Select a rating"}
         </span>
       </div>
-      {description && <p className="text-muted-foreground text-xs">{description}</p>}
-      <div className="flex items-center gap-1.5 pt-0.5">
+      <div className="flex items-center gap-2" role="group" aria-label={`Rating for ${label}`}>
         {[1, 2, 3, 4, 5].map((star) => {
           const isFilled = star <= displayVal
+          const isSelected = star === value
           return (
             <button
               key={star}
@@ -68,12 +71,15 @@ function StarPicker({ value, onChange, label, description }: StarPickerProps) {
               onClick={() => onChange(star)}
               onMouseEnter={() => setHoverVal(star)}
               onMouseLeave={() => setHoverVal(null)}
-              className="hover:bg-muted focus:ring-primary/40 rounded-md p-1 transition focus:ring-2 focus:outline-none"
+              className={`focus-visible:ring-ring flex h-9 w-9 items-center justify-center rounded-md border transition focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none ${
+                isSelected ? "border-primary bg-primary/10" : "border-input hover:bg-muted"
+              }`}
               aria-label={`Rate ${star} out of 5 stars`}
+              aria-pressed={isSelected}
             >
               <Star
-                className={`h-6 w-6 transition-colors ${
-                  isFilled ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-muted-foreground/50"
+                className={`h-5 w-5 transition-colors ${
+                  isFilled ? "fill-primary text-primary" : "text-muted-foreground/40"
                 }`}
               />
             </button>
@@ -97,27 +103,26 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
   const [overallRating, setOverallRating] = useState<number>(existingSurvey?.overall_rating || 0)
   const [speedRating, setSpeedRating] = useState<number>(existingSurvey?.speed_rating || 0)
   const [usabilityRating, setUsabilityRating] = useState<number>(existingSurvey?.usability_rating || 0)
-  const [modulesUsed, setModulesUsed] = useState<string[]>(existingSurvey?.modules_used || [])
-  const [moduleRatings, setModuleRatings] = useState<Record<string, number>>(existingSurvey?.module_ratings || {})
-  const [trainingRating, setTrainingRating] = useState<string | null>(existingSurvey?.training_rating || null)
-  const [biggestFrustration, setBiggestFrustration] = useState(existingSurvey?.biggest_frustration || "")
+  const [modulesUsed, setModulesUsed] = useState<string[]>(() =>
+    (existingSurvey?.modules_used || [])
+      .filter((modId) => AVAILABLE_MODULES.some((module) => module.id === modId))
+      .slice(0, 3)
+  )
   const [desiredFeatures, setDesiredFeatures] = useState(existingSurvey?.desired_features || "")
-  const [isAnonymous, setIsAnonymous] = useState<boolean>(existingSurvey?.is_anonymous || false)
+  const [isAnonymous, setIsAnonymous] = useState<boolean>(existingSurvey?.is_anonymous ?? true)
 
   const toggleModule = (modId: string) => {
     if (modulesUsed.includes(modId)) {
       setModulesUsed(modulesUsed.filter((m) => m !== modId))
-      const copy = { ...moduleRatings }
-      delete copy[modId]
-      setModuleRatings(copy)
-    } else {
-      setModulesUsed([...modulesUsed, modId])
-      setModuleRatings({ ...moduleRatings, [modId]: 4 }) // default 4
+      return
     }
-  }
 
-  const setRatingForModule = (modId: string, rating: number) => {
-    setModuleRatings({ ...moduleRatings, [modId]: rating })
+    if (modulesUsed.length === 3) {
+      toast.info("Choose up to three areas to improve.")
+      return
+    }
+
+    setModulesUsed([...modulesUsed, modId])
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -135,9 +140,9 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
         speedRating,
         usabilityRating,
         modulesUsed,
-        moduleRatings,
-        trainingRating,
-        biggestFrustration: biggestFrustration.trim() || null,
+        moduleRatings: existingSurvey?.module_ratings ?? {},
+        trainingRating: existingSurvey?.training_rating ?? null,
+        biggestFrustration: existingSurvey?.biggest_frustration ?? null,
         desiredFeatures: desiredFeatures.trim() || null,
         isAnonymous,
       }
@@ -175,212 +180,164 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="border-border/60 bg-card relative max-h-[90vh] max-w-2xl overflow-y-auto p-6 shadow-2xl sm:rounded-2xl">
-        {/* Subtle top gradient accent line */}
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
-
-        <DialogHeader className="pt-1">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
-              <ClipboardList className="h-5 w-5 text-emerald-500" />
-            </span>
-            <div>
-              <DialogTitle className="text-lg font-bold tracking-tight">
-                {existingSurvey ? "Edit Your ERP Satisfaction Survey" : "ACOB Matrix ERP Experience Pulse"}
-              </DialogTitle>
-              <DialogDescription className="text-muted-foreground text-xs">
-                Help us refine and enhance system features, performance, and daily workflow ease.
-              </DialogDescription>
-            </div>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto p-0 sm:p-0">
+        <DialogHeader className="flex flex-row items-start gap-3 space-y-0 p-6 pb-5 text-left">
+          <div className="bg-muted text-muted-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-md">
+            <MessageSquareText className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div className="space-y-1">
+            <DialogTitle className="text-lg font-semibold tracking-tight">
+              {existingSurvey ? "Update your Matrix feedback" : "Share your Matrix feedback"}
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-5">
+              A short check-in to help us prioritise the right improvements.
+            </DialogDescription>
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 py-2">
-          {/* Section 1: Core Ratings */}
-          <div className="bg-card space-y-4 rounded-lg border p-4 shadow-sm">
-            <h4 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-              Core Usability & Performance
-            </h4>
-
-            <StarPicker
-              label="1. Overall System Satisfaction"
-              description="How satisfied are you with ACOB Matrix ERP overall?"
-              value={overallRating}
-              onChange={setOverallRating}
-            />
-
-            <div className="border-t pt-3">
-              <StarPicker
-                label="2. Speed & Responsiveness"
-                description="How fast does the system load pages, search records, and save actions?"
-                value={speedRating}
-                onChange={setSpeedRating}
-              />
+        <form onSubmit={handleSubmit} className="divide-y">
+          <section className="space-y-5 p-6" aria-labelledby="experience-heading">
+            <div className="space-y-1">
+              <h3 id="experience-heading" className="text-sm font-semibold">
+                Your experience
+              </h3>
+              <p className="text-muted-foreground text-sm">Three quick ratings give us a reliable baseline.</p>
             </div>
 
-            <div className="border-t pt-3">
-              <StarPicker
-                label="3. Ease of Navigation & Daily Use"
-                description="How intuitive is it to find what you need and complete your work?"
-                value={usabilityRating}
-                onChange={setUsabilityRating}
-              />
+            <div className="divide-y border-y">
+              <div className="py-4 first:pt-0">
+                <StarPicker
+                  label="Overall experience"
+                  description="How satisfied are you with Matrix overall?"
+                  value={overallRating}
+                  onChange={setOverallRating}
+                />
+              </div>
+
+              <div className="py-4">
+                <StarPicker
+                  label="Speed and responsiveness"
+                  description="How quickly Matrix loads, searches, and saves your work."
+                  value={speedRating}
+                  onChange={setSpeedRating}
+                />
+              </div>
+
+              <div className="py-4 last:pb-0">
+                <StarPicker
+                  label="Navigation and daily use"
+                  description="How easily you can find what you need and complete your work."
+                  value={usabilityRating}
+                  onChange={setUsabilityRating}
+                />
+              </div>
             </div>
-          </div>
+          </section>
 
-          {/* Section 2: Modules Used */}
-          <div className="bg-card space-y-3 rounded-lg border p-4 shadow-sm">
-            <h4 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-              Modules You Use Regularly
-            </h4>
-            <p className="text-muted-foreground text-xs">
-              Select the modules you work with and rate your experience with each:
-            </p>
+          <section className="space-y-5 p-6" aria-labelledby="modules-heading">
+            <div className="space-y-1">
+              <h3 id="modules-heading" className="text-sm font-semibold">
+                Areas needing improvement
+              </h3>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <p className="text-muted-foreground">
+                  Choose up to three Matrix areas you would most like us to improve.
+                </p>
+                <span className="text-muted-foreground font-medium" aria-live="polite">
+                  {modulesUsed.length} of 3 selected
+                </span>
+              </div>
+            </div>
 
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-2">
               {AVAILABLE_MODULES.map((mod) => {
                 const isSelected = modulesUsed.includes(mod.id)
                 return (
-                  <Badge
+                  <button
                     key={mod.id}
-                    variant={isSelected ? "default" : "outline"}
-                    className="cursor-pointer px-3 py-1 text-xs transition select-none"
+                    type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleModule(mod.id)}
+                    className={`focus-visible:ring-ring inline-flex min-h-9 items-center rounded-md border px-3 py-1.5 text-left text-xs font-medium transition focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none ${
+                      isSelected ? "border-primary bg-primary/10 text-primary" : "border-input hover:bg-muted"
+                    }`}
                   >
-                    {isSelected && <Check className="mr-1 h-3 w-3" />}
+                    {isSelected && <Check className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
                     {mod.label}
-                  </Badge>
+                  </button>
                 )
               })}
             </div>
+          </section>
 
-            {modulesUsed.length > 0 && (
-              <div className="space-y-2.5 border-t pt-3">
-                <span className="text-muted-foreground text-xs font-medium">Rate your selected modules (1–5):</span>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {modulesUsed.map((modId) => {
-                    const mod = AVAILABLE_MODULES.find((m) => m.id === modId)
-                    const rating = moduleRatings[modId] || 4
-                    return (
-                      <div
-                        key={modId}
-                        className="bg-muted/40 flex items-center justify-between rounded-md border px-3 py-2 text-xs"
-                      >
-                        <span className="max-w-[140px] truncate font-medium">{mod?.label}</span>
-                        <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={() => setRatingForModule(modId, star)}
-                              className="focus:outline-none"
-                            >
-                              <Star
-                                className={`h-4 w-4 ${
-                                  star <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"
-                                }`}
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Section 3: Training & Guidance */}
-          <div className="bg-card space-y-3 rounded-lg border p-4 shadow-sm">
-            <Label className="text-sm font-semibold">Did you receive enough guidance to use the ERP comfortably?</Label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {TRAINING_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setTrainingRating(opt.value)}
-                  className={`rounded-lg border p-2.5 text-left text-xs font-medium transition ${
-                    trainingRating === opt.value
-                      ? "border-primary bg-primary/10 text-primary ring-primary ring-1"
-                      : "border-input hover:bg-muted"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Section 4: Qualitative Feedback */}
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="biggest-frustration" className="text-sm font-medium">
-                What is your biggest frustration or blocker in the ERP?
-              </Label>
-              <Textarea
-                id="biggest-frustration"
-                placeholder="e.g. Navigating between approvals is too many clicks; slow file uploads; unclear status..."
-                value={biggestFrustration}
-                onChange={(e) => setBiggestFrustration(e.target.value)}
-                rows={2}
-                maxLength={1000}
-                className="text-sm"
-              />
+          <section className="space-y-4 p-6" aria-labelledby="comments-heading">
+            <div className="space-y-1">
+              <h3 id="comments-heading" className="text-sm font-semibold">
+                One improvement that would help most
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Optional, but a specific example helps us turn feedback into action.
+              </p>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="desired-features" className="text-sm font-medium">
-                What feature or improvement would save you the most time?
+                What single change would make Matrix work better for you?
               </Label>
               <Textarea
                 id="desired-features"
-                placeholder="e.g. Quick keyboard shortcuts, bulk approvals, export to Excel..."
+                placeholder="For example: bulk approvals, keyboard shortcuts, or clearer reporting."
                 value={desiredFeatures}
                 onChange={(e) => setDesiredFeatures(e.target.value)}
-                rows={2}
+                rows={3}
                 maxLength={1000}
-                className="text-sm"
+                className="resize-y text-sm"
               />
             </div>
-          </div>
+          </section>
 
-          {/* Section 5: Anonymity Toggle */}
-          <div className="bg-muted/30 flex items-start justify-between gap-3 rounded-lg border p-3.5">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5">
+          <section className="p-6" aria-labelledby="privacy-heading">
+            <div className="flex items-start gap-3">
+              <div className="bg-muted text-muted-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
                 {isAnonymous ? (
-                  <EyeOff className="text-muted-foreground h-4 w-4" />
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
                 ) : (
-                  <ShieldCheck className="text-primary h-4 w-4" />
+                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                 )}
-                <Label htmlFor="anonymous-mode" className="cursor-pointer text-xs font-semibold">
-                  Submit Anonymously
-                </Label>
               </div>
-              <p className="text-muted-foreground text-[11px] leading-relaxed">
-                {isAnonymous
-                  ? "Your name and email will be hidden in administrative dashboards. Only your department is aggregated for team sentiment."
-                  : "Your name is recorded. You will be able to review and update your answers anytime under Tools > Feedback."}
-              </p>
+              <div className="min-w-0 flex-1 space-y-1">
+                <Label id="privacy-heading" htmlFor="anonymous-mode" className="cursor-pointer text-sm font-medium">
+                  Submit anonymously
+                </Label>
+                <p className="text-muted-foreground text-sm leading-5">
+                  {isAnonymous
+                    ? "Your name and email are hidden in administrative dashboards."
+                    : "Your name is recorded so you can review and update your response later."}
+                </p>
+              </div>
+              <Switch
+                id="anonymous-mode"
+                checked={isAnonymous}
+                onCheckedChange={setIsAnonymous}
+                aria-labelledby="privacy-heading"
+              />
             </div>
-            <Switch id="anonymous-mode" checked={isAnonymous} onCheckedChange={setIsAnonymous} />
-          </div>
+          </section>
 
-          <DialogFooter className="flex flex-row items-center justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting} className="h-8 text-xs">
+          <DialogFooter className="bg-muted/30 flex flex-row items-center justify-end gap-2 px-6 py-4 sm:space-x-0">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="h-8 min-w-[120px] text-xs">
+            <Button type="submit" disabled={isSubmitting} className="min-w-[132px]">
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="animate-spin" />
                   Saving...
                 </>
               ) : existingSurvey ? (
-                "Update Response"
+                "Update feedback"
               ) : (
-                "Submit Survey"
+                "Send feedback"
               )}
             </Button>
           </DialogFooter>

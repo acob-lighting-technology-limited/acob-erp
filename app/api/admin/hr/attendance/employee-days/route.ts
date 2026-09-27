@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
       ? Promise.all([
           dataClient
             .from("audit_logs")
-            .select("entity_id, user_id, created_at")
+            .select("entity_id, user_id, created_at, metadata")
             .in("entity_type", ["attendance_record", "attendance_records"])
             .in("entity_id", recordIds)
             .order("created_at", { ascending: false }),
@@ -124,7 +124,11 @@ export async function GET(request: NextRequest) {
             .in("attendance_record_id", recordIds)
             .order("created_at", { ascending: false }),
         ]).then(([auditRes, eventRes]) => ({
-          auditRows: auditRes.data ?? [],
+          auditRows: (auditRes.data ?? []).filter((lg: { metadata?: Record<string, unknown> | null }) => {
+            const isSystem =
+              lg.metadata?.source === "system" || String(lg.metadata?.route ?? "").startsWith("/api/devices/")
+            return !isSystem
+          }),
           eventRows: eventRes.data ?? [],
         }))
       : Promise.resolve({ auditRows: [], eventRows: [] }),
@@ -161,9 +165,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const allMonthDates = getWorkdaysInMonth(yearMonth)
+  const closureCreatorIds: string[] = []
+  for (const d of allMonthDates) {
+    const cUid = ctx.earlyCloseCreatedBy(d)
+    if (cUid) closureCreatorIds.push(cUid)
+    const rUid = ctx.lateResumptionCreatedBy(d)
+    if (rUid) closureCreatorIds.push(rUid)
+  }
+
   // Resolve every actor id → first name in one query.
   const actorIds = [
-    ...new Set([...editorIdByRecordId.values(), ...holBy.values(), ...lvBy.values(), ...exBy.values()].filter(Boolean)),
+    ...new Set(
+      [
+        ...editorIdByRecordId.values(),
+        ...holBy.values(),
+        ...lvBy.values(),
+        ...exBy.values(),
+        ...closureCreatorIds,
+      ].filter(Boolean)
+    ),
   ]
   const firstNameById = new Map<string, string>()
   if (actorIds.length > 0) {
@@ -176,7 +197,12 @@ export async function GET(request: NextRequest) {
     }
   }
   const manualByDate = (date: string): string | null => {
-    const id = holBy.get(date) ?? lvBy.get(date) ?? exBy.get(date)
+    const id =
+      holBy.get(date) ??
+      lvBy.get(date) ??
+      exBy.get(date) ??
+      ctx.earlyCloseCreatedBy(date) ??
+      ctx.lateResumptionCreatedBy(date)
     return id ? (firstNameById.get(id) ?? null) : null
   }
 
