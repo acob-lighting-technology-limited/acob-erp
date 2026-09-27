@@ -419,43 +419,28 @@ async function getProfileData() {
     loadAttendancePolicy(dataClient),
   ])
 
-  let derivedTodayStatus: string = "not_clocked_in"
-  let todayClockIn: string | null = null
+  const unifiedTodayStatus = deriveUnifiedAttendanceStatus(
+    {
+      record: todayRecord,
+      isHoliday: dayCtx.isHoliday(todayIso),
+      isOnLeave: dayCtx.isOnLeave(userId, todayIso),
+      isOnUnpaidLeave: dayCtx.isOnUnpaidLeave(userId, todayIso),
+      isExempted: Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, todayIso),
+      recordDate: todayIso,
+      earlyClosure: dayCtx.earlyCloseTime(todayIso) ? { closeTime: dayCtx.earlyCloseTime(todayIso)! } : null,
+      lateResumption: dayCtx.lateResumptionTime(todayIso)
+        ? { resumptionTime: dayCtx.lateResumptionTime(todayIso)! }
+        : null,
+    },
+    policy
+  )
 
-  if (todayRecord?.clock_in) {
-    todayClockIn = todayRecord.clock_in
-    derivedTodayStatus = deriveUnifiedAttendanceStatus(
-      {
-        record: todayRecord,
-        isHoliday: dayCtx.isHoliday(todayIso),
-        isOnLeave: dayCtx.isOnLeave(userId, todayIso),
-        isOnUnpaidLeave: dayCtx.isOnUnpaidLeave(userId, todayIso),
-        isExempted: Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, todayIso),
-        recordDate: todayIso,
-        earlyClosure: dayCtx.earlyCloseTime(todayIso) ? { closeTime: dayCtx.earlyCloseTime(todayIso)! } : null,
-        lateResumption: dayCtx.lateResumptionTime(todayIso)
-          ? { resumptionTime: dayCtx.lateResumptionTime(todayIso)! }
-          : null,
-      },
-      policy
-    )
-  } else if (isWeekend(todayIso)) {
-    derivedTodayStatus = "weekend"
-  } else if (dayCtx.isHoliday(todayIso)) {
-    derivedTodayStatus = "holiday"
-  } else if (dayCtx.isOnUnpaidLeave(userId, todayIso)) {
-    derivedTodayStatus = "lwop"
-  } else if (dayCtx.isOnLeave(userId, todayIso)) {
-    derivedTodayStatus = "on_leave"
-  } else if (Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, todayIso)) {
-    derivedTodayStatus = "exempted"
-  } else {
-    derivedTodayStatus = "not_clocked_in"
-  }
+  const derivedTodayStatus =
+    unifiedTodayStatus === "absent" && !todayRecord?.clock_in ? "not_clocked_in" : unifiedTodayStatus
 
   const todayStatus: TodayAttendanceStatus = {
     status: derivedTodayStatus,
-    clock_in: todayClockIn,
+    clock_in: todayRecord?.clock_in ?? null,
   }
 
   const { data: lunchLogsData } = await dataClient
