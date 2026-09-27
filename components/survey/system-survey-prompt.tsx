@@ -58,12 +58,12 @@ export function SystemSurveyPrompt({ hasCompletedSurvey = false }: SystemSurveyP
               <div className="text-muted-foreground flex items-center gap-2">
                 <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <dt className="sr-only">Duration</dt>
-                <dd>About 2 minutes</dd>
+                <dd>About 1 minute</dd>
               </div>
               <div className="text-muted-foreground flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <dt className="sr-only">Privacy</dt>
-                <dd>You choose whether to share your name</dd>
+                <dd>Anonymous by default</dd>
               </div>
             </dl>
           </div>

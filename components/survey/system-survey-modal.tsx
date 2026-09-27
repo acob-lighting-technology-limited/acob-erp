@@ -38,12 +38,6 @@ const AVAILABLE_MODULES = [
   { id: "assets", label: "Assets" },
 ]
 
-const TRAINING_OPTIONS = [
-  { value: "adequate", label: "Yes, fully prepared" },
-  { value: "somewhat", label: "Partially, needed more guidance" },
-  { value: "inadequate", label: "No, struggled to get started" },
-]
-
 interface StarPickerProps {
   value: number
   onChange: (val: number) => void
@@ -109,31 +103,26 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
   const [overallRating, setOverallRating] = useState<number>(existingSurvey?.overall_rating || 0)
   const [speedRating, setSpeedRating] = useState<number>(existingSurvey?.speed_rating || 0)
   const [usabilityRating, setUsabilityRating] = useState<number>(existingSurvey?.usability_rating || 0)
-  const [modulesUsed, setModulesUsed] = useState<string[]>(existingSurvey?.modules_used || [])
-  const [moduleRatings, setModuleRatings] = useState<Record<string, number>>(existingSurvey?.module_ratings || {})
-  const [trainingRating, setTrainingRating] = useState<string | null>(existingSurvey?.training_rating || null)
-  const [biggestFrustration, setBiggestFrustration] = useState(existingSurvey?.biggest_frustration || "")
-  const [desiredFeatures, setDesiredFeatures] = useState(existingSurvey?.desired_features || "")
-  const [isAnonymous, setIsAnonymous] = useState<boolean>(existingSurvey?.is_anonymous || false)
-  const selectedModules = modulesUsed.filter((modId) => AVAILABLE_MODULES.some((module) => module.id === modId))
-  const selectedModuleRatings = Object.fromEntries(
-    Object.entries(moduleRatings).filter(([modId]) => selectedModules.includes(modId))
+  const [modulesUsed, setModulesUsed] = useState<string[]>(() =>
+    (existingSurvey?.modules_used || [])
+      .filter((modId) => AVAILABLE_MODULES.some((module) => module.id === modId))
+      .slice(0, 3)
   )
+  const [desiredFeatures, setDesiredFeatures] = useState(existingSurvey?.desired_features || "")
+  const [isAnonymous, setIsAnonymous] = useState<boolean>(existingSurvey?.is_anonymous ?? true)
 
   const toggleModule = (modId: string) => {
     if (modulesUsed.includes(modId)) {
       setModulesUsed(modulesUsed.filter((m) => m !== modId))
-      const copy = { ...moduleRatings }
-      delete copy[modId]
-      setModuleRatings(copy)
-    } else {
-      setModulesUsed([...modulesUsed, modId])
-      setModuleRatings({ ...moduleRatings, [modId]: 4 }) // default 4
+      return
     }
-  }
 
-  const setRatingForModule = (modId: string, rating: number) => {
-    setModuleRatings({ ...moduleRatings, [modId]: rating })
+    if (modulesUsed.length === 3) {
+      toast.info("Choose up to three areas to improve.")
+      return
+    }
+
+    setModulesUsed([...modulesUsed, modId])
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,10 +139,10 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
         overallRating,
         speedRating,
         usabilityRating,
-        modulesUsed: selectedModules,
-        moduleRatings: selectedModuleRatings,
-        trainingRating,
-        biggestFrustration: biggestFrustration.trim() || null,
+        modulesUsed,
+        moduleRatings: existingSurvey?.module_ratings ?? {},
+        trainingRating: existingSurvey?.training_rating ?? null,
+        biggestFrustration: existingSurvey?.biggest_frustration ?? null,
         desiredFeatures: desiredFeatures.trim() || null,
         isAnonymous,
       }
@@ -201,7 +190,7 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
               {existingSurvey ? "Update your Matrix feedback" : "Share your Matrix feedback"}
             </DialogTitle>
             <DialogDescription className="text-sm leading-5">
-              Tell us what is working well and what we should improve.
+              A short check-in to help us prioritise the right improvements.
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -212,7 +201,7 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
               <h3 id="experience-heading" className="text-sm font-semibold">
                 Your experience
               </h3>
-              <p className="text-muted-foreground text-sm">Rate the parts of Matrix you use every day.</p>
+              <p className="text-muted-foreground text-sm">Three quick ratings give us a reliable baseline.</p>
             </div>
 
             <div className="divide-y border-y">
@@ -248,9 +237,16 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
           <section className="space-y-5 p-6" aria-labelledby="modules-heading">
             <div className="space-y-1">
               <h3 id="modules-heading" className="text-sm font-semibold">
-                Modules you use
+                Areas needing improvement
               </h3>
-              <p className="text-muted-foreground text-sm">Select the Matrix modules you work in regularly.</p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <p className="text-muted-foreground">
+                  Choose up to three Matrix areas you would most like us to improve.
+                </p>
+                <span className="text-muted-foreground font-medium" aria-live="polite">
+                  {modulesUsed.length} of 3 selected
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -272,124 +268,31 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
                 )
               })}
             </div>
-
-            {selectedModules.length > 0 && (
-              <div className="space-y-3 border-t pt-5">
-                <p className="text-muted-foreground text-sm">Rate the modules you selected.</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {selectedModules.map((modId) => {
-                    const mod = AVAILABLE_MODULES.find((m) => m.id === modId)
-                    const rating = moduleRatings[modId] || 4
-                    return (
-                      <div
-                        key={modId}
-                        className="bg-muted/30 flex items-center justify-between gap-3 rounded-md border p-3"
-                      >
-                        <span className="min-w-0 truncate text-sm font-medium">{mod?.label}</span>
-                        <div
-                          className="flex shrink-0 items-center gap-1"
-                          role="group"
-                          aria-label={`Rating for ${mod?.label}`}
-                        >
-                          {[1, 2, 3, 4, 5].map((star) => {
-                            const isSelected = star === rating
-                            return (
-                              <button
-                                key={star}
-                                type="button"
-                                onClick={() => setRatingForModule(modId, star)}
-                                aria-label={`Rate ${mod?.label} ${star} out of 5 stars`}
-                                aria-pressed={isSelected}
-                                className={`focus-visible:ring-ring flex h-7 w-7 items-center justify-center rounded-md transition focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none ${
-                                  isSelected
-                                    ? "bg-primary/10 text-primary"
-                                    : "text-muted-foreground/40 hover:bg-background hover:text-muted-foreground"
-                                }`}
-                              >
-                                <Star
-                                  className={`h-4 w-4 ${star <= rating ? "fill-current" : ""}`}
-                                  aria-hidden="true"
-                                />
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="space-y-4 p-6" aria-labelledby="guidance-heading">
-            <div className="space-y-1">
-              <h3 id="guidance-heading" className="text-sm font-semibold">
-                Guidance and training
-              </h3>
-              <p className="text-muted-foreground text-sm">
-                Did you receive enough guidance to use Matrix comfortably?
-              </p>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              {TRAINING_OPTIONS.map((opt) => {
-                const isSelected = trainingRating === opt.value
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => setTrainingRating(opt.value)}
-                    className={`focus-visible:ring-ring min-h-11 rounded-md border px-3 py-2 text-left text-sm font-medium transition focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none ${
-                      isSelected ? "border-primary bg-primary/10 text-primary" : "border-input hover:bg-muted"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
           </section>
 
           <section className="space-y-4 p-6" aria-labelledby="comments-heading">
             <div className="space-y-1">
               <h3 id="comments-heading" className="text-sm font-semibold">
-                Tell us more
+                One improvement that would help most
               </h3>
-              <p className="text-muted-foreground text-sm">Optional details give the team the context to act.</p>
+              <p className="text-muted-foreground text-sm">
+                Optional, but a specific example helps us turn feedback into action.
+              </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="biggest-frustration" className="text-sm font-medium">
-                  What is your biggest frustration or blocker in Matrix?
-                </Label>
-                <Textarea
-                  id="biggest-frustration"
-                  placeholder="For example: slow file uploads, unclear statuses, or too many approval steps."
-                  value={biggestFrustration}
-                  onChange={(e) => setBiggestFrustration(e.target.value)}
-                  rows={3}
-                  maxLength={1000}
-                  className="resize-y text-sm"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="desired-features" className="text-sm font-medium">
-                  What improvement would save you the most time?
-                </Label>
-                <Textarea
-                  id="desired-features"
-                  placeholder="For example: bulk approvals, keyboard shortcuts, or clearer reporting."
-                  value={desiredFeatures}
-                  onChange={(e) => setDesiredFeatures(e.target.value)}
-                  rows={3}
-                  maxLength={1000}
-                  className="resize-y text-sm"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="desired-features" className="text-sm font-medium">
+                What single change would make Matrix work better for you?
+              </Label>
+              <Textarea
+                id="desired-features"
+                placeholder="For example: bulk approvals, keyboard shortcuts, or clearer reporting."
+                value={desiredFeatures}
+                onChange={(e) => setDesiredFeatures(e.target.value)}
+                rows={3}
+                maxLength={1000}
+                className="resize-y text-sm"
+              />
             </div>
           </section>
 
@@ -409,7 +312,7 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
                 <p className="text-muted-foreground text-sm leading-5">
                   {isAnonymous
                     ? "Your name and email are hidden in administrative dashboards."
-                    : "Your name is recorded, so you can review and update your response later."}
+                    : "Your name is recorded so you can review and update your response later."}
                 </p>
               </div>
               <Switch
