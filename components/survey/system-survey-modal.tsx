@@ -22,13 +22,20 @@ import type { SystemSatisfactionSurvey } from "@/types/survey"
 const log = logger("system-survey-modal")
 
 const AVAILABLE_MODULES = [
-  { id: "pms", label: "PMS (Performance)" },
-  { id: "correspondence", label: "Correspondence & Memos" },
-  { id: "hr", label: "HR, Leave & Attendance" },
-  { id: "accounts", label: "Accounts & Payments" },
-  { id: "directory", label: "Employee Directory" },
-  { id: "projects", label: "Projects & Tasks" },
-  { id: "md_desk", label: "MD Desk" },
+  { id: "leave", label: "Leave" },
+  { id: "lunch", label: "Lunch" },
+  { id: "kpi", label: "KPI" },
+  { id: "cbt", label: "CBT" },
+  { id: "projects", label: "Projects" },
+  { id: "tasks", label: "Tasks" },
+  { id: "correspondence", label: "Correspondence" },
+  { id: "documentation", label: "Documentation" },
+  { id: "pms", label: "PMS" },
+  { id: "profile", label: "Profile" },
+  { id: "attendance", label: "Attendance" },
+  { id: "directory", label: "Directory" },
+  { id: "reports", label: "Reports" },
+  { id: "assets", label: "Assets" },
 ]
 
 const TRAINING_OPTIONS = [
@@ -108,6 +115,10 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
   const [biggestFrustration, setBiggestFrustration] = useState(existingSurvey?.biggest_frustration || "")
   const [desiredFeatures, setDesiredFeatures] = useState(existingSurvey?.desired_features || "")
   const [isAnonymous, setIsAnonymous] = useState<boolean>(existingSurvey?.is_anonymous || false)
+  const selectedModules = modulesUsed.filter((modId) => AVAILABLE_MODULES.some((module) => module.id === modId))
+  const selectedModuleRatings = Object.fromEntries(
+    Object.entries(moduleRatings).filter(([modId]) => selectedModules.includes(modId))
+  )
 
   const toggleModule = (modId: string) => {
     if (modulesUsed.includes(modId)) {
@@ -139,8 +150,8 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
         overallRating,
         speedRating,
         usabilityRating,
-        modulesUsed,
-        moduleRatings,
+        modulesUsed: selectedModules,
+        moduleRatings: selectedModuleRatings,
         trainingRating,
         biggestFrustration: biggestFrustration.trim() || null,
         desiredFeatures: desiredFeatures.trim() || null,
@@ -262,11 +273,11 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
               })}
             </div>
 
-            {modulesUsed.length > 0 && (
+            {selectedModules.length > 0 && (
               <div className="space-y-3 border-t pt-5">
                 <p className="text-muted-foreground text-sm">Rate the modules you selected.</p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {modulesUsed.map((modId) => {
+                  {selectedModules.map((modId) => {
                     const mod = AVAILABLE_MODULES.find((m) => m.id === modId)
                     const rating = moduleRatings[modId] || 4
                     return (
