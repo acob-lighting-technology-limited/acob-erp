@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
       recordIds.length > 0
         ? dataClient
             .from("audit_logs")
-            .select("entity_id, user_id, created_at")
+            .select("entity_id, user_id, created_at, metadata")
             .eq("entity_type", "attendance_record")
             .in("entity_id", recordIds)
             .order("created_at", { ascending: false })
@@ -145,10 +145,17 @@ export async function GET(request: NextRequest) {
       loadDayContext(dataClient, { userIds, start: minDate, end: maxDate }),
     ])
 
-    // Build audit log lookups to find the latest editor for each record
+    // Build audit log lookups to find the latest manual editor for each record.
+    // Exclude automated system logs (e.g. Hikvision device punches where user_id is the employee).
     const editorIdByRecordId = new Map<string, string>()
-    for (const log of auditLogRows as Array<{ entity_id: string; user_id: string }>) {
-      if (!editorIdByRecordId.has(log.entity_id)) {
+    for (const log of auditLogRows as Array<{
+      entity_id: string
+      user_id: string
+      metadata?: Record<string, unknown> | null
+    }>) {
+      const isSystemLog =
+        log.metadata?.source === "system" || String(log.metadata?.route ?? "").startsWith("/api/devices/")
+      if (!isSystemLog && !editorIdByRecordId.has(log.entity_id)) {
         editorIdByRecordId.set(log.entity_id, log.user_id)
       }
     }
@@ -208,13 +215,13 @@ export async function GET(request: NextRequest) {
         },
         policy
       )
-      let editorUserId = editorIdByRecordId.get(r.id)
-      if (!editorUserId) {
-        if (derivedStatus === "early_closure") {
-          editorUserId = ctx.earlyCloseCreatedBy(r.date) ?? undefined
-        } else if (derivedStatus === "late_resumption") {
-          editorUserId = ctx.lateResumptionCreatedBy(r.date) ?? undefined
-        }
+      let editorUserId: string | undefined
+      if (derivedStatus === "early_closure") {
+        editorUserId = ctx.earlyCloseCreatedBy(r.date) ?? editorIdByRecordId.get(r.id)
+      } else if (derivedStatus === "late_resumption") {
+        editorUserId = ctx.lateResumptionCreatedBy(r.date) ?? editorIdByRecordId.get(r.id)
+      } else {
+        editorUserId = editorIdByRecordId.get(r.id)
       }
       const editorProfile = editorUserId ? editorProfileMap.get(editorUserId) : null
       const editorFirstName = editorProfile?.first_name || editorProfile?.full_name?.split(" ")[0] || null
