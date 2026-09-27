@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Download, Loader2, Printer, QrCode, RefreshCw } from "lucide-react"
+import { AlertTriangle, Download, Loader2, Printer, QrCode, RefreshCw, ShieldCheck } from "lucide-react"
 import {
   generateMeetingAttendancePdf,
   generateQrWithMatrixLogo,
@@ -126,9 +126,12 @@ export function AttendancePrintSheetDialog({
         <div className="space-y-4 py-2">
           {/* Holiday Alert if applicable */}
           {isHoliday && holidayName && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
-              <span className="font-semibold">⚠️ Public Holiday Notice:</span> {holidayName} (Meeting held on{" "}
-              {meetingDate})
+            <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+              <div>
+                <span className="font-semibold">Public Holiday Notice:</span> {holidayName} (Meeting held on{" "}
+                {meetingDate})
+              </div>
             </div>
           )}
 
@@ -171,7 +174,7 @@ export function AttendancePrintSheetDialog({
                 variant="outline"
                 className="border-emerald-500/30 bg-emerald-50 text-[11px] text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
               >
-                🔒 Biometric Entrance Punch Required
+                <ShieldCheck className="mr-1 h-3.5 w-3.5 text-emerald-600" /> Biometric Entrance Punch Required
               </Badge>
             </div>
           </div>

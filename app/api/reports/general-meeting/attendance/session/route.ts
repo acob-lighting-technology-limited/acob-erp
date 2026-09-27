@@ -89,6 +89,22 @@ export async function GET(request: NextRequest) {
     session = created
   }
 
+  // 4. Check calling user's entrance biometric punch and meeting attendance for this session
+  const { data: userPunch } = await db
+    .from("attendance_records")
+    .select("clock_in, source")
+    .eq("user_id", user.id)
+    .eq("date", meetingDate)
+    .maybeSingle()
+
+  const { data: userMeetingRecord } = await db
+    .from("general_meeting_attendance")
+    .select("meeting_clock_in, office_clock_in, attendance_mode, status")
+    .eq("user_id", user.id)
+    .eq("meeting_week", week)
+    .eq("meeting_year", year)
+    .maybeSingle()
+
   return NextResponse.json({
     session,
     holidayInfo: {
@@ -98,6 +114,15 @@ export async function GET(request: NextRequest) {
       meetingHolidayName: meetingHoliday?.name || null,
       mondayIso,
       meetingDate,
+    },
+    userStatus: {
+      hasOfficeClockIn: Boolean(userPunch?.clock_in),
+      officeClockIn: userPunch?.clock_in || null,
+      officeClockInSource: userPunch?.source || null,
+      alreadyCheckedIn: Boolean(userMeetingRecord?.meeting_clock_in),
+      meetingClockIn: userMeetingRecord?.meeting_clock_in || null,
+      attendanceMode: userMeetingRecord?.attendance_mode || null,
+      status: userMeetingRecord?.status || null,
     },
   })
 }

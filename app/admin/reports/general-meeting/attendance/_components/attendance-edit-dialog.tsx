@@ -170,7 +170,7 @@ export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onS
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="physical">Physical (In Room)</SelectItem>
-                  <SelectItem value="virtual">Virtual (Teams)</SelectItem>
+                  <SelectItem value="virtual">Online (Teams / Virtual)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

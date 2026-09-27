@@ -1,24 +1,59 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { PageHeader, PageWrapper } from "@/components/layout"
-import { PageSection } from "@/components/ui/patterns"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AlertCircle, Calendar, Download, QrCode, RefreshCw, UserCheck } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  AlertTriangle,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Download,
+  Edit2,
+  FileSignature,
+  KeyRound,
+  Laptop,
+  Palmtree,
+  QrCode,
+  RefreshCw,
+  ShieldCheck,
+  UserCheck,
+  Users,
+  XCircle,
+} from "lucide-react"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { AttendanceStatsGrid } from "./_components/attendance-stats"
-import { AttendanceTable } from "./_components/attendance-table"
 import { AttendancePrintSheetDialog } from "./_components/attendance-print-sheet"
+import { AttendanceEditDialog } from "./_components/attendance-edit-dialog"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
+
+function formatTime(isoString: string | null): string {
+  if (!isoString) return "—"
+  try {
+    const d = new Date(isoString)
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+  } catch {
+    return isoString
+  }
+}
 
 export default function AdminMeetingAttendancePage() {
   const currentWeek = useMemo(() => getCurrentOfficeWeek(), [])
   const [week, setWeek] = useState(currentWeek.week)
   const [year, setYear] = useState(currentWeek.year)
+  const [selectedTab, setSelectedTab] = useState<string>("all")
   const [showPrintSheet, setShowPrintSheet] = useState(false)
+  const [editingItem, setEditingItem] = useState<AttendanceRosterItem | null>(null)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
 
   // 1. Fetch meeting session (contains 6-digit code, active state, holiday info)
   const {
@@ -63,7 +98,7 @@ export default function AdminMeetingAttendancePage() {
 
   const session = sessionData?.session
   const holidayInfo = sessionData?.holidayInfo
-  const items = attendanceData?.items || []
+  const items = useMemo(() => attendanceData?.items || [], [attendanceData?.items])
   const stats = attendanceData?.stats || {
     totalStaff: 0,
     officeClockedIn: 0,
@@ -73,8 +108,92 @@ export default function AdminMeetingAttendancePage() {
     absent: 0,
   }
 
+  const onlineCount = useMemo(() => items.filter((i) => i.attendance_mode === "virtual").length, [items])
+
   const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
   const yearOptions = useMemo(() => [currentWeek.year - 1, currentWeek.year, currentWeek.year + 1], [currentWeek.year])
+
+  // Extract departments for filter dropdown
+  const departments = useMemo(() => {
+    return Array.from(new Set(items.map((i) => i.department).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+  }, [items])
+
+  // Tab definitions with Lucide icons & dynamic badge counts
+  const tabs: DataTableTab[] = useMemo(
+    () => [
+      { key: "all", label: "All Staff", icon: Users },
+      {
+        key: "not_scanned",
+        label: "At Office, Not Scanned",
+        icon: AlertTriangle,
+        badge: stats.officeNotScanned > 0 ? stats.officeNotScanned : undefined,
+        badgeVariant: "destructive",
+      },
+      { key: "present", label: "In Meeting", icon: CheckCircle2 },
+      {
+        key: "online",
+        label: "Online / Virtual",
+        icon: Laptop,
+        badge: onlineCount > 0 ? onlineCount : undefined,
+      },
+      { key: "not_at_office", label: "Not in Office", icon: Building2 },
+      {
+        key: "on_leave",
+        label: "On Leave",
+        icon: Palmtree,
+        badge: stats.onLeave > 0 ? stats.onLeave : undefined,
+      },
+    ],
+    [stats.officeNotScanned, stats.onLeave, onlineCount]
+  )
+
+  // Filter items by active tab
+  const filteredData = useMemo(() => {
+    switch (selectedTab) {
+      case "not_scanned":
+        return items.filter((i) => i.office_clock_in && !i.meeting_clock_in && !i.is_on_leave)
+      case "present":
+        return items.filter((i) => i.status === "present" || i.status === "late")
+      case "online":
+        return items.filter((i) => i.attendance_mode === "virtual")
+      case "on_leave":
+        return items.filter((i) => i.is_on_leave)
+      case "not_at_office":
+        return items.filter((i) => !i.office_clock_in && !i.meeting_clock_in && !i.is_on_leave)
+      default:
+        return items
+    }
+  }, [items, selectedTab])
+
+  // 1-Click "Confirm in Room" action
+  const handleQuickConfirm = useCallback(
+    async (item: AttendanceRosterItem) => {
+      setConfirmingId(item.id)
+      try {
+        const res = await fetch("/api/reports/general-meeting/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            week,
+            year,
+            userId: item.id,
+            action: "confirm_in_room",
+          }),
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Failed to confirm attendance")
+
+        toast.success(`Confirmed ${item.full_name} in conference room!`)
+        await refetchAttendance()
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Error confirming in room")
+      } finally {
+        setConfirmingId(null)
+      }
+    },
+    [week, year, refetchAttendance]
+  )
 
   const handleRegenerateCode = async () => {
     const res = await fetch("/api/reports/general-meeting/attendance/session", {
@@ -105,6 +224,7 @@ export default function AdminMeetingAttendancePage() {
       "Office Entrance Punch",
       "Meeting Check-In",
       "Status",
+      "Mode",
       "Source",
       "Manual Comment",
     ]
@@ -115,6 +235,7 @@ export default function AdminMeetingAttendancePage() {
       `"${i.office_clock_in || "No Punch"}"`,
       `"${i.meeting_clock_in || "Not Checked In"}"`,
       `"${i.status}"`,
+      `"${i.attendance_mode || "physical"}"`,
       `"${i.source || "—"}"`,
       `"${(i.manual_comment || "").replace(/"/g, '""')}"`,
     ])
@@ -130,125 +251,366 @@ export default function AdminMeetingAttendancePage() {
     toast.success("Exported attendance roster to CSV")
   }
 
+  const columns = useMemo<DataTableColumn<AttendanceRosterItem>[]>(
+    () => [
+      {
+        key: "employee",
+        label: "Employee",
+        sortable: true,
+        accessor: (r) => r.full_name,
+        render: (r) => (
+          <div className="flex items-center gap-3 py-1">
+            <StaffAvatar name={r.full_name} src={r.avatar_url} size="md" />
+            <div className="min-w-0">
+              <div className="text-foreground truncate font-medium">{r.full_name}</div>
+              <div className="text-muted-foreground truncate text-xs">{r.designation || r.department}</div>
+            </div>
+          </div>
+        ),
+        initialWidth: 260,
+      },
+      {
+        key: "department",
+        label: "Department",
+        sortable: true,
+        accessor: (r) => r.department,
+        render: (r) => <span className="text-muted-foreground text-xs font-medium">{r.department}</span>,
+        initialWidth: 160,
+      },
+      {
+        key: "office_clock_in",
+        label: "Office Entrance Punch",
+        sortable: true,
+        accessor: (r) => r.office_clock_in || "",
+        render: (r) => {
+          if (!r.office_clock_in) {
+            return <span className="text-muted-foreground text-xs italic">No punch</span>
+          }
+          return (
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-blue-500" />
+              <span className="text-foreground text-xs font-semibold">{formatTime(r.office_clock_in)}</span>
+              <Badge
+                variant="outline"
+                className="border-muted-foreground/30 text-muted-foreground px-1 py-0 text-[10px] uppercase"
+              >
+                {r.office_clock_in_source || "Bio"}
+              </Badge>
+            </div>
+          )
+        },
+        initialWidth: 180,
+      },
+      {
+        key: "meeting_clock_in",
+        label: "Meeting Check-In",
+        sortable: true,
+        accessor: (r) => r.meeting_clock_in || "",
+        render: (r) => {
+          if (!r.meeting_clock_in) {
+            if (r.office_clock_in && !r.is_on_leave) {
+              return (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                >
+                  <AlertTriangle className="h-3 w-3" /> Missed scan
+                </Badge>
+              )
+            }
+            return <span className="text-muted-foreground text-xs italic">—</span>
+          }
+          return (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+              <span className="text-foreground text-xs font-semibold">{formatTime(r.meeting_clock_in)}</span>
+            </div>
+          )
+        },
+        initialWidth: 160,
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        accessor: (r) => r.status,
+        render: (r) => {
+          if (r.is_on_leave) {
+            return (
+              <Badge variant="outline" className="gap-1 border-sky-400/50 bg-sky-500/10 text-sky-700 dark:text-sky-400">
+                <Palmtree className="h-3 w-3" /> On Leave
+              </Badge>
+            )
+          }
+          switch (r.status) {
+            case "present":
+              return (
+                <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600">
+                  <CheckCircle2 className="h-3 w-3" /> Present
+                </Badge>
+              )
+            case "late":
+              return (
+                <Badge className="gap-1 bg-amber-600 text-white hover:bg-amber-600">
+                  <Clock className="h-3 w-3" /> Late
+                </Badge>
+              )
+            case "excused":
+              return (
+                <Badge variant="secondary" className="gap-1">
+                  <ShieldCheck className="h-3 w-3" /> Excused
+                </Badge>
+              )
+            case "absent":
+              return (
+                <Badge variant="destructive" className="gap-1">
+                  <XCircle className="h-3 w-3" /> Absent
+                </Badge>
+              )
+            default:
+              return (
+                <Badge variant="outline" className="text-muted-foreground">
+                  Unrecorded
+                </Badge>
+              )
+          }
+        },
+        initialWidth: 130,
+      },
+      {
+        key: "source",
+        label: "Source / Mode",
+        sortable: true,
+        accessor: (r) => r.source || "",
+        render: (r) => {
+          if (!r.source && !r.attendance_mode) return <span className="text-muted-foreground text-xs">—</span>
+          if (r.attendance_mode === "virtual") {
+            return (
+              <Badge
+                variant="outline"
+                className="gap-1 border-sky-400/50 bg-sky-500/10 text-[11px] text-sky-700 dark:text-sky-400"
+              >
+                <Laptop className="h-3 w-3" /> Online
+              </Badge>
+            )
+          }
+          switch (r.source) {
+            case "qr_scan":
+              return (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-indigo-400/50 bg-indigo-500/10 text-[11px] text-indigo-700 dark:text-indigo-400"
+                >
+                  <QrCode className="h-3 w-3" /> QR Scan
+                </Badge>
+              )
+            case "code_input":
+              return (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-violet-400/50 bg-violet-500/10 text-[11px] text-violet-700 dark:text-violet-400"
+                >
+                  <KeyRound className="h-3 w-3" /> 6-Digit Code
+                </Badge>
+              )
+            case "manual":
+              return (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-slate-400/50 bg-slate-500/10 text-[11px] text-slate-700 dark:text-slate-300"
+                >
+                  <FileSignature className="h-3 w-3" /> Manual
+                </Badge>
+              )
+            default:
+              return <span className="text-muted-foreground text-xs">{r.source}</span>
+          }
+        },
+        initialWidth: 140,
+      },
+      {
+        key: "actions",
+        label: "Actions",
+        render: (r) => (
+          <div className="flex items-center gap-1.5">
+            {r.office_clock_in && !r.meeting_clock_in && !r.is_on_leave && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleQuickConfirm(r)}
+                    disabled={confirmingId === r.id}
+                    className="h-7 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  >
+                    <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+                    Confirm in Room
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Employee clocked into building today. Confirm they are seated in conference room.
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditingItem(r)}
+              className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+        initialWidth: 160,
+      },
+    ],
+    [confirmingId, handleQuickConfirm]
+  )
+
+  const filters: DataTableFilter<AttendanceRosterItem>[] = [
+    {
+      key: "department",
+      label: "Department",
+      options: departments.map((d) => ({ value: d, label: d })),
+    },
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "present", label: "Present" },
+        { value: "late", label: "Late" },
+        { value: "excused", label: "Excused" },
+        { value: "absent", label: "Absent" },
+        { value: "on_leave", label: "On Leave" },
+        { value: "unrecorded", label: "Unrecorded" },
+      ],
+    },
+  ]
+
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="General Meeting Attendance"
-        description="Replace pen and paper with real-time biometric-verified QR & 6-digit attendance check-in."
-        icon={UserCheck}
-        backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
+    <DataTablePage
+      title="General Meeting Attendance"
+      description="Real-time biometric-verified attendance tracking for General Meeting & KSS."
+      icon={UserCheck}
+      backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
+      tabs={tabs}
+      activeTab={selectedTab}
+      onTabChange={setSelectedTab}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="bg-background flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs">
+            <Calendar className="text-muted-foreground h-3.5 w-3.5" />
+            <span className="text-muted-foreground font-semibold">Week:</span>
+            <Select value={String(week)} onValueChange={(v) => setWeek(Number(v))}>
+              <SelectTrigger className="h-6 w-16 border-0 bg-transparent p-0 text-xs font-semibold shadow-none focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {weekOptions.map((w) => (
+                  <SelectItem key={w} value={String(w)} className="text-xs">
+                    Week {w}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+              <SelectTrigger className="h-6 w-14 border-0 bg-transparent p-0 text-xs font-semibold shadow-none focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((y) => (
+                  <SelectItem key={y} value={String(y)} className="text-xs">
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowPrintSheet(true)}>
+            <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+            <span>Sign-In Sheet</span>
+          </Button>
+
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleExportCsv}>
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Export CSV</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => {
+              refetchSession()
+              refetchAttendance()
+            }}
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", (attendanceLoading || sessionLoading) && "animate-spin")} />
+          </Button>
+        </div>
+      }
+      stats={
+        <div className="space-y-3">
+          {holidayInfo?.isMondayHoliday && (
+            <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="flex-1">
+                <span className="font-semibold">Public Holiday Notice: </span>
+                <span>{holidayInfo.mondayHolidayName} falls on Monday of this week.</span>
+              </div>
+            </div>
+          )}
+          <AttendanceStatsGrid stats={stats} onlineCount={onlineCount} />
+        </div>
+      }
+    >
+      <DataTable<AttendanceRosterItem>
+        data={filteredData}
+        columns={columns}
+        getRowId={(r) => r.id}
+        searchPlaceholder="Search staff by name, department, or designation..."
+        searchFn={(row, query) => {
+          const q = query.toLowerCase()
+          return (
+            row.full_name.toLowerCase().includes(q) ||
+            row.department.toLowerCase().includes(q) ||
+            (row.designation?.toLowerCase().includes(q) ?? false)
+          )
+        }}
+        filters={filters}
+        isLoading={attendanceLoading}
+        onRetry={() => {
+          refetchSession()
+          refetchAttendance()
+        }}
+        pagination={{ pageSize: 50 }}
       />
 
-      <div className="space-y-6">
-        {/* Top Controls Bar: Week/Year Selector + Sheet & Export Buttons */}
-        <div className="bg-card flex flex-wrap items-center justify-between gap-4 rounded-xl border p-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="text-muted-foreground h-4 w-4" />
-              <span className="text-foreground text-xs font-semibold">Week:</span>
-              <Select value={String(week)} onValueChange={(v) => setWeek(Number(v))}>
-                <SelectTrigger className="h-8 w-24 text-xs font-medium">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {weekOptions.map((w) => (
-                    <SelectItem key={w} value={String(w)} className="text-xs">
-                      Week {w}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {session && (
+        <AttendancePrintSheetDialog
+          open={showPrintSheet}
+          onOpenChange={setShowPrintSheet}
+          week={week}
+          year={year}
+          meetingDate={session.meeting_date}
+          code6Digit={session.code_6_digit}
+          isHoliday={holidayInfo?.isMeetingDayHoliday}
+          holidayName={holidayInfo?.meetingHolidayName}
+          onRegenerateCode={handleRegenerateCode}
+        />
+      )}
 
-            <div className="flex items-center gap-2">
-              <span className="text-foreground text-xs font-semibold">Year:</span>
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger className="h-8 w-24 text-xs font-medium">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((y) => (
-                    <SelectItem key={y} value={String(y)} className="text-xs">
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                refetchSession()
-                refetchAttendance()
-              }}
-              disabled={attendanceLoading}
-              className="text-muted-foreground hover:text-foreground h-8 px-2 text-xs"
-            >
-              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${attendanceLoading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Button size="sm" variant="outline" onClick={handleExportCsv} className="h-8 gap-1.5 text-xs font-medium">
-              <Download className="h-3.5 w-3.5" />
-              Export CSV
-            </Button>
-
-            <Button
-              size="sm"
-              onClick={() => setShowPrintSheet(true)}
-              className="h-8 gap-1.5 bg-indigo-600 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700"
-            >
-              <QrCode className="h-3.5 w-3.5" />
-              Print / Download Sign-In Sheet
-            </Button>
-          </div>
-        </div>
-
-        {/* Dynamic Holiday Warning Banner */}
-        {holidayInfo?.isMondayHoliday && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-500/10 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div className="space-y-0.5">
-              <h4 className="text-sm font-semibold">Monday is a Public Holiday ({holidayInfo.mondayHolidayName})</h4>
-              <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
-                General Meeting & KSS is dynamically aligned for this week. Scheduled meeting date:{" "}
-                <span className="font-semibold underline">{holidayInfo.meetingDate}</span>.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Real-time Stats Grid */}
-        <AttendanceStatsGrid stats={stats} />
-
-        {/* Directory-style Attendance Table */}
-        <PageSection title="Staff Attendance Roster">
-          <AttendanceTable
-            items={items}
-            week={week}
-            year={year}
-            isLoading={attendanceLoading || sessionLoading}
-            onRefresh={refetchAttendance}
-          />
-        </PageSection>
-      </div>
-
-      {/* Printable Sheet Dialog */}
-      <AttendancePrintSheetDialog
-        open={showPrintSheet}
-        onOpenChange={setShowPrintSheet}
+      <AttendanceEditDialog
+        open={Boolean(editingItem)}
+        onOpenChange={(open) => !open && setEditingItem(null)}
+        item={editingItem}
         week={week}
         year={year}
-        meetingDate={session?.meeting_date || attendanceData?.meetingDate || ""}
-        code6Digit={session?.code_6_digit || "000000"}
-        isHoliday={holidayInfo?.isMondayHoliday || holidayInfo?.isMeetingDayHoliday}
-        holidayName={holidayInfo?.mondayHolidayName || holidayInfo?.meetingHolidayName}
-        onRegenerateCode={handleRegenerateCode}
+        onSuccess={refetchAttendance}
       />
-    </PageWrapper>
+    </DataTablePage>
   )
 }

@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge"
 import { AlertCircle, CheckCircle2, Clock, Loader2, QrCode, ShieldCheck, UserCheck } from "lucide-react"
 import { toast } from "sonner"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
-import { cn } from "@/lib/utils"
 
 function CheckInContent() {
   const searchParams = useSearchParams()
@@ -25,18 +24,53 @@ function CheckInContent() {
   const [week] = useState(initialWeek)
   const [year] = useState(initialYear)
   const [code, setCode] = useState(initialCode)
-  const [mode, setMode] = useState<"physical" | "virtual">("physical")
   const [submitting, setSubmitting] = useState(false)
+  const [sessionLoading, setSessionLoading] = useState(true)
+  const [userStatus, setUserStatus] = useState<{
+    hasOfficeClockIn: boolean
+    officeClockIn: string | null
+    officeClockInSource: string | null
+    alreadyCheckedIn: boolean
+    meetingClockIn: string | null
+  } | null>(null)
   const [successResult, setSuccessResult] = useState<{
     officeClockIn: string | null
     meetingClockIn: string
   } | null>(null)
   const [biometricError, setBiometricError] = useState<string | null>(null)
 
+  // Fetch session & current user's biometric entrance punch status
+  useEffect(() => {
+    let mounted = true
+    const loadSession = async () => {
+      try {
+        setSessionLoading(true)
+        const res = await fetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
+        const data = await res.json()
+        if (mounted && data.userStatus) {
+          setUserStatus(data.userStatus)
+          if (data.userStatus.alreadyCheckedIn && data.userStatus.meetingClockIn) {
+            setSuccessResult({
+              officeClockIn: data.userStatus.officeClockIn,
+              meetingClockIn: data.userStatus.meetingClockIn,
+            })
+          }
+        }
+      } catch {
+        // Fail quietly on network hiccup
+      } finally {
+        if (mounted) setSessionLoading(false)
+      }
+    }
+    loadSession()
+    return () => {
+      mounted = false
+    }
+  }, [week, year])
+
   // Auto-submit if code is prefilled via QR scan (length 6)
   useEffect(() => {
     if (initialCode && initialCode.length === 6 && !successResult && !submitting) {
-      // Auto pre-populate code
       setCode(initialCode)
     }
   }, [initialCode, successResult, submitting])
@@ -44,6 +78,12 @@ function CheckInContent() {
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setBiometricError(null)
+
+    // Check if user has clocked in at entrance
+    if (userStatus && !userStatus.hasOfficeClockIn) {
+      toast.error("You haven't clocked in yet to use this")
+      return
+    }
 
     const cleanedCode = code.trim().replace(/\s+/g, "")
     if (cleanedCode.length !== 6) {
@@ -60,7 +100,7 @@ function CheckInContent() {
           week,
           year,
           code: cleanedCode,
-          attendanceMode: mode,
+          attendanceMode: "physical",
           source: initialCode ? "qr_scan" : "code_input",
         }),
       })
@@ -69,8 +109,11 @@ function CheckInContent() {
       if (!res.ok) {
         if (data.code === "BIOMETRIC_PUNCH_REQUIRED") {
           setBiometricError(data.error)
+          toast.error("You haven't clocked in yet to use this")
+        } else {
+          throw new Error(data.error || "Failed to record attendance")
         }
-        throw new Error(data.error || "Failed to record attendance")
+        return
       }
 
       toast.success("Attendance confirmed successfully!")
@@ -78,6 +121,7 @@ function CheckInContent() {
         officeClockIn: data.record.office_clock_in,
         meetingClockIn: data.record.meeting_clock_in,
       })
+      setUserStatus((prev) => (prev ? { ...prev, alreadyCheckedIn: true } : null))
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error checking in")
     } finally {
@@ -180,48 +224,43 @@ function CheckInContent() {
                 </p>
               </div>
 
-              {/* Mode Selection: Physical vs Virtual */}
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Attendance Mode</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setMode("physical")}
-                    className={cn(
-                      "flex cursor-pointer flex-col items-center justify-between rounded-lg border-2 p-3 text-center text-xs transition-all",
-                      mode === "physical"
-                        ? "border-indigo-600 bg-indigo-50/50 font-semibold text-indigo-950 dark:bg-indigo-950/30 dark:text-indigo-200"
-                        : "border-muted bg-popover hover:bg-accent text-muted-foreground"
-                    )}
-                  >
-                    <span className="mb-1 text-base">🏢</span>
-                    <span>In Conference Room</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("virtual")}
-                    className={cn(
-                      "flex cursor-pointer flex-col items-center justify-between rounded-lg border-2 p-3 text-center text-xs transition-all",
-                      mode === "virtual"
-                        ? "border-indigo-600 bg-indigo-50/50 font-semibold text-indigo-950 dark:bg-indigo-950/30 dark:text-indigo-200"
-                        : "border-muted bg-popover hover:bg-accent text-muted-foreground"
-                    )}
-                  >
-                    <span className="mb-1 text-base">💻</span>
-                    <span>Online (Teams)</span>
-                  </button>
+              {/* Biometric status notice */}
+              {sessionLoading ? (
+                <div className="bg-muted/40 text-muted-foreground flex items-center justify-center gap-2 rounded-lg border p-3 text-xs">
+                  <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                  <span>Checking office entrance clock-in status...</span>
                 </div>
-              </div>
-
-              {/* Security notice */}
-              <div className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-lg p-2.5 text-[11px]">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
-                <span>Requires your morning biometric punch at the office entrance machine.</span>
-              </div>
+              ) : userStatus && !userStatus.hasOfficeClockIn ? (
+                <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                  <div className="flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>No Office Clock-In Recorded Today</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-amber-700/90 dark:text-amber-300/90">
+                    You haven&apos;t clocked in at the front entrance biometric machine yet today. If you just punched
+                    seconds ago, please wait 30 seconds for device sync.
+                  </p>
+                </div>
+              ) : userStatus && userStatus.hasOfficeClockIn ? (
+                <div className="space-y-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-950 dark:text-emerald-200">
+                  <div className="flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>Office Entrance Punch Verified</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90">
+                    Punched in at{" "}
+                    {new Date(userStatus.officeClockIn!).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    ({userStatus.officeClockInSource || "Biometric"}).
+                  </p>
+                </div>
+              ) : null}
 
               <Button
                 type="submit"
-                disabled={submitting || code.trim().length !== 6}
+                disabled={submitting}
                 className="h-11 w-full bg-indigo-600 text-sm font-semibold text-white shadow hover:bg-indigo-700"
               >
                 {submitting ? (
