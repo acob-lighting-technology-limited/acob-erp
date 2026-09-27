@@ -748,42 +748,49 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Emp. No.",
         sortable: true,
         resizable: true,
-        initialWidth: 120,
+        initialWidth: 100,
         accessor: (r) => r.employee_number || "",
         hideOnMobile: true,
-        render: (r) => <span className="text-muted-foreground font-mono text-sm">{r.employee_number || "—"}</span>,
+        render: (r) => (
+          <span className="text-muted-foreground font-mono text-xs whitespace-nowrap">{r.employee_number || "—"}</span>
+        ),
       },
       {
         key: "name",
         label: "Name",
         sortable: true,
         resizable: true,
-        initialWidth: 260,
+        initialWidth: 210,
         accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <EmployeeAvatar employee={r} size="sm" />
-            <div className="min-w-0 space-y-0.5">
-              <div className="flex items-center gap-2">
+            <div className="max-w-[155px] min-w-0 space-y-0.5">
+              <div className="flex items-center gap-1.5">
                 <span
                   className={cn(
-                    "truncate font-medium",
+                    "truncate text-sm font-medium",
                     r.employment_status === "exited" && "text-muted-foreground line-through"
                   )}
+                  title={`${formatName(r.last_name)}, ${formatName(r.first_name)}`}
                 >
                   {formatName(r.last_name)}, {formatName(r.first_name)}
                 </span>
                 {r.is_department_lead && (
                   <Badge
                     variant="outline"
-                    className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                    className="shrink-0 gap-0.5 border-amber-500/40 bg-amber-500/10 px-1 py-0 text-[10px] font-medium text-amber-600 dark:text-amber-400"
                   >
                     <Shield className="h-2.5 w-2.5" />
                     Lead
                   </Badge>
                 )}
               </div>
-              {r.designation && <p className="text-muted-foreground truncate text-xs">{r.designation}</p>}
+              {r.designation && (
+                <p className="text-muted-foreground truncate text-xs" title={r.designation}>
+                  {r.designation}
+                </p>
+              )}
             </div>
           </div>
         ),
@@ -792,16 +799,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "email",
         label: "Email",
         resizable: true,
-        initialWidth: 220,
+        initialWidth: 180,
         accessor: (r) => r.company_email,
         hideOnMobile: true,
         render: (r) => (
-          <div className="flex flex-col gap-0.5 text-sm">
+          <div className="flex flex-col gap-0.5 text-xs">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex max-w-full items-center gap-1.5 text-left transition-colors"
+                  className="text-muted-foreground hover:text-foreground inline-flex max-w-[160px] items-center gap-1.5 text-left transition-colors"
                   onClick={() => void handleCopyEmail(r.company_email)}
                   aria-label="Copy email"
                 >
@@ -816,7 +823,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground/80 hover:text-foreground ml-5 max-w-full truncate text-left text-xs transition-colors"
+                    className="text-muted-foreground/80 hover:text-foreground ml-5 max-w-[140px] truncate text-left text-xs transition-colors"
                     onClick={() => void handleCopyEmail(r.additional_email || "")}
                     aria-label="Copy additional email"
                   >
@@ -834,7 +841,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Department",
         sortable: true,
         accessor: (r) => r.department,
-        render: (r) => <span className="whitespace-nowrap">{r.department}</span>,
+        render: (r) => (
+          <span className="block max-w-[120px] truncate text-xs" title={r.department}>
+            {r.department}
+          </span>
+        ),
       },
       {
         key: "role",
@@ -846,7 +857,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             return <span className="text-muted-foreground text-xs">—</span>
           }
           return (
-            <Badge className={cn("whitespace-nowrap shadow-none", getRoleBadgeColor(r.role))}>
+            <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap shadow-none", getRoleBadgeColor(r.role))}>
               {getRoleDisplayName(r.role)}
             </Badge>
           )
@@ -884,7 +895,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             display = "Contract Staff"
             badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
           }
-          return <Badge className={cn("whitespace-nowrap", badgeColor)}>{display}</Badge>
+          return <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap", badgeColor)}>{display}</Badge>
         },
       },
       {
