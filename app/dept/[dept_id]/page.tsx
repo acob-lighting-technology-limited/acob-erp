@@ -32,7 +32,7 @@ import {
   type AdminPaymentActivityRow,
   type AdminTaskActivityRow,
 } from "@/components/admin/activity-tabs"
-import { normalizeToken, buildRecentActivity } from "@/components/admin/dashboard-helpers"
+import { normalizeToken, buildRecentActivity, isExcludedActivity } from "@/components/admin/dashboard-helpers"
 import { logger } from "@/lib/logger"
 
 const log = logger("dept-dashboard")
@@ -255,6 +255,8 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
       dataClient
         .from("audit_logs")
         .select(activitySelect)
+        .neq("action", "client_error")
+        .neq("entity_type", "ui_runtime")
         .in("department", queryDepartmentScope)
         .order("created_at", { ascending: false })
         .limit(20)
@@ -263,6 +265,8 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
         ? dataClient
             .from("audit_logs")
             .select(activitySelect)
+            .neq("action", "client_error")
+            .neq("entity_type", "ui_runtime")
             .in("user_id", scopedUserIds)
             .order("created_at", { ascending: false })
             .limit(20)
@@ -273,12 +277,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
     for (const item of [...(deptActivity.data || []), ...(userActivity.data || [])]) byId.set(item.id, item)
     filteredRawActivity = Array.from(byId.values())
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .filter(
-        (item) =>
-          !["sync", "migrate", "update_schema", "migration"].includes(
-            normalizeToken(item.action || item.operation || "")
-          )
-      )
+      .filter((item) => !isExcludedActivity(item))
       .slice(0, 8)
   }
 

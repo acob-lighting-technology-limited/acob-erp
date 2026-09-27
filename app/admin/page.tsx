@@ -21,7 +21,7 @@ import {
   type AdminPaymentActivityRow,
   type AdminTaskActivityRow,
 } from "@/components/admin/activity-tabs"
-import { normalizeToken, buildRecentActivity } from "@/components/admin/dashboard-helpers"
+import { normalizeToken, buildRecentActivity, isExcludedActivity } from "@/components/admin/dashboard-helpers"
 import { logger } from "@/lib/logger"
 import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
@@ -352,6 +352,8 @@ export default async function AdminDashboardPage() {
           dataClient
             .from("audit_logs")
             .select(activitySelect)
+            .neq("action", "client_error")
+            .neq("entity_type", "ui_runtime")
             .in("department", queryDepartmentScope)
             .order("created_at", { ascending: false })
             .limit(20)
@@ -360,6 +362,8 @@ export default async function AdminDashboardPage() {
             ? dataClient
                 .from("audit_logs")
                 .select(activitySelect)
+                .neq("action", "client_error")
+                .neq("entity_type", "ui_runtime")
                 .in("user_id", scopedUserIds)
                 .order("created_at", { ascending: false })
                 .limit(20)
@@ -382,6 +386,8 @@ export default async function AdminDashboardPage() {
       const { data, error: auditError } = await dataClient
         .from("audit_logs")
         .select(activitySelect)
+        .neq("action", "client_error")
+        .neq("entity_type", "ui_runtime")
         .order("created_at", { ascending: false })
         .limit(20)
         .returns<ActivityLogRow[]>()
@@ -389,12 +395,7 @@ export default async function AdminDashboardPage() {
       rawActivity = data || []
     }
 
-    filteredRawActivity = rawActivity
-      .filter(
-        (item) =>
-          !["sync", "migrate", "update_schema", "migration"].includes(normalizeToken(item.action || item.operation))
-      )
-      .slice(0, 8)
+    filteredRawActivity = rawActivity.filter((item) => !isExcludedActivity(item)).slice(0, 8)
   }
 
   const actorIds = Array.from(new Set(filteredRawActivity.map((item) => item.user_id).filter(Boolean)))

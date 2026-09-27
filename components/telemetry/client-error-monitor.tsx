@@ -13,6 +13,41 @@ function normalizeMessage(value: unknown): string {
   }
 }
 
+function isChunkLoadError(message: string): boolean {
+  return (
+    /loading chunk .* failed/i.test(message) ||
+    /failed to fetch dynamically imported module/i.test(message) ||
+    /error loading dynamically imported module/i.test(message)
+  )
+}
+
+function isBenignHydrationWarning(message: string): boolean {
+  return (
+    message.includes("Minified React error #418") ||
+    message.includes("Minified React error #423") ||
+    message.includes("Minified React error #425") ||
+    message.includes("Hydration failed") ||
+    message.includes("Text content does not match server-rendered HTML") ||
+    message.includes("There was an error while hydrating")
+  )
+}
+
+function tryChunkReload(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    const lastReload = sessionStorage.getItem("chunk_reload_monitor_ts")
+    const now = Date.now()
+    if (!lastReload || now - parseInt(lastReload, 10) > 15000) {
+      sessionStorage.setItem("chunk_reload_monitor_ts", now.toString())
+      window.location.reload()
+      return true
+    }
+  } catch {
+    // Ignore sessionStorage errors
+  }
+  return false
+}
+
 export function ClientErrorMonitor() {
   const seenRef = useRef<Map<string, number>>(new Map())
 
@@ -31,6 +66,15 @@ export function ClientErrorMonitor() {
 
     const onWindowError = (event: ErrorEvent) => {
       const message = normalizeMessage(event.error || event.message || "Window error")
+
+      if (isChunkLoadError(message) && tryChunkReload()) {
+        return
+      }
+
+      if (isBenignHydrationWarning(message)) {
+        return
+      }
+
       const stack = event.error instanceof Error ? event.error.stack || null : null
       const route = typeof window !== "undefined" ? window.location.pathname : "/"
       const fingerprint = `${route}|window.error|${message}`
@@ -52,6 +96,15 @@ export function ClientErrorMonitor() {
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason
       const message = normalizeMessage(reason)
+
+      if (isChunkLoadError(message) && tryChunkReload()) {
+        return
+      }
+
+      if (isBenignHydrationWarning(message)) {
+        return
+      }
+
       const stack = reason instanceof Error ? reason.stack || null : null
       const route = typeof window !== "undefined" ? window.location.pathname : "/"
       const fingerprint = `${route}|unhandledrejection|${message}`

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ProfileContent } from "./profile-content"
-import { buildRecentActivity, normalizeToken } from "@/components/admin/dashboard-helpers"
+import { buildRecentActivity, normalizeToken, isExcludedActivity } from "@/components/admin/dashboard-helpers"
 import type { PersonalRecentActivityItem } from "@/components/profile/personal-recent-activity-feed"
 import { getAvatarSignedUrl } from "@/lib/profile-photos"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
@@ -458,17 +458,14 @@ async function getProfileData() {
     .select(
       "id, user_id, created_at, action, operation, entity_type, table_name, entity_id, metadata, changed_fields, new_values, old_values"
     )
+    .neq("action", "client_error")
+    .neq("entity_type", "ui_runtime")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(50)
     .returns<ActivityLogRow[]>()
 
-  const filteredRawActivity = (rawActivity || [])
-    .filter(
-      (item) =>
-        !["sync", "migrate", "update_schema", "migration"].includes(normalizeToken(item.action || item.operation))
-    )
-    .slice(0, 50)
+  const filteredRawActivity = (rawActivity || []).filter((item) => !isExcludedActivity(item)).slice(0, 50)
 
   const actorMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>([
     [
