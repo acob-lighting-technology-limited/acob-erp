@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { AlertTriangle, Download, Loader2, Printer, QrCode } from "lucide-react"
+import { AlertTriangle, Download, Loader2, Printer, QrCode, ShieldCheck } from "lucide-react"
 import {
   generateMeetingAttendancePdf,
   generateQrWithMatrixLogo,
@@ -147,56 +148,50 @@ export function AttendancePrintSheetDialog({
             </div>
           )}
 
-          {/* Screen preview of the A4 sheet */}
-          <div className="bg-muted/30 rounded-xl border p-3 shadow-inner sm:p-4">
-            <div className="mx-auto flex aspect-[210/297] w-full max-w-[340px] flex-col items-center overflow-hidden rounded-sm border bg-white px-5 py-5 text-center shadow-sm">
-              <div className="h-1 w-full rounded-full bg-emerald-700" />
-              <div className="mt-3 text-[10px] font-bold tracking-[0.16em] text-slate-900">ACOB LIGHTING</div>
-              <div className="mt-2 text-base font-bold text-slate-900">General Meeting & KSS</div>
-              <div className="mt-0.5 text-[9px] text-slate-500">
-                Attendance Sign-In Sheet · Week {week}, {year}
-              </div>
-              <div className="mt-0.5 text-[9px] text-slate-500">{meetingDate}</div>
+          {/* Large On-Screen Scan Display */}
+          <div className="bg-muted/30 flex flex-col items-center justify-center rounded-2xl border p-5 text-center shadow-inner sm:p-6">
+            <div className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+              Week {week}, {year} • General Meeting & KSS
+            </div>
+            <div className="text-foreground mt-1 text-sm font-medium">{meetingDate}</div>
 
-              <div className="mt-3 flex w-full flex-1 flex-col gap-2">
-                {/* Block 1: Scan Hero */}
-                <div className="flex flex-col items-center rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
-                  <div className="rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-0.5 text-[8px] font-bold tracking-wider text-emerald-800">
-                    SCAN TO SIGN IN
-                  </div>
+            {/* QR Code Container - Large and High Contrast for instant camera focus */}
+            <div className="relative mt-4 flex h-60 w-60 items-center justify-center rounded-2xl border-2 border-slate-200 bg-white p-3 shadow-md sm:h-64 sm:w-64 dark:border-slate-800">
+              {generatingQr ? (
+                <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+              ) : qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrDataUrl} alt="Meeting QR Code" className="h-full w-full object-contain" />
+              ) : (
+                <span className="text-muted-foreground text-xs">Unable to render QR</span>
+              )}
+            </div>
 
-                  {/* QR Code Container */}
-                  <div className="relative mt-1.5 flex aspect-square w-[56%] items-center justify-center rounded-md border border-slate-300 bg-white p-1.5 shadow-xs">
-                    {generatingQr ? (
-                      <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
-                    ) : qrDataUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={qrDataUrl} alt="Meeting QR Code" className="h-full w-full object-contain" />
-                    ) : (
-                      <span className="text-muted-foreground text-[10px]">Unable to render QR</span>
-                    )}
-                  </div>
+            <div className="text-muted-foreground mt-3 text-xs">
+              Point your camera or scanner at the code to check in.
+            </div>
 
-                  <div className="mt-1 text-[7.5px] text-slate-500">
-                    Point your camera or scanner at the code to check in.
-                  </div>
-                </div>
+            <div className="mt-3.5 flex items-center gap-2">
+              <div className="bg-border h-px w-10 sm:w-16" />
+              <span className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
+                OR ENTER CODE IN MATRIX
+              </span>
+              <div className="bg-border h-px w-10 sm:w-16" />
+            </div>
 
-                {/* Block 2: Backup Code */}
-                <div className="flex flex-col items-center rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-center">
-                  <div className="text-[7.5px] font-bold tracking-wide text-emerald-800">
-                    CAN&apos;T SCAN? USE 6-DIGIT BACKUP CODE
-                  </div>
-                  <div className="mt-1 w-full max-w-[180px] rounded-md border border-emerald-300 bg-white py-1 text-base font-black tracking-widest text-emerald-950">
-                    {formattedCode}
-                  </div>
-                  <div className="mt-1 text-[7px] text-slate-500">Enter code in Matrix General Meeting Attendance.</div>
-                </div>
-              </div>
+            {/* 6-Digit Code with Dash */}
+            <div className="mt-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-8 py-2.5 font-mono text-2xl font-black tracking-[0.25em] text-emerald-700 shadow-xs sm:text-3xl dark:text-emerald-300">
+              {formattedCode}
+            </div>
 
-              <div className="mt-auto border-t border-slate-100 pt-1.5 text-[7px] text-slate-400">
-                ACOB Lighting Technology Limited · Matrix ERP
-              </div>
+            <div className="mt-3 flex items-center gap-1.5">
+              <Badge
+                variant="outline"
+                className="border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-700 dark:text-emerald-300"
+              >
+                <ShieldCheck className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Biometric Entrance
+                Punch Required
+              </Badge>
             </div>
           </div>
 
