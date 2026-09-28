@@ -16,6 +16,7 @@ import {
   Download,
   Edit2,
   FileSignature,
+  Laptop,
   Palmtree,
   QrCode,
   RefreshCw,
@@ -307,6 +308,38 @@ export default function AdminMeetingAttendancePage() {
           }
         },
         initialWidth: 130,
+      },
+      {
+        key: "attendance_mode",
+        label: "Mode",
+        sortable: true,
+        accessor: (r) => r.attendance_mode || "",
+        render: (r) => {
+          if (!r.attendance_mode) return <span className="text-muted-foreground text-xs">—</span>
+          if (r.attendance_mode === "virtual") {
+            return (
+              <Badge
+                variant="outline"
+                className="gap-1 border-sky-400/50 bg-sky-500/10 text-[11px] text-sky-700 dark:text-sky-400"
+              >
+                <Laptop className="h-3 w-3" /> Online
+              </Badge>
+            )
+          }
+          if (r.attendance_mode === "physical") {
+            return (
+              <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground gap-1 text-[11px]">
+                <Building2 className="h-3 w-3" /> Physical
+              </Badge>
+            )
+          }
+          return (
+            <Badge variant="outline" className="text-[11px] capitalize">
+              {r.attendance_mode}
+            </Badge>
+          )
+        },
+        initialWidth: 120,
       },
       {
         key: "actions",
