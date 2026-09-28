@@ -76,39 +76,36 @@ export async function generateQrWithMatrixLogo(text: string): Promise<string> {
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
       img.onerror = () => reject()
-      // Use the crisp dark Matrix mark
       img.src = "/images/exports/matrix-mark.png"
     })
 
     const size = canvas.width * 0.22
     const x = (canvas.width - size) / 2
     const y = (canvas.height - size) / 2
-    const padding = 8
+    const pad = 6
 
-    // Draw white circular/rounded background badge with clean contrast
+    // Clean white rounded badge with subtle border
     ctx.fillStyle = "#ffffff"
-    ctx.strokeStyle = "#cbd5e1"
-    ctx.lineWidth = 3
     ctx.beginPath()
-    ctx.roundRect(x - padding, y - padding, size + padding * 2, size + padding * 2, 12)
+    ctx.roundRect(x - pad, y - pad, size + pad * 2, size + pad * 2, 8)
     ctx.fill()
+
+    ctx.strokeStyle = "#e2e8f0"
+    ctx.lineWidth = 1.5
     ctx.stroke()
 
     // Draw logo centered
     ctx.drawImage(img, x, y, size, size)
   } catch {
-    // Graceful fallback: Draw clean dark Matrix mark
+    // Graceful fallback
     const size = canvas.width * 0.22
     const x = (canvas.width - size) / 2
     const y = (canvas.height - size) / 2
 
     ctx.fillStyle = "#ffffff"
-    ctx.strokeStyle = "#cbd5e1"
-    ctx.lineWidth = 3
     ctx.beginPath()
-    ctx.roundRect(x - 6, y - 6, size + 12, size + 12, 10)
+    ctx.roundRect(x - 6, y - 6, size + 12, size + 12, 8)
     ctx.fill()
-    ctx.stroke()
 
     ctx.fillStyle = "#15803d"
     ctx.font = "bold 20px sans-serif"
@@ -134,34 +131,45 @@ export async function generateMeetingAttendancePdf(data: MeetingSheetData): Prom
   const pageWidth = 210
   const pageHeight = 297
 
-  // Load the dark ACOB logo for the header
+  // Top emerald accent strip
+  doc.setFillColor(22, 101, 52) // Brand Deep Green
+  doc.rect(0, 0, pageWidth, 4, "F")
+
+  // Load the full ACOB Lighting logo
   const logoDataUrl = await loadImageDataUrl("/images/exports/acob-lighting-full.png")
 
-  let currentY = 22
+  let currentY = 18
 
   if (logoDataUrl) {
-    // Centered dark ACOB logo
-    const logoWidth = 68
-    const logoHeight = 15
+    const logoWidth = 64
+    const logoHeight = 14.5
     doc.addImage(logoDataUrl, "PNG", (pageWidth - logoWidth) / 2, currentY, logoWidth, logoHeight)
-    currentY += logoHeight + 10
+    currentY += logoHeight + 6
   } else {
-    // Text fallback
     doc.setTextColor(15, 23, 42)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(16)
     doc.text("ACOB LIGHTING TECHNOLOGY LIMITED", pageWidth / 2, currentY + 6, { align: "center" })
-    currentY += 18
+    currentY += 16
   }
 
   // Meeting Title
-  doc.setTextColor(15, 23, 42) // Dark Slate
+  doc.setTextColor(15, 23, 42)
   doc.setFont("helvetica", "bold")
-  doc.setFontSize(22)
+  doc.setFontSize(23)
   doc.text("General Meeting & KSS", pageWidth / 2, currentY, { align: "center" })
-  currentY += 8
+  currentY += 7.5
 
-  // Subtitle with Week and Formatted Date
+  // Subtitle with Week
+  doc.setFont("helvetica", "normal")
+  doc.setFontSize(11)
+  doc.setTextColor(71, 85, 105) // Slate 600
+  doc.text(`Attendance Sign-In Sheet   ·   Week ${data.week}, ${data.year}`, pageWidth / 2, currentY, {
+    align: "center",
+  })
+  currentY += 5.5
+
+  // Formatted Date
   let formattedDate: string
   try {
     const d = new Date(`${data.meetingDate}T00:00:00`)
@@ -170,76 +178,121 @@ export async function generateMeetingAttendancePdf(data: MeetingSheetData): Prom
     formattedDate = data.meetingDate
   }
 
-  doc.setFont("helvetica", "normal")
-  doc.setFontSize(11)
-  doc.setTextColor(100, 116, 139) // Slate 500
-  doc.text(`Attendance Sign-In Sheet  •  Week ${data.week}, ${data.year}`, pageWidth / 2, currentY, { align: "center" })
-  currentY += 6
-
   doc.setFontSize(10)
+  doc.setTextColor(100, 116, 139) // Slate 500
   doc.text(formattedDate, pageWidth / 2, currentY, { align: "center" })
-  currentY += 8
+  currentY += 7
 
   // Holiday notice (if applicable)
   if (data.isHoliday && data.holidayName) {
-    doc.setFillColor(254, 243, 199) // Amber 100
-    doc.setDrawColor(245, 158, 11) // Amber 500
-    doc.roundedRect(30, currentY, pageWidth - 60, 9, 2, 2, "FD")
+    doc.setFillColor(254, 243, 199)
+    doc.setDrawColor(245, 158, 11)
+    doc.setLineWidth(0.4)
+    doc.roundedRect(30, currentY, pageWidth - 60, 8.5, 2, 2, "FD")
 
-    doc.setTextColor(146, 64, 14) // Amber 800
+    doc.setTextColor(146, 64, 14)
     doc.setFont("helvetica", "bold")
-    doc.setFontSize(9)
-    doc.text(`Public Holiday: ${data.holidayName} (Meeting held ${formattedDate})`, pageWidth / 2, currentY + 6, {
+    doc.setFontSize(8.5)
+    doc.text(`Public Holiday: ${data.holidayName} (Meeting held ${formattedDate})`, pageWidth / 2, currentY + 5.5, {
       align: "center",
     })
-    currentY += 13
+    currentY += 12
   }
 
-  // Subtle clean divider line
-  doc.setDrawColor(226, 232, 240) // Slate 200
-  doc.setLineWidth(0.5)
-  doc.line(40, currentY, pageWidth - 40, currentY)
-  currentY += 10
+  // Thin clean divider
+  doc.setDrawColor(226, 232, 240)
+  doc.setLineWidth(0.35)
+  doc.line(36, currentY, pageWidth - 36, currentY)
+  currentY += 8
 
-  // Central QR Code (Large, prominent and easily scannable)
+  // Pill badge: SCAN TO CHECK IN
+  const badgeWidth = 48
+  const badgeHeight = 7
+  doc.setFillColor(240, 253, 244)
+  doc.setDrawColor(187, 247, 208)
+  doc.setLineWidth(0.3)
+  doc.roundedRect((pageWidth - badgeWidth) / 2, currentY, badgeWidth, badgeHeight, 3.5, 3.5, "FD")
+
+  doc.setTextColor(22, 101, 52)
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(8.5)
+  doc.text("SCAN TO CHECK IN", pageWidth / 2, currentY + 4.8, { align: "center" })
+  currentY += badgeHeight + 5
+
+  // Central QR Code Container
   const qrDataUrl = await generateQrWithMatrixLogo(data.checkInUrl)
   const qrSize = 92
-  const qrX = (pageWidth - qrSize) / 2
-  doc.addImage(qrDataUrl, "PNG", qrX, currentY, qrSize, qrSize)
-  currentY += qrSize + 10
+  const framePad = 4
+  const frameSize = qrSize + framePad * 2
+  const frameX = (pageWidth - frameSize) / 2
 
-  // Divider: OR ENTER CODE
+  doc.setFillColor(255, 255, 255)
+  doc.setDrawColor(226, 232, 240)
+  doc.setLineWidth(0.4)
+  doc.roundedRect(frameX, currentY, frameSize, frameSize, 3, 3, "FD")
+  doc.addImage(qrDataUrl, "PNG", frameX + framePad, currentY + framePad, qrSize, qrSize)
+  currentY += frameSize + 10
+
+  // Divider: OR ENTER CODE IN MATRIX
+  doc.setDrawColor(226, 232, 240)
+  doc.setLineWidth(0.35)
+  doc.line(36, currentY, 78, currentY)
+
   doc.setFont("helvetica", "bold")
-  doc.setFontSize(9)
-  doc.setTextColor(148, 163, 184) // Slate 400
-  doc.text("—  OR ENTER 6-DIGIT CODE  —", pageWidth / 2, currentY, { align: "center" })
-  currentY += 14
+  doc.setFontSize(8.5)
+  doc.setTextColor(100, 116, 139)
+  doc.text("OR ENTER CODE IN MATRIX", pageWidth / 2, currentY + 1, { align: "center" })
 
-  // Prominent 6-Digit Code (e.g. 849  203)
+  doc.line(132, currentY, pageWidth - 36, currentY)
+  currentY += 7
+
+  // 6-Digit Code Box with dash: e.g. "836 - 223"
   const rawCode = String(data.code6Digit || "000000").padStart(6, "0")
-  const spacedCode = `${rawCode.slice(0, 3)}   ${rawCode.slice(3, 6)}`
+  const formattedCode = `${rawCode.slice(0, 3)} - ${rawCode.slice(3, 6)}`
 
-  doc.setTextColor(22, 101, 52) // Brand Deep Green
+  const boxWidth = 110
+  const boxHeight = 24
+  const boxX = (pageWidth - boxWidth) / 2
+
+  doc.setFillColor(240, 253, 244)
+  doc.setDrawColor(187, 247, 208)
+  doc.setLineWidth(0.5)
+  doc.roundedRect(boxX, currentY, boxWidth, boxHeight, 3.5, 3.5, "FD")
+
+  doc.setTextColor(20, 83, 45) // Deep Forest Green
   doc.setFont("helvetica", "bold")
-  doc.setFontSize(36)
-  doc.text(spacedCode, pageWidth / 2, currentY, { align: "center" })
-  currentY += 11
+  doc.setFontSize(30)
+  doc.text(formattedCode, pageWidth / 2, currentY + 16.5, { align: "center" })
+  currentY += boxHeight + 10
 
-  // Clean Instruction
+  // Simple instruction text
   doc.setFont("helvetica", "normal")
   doc.setFontSize(10)
   doc.setTextColor(71, 85, 105) // Slate 600
-  doc.text("Scan with your phone camera or visit Matrix on your browser to check in.", pageWidth / 2, currentY, {
-    align: "center",
-  })
+  doc.text(
+    "Open your mobile camera or scanner, scan the QR code, then confirm your attendance.",
+    pageWidth / 2,
+    currentY,
+    {
+      align: "center",
+    }
+  )
 
-  // Footer Branding
+  // Footer divider & branding
+  doc.setDrawColor(226, 232, 240)
+  doc.setLineWidth(0.35)
+  doc.line(40, pageHeight - 16, pageWidth - 40, pageHeight - 16)
+
   doc.setFont("helvetica", "normal")
   doc.setFontSize(8.5)
   doc.setTextColor(148, 163, 184) // Slate 400
-  doc.text("ACOB Lighting Technology Limited  •  Matrix ERP", pageWidth / 2, pageHeight - 12, {
+  doc.text("ACOB Lighting Technology Limited   ·   Matrix ERP", pageWidth / 2, pageHeight - 10, {
     align: "center",
   })
+
+  // Bottom subtle green accent line
+  doc.setFillColor(22, 101, 52)
+  doc.rect(0, pageHeight - 2, pageWidth, 2, "F")
 
   return doc
 }

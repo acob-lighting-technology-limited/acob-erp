@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { AlertTriangle, Download, Loader2, Printer, QrCode, ShieldCheck } from "lucide-react"
+import { AlertTriangle, Download, Loader2, Printer, QrCode } from "lucide-react"
 import {
   generateMeetingAttendancePdf,
   generateQrWithMatrixLogo,
@@ -36,6 +35,7 @@ export function AttendancePrintSheetDialog({
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [generatingQr, setGeneratingQr] = useState(false)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [printingPdf, setPrintingPdf] = useState(false)
 
   // Construct check-in URL with prefilled code for easy scanning
   const checkInUrl =
@@ -87,12 +87,40 @@ export function AttendancePrintSheetDialog({
     }
   }
 
-  const handlePrint = () => {
-    window.print()
+  const handlePrint = async () => {
+    // Open immediately while the click still counts as a user gesture; opening
+    // after PDF generation is commonly blocked by browser pop-up protection.
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) {
+      toast.error("Allow pop-ups for Matrix to open the print sheet")
+      return
+    }
+    printWindow.opener = null
+
+    setPrintingPdf(true)
+    try {
+      const sheetData: MeetingSheetData = {
+        week,
+        year,
+        meetingDate,
+        code6Digit,
+        checkInUrl,
+        isHoliday,
+        holidayName,
+      }
+      const pdf = await generateMeetingAttendancePdf(sheetData)
+      pdf.autoPrint()
+      printWindow.location.href = pdf.output("bloburl").toString()
+    } catch (err: unknown) {
+      printWindow.close()
+      toast.error(err instanceof Error ? err.message : "Failed to open print sheet")
+    } finally {
+      setPrintingPdf(false)
+    }
   }
 
-  // Format code with space e.g. "849 203"
-  const formattedCode = code6Digit.length === 6 ? `${code6Digit.slice(0, 3)}  ${code6Digit.slice(3, 6)}` : code6Digit
+  // Format code with dash e.g. "849 - 203"
+  const formattedCode = code6Digit.length === 6 ? `${code6Digit.slice(0, 3)} - ${code6Digit.slice(3, 6)}` : code6Digit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,54 +147,58 @@ export function AttendancePrintSheetDialog({
             </div>
           )}
 
-          {/* Printable Card Preview */}
-          <div className="bg-muted/30 flex flex-col items-center justify-center rounded-xl border p-6 text-center shadow-inner">
-            <div className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-              Week {week}, {year} • General Meeting & KSS
-            </div>
-            <div className="text-foreground mt-1 text-sm font-medium">{meetingDate}</div>
+          {/* Screen preview of the A4 sheet */}
+          <div className="bg-muted/30 rounded-xl border p-3 shadow-inner sm:p-4">
+            <div className="mx-auto flex aspect-[210/297] w-full max-w-[340px] flex-col items-center overflow-hidden rounded-sm border bg-white px-5 py-5 text-center shadow-sm">
+              <div className="h-1 w-full rounded-full bg-emerald-700" />
+              <div className="mt-3 text-[10px] font-bold tracking-[0.16em] text-slate-900">ACOB LIGHTING</div>
+              <div className="mt-2 text-base font-bold text-slate-900">General Meeting & KSS</div>
+              <div className="mt-0.5 text-[9px] text-slate-500">
+                Attendance Sign-In Sheet · Week {week}, {year}
+              </div>
+              <div className="mt-0.5 text-[9px] text-slate-500">{meetingDate}</div>
 
-            {/* QR Code Container */}
-            <div className="relative mt-4 flex h-52 w-52 items-center justify-center rounded-xl border bg-white p-2 shadow-sm">
-              {generatingQr ? (
-                <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-              ) : qrDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={qrDataUrl} alt="Meeting QR Code" className="h-full w-full object-contain" />
-              ) : (
-                <span className="text-muted-foreground text-xs">Unable to render QR</span>
-              )}
-            </div>
+              <div className="mt-3 flex w-full flex-1 flex-col items-center px-4 py-2">
+                <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-0.5 text-[8px] font-bold tracking-wider text-emerald-700">
+                  SCAN TO CHECK IN
+                </div>
 
-            <div className="text-muted-foreground mt-2 text-[11px]">Scan with camera to open check-in</div>
+                {/* QR Code Container */}
+                <div className="relative mt-2.5 flex aspect-square w-[68%] items-center justify-center rounded-md border border-slate-200 bg-white p-2 shadow-xs">
+                  {generatingQr ? (
+                    <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+                  ) : qrDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={qrDataUrl} alt="Meeting QR Code" className="h-full w-full object-contain" />
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Unable to render QR</span>
+                  )}
+                </div>
 
-            <div className="mt-3 flex items-center gap-2">
-              <div className="bg-border h-px w-10" />
-              <span className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
-                OR ENTER CODE
-              </span>
-              <div className="bg-border h-px w-10" />
-            </div>
+                <div className="mt-3 text-[8px] font-semibold tracking-wide text-slate-400">
+                  ── OR ENTER CODE IN MATRIX ──
+                </div>
 
-            {/* 6-Digit Code */}
-            <div className="mt-3 rounded-lg bg-emerald-950 px-6 py-2.5 text-2xl font-black tracking-[0.25em] text-emerald-100 shadow dark:bg-emerald-900/60">
-              {formattedCode}
-            </div>
+                {/* 6-Digit Code with Dash */}
+                <div className="mt-2 w-full max-w-[220px] rounded-md border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xl font-bold tracking-wider text-emerald-900">
+                  {formattedCode}
+                </div>
 
-            <div className="mt-3 flex items-center gap-1.5">
-              <Badge
-                variant="outline"
-                className="border-emerald-500/30 bg-emerald-50 text-[11px] text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-              >
-                <ShieldCheck className="mr-1 h-3.5 w-3.5 text-emerald-600" /> Biometric Entrance Punch Required
-              </Badge>
+                <div className="mt-3 text-[8.5px] leading-relaxed text-slate-500">
+                  Open your camera, scan the QR code, then confirm your attendance.
+                </div>
+              </div>
+
+              <div className="mt-auto border-t border-slate-100 pt-2 text-[7px] text-slate-400">
+                ACOB Lighting Technology Limited · Matrix ERP
+              </div>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
-              <Printer className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={handlePrint} disabled={printingPdf} className="gap-1.5">
+              {printingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
               Print
             </Button>
             <Button size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} className="gap-1.5">
