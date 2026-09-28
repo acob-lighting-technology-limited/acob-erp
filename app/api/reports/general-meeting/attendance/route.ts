@@ -5,6 +5,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { getAvatarSignedUrls } from "@/lib/profile-photos"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 export const dynamic = "force-dynamic"
@@ -64,21 +65,42 @@ export async function GET(request: NextRequest) {
   const { data: profiles, error: profErr } = await db
     .from("profiles")
     .select(
-      "id, full_name, first_name, last_name, company_email, department, designation, employment_status, employment_type, avatar_url"
+      "id, full_name, first_name, last_name, company_email, department, designation, employment_status, employment_type, avatar_path, avatar_url"
     )
-    .not("department", "is", null)
-    .neq("employment_status", "exited")
     .order("full_name", { ascending: true })
 
   if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 })
 
-  const regularEmployees = (profiles || []).filter((p) => {
+  type ProfileRow = {
+    id: string
+    full_name: string | null
+    first_name: string | null
+    last_name: string | null
+    company_email: string | null
+    department: string | null
+    designation: string | null
+    employment_status: string | null
+    employment_type: string | null
+    avatar_path: string | null
+    avatar_url: string | null
+  }
+
+  // Filter out exited employees in JS (matches directory route: null !== "exited" is true)
+  const visibleProfiles = ((profiles as unknown as ProfileRow[]) || []).filter((p) => p.employment_status !== "exited")
+
+  const regularEmployees = visibleProfiles.filter((p) => {
     const isContract =
       ((p.employment_status || "").toLowerCase() === "contract" ||
         (p.employment_type || "").toLowerCase() === "contract") &&
       !p.company_email
     return !isContract
   })
+
+  // Sign profile photo URLs
+  const signedUrlsByPath = await getAvatarSignedUrls(
+    db,
+    regularEmployees.map((r) => r.avatar_path).filter((path): path is string => Boolean(path))
+  )
 
   // 3. Fetch attendance records for this meeting date (office entrance biometrics)
   const { data: biometricRecords } = await db
@@ -172,9 +194,9 @@ export async function GET(request: NextRequest) {
     items.push({
       id: p.id,
       full_name: p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Staff Member",
-      department: normalizeDepartmentName(p.department),
+      department: normalizeDepartmentName(p.department) || "Unassigned",
       designation: p.designation || null,
-      avatar_url: p.avatar_url || null,
+      avatar_url: (p.avatar_path ? signedUrlsByPath.get(p.avatar_path) : null) || p.avatar_url || null,
       employment_status: p.employment_status || null,
       office_clock_in: officeClockIn,
       office_clock_in_source: officeClockInSource,

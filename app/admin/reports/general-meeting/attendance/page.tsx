@@ -10,6 +10,7 @@ import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   AlertTriangle,
+  Building2,
   CheckCircle2,
   Clock,
   Download,
@@ -528,6 +529,209 @@ export default function AdminMeetingAttendancePage() {
           refetchAttendance()
         }}
         pagination={{ pageSize: 50 }}
+        viewToggle
+        contactsView
+        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        mobileRow={{
+          leading: (r) => <StaffAvatar name={r.full_name} src={r.avatar_url} size="md" />,
+          title: (r) => r.full_name,
+          subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
+          trailing: (r) => {
+            if (r.is_on_leave) {
+              return (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-sky-400/50 bg-sky-500/10 text-[10px] text-sky-700 dark:text-sky-400"
+                >
+                  <Palmtree className="h-2.5 w-2.5" /> Leave
+                </Badge>
+              )
+            }
+            if (r.meeting_clock_in) {
+              return (
+                <Badge className="gap-1 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
+                  <CheckCircle2 className="h-2.5 w-2.5" /> In Room
+                </Badge>
+              )
+            }
+            if (r.office_clock_in) {
+              return (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-400"
+                >
+                  <AlertTriangle className="h-2.5 w-2.5" /> Missed
+                </Badge>
+              )
+            }
+            return (
+              <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                Unrecorded
+              </Badge>
+            )
+          },
+          detail: {
+            title: (r) => r.full_name,
+            subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
+            avatar: (r) => <StaffAvatar name={r.full_name} src={r.avatar_url} size="xl" />,
+            fields: (r) => [
+              { icon: Building2, label: "Department", value: r.department },
+              {
+                icon: Clock,
+                label: "Entrance Punch",
+                value: r.office_clock_in
+                  ? `${formatTime(r.office_clock_in)} (${r.office_clock_in_source || "Bio"})`
+                  : "No punch",
+              },
+              {
+                icon: CheckCircle2,
+                label: "Meeting Check-In",
+                value: r.meeting_clock_in
+                  ? `${formatTime(r.meeting_clock_in)} (${r.source || "QR"})`
+                  : "Not checked in",
+              },
+              {
+                icon: ShieldCheck,
+                label: "Status",
+                value: r.is_on_leave ? "On Leave" : r.status,
+              },
+              ...(r.manual_comment ? [{ icon: FileSignature, label: "Comment", value: r.manual_comment }] : []),
+            ],
+            actions: (r) => [
+              ...(r.office_clock_in && !r.meeting_clock_in && !r.is_on_leave
+                ? [
+                    {
+                      label: "Confirm in Room",
+                      icon: CheckCircle2,
+                      onClick: () => handleQuickConfirm(r),
+                    },
+                  ]
+                : []),
+              {
+                label: "Edit Attendance",
+                icon: Edit2,
+                onClick: () => setEditingItem(r),
+                variant: "outline" as const,
+              },
+            ],
+          },
+        }}
+        cardRenderer={(r) => (
+          <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 space-y-3 rounded-xl border p-4 shadow-sm transition-all">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <StaffAvatar name={r.full_name} src={r.avatar_url} size="lg" />
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{r.full_name}</div>
+                  <div className="text-muted-foreground truncate text-xs">{r.designation || r.department}</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="shrink-0 text-xs">
+                {r.department}
+              </Badge>
+            </div>
+
+            <div className="grid gap-2 border-t pt-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-blue-500" />
+                  Office Punch:
+                </span>
+                {r.office_clock_in ? (
+                  <div className="flex items-center gap-1 font-semibold">
+                    <span>{formatTime(r.office_clock_in)}</span>
+                    <Badge variant="outline" className="px-1 py-0 text-[10px] uppercase">
+                      {r.office_clock_in_source || "Bio"}
+                    </Badge>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground italic">No punch</span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                  Meeting Check-In:
+                </span>
+                {r.meeting_clock_in ? (
+                  <div className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span>{formatTime(r.meeting_clock_in)}</span>
+                    {r.source && (
+                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                        {r.source === "qr_scan" ? "QR" : r.source === "code_input" ? "Code" : r.source}
+                      </Badge>
+                    )}
+                  </div>
+                ) : r.office_clock_in && !r.is_on_leave ? (
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                  >
+                    <AlertTriangle className="h-3 w-3" /> Missed scan
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground italic">—</span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status:</span>
+                {r.is_on_leave ? (
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-sky-400/50 bg-sky-500/10 text-[11px] text-sky-700 dark:text-sky-400"
+                  >
+                    <Palmtree className="h-3 w-3" /> On Leave
+                  </Badge>
+                ) : r.status === "present" ? (
+                  <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
+                    <CheckCircle2 className="h-3 w-3" /> Present
+                  </Badge>
+                ) : r.status === "late" ? (
+                  <Badge className="gap-1 bg-amber-600 text-xs text-white hover:bg-amber-600">
+                    <Clock className="h-3 w-3" /> Late
+                  </Badge>
+                ) : r.status === "excused" ? (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    <ShieldCheck className="h-3 w-3" /> Excused
+                  </Badge>
+                ) : r.status === "absent" ? (
+                  <Badge variant="destructive" className="gap-1 text-xs">
+                    <XCircle className="h-3 w-3" /> Absent
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-muted-foreground text-xs">
+                    Unrecorded
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t pt-2">
+              {r.office_clock_in && !r.meeting_clock_in && !r.is_on_leave && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleQuickConfirm(r)}
+                  disabled={confirmingId === r.id}
+                  className="h-7 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                >
+                  <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+                  Confirm in Room
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditingItem(r)}
+                className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       />
 
       {session && (
