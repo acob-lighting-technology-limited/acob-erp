@@ -28,6 +28,7 @@ import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { AttendanceStatsGrid } from "./_components/attendance-stats"
 import { AttendancePrintSheetDialog } from "./_components/attendance-print-sheet"
 import { AttendanceEditDialog } from "./_components/attendance-edit-dialog"
+import { AttendanceConfirmDialog } from "./_components/attendance-confirm-dialog"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
@@ -58,7 +59,7 @@ export default function AdminMeetingAttendancePage() {
   const [year, setYear] = useState(currentWeek.year)
   const [showPrintSheet, setShowPrintSheet] = useState(false)
   const [editingItem, setEditingItem] = useState<AttendanceRosterItem | null>(null)
-  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [confirmingItem, setConfirmingItem] = useState<AttendanceRosterItem | null>(null)
 
   // 1. Fetch meeting session (contains 6-digit code, active state, holiday info)
   const {
@@ -119,37 +120,10 @@ export default function AdminMeetingAttendancePage() {
     return Array.from(new Set(items.map((i) => i.department).filter(Boolean))).sort((a, b) => a.localeCompare(b))
   }, [items])
 
-  // 1-Click "Confirm in Room" action
-  const handleQuickConfirm = useCallback(
-    async (item: AttendanceRosterItem) => {
-      setConfirmingId(item.id)
-      try {
-        const res = await apiFetch("/api/reports/general-meeting/attendance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            week,
-            year,
-            userId: item.id,
-            action: "confirm_in_room",
-          }),
-        })
-
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || "Failed to confirm attendance")
-
-        toast.success(
-          `Confirmed ${item.full_name} (${item.office_clock_in ? "in conference room" : "online attendance"})!`
-        )
-        await refetchAttendance()
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Error confirming attendance")
-      } finally {
-        setConfirmingId(null)
-      }
-    },
-    [week, year, refetchAttendance]
-  )
+  // Quick Confirm action opens dialog to verify/adjust time
+  const handleQuickConfirm = useCallback((item: AttendanceRosterItem) => {
+    setConfirmingItem(item)
+  }, [])
 
   // Export Roster to CSV
   const handleExportCsv = () => {
@@ -366,7 +340,6 @@ export default function AdminMeetingAttendancePage() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleQuickConfirm(r)}
-                    disabled={confirmingId === r.id}
                     className="h-7 shrink-0 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
                   >
                     {r.office_clock_in ? (
@@ -384,8 +357,8 @@ export default function AdminMeetingAttendancePage() {
                 </TooltipTrigger>
                 <TooltipContent>
                   {r.office_clock_in
-                    ? "Employee punched entrance gate today. Confirm seated in conference room."
-                    : "No office entrance punch. Confirm remote/online attendance."}
+                    ? "Employee punched entrance gate today. Set check-in time and confirm seated in conference room."
+                    : "No office entrance punch. Set check-in time and confirm remote/online attendance."}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -394,7 +367,7 @@ export default function AdminMeetingAttendancePage() {
         initialWidth: 175,
       },
     ],
-    [confirmingId, handleQuickConfirm]
+    [handleQuickConfirm]
   )
 
   const filters = useMemo<DataTableFilter<AttendanceRosterItem>[]>(
@@ -728,7 +701,6 @@ export default function AdminMeetingAttendancePage() {
                   size="sm"
                   variant="outline"
                   onClick={() => handleQuickConfirm(r)}
-                  disabled={confirmingId === r.id}
                   className="h-7 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
                 >
                   {r.office_clock_in ? (
@@ -766,6 +738,16 @@ export default function AdminMeetingAttendancePage() {
         open={Boolean(editingItem)}
         onOpenChange={(open) => !open && setEditingItem(null)}
         item={editingItem}
+        week={week}
+        year={year}
+        onSuccess={refetchAttendance}
+      />
+
+      <AttendanceConfirmDialog
+        open={Boolean(confirmingItem)}
+        onOpenChange={(open) => !open && setConfirmingItem(null)}
+        item={confirmingItem}
+        meetingDate={attendanceData?.meetingDate}
         week={week}
         year={year}
         onSuccess={refetchAttendance}
