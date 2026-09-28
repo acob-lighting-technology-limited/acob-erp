@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { CheckCircle2, Loader2, Trash2, UserCheck } from "lucide-react"
+import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
 
 interface Props {
@@ -67,7 +68,7 @@ export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onS
         resolvedDateTime = today.toISOString()
       }
 
-      const res = await fetch("/api/reports/general-meeting/attendance", {
+      const res = await apiFetch("/api/reports/general-meeting/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,7 +99,7 @@ export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onS
   const handleDelete = async () => {
     setDeleting(true)
     try {
-      const res = await fetch("/api/reports/general-meeting/attendance", {
+      const res = await apiFetch("/api/reports/general-meeting/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

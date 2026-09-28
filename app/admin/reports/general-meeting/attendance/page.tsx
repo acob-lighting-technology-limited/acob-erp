@@ -30,6 +30,7 @@ import { AttendancePrintSheetDialog } from "./_components/attendance-print-sheet
 import { AttendanceEditDialog } from "./_components/attendance-edit-dialog"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
 
 function formatTime(value: string | null): string {
@@ -67,7 +68,7 @@ export default function AdminMeetingAttendancePage() {
   } = useQuery({
     queryKey: ["general-meeting-session", week, year],
     queryFn: async () => {
-      const res = await fetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
+      const res = await apiFetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load meeting session")
       return json
@@ -83,7 +84,7 @@ export default function AdminMeetingAttendancePage() {
   } = useQuery({
     queryKey: ["general-meeting-attendance", week, year],
     queryFn: async () => {
-      const res = await fetch(`/api/reports/general-meeting/attendance?week=${week}&year=${year}`)
+      const res = await apiFetch(`/api/reports/general-meeting/attendance?week=${week}&year=${year}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load attendance roster")
       return json as {
@@ -123,7 +124,7 @@ export default function AdminMeetingAttendancePage() {
     async (item: AttendanceRosterItem) => {
       setConfirmingId(item.id)
       try {
-        const res = await fetch("/api/reports/general-meeting/attendance", {
+        const res = await apiFetch("/api/reports/general-meeting/attendance", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
