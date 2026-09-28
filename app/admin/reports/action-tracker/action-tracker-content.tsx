@@ -773,33 +773,34 @@ export function ActionTrackerContent({
   return (
     <DataTablePage
       title="Action Tracker"
-      description="Monitor and manage weekly departmental actions."
+      description="Monitor and update weekly departmental action points and management directives."
       icon={FileSpreadsheet}
       backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab === "directives" ? "directives" : "weekly")}
+      spacing="tight"
+      actionsPlacement="inline-always"
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           {activeTab === "directives" && (canGlobalEdit || editableDepartments.length > 0) ? (
             <Button
               size="sm"
-              className="h-8 gap-2"
+              className="h-8"
               onClick={() => {
                 setEditingDirective(null)
                 setDirectiveDialogOpen(true)
               }}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Add Directive</span>
-              <span className="sm:hidden">Add</span>
             </Button>
           ) : null}
           {actionItemsForExport.length > 0 ? (
             <Button
               variant="outline"
               size="sm"
-              className="h-8 gap-2"
+              className="h-8"
               onClick={() => {
                 setExportScope({
                   label: activeTab === "directives" ? "Management Directives" : "All Departments",
@@ -808,13 +809,13 @@ export function ActionTrackerContent({
                 setExportOptionsOpen(true)
               }}
             >
-              <Download className="h-4 w-4" />
-              Export
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Export</span>
             </Button>
           ) : null}
-          <Button variant="outline" onClick={handleCarryForward} disabled={isCarryForwarding} className="h-8">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Carry Forward
+          <Button variant="outline" onClick={handleCarryForward} disabled={isCarryForwarding} size="sm" className="h-8">
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Carry Forward</span>
           </Button>
         </div>
       }

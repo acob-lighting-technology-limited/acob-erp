@@ -90,7 +90,7 @@ export function PageHeader({
         {backLink && (
           <Link
             href={backLink.href}
-            className="text-muted-foreground hover:text-foreground mb-1 inline-flex items-center gap-1 text-xs transition-colors sm:text-sm"
+            className="text-muted-foreground hover:text-foreground mb-1 inline-flex items-center gap-1 text-xs whitespace-nowrap transition-colors sm:text-sm"
           >
             <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
             {backLink.label || "Back"}

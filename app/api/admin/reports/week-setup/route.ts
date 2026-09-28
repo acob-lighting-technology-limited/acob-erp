@@ -3,6 +3,7 @@ import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { getOfficeWeekMonday } from "@/lib/meeting-week"
 
 export const dynamic = "force-dynamic"
 
@@ -28,7 +29,10 @@ export async function GET(request: NextRequest) {
   }
 
   const db = getServiceRoleClientOrFallback(supabase)
-  const [meetingWindowResult, rosterResult] = await Promise.all([
+  const mondayDate = getOfficeWeekMonday(weekNumber, yearNumber)
+  const mondayIso = `${mondayDate.getFullYear()}-${String(mondayDate.getMonth() + 1).padStart(2, "0")}-${String(mondayDate.getDate()).padStart(2, "0")}`
+
+  const [meetingWindowResult, rosterResult, holidayResult] = await Promise.all([
     db
       .from("weekly_report_meeting_windows")
       .select("meeting_time")
@@ -41,9 +45,12 @@ export async function GET(request: NextRequest) {
       .eq("meeting_week", weekNumber)
       .eq("meeting_year", yearNumber)
       .maybeSingle(),
+    db.from("holiday_calendar").select("name, is_business_day").eq("holiday_date", mondayIso).maybeSingle(),
   ])
   if (meetingWindowResult.error) return NextResponse.json({ error: meetingWindowResult.error.message }, { status: 500 })
   if (rosterResult.error) return NextResponse.json({ error: rosterResult.error.message }, { status: 500 })
+
+  const isMondayHoliday = Boolean(holidayResult.data && !holidayResult.data.is_business_day)
 
   return NextResponse.json({
     rosterId: typeof rosterResult.data?.id === "string" ? rosterResult.data.id : null,
@@ -61,6 +68,9 @@ export async function GET(request: NextRequest) {
       typeof rosterResult.data?.presenter_name === "string" && rosterResult.data.presenter_name.trim()
         ? rosterResult.data.presenter_name.trim()
         : "",
+    isMondayHoliday,
+    mondayHolidayName: holidayResult.data?.name || null,
+    mondayDateIso: mondayIso,
   })
 }
 

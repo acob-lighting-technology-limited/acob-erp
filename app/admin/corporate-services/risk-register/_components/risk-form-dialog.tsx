@@ -63,6 +63,7 @@ interface FormState {
   likelihood: string
   control_owner_departments: string[]
   control_owner_id: string
+  control_owner_note: string
   mitigation_plan: string
   timeline_type: RiskTimelineType
   target_date: string
@@ -82,6 +83,7 @@ function initialState(risk: RiskRow | null, raisable: string[]): FormState {
     likelihood: risk ? String(risk.likelihood) : "",
     control_owner_departments: risk?.control_owner_departments ?? [],
     control_owner_id: risk?.control_owner_id ?? NO_OWNER,
+    control_owner_note: risk?.control_owner_note ?? "",
     mitigation_plan: risk?.mitigation_plan ?? "",
     timeline_type: risk?.timeline_type ?? "by_date",
     target_date: risk?.target_date ?? "",
@@ -166,6 +168,7 @@ export function RiskFormDialog({
           likelihood,
           control_owner_departments: form.control_owner_departments,
           control_owner_id: form.control_owner_id === NO_OWNER ? null : form.control_owner_id,
+          control_owner_note: form.control_owner_note,
         }
 
     if (!locked) {
@@ -356,6 +359,20 @@ export function RiskFormDialog({
                 />
               </Field>
             </div>
+
+            <Field
+              label="Control owner note (optional)"
+              hint="Preserves role-based responsibility such as “Hiring HOD” or “Supervisors”."
+              htmlFor="risk-owner-note"
+            >
+              <Input
+                id="risk-owner-note"
+                value={form.control_owner_note}
+                onChange={(e) => set("control_owner_note", e.target.value)}
+                maxLength={5000}
+                disabled={locked}
+              />
+            </Field>
 
             <Field
               label="Mitigation Plans"

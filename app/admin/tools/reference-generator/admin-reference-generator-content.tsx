@@ -20,7 +20,7 @@ import {
   User,
 } from "lucide-react"
 import type { CorrespondenceRecord, CorrespondenceStatus } from "@/types/correspondence"
-import { getCanonicalDepartmentOrder, getDepartmentShortCode } from "@/shared/departments"
+import { getCanonicalDepartmentOrder } from "@/shared/departments"
 import { useDepartments } from "@/hooks/use-departments"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -373,28 +373,18 @@ export function AdminReferenceGeneratorContent({
     },
     {
       key: "department",
-      label: "Dept",
+      label: "Department",
       sortable: true,
-      initialWidth: 90,
       hideOnMobile: true,
-      accessor: (r) => getDepartmentShortCode(r.department_name || r.assigned_department_name),
-      render: (r) => {
-        const fullDeptName = r.department_name || r.assigned_department_name
-        const badge = (
-          <Badge variant="secondary" className="cursor-default font-mono text-[11px]">
-            {getDepartmentShortCode(fullDeptName)}
-          </Badge>
-        )
-        if (!fullDeptName) return badge
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>{badge}</TooltipTrigger>
-            <TooltipContent>
-              <p>{fullDeptName}</p>
-            </TooltipContent>
-          </Tooltip>
-        )
-      },
+      accessor: (r) => r.department_name || r.assigned_department_name || "-",
+      render: (r) => (
+        <span
+          className="block max-w-[180px] truncate"
+          title={r.department_name || r.assigned_department_name || undefined}
+        >
+          {r.department_name || r.assigned_department_name || "-"}
+        </span>
+      ),
     },
     {
       key: "status",
@@ -409,13 +399,6 @@ export function AdminReferenceGeneratorContent({
       sortable: true,
       hideOnMobile: true,
       accessor: (r) => r.sender_name || "-",
-    },
-    {
-      key: "created_by",
-      label: "Created by",
-      sortable: true,
-      hideOnMobile: true,
-      accessor: (r) => r.created_by_name || r.sender_name || "-",
     },
     {
       key: "created_at",
@@ -637,7 +620,7 @@ export function AdminReferenceGeneratorContent({
         mobileRow={{
           title: (r) => `${r.reference_number} · ${r.subject}`,
           subtitle: (r) =>
-            `${getDepartmentShortCode(r.department_name || r.assigned_department_name)} · ${r.recipient_name || "No recipient"} · ${formatWATDate(r.created_at)}`,
+            `${r.department_name || r.assigned_department_name || "No dept"} · ${r.recipient_name || "No recipient"} · ${formatWATDate(r.created_at)}`,
           trailing: (r) => (
             <Badge variant="outline" className={`text-[10px] capitalize ${statusBadgeClass(r.status)}`}>
               {statusLabel(r.status)}
@@ -653,11 +636,7 @@ export function AdminReferenceGeneratorContent({
                 {(r.department_name || r.assigned_department_name) && (
                   <span className="inline-flex items-center gap-1">
                     <Building2 className="text-muted-foreground/70 h-3.5 w-3.5" />
-                    <span>
-                      {getDepartmentShortCode(r.department_name || r.assigned_department_name)}
-                      {" · "}
-                      {r.department_name || r.assigned_department_name}
-                    </span>
+                    <span>{r.department_name || r.assigned_department_name}</span>
                   </span>
                 )}
               </div>
@@ -676,10 +655,7 @@ export function AdminReferenceGeneratorContent({
               {
                 icon: Building2,
                 label: "Department",
-                value:
-                  r.department_name || r.assigned_department_name
-                    ? `${getDepartmentShortCode(r.department_name || r.assigned_department_name)} — ${r.department_name || r.assigned_department_name}`
-                    : "—",
+                value: r.department_name || r.assigned_department_name || "—",
                 fullWidth: true,
               },
               {
@@ -770,9 +746,7 @@ export function AdminReferenceGeneratorContent({
             <div className="text-muted-foreground space-y-1 border-t pt-2 text-xs">
               <p>Recipient: {r.recipient_name || "—"}</p>
               <div className="flex items-center justify-between text-[10px]">
-                <Badge variant="secondary" className="h-4 px-1 py-0 font-mono text-[10px]">
-                  {getDepartmentShortCode(r.department_name || r.assigned_department_name)}
-                </Badge>
+                <span>{r.department_name || r.assigned_department_name || "—"}</span>
                 <span>{formatWATDate(r.created_at)}</span>
               </div>
             </div>

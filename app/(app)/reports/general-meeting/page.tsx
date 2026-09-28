@@ -1,7 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { FileBarChart, ClipboardList, FileText, ChevronRight, Presentation, Users, AlertTriangle } from "lucide-react"
+import {
+  FileBarChart,
+  ClipboardList,
+  FileText,
+  ChevronRight,
+  Presentation,
+  Users,
+  AlertTriangle,
+  QrCode,
+} from "lucide-react"
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { Badge } from "@/components/ui/badge"
@@ -10,6 +19,18 @@ import { cn } from "@/lib/utils"
 
 export default function PortalGeneralMeetingPage() {
   const reportCards = [
+    {
+      title: "Meeting Attendance",
+      description: "Check in with this week's 6-digit meeting code or room QR scan after your entrance punch.",
+      href: "/reports/general-meeting/attendance",
+      icon: QrCode,
+      tag: "Check-In",
+      subLabel: "Attendance check-in",
+      color: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+      fill: "bg-purple-500",
+      hoverBorder: "hover:border-purple-500/60 dark:hover:border-purple-400/60",
+      hoverText: "group-hover:text-purple-500",
+    },
     {
       title: "Weekly Reports",
       description: "View and submit weekly status updates and performance summaries for your department.",

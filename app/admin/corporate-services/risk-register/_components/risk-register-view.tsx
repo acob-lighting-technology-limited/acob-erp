@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, CalendarX, CheckCircle2, Download, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react"
+import {
+  AlertTriangle,
+  CalendarX,
+  CheckCircle2,
+  Download,
+  Pencil,
+  Plus,
+  ShieldAlert,
+  Trash2,
+  Upload,
+} from "lucide-react"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -40,6 +50,7 @@ import { RatingBadge, StatusBadge } from "./risk-badges"
 import { RiskCard } from "./risk-card"
 import { RiskFormDialog, type StaffOption } from "./risk-form-dialog"
 import { RiskHeatMap } from "./risk-heat-map"
+import { RiskImportDialog } from "./risk-import-dialog"
 import { TimelineText, describeTimeline } from "./risk-timeline"
 
 interface RiskRegisterViewProps {
@@ -84,6 +95,7 @@ export function RiskRegisterView({
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<RiskRow | null>(null)
   const [deleting, setDeleting] = useState<RiskRow | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const today = toLocalISODate()
 
   const queryKey = lockedDepartment ? ["corporate-services-risk-register", lockedDepartment] : QUERY_KEY
@@ -132,6 +144,12 @@ export function RiskRegisterView({
       const exists = rows.some((r) => r.id === saved.id)
       return { data: exists ? rows.map((r) => (r.id === saved.id ? saved : r)) : [...rows, saved] }
     })
+  }
+
+  function handleImported(imported: RiskRow[]) {
+    queryClient.setQueryData<{ data: RiskRow[] }>(QUERY_KEY, (old) => ({
+      data: [...(old?.data || []), ...imported],
+    }))
   }
 
   async function confirmDelete() {
@@ -209,11 +227,15 @@ export function RiskRegisterView({
     {
       key: "control_owner",
       label: "Control Owner",
-      accessor: (r) => [r.control_owner_departments.join(", "), ownerName(r)].filter(Boolean).join(" — "),
+      accessor: (r) =>
+        [r.control_owner_departments.join(", "), ownerName(r), r.control_owner_note].filter(Boolean).join(" — "),
       render: (r) => (
         <div className="space-y-0.5">
           <span className="text-xs">{r.control_owner_departments.join(", ")}</span>
           {ownerName(r) && <p className="text-muted-foreground text-[11px]">{ownerName(r)}</p>}
+          {r.control_owner_note && (
+            <p className="text-muted-foreground line-clamp-1 text-[11px]">{r.control_owner_note}</p>
+          )}
         </div>
       ),
       hideOnMobile: true,
@@ -276,7 +298,7 @@ export function RiskRegisterView({
     { label: "Potential Impact/Consequence", value: r.consequence || "Not recorded", fullWidth: true },
     {
       label: "Control Owner",
-      value: [r.control_owner_departments.join(", "), ownerName(r)].filter(Boolean).join(" — "),
+      value: [r.control_owner_departments.join(", "), ownerName(r), r.control_owner_note].filter(Boolean).join(" — "),
       fullWidth: true,
     },
     { label: "Mitigation Plans", value: r.mitigation_plan || "Not recorded", fullWidth: true },
@@ -306,6 +328,12 @@ export function RiskRegisterView({
             >
               <Download className="mr-1.5 h-4 w-4" aria-hidden />
               Export
+            </Button>
+          )}
+          {isAdminLike && !lockedDepartment && (
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload className="mr-1.5 h-4 w-4" aria-hidden />
+              Import
             </Button>
           )}
           {raisableDepartments.length > 0 && (
@@ -377,6 +405,7 @@ export function RiskRegisterView({
               r.department,
               ...r.supporting_departments,
               ...r.control_owner_departments,
+              r.control_owner_note,
             ].some((v) => (v || "").toLowerCase().includes(needle))
           }}
           filters={filters}
@@ -449,6 +478,10 @@ export function RiskRegisterView({
         ownerOnly={editing ? !canEditAll(editing) : false}
         onSaved={handleSaved}
       />
+
+      {isAdminLike && !lockedDepartment && (
+        <RiskImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={handleImported} />
+      )}
 
       <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>

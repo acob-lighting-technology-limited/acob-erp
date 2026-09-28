@@ -23,7 +23,6 @@ import type { CorrespondenceRecord } from "@/types/correspondence"
 import { CreateReferenceDialog, type CreateReferenceForm } from "@/components/correspondence/create-reference-dialog"
 import { cn, formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
-import { getDepartmentShortCode } from "@/shared/departments"
 import { apiFetch } from "@/lib/api-client"
 
 interface DepartmentCodeOption {
@@ -308,19 +307,17 @@ export function PortalReferenceGeneratorContent({
       },
       {
         key: "department",
-        label: "Dept",
+        label: "Department",
         sortable: true,
-        initialWidth: 90,
-        accessor: (row) => getDepartmentShortCode(row.department_name || row.assigned_department_name),
+        accessor: (row) => row.department_name || row.assigned_department_name || "-",
         hideOnMobile: true,
         render: (row) => (
-          <Badge
-            variant="secondary"
-            className="font-mono text-[11px]"
+          <span
+            className="block max-w-[180px] truncate"
             title={row.department_name || row.assigned_department_name || undefined}
           >
-            {getDepartmentShortCode(row.department_name || row.assigned_department_name)}
-          </Badge>
+            {row.department_name || row.assigned_department_name || "-"}
+          </span>
         ),
       },
       {
@@ -461,10 +458,7 @@ export function PortalReferenceGeneratorContent({
               {["approved", "sent", "filed"].includes(row.status) ? row.reference_number : "Reference pending"}
             </span>
           ),
-          subtitle: (row) => {
-            const deptCode = getDepartmentShortCode(row.department_name || row.assigned_department_name)
-            return deptCode && deptCode !== "-" ? `${deptCode} · ${row.subject}` : row.subject
-          },
+          subtitle: (row) => row.subject,
           trailing: (row) => (
             <Badge className={cn("text-[10px]", statusBadgeClass(row.status))}>{statusLabel(row.status)}</Badge>
           ),
@@ -481,11 +475,7 @@ export function PortalReferenceGeneratorContent({
                 {(row.department_name || row.assigned_department_name) && (
                   <span className="inline-flex items-center gap-1">
                     <Building2 className="text-muted-foreground/70 h-3.5 w-3.5" />
-                    <span>
-                      {getDepartmentShortCode(row.department_name || row.assigned_department_name)}
-                      {" · "}
-                      {row.department_name || row.assigned_department_name}
-                    </span>
+                    <span>{row.department_name || row.assigned_department_name}</span>
                   </span>
                 )}
               </div>
@@ -510,10 +500,7 @@ export function PortalReferenceGeneratorContent({
               {
                 icon: Building2,
                 label: "Department",
-                value:
-                  row.department_name || row.assigned_department_name
-                    ? `${getDepartmentShortCode(row.department_name || row.assigned_department_name)} — ${row.department_name || row.assigned_department_name}`
-                    : "—",
+                value: row.department_name || row.assigned_department_name || "—",
                 fullWidth: true,
               },
               {
@@ -588,14 +575,9 @@ export function PortalReferenceGeneratorContent({
             </div>
             <div>
               <h4 className="line-clamp-2 text-sm font-semibold">{row.subject}</h4>
-              <div className="mt-1 flex items-center gap-2">
-                <Badge variant="secondary" className="h-4 px-1 py-0 font-mono text-[10px]">
-                  {getDepartmentShortCode(row.department_name || row.assigned_department_name)}
-                </Badge>
-                <span className="text-muted-foreground truncate text-xs">
-                  {row.department_name || row.assigned_department_name || "-"}
-                </span>
-              </div>
+              <p className="text-muted-foreground text-xs">
+                {row.department_name || row.assigned_department_name || "-"}
+              </p>
             </div>
             <div className="border-border/40 flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground capitalize">{statusLabel(row.status)}</span>
