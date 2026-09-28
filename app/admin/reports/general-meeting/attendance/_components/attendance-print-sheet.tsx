@@ -158,38 +158,43 @@ export function AttendancePrintSheetDialog({
               </div>
               <div className="mt-0.5 text-[9px] text-slate-500">{meetingDate}</div>
 
-              <div className="mt-3 flex w-full flex-1 flex-col items-center px-4 py-2">
-                <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-0.5 text-[8px] font-bold tracking-wider text-emerald-700">
-                  SCAN TO CHECK IN
+              <div className="mt-3 flex w-full flex-1 flex-col gap-2">
+                {/* Block 1: Scan Hero */}
+                <div className="flex flex-col items-center rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2">
+                  <div className="rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-0.5 text-[8px] font-bold tracking-wider text-emerald-800">
+                    SCAN TO SIGN IN
+                  </div>
+
+                  {/* QR Code Container */}
+                  <div className="relative mt-1.5 flex aspect-square w-[56%] items-center justify-center rounded-md border border-slate-300 bg-white p-1.5 shadow-xs">
+                    {generatingQr ? (
+                      <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+                    ) : qrDataUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={qrDataUrl} alt="Meeting QR Code" className="h-full w-full object-contain" />
+                    ) : (
+                      <span className="text-muted-foreground text-[10px]">Unable to render QR</span>
+                    )}
+                  </div>
+
+                  <div className="mt-1 text-[7.5px] text-slate-500">
+                    Point your camera or scanner at the code to check in.
+                  </div>
                 </div>
 
-                {/* QR Code Container */}
-                <div className="relative mt-2.5 flex aspect-square w-[68%] items-center justify-center rounded-md border border-slate-200 bg-white p-2 shadow-xs">
-                  {generatingQr ? (
-                    <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-                  ) : qrDataUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={qrDataUrl} alt="Meeting QR Code" className="h-full w-full object-contain" />
-                  ) : (
-                    <span className="text-muted-foreground text-xs">Unable to render QR</span>
-                  )}
-                </div>
-
-                <div className="mt-3 text-[8px] font-semibold tracking-wide text-slate-400">
-                  ── OR ENTER CODE IN MATRIX ──
-                </div>
-
-                {/* 6-Digit Code with Dash */}
-                <div className="mt-2 w-full max-w-[220px] rounded-md border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xl font-bold tracking-wider text-emerald-900">
-                  {formattedCode}
-                </div>
-
-                <div className="mt-3 text-[8.5px] leading-relaxed text-slate-500">
-                  Open your camera, scan the QR code, then confirm your attendance.
+                {/* Block 2: Backup Code */}
+                <div className="flex flex-col items-center rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-center">
+                  <div className="text-[7.5px] font-bold tracking-wide text-emerald-800">
+                    CAN&apos;T SCAN? USE 6-DIGIT BACKUP CODE
+                  </div>
+                  <div className="mt-1 w-full max-w-[180px] rounded-md border border-emerald-300 bg-white py-1 text-base font-black tracking-widest text-emerald-950">
+                    {formattedCode}
+                  </div>
+                  <div className="mt-1 text-[7px] text-slate-500">Enter code in Matrix General Meeting Attendance.</div>
                 </div>
               </div>
 
-              <div className="mt-auto border-t border-slate-100 pt-2 text-[7px] text-slate-400">
+              <div className="mt-auto border-t border-slate-100 pt-1.5 text-[7px] text-slate-400">
                 ACOB Lighting Technology Limited · Matrix ERP
               </div>
             </div>

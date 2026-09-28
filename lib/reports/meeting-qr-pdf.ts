@@ -118,8 +118,9 @@ export async function generateQrWithMatrixLogo(text: string): Promise<string> {
 }
 
 /**
- * Generates an executive A4 printable PDF containing the QR Code & 6-digit code.
- * Clean, modern layout matching ACOB brand guidelines (Green, Slate, Crisp White).
+ * Generates an executive A4 printable poster containing the QR Code & 6-digit code.
+ * Two-Block Executive design: Primary Scan Card + Manual Backup Card.
+ * Perfectly balanced across the entire A4 canvas.
  */
 export async function generateMeetingAttendancePdf(data: MeetingSheetData): Promise<jsPDF> {
   const doc = new jsPDF({
@@ -131,18 +132,23 @@ export async function generateMeetingAttendancePdf(data: MeetingSheetData): Prom
   const pageWidth = 210
   const pageHeight = 297
 
-  // Top emerald accent strip
+  // 1. Top emerald brand banner
   doc.setFillColor(22, 101, 52) // Brand Deep Green
-  doc.rect(0, 0, pageWidth, 4, "F")
+  doc.rect(0, 0, pageWidth, 5, "F")
 
-  // Load the full ACOB Lighting logo
+  // 2. Elegant outer structural border framing the entire sheet
+  doc.setDrawColor(226, 232, 240) // Slate 200
+  doc.setLineWidth(0.4)
+  doc.roundedRect(12, 12, pageWidth - 24, pageHeight - 24, 4, 4, "S")
+
+  // 3. Load full ACOB Lighting logo
   const logoDataUrl = await loadImageDataUrl("/images/exports/acob-lighting-full.png")
 
-  let currentY = 18
+  let currentY = 19
 
   if (logoDataUrl) {
-    const logoWidth = 64
-    const logoHeight = 14.5
+    const logoWidth = 66
+    const logoHeight = 15
     doc.addImage(logoDataUrl, "PNG", (pageWidth - logoWidth) / 2, currentY, logoWidth, logoHeight)
     currentY += logoHeight + 6
   } else {
@@ -156,13 +162,13 @@ export async function generateMeetingAttendancePdf(data: MeetingSheetData): Prom
   // Meeting Title
   doc.setTextColor(15, 23, 42)
   doc.setFont("helvetica", "bold")
-  doc.setFontSize(23)
+  doc.setFontSize(22)
   doc.text("General Meeting & KSS", pageWidth / 2, currentY, { align: "center" })
-  currentY += 7.5
+  currentY += 7
 
   // Subtitle with Week
   doc.setFont("helvetica", "normal")
-  doc.setFontSize(11)
+  doc.setFontSize(10.5)
   doc.setTextColor(71, 85, 105) // Slate 600
   doc.text(`Attendance Sign-In Sheet   ·   Week ${data.week}, ${data.year}`, pageWidth / 2, currentY, {
     align: "center",
@@ -181,118 +187,153 @@ export async function generateMeetingAttendancePdf(data: MeetingSheetData): Prom
   doc.setFontSize(10)
   doc.setTextColor(100, 116, 139) // Slate 500
   doc.text(formattedDate, pageWidth / 2, currentY, { align: "center" })
-  currentY += 7
+  currentY += 6
 
   // Holiday notice (if applicable)
   if (data.isHoliday && data.holidayName) {
     doc.setFillColor(254, 243, 199)
     doc.setDrawColor(245, 158, 11)
     doc.setLineWidth(0.4)
-    doc.roundedRect(30, currentY, pageWidth - 60, 8.5, 2, 2, "FD")
+    doc.roundedRect(30, currentY, pageWidth - 60, 8, 2, 2, "FD")
 
     doc.setTextColor(146, 64, 14)
     doc.setFont("helvetica", "bold")
     doc.setFontSize(8.5)
-    doc.text(`Public Holiday: ${data.holidayName} (Meeting held ${formattedDate})`, pageWidth / 2, currentY + 5.5, {
+    doc.text(`Public Holiday: ${data.holidayName} (Meeting held ${formattedDate})`, pageWidth / 2, currentY + 5.2, {
       align: "center",
     })
-    currentY += 12
+    currentY += 11
   }
 
-  // Thin clean divider
+  // Dividing rule
   doc.setDrawColor(226, 232, 240)
   doc.setLineWidth(0.35)
-  doc.line(36, currentY, pageWidth - 36, currentY)
-  currentY += 8
+  doc.line(28, currentY, pageWidth - 28, currentY)
+  currentY += 6
 
-  // Pill badge: SCAN TO CHECK IN
-  const badgeWidth = 48
-  const badgeHeight = 7
-  doc.setFillColor(240, 253, 244)
-  doc.setDrawColor(187, 247, 208)
-  doc.setLineWidth(0.3)
-  doc.roundedRect((pageWidth - badgeWidth) / 2, currentY, badgeWidth, badgeHeight, 3.5, 3.5, "FD")
+  // -------------------------------------------------------------
+  // BLOCK 1: PRIMARY SCAN HERO CARD
+  // -------------------------------------------------------------
+  const card1X = 18
+  const card1Y = currentY
+  const card1W = pageWidth - card1X * 2
+  const card1H = 132
+
+  doc.setFillColor(248, 250, 252) // Slate 50
+  doc.setDrawColor(226, 232, 240) // Slate 200
+  doc.setLineWidth(0.45)
+  doc.roundedRect(card1X, card1Y, card1W, card1H, 4, 4, "FD")
+
+  // Pill badge: SCAN TO SIGN IN
+  const badgeWidth = 52
+  const badgeHeight = 7.5
+  const badgeY = card1Y + 7
+  doc.setFillColor(220, 252, 231) // Emerald 100
+  doc.setDrawColor(134, 239, 172) // Emerald 300
+  doc.setLineWidth(0.35)
+  doc.roundedRect((pageWidth - badgeWidth) / 2, badgeY, badgeWidth, badgeHeight, 3.5, 3.5, "FD")
 
   doc.setTextColor(22, 101, 52)
   doc.setFont("helvetica", "bold")
   doc.setFontSize(8.5)
-  doc.text("SCAN TO CHECK IN", pageWidth / 2, currentY + 4.8, { align: "center" })
-  currentY += badgeHeight + 5
+  doc.text("SCAN TO SIGN IN", pageWidth / 2, badgeY + 5, { align: "center" })
 
-  // Central QR Code Container
+  // QR Code Frame inside Card 1
   const qrDataUrl = await generateQrWithMatrixLogo(data.checkInUrl)
-  const qrSize = 92
-  const framePad = 4
-  const frameSize = qrSize + framePad * 2
-  const frameX = (pageWidth - frameSize) / 2
+  const qrFrameSize = 96
+  const qrFrameX = (pageWidth - qrFrameSize) / 2
+  const qrFrameY = badgeY + badgeHeight + 5
 
   doc.setFillColor(255, 255, 255)
-  doc.setDrawColor(226, 232, 240)
+  doc.setDrawColor(203, 213, 225) // Slate 300
   doc.setLineWidth(0.4)
-  doc.roundedRect(frameX, currentY, frameSize, frameSize, 3, 3, "FD")
-  doc.addImage(qrDataUrl, "PNG", frameX + framePad, currentY + framePad, qrSize, qrSize)
-  currentY += frameSize + 10
+  doc.roundedRect(qrFrameX, qrFrameY, qrFrameSize, qrFrameSize, 3, 3, "FD")
 
-  // Divider: OR ENTER CODE IN MATRIX
-  doc.setDrawColor(226, 232, 240)
-  doc.setLineWidth(0.35)
-  doc.line(36, currentY, 78, currentY)
+  // High-res QR image centered in white frame
+  const qrSize = 90
+  const qrX = (pageWidth - qrSize) / 2
+  const qrY = qrFrameY + (qrFrameSize - qrSize) / 2
+  doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize)
 
-  doc.setFont("helvetica", "bold")
-  doc.setFontSize(8.5)
-  doc.setTextColor(100, 116, 139)
-  doc.text("OR ENTER CODE IN MATRIX", pageWidth / 2, currentY + 1, { align: "center" })
-
-  doc.line(132, currentY, pageWidth - 36, currentY)
-  currentY += 7
-
-  // 6-Digit Code Box with dash: e.g. "836 - 223"
-  const rawCode = String(data.code6Digit || "000000").padStart(6, "0")
-  const formattedCode = `${rawCode.slice(0, 3)} - ${rawCode.slice(3, 6)}`
-
-  const boxWidth = 110
-  const boxHeight = 24
-  const boxX = (pageWidth - boxWidth) / 2
-
-  doc.setFillColor(240, 253, 244)
-  doc.setDrawColor(187, 247, 208)
-  doc.setLineWidth(0.5)
-  doc.roundedRect(boxX, currentY, boxWidth, boxHeight, 3.5, 3.5, "FD")
-
-  doc.setTextColor(20, 83, 45) // Deep Forest Green
-  doc.setFont("helvetica", "bold")
-  doc.setFontSize(30)
-  doc.text(formattedCode, pageWidth / 2, currentY + 16.5, { align: "center" })
-  currentY += boxHeight + 10
-
-  // Simple instruction text
+  // Clear step instruction below QR
   doc.setFont("helvetica", "normal")
-  doc.setFontSize(10)
+  doc.setFontSize(9.5)
   doc.setTextColor(71, 85, 105) // Slate 600
   doc.text(
-    "Open your mobile camera or scanner, scan the QR code, then confirm your attendance.",
+    "Point your mobile camera or scanner at the code to confirm attendance.",
     pageWidth / 2,
-    currentY,
+    card1Y + card1H - 6.5,
     {
       align: "center",
     }
   )
 
-  // Footer divider & branding
-  doc.setDrawColor(226, 232, 240)
-  doc.setLineWidth(0.35)
-  doc.line(40, pageHeight - 16, pageWidth - 40, pageHeight - 16)
+  currentY = card1Y + card1H + 6
 
+  // -------------------------------------------------------------
+  // BLOCK 2: MANUAL BACKUP CODE CARD
+  // -------------------------------------------------------------
+  const card2X = 18
+  const card2Y = currentY
+  const card2W = card1W
+  const card2H = 58
+
+  doc.setFillColor(240, 253, 244) // Emerald 50
+  doc.setDrawColor(187, 247, 208) // Emerald 200
+  doc.setLineWidth(0.5)
+  doc.roundedRect(card2X, card2Y, card2W, card2H, 4, 4, "FD")
+
+  // Card 2 title
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(9)
+  doc.setTextColor(22, 101, 52) // Deep Green
+  doc.text("CAN'T SCAN? USE 6-DIGIT BACKUP CODE", pageWidth / 2, card2Y + 8.5, { align: "center" })
+
+  // 6-Digit Code Display Box
+  const rawCode = String(data.code6Digit || "000000").padStart(6, "0")
+  const formattedCode = `${rawCode.slice(0, 3)} - ${rawCode.slice(3, 6)}`
+
+  const boxW = 114
+  const boxH = 22
+  const boxX = (pageWidth - boxW) / 2
+  const boxY = card2Y + 13
+
+  doc.setFillColor(255, 255, 255)
+  doc.setDrawColor(134, 239, 172)
+  doc.setLineWidth(0.4)
+  doc.roundedRect(boxX, boxY, boxW, boxH, 3, 3, "FD")
+
+  doc.setTextColor(20, 83, 45) // Forest Green
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(28)
+  doc.text(formattedCode, pageWidth / 2, boxY + 15.5, { align: "center" })
+
+  // Step instruction inside backup card
   doc.setFont("helvetica", "normal")
-  doc.setFontSize(8.5)
+  doc.setFontSize(9)
+  doc.setTextColor(71, 85, 105)
+  doc.text(
+    "Enter this code in Matrix General Meeting Attendance to record your presence.",
+    pageWidth / 2,
+    card2Y + card2H - 7,
+    {
+      align: "center",
+    }
+  )
+
+  // -------------------------------------------------------------
+  // FOOTER & BOTTOM ACCENT
+  // -------------------------------------------------------------
+  doc.setFont("helvetica", "normal")
+  doc.setFontSize(8)
   doc.setTextColor(148, 163, 184) // Slate 400
-  doc.text("ACOB Lighting Technology Limited   ·   Matrix ERP", pageWidth / 2, pageHeight - 10, {
+  doc.text("ACOB Lighting Technology Limited   ·   Matrix ERP", pageWidth / 2, pageHeight - 16, {
     align: "center",
   })
 
-  // Bottom subtle green accent line
+  // Bottom brand strip
   doc.setFillColor(22, 101, 52)
-  doc.rect(0, pageHeight - 2, pageWidth, 2, "F")
+  doc.rect(0, pageHeight - 4, pageWidth, 4, "F")
 
   return doc
 }
