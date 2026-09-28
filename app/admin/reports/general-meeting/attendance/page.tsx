@@ -71,6 +71,7 @@ export default function AdminMeetingAttendancePage() {
     data: attendanceData,
     refetch: refetchAttendance,
     isLoading: attendanceLoading,
+    error: attendanceError,
   } = useQuery({
     queryKey: ["general-meeting-attendance", week, year],
     queryFn: async () => {
@@ -524,6 +525,7 @@ export default function AdminMeetingAttendancePage() {
           }
         }}
         isLoading={attendanceLoading}
+        error={attendanceError instanceof Error ? attendanceError.message : null}
         onRetry={() => {
           refetchSession()
           refetchAttendance()

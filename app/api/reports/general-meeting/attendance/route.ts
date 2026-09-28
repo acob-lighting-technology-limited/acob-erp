@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
   const { data: profiles, error: profErr } = await db
     .from("profiles")
     .select(
-      "id, full_name, first_name, last_name, company_email, department, designation, employment_status, employment_type, avatar_path, avatar_url"
+      "id, full_name, first_name, last_name, company_email, department, designation, employment_status, employment_type, avatar_path"
     )
     .order("full_name", { ascending: true })
 
@@ -82,7 +82,6 @@ export async function GET(request: NextRequest) {
     employment_status: string | null
     employment_type: string | null
     avatar_path: string | null
-    avatar_url: string | null
   }
 
   // Filter out exited employees in JS (matches directory route: null !== "exited" is true)
@@ -196,7 +195,7 @@ export async function GET(request: NextRequest) {
       full_name: p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Staff Member",
       department: normalizeDepartmentName(p.department) || "Unassigned",
       designation: p.designation || null,
-      avatar_url: (p.avatar_path ? signedUrlsByPath.get(p.avatar_path) : null) || p.avatar_url || null,
+      avatar_url: (p.avatar_path ? signedUrlsByPath.get(p.avatar_path) : null) || null,
       employment_status: p.employment_status || null,
       office_clock_in: officeClockIn,
       office_clock_in_source: officeClockInSource,
