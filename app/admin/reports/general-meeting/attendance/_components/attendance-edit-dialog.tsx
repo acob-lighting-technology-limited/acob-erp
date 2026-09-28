@@ -28,6 +28,23 @@ interface Props {
   onSuccess: () => void
 }
 
+function formatTime(value: string | null | undefined): string {
+  if (!value) return "—"
+  const timeOnlyMatch = value.match(/^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/)
+  if (timeOnlyMatch) {
+    const hours = Number(timeOnlyMatch[1])
+    const minutes = Number(timeOnlyMatch[2])
+    if (hours <= 23 && minutes <= 59) {
+      const period = hours >= 12 ? "PM" : "AM"
+      const displayHour = hours % 12 || 12
+      return `${String(displayHour).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${period}`
+    }
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+}
+
 export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onSuccess }: Props) {
   const [status, setStatus] = useState<string>("present")
   const [attendanceMode, setAttendanceMode] = useState<string>("physical")
@@ -142,7 +159,7 @@ export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onS
             <span className="text-muted-foreground">Office Entrance Punch:</span>
             <span className="text-foreground font-semibold">
               {item.office_clock_in
-                ? `${new Date(item.office_clock_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} (${item.office_clock_in_source || "biometric"})`
+                ? `${formatTime(item.office_clock_in)} (${item.office_clock_in_source || "biometric"})`
                 : "No punch recorded"}
             </span>
           </div>
