@@ -16,8 +16,6 @@ import {
   Download,
   Edit2,
   FileSignature,
-  KeyRound,
-  Laptop,
   Palmtree,
   QrCode,
   RefreshCw,
@@ -33,14 +31,23 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
 
-function formatTime(isoString: string | null): string {
-  if (!isoString) return "—"
-  try {
-    const d = new Date(isoString)
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
-  } catch {
-    return isoString
+function formatTime(value: string | null): string {
+  if (!value) return "—"
+
+  const timeOnlyMatch = value.match(/^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/)
+  if (timeOnlyMatch) {
+    const hours = Number(timeOnlyMatch[1])
+    const minutes = Number(timeOnlyMatch[2])
+    if (hours <= 23 && minutes <= 59) {
+      const period = hours >= 12 ? "PM" : "AM"
+      const displayHour = hours % 12 || 12
+      return `${String(displayHour).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${period}`
+    }
   }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
 }
 
 export default function AdminMeetingAttendancePage() {
@@ -220,12 +227,6 @@ export default function AdminMeetingAttendancePage() {
             <div className="flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5 text-blue-500" />
               <span className="text-foreground text-xs font-semibold">{formatTime(r.office_clock_in)}</span>
-              <Badge
-                variant="outline"
-                className="border-muted-foreground/30 text-muted-foreground px-1 py-0 text-[10px] uppercase"
-              >
-                {r.office_clock_in_source || "Bio"}
-              </Badge>
             </div>
           )
         },
@@ -306,57 +307,6 @@ export default function AdminMeetingAttendancePage() {
           }
         },
         initialWidth: 130,
-      },
-      {
-        key: "source",
-        label: "Source / Mode",
-        sortable: true,
-        accessor: (r) => r.source || "",
-        render: (r) => {
-          if (!r.source && !r.attendance_mode) return <span className="text-muted-foreground text-xs">—</span>
-          if (r.attendance_mode === "virtual") {
-            return (
-              <Badge
-                variant="outline"
-                className="gap-1 border-sky-400/50 bg-sky-500/10 text-[11px] text-sky-700 dark:text-sky-400"
-              >
-                <Laptop className="h-3 w-3" /> Online
-              </Badge>
-            )
-          }
-          switch (r.source) {
-            case "qr_scan":
-              return (
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-indigo-400/50 bg-indigo-500/10 text-[11px] text-indigo-700 dark:text-indigo-400"
-                >
-                  <QrCode className="h-3 w-3" /> QR Scan
-                </Badge>
-              )
-            case "code_input":
-              return (
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-violet-400/50 bg-violet-500/10 text-[11px] text-violet-700 dark:text-violet-400"
-                >
-                  <KeyRound className="h-3 w-3" /> 6-Digit Code
-                </Badge>
-              )
-            case "manual":
-              return (
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-slate-400/50 bg-slate-500/10 text-[11px] text-slate-700 dark:text-slate-300"
-                >
-                  <FileSignature className="h-3 w-3" /> Manual
-                </Badge>
-              )
-            default:
-              return <span className="text-muted-foreground text-xs">{r.source}</span>
-          }
-        },
-        initialWidth: 140,
       },
       {
         key: "actions",
@@ -581,16 +531,12 @@ export default function AdminMeetingAttendancePage() {
               {
                 icon: Clock,
                 label: "Entrance Punch",
-                value: r.office_clock_in
-                  ? `${formatTime(r.office_clock_in)} (${r.office_clock_in_source || "Bio"})`
-                  : "No punch",
+                value: r.office_clock_in ? formatTime(r.office_clock_in) : "No punch",
               },
               {
                 icon: CheckCircle2,
                 label: "Meeting Check-In",
-                value: r.meeting_clock_in
-                  ? `${formatTime(r.meeting_clock_in)} (${r.source || "QR"})`
-                  : "Not checked in",
+                value: r.meeting_clock_in ? formatTime(r.meeting_clock_in) : "Not checked in",
               },
               {
                 icon: ShieldCheck,
@@ -640,12 +586,7 @@ export default function AdminMeetingAttendancePage() {
                   Office Punch:
                 </span>
                 {r.office_clock_in ? (
-                  <div className="flex items-center gap-1 font-semibold">
-                    <span>{formatTime(r.office_clock_in)}</span>
-                    <Badge variant="outline" className="px-1 py-0 text-[10px] uppercase">
-                      {r.office_clock_in_source || "Bio"}
-                    </Badge>
-                  </div>
+                  <span className="font-semibold">{formatTime(r.office_clock_in)}</span>
                 ) : (
                   <span className="text-muted-foreground italic">No punch</span>
                 )}
@@ -657,14 +598,9 @@ export default function AdminMeetingAttendancePage() {
                   Meeting Check-In:
                 </span>
                 {r.meeting_clock_in ? (
-                  <div className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-                    <span>{formatTime(r.meeting_clock_in)}</span>
-                    {r.source && (
-                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                        {r.source === "qr_scan" ? "QR" : r.source === "code_input" ? "Code" : r.source}
-                      </Badge>
-                    )}
-                  </div>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    {formatTime(r.meeting_clock_in)}
+                  </span>
                 ) : r.office_clock_in && !r.is_on_leave ? (
                   <Badge
                     variant="outline"

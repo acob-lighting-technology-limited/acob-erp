@@ -32,6 +32,14 @@ export type AttendanceRosterItem = {
   leave_type: string | null
 }
 
+function formatEmployeeName(firstName: string | null, lastName: string | null, fallbackName: string | null): string {
+  const surname = lastName?.trim()
+  const first = firstName?.trim()
+
+  if (surname && first) return `${surname}, ${first}`
+  return surname || first || fallbackName?.trim() || "Staff Member"
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const {
@@ -67,7 +75,8 @@ export async function GET(request: NextRequest) {
     .select(
       "id, full_name, first_name, last_name, company_email, department, designation, employment_status, employment_type, avatar_path"
     )
-    .order("full_name", { ascending: true })
+    .order("last_name", { ascending: true })
+    .order("first_name", { ascending: true })
 
   if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 })
 
@@ -192,7 +201,7 @@ export async function GET(request: NextRequest) {
 
     items.push({
       id: p.id,
-      full_name: p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Staff Member",
+      full_name: formatEmployeeName(p.first_name, p.last_name, p.full_name),
       department: normalizeDepartmentName(p.department) || "Unassigned",
       designation: p.designation || null,
       avatar_url: (p.avatar_path ? signedUrlsByPath.get(p.avatar_path) : null) || null,
