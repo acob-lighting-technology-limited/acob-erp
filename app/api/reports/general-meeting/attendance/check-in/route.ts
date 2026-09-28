@@ -87,6 +87,12 @@ export async function POST(request: NextRequest) {
 
   // 3. Upsert into general_meeting_attendance
   const nowIso = new Date().toISOString()
+  const normalizedOfficeClockIn = attendanceRow.clock_in
+    ? attendanceRow.clock_in.includes("T")
+      ? new Date(attendanceRow.clock_in).toISOString()
+      : new Date(`${meetingDateIso}T${attendanceRow.clock_in}+01:00`).toISOString()
+    : null
+
   const { data: savedRecord, error: saveErr } = await db
     .from("general_meeting_attendance")
     .upsert(
@@ -98,7 +104,7 @@ export async function POST(request: NextRequest) {
         status: "present",
         attendance_mode: attendanceMode,
         source: source,
-        office_clock_in: attendanceRow.clock_in,
+        office_clock_in: normalizedOfficeClockIn,
         meeting_clock_in: nowIso,
         recorded_by: user.id,
         updated_at: nowIso,
@@ -124,7 +130,7 @@ export async function POST(request: NextRequest) {
         meetingDate: meetingDateIso,
         source,
         attendanceMode,
-        officeClockIn: attendanceRow.clock_in,
+        officeClockIn: normalizedOfficeClockIn,
         meetingClockIn: nowIso,
       },
       context: { actorId: user.id, source: "api", route: "/api/reports/general-meeting/attendance/check-in" },

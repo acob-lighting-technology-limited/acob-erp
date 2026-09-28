@@ -112,6 +112,12 @@ export async function GET(request: NextRequest) {
     .eq("meeting_year", year)
     .maybeSingle()
 
+  const normalizedOfficeClockIn = userPunch?.clock_in
+    ? userPunch.clock_in.includes("T")
+      ? userPunch.clock_in
+      : `${meetingDate}T${userPunch.clock_in}+01:00`
+    : null
+
   return NextResponse.json({
     session,
     holidayInfo: {
@@ -124,7 +130,7 @@ export async function GET(request: NextRequest) {
     },
     userStatus: {
       hasOfficeClockIn: Boolean(userPunch?.clock_in),
-      officeClockIn: userPunch?.clock_in || null,
+      officeClockIn: normalizedOfficeClockIn,
       officeClockInSource: userPunch?.source || null,
       alreadyCheckedIn: Boolean(userMeetingRecord?.meeting_clock_in),
       meetingClockIn: userMeetingRecord?.meeting_clock_in || null,

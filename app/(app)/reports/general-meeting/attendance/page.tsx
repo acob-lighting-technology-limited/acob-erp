@@ -57,6 +57,23 @@ function formatMeetingDate(dateStr?: string | null): string {
   })
 }
 
+function formatClockTime(val: string | null | undefined): string {
+  if (!val) return "-"
+  const timeMatch = val.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
+  if (timeMatch) {
+    const hours = Number(timeMatch[1])
+    const mins = timeMatch[2]
+    const period = hours >= 12 ? "PM" : "AM"
+    const hour12 = hours % 12 || 12
+    return `${String(hour12).padStart(2, "0")}:${mins} ${period}`
+  }
+  const d = new Date(val)
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  }
+  return val
+}
+
 function CheckInContent() {
   const searchParams = useSearchParams()
   const officeWeek = useMemo(() => getCurrentOfficeWeek(), [])
@@ -220,20 +237,14 @@ function CheckInContent() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Meeting Check-In:</span>
                     <span className="text-foreground font-semibold">
-                      {new Date(successResult.meetingClockIn).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatClockTime(successResult.meetingClockIn)}
                     </span>
                   </div>
                   {successResult.officeClockIn && (
                     <div className="flex justify-between border-t pt-1.5">
                       <span className="text-muted-foreground">Entrance Biometric Punch:</span>
                       <span className="text-foreground font-semibold">
-                        {new Date(successResult.officeClockIn).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatClockTime(successResult.officeClockIn)}
                       </span>
                     </div>
                   )}
@@ -318,12 +329,8 @@ function CheckInContent() {
                       <span>Office Entrance Punch Verified</span>
                     </div>
                     <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90">
-                      Punched in at{" "}
-                      {new Date(userStatus.officeClockIn!).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}{" "}
-                      ({userStatus.officeClockInSource || "Biometric"}).
+                      Punched in at {formatClockTime(userStatus.officeClockIn)} (
+                      {userStatus.officeClockInSource || "Biometric"}).
                     </p>
                   </div>
                 ) : null}

@@ -345,6 +345,12 @@ export async function POST(request: NextRequest) {
         : "Confirmed online attendance by coordinator"
       : null
 
+  const normalizedOfficeClockIn = bioRow?.clock_in
+    ? bioRow.clock_in.includes("T")
+      ? new Date(bioRow.clock_in).toISOString()
+      : new Date(`${meetingDate}T${bioRow.clock_in}+01:00`).toISOString()
+    : null
+
   const { data: saved, error } = await db
     .from("general_meeting_attendance")
     .upsert(
@@ -356,7 +362,7 @@ export async function POST(request: NextRequest) {
         status: resolvedStatus,
         attendance_mode: resolvedMode,
         source: "manual",
-        office_clock_in: bioRow?.clock_in || null,
+        office_clock_in: normalizedOfficeClockIn,
         meeting_clock_in: resolvedClockIn,
         manual_comment: manualComment || defaultComment,
         recorded_by: user.id,
