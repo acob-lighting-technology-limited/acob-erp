@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, CheckCircle2, Clock, Loader2, QrCode, ShieldCheck, UserCheck } from "lucide-react"
 import { toast } from "sonner"
+import { apiFetch } from "@/lib/api-client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 function CheckInContent() {
@@ -45,7 +46,7 @@ function CheckInContent() {
     const loadSession = async () => {
       try {
         setSessionLoading(true)
-        const res = await fetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
+        const res = await apiFetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
         const data = await res.json()
         if (mounted && data.userStatus) {
           setUserStatus(data.userStatus)
@@ -93,7 +94,7 @@ function CheckInContent() {
 
     setSubmitting(true)
     try {
-      const res = await fetch("/api/reports/general-meeting/attendance/check-in", {
+      const res = await apiFetch("/api/reports/general-meeting/attendance/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -133,7 +134,7 @@ function CheckInContent() {
     <div className="mx-auto max-w-lg space-y-6">
       <Card className="border shadow-md">
         <CardHeader className="pb-4 text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-600">
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
             <UserCheck className="h-6 w-6" />
           </div>
           <CardTitle className="text-xl">General Meeting & KSS Check-In</CardTitle>
@@ -227,7 +228,7 @@ function CheckInContent() {
               {/* Biometric status notice */}
               {sessionLoading ? (
                 <div className="bg-muted/40 text-muted-foreground flex items-center justify-center gap-2 rounded-lg border p-3 text-xs">
-                  <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                  <Loader2 className="h-4 w-4 animate-spin text-emerald-600 dark:text-emerald-400" />
                   <span>Checking office entrance clock-in status...</span>
                 </div>
               ) : userStatus && !userStatus.hasOfficeClockIn ? (
@@ -258,11 +259,7 @@ function CheckInContent() {
                 </div>
               ) : null}
 
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="h-11 w-full bg-indigo-600 text-sm font-semibold text-white shadow hover:bg-indigo-700"
-              >
+              <Button type="submit" disabled={submitting} className="h-11 w-full text-sm font-semibold shadow">
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying Clock-In...
