@@ -30,7 +30,9 @@ export function toTemplateRow(risk: RiskRow, ctx: RiskExportContext): Record<str
     "Inherent Likelihood": `${risk.likelihood} - ${likelihoodLabel(risk.likelihood)}`,
     "Risk Score": risk.score,
     "Risk Rating": RATING_LABELS[risk.rating],
-    "Control Owner": [risk.control_owner_departments.join(", "), owner].filter(Boolean).join(" — "),
+    "Control Owner": [risk.control_owner_departments.join(", "), owner, risk.control_owner_note]
+      .filter(Boolean)
+      .join(" — "),
     "Mitigation Plans (Actions to Improve Risk Exposure)": risk.mitigation_plan || "",
     "Implementation Timeline/Responsibility": formatTimeline(risk),
     "Risk Status": STATUS_LABELS[risk.status],

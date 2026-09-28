@@ -94,6 +94,7 @@ export interface RiskRow {
   rating: RiskRating
   control_owner_departments: string[]
   control_owner_id: string | null
+  control_owner_note: string | null
   mitigation_plan: string | null
   timeline_type: RiskTimelineType
   target_date: string | null
@@ -107,7 +108,7 @@ export interface RiskRow {
 }
 
 export const RISK_COLUMNS =
-  "id, serial_no, department, supporting_departments, risk_name, description, causes, consequence, impact, likelihood, score, rating, control_owner_departments, control_owner_id, mitigation_plan, timeline_type, target_date, timeline_note, status, closed_at, created_by, updated_by, created_at, updated_at"
+  "id, serial_no, department, supporting_departments, risk_name, description, causes, consequence, impact, likelihood, score, rating, control_owner_departments, control_owner_id, control_owner_note, mitigation_plan, timeline_type, target_date, timeline_note, status, closed_at, created_by, updated_by, created_at, updated_at"
 
 const optionalText = z
   .string()
@@ -133,6 +134,7 @@ const riskFields = {
     .uuid()
     .nullish()
     .transform((v) => v ?? null),
+  control_owner_note: optionalText,
   mitigation_plan: optionalText,
   timeline_type: z.enum(["by_date", "continuous"]),
   target_date: z
