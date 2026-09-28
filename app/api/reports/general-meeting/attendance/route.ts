@@ -199,6 +199,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Mode calculation:
+    // If meeting check in exists:
+    // If office punch exists -> physical
+    // If no office punch -> virtual (online / Teams)
+    let calculatedMode: AttendanceRosterItem["attendance_mode"] = null
+    if (meetingClockIn || meet?.attendance_mode) {
+      if (meet?.attendance_mode) {
+        calculatedMode = meet.attendance_mode as AttendanceRosterItem["attendance_mode"]
+      } else if (officeClockIn) {
+        calculatedMode = "physical"
+      } else {
+        calculatedMode = "virtual"
+      }
+    }
+
     items.push({
       id: p.id,
       full_name: formatEmployeeName(p.first_name, p.last_name, p.full_name),
@@ -212,7 +227,7 @@ export async function GET(request: NextRequest) {
       attendance_id: meet?.id || null,
       status: finalStatus,
       source: (meet?.source as AttendanceRosterItem["source"]) || null,
-      attendance_mode: (meet?.attendance_mode as AttendanceRosterItem["attendance_mode"]) || null,
+      attendance_mode: calculatedMode,
       manual_comment: meet?.manual_comment || null,
       recorded_by_name: null,
       is_on_leave: isOnLeave,
@@ -322,6 +337,14 @@ export async function POST(request: NextRequest) {
   const resolvedClockIn = meetingClockIn ? new Date(meetingClockIn).toISOString() : nowIso
   const resolvedStatus = action === "confirm_in_room" ? "present" : status || "present"
 
+  const resolvedMode = attendanceMode || (bioRow?.clock_in ? "physical" : "virtual")
+  const defaultComment =
+    action === "confirm_in_room"
+      ? bioRow?.clock_in
+        ? "Confirmed in conference room by coordinator"
+        : "Confirmed online attendance by coordinator"
+      : null
+
   const { data: saved, error } = await db
     .from("general_meeting_attendance")
     .upsert(
@@ -331,11 +354,11 @@ export async function POST(request: NextRequest) {
         meeting_date: meetingDate,
         user_id: userId,
         status: resolvedStatus,
-        attendance_mode: attendanceMode || "physical",
+        attendance_mode: resolvedMode,
         source: "manual",
         office_clock_in: bioRow?.clock_in || null,
         meeting_clock_in: resolvedClockIn,
-        manual_comment: manualComment || (action === "confirm_in_room" ? "Confirmed in room by coordinator" : null),
+        manual_comment: manualComment || defaultComment,
         recorded_by: user.id,
         updated_at: nowIso,
       },

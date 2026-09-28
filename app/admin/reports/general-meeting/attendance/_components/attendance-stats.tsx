@@ -25,8 +25,8 @@ export function AttendanceStatsGrid({ stats }: Props) {
         title="Total Staff"
         value={stats.totalStaff}
         icon={Users}
-        iconColor="text-blue-500"
-        iconBgColor="bg-blue-500/10"
+        iconColor="text-foreground"
+        iconBgColor="bg-muted"
         description="All active employees"
       />
       <StatCard

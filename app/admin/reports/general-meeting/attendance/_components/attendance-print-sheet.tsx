@@ -99,7 +99,7 @@ export function AttendancePrintSheetDialog({
       <DialogContent className="max-w-md sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
-            <QrCode className="h-5 w-5 text-indigo-600" />
+            <QrCode className="text-primary h-5 w-5" />
             Meeting Sign-In Sheet (QR & Code)
           </DialogTitle>
           <DialogDescription>
@@ -149,7 +149,7 @@ export function AttendancePrintSheetDialog({
             </div>
 
             {/* 6-Digit Code */}
-            <div className="mt-3 rounded-lg bg-slate-900 px-6 py-2.5 text-2xl font-black tracking-[0.25em] text-white shadow">
+            <div className="mt-3 rounded-lg bg-emerald-950 px-6 py-2.5 text-2xl font-black tracking-[0.25em] text-emerald-100 shadow dark:bg-emerald-900/60">
               {formattedCode}
             </div>
 
@@ -169,12 +169,7 @@ export function AttendancePrintSheetDialog({
               <Printer className="h-4 w-4" />
               Print
             </Button>
-            <Button
-              size="sm"
-              onClick={handleDownloadPdf}
-              disabled={downloadingPdf}
-              className="gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700"
-            >
+            <Button size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} className="gap-1.5">
               {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Download PDF
             </Button>

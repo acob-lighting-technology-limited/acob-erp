@@ -127,7 +127,7 @@ export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onS
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
-            <UserCheck className="h-5 w-5 text-indigo-600" />
+            <UserCheck className="text-primary h-5 w-5" />
             Manage Attendance: {item.full_name}
           </DialogTitle>
           <DialogDescription>
@@ -219,13 +219,7 @@ export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onS
             <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-indigo-600 text-white hover:bg-indigo-700"
-            >
+            <Button type="button" size="sm" onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />}
               Save Attendance
             </Button>

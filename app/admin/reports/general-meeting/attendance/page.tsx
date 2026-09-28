@@ -137,10 +137,12 @@ export default function AdminMeetingAttendancePage() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Failed to confirm attendance")
 
-        toast.success(`Confirmed ${item.full_name} in conference room!`)
+        toast.success(
+          `Confirmed ${item.full_name} (${item.office_clock_in ? "in conference room" : "online attendance"})!`
+        )
         await refetchAttendance()
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Error confirming in room")
+        toast.error(err instanceof Error ? err.message : "Error confirming attendance")
       } finally {
         setConfirmingId(null)
       }
@@ -226,7 +228,7 @@ export default function AdminMeetingAttendancePage() {
           }
           return (
             <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-blue-500" />
+              <Clock className="text-muted-foreground h-3.5 w-3.5" />
               <span className="text-foreground text-xs font-semibold">{formatTime(r.office_clock_in)}</span>
             </div>
           )
@@ -262,6 +264,38 @@ export default function AdminMeetingAttendancePage() {
         initialWidth: 160,
       },
       {
+        key: "attendance_mode",
+        label: "Mode",
+        sortable: true,
+        accessor: (r) => r.attendance_mode || "",
+        render: (r) => {
+          if (!r.attendance_mode) return <span className="text-muted-foreground text-xs">—</span>
+          if (r.attendance_mode === "virtual") {
+            return (
+              <Badge
+                variant="outline"
+                className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] text-emerald-800 dark:text-emerald-300"
+              >
+                <Laptop className="h-3 w-3" /> Online
+              </Badge>
+            )
+          }
+          if (r.attendance_mode === "physical") {
+            return (
+              <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground gap-1 text-[11px]">
+                <Building2 className="h-3 w-3" /> Physical
+              </Badge>
+            )
+          }
+          return (
+            <Badge variant="outline" className="text-[11px] capitalize">
+              {r.attendance_mode}
+            </Badge>
+          )
+        },
+        initialWidth: 120,
+      },
+      {
         key: "status",
         label: "Status",
         sortable: true,
@@ -269,7 +303,7 @@ export default function AdminMeetingAttendancePage() {
         render: (r) => {
           if (r.is_on_leave) {
             return (
-              <Badge variant="outline" className="gap-1 border-sky-400/50 bg-sky-500/10 text-sky-700 dark:text-sky-400">
+              <Badge variant="secondary" className="text-muted-foreground gap-1 text-[11px]">
                 <Palmtree className="h-3 w-3" /> On Leave
               </Badge>
             )
@@ -310,43 +344,21 @@ export default function AdminMeetingAttendancePage() {
         initialWidth: 130,
       },
       {
-        key: "attendance_mode",
-        label: "Mode",
-        sortable: true,
-        accessor: (r) => r.attendance_mode || "",
-        render: (r) => {
-          if (!r.attendance_mode) return <span className="text-muted-foreground text-xs">—</span>
-          if (r.attendance_mode === "virtual") {
-            return (
-              <Badge
-                variant="outline"
-                className="gap-1 border-sky-400/50 bg-sky-500/10 text-[11px] text-sky-700 dark:text-sky-400"
-              >
-                <Laptop className="h-3 w-3" /> Online
-              </Badge>
-            )
-          }
-          if (r.attendance_mode === "physical") {
-            return (
-              <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground gap-1 text-[11px]">
-                <Building2 className="h-3 w-3" /> Physical
-              </Badge>
-            )
-          }
-          return (
-            <Badge variant="outline" className="text-[11px] capitalize">
-              {r.attendance_mode}
-            </Badge>
-          )
-        },
-        initialWidth: 120,
-      },
-      {
         key: "actions",
         label: "Actions",
         render: (r) => (
-          <div className="flex items-center gap-1.5">
-            {r.office_clock_in && !r.meeting_clock_in && !r.is_on_leave && (
+          <div className="flex min-w-[170px] items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditingItem(r)}
+              className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0 p-0"
+              title="Edit attendance"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+
+            {!r.meeting_clock_in && !r.is_on_leave && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -354,29 +366,31 @@ export default function AdminMeetingAttendancePage() {
                     variant="outline"
                     onClick={() => handleQuickConfirm(r)}
                     disabled={confirmingId === r.id}
-                    className="h-7 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    className="h-7 shrink-0 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
                   >
-                    <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />
-                    Confirm in Room
+                    {r.office_clock_in ? (
+                      <>
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+                        Confirm in Room
+                      </>
+                    ) : (
+                      <>
+                        <Laptop className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+                        Confirm Online
+                      </>
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Employee clocked into building today. Confirm they are seated in conference room.
+                  {r.office_clock_in
+                    ? "Employee punched entrance gate today. Confirm seated in conference room."
+                    : "No office entrance punch. Confirm remote/online attendance."}
                 </TooltipContent>
               </Tooltip>
             )}
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setEditingItem(r)}
-              className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
-            >
-              <Edit2 className="h-3.5 w-3.5" />
-            </Button>
           </div>
         ),
-        initialWidth: 160,
+        initialWidth: 175,
       },
     ],
     [confirmingId, handleQuickConfirm]
@@ -438,7 +452,7 @@ export default function AdminMeetingAttendancePage() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowPrintSheet(true)}>
-            <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+            <QrCode className="text-primary h-3.5 w-3.5" />
             <span>Sign-In Sheet</span>
           </Button>
 
@@ -579,21 +593,21 @@ export default function AdminMeetingAttendancePage() {
               ...(r.manual_comment ? [{ icon: FileSignature, label: "Comment", value: r.manual_comment }] : []),
             ],
             actions: (r) => [
-              ...(r.office_clock_in && !r.meeting_clock_in && !r.is_on_leave
-                ? [
-                    {
-                      label: "Confirm in Room",
-                      icon: CheckCircle2,
-                      onClick: () => handleQuickConfirm(r),
-                    },
-                  ]
-                : []),
               {
                 label: "Edit Attendance",
                 icon: Edit2,
                 onClick: () => setEditingItem(r),
                 variant: "outline" as const,
               },
+              ...(!r.meeting_clock_in && !r.is_on_leave
+                ? [
+                    {
+                      label: r.office_clock_in ? "Confirm in Room" : "Confirm Online",
+                      icon: r.office_clock_in ? CheckCircle2 : Laptop,
+                      onClick: () => handleQuickConfirm(r),
+                    },
+                  ]
+                : []),
             ],
           },
         }}
@@ -615,7 +629,7 @@ export default function AdminMeetingAttendancePage() {
             <div className="grid gap-2 border-t pt-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-blue-500" />
+                  <Clock className="text-muted-foreground h-3.5 w-3.5" />
                   Office Punch:
                 </span>
                 {r.office_clock_in ? (
@@ -647,12 +661,30 @@ export default function AdminMeetingAttendancePage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status:</span>
-                {r.is_on_leave ? (
+                <span className="text-muted-foreground">Mode:</span>
+                {r.attendance_mode === "virtual" ? (
                   <Badge
                     variant="outline"
-                    className="gap-1 border-sky-400/50 bg-sky-500/10 text-[11px] text-sky-700 dark:text-sky-400"
+                    className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] text-emerald-800 dark:text-emerald-300"
                   >
+                    <Laptop className="h-3 w-3" /> Online
+                  </Badge>
+                ) : r.attendance_mode === "physical" ? (
+                  <Badge
+                    variant="outline"
+                    className="border-muted-foreground/30 text-muted-foreground gap-1 text-[11px]"
+                  >
+                    <Building2 className="h-3 w-3" /> Physical
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground text-xs italic">—</span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status:</span>
+                {r.is_on_leave ? (
+                  <Badge variant="secondary" className="text-muted-foreground gap-1 text-[11px]">
                     <Palmtree className="h-3 w-3" /> On Leave
                   </Badge>
                 ) : r.status === "present" ? (
@@ -679,8 +711,18 @@ export default function AdminMeetingAttendancePage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t pt-2">
-              {r.office_clock_in && !r.meeting_clock_in && !r.is_on_leave && (
+            <div className="flex items-center justify-between gap-2 border-t pt-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setEditingItem(r)}
+                className="text-muted-foreground hover:text-foreground h-7 w-7 shrink-0 p-0"
+                title="Edit attendance"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </Button>
+
+              {!r.meeting_clock_in && !r.is_on_leave && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -688,18 +730,19 @@ export default function AdminMeetingAttendancePage() {
                   disabled={confirmingId === r.id}
                   className="h-7 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
                 >
-                  <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />
-                  Confirm in Room
+                  {r.office_clock_in ? (
+                    <>
+                      <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+                      Confirm in Room
+                    </>
+                  ) : (
+                    <>
+                      <Laptop className="mr-1 h-3.5 w-3.5 text-emerald-600" />
+                      Confirm Online
+                    </>
+                  )}
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditingItem(r)}
-                className="text-muted-foreground hover:text-foreground h-7 w-7 p-0"
-              >
-                <Edit2 className="h-3.5 w-3.5" />
-              </Button>
             </div>
           </div>
         )}
