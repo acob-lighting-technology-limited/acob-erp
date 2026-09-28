@@ -53,6 +53,71 @@ function formatTime(value: string | null): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
 }
 
+function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
+  if (item.is_on_leave) {
+    return (
+      <Badge variant="secondary" className="text-muted-foreground gap-1 text-[11px]">
+        <Palmtree className="h-3 w-3" /> On Leave
+      </Badge>
+    )
+  }
+
+  const isVirtual = item.attendance_mode === "virtual"
+
+  switch (item.status) {
+    case "present":
+      if (isVirtual) {
+        return (
+          <Badge
+            variant="outline"
+            className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] font-medium text-emerald-800 dark:text-emerald-300"
+          >
+            <Laptop className="h-3 w-3" /> Present (Virtual)
+          </Badge>
+        )
+      }
+      return (
+        <Badge className="gap-1 bg-emerald-600 text-[11px] text-white hover:bg-emerald-600">
+          <Building2 className="h-3 w-3" /> Present (In-Room)
+        </Badge>
+      )
+    case "late":
+      if (isVirtual) {
+        return (
+          <Badge
+            variant="outline"
+            className="gap-1 border-amber-500/40 bg-amber-500/10 text-[11px] font-medium text-amber-800 dark:text-amber-300"
+          >
+            <Laptop className="h-3 w-3" /> Late (Virtual)
+          </Badge>
+        )
+      }
+      return (
+        <Badge className="gap-1 bg-amber-600 text-[11px] text-white hover:bg-amber-600">
+          <Clock className="h-3 w-3" /> Late (In-Room)
+        </Badge>
+      )
+    case "excused":
+      return (
+        <Badge variant="secondary" className="gap-1 text-[11px]">
+          <ShieldCheck className="h-3 w-3" /> Excused
+        </Badge>
+      )
+    case "absent":
+      return (
+        <Badge variant="destructive" className="gap-1 text-[11px]">
+          <XCircle className="h-3 w-3" /> Absent
+        </Badge>
+      )
+    default:
+      return (
+        <Badge variant="outline" className="text-muted-foreground text-[11px]">
+          Unrecorded
+        </Badge>
+      )
+  }
+}
+
 export default function AdminMeetingAttendancePage() {
   const currentWeek = useMemo(() => getCurrentOfficeWeek(), [])
   const [week, setWeek] = useState(currentWeek.week)
@@ -239,84 +304,12 @@ export default function AdminMeetingAttendancePage() {
         initialWidth: 160,
       },
       {
-        key: "attendance_mode",
-        label: "Mode",
-        sortable: true,
-        accessor: (r) => r.attendance_mode || "",
-        render: (r) => {
-          if (!r.attendance_mode) return <span className="text-muted-foreground text-xs">—</span>
-          if (r.attendance_mode === "virtual") {
-            return (
-              <Badge
-                variant="outline"
-                className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] text-emerald-800 dark:text-emerald-300"
-              >
-                <Laptop className="h-3 w-3" /> Online
-              </Badge>
-            )
-          }
-          if (r.attendance_mode === "physical") {
-            return (
-              <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground gap-1 text-[11px]">
-                <Building2 className="h-3 w-3" /> Physical
-              </Badge>
-            )
-          }
-          return (
-            <Badge variant="outline" className="text-[11px] capitalize">
-              {r.attendance_mode}
-            </Badge>
-          )
-        },
-        initialWidth: 120,
-      },
-      {
         key: "status",
         label: "Status",
         sortable: true,
         accessor: (r) => r.status,
-        render: (r) => {
-          if (r.is_on_leave) {
-            return (
-              <Badge variant="secondary" className="text-muted-foreground gap-1 text-[11px]">
-                <Palmtree className="h-3 w-3" /> On Leave
-              </Badge>
-            )
-          }
-          switch (r.status) {
-            case "present":
-              return (
-                <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600">
-                  <CheckCircle2 className="h-3 w-3" /> Present
-                </Badge>
-              )
-            case "late":
-              return (
-                <Badge className="gap-1 bg-amber-600 text-white hover:bg-amber-600">
-                  <Clock className="h-3 w-3" /> Late
-                </Badge>
-              )
-            case "excused":
-              return (
-                <Badge variant="secondary" className="gap-1">
-                  <ShieldCheck className="h-3 w-3" /> Excused
-                </Badge>
-              )
-            case "absent":
-              return (
-                <Badge variant="destructive" className="gap-1">
-                  <XCircle className="h-3 w-3" /> Absent
-                </Badge>
-              )
-            default:
-              return (
-                <Badge variant="outline" className="text-muted-foreground">
-                  Unrecorded
-                </Badge>
-              )
-          }
-        },
-        initialWidth: 130,
+        render: (r) => <AttendanceStatusBadge item={r} />,
+        initialWidth: 165,
       },
       {
         key: "actions",
@@ -467,13 +460,15 @@ export default function AdminMeetingAttendancePage() {
         data={items}
         columns={columns}
         getRowId={(r) => r.id}
-        searchPlaceholder="Search staff by name, department, or designation..."
+        searchPlaceholder="Search staff by name, department, or status..."
         searchFn={(row, query) => {
           const q = query.toLowerCase()
           return (
             row.full_name.toLowerCase().includes(q) ||
             row.department.toLowerCase().includes(q) ||
-            (row.designation?.toLowerCase().includes(q) ?? false)
+            (row.designation?.toLowerCase().includes(q) ?? false) ||
+            (row.attendance_mode?.toLowerCase().includes(q) ?? false) ||
+            row.status.toLowerCase().includes(q)
           )
         }}
         filters={filters}
@@ -635,53 +630,8 @@ export default function AdminMeetingAttendancePage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Mode:</span>
-                {r.attendance_mode === "virtual" ? (
-                  <Badge
-                    variant="outline"
-                    className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] text-emerald-800 dark:text-emerald-300"
-                  >
-                    <Laptop className="h-3 w-3" /> Online
-                  </Badge>
-                ) : r.attendance_mode === "physical" ? (
-                  <Badge
-                    variant="outline"
-                    className="border-muted-foreground/30 text-muted-foreground gap-1 text-[11px]"
-                  >
-                    <Building2 className="h-3 w-3" /> Physical
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground text-xs italic">—</span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Status:</span>
-                {r.is_on_leave ? (
-                  <Badge variant="secondary" className="text-muted-foreground gap-1 text-[11px]">
-                    <Palmtree className="h-3 w-3" /> On Leave
-                  </Badge>
-                ) : r.status === "present" ? (
-                  <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
-                    <CheckCircle2 className="h-3 w-3" /> Present
-                  </Badge>
-                ) : r.status === "late" ? (
-                  <Badge className="gap-1 bg-amber-600 text-xs text-white hover:bg-amber-600">
-                    <Clock className="h-3 w-3" /> Late
-                  </Badge>
-                ) : r.status === "excused" ? (
-                  <Badge variant="secondary" className="gap-1 text-xs">
-                    <ShieldCheck className="h-3 w-3" /> Excused
-                  </Badge>
-                ) : r.status === "absent" ? (
-                  <Badge variant="destructive" className="gap-1 text-xs">
-                    <XCircle className="h-3 w-3" /> Absent
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-muted-foreground text-xs">
-                    Unrecorded
-                  </Badge>
-                )}
+                <AttendanceStatusBadge item={r} />
               </div>
             </div>
 
