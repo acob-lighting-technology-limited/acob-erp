@@ -3,16 +3,13 @@
 import { useCallback, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   AlertTriangle,
-  Building2,
-  Calendar,
   CheckCircle2,
   Clock,
   Download,
@@ -25,7 +22,6 @@ import {
   RefreshCw,
   ShieldCheck,
   UserCheck,
-  Users,
   XCircle,
 } from "lucide-react"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
@@ -50,7 +46,6 @@ export default function AdminMeetingAttendancePage() {
   const currentWeek = useMemo(() => getCurrentOfficeWeek(), [])
   const [week, setWeek] = useState(currentWeek.week)
   const [year, setYear] = useState(currentWeek.year)
-  const [selectedTab, setSelectedTab] = useState<string>("all")
   const [showPrintSheet, setShowPrintSheet] = useState(false)
   const [editingItem, setEditingItem] = useState<AttendanceRosterItem | null>(null)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
@@ -108,62 +103,10 @@ export default function AdminMeetingAttendancePage() {
     absent: 0,
   }
 
-  const onlineCount = useMemo(() => items.filter((i) => i.attendance_mode === "virtual").length, [items])
-
-  const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
-  const yearOptions = useMemo(() => [currentWeek.year - 1, currentWeek.year, currentWeek.year + 1], [currentWeek.year])
-
   // Extract departments for filter dropdown
   const departments = useMemo(() => {
     return Array.from(new Set(items.map((i) => i.department).filter(Boolean))).sort((a, b) => a.localeCompare(b))
   }, [items])
-
-  // Tab definitions with Lucide icons & dynamic badge counts
-  const tabs: DataTableTab[] = useMemo(
-    () => [
-      { key: "all", label: "All Staff", icon: Users },
-      {
-        key: "not_scanned",
-        label: "At Office, Not Scanned",
-        icon: AlertTriangle,
-        badge: stats.officeNotScanned > 0 ? stats.officeNotScanned : undefined,
-        badgeVariant: "destructive",
-      },
-      { key: "present", label: "In Meeting", icon: CheckCircle2 },
-      {
-        key: "online",
-        label: "Online / Virtual",
-        icon: Laptop,
-        badge: onlineCount > 0 ? onlineCount : undefined,
-      },
-      { key: "not_at_office", label: "Not in Office", icon: Building2 },
-      {
-        key: "on_leave",
-        label: "On Leave",
-        icon: Palmtree,
-        badge: stats.onLeave > 0 ? stats.onLeave : undefined,
-      },
-    ],
-    [stats.officeNotScanned, stats.onLeave, onlineCount]
-  )
-
-  // Filter items by active tab
-  const filteredData = useMemo(() => {
-    switch (selectedTab) {
-      case "not_scanned":
-        return items.filter((i) => i.office_clock_in && !i.meeting_clock_in && !i.is_on_leave)
-      case "present":
-        return items.filter((i) => i.status === "present" || i.status === "late")
-      case "online":
-        return items.filter((i) => i.attendance_mode === "virtual")
-      case "on_leave":
-        return items.filter((i) => i.is_on_leave)
-      case "not_at_office":
-        return items.filter((i) => !i.office_clock_in && !i.meeting_clock_in && !i.is_on_leave)
-      default:
-        return items
-    }
-  }, [items, selectedTab])
 
   // 1-Click "Confirm in Room" action
   const handleQuickConfirm = useCallback(
@@ -194,21 +137,6 @@ export default function AdminMeetingAttendancePage() {
     },
     [week, year, refetchAttendance]
   )
-
-  const handleRegenerateCode = async () => {
-    const res = await fetch("/api/reports/general-meeting/attendance/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        week,
-        year,
-        action: "regenerate_code",
-      }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || "Failed to regenerate code")
-    await refetchSession()
-  }
 
   // Export Roster to CSV
   const handleExportCsv = () => {
@@ -469,25 +397,52 @@ export default function AdminMeetingAttendancePage() {
     [confirmingId, handleQuickConfirm]
   )
 
-  const filters: DataTableFilter<AttendanceRosterItem>[] = [
-    {
-      key: "department",
-      label: "Department",
-      options: departments.map((d) => ({ value: d, label: d })),
-    },
-    {
-      key: "status",
-      label: "Status",
-      options: [
-        { value: "present", label: "Present" },
-        { value: "late", label: "Late" },
-        { value: "excused", label: "Excused" },
-        { value: "absent", label: "Absent" },
-        { value: "on_leave", label: "On Leave" },
-        { value: "unrecorded", label: "Unrecorded" },
-      ],
-    },
-  ]
+  const filters = useMemo<DataTableFilter<AttendanceRosterItem>[]>(
+    () => [
+      {
+        key: "week_number",
+        label: "Week",
+        options: Array.from({ length: 53 }, (_, index) => {
+          const w = index + 1
+          return { value: String(w), label: `Week ${w}` }
+        }),
+        multi: false,
+        placeholder: `Week ${week}`,
+        mode: "custom",
+        filterFn: () => true,
+      },
+      {
+        key: "year",
+        label: "Year",
+        options: [currentWeek.year - 1, currentWeek.year, currentWeek.year + 1].map((y) => ({
+          value: String(y),
+          label: String(y),
+        })),
+        multi: false,
+        placeholder: String(year),
+        mode: "custom",
+        filterFn: () => true,
+      },
+      {
+        key: "department",
+        label: "Department",
+        options: departments.map((d) => ({ value: d, label: d })),
+      },
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "present", label: "Present" },
+          { value: "late", label: "Late" },
+          { value: "excused", label: "Excused" },
+          { value: "absent", label: "Absent" },
+          { value: "on_leave", label: "On Leave" },
+          { value: "unrecorded", label: "Unrecorded" },
+        ],
+      },
+    ],
+    [currentWeek.year, departments, week, year]
+  )
 
   return (
     <DataTablePage
@@ -495,40 +450,8 @@ export default function AdminMeetingAttendancePage() {
       description="Real-time biometric-verified attendance tracking for General Meeting & KSS."
       icon={UserCheck}
       backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
-      tabs={tabs}
-      activeTab={selectedTab}
-      onTabChange={setSelectedTab}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <div className="bg-background flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs">
-            <Calendar className="text-muted-foreground h-3.5 w-3.5" />
-            <span className="text-muted-foreground font-semibold">Week:</span>
-            <Select value={String(week)} onValueChange={(v) => setWeek(Number(v))}>
-              <SelectTrigger className="h-6 w-16 border-0 bg-transparent p-0 text-xs font-semibold shadow-none focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {weekOptions.map((w) => (
-                  <SelectItem key={w} value={String(w)} className="text-xs">
-                    Week {w}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-              <SelectTrigger className="h-6 w-14 border-0 bg-transparent p-0 text-xs font-semibold shadow-none focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((y) => (
-                  <SelectItem key={y} value={String(y)} className="text-xs">
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowPrintSheet(true)}>
             <QrCode className="h-3.5 w-3.5 text-indigo-600" />
             <span>Sign-In Sheet</span>
@@ -563,12 +486,12 @@ export default function AdminMeetingAttendancePage() {
               </div>
             </div>
           )}
-          <AttendanceStatsGrid stats={stats} onlineCount={onlineCount} />
+          <AttendanceStatsGrid stats={stats} />
         </div>
       }
     >
       <DataTable<AttendanceRosterItem>
-        data={filteredData}
+        data={items}
         columns={columns}
         getRowId={(r) => r.id}
         searchPlaceholder="Search staff by name, department, or designation..."
@@ -581,6 +504,24 @@ export default function AdminMeetingAttendancePage() {
           )
         }}
         filters={filters}
+        onFilterChange={(filterValues) => {
+          const weekValue = filterValues.week_number?.[0]
+          const yearValue = filterValues.year?.[0]
+
+          if (weekValue) {
+            const parsedWeek = Number(weekValue)
+            if (!Number.isNaN(parsedWeek) && parsedWeek !== week) {
+              setWeek(parsedWeek)
+            }
+          }
+
+          if (yearValue) {
+            const parsedYear = Number(yearValue)
+            if (!Number.isNaN(parsedYear) && parsedYear !== year) {
+              setYear(parsedYear)
+            }
+          }
+        }}
         isLoading={attendanceLoading}
         onRetry={() => {
           refetchSession()
@@ -599,7 +540,6 @@ export default function AdminMeetingAttendancePage() {
           code6Digit={session.code_6_digit}
           isHoliday={holidayInfo?.isMeetingDayHoliday}
           holidayName={holidayInfo?.meetingHolidayName}
-          onRegenerateCode={handleRegenerateCode}
         />
       )}
 

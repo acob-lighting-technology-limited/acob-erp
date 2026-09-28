@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { AlertTriangle, Download, Loader2, Printer, QrCode, RefreshCw, ShieldCheck } from "lucide-react"
+import { AlertTriangle, Download, Loader2, Printer, QrCode, ShieldCheck } from "lucide-react"
 import {
   generateMeetingAttendancePdf,
   generateQrWithMatrixLogo,
@@ -21,7 +21,6 @@ interface Props {
   code6Digit: string
   isHoliday?: boolean
   holidayName?: string | null
-  onRegenerateCode?: () => Promise<void>
 }
 
 export function AttendancePrintSheetDialog({
@@ -33,12 +32,10 @@ export function AttendancePrintSheetDialog({
   code6Digit,
   isHoliday,
   holidayName,
-  onRegenerateCode,
 }: Props) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [generatingQr, setGeneratingQr] = useState(false)
   const [downloadingPdf, setDownloadingPdf] = useState(false)
-  const [regenerating, setRegenerating] = useState(false)
 
   // Construct check-in URL with prefilled code for easy scanning
   const checkInUrl =
@@ -87,19 +84,6 @@ export function AttendancePrintSheetDialog({
       toast.error(err instanceof Error ? err.message : "Failed to download PDF")
     } finally {
       setDownloadingPdf(false)
-    }
-  }
-
-  const handleRegenerate = async () => {
-    if (!onRegenerateCode) return
-    setRegenerating(true)
-    try {
-      await onRegenerateCode()
-      toast.success("New 6-digit meeting code generated")
-    } catch {
-      toast.error("Failed to regenerate code")
-    } finally {
-      setRegenerating(false)
     }
   }
 
@@ -180,35 +164,20 @@ export function AttendancePrintSheetDialog({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-            {onRegenerateCode && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRegenerate}
-                disabled={regenerating}
-                className="text-muted-foreground gap-1.5 text-xs"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
-                Regenerate Code
-              </Button>
-            )}
-
-            <div className="ml-auto flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
-                <Printer className="h-4 w-4" />
-                Print
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleDownloadPdf}
-                disabled={downloadingPdf}
-                className="gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Download PDF
-              </Button>
-            </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700"
+            >
+              {downloadingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Download PDF
+            </Button>
           </div>
         </div>
       </DialogContent>

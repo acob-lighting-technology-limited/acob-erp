@@ -7,9 +7,16 @@ import { getOfficeWeekMonday } from "@/lib/meeting-week"
 
 export const dynamic = "force-dynamic"
 
-function generate6DigitCode(): string {
-  // Generate a random 6-digit numerical string
-  return Math.floor(100000 + Math.random() * 900000).toString()
+function getConstantWeeklyCode(week: number, year: number): string {
+  // Deterministic 6-digit code constant for each week and year
+  let hash = 0
+  const str = `acob-meeting-auth-${year}-w${week}`
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash |= 0
+  }
+  const codeNum = Math.abs(hash % 900000) + 100000
+  return codeNum.toString()
 }
 
 export async function GET(request: NextRequest) {
@@ -68,8 +75,8 @@ export async function GET(request: NextRequest) {
   let session = initialSession
 
   if (!session) {
-    // Auto-create session with new 6-digit code
-    const newCode = generate6DigitCode()
+    // Auto-create session with deterministic constant 6-digit code for this week
+    const newCode = getConstantWeeklyCode(week, year)
     const { data: created, error: createErr } = await db
       .from("general_meeting_sessions")
       .insert({
@@ -130,7 +137,7 @@ export async function GET(request: NextRequest) {
 const SessionActionSchema = z.object({
   week: z.number().int().min(1).max(53),
   year: z.number().int().min(2000).max(2100),
-  action: z.enum(["regenerate_code", "toggle_active"]),
+  action: z.enum(["toggle_active"]),
   isActive: z.boolean().optional(),
 })
 
@@ -157,24 +164,6 @@ export async function POST(request: NextRequest) {
 
   const { week, year, action, isActive } = parsed.data
   const db = getServiceRoleClientOrFallback(supabase)
-
-  if (action === "regenerate_code") {
-    const newCode = generate6DigitCode()
-    const { data, error } = await db
-      .from("general_meeting_sessions")
-      .update({
-        code_6_digit: newCode,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("meeting_week", week)
-      .eq("meeting_year", year)
-      .select()
-      .single()
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ session: data })
-  }
 
   if (action === "toggle_active") {
     const { data, error } = await db

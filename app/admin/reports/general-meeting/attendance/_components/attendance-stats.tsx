@@ -2,7 +2,7 @@
 
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { AlertTriangle, CheckCircle2, Laptop, Palmtree, Users } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Users } from "lucide-react"
 
 interface Props {
   stats: {
@@ -13,10 +13,9 @@ interface Props {
     onLeave: number
     absent: number
   }
-  onlineCount?: number
 }
 
-export function AttendanceStatsGrid({ stats, onlineCount = 0 }: Props) {
+export function AttendanceStatsGrid({ stats }: Props) {
   const attendanceRate = stats.totalStaff > 0 ? Math.round((stats.meetingPresent / stats.totalStaff) * 100) : 0
 
   return (
@@ -28,7 +27,7 @@ export function AttendanceStatsGrid({ stats, onlineCount = 0 }: Props) {
         icon={Users}
         iconColor="text-blue-500"
         iconBgColor="bg-blue-500/10"
-        description="All active workforce"
+        description="All active employees"
       />
       <StatCard
         variant="compact"
@@ -47,24 +46,6 @@ export function AttendanceStatsGrid({ stats, onlineCount = 0 }: Props) {
         iconColor="text-amber-500"
         iconBgColor="bg-amber-500/10"
         description="Punched gate, no scan"
-      />
-      <StatCard
-        variant="compact"
-        title="Online / Virtual"
-        value={onlineCount}
-        icon={Laptop}
-        iconColor="text-sky-500"
-        iconBgColor="bg-sky-500/10"
-        description="Recorded online"
-      />
-      <StatCard
-        variant="compact"
-        title="On Approved Leave"
-        value={stats.onLeave}
-        icon={Palmtree}
-        iconColor="text-slate-500"
-        iconBgColor="bg-slate-500/10"
-        description="Verified on leave"
       />
     </StatGrid>
   )

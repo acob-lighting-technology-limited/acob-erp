@@ -60,14 +60,25 @@ export async function GET(request: NextRequest) {
     meetingDate = `${yyyy}-${mm}-${dd}`
   }
 
-  // 2. Fetch all active employees
+  // 2. Fetch all regular employees (excluding contract staff without company email and exited staff — matching Directory Employees tab)
   const { data: profiles, error: profErr } = await db
     .from("profiles")
-    .select("id, full_name, first_name, last_name, department, designation, employment_status, avatar_url")
+    .select(
+      "id, full_name, first_name, last_name, company_email, department, designation, employment_status, employment_type, avatar_url"
+    )
     .not("department", "is", null)
+    .neq("employment_status", "exited")
     .order("full_name", { ascending: true })
 
   if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 })
+
+  const regularEmployees = (profiles || []).filter((p) => {
+    const isContract =
+      ((p.employment_status || "").toLowerCase() === "contract" ||
+        (p.employment_type || "").toLowerCase() === "contract") &&
+      !p.company_email
+    return !isContract
+  })
 
   // 3. Fetch attendance records for this meeting date (office entrance biometrics)
   const { data: biometricRecords } = await db
@@ -128,7 +139,7 @@ export async function GET(request: NextRequest) {
   let countOnLeave = 0
   let countAbsent = 0
 
-  for (const p of profiles || []) {
+  for (const p of regularEmployees) {
     const bio = biometricMap.get(p.id)
     const meet = meetingMap.get(p.id)
     const leaveTypeName = leaveMap.get(p.id)
