@@ -49,7 +49,7 @@ import {
   getManualStatusEditOptions,
   isPermissionAttendanceStatus,
 } from "@/lib/hr/attendance-status"
-import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay, netDayHoursFor, COVERED_STATUSES } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { StatusBadge, labelSource } from "./_components/status-badge"
 import { apiFetch } from "@/lib/api-client"
@@ -266,14 +266,7 @@ function getHourBreakdown(
   policy: AttendancePolicy = DEFAULT_ATTENDANCE_POLICY,
   recordDate?: string
 ) {
-  const covered =
-    status === "waiver" ||
-    status === "on_leave" ||
-    status === "holiday" ||
-    status === "exempted" ||
-    status === "out_of_station" ||
-    status === "absent_with_permission" ||
-    status === "lateness_with_permission"
+  const covered = status ? COVERED_STATUSES.has(status) : false
   if (covered) {
     const inMin = parseTimeToMinutes(record?.clock_in)
     const outMin = parseTimeToMinutes(record?.clock_out)
@@ -295,7 +288,7 @@ function getHourBreakdown(
     const today = toLocalISODate()
     const isInProgress = Boolean(recordDate && recordDate >= today) && Boolean(record.clock_in) && !record.clock_out
     const { hoursLost } = computeAttendanceDay({
-      status: record.status ?? "incomplete",
+      status: status ?? record.status ?? "incomplete",
       clockIn: record.clock_in,
       clockOut: record.clock_out,
       policy,

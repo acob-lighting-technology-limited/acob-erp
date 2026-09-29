@@ -33,7 +33,7 @@ import {
 import { toast } from "sonner"
 import { toLocalISODate, isLate } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
-import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay, netDayHoursFor, COVERED_STATUSES } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import {
   MANUAL_ATTENDANCE_STATUS_OPTIONS,
@@ -53,6 +53,12 @@ function parseTimeToMinutes(value: string | null | undefined): number | null {
 export function getHourBreakdown(r: AttendanceRecord, policy: AttendancePolicy = DEFAULT_ATTENDANCE_POLICY) {
   const inMin = parseTimeToMinutes(r.clock_in)
   const outMin = parseTimeToMinutes(r.clock_out)
+
+  const covered = r.status ? COVERED_STATUSES.has(r.status) : false
+  if (covered) {
+    const total = inMin !== null && outMin !== null && outMin > inMin ? (outMin - inMin) / 60 : null
+    return { total, work: null, overtime: null, missed: null }
+  }
 
   // One punch only — surface what the day actually costs (the recorded side's
   // bracket plus the incomplete penalty) instead of a dash. Work stays blank
