@@ -134,7 +134,14 @@ function AttendanceChip({
   const today = attendance.find((record) => record.date === todayIso) || null
 
   const status =
-    todayStatus?.status ?? (today?.clock_in ? today.status : isWeekend(todayIso) ? "weekend" : "not_clocked_in")
+    todayStatus?.status ??
+    (today?.status && today.status !== "absent"
+      ? today.status
+      : today?.clock_in
+        ? today.status
+        : isWeekend(todayIso)
+          ? "weekend"
+          : "not_clocked_in")
   const clockIn = todayStatus?.clock_in ?? (today?.clock_in ? String(today.clock_in).slice(0, 5) : null)
 
   const label = ATTENDANCE_STATUS_LABELS[status] ?? status

@@ -402,17 +402,25 @@ async function getProfileData() {
     // Fail-safe fallback if leave entitlements computation fails
   }
 
-  const { data: attendanceData, error: attendanceError } = await dataClient
-    .from("attendance_records")
-    .select("id, date, status, clock_in, clock_out, created_at")
-    .eq("user_id", userId)
-    .order("date", { ascending: false })
-    .limit(20)
-    .returns<AttendanceItem[]>()
-  if (attendanceError) loadErrors.push("attendance")
-
   const todayIso = toLocalISODate()
-  const todayRecord = (attendanceData || []).find((r) => r.date === todayIso) ?? null
+
+  const [{ data: todayRecord }, { data: attendanceData, error: attendanceError }] = await Promise.all([
+    dataClient
+      .from("attendance_records")
+      .select("id, date, status, clock_in, clock_out, created_at")
+      .eq("user_id", userId)
+      .eq("date", todayIso)
+      .maybeSingle<AttendanceItem>(),
+    dataClient
+      .from("attendance_records")
+      .select("id, date, status, clock_in, clock_out, created_at")
+      .eq("user_id", userId)
+      .lte("date", todayIso)
+      .order("date", { ascending: false })
+      .limit(20)
+      .returns<AttendanceItem[]>(),
+  ])
+  if (attendanceError) loadErrors.push("attendance")
 
   const [dayCtx, policy] = await Promise.all([
     loadDayContext(dataClient, { userIds: [userId], start: todayIso, end: todayIso }),
