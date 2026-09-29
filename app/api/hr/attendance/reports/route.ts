@@ -223,6 +223,7 @@ export async function GET(request: NextRequest) {
         total_hours = 0,
         total_missed_hours = 0,
         waived_days = 0,
+        cds_days = 0,
         leave_days = 0,
         holiday_days = 0,
         attendance_credits = 0,
@@ -272,6 +273,7 @@ export async function GET(request: NextRequest) {
             recordDate: workday,
             earlyClosure: earlyClose ? { closeTime: earlyClose } : null,
             lateResumption: lateRes ? { resumptionTime: lateRes } : null,
+            isCdsDay: ctx.isCdsDay(profile.id, workday),
           },
           policy
         )
@@ -282,6 +284,10 @@ export async function GET(request: NextRequest) {
         }
         if (derived === "absent_with_permission") {
           absent_with_permission_days++
+          continue
+        }
+        if (derived === "cds") {
+          cds_days++
           continue
         }
 
@@ -389,6 +395,7 @@ export async function GET(request: NextRequest) {
         incomplete_with_permission_days,
         absent_days,
         waived_days,
+        cds_days,
         leave_days,
         holiday_days,
         attendance_credits: Math.round(attendance_credits * 100) / 100,

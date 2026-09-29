@@ -26,6 +26,7 @@ const OnboardingSubmitSchema = z.object({
   status: z.string().trim().default("pending"),
   employment_type: z.enum(["full_time", "part_time", "contract"]).optional().default("full_time"),
   contract_category_code: z.string().trim().optional().nullable(),
+  nysc_cds_day: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]).optional().nullable(),
   honeypot: z.string().optional().nullable(),
 })
 
@@ -116,6 +117,11 @@ export async function POST(req: Request) {
     status: "pending",
     employment_type: parsed.data.employment_type || "full_time",
     contract_category_id: contractCategoryId,
+    nysc_cds_day:
+      parsed.data.employment_type === "contract" &&
+      (parsed.data.contract_category_code || "").toUpperCase().includes("NYSC")
+        ? parsed.data.nysc_cds_day || null
+        : null,
     updated_at: nowIso,
   }
 

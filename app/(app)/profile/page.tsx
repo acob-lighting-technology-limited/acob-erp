@@ -434,6 +434,7 @@ async function getProfileData() {
       isOnLeave: dayCtx.isOnLeave(userId, todayIso),
       isOnUnpaidLeave: dayCtx.isOnUnpaidLeave(userId, todayIso),
       isExempted: Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, todayIso),
+      isCdsDay: dayCtx.isCdsDay(userId, todayIso),
       recordDate: todayIso,
       earlyClosure: dayCtx.earlyCloseTime(todayIso) ? { closeTime: dayCtx.earlyCloseTime(todayIso)! } : null,
       lateResumption: dayCtx.lateResumptionTime(todayIso)

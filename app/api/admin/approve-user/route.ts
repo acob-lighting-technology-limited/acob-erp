@@ -26,6 +26,7 @@ const ApproveUserSchema = z.object({
   sendEmails: z.boolean().optional().default(false),
   employmentType: z.enum(["full_time", "part_time", "contract"]).optional().default("full_time"),
   contractCategoryCode: z.string().trim().nullable().optional(),
+  nyscCdsDay: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]).nullable().optional(),
 })
 
 export async function POST(req: Request) {
@@ -425,6 +426,8 @@ export async function POST(req: Request) {
       p_employment_type: employmentType,
       p_contract_category_id: contractCategoryId,
       p_gender: pendingUser.gender ?? null,
+      p_nysc_cds_day:
+        parsed.data.nyscCdsDay || (pendingUser as unknown as { nysc_cds_day?: string }).nysc_cds_day || null,
     })
 
     if (approvalError) {

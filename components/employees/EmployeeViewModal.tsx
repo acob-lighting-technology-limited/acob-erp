@@ -90,6 +90,7 @@ export interface EditForm {
   separation_date?: string
   employment_type: "full_time" | "part_time" | "contract"
   contract_category_code?: string
+  nysc_cds_day?: string
 }
 
 export interface EmployeeViewModalProps {
@@ -519,6 +520,14 @@ export function EmployeeViewModal({
                           categoryName={viewEmployeeProfile.contract_categories?.name}
                           className="px-2 py-0.5"
                         />
+                        {viewEmployeeProfile.nysc_cds_day && (
+                          <Badge
+                            variant="outline"
+                            className="border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[10px] font-semibold text-teal-700 capitalize shadow-none dark:text-teal-300"
+                          >
+                            CDS: {viewEmployeeProfile.nysc_cds_day}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     {canManageUsers && (
@@ -893,7 +902,13 @@ export function EmployeeViewModal({
                         </Label>
                         <Select
                           value={editForm.contract_category_code}
-                          onValueChange={(val) => setEditForm((prev) => ({ ...prev, contract_category_code: val }))}
+                          onValueChange={(val) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              contract_category_code: val,
+                              nysc_cds_day: val?.toUpperCase().includes("NYSC") ? prev.nysc_cds_day || "thursday" : "",
+                            }))
+                          }
                         >
                           <SelectTrigger id="edit_contract_cat" className="mt-1 h-8 text-xs">
                             <SelectValue placeholder="Select category (e.g. SIWES, NYSC)" />
@@ -908,6 +923,40 @@ export function EmployeeViewModal({
                         </Select>
                       </div>
                     )}
+
+                    {editForm.employment_type === "contract" &&
+                      (editForm.contract_category_code || "").toUpperCase().includes("NYSC") && (
+                        <div className="sm:col-span-2">
+                          <Label htmlFor="edit_nysc_cds_day" className="text-xs">
+                            NYSC CDS Day *
+                          </Label>
+                          <Select
+                            value={editForm.nysc_cds_day || ""}
+                            onValueChange={(val) => setEditForm((prev) => ({ ...prev, nysc_cds_day: val }))}
+                          >
+                            <SelectTrigger id="edit_nysc_cds_day" className="mt-1 h-8 text-xs">
+                              <SelectValue placeholder="Select CDS Day (e.g. Thursday)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monday" className="text-xs">
+                                Monday
+                              </SelectItem>
+                              <SelectItem value="tuesday" className="text-xs">
+                                Tuesday
+                              </SelectItem>
+                              <SelectItem value="wednesday" className="text-xs">
+                                Wednesday
+                              </SelectItem>
+                              <SelectItem value="thursday" className="text-xs">
+                                Thursday
+                              </SelectItem>
+                              <SelectItem value="friday" className="text-xs">
+                                Friday
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
                     {editForm.employment_status === "suspended" && (
                       <>

@@ -40,6 +40,7 @@ const formSchema = z.object({
   office_location: z.string().optional(),
   employment_type: z.enum(["full_time", "part_time", "contract"], { message: "Employment type is required" }),
   contract_category_code: z.string().optional(),
+  nysc_cds_day: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]).optional(),
   honeypot: z.string().optional(),
 })
 
@@ -86,6 +87,7 @@ export default function EmployeeOnboardingForm() {
       office_location: "",
       employment_type: "full_time",
       contract_category_code: "",
+      nysc_cds_day: undefined,
       honeypot: "",
     },
   })
@@ -121,6 +123,7 @@ export default function EmployeeOnboardingForm() {
         office_location: parsed.office_location || "",
         employment_type: parsed.employment_type || "full_time",
         contract_category_code: parsed.contract_category_code || "",
+        nysc_cds_day: parsed.nysc_cds_day || undefined,
         honeypot: "",
       })
     } catch {
@@ -160,13 +163,18 @@ export default function EmployeeOnboardingForm() {
     if (val === "full_time") {
       setValue("employment_type", "full_time")
       setValue("contract_category_code", "")
+      setValue("nysc_cds_day", undefined)
     } else if (val === "part_time") {
       setValue("employment_type", "part_time")
       setValue("contract_category_code", "")
+      setValue("nysc_cds_day", undefined)
     } else if (val.startsWith("cat:")) {
       const code = val.replace("cat:", "")
       setValue("employment_type", "contract")
       setValue("contract_category_code", code)
+      if (!code.toUpperCase().includes("NYSC")) {
+        setValue("nysc_cds_day", undefined)
+      }
     }
   }
 
@@ -208,6 +216,10 @@ export default function EmployeeOnboardingForm() {
         office_location: data.office_location,
         employment_type: data.employment_type || "full_time",
         contract_category_code: data.employment_type === "contract" ? data.contract_category_code || null : null,
+        nysc_cds_day:
+          data.employment_type === "contract" && (data.contract_category_code || "").toUpperCase().includes("NYSC")
+            ? data.nysc_cds_day || null
+            : null,
         status: "pending",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -464,6 +476,35 @@ export default function EmployeeOnboardingForm() {
                       <p className="text-destructive mt-1 text-sm">{errors.employment_type.message}</p>
                     )}
                   </div>
+
+                  {selectedEmploymentType === "contract" &&
+                    (selectedContractCategory || "").toUpperCase().includes("NYSC") && (
+                      <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
+                        <label className="text-foreground text-sm font-medium">
+                          NYSC CDS Day <span className="text-destructive">*</span>
+                        </label>
+                        <Select
+                          onValueChange={(val: "monday" | "tuesday" | "wednesday" | "thursday" | "friday") =>
+                            setValue("nysc_cds_day", val, { shouldValidate: true })
+                          }
+                          value={watch("nysc_cds_day") || ""}
+                        >
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Select CDS Day (e.g. Thursday)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monday">Monday</SelectItem>
+                            <SelectItem value="tuesday">Tuesday</SelectItem>
+                            <SelectItem value="wednesday">Wednesday</SelectItem>
+                            <SelectItem value="thursday">Thursday</SelectItem>
+                            <SelectItem value="friday">Friday</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {errors.nysc_cds_day && (
+                          <p className="text-destructive mt-1 text-sm">{errors.nysc_cds_day.message}</p>
+                        )}
+                      </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

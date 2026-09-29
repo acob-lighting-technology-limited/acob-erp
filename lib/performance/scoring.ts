@@ -206,9 +206,9 @@ export async function computeIndividualPerformanceScore(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("attendance_exempt")
+    .select("attendance_exempt, nysc_cds_day")
     .eq("id", params.userId)
-    .maybeSingle<{ attendance_exempt?: boolean | null }>()
+    .maybeSingle<{ attendance_exempt?: boolean | null; nysc_cds_day?: string | null }>()
 
   // The MD's own tasks have no one above them to rate them honestly, so they
   // are left out of the MD's KPI (see lib/tasks/rating-authority.ts).
@@ -484,6 +484,15 @@ export async function computeIndividualPerformanceScore(
       if (holidayDateSet.has(day)) continue
       if (leaveDateSet.has(day)) continue
       if (Boolean(profile?.attendance_exempt) || exemptionDateSet.has(day)) continue
+
+      if (profile?.nysc_cds_day) {
+        const parts = day.split("-").map(Number)
+        if (parts.length >= 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+          const dowIndex = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).getUTCDay()
+          const DOW_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+          if (DOW_NAMES[dowIndex] === profile.nysc_cds_day.toLowerCase().trim()) continue
+        }
+      }
 
       const row = recordByDate.get(day)
       const rawStoredStatus = String((row as { status?: string | null })?.status || "").toLowerCase()

@@ -98,6 +98,7 @@ const ATTENDANCE_DOT_COLORS: Record<string, string> = {
   holiday: "bg-sky-500",
   exempted: "bg-violet-500",
   lwop: "bg-rose-500",
+  cds: "bg-teal-500",
   not_clocked_in: "bg-muted-foreground",
 }
 
