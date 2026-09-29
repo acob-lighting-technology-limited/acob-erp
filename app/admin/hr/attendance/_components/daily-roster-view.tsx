@@ -412,6 +412,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         { value: "absent_with_permission", label: "AWP" },
         { value: "out_of_station", label: "OOS" },
         { value: "exempted", label: "Exempted" },
+        { value: "cds", label: "CDS" },
         { value: "waiver", label: "Waiver" },
         { value: "on_leave", label: "On Leave" },
         { value: "holiday", label: "Holiday" },

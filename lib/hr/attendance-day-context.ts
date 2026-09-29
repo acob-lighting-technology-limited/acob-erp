@@ -57,8 +57,8 @@ export async function loadDayContext(
   const resumptionByDate = new Map<string, string>()
   const resumptionCreatedBy = new Map<string, string>()
 
-  // Org-wide early-closure and late-resumption days apply regardless of user set.
-  const [{ data: closures }, { data: resumptions }] = await Promise.all([
+  // Org-wide early-closure, late-resumption, and NYSC CDS schedules apply regardless of user set.
+  const [{ data: closures }, { data: resumptions }, { data: nyscProfiles }] = await Promise.all([
     client
       .from("attendance_early_closures")
       .select("closure_date, close_time, created_by")
@@ -69,6 +69,7 @@ export async function loadDayContext(
       .select("resumption_date, resumption_time, created_by")
       .gte("resumption_date", start)
       .lte("resumption_date", end),
+    client.from("profiles").select("id, nysc_cds_day").not("nysc_cds_day", "is", null),
   ])
 
   for (const c of (closures ?? []) as Array<{ closure_date: string; close_time: string; created_by?: string | null }>) {
@@ -84,6 +85,9 @@ export async function loadDayContext(
       resumptionByDate.set(r.resumption_date, String(r.resumption_time).slice(0, 5))
     if (r.resumption_date && r.created_by) resumptionCreatedBy.set(r.resumption_date, r.created_by)
   }
+  for (const p of (nyscProfiles ?? []) as Array<{ id: string; nysc_cds_day?: string | null }>) {
+    if (p.id && p.nysc_cds_day) cdsDayByUser.set(p.id, p.nysc_cds_day.toLowerCase().trim())
+  }
 
   if (userIds.length === 0) {
     // Still load holidays so callers with no users (rare) behave sanely.
@@ -94,7 +98,7 @@ export async function loadDayContext(
       .lte("holiday_date", end)
     for (const h of (holidays ?? []) as Array<{ holiday_date: string }>) holidayDates.add(h.holiday_date)
   } else {
-    const [{ data: holidays }, { data: leaves }, { data: periods }, { data: profiles }] = await Promise.all([
+    const [{ data: holidays }, { data: leaves }, { data: periods }] = await Promise.all([
       client.from("holiday_calendar").select("holiday_date").gte("holiday_date", start).lte("holiday_date", end),
       client
         .from("leave_requests")
@@ -109,7 +113,6 @@ export async function loadDayContext(
         .in("user_id", userIds)
         .lte("start_date", end)
         .gte("end_date", start),
-      client.from("profiles").select("id, nysc_cds_day").in("id", userIds).not("nysc_cds_day", "is", null),
     ])
 
     for (const h of (holidays ?? []) as Array<{ holiday_date: string }>) holidayDates.add(h.holiday_date)
@@ -135,10 +138,6 @@ export async function loadDayContext(
     for (const ep of (periods ?? []) as Array<{ user_id: string; start_date: string; end_date: string }>) {
       if (!exemptByUser.has(ep.user_id)) exemptByUser.set(ep.user_id, new Set())
       expandInto(exemptByUser.get(ep.user_id)!, ep.start_date, ep.end_date)
-    }
-
-    for (const p of (profiles ?? []) as Array<{ id: string; nysc_cds_day?: string | null }>) {
-      if (p.nysc_cds_day) cdsDayByUser.set(p.id, p.nysc_cds_day.toLowerCase().trim())
     }
   }
 
