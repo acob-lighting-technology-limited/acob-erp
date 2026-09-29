@@ -266,7 +266,15 @@ function getHourBreakdown(
   policy: AttendancePolicy = DEFAULT_ATTENDANCE_POLICY,
   recordDate?: string
 ) {
-  const covered = status ? COVERED_STATUSES.has(status) : false
+  const covered =
+    status === "waiver" ||
+    status === "on_leave" ||
+    status === "holiday" ||
+    status === "exempted" ||
+    status === "out_of_station" ||
+    status === "absent_with_permission" ||
+    status === "lateness_with_permission" ||
+    status === "cds"
   if (covered) {
     const inMin = parseTimeToMinutes(record?.clock_in)
     const outMin = parseTimeToMinutes(record?.clock_out)

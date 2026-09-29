@@ -54,7 +54,15 @@ export function getHourBreakdown(r: AttendanceRecord, policy: AttendancePolicy =
   const inMin = parseTimeToMinutes(r.clock_in)
   const outMin = parseTimeToMinutes(r.clock_out)
 
-  const covered = r.status ? COVERED_STATUSES.has(r.status) : false
+  const covered =
+    r.status === "waiver" ||
+    r.status === "on_leave" ||
+    r.status === "holiday" ||
+    r.status === "exempted" ||
+    r.status === "out_of_station" ||
+    r.status === "absent_with_permission" ||
+    r.status === "lateness_with_permission" ||
+    r.status === "cds"
   if (covered) {
     const total = inMin !== null && outMin !== null && outMin > inMin ? (outMin - inMin) / 60 : null
     return { total, work: null, overtime: null, missed: null }
