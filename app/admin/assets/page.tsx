@@ -29,6 +29,8 @@ type AssignmentUserRow = {
   first_name?: string | null
   last_name?: string | null
   department?: string | null
+  designation?: string | null
+  residential_address?: string | null
 }
 
 async function getAdminAssetsData() {
@@ -43,12 +45,23 @@ async function getAdminAssetsData() {
     return { redirect: "/auth/login" as const }
   }
 
-  const scope = await resolveAdminScope(supabase as AdminAssetsPageClient, user.id)
+  const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetsPageClient)
+
+  const [scope, { data: userProfileData }] = await Promise.all([
+    resolveAdminScope(supabase as AdminAssetsPageClient, user.id),
+    dataClient
+      .from("profiles")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .maybeSingle<{ first_name?: string | null; last_name?: string | null }>(),
+  ])
   if (!scope) {
     return { redirect: "/profile" as const }
   }
 
   const userProfile: UserProfile = {
+    first_name: userProfileData?.first_name || null,
+    last_name: userProfileData?.last_name || null,
     role: scope.role,
     admin_routes: scope.adminRoutes,
     is_department_lead: scope.isDepartmentLead,
@@ -57,8 +70,6 @@ async function getAdminAssetsData() {
     managed_offices: scope.managedOffices,
   }
   const departmentScope = getDepartmentScope(scope, "general")
-
-  const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetsPageClient)
 
   // Fetch assets
   let { data: assetsData, error: assetsError } = await dataClient
@@ -91,7 +102,7 @@ async function getAdminAssetsData() {
   if (assignedUserIds.length > 0) {
     const { data: usersData } = await dataClient
       .from("profiles")
-      .select("id, first_name, last_name, department")
+      .select("id, first_name, last_name, department, designation, residential_address")
       .in("id", assignedUserIds)
 
     assignmentUsersMap = new Map(usersData?.map((u) => [u.id, u]))
@@ -99,7 +110,7 @@ async function getAdminAssetsData() {
 
   // Fetch employees - leads can only see employees in their departments
   const { data: employeeData } = await listAssignableProfiles(dataClient, {
-    select: "id, first_name, last_name, company_email, department, employment_status",
+    select: "id, first_name, last_name, company_email, department, employment_status, designation, residential_address",
     departmentScope,
     allowLegacyNullStatus: false,
   })
