@@ -13,6 +13,7 @@ const ConvertTypeSchema = z.object({
   profileId: z.string().uuid("Invalid profile ID"),
   newType: z.enum(["full_time", "part_time", "contract"]),
   newCategoryCode: z.string().trim().nullable().optional(),
+  newCdsDay: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]).nullable().optional(),
 })
 
 async function ensureAdmin(request: NextRequest) {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 })
   }
 
-  const { profileId, newType, newCategoryCode } = parsed.data
+  const { profileId, newType, newCategoryCode, newCdsDay } = parsed.data
   const dataClient = getServiceRoleClientOrFallback(auth.supabase)
 
   // Fetch current details for audit logging context before mutating
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
     p_new_type: newType,
     p_new_category_code: newCategoryCode || null,
     p_actor: auth.user.id,
+    p_cds_day: newCdsDay || null,
   })
 
   if (error) {

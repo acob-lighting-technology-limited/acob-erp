@@ -23,6 +23,8 @@ export interface DayContext {
   isOnUnpaidLeave(userId: string, date: string): boolean
   /** Period-based exemption only — does NOT include the profile.attendance_exempt flag. */
   isExempt(userId: string, date: string): boolean
+  /** Whether the user is an NYSC corps member scheduled for Community Development Service (CDS) on this weekday. */
+  isCdsDay(userId: string, date: string): boolean
   /** Org-wide early-closure time (HH:MM) for the date, or null if not a closure day. */
   earlyCloseTime(date: string): string | null
   /** User ID of the admin who created the early-closure directive for the date. */
@@ -49,13 +51,14 @@ export async function loadDayContext(
   const leaveByUser = new Map<string, Set<string>>()
   const unpaidLeaveByUser = new Map<string, Set<string>>()
   const exemptByUser = new Map<string, Set<string>>()
+  const cdsDayByUser = new Map<string, string>()
   const closureByDate = new Map<string, string>()
   const closureCreatedBy = new Map<string, string>()
   const resumptionByDate = new Map<string, string>()
   const resumptionCreatedBy = new Map<string, string>()
 
-  // Org-wide early-closure and late-resumption days apply regardless of user set.
-  const [{ data: closures }, { data: resumptions }] = await Promise.all([
+  // Org-wide early-closure, late-resumption, and NYSC CDS schedules apply regardless of user set.
+  const [{ data: closures }, { data: resumptions }, { data: nyscProfiles }] = await Promise.all([
     client
       .from("attendance_early_closures")
       .select("closure_date, close_time, created_by")
@@ -66,6 +69,7 @@ export async function loadDayContext(
       .select("resumption_date, resumption_time, created_by")
       .gte("resumption_date", start)
       .lte("resumption_date", end),
+    client.from("profiles").select("id, nysc_cds_day").not("nysc_cds_day", "is", null),
   ])
 
   for (const c of (closures ?? []) as Array<{ closure_date: string; close_time: string; created_by?: string | null }>) {
@@ -80,6 +84,9 @@ export async function loadDayContext(
     if (r.resumption_date && r.resumption_time)
       resumptionByDate.set(r.resumption_date, String(r.resumption_time).slice(0, 5))
     if (r.resumption_date && r.created_by) resumptionCreatedBy.set(r.resumption_date, r.created_by)
+  }
+  for (const p of (nyscProfiles ?? []) as Array<{ id: string; nysc_cds_day?: string | null }>) {
+    if (p.id && p.nysc_cds_day) cdsDayByUser.set(p.id, p.nysc_cds_day.toLowerCase().trim())
   }
 
   if (userIds.length === 0) {
@@ -134,11 +141,21 @@ export async function loadDayContext(
     }
   }
 
+  const DOW_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const
+
   return {
     isHoliday: (date) => holidayDates.has(date),
     isOnLeave: (userId, date) => leaveByUser.get(userId)?.has(date) ?? false,
     isOnUnpaidLeave: (userId, date) => unpaidLeaveByUser.get(userId)?.has(date) ?? false,
     isExempt: (userId, date) => exemptByUser.get(userId)?.has(date) ?? false,
+    isCdsDay: (userId, date) => {
+      const scheduledDay = cdsDayByUser.get(userId)
+      if (!scheduledDay) return false
+      const parts = date.split("-").map(Number)
+      if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return false
+      const dowIndex = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])).getUTCDay()
+      return DOW_NAMES[dowIndex] === scheduledDay
+    },
     earlyCloseTime: (date) => closureByDate.get(date) ?? null,
     earlyCloseCreatedBy: (date) => closureCreatedBy.get(date) ?? null,
     lateResumptionTime: (date) => resumptionByDate.get(date) ?? null,

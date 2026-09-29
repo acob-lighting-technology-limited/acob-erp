@@ -98,6 +98,7 @@ const ATTENDANCE_DOT_COLORS: Record<string, string> = {
   holiday: "bg-sky-500",
   exempted: "bg-violet-500",
   lwop: "bg-rose-500",
+  cds: "bg-teal-500",
   not_clocked_in: "bg-muted-foreground",
 }
 
@@ -134,7 +135,14 @@ function AttendanceChip({
   const today = attendance.find((record) => record.date === todayIso) || null
 
   const status =
-    todayStatus?.status ?? (today?.clock_in ? today.status : isWeekend(todayIso) ? "weekend" : "not_clocked_in")
+    todayStatus?.status ??
+    (today?.status && today.status !== "absent"
+      ? today.status
+      : today?.clock_in
+        ? today.status
+        : isWeekend(todayIso)
+          ? "weekend"
+          : "not_clocked_in")
   const clockIn = todayStatus?.clock_in ?? (today?.clock_in ? String(today.clock_in).slice(0, 5) : null)
 
   const label = ATTENDANCE_STATUS_LABELS[status] ?? status

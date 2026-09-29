@@ -91,6 +91,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
   const [pendingReject, setPendingReject] = useState(false)
   const [employmentType, setEmploymentType] = useState<"full_time" | "part_time" | "contract">("full_time")
   const [contractCategoryCode, setContractCategoryCode] = useState("")
+  const [nyscCdsDay, setNyscCdsDay] = useState("")
 
   // Edit fields states
   const [firstName, setFirstName] = useState("")
@@ -175,6 +176,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
     setPhoneNumber(user.phone_number || "")
     setResidentialAddress(user.residential_address || "")
     setOfficeLocation(user.office_location || "")
+    setNyscCdsDay((user as unknown as { nysc_cds_day?: string }).nysc_cds_day || "")
   }, [])
 
   // Auto-select first user when data loads
@@ -219,6 +221,10 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
           sendEmails: false,
           employmentType: employmentType,
           contractCategoryCode: contractCategoryCode || null,
+          nyscCdsDay:
+            employmentType === "contract" && (contractCategoryCode || "").toUpperCase().includes("NYSC")
+              ? nyscCdsDay || null
+              : null,
         }),
       })
 
@@ -514,6 +520,26 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                               </span>
                             }
                           />
+                          {employmentType === "contract" &&
+                            (contractCategoryCode || "").toUpperCase().includes("NYSC") && (
+                              <DetailRow
+                                label="NYSC CDS Day"
+                                value={
+                                  <Select value={nyscCdsDay || ""} onValueChange={setNyscCdsDay}>
+                                    <SelectTrigger className="h-8 w-full border-0 bg-transparent text-left font-medium shadow-none focus:ring-0">
+                                      <SelectValue placeholder="Select CDS Day (e.g. Thursday)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="monday">Monday</SelectItem>
+                                      <SelectItem value="tuesday">Tuesday</SelectItem>
+                                      <SelectItem value="wednesday">Wednesday</SelectItem>
+                                      <SelectItem value="thursday">Thursday</SelectItem>
+                                      <SelectItem value="friday">Friday</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                }
+                              />
+                            )}
                           <DetailRow
                             label="Office / Room"
                             value={

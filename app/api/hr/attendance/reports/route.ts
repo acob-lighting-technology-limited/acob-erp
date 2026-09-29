@@ -17,7 +17,7 @@ import {
   netDayHoursFor,
   getEffectiveAttendanceStartDate,
 } from "@/lib/hr/attendance-ssot"
-import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { deriveUnifiedAttendanceStatus, isLateWithPolicy } from "@/lib/hr/attendance-status"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
@@ -223,6 +223,7 @@ export async function GET(request: NextRequest) {
         total_hours = 0,
         total_missed_hours = 0,
         waived_days = 0,
+        cds_days = 0,
         leave_days = 0,
         holiday_days = 0,
         attendance_credits = 0,
@@ -265,12 +266,14 @@ export async function GET(request: NextRequest) {
 
         const earlyClose = ctx.earlyCloseTime(workday)
         const lateRes = ctx.lateResumptionTime(workday)
+        const effectiveLateCutoff = lateRes ?? policy.lateCutoff
         const derived = deriveUnifiedAttendanceStatus(
           {
             record: rec,
             recordDate: workday,
             earlyClosure: earlyClose ? { closeTime: earlyClose } : null,
             lateResumption: lateRes ? { resumptionTime: lateRes } : null,
+            isCdsDay: ctx.isCdsDay(profile.id, workday),
           },
           policy
         )
@@ -281,6 +284,10 @@ export async function GET(request: NextRequest) {
         }
         if (derived === "absent_with_permission") {
           absent_with_permission_days++
+          continue
+        }
+        if (derived === "cds") {
+          cds_days++
           continue
         }
 
@@ -321,9 +328,16 @@ export async function GET(request: NextRequest) {
           present_days++
           // Bucket for the summary counters: Early Closure / Late Resumption counts as a full present
           // day; Left Early (± permission) is a docked present day, grouped with late.
-          if (derived === "early" || derived === "early_closure" || derived === "late_resumption") early_days++
-          else if (derived === "incomplete") incomplete_days++
-          else late_days++
+          if (derived === "early" || derived === "early_closure" || derived === "late_resumption") {
+            early_days++
+          } else if (derived === "incomplete") {
+            incomplete_days++
+            if (rec.clock_in && isLateWithPolicy(rec.clock_in, effectiveLateCutoff)) {
+              late_days++
+            }
+          } else {
+            late_days++
+          }
 
           const day = computeAttendanceDay({
             status: derived,
@@ -381,6 +395,7 @@ export async function GET(request: NextRequest) {
         incomplete_with_permission_days,
         absent_days,
         waived_days,
+        cds_days,
         leave_days,
         holiday_days,
         attendance_credits: Math.round(attendance_credits * 100) / 100,

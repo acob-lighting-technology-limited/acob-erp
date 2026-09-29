@@ -47,8 +47,9 @@ import {
   ATTENDANCE_STATUS_LABELS,
   MANUAL_ATTENDANCE_STATUS_OPTIONS,
   getManualStatusEditOptions,
+  isPermissionAttendanceStatus,
 } from "@/lib/hr/attendance-status"
-import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay, netDayHoursFor, COVERED_STATUSES } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { StatusBadge, labelSource } from "./_components/status-badge"
 import { apiFetch } from "@/lib/api-client"
@@ -272,7 +273,8 @@ function getHourBreakdown(
     status === "exempted" ||
     status === "out_of_station" ||
     status === "absent_with_permission" ||
-    status === "lateness_with_permission"
+    status === "lateness_with_permission" ||
+    status === "cds"
   if (covered) {
     const inMin = parseTimeToMinutes(record?.clock_in)
     const outMin = parseTimeToMinutes(record?.clock_out)
@@ -294,7 +296,7 @@ function getHourBreakdown(
     const today = toLocalISODate()
     const isInProgress = Boolean(recordDate && recordDate >= today) && Boolean(record.clock_in) && !record.clock_out
     const { hoursLost } = computeAttendanceDay({
-      status: record.status ?? "incomplete",
+      status: status ?? record.status ?? "incomplete",
       clockIn: record.clock_in,
       clockOut: record.clock_out,
       policy,
@@ -346,6 +348,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
     manual_comment: "",
   })
   const [saving, setSaving] = useState(false)
+  const [reverting, setReverting] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyItems, setHistoryItems] = useState<TimelineEvent[]>([])
@@ -446,6 +449,27 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
     }
   }
 
+  async function handleRevert() {
+    if (!editTarget?.record) return
+    setReverting(true)
+    try {
+      const res = await apiFetch(`/api/admin/hr/attendance/records/${editTarget.record.id}`, {
+        method: "DELETE",
+      })
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) throw new Error(payload?.error ?? "Failed to revert record")
+      toast.success("Manual override removed — reverted to auto-derived attendance")
+      setEditTarget(null)
+      setDays(null)
+      loadDays()
+      onRecordChanged?.(report.user_id)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to revert record")
+    } finally {
+      setReverting(false)
+    }
+  }
+
   async function openHistory(day: CalendarDay) {
     setHistoryTarget({ date: day.date })
     setHistoryOpen(true)
@@ -477,6 +501,13 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
   const visibleDays = days.filter((d) => d.date <= today)
   const isCreating = editTarget !== null && editTarget.record === null
   const { isOnTimePresent, options: statusOptions } = getManualStatusEditOptions(editTarget?.record ?? null)
+  const isOverridden = Boolean(
+    editTarget?.record &&
+      (editTarget.record.source === "manual" ||
+        Boolean(editTarget.record.manual_comment) ||
+        editTarget.record.waived ||
+        isPermissionAttendanceStatus(editTarget.record.status))
+  )
 
   const hasManualComment = editForm.manual_comment.trim().length >= 3
   const cannotSave = saving || !editForm.status || !hasManualComment || isOnTimePresent
@@ -630,7 +661,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {isOnTimePresent ? (
+            {isOnTimePresent && !isOverridden ? (
               <p className="text-muted-foreground text-sm">
                 This record is fully present and on-time. No overrides (LWP/AWP) are applicable.
               </p>
@@ -673,13 +704,30 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
               </>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTarget(null)}>
-              Cancel
-            </Button>
-            <Button onClick={saveEdit} disabled={cannotSave}>
-              {saving ? "Saving…" : isCreating ? "Create" : "Save"}
-            </Button>
+          <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {isOverridden ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleRevert}
+                disabled={reverting || saving}
+              >
+                {reverting ? "Reverting…" : "Revert Override"}
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditTarget(null)} disabled={saving || reverting}>
+                Cancel
+              </Button>
+              {(!isOnTimePresent || !isOverridden) && (
+                <Button onClick={saveEdit} disabled={cannotSave || reverting}>
+                  {saving ? "Saving…" : isCreating ? "Create" : "Save"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

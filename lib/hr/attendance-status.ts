@@ -28,6 +28,7 @@ export type UnifiedAttendanceStatus =
   | "absent"
   | "absent_with_permission"
   | "out_of_station"
+  | "cds"
   | "on_leave"
   | "lwop"
   | "weekend"
@@ -36,6 +37,7 @@ export type UnifiedAttendanceStatus =
 
 /** Tailwind colour classes for every canonical attendance status (with dark mode support). */
 export const ATTENDANCE_STATUS_COLORS: Record<UnifiedAttendanceStatus, string> = {
+  cds: "bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border-teal-200 dark:border-teal-800",
   early: "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300 border-green-200 dark:border-green-800",
   present: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800",
   late: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
@@ -73,6 +75,7 @@ export const ATTENDANCE_STATUS_COLORS: Record<UnifiedAttendanceStatus, string> =
 
 /** Human-readable labels for statuses whose raw value would look bad in the UI. */
 export const ATTENDANCE_STATUS_LABELS: Record<UnifiedAttendanceStatus, string> = {
+  cds: "CDS",
   early: "Early",
   present: "Present",
   late: "Late",
@@ -97,6 +100,7 @@ export const ATTENDANCE_STATUS_LABELS: Record<UnifiedAttendanceStatus, string> =
   half_day: "Half Day",
 }
 export const DB_WRITABLE_STATUSES = [
+  "cds",
   "early",
   "present",
   "late",
@@ -131,6 +135,7 @@ export const MANUAL_ATTENDANCE_STATUS_OPTIONS: Array<{ value: DbAttendanceStatus
   { value: "absent_with_permission", label: "AWP" },
   { value: "early_departure_with_permission", label: "LEWP" },
   { value: "out_of_station", label: "OOS" },
+  { value: "cds", label: "CDS" },
   { value: "absent", label: "Absent" },
 ]
 
@@ -261,6 +266,7 @@ export function deriveUnifiedAttendanceStatus(
     /** Leave of an unpaid type (LWOP) — takes precedence over isOnLeave. */
     isOnUnpaidLeave?: boolean
     isExempted?: boolean
+    isCdsDay?: boolean
     recordDate?: string
     /** Org-wide early-closure context for this date, if any. */
     earlyClosure?: EarlyClosureInfo
@@ -287,11 +293,15 @@ export function deriveUnifiedAttendanceStatus(
   // 4. Exemption
   if (input.isExempted) return "exempted"
 
-  // 5. Whole-day manual permissions (AWP/LWP) & waivers
+  // 5. Explicit CDS / whole-day manual permissions (AWP/LWP) & waivers
   // LEWP is handled below because it must not rescue a late arrival, only the early departure.
+  if (explicitStatus === "cds") return "cds"
   if (explicitStatus && isPermissionAttendanceStatus(explicitStatus)) return explicitStatus
   if (rec?.waived) return "waiver"
   if (explicitStatus === "waiver") return "waiver"
+
+  // 6. Automated NYSC CDS Day (Community Development Service)
+  if (input.isCdsDay) return "cds"
 
   // If no record or empty punches:
   if (!rec || (!rec.clock_in && !rec.clock_out)) {

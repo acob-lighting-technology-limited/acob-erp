@@ -92,6 +92,7 @@ export const COVERED_STATUSES = new Set([
   "early_closure",
   "late_resumption",
   "early",
+  "cds",
 ])
 
 export function isCoveredAttendanceStatus(status: string | null | undefined): boolean {

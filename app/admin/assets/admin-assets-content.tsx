@@ -140,6 +140,8 @@ export interface Employee {
   company_email: string
   department: string
   employment_status?: string | null
+  designation?: string | null
+  residential_address?: string | null
 }
 
 interface AssetAssignment {
@@ -153,6 +155,8 @@ interface AssetAssignment {
   user?: {
     first_name: string
     last_name: string
+    designation?: string | null
+    residential_address?: string | null
   }
 }
 
@@ -169,6 +173,8 @@ type AssignableAsset = {
     user?: {
       first_name: string
       last_name: string
+      designation?: string | null
+      residential_address?: string | null
     }
   }
 }
@@ -201,6 +207,8 @@ interface AssetActivity {
 const currentYear = new Date().getFullYear()
 
 export interface UserProfile {
+  first_name?: string | null
+  last_name?: string | null
   role: string
   admin_routes?: string[] | null
   is_department_lead?: boolean

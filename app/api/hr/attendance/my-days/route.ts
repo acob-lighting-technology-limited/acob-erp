@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
           isOnLeave: ctx.isOnLeave(userId, date),
           isOnUnpaidLeave: ctx.isOnUnpaidLeave(userId, date),
           isExempted: Boolean(profile?.attendance_exempt) || ctx.isExempt(userId, date),
+          isCdsDay: ctx.isCdsDay(userId, date),
           recordDate: date,
           earlyClosure: closeTime ? { closeTime } : null,
           lateResumption: lateRes ? { resumptionTime: lateRes } : null,

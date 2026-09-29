@@ -210,3 +210,124 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const rl = await rateLimit(`admin-attendance-delete:${getClientId(request)}`, { limit: 30, windowSec: 60 })
+  if (!rl.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+
+  try {
+    const auth = await requireApiAdminScope()
+    if (!auth.ok) return auth.response
+    const { supabase, scope } = auth
+    const policy = await loadAttendancePolicy(supabase)
+    const { id } = await params
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+
+    const { data: record } = await dataClient
+      .from("attendance_records")
+      .select(
+        "id, user_id, clock_in, clock_out, clock_in_source, clock_out_source, date, status, waived, manual_comment, source"
+      )
+      .eq("id", id)
+      .maybeSingle()
+
+    if (!record) return NextResponse.json({ error: "Record not found" }, { status: 404 })
+
+    const hasPunches = Boolean(record.clock_in || record.clock_out)
+
+    if (!hasPunches) {
+      // Pure manual entry (e.g. manual AWP/OOS/Waiver on an absent day). Deleting it restores the unrecorded absent day.
+      const { error: delErr } = await dataClient.from("attendance_records").delete().eq("id", id)
+      if (delErr) {
+        log.error({ err: JSON.stringify(delErr) }, "Failed to delete manual attendance record")
+        return NextResponse.json({ error: "Failed to delete record" }, { status: 500 })
+      }
+
+      await writeAuditLog(
+        supabase,
+        {
+          action: "delete",
+          entityType: "attendance_record",
+          entityId: id,
+          oldValues: record,
+          context: { actorId: scope.userId, source: "api", route: `/api/admin/hr/attendance/records/${id}` },
+        },
+        { failOpen: true }
+      )
+
+      await recordAttendanceEvent(dataClient, {
+        userId: record.user_id,
+        eventDate: record.date,
+        eventType: "manual_delete",
+        attendanceRecordId: null,
+        fromStatus: record.status,
+        toStatus: null,
+        source: "manual",
+        comment: "Manual attendance record deleted — reverted to unrecorded day",
+        actorId: scope.userId,
+      })
+
+      return NextResponse.json({ message: "Record deleted and reverted to unrecorded day" })
+    }
+
+    // Has raw device punch(es) — restore to auto-derived status from punches
+    const restoredStatus = deriveUnifiedAttendanceStatus(
+      {
+        record: { clock_in: record.clock_in, clock_out: record.clock_out, waived: false, status: null },
+        recordDate: record.date,
+      },
+      policy
+    )
+    const restoredSource = record.clock_in_source || record.clock_out_source || "hikvision"
+
+    const updates: Record<string, unknown> = {
+      status: restoredStatus,
+      waived: false,
+      manual_comment: null,
+      source: restoredSource,
+    }
+
+    const { data: updated, error: upErr } = await dataClient
+      .from("attendance_records")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (upErr) {
+      log.error({ err: JSON.stringify(upErr) }, "Failed to revert attendance record")
+      return NextResponse.json({ error: "Failed to revert record" }, { status: 500 })
+    }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "update",
+        entityType: "attendance_record",
+        entityId: id,
+        oldValues: record,
+        newValues: updated,
+        context: { actorId: scope.userId, source: "api", route: `/api/admin/hr/attendance/records/${id}` },
+      },
+      { failOpen: true }
+    )
+
+    await recordAttendanceEvent(dataClient, {
+      userId: record.user_id,
+      eventDate: record.date,
+      eventType: "manual_update",
+      attendanceRecordId: id,
+      fromStatus: record.status,
+      toStatus: restoredStatus,
+      source: "manual",
+      comment: "Manual override removed — reverted to auto-derived punch attendance",
+      actorId: scope.userId,
+      metadata: { clock_in: record.clock_in, clock_out: record.clock_out },
+    })
+
+    return NextResponse.json({ data: updated, message: "Record reverted to auto-derived attendance" })
+  } catch (error) {
+    log.error({ err: String(error) }, "Error in DELETE /api/admin/hr/attendance/records/[id]")
+    return NextResponse.json({ error: "An error occurred" }, { status: 500 })
+  }
+}

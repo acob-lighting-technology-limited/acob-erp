@@ -128,6 +128,7 @@ export interface Employee {
   avatar_url?: string | null
   created_at: string
   mailbox_credentials_sent_at?: string | null
+  nysc_cds_day?: string | null
 }
 
 export interface UserProfile {
@@ -296,6 +297,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     separation_date: "",
     employment_type: "full_time",
     contract_category_code: "",
+    nysc_cds_day: "",
   })
 
   const canManageUsers = ["developer", "super_admin", "admin"].includes(userProfile?.role || "")
@@ -416,6 +418,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             separation_date: fullProfile.separation_date || "",
             employment_type: (fullProfile.employment_type as "full_time" | "part_time" | "contract") || "full_time",
             contract_category_code: contractCategoryCode,
+            nysc_cds_day: fullProfile.nysc_cds_day || "",
           })
         }
 
@@ -528,6 +531,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             profileId: selectedEmployee.id,
             newType: editForm.employment_type,
             newCategoryCode: editForm.employment_type === "contract" ? editForm.contract_category_code : undefined,
+            newCdsDay:
+              editForm.employment_type === "contract" &&
+              (editForm.contract_category_code || "").toUpperCase().includes("NYSC")
+                ? editForm.nysc_cds_day || null
+                : null,
           }),
         })
 
@@ -657,6 +665,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       ;(updateData as Record<string, unknown>).attendance_exempt = editForm.attendance_exempt
       ;(updateData as Record<string, unknown>).personal_email = personalEmail || null
+      ;(updateData as Record<string, unknown>).nysc_cds_day =
+        editForm.employment_type === "contract" &&
+        (editForm.contract_category_code || "").toUpperCase().includes("NYSC")
+          ? editForm.nysc_cds_day || null
+          : null
 
       const emailSyncResponse = await apiFetch(`/api/admin/hr/employees/${selectedEmployee.id}/email`, {
         method: "PATCH",
