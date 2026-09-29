@@ -215,7 +215,7 @@ export function AssetHandoverDialog({
                 <Input
                   id="employeeName"
                   value={formData.employeeName}
-                  onChange={(e) => setFormData((p) => ({ ...p, employeeName: e.target.value }))}
+                  disabled
                   placeholder="e.g. Vanessa Lawrence-Ukaegbu"
                 />
               </div>
@@ -224,12 +224,7 @@ export function AssetHandoverDialog({
                 <Label htmlFor="department" className="text-xs">
                   Department
                 </Label>
-                <Input
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => setFormData((p) => ({ ...p, department: e.target.value }))}
-                  placeholder="e.g. Human Resources"
-                />
+                <Input id="department" value={formData.department} disabled placeholder="e.g. Human Resources" />
               </div>
 
               <div className="space-y-1.5">
@@ -269,24 +264,14 @@ export function AssetHandoverDialog({
                 <Label htmlFor="assetType" className="text-xs">
                   Asset Type
                 </Label>
-                <Input
-                  id="assetType"
-                  value={formData.assetType}
-                  onChange={(e) => setFormData((p) => ({ ...p, assetType: e.target.value }))}
-                  placeholder="e.g. Laptop"
-                />
+                <Input id="assetType" value={formData.assetType} disabled placeholder="e.g. Laptop" />
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="assetModel" className="text-xs">
                   Brand / Model
                 </Label>
-                <Input
-                  id="assetModel"
-                  value={formData.assetModel}
-                  onChange={(e) => setFormData((p) => ({ ...p, assetModel: e.target.value }))}
-                  placeholder="e.g. Dell Latitude 7430"
-                />
+                <Input id="assetModel" value={formData.assetModel} disabled placeholder="e.g. Dell Latitude 7430" />
               </div>
 
               <div className="space-y-1.5">
@@ -296,7 +281,7 @@ export function AssetHandoverDialog({
                 <Input
                   id="serialNumber"
                   value={formData.serialNumber}
-                  onChange={(e) => setFormData((p) => ({ ...p, serialNumber: e.target.value }))}
+                  disabled
                   placeholder="e.g. 2R0FKR3"
                   className="font-mono"
                 />
@@ -309,7 +294,7 @@ export function AssetHandoverDialog({
                 <Input
                   id="uniqueCode"
                   value={formData.uniqueCode}
-                  onChange={(e) => setFormData((p) => ({ ...p, uniqueCode: e.target.value }))}
+                  disabled
                   placeholder="e.g. ACOB/HQ/LAP/2026/028"
                   className="font-mono"
                 />
