@@ -42,6 +42,7 @@ import {
   isEarlyDeparture,
   normalizeStoredAttendanceStatus,
   getManualStatusEditOptions,
+  isPermissionAttendanceStatus,
 } from "@/lib/hr/attendance-status"
 import { isLate } from "@/lib/hr/attendance-utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -100,6 +101,7 @@ export function AdminAttendanceRecordsPage({
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [editForm, setEditForm] = useState({ status: "", manual_comment: "" })
   const [saving, setSaving] = useState(false)
+  const [reverting, setReverting] = useState(false)
   const [evidenceRecord, setEvidenceRecord] = useState<AttendanceRecord | null>(null)
 
   const load = useCallback(async () => {
@@ -175,6 +177,25 @@ export function AdminAttendanceRecordsPage({
       toast.error(err instanceof Error ? err.message : "Failed to save")
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleRevert() {
+    if (!editRecord) return
+    setReverting(true)
+    try {
+      const res = await apiFetch(`/api/admin/hr/attendance/records/${editRecord.id}`, {
+        method: "DELETE",
+      })
+      const payload = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(payload?.error || "Failed to revert record")
+      toast.success("Manual override removed — reverted to auto-derived attendance")
+      setEditRecord(null)
+      void load()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to revert record")
+    } finally {
+      setReverting(false)
     }
   }
 
@@ -377,6 +398,12 @@ export function AdminAttendanceRecordsPage({
   ]
 
   const { isOnTimePresent, options: statusOptions } = getManualStatusEditOptions(editRecord)
+  const isOverridden = Boolean(
+    editRecord &&
+      (editRecord.source === "manual" ||
+        Boolean(editRecord.manual_comment) ||
+        isPermissionAttendanceStatus(editRecord.status))
+  )
 
   const hasManualComment = editForm.manual_comment.trim().length >= 3
   const cannotSave = saving || !editForm.status || !hasManualComment || isOnTimePresent
@@ -716,7 +743,7 @@ export function AdminAttendanceRecordsPage({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            {isOnTimePresent ? (
+            {isOnTimePresent && !isOverridden ? (
               <p className="text-muted-foreground text-sm">
                 This record is fully present and on-time. No overrides (LWP/AWP) are applicable.
               </p>
@@ -753,13 +780,30 @@ export function AdminAttendanceRecordsPage({
               </>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditRecord(null)}>
-              Cancel
-            </Button>
-            <Button onClick={saveEdit} disabled={cannotSave}>
-              {saving ? "Saving..." : "Save"}
-            </Button>
+          <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {isOverridden ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleRevert}
+                disabled={reverting || saving}
+              >
+                {reverting ? "Reverting…" : "Revert Override"}
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditRecord(null)} disabled={saving || reverting}>
+                Cancel
+              </Button>
+              {(!isOnTimePresent || !isOverridden) && (
+                <Button onClick={saveEdit} disabled={cannotSave || reverting}>
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

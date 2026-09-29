@@ -392,20 +392,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     for (const row of toRevert) {
-      // Preserve individually-set permission statuses (LWP/AWP/OOS) so a bulk revert
-      // targeting other records doesn't silently strip them. For all other statuses
-      // (waiver, present, late, etc.) re-derive from the raw punches as intended.
-      const preservedStatus = isPermissionAttendanceStatus(row.status) ? row.status : null
       const revertedStatus = deriveUnifiedAttendanceStatus(
         {
-          record: { clock_in: row.clock_in, clock_out: row.clock_out, waived: false, status: preservedStatus },
+          record: { clock_in: row.clock_in, clock_out: row.clock_out, waived: false, status: null },
           recordDate: row.date,
         },
         policy
       )
       await dataClient
         .from("attendance_records")
-        .update({ status: revertedStatus, waived: false, manual_comment: null })
+        .update({ status: revertedStatus, waived: false, manual_comment: null, source: "hikvision" })
         .eq("id", row.id)
     }
 

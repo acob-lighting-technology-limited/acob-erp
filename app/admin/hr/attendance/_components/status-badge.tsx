@@ -49,10 +49,10 @@ export function StatusBadge({
           className: ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS],
         }
       } else if (isPastDate && record.clock_in && !record.clock_out) {
-        const isApproved = s === "lateness_with_permission"
-        const key = isApproved ? "incomplete_with_permission" : "incomplete"
+        const isApprovedIwp = record.status === "incomplete_with_permission"
+        const key = isApprovedIwp ? "incomplete_with_permission" : "incomplete"
         secondary = {
-          label: isApproved ? "IWP" : "Inc",
+          label: isApprovedIwp ? "IWP" : "Inc",
           className: ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS],
         }
       }
