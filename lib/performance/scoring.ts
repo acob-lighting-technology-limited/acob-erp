@@ -539,7 +539,7 @@ export async function computeIndividualPerformanceScore(
       })
       creditSum += dayResult.hoursWorked / netDay
 
-      if (status !== "absent" && status !== "incomplete" && dayResult.lateBracket > 0) {
+      if (status !== "absent" && dayResult.lateBracket > 0) {
         lateDays += 1
         latePenaltyStepsTotal += dayResult.lateBracket
       }

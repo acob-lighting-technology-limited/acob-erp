@@ -17,7 +17,7 @@ import {
   netDayHoursFor,
   getEffectiveAttendanceStartDate,
 } from "@/lib/hr/attendance-ssot"
-import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { deriveUnifiedAttendanceStatus, isLateWithPolicy } from "@/lib/hr/attendance-status"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
@@ -265,6 +265,7 @@ export async function GET(request: NextRequest) {
 
         const earlyClose = ctx.earlyCloseTime(workday)
         const lateRes = ctx.lateResumptionTime(workday)
+        const effectiveLateCutoff = lateRes ?? policy.lateCutoff
         const derived = deriveUnifiedAttendanceStatus(
           {
             record: rec,
@@ -321,9 +322,16 @@ export async function GET(request: NextRequest) {
           present_days++
           // Bucket for the summary counters: Early Closure / Late Resumption counts as a full present
           // day; Left Early (± permission) is a docked present day, grouped with late.
-          if (derived === "early" || derived === "early_closure" || derived === "late_resumption") early_days++
-          else if (derived === "incomplete") incomplete_days++
-          else late_days++
+          if (derived === "early" || derived === "early_closure" || derived === "late_resumption") {
+            early_days++
+          } else if (derived === "incomplete") {
+            incomplete_days++
+            if (rec.clock_in && isLateWithPolicy(rec.clock_in, effectiveLateCutoff)) {
+              late_days++
+            }
+          } else {
+            late_days++
+          }
 
           const day = computeAttendanceDay({
             status: derived,
