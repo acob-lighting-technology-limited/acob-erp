@@ -114,7 +114,7 @@ function toRow(r: AttendanceRow): (string | number)[] {
 export function AttendanceExportDialog({ open, onOpenChange, department, monthOptions }: Props) {
   const picker = useExportPeriod()
   const [format, setFormat] = useState<ExportFormat>("xlsx")
-  const [includeLunch, setIncludeLunch] = useState(false)
+  const [includeLunch, setIncludeLunch] = useState(true)
   const [exporting, setExporting] = useState(false)
 
   // The lunch report is a second worksheet, which only Excel can carry — CSV and PDF are
