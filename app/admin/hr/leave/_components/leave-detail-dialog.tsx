@@ -33,7 +33,7 @@ import {
   Paperclip,
   CalendarCheck2,
 } from "lucide-react"
-import { LeaveItem, approvalStageKey, resolvePersonName, getStageBadge } from "../view"
+import { LeaveItem, approvalStageKey, resolvePersonName, getStageBadge, resolveLeaveRouteStages } from "../view"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { leaveEvidenceHref, leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { formatName, cn } from "@/lib/utils"
@@ -113,7 +113,7 @@ export function LeaveDetailDialog({
     }
   }
 
-  const stageOrder = ["reliever", "department_lead", "admin_hr_lead", "hcs", "md"]
+  const stageOrder = resolveLeaveRouteStages(leave)
   const stageName: Record<string, string> = {
     reliever: "Reliever Review",
     department_lead: "Department Lead",
