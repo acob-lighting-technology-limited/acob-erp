@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { formatLeaveReference, leaveStageLabel, notifyUsers } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { toLocalISODate } from "@/lib/utils/date"
+import { isSameDepartment, DEPT_ADMIN_HR } from "@/shared/departments"
 
 const log = logger("hr-leave-sla-reminders")
 
@@ -59,6 +61,37 @@ const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_admin_hr_lead: "hr_pending",
   pending_md: "hr_pending",
   pending_hcs: "hr_pending",
+}
+
+async function resolveAdminHrLeadUserIds(db: SupabaseClient<any, any, any>): Promise<string[]> {
+  const { data: leads } = await db
+    .from("profiles")
+    .select("id, department, lead_departments")
+    .eq("is_department_lead", true)
+
+  const matched = ((leads || []) as { id: string; department?: string | null; lead_departments?: string[] | null }[])
+    .filter((profile) => {
+      const managed = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
+      return (
+        isSameDepartment(profile.department, DEPT_ADMIN_HR) ||
+        managed.some((dept) => isSameDepartment(dept, DEPT_ADMIN_HR))
+      )
+    })
+    .map((p) => p.id)
+
+  if (matched.length > 0) return matched
+
+  const { data: assignee } = await db
+    .from("leave_approval_role_assignees")
+    .select("user_id")
+    .eq("role_code", "admin_hr_lead")
+    .eq("is_active", true)
+
+  const assigneeIds = ((assignee || []) as { user_id: string }[]).map((a) => a.user_id).filter(Boolean)
+  if (assigneeIds.length > 0) return assigneeIds
+
+  log.warn("No Admin & HR lead found for leave SLA breach escalation")
+  return []
 }
 
 export async function PATCH() {
@@ -116,6 +149,7 @@ export async function PATCH() {
 
     const now = Date.now()
     const today = toLocalISODate()
+    const hrLeadUserIds = await resolveAdminHrLeadUserIds(db)
     let remindersSent = 0
 
     for (const request of (pendingRequests || []) as PendingLeaveRequestRow[]) {
@@ -228,20 +262,18 @@ export async function PATCH() {
         remindersSent += 1
       }
 
-      if (now >= dueAt && policy.escalate_to_role) {
-        const { data: escalatedUsers } = await db.from("profiles").select("id").eq("role", policy.escalate_to_role)
-
-        const escalateRecipients = ((escalatedUsers || []) as ProfileIdRow[]).map((row) => row.id)
-        if (escalateRecipients.length) {
+      // Leave approval SLA breaches escalate exclusively to the Admin & HR Lead.
+      if (now >= dueAt) {
+        if (hrLeadUserIds.length > 0) {
           await notifyUsers(db, {
-            userIds: escalateRecipients,
+            userIds: hrLeadUserIds,
             title: "Leave approval SLA breached",
             message: `Leave request ${formatLeaveReference(request.id)} has breached SLA at the ${leaveStageLabel(request.current_stage_code || "")} stage.`,
             linkUrl: "/admin/hr/leave/approve",
             entityId: request.id,
             emailEvent: "sla_breached",
           })
-          remindersSent += escalateRecipients.length
+          remindersSent += hrLeadUserIds.length
         }
       }
     }
