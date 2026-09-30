@@ -5,6 +5,7 @@ import { Check, ChevronDown, Search } from "lucide-react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface SearchableSelectProps {
   value: string
@@ -111,9 +112,8 @@ export function SearchableSelect({
         {filteredOptions.length > 0 ? (
           filteredOptions.map((option) => {
             const isSelected = option.value === value
-            return (
+            const itemButton = (
               <button
-                key={option.value}
                 type="button"
                 onClick={() => {
                   onValueChange(option.value)
@@ -135,6 +135,25 @@ export function SearchableSelect({
                 </div>
               </button>
             )
+
+            if (!option.label) {
+              return <React.Fragment key={option.value}>{itemButton}</React.Fragment>
+            }
+
+            return (
+              <Tooltip key={option.value} delayDuration={200} disableHoverableContent>
+                <TooltipTrigger asChild>{itemButton}</TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  align="center"
+                  sideOffset={8}
+                  collisionPadding={10}
+                  className="z-[70] max-w-sm break-words sm:max-w-md"
+                >
+                  {option.label}
+                </TooltipContent>
+              </Tooltip>
+            )
           })
         ) : (
           <div className="text-muted-foreground py-6 text-center text-sm">No results found</div>
@@ -153,6 +172,7 @@ export function SearchableSelect({
           type="button"
           ref={triggerRef}
           disabled={disabled}
+          title={selectedOption?.label || undefined}
           className={cn(
             "border-input ring-offset-background data-[placeholder]:text-muted-foreground focus:ring-ring flex h-9 w-full max-w-full min-w-0 items-center justify-between overflow-hidden rounded-md border bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
             className
