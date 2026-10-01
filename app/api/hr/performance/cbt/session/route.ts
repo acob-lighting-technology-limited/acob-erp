@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { pickRandom, shuffle } from "@/lib/utils/random"
 import { z } from "zod"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
@@ -402,7 +403,7 @@ export async function POST(request: NextRequest) {
 
       // 3. Select questions based on targetCount
       if (allQuestions.length <= targetCount) {
-        sessionQuestions = [...allQuestions].sort(() => 0.5 - Math.random())
+        sessionQuestions = shuffle(allQuestions)
       } else {
         const deptMap = new Map<string, QuestionRow[]>()
         for (const q of allQuestions) {
@@ -413,22 +414,20 @@ export async function POST(request: NextRequest) {
           deptMap.get(dept)!.push(q)
         }
 
-        const departments = Array.from(deptMap.keys()).sort(() => 0.5 - Math.random())
+        const departments = shuffle(Array.from(deptMap.keys()))
         const selectedDepts = departments.slice(0, targetCount)
         const chosenQuestions: QuestionRow[] = []
 
         for (const dept of selectedDepts) {
           const questionsInDept = deptMap.get(dept) || []
-          if (questionsInDept.length > 0) {
-            const randomQ = questionsInDept[Math.floor(Math.random() * questionsInDept.length)]
-            chosenQuestions.push(randomQ)
-          }
+          const randomQ = pickRandom(questionsInDept)
+          if (randomQ) chosenQuestions.push(randomQ)
         }
 
         if (chosenQuestions.length < targetCount) {
           const remainingPool = allQuestions.filter((q) => !chosenQuestions.some((cq) => cq.id === q.id))
           const needed = targetCount - chosenQuestions.length
-          const padding = [...remainingPool].sort(() => 0.5 - Math.random()).slice(0, needed)
+          const padding = shuffle(remainingPool).slice(0, needed)
           chosenQuestions.push(...padding)
         }
 

@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf"
+import { shuffle } from "@/lib/utils/random"
 import { saveAs } from "file-saver"
 import { DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
 import {
@@ -3001,14 +3002,7 @@ const renderDepartmentWeeklySlides = (
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
 
   let pageCursor = startPageNumber
-  const titleSlide = addDeptTitleSlide(
-    pres,
-    report.department,
-    name,
-    pageCursor,
-    theme,
-    position
-  )
+  const titleSlide = addDeptTitleSlide(pres, report.department, name, pageCursor, theme, position)
   applyWeeklySlideTransition(titleSlide)
   if (typeof pageCursor === "number") pageCursor += 1
 
@@ -3017,15 +3011,10 @@ const renderDepartmentWeeklySlides = (
   // could not tell what was coming up until you were already on the last slide
   // of the department. Where you are within the department is now carried by
   // the "1 OF 2" / "2 OF 2" label in the header.
-  const workDoneSlide = addWorkDoneSlide(
-    pres,
-    report.department,
-    workDone,
-    nextDepartmentName,
-    pageCursor,
-    theme,
-    { index: 1, total: 2 }
-  )
+  const workDoneSlide = addWorkDoneSlide(pres, report.department, workDone, nextDepartmentName, pageCursor, theme, {
+    index: 1,
+    total: 2,
+  })
   applyWeeklySlideTransition(workDoneSlide)
   if (typeof pageCursor === "number") pageCursor += 1
 
@@ -3129,7 +3118,7 @@ export const exportAllToPPTX = async (
           normalizeDepartmentName(a.department).localeCompare(normalizeDepartmentName(b.department))
         )
       : order === "random"
-        ? [...reports].sort(() => Math.random() - 0.5)
+        ? shuffle(reports)
         : sortReportsByDepartment(reports)
   const departments = sortedReports.map((entry) => entry.department)
 

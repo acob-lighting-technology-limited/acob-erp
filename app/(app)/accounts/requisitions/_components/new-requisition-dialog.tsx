@@ -112,7 +112,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         const fileExt = file.name.split(".").pop()
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+        const fileName = `${crypto.randomUUID()}.${fileExt}`
         const filePath = `receipts/${fileName}`
 
         const { data, error } = await supabase.storage

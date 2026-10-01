@@ -1,5 +1,6 @@
 "use client"
 
+import { secureRandomString } from "@/lib/utils/random"
 import { useState } from "react"
 import {
   Dialog,
@@ -35,13 +36,10 @@ interface DispatchCredentialsDialogProps {
   onSuccess?: () => void
 }
 
+const PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*"
+
 function generateRandomPassword() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*"
-  let pass = ""
-  for (let i = 0; i < 14; i++) {
-    pass += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return pass
+  return secureRandomString(14, PASSWORD_ALPHABET)
 }
 
 export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSuccess }: DispatchCredentialsDialogProps) {
