@@ -73,6 +73,7 @@ interface HistoryRow {
 interface LunchContentProps {
   initialData: LunchPollData
   currentUserId: string
+  initialTab?: string
 }
 
 const TABS: DataTableTab[] = [
@@ -106,8 +107,8 @@ function shiftDate(date: string, days: number): string {
   return toLocalISODate(d)
 }
 
-export function LunchContent({ initialData, currentUserId }: LunchContentProps) {
-  const [activeTab, setActiveTab] = useState<string>("poll")
+export function LunchContent({ initialData, currentUserId, initialTab = "poll" }: LunchContentProps) {
+  const [activeTab, setActiveTab] = useState<string>(initialTab)
   const [data, setData] = useState<LunchPollData>(initialData)
   const [submitting, setSubmitting] = useState(false)
   const [loadingDay, setLoadingDay] = useState(false)

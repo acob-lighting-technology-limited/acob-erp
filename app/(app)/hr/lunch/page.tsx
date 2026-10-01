@@ -15,7 +15,13 @@ import { LunchContent, type LunchPollData } from "./lunch-content"
 
 export const dynamic = "force-dynamic"
 
-export default async function LunchPage() {
+interface PageProps {
+  searchParams?: Promise<{ tab?: string }>
+}
+
+export default async function LunchPage({ searchParams }: PageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const initialTab = resolvedSearchParams?.tab === "history" ? "history" : "poll"
   const supabase = await createClient()
   const {
     data: { user },
@@ -57,5 +63,5 @@ export default async function LunchPage() {
     eatingDays: settings.eating_days,
   }
 
-  return <LunchContent initialData={initialData} currentUserId={user.id} />
+  return <LunchContent initialData={initialData} currentUserId={user.id} initialTab={initialTab} />
 }

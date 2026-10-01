@@ -23,6 +23,7 @@ import { getTaskUrgency, isOpenCorrespondence, isOpenTicket, sortTasksByUrgency 
 const MAX_TASKS = 6
 const MAX_OPEN_ITEMS = 7
 const MAX_ASSETS = 4
+const MAX_LUNCH_LOGS = 5
 
 function shortDate(dateString: string): string {
   return formatWATDate(dateString, { month: "short", day: "numeric" })
@@ -264,28 +265,23 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
   })
 
   const totalDeduction = thisMonthLogs.reduce((sum, log) => sum + Number(log.employee_deduction), 0)
+  const recentLogs = lunchLogs.slice(0, MAX_LUNCH_LOGS)
 
   return (
-    <ListCard
-      title="Lunch History"
-      icon={Utensils}
-      count={thisMonthLogs.length}
-      viewAllHref="/accounts/payroll"
-      viewAllLabel={`${currentMonthName} Logs`}
-    >
+    <ListCard title="Lunch History" icon={Utensils} viewAllHref="/hr/lunch?tab=history" viewAllLabel="All logs">
       <div className="bg-muted/30 flex items-center justify-between border-t border-b px-4 py-3 text-sm">
-        <span className="text-muted-foreground font-medium">Monthly Surcharge:</span>
+        <span className="text-muted-foreground font-medium">{currentMonthName} Surcharge:</span>
         <span className="font-bold text-red-600">
           ₦{totalDeduction.toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       </div>
-      {thisMonthLogs.length > 0 ? (
+      {recentLogs.length > 0 ? (
         <ul className="max-h-[220px] divide-y overflow-y-auto">
-          {thisMonthLogs.slice(0, 5).map((log) => (
+          {recentLogs.map((log) => (
             <li key={log.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
               <div>
                 <p className="text-foreground font-semibold">
-                  {new Date(log.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  {formatWATDate(log.date, { weekday: "short", month: "short", day: "numeric" })}
                 </p>
                 <p className="text-muted-foreground text-[10px]">Meal price: ₦{Number(log.cost).toLocaleString()}</p>
               </div>
@@ -302,7 +298,7 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
         <div className="border-t px-6 py-8 text-center">
           <EmptyState
             title="No lunch entries"
-            description="Your lunch registers for this month will appear here."
+            description="Your recent lunch registers will appear here."
             icon={Utensils}
             className="border-0 py-2"
           />
