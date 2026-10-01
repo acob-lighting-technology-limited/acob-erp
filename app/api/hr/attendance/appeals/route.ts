@@ -9,6 +9,7 @@ import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { notifyAppealSubmittedMail } from "@/lib/hr/attendance-notify"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("hr-attendance-appeals")
 export const dynamic = "force-dynamic"
@@ -350,7 +351,7 @@ export async function POST(request: NextRequest) {
 
       for (const recipientId of recipientIds) {
         try {
-          await dataClient.rpc("create_notification", {
+          await createNotification({
             p_user_id: recipientId,
             p_type: "approval_request",
             p_category: "approvals",

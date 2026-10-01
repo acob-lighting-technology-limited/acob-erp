@@ -1,4 +1,5 @@
 import { sendLeaveWorkflowEmail, type LeaveWorkflowDetail, type LeaveBadgeVariant } from "@/lib/leave-mailer"
+import { getServiceClient } from "@/lib/supabase/admin"
 import { resolveChannelEligibleUserIds } from "@/lib/notifications/delivery-policy"
 import { logger } from "@/lib/logger"
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -816,7 +817,9 @@ export async function notifyUsers(
       emailEvent: params.emailEvent,
     })
 
-    const { error: notifyError } = await supabase.from("notifications").insert(rows)
+    // notifications INSERT is service-role only; callers may pass a session client.
+    const writer = getServiceClient() ?? supabase
+    const { error: notifyError } = await writer.from("notifications").insert(rows)
     if (notifyError) {
       log.error({ err: notifyError }, "Failed to create leave notifications")
     }

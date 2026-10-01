@@ -26,9 +26,6 @@ export interface Employee {
   additional_phone: string | null
   residential_address: string | null
   office_location: string | null
-  bank_name: string | null
-  bank_account_number: string | null
-  bank_account_name: string | null
   date_of_birth: string | null
   birthday: string | null
   employment_date: string | null
@@ -67,9 +64,6 @@ export function buildEmployeeExportRows(employees: Employee[], opts: ExportOptio
     if (selectedColumns["Additional Phone"]) row["Additional Phone"] = member.additional_phone || "-"
     if (selectedColumns["Residential Address"]) row["Residential Address"] = member.residential_address || "-"
     if (selectedColumns["Office Location"]) row["Office Location"] = member.office_location || "-"
-    if (selectedColumns["Bank Name"]) row["Bank Name"] = member.bank_name || "-"
-    if (selectedColumns["Bank Account Number"]) row["Bank Account Number"] = member.bank_account_number || "-"
-    if (selectedColumns["Bank Account Name"]) row["Bank Account Name"] = member.bank_account_name || "-"
     if (selectedColumns["Date of Birth"])
       row["Date of Birth"] = formatDateOfBirth(member.date_of_birth, member.birthday) || "-"
     if (selectedColumns["Employment Date"])
@@ -219,18 +213,6 @@ export async function exportEmployeesToPDF(
       if (selectedColumns["Office Location"]) {
         row.push(member.office_location || "-")
         headers.push("Office Location")
-      }
-      if (selectedColumns["Bank Name"]) {
-        row.push(member.bank_name || "-")
-        headers.push("Bank Name")
-      }
-      if (selectedColumns["Bank Account Number"]) {
-        row.push(member.bank_account_number || "-")
-        headers.push("Bank Account Number")
-      }
-      if (selectedColumns["Bank Account Name"]) {
-        row.push(member.bank_account_name || "-")
-        headers.push("Bank Account Name")
       }
       if (selectedColumns["Date of Birth"]) {
         row.push(formatDateOfBirth(member.date_of_birth, member.birthday) || "-")

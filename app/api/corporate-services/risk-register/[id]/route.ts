@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
@@ -84,7 +85,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       { failOpen: true }
     )
     if (risk.control_owner_id !== existing.control_owner_id) {
-      await notifyControlOwner(supabase, risk, scope.userId)
+      await notifyControlOwner(getServiceRoleClientOrFallback(supabase), risk, scope.userId)
     }
 
     return NextResponse.json({ data: risk })

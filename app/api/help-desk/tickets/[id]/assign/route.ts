@@ -11,6 +11,7 @@ import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { getUnassignableReason } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("help-desk-tickets-assign")
 const AssignHelpDeskTicketSchema = z.object({
@@ -180,7 +181,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     })
 
     if (newAssignedTo) {
-      await supabase.rpc("create_notification", {
+      await createNotification({
         p_user_id: newAssignedTo,
         p_type: "task_assigned",
         p_category: "tasks",

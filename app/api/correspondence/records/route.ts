@@ -19,6 +19,7 @@ import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/
 import { getOneDriveService } from "@/lib/onedrive"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getDepartmentAliases } from "@/shared/departments"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("correspondence-records")
 const MAX_REFERENCE_INSERT_RETRIES = 3
@@ -704,7 +705,7 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: originatorId,
             p_type: "approval_granted",
             p_category: "approvals",
@@ -756,7 +757,7 @@ export async function POST(request: NextRequest) {
             },
             { onConflict: "correspondence_id,approval_stage" }
           )
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: execLead.id,
             p_type: "approval_request",
             p_category: "approvals",
@@ -782,7 +783,7 @@ export async function POST(request: NextRequest) {
             },
             { onConflict: "correspondence_id,approval_stage" }
           )
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: deptLead.id,
             p_type: "approval_request",
             p_category: "approvals",
@@ -901,7 +902,7 @@ export async function POST(request: NextRequest) {
         )
 
         if (targetLead?.id) {
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: targetLead.id,
             p_type: "approval_request",
             p_category: "approvals",

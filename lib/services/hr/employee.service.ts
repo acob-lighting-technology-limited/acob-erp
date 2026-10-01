@@ -59,9 +59,6 @@ export class EmployeeService extends BaseService {
       office_location?: string
       residential_address?: string
       current_work_location?: string
-      bank_name?: string
-      bank_account_number?: string
-      bank_account_name?: string
       birthday?: string // MM-DD; date_of_birth is derived from this + birth_year
       birth_year?: number
       employment_date?: string

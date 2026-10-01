@@ -6,12 +6,8 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { toLocalISODate } from "@/lib/utils/date"
 
-const ExportSchema = z.object({
-  format: z.enum(["csv", "xlsx"]),
-  fields: z.array(z.string()).optional(),
-  department: z.string().optional(),
-})
-
+// The only columns an export may select. `fields` from the client is validated
+// against this list so a caller can never pull arbitrary profile columns.
 const SAFE_FIELDS = [
   "employee_number",
   "first_name",
@@ -24,9 +20,13 @@ const SAFE_FIELDS = [
   "phone_number",
   "employment_date",
   "confirmation_date",
-]
+] as const
 
-const SENSITIVE_FIELDS = ["bank_name", "bank_account_number", "bank_account_name"]
+const ExportSchema = z.object({
+  format: z.enum(["csv", "xlsx"]),
+  fields: z.array(z.enum(SAFE_FIELDS)).min(1).optional(),
+  department: z.string().optional(),
+})
 type EmployeeExportRow = Record<string, unknown>
 
 async function getDepartmentIdByName(
@@ -69,13 +69,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { format, fields, department } = parsed.data
-  const requestedFields = fields ?? SAFE_FIELDS
-  const hasSensitiveFields = requestedFields.some((field) => SENSITIVE_FIELDS.includes(field))
-
-  if (hasSensitiveFields && scope.role !== "super_admin" && scope.role !== "developer") {
-    return NextResponse.json({ error: "Insufficient permissions to export sensitive fields" }, { status: 403 })
-  }
-
+  const requestedFields: readonly string[] = fields ?? SAFE_FIELDS
   const selectFields = Array.from(new Set([...requestedFields, "department", "department_id"])).join(", ")
   let query = supabase.from("profiles").select(selectFields)
 
@@ -110,10 +104,6 @@ export async function POST(req: NextRequest) {
         fields: requestedFields,
         department: department ?? "all",
         record_count: employees?.length ?? 0,
-        includes_sensitive: hasSensitiveFields,
-      },
-      metadata: {
-        is_critical: hasSensitiveFields,
       },
     },
     { failOpen: true }

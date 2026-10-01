@@ -14,6 +14,7 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { logger } from "@/lib/logger"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("correspondence-records-approvals")
 
@@ -327,7 +328,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       })
 
       try {
-        await supabase.rpc("create_notification", {
+        await createNotification({
           p_user_id: record.originator_id,
           p_type: "approval_granted",
           p_category: "approvals",
@@ -570,7 +571,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
     try {
       const displayRef = record.reference_number || updatedRecord.reference_number || finalReferenceNumber || "Draft"
-      await supabase.rpc("create_notification", {
+      await createNotification({
         p_user_id: record.originator_id,
         p_type:
           decision === "approved"

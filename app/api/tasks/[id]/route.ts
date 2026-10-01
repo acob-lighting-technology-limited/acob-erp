@@ -11,6 +11,7 @@ import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
 import { canAssignToDepartment, canAssignToProfile } from "@/lib/tasks/assignment-scope"
 import { TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("task-detail-route")
 
@@ -243,7 +244,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       const notifyPriority = priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal"
 
       try {
-        await supabase.rpc("create_notification", {
+        await createNotification({
           p_user_id: newAssigneeId,
           p_type: reassigned ? "task_assigned" : "task_updated",
           p_category: "tasks",

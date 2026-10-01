@@ -8,6 +8,7 @@ import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 import { liveAppealDayStatus } from "@/lib/hr/attendance-appeals"
 import { logger } from "@/lib/logger"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("admin-hr-attendance-appeals")
 export const dynamic = "force-dynamic"
@@ -341,7 +342,7 @@ export async function PATCH(request: NextRequest) {
 
     // Notify the employee
     try {
-      await dataClient.rpc("create_notification", {
+      await createNotification({
         p_user_id: appeal.user_id,
         p_type: action === "approve" ? "approval_granted" : "approval_rejected",
         p_category: "approvals",

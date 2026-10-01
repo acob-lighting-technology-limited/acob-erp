@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       },
       { failOpen: true }
     )
-    await notifyControlOwner(supabase, risk, scope.userId)
+    await notifyControlOwner(getServiceRoleClientOrFallback(supabase), risk, scope.userId)
 
     return NextResponse.json({ data: risk }, { status: 201 })
   } catch (err: unknown) {

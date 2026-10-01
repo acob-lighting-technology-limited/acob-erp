@@ -7,6 +7,7 @@ import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_ICT_EMAIL, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { taskDeadline } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("cron-reminders-health")
 
@@ -196,7 +197,7 @@ async function alertStaleExpiry(supabase: Supabase, staleCount: number): Promise
       .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString())
     if (count && count > 0) continue
 
-    const { error } = await supabase.rpc("create_notification", {
+    const { error } = await createNotification({
       p_user_id: userId,
       p_type: "system",
       p_category: "system",
@@ -267,7 +268,7 @@ export async function GET(request: NextRequest) {
     let notified = 0
     for (const userId of userIds) {
       for (const failure of failures) {
-        const { error: notifyError } = await supabase.rpc("create_notification", {
+        const { error: notifyError } = await createNotification({
           p_user_id: userId,
           p_type: "system",
           p_category: "system",
