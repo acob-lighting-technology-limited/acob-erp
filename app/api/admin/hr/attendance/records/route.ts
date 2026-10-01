@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     let attendanceQuery = dataClient
       .from("attendance_records")
       .select(
-        "id, user_id, date, clock_in, clock_out, total_hours, status, source, clock_in_source, clock_out_source, waived, manual_comment, updated_at, selfie_url, selfie_out_url, face_match_confidence, face_verified, location_verified, latitude, longitude, site_id"
+        "id, user_id, date, clock_in, clock_out, total_hours, status, source, clock_in_source, clock_out_source, waived, manual_comment, updated_at"
       )
       .order("date", { ascending: false })
       .order("created_at", { ascending: false })
@@ -245,14 +245,6 @@ export async function GET(request: NextRequest) {
         waived: r.waived,
         manual_comment: r.manual_comment ?? null,
         updated_at: r.updated_at,
-        selfie_url: r.selfie_url ?? null,
-        selfie_out_url: r.selfie_out_url ?? null,
-        face_match_confidence: r.face_match_confidence ?? null,
-        face_verified: r.face_verified ?? null,
-        location_verified: r.location_verified ?? null,
-        latitude: r.latitude ?? null,
-        longitude: r.longitude ?? null,
-        site_id: r.site_id ?? null,
         editor_first_name: editorFirstName,
         early_closure_time: closeTime,
         late_resumption_time: lateRes,
@@ -351,14 +343,6 @@ export async function GET(request: NextRequest) {
             waived: false,
             manual_comment: null,
             updated_at: null,
-            selfie_url: null,
-            selfie_out_url: null,
-            face_match_confidence: null,
-            face_verified: null,
-            location_verified: null,
-            latitude: null,
-            longitude: null,
-            site_id: null,
             editor_first_name: missingEditorFirstName,
             early_closure_time: closeTime,
             late_resumption_time: lateRes,

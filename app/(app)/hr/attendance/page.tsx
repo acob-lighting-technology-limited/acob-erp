@@ -28,8 +28,7 @@ async function getAttendanceData() {
 
   const today = toLocalISODate()
 
-  // Fetch today's record + profile remote check-in eligibility in parallel
-  const [{ data: todayData }, { data: recentData }, { data: profileData }] = await Promise.all([
+  const [{ data: todayData }, { data: recentData }] = await Promise.all([
     supabase.from("attendance_records").select("*").eq("user_id", user.id).eq("date", today).maybeSingle(),
     supabase
       .from("attendance_records")
@@ -45,13 +44,11 @@ async function getAttendanceData() {
       )
       .lte("date", today)
       .order("date", { ascending: false }),
-    supabase.from("profiles").select("remote_checkin_enabled").eq("id", user.id).maybeSingle(),
   ])
 
   return {
     todayRecord: todayData as AttendanceRecord | null,
     recentRecords: (recentData || []) as AttendanceRecord[],
-    remoteCheckinEnabled: Boolean(profileData?.remote_checkin_enabled),
   }
 }
 
@@ -65,14 +62,12 @@ export default async function AttendancePage() {
   const attendanceData = data as {
     todayRecord: AttendanceRecord | null
     recentRecords: AttendanceRecord[]
-    remoteCheckinEnabled: boolean
   }
 
   return (
     <AttendanceContent
       initialTodayRecord={attendanceData.todayRecord}
       initialRecentRecords={attendanceData.recentRecords}
-      remoteCheckinEnabled={attendanceData.remoteCheckinEnabled}
     />
   )
 }
