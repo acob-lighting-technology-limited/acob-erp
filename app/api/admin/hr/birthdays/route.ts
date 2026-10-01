@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const start = searchParams.get("start") || ""
   const end = searchParams.get("end") || ""
+  // The /birthday showcase fills a card with each photo; list views keep thumbnails.
+  const photoSize = searchParams.get("photo") === "large" ? "large" : "thumb"
 
   if (!MMDD_PATTERN.test(start) || !MMDD_PATTERN.test(end)) {
     return NextResponse.json({ error: "start and end must be MM-DD" }, { status: 400 })
@@ -63,7 +65,7 @@ export async function GET(request: NextRequest) {
   const matches = (profiles || []).filter((p) => p.birthday && isInRange(p.birthday, start, end))
 
   const avatarPaths = matches.map((p) => p.avatar_path).filter((path): path is string => Boolean(path))
-  const signedUrlsByPath = await getAvatarSignedUrls(dataClient, avatarPaths)
+  const signedUrlsByPath = await getAvatarSignedUrls(dataClient, avatarPaths, photoSize)
 
   const celebrants = matches
     .map((p) => ({

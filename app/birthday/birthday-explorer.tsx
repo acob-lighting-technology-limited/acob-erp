@@ -122,7 +122,7 @@ export function BirthdayExplorer() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await apiFetch(`/api/admin/hr/birthdays?start=${start}&end=${end}`)
+      const response = await apiFetch(`/api/admin/hr/birthdays?start=${start}&end=${end}&photo=large`)
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(payload?.error || "Failed to load birthdays")
       setCelebrants(payload?.data || [])

@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from "next/server"
+import sharp from "sharp"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { buildAvatarStoragePath, getAvatarSignedUrl, PROFILE_PHOTOS_BUCKET } from "@/lib/profile-photos"
+import {
+  AVATAR_CACHE_CONTROL_SECONDS,
+  AVATAR_LARGE_MAX_PX,
+  AVATAR_SIZE_PX,
+  avatarObjectPaths,
+  buildAvatarStoragePath,
+  getAvatarSignedUrl,
+  largeAvatarPath,
+  PROFILE_PHOTOS_BUCKET,
+} from "@/lib/profile-photos"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
 
 const log = logger("profile-avatar")
 
-const ALLOWED_MIME_TO_EXT: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-}
+const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"])
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 
 export async function POST(request: NextRequest) {
@@ -38,8 +43,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 })
   }
 
-  const extension = ALLOWED_MIME_TO_EXT[file.type]
-  if (!extension) {
+  if (!ALLOWED_MIME_TYPES.has(file.type)) {
     return NextResponse.json({ error: "Unsupported file type. Use JPEG, PNG, or WebP." }, { status: 400 })
   }
 
@@ -47,15 +51,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "File is too large. Maximum size is 5MB." }, { status: 400 })
   }
 
-  const dataClient = getServiceRoleClientOrFallback(supabase)
-  const avatarPath = buildAvatarStoragePath(user.id, extension)
+  // Phone photos arrive at several MB. Store two WebPs instead of the original: a
+  // small square thumbnail for every avatar (never shown above 64px) and an
+  // uncropped copy for the birthday showcase. `rotate()` applies EXIF orientation.
+  let thumb: Buffer
+  let large: Buffer
+  try {
+    const source = sharp(Buffer.from(await file.arrayBuffer())).rotate()
+    ;[thumb, large] = await Promise.all([
+      source.clone().resize(AVATAR_SIZE_PX, AVATAR_SIZE_PX, { fit: "cover" }).webp({ quality: 80 }).toBuffer(),
+      source
+        .clone()
+        .resize(AVATAR_LARGE_MAX_PX, AVATAR_LARGE_MAX_PX, { fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toBuffer(),
+    ])
+  } catch (err) {
+    log.warn({ err: String(err) }, "Could not decode profile photo")
+    return NextResponse.json({ error: "Could not read that image. Try a different photo." }, { status: 400 })
+  }
 
-  const { error: uploadError } = await dataClient.storage
-    .from(PROFILE_PHOTOS_BUCKET)
-    .upload(avatarPath, file, { upsert: true, contentType: file.type })
+  const dataClient = getServiceRoleClientOrFallback(supabase)
+  const bucket = dataClient.storage.from(PROFILE_PHOTOS_BUCKET)
+  const avatarPath = buildAvatarStoragePath(user.id)
+  const newObjects = avatarObjectPaths(avatarPath)
+
+  const { data: previous } = await dataClient.from("profiles").select("avatar_path").eq("id", user.id).maybeSingle()
+
+  const uploadOptions = { contentType: "image/webp", cacheControl: AVATAR_CACHE_CONTROL_SECONDS }
+  const uploads = await Promise.all([
+    bucket.upload(avatarPath, thumb, uploadOptions),
+    bucket.upload(largeAvatarPath(avatarPath), large, uploadOptions),
+  ])
+  const uploadError = uploads.find((u) => u.error)?.error
 
   if (uploadError) {
     log.error({ err: String(uploadError) }, "Failed to upload profile photo")
+    await bucket.remove(newObjects)
     return NextResponse.json({ error: "Failed to upload photo" }, { status: 500 })
   }
 
@@ -63,7 +95,13 @@ export async function POST(request: NextRequest) {
 
   if (updateError) {
     log.error({ err: String(updateError) }, "Failed to save avatar_path")
+    await bucket.remove(newObjects)
     return NextResponse.json({ error: "Failed to save photo" }, { status: 500 })
+  }
+
+  if (previous?.avatar_path && previous.avatar_path !== avatarPath) {
+    const { error: removeError } = await bucket.remove(avatarObjectPaths(previous.avatar_path))
+    if (removeError) log.warn({ err: String(removeError) }, "Failed to remove previous profile photo")
   }
 
   const signedUrl = await getAvatarSignedUrl(dataClient, avatarPath)
@@ -106,7 +144,7 @@ export async function DELETE() {
   const { data: profile } = await dataClient.from("profiles").select("avatar_path").eq("id", user.id).maybeSingle()
 
   if (profile?.avatar_path) {
-    await dataClient.storage.from(PROFILE_PHOTOS_BUCKET).remove([profile.avatar_path])
+    await dataClient.storage.from(PROFILE_PHOTOS_BUCKET).remove(avatarObjectPaths(profile.avatar_path))
   }
 
   const { error: updateError } = await dataClient.from("profiles").update({ avatar_path: null }).eq("id", user.id)
