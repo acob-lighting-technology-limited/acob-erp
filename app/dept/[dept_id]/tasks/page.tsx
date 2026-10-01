@@ -140,24 +140,11 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
       return false
     })
 
-  const { data: goalRowsRaw } = await dataClient
-    .from("goals_objectives")
-    .select("id, title, department")
-    .eq("is_archived", false)
-    .in("department", expandedDepts)
-    .order("title", { ascending: true })
-
-  const goalRows = ((goalRowsRaw || []) as GoalRow[]).map((g) => ({
-    id: g.id,
-    title: g.title,
-  }))
-
   return (
     <AdminTasksContent
       initialTasks={filteredTasks}
       initialemployee={(employeeResult.data || []) as employee[]}
       initialDepartments={[deptName]}
-      initialGoals={goalRows}
       initialProjects={(allProjectsRes.data || []) as Array<{ id: string; project_name: string }>}
       userProfile={userProfile}
       initialGoalId={resolvedSearchParams?.goal_id || ""}

@@ -130,7 +130,7 @@ const STAFF_PAGE_DESCRIPTIONS: Array<[string, string]> = [
   ["/correspondence", "Correspondence — official letters and memos sent to or from you."],
   ["/documentation", "Documentation & Resources — company documents, policies, and resources."],
   ["/pms", "PMS — your performance targets, behaviour self-assessment, peer feedback, and review cycle."],
-  ["/goals", "Goals — your personal and team goals."],
+  ["/goals", "Goals — the company goals your tasks work towards (a tab on the PMS KPI page)."],
   ["/reviews", "Reviews — formal performance reviews."],
   ["/reports", "Reports — KSS reports, action tracker, and weekly reports."],
   ["/fleet", "Resource Booking — book shared company resources."],

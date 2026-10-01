@@ -10,7 +10,6 @@ import type { NavChild } from "@/lib/nav/types"
 export const PMS_SECTIONS = [
   { slug: "analytics", name: "Analytics", adminOnly: true },
   { slug: "cycles", name: "Cycles", adminOnly: true },
-  { slug: "goals", name: "Goals" },
   { slug: "kpi", name: "KPI" },
   { slug: "reviews", name: "Reviews" },
   { slug: "peer-feedback", name: "Peer Feedback" },

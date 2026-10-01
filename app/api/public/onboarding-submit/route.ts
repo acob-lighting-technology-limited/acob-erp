@@ -5,7 +5,8 @@ import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { checkRequestSize } from "@/lib/api/request-size"
 import { sendNotificationEmail } from "@/lib/notifications/email-gateway"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
-import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING, ORG_HR_EMAIL } from "@/lib/org-config"
+import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
+import { resolveSubmissionRecipients } from "@/lib/onboarding/recipients"
 import { renderOnboardingSubmissionEmail } from "@/lib/email-templates/onboarding-submission"
 import { formatName } from "@/lib/utils"
 
@@ -154,30 +155,18 @@ export async function POST(req: Request) {
   return NextResponse.json({ success: true, reused: false })
 }
 
-interface DepartmentEmailRow {
-  email: string | null
-}
-
 async function notifyHROfSubmission(
   supabase: SupabaseClient<any, any, any>,
   applicant: z.infer<typeof OnboardingSubmitSchema>,
   personalEmail: string
 ) {
   try {
-    // Resolve HR department official email, falling back to ORG_HR_EMAIL
-    const { data: hrDept } = (await supabase
-      .from("departments")
-      .select("email")
-      .or("name.eq.Admin and HR,department_code.eq.HR")
-      .eq("is_active", true)
-      .maybeSingle()) as { data: DepartmentEmailRow | null }
-
-    const hrEmail = (hrDept?.email || ORG_HR_EMAIL || "").trim().toLowerCase()
-    if (!hrEmail || !hrEmail.includes("@")) return
-
-    // Goes to the HR mailbox, not to a user, so only the system-wide switch
-    // applies - but it is onboarding mail and belongs under that key.
+    // Only the system-wide switch applies: this is HR's review queue, not a
+    // personal notification a lead can opt out of.
     if (!(await isSystemNotificationChannelEnabled(supabase, "onboarding", "email"))) return
+
+    const recipients = await resolveSubmissionRecipients(supabase)
+    if (recipients.length === 0) return
 
     const subject = `Onboarding Form Submitted — ${applicant.first_name} ${applicant.last_name}`
     const html = renderOnboardingSubmissionEmail({
@@ -196,7 +185,7 @@ async function notifyHROfSubmission(
     await sendNotificationEmail({
       from: ORG_EMAIL_SENDERS.system,
       ...ORG_MAIL_ROUTING.Onboarding,
-      to: [hrEmail],
+      to: recipients,
       subject,
       html,
     })

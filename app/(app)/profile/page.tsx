@@ -2,7 +2,8 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ProfileContent } from "./profile-content"
-import { buildRecentActivity, normalizeToken, isExcludedActivity } from "@/components/admin/dashboard-helpers"
+import { normalizeToken, isExcludedActivity } from "@/components/admin/dashboard-helpers"
+import { buildPersonalActivity } from "@/components/profile/personal-activity"
 import type { PersonalRecentActivityItem } from "@/components/profile/personal-recent-activity-feed"
 import { getAvatarSignedUrl } from "@/lib/profile-photos"
 import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
@@ -11,6 +12,7 @@ import type { Task, TaskUserProfile } from "@/types/task"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { loadAttendancePolicy, toLocalISODate, isWeekend } from "@/lib/hr/attendance-utils"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { addIsoDays } from "@/lib/hr/leave-days"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +21,14 @@ export type { Task }
 export interface TodayAttendanceStatus {
   status: string
   clock_in?: string | null
+}
+
+export interface WorkDayAttendanceItem {
+  date: string
+  clock_in: string | null
+  clock_out: string | null
+  status: string
+  leave_type?: string | null
 }
 
 export interface UserProfile {
@@ -115,24 +125,14 @@ export interface LeaveItem {
   created_at: string
 }
 
-type LeaveItemLegacyRow = {
+type LeaveRequestRow = {
   id: string
-  leave_type: string
-  status: string
-  start_date: string
-  end_date: string
-  days_requested: number
-  created_at: string
-}
-
-type LeaveItemModernRow = {
-  id: string
-  leave_type_id: string | null
   status: string
   start_date: string
   end_date: string
   days_count: number | null
   created_at: string
+  leave_type: { name: string | null } | { name: string | null }[] | null
 }
 
 export interface AttendanceItem {
@@ -229,6 +229,7 @@ async function getProfileData() {
       leave: [],
       annualLeaveRemaining: 0,
       attendance: [],
+      recentWorkDaysAttendance: [],
       recentActivity: [],
     }
   }
@@ -354,39 +355,33 @@ async function getProfileData() {
   const { data: paymentsData, error: paymentsError } = await paymentsQuery.returns<PaymentItem[]>()
   if (paymentsError) loadErrors.push("payments")
 
+  // Production's leave_requests has leave_type_id/days_count only. The old
+  // leave_type/days_requested query errored on every load and its fallback
+  // showed the type's UUID as its name, so join the name the way /hr/leave does.
   let leaveData: LeaveItem[] = []
-  const { data: legacyLeaveData, error: legacyLeaveError } = await dataClient
+  const { data: leaveRows, error: leaveError } = await dataClient
     .from("leave_requests")
-    .select("id, leave_type, status, start_date, end_date, days_requested, created_at")
+    .select("id, status, start_date, end_date, days_count, created_at, leave_type:leave_types(name)")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(20)
-    .returns<LeaveItemLegacyRow[]>()
+    .returns<LeaveRequestRow[]>()
 
-  if (!legacyLeaveError && legacyLeaveData) {
-    leaveData = legacyLeaveData
-  } else {
-    const { data: modernLeaveData, error: modernLeaveError } = await dataClient
-      .from("leave_requests")
-      .select("id, leave_type_id, status, start_date, end_date, days_count, created_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20)
-      .returns<LeaveItemModernRow[]>()
-
-    if (modernLeaveError) {
-      loadErrors.push("leave")
-    } else if (modernLeaveData) {
-      leaveData = modernLeaveData.map((row) => ({
+  if (leaveError) {
+    loadErrors.push("leave")
+  } else if (leaveRows) {
+    leaveData = leaveRows.map((row) => {
+      const leaveType = Array.isArray(row.leave_type) ? row.leave_type[0] : row.leave_type
+      return {
         id: row.id,
-        leave_type: row.leave_type_id || "Leave",
+        leave_type: leaveType?.name || "Leave",
         status: row.status,
         start_date: row.start_date,
         end_date: row.end_date,
         days_requested: row.days_count || 0,
         created_at: row.created_at,
-      }))
-    }
+      }
+    })
   }
 
   let annualLeaveRemaining = 0
@@ -403,6 +398,7 @@ async function getProfileData() {
   }
 
   const todayIso = toLocalISODate()
+  const lookbackStartIso = addIsoDays(todayIso, -20)
 
   const [{ data: todayRecord }, { data: attendanceData, error: attendanceError }] = await Promise.all([
     dataClient
@@ -423,7 +419,7 @@ async function getProfileData() {
   if (attendanceError) loadErrors.push("attendance")
 
   const [dayCtx, policy] = await Promise.all([
-    loadDayContext(dataClient, { userIds: [userId], start: todayIso, end: todayIso }),
+    loadDayContext(dataClient, { userIds: [userId], start: lookbackStartIso, end: todayIso }),
     loadAttendancePolicy(dataClient),
   ])
 
@@ -452,6 +448,63 @@ async function getProfileData() {
     clock_in: todayRecord?.clock_in ?? null,
   }
 
+  // Calculate the last 5 actual company workdays (Mon–Fri, excluding org holidays)
+  const recentWorkDays: string[] = []
+  let workDayCursor = todayIso
+  while (recentWorkDays.length < 5) {
+    if (!isWeekend(workDayCursor) && !dayCtx.isHoliday(workDayCursor)) {
+      recentWorkDays.push(workDayCursor)
+    }
+    workDayCursor = addIsoDays(workDayCursor, -1)
+  }
+
+  const attendanceByDate = new Map<string, AttendanceItem>()
+  for (const rec of attendanceData || []) {
+    if (rec.date) attendanceByDate.set(rec.date, rec)
+  }
+  if (todayRecord) {
+    attendanceByDate.set(todayIso, todayRecord)
+  }
+
+  const recentWorkDaysAttendance: WorkDayAttendanceItem[] = recentWorkDays.map((d) => {
+    const record = attendanceByDate.get(d) || null
+    const isToday = d === todayIso
+
+    let status: string
+    if (isToday) {
+      status = derivedTodayStatus
+    } else {
+      status = deriveUnifiedAttendanceStatus(
+        {
+          record,
+          isHoliday: dayCtx.isHoliday(d),
+          isOnLeave: dayCtx.isOnLeave(userId, d),
+          isOnUnpaidLeave: dayCtx.isOnUnpaidLeave(userId, d),
+          isExempted: Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, d),
+          isCdsDay: dayCtx.isCdsDay(userId, d),
+          recordDate: d,
+          earlyClosure: dayCtx.earlyCloseTime(d) ? { closeTime: dayCtx.earlyCloseTime(d)! } : null,
+          lateResumption: dayCtx.lateResumptionTime(d) ? { resumptionTime: dayCtx.lateResumptionTime(d)! } : null,
+        },
+        policy
+      )
+    }
+
+    let leaveType: string | null = null
+    if (status === "on_leave" || status === "lwop") {
+      const matched = leaveData.find((l) => d >= l.start_date && d <= l.end_date)
+      if (matched) leaveType = matched.leave_type
+    }
+
+    return {
+      date: d,
+      clock_in: record?.clock_in || null,
+      clock_out: record?.clock_out || null,
+      status,
+      leave_type: leaveType,
+    }
+  })
+
   const { data: lunchLogsData } = await dataClient
     .from("attendance_lunch_log")
     .select("id, date, cost, company_subsidy, employee_deduction")
@@ -476,18 +529,7 @@ async function getProfileData() {
 
   const filteredRawActivity = (rawActivity || []).filter((item) => !isExcludedActivity(item)).slice(0, 50)
 
-  const actorMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>([
-    [
-      userId,
-      {
-        first_name: profileData.first_name || undefined,
-        last_name: profileData.last_name || undefined,
-        company_email: profileData.company_email || undefined,
-      },
-    ],
-  ])
-
-  const recentActivity = buildRecentActivity(filteredRawActivity, actorMap) as PersonalRecentActivityItem[]
+  const recentActivity = buildPersonalActivity(filteredRawActivity, userId)
 
   const avatarUrl = await getAvatarSignedUrl(dataClient, profileData.avatar_path)
 
@@ -504,6 +546,7 @@ async function getProfileData() {
     leave: leaveData,
     annualLeaveRemaining,
     attendance: attendanceData || [],
+    recentWorkDaysAttendance,
     todayStatus,
     lunchLogs: lunchLogsData || [],
     recentActivity,
@@ -533,6 +576,7 @@ export default async function ProfilePage() {
       leave={profileData.leave}
       annualLeaveRemaining={profileData.annualLeaveRemaining}
       attendance={profileData.attendance}
+      recentWorkDaysAttendance={profileData.recentWorkDaysAttendance || []}
       todayStatus={profileData.todayStatus}
       lunchLogs={profileData.lunchLogs || []}
       recentActivity={profileData.recentActivity}

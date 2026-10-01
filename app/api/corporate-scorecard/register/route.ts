@@ -4,8 +4,9 @@ import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import {
-  computeAttainment,
   computePacingStatus,
+  resolveKpiAttainment,
+  type KpiTaskStats,
   averageCappedPct,
   ragStatus,
   type MeasureType,
@@ -44,11 +45,13 @@ type ActualRow = {
   milestones_completed: number | null
   milestones_total: number | null
   note: string | null
+  is_override?: boolean | null
   recorded_at: string
 }
 
 type TaskCountRow = {
   kpi_id: string
+  department: string | null
   status: string
 }
 
@@ -91,12 +94,14 @@ export async function GET(request: NextRequest) {
       .returns<AssignmentRow[]>(),
     supabase
       .from("kpi_actuals")
-      .select("kpi_id, department, actual_value, milestones_completed, milestones_total, note, recorded_at")
+      .select(
+        "kpi_id, department, actual_value, milestones_completed, milestones_total, note, is_override, recorded_at"
+      )
       .order("recorded_at", { ascending: false })
       .returns<ActualRow[]>(),
     supabase
       .from("tasks")
-      .select("kpi_id, status")
+      .select("kpi_id, department, status")
       .not("kpi_id", "is", null)
       .eq("is_archived", false)
       .returns<TaskCountRow[]>(),
@@ -125,6 +130,9 @@ export async function GET(request: NextRequest) {
 
   // Pre-index task counts by kpi_id
   const taskCountsByKpi = new Map<string, { total: number; completed: number; in_progress: number }>()
+  // Per department too, so each assignment's attainment is resolved exactly as
+  // the department cascade and the summary resolve it.
+  const taskStatsByKpiDept = new Map<string, KpiTaskStats>()
   for (const task of taskRows || []) {
     if (!task.kpi_id) continue
     const counts = taskCountsByKpi.get(task.kpi_id) || { total: 0, completed: 0, in_progress: 0 }
@@ -135,6 +143,15 @@ export async function GET(request: NextRequest) {
       counts.in_progress += 1
     }
     taskCountsByKpi.set(task.kpi_id, counts)
+
+    if (task.department) {
+      const key = `${task.kpi_id}:${task.department}`
+      const deptStats = taskStatsByKpiDept.get(key) || { total: 0, completed: 0, inProgress: 0 }
+      deptStats.total += 1
+      if (task.status === "completed") deptStats.completed += 1
+      else if (task.status === "in_progress") deptStats.inProgress += 1
+      taskStatsByKpiDept.set(key, deptStats)
+    }
   }
 
   // Group assignments by kpi_id
@@ -150,13 +167,13 @@ export async function GET(request: NextRequest) {
 
     const detailedAssignments = rows.map((a) => {
       const latest = latestActualMap.get(`${kpi.id}:${a.department}`) || null
-      const attainment = computeAttainment({
+      const { attainment } = resolveKpiAttainment({
         measureType: kpi.measure_type,
         direction: kpi.direction,
         targetValue: a.target_value,
-        actualValue: latest?.actual_value ?? null,
-        milestonesCompleted: latest?.milestones_completed ?? null,
-        milestonesTotal: latest?.milestones_total ?? null,
+        targetText: kpi.target_text,
+        manualActual: latest,
+        taskStats: taskStatsByKpiDept.get(`${kpi.id}:${a.department}`) ?? null,
       })
 
       return {

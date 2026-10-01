@@ -70,7 +70,7 @@ export default async function PmsKpiPage({
 }) {
   const { cycle_id, tab } = await searchParams
   const effectiveCycleId = cycle_id ?? "all"
-  const { score, cycles, activeCycleId, goalSummary, profile } = await getCurrentUserPmsData(effectiveCycleId)
+  const { score, cycles, activeCycleId, profile } = await getCurrentUserPmsData(effectiveCycleId)
   const supabase = await createClient()
 
   const goalIds = score.breakdown.goals.map((goal) => goal.goal_id).filter((id): id is string => Boolean(id))
@@ -211,8 +211,6 @@ export default async function PmsKpiPage({
       cycles={cycles}
       activeCycleId={activeCycleId}
       kpiScore={score.kpi_score}
-      approvedGoals={goalSummary.approved}
-      completedGoals={goalSummary.completed}
       cycleName={score.cycle_name || (effectiveCycleId === "all" ? "All Quarters" : "Active Cycle")}
       rows={rows}
     />

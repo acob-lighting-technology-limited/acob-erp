@@ -25,10 +25,12 @@ export interface AppealRow {
   department: string
   appeal_date: string
   current_status: string
+  /** The day's status now; current_status is a snapshot from when the appeal was raised. */
+  live_status?: string
   requested_status: string
   appeal_reason: string
   resolution_note: string | null
-  status: "pending" | "approved" | "rejected"
+  status: "pending" | "approved" | "rejected" | "resolved"
   created_at: string
 }
 
@@ -122,7 +124,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 <span className="font-medium">{appeal.appeal_date}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Current Status</span>
+                <span className="text-muted-foreground">Status when appealed</span>
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
@@ -132,6 +134,15 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                   {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
                 </Badge>
               </div>
+              {appeal.live_status && appeal.live_status !== appeal.current_status && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+                  This day has changed since the appeal was raised and is now{" "}
+                  <strong>
+                    {ATTENDANCE_STATUS_LABELS[appeal.live_status as UnifiedAttendanceStatus] ?? appeal.live_status}
+                  </strong>
+                  . Check the clock times before deciding - the appeal may no longer be needed.
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Requesting</span>
                 <Badge

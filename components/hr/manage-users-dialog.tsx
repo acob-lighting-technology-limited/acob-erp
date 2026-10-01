@@ -89,16 +89,7 @@ interface PendingUser {
 }
 
 interface ApprovalEmailPreview {
-  tempPassword: string
-  portalUrl: string
-  welcome: { enabled: boolean; subject: string; recipients: string[]; html: string }
-  internal: { enabled: boolean; subject: string; recipients: string[]; html: string }
-}
-
-interface PendingEmailDispatch {
-  profileId: string
-  welcome: { subject: string; recipients: string[]; html: string }
-  internal: { subject: string; recipients: string[]; html: string }
+  ict: { enabled: boolean; subject: string; recipients: string[]; html: string }
 }
 
 async function fetchPendingApplications(): Promise<PendingUser[]> {
@@ -317,20 +308,10 @@ export function ManageUsersDialog({
   })
 
   const { data: approvalEmailPreview, isLoading: isLoadingApprovalPreview } = useQuery<ApprovalEmailPreview>({
-    queryKey: ["pending-approval-email-preview", selectedUser?.id, employmentType, contractCategoryCode],
+    queryKey: ["pending-approval-email-preview", selectedUser?.id],
     queryFn: async () => {
       if (!selectedUser?.id) throw new Error("Missing context")
-      const currentYear = new Date().getFullYear()
-      const dummyId =
-        employmentType === "full_time"
-          ? `ACOB/${currentYear}/999`
-          : employmentType === "part_time"
-            ? `ACOB/PT/${currentYear}/999`
-            : `ACOB/${contractCategoryCode || "SIWES"}/${currentYear}/999`
-
-      const res = await apiFetch(
-        `/api/admin/pending-users/${selectedUser.id}/approval-preview?employeeId=${encodeURIComponent(dummyId)}`
-      )
+      const res = await apiFetch(`/api/admin/pending-users/${selectedUser.id}/approval-preview`)
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || "Failed to load preview")
       return result as ApprovalEmailPreview
@@ -388,16 +369,16 @@ export function ManageUsersDialog({
         body: JSON.stringify({
           pendingUserId: selectedUser.id,
           hireDate,
-          sendEmails: false,
           employmentType,
           contractCategoryCode: employmentType === "contract" ? contractCategoryCode : null,
         }),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || "Failed to approve")
-      toast.success(
-        "Employee approved successfully. Staff ID generated. Mailbox status is set to 'Pending' for IT provisioning."
-      )
+      toast.success("Employee approved. Staff ID generated and ICT notified to set up their webmail.")
+      if (Array.isArray(result.emailWarnings) && result.emailWarnings.length > 0) {
+        toast.warning(`ICT email not sent: ${result.emailWarnings[0].reason}`)
+      }
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
       const remaining = pendingUsers.filter((u) => u.id !== selectedUser.id)
@@ -1182,47 +1163,25 @@ export function ManageUsersDialog({
                           {approvalEmailPreview && (
                             <div className="mt-8 space-y-3">
                               <div className="flex items-center justify-between">
-                                <h4 className="font-semibold">Email Preview</h4>
+                                <h4 className="font-semibold">ICT Email Preview</h4>
                                 {isLoadingApprovalPreview && <Loader2 className="text-primary h-4 w-4 animate-spin" />}
                               </div>
-                              <Tabs defaultValue="welcome" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                  <TabsTrigger value="welcome">Welcome Email</TabsTrigger>
-                                  <TabsTrigger value="internal">Internal Notice</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="welcome">
-                                  <div className="border-border rounded-lg border">
-                                    <div className="bg-muted/30 border-b p-3">
-                                      <Badge variant={approvalEmailPreview.welcome.enabled ? "default" : "secondary"}>
-                                        {approvalEmailPreview.welcome.enabled ? "ENABLED" : "DISABLED"}
-                                      </Badge>
-                                      <p className="mt-1 text-sm font-medium">{approvalEmailPreview.welcome.subject}</p>
-                                    </div>
-                                    <iframe
-                                      title="Welcome email"
-                                      srcDoc={approvalEmailPreview.welcome.html}
-                                      className="h-96 w-full rounded-b-lg bg-white"
-                                    />
-                                  </div>
-                                </TabsContent>
-                                <TabsContent value="internal">
-                                  <div className="border-border rounded-lg border">
-                                    <div className="bg-muted/30 border-b p-3">
-                                      <Badge variant={approvalEmailPreview.internal.enabled ? "default" : "secondary"}>
-                                        {approvalEmailPreview.internal.enabled ? "ENABLED" : "DISABLED"}
-                                      </Badge>
-                                      <p className="mt-1 text-sm font-medium">
-                                        {approvalEmailPreview.internal.subject}
-                                      </p>
-                                    </div>
-                                    <iframe
-                                      title="Internal email"
-                                      srcDoc={approvalEmailPreview.internal.html}
-                                      className="h-80 w-full rounded-b-lg bg-white"
-                                    />
-                                  </div>
-                                </TabsContent>
-                              </Tabs>
+                              <div className="border-border rounded-lg border">
+                                <div className="bg-muted/30 border-b p-3">
+                                  <Badge variant={approvalEmailPreview.ict.enabled ? "default" : "secondary"}>
+                                    {approvalEmailPreview.ict.enabled ? "ENABLED" : "DISABLED"}
+                                  </Badge>
+                                  <p className="mt-1 text-sm font-medium">{approvalEmailPreview.ict.subject}</p>
+                                  <p className="text-muted-foreground mt-1 font-mono text-xs">
+                                    To: {approvalEmailPreview.ict.recipients.join(", ") || "No recipients"}
+                                  </p>
+                                </div>
+                                <iframe
+                                  title="ICT webmail setup email"
+                                  srcDoc={approvalEmailPreview.ict.html}
+                                  className="h-96 w-full rounded-b-lg bg-white"
+                                />
+                              </div>
                             </div>
                           )}
                         </div>

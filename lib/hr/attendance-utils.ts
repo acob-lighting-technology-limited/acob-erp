@@ -104,14 +104,21 @@ export function quarterBounds(year: number, quarter: Quarter): { start: string; 
   return { start, end }
 }
 
-/** Returns month options { value: "YYYY-MM", label: "Month YYYY" } down to tracking start. */
-export function getAttendanceMonthOptions(): { value: string; label: string }[] {
+/**
+ * Returns month options { value: "YYYY-MM", label: "Month YYYY" }, newest first,
+ * down to tracking start - or to `startDate` (YYYY-MM-DD) when a view's history
+ * begins earlier, as the attendance Change log's does.
+ */
+export function getAttendanceMonthOptions(startDate: string = ATTENDANCE_TRACKING_START): {
+  value: string
+  label: string
+}[] {
   const options: { value: string; label: string }[] = []
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth()
 
-  const [trackingStartYear, trackingStartMonth] = ATTENDANCE_TRACKING_START.split("-").map(Number)
+  const [trackingStartYear, trackingStartMonth] = startDate.split("-").map(Number)
   const startYear = trackingStartYear
   const startMonth = trackingStartMonth - 1
 

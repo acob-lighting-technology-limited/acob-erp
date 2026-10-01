@@ -26,6 +26,7 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
   Building,
   MessageSquare,
   Calendar,
@@ -42,6 +43,7 @@ import {
 } from "@/lib/hr/attendance-status"
 import { StatusBadge, formatTime, labelSource } from "./status-badge"
 import { apiFetch } from "@/lib/api-client"
+import { orderRoster, rosterPhase } from "@/lib/hr/roster-order"
 
 function parseTimeToMinutes(value: string | null | undefined): number | null {
   if (!value) return null
@@ -140,6 +142,17 @@ interface DailyRosterViewProps {
   lockedDepartment?: string
 }
 
+/** How often today's roster reloads itself. */
+const AUTO_REFRESH_MS = 2 * 60 * 1000
+
+/** "17:00" -> "5:00 PM". */
+function formatClock12(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm
+  const suffix = h >= 12 ? "PM" : "AM"
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`
+}
+
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
   const [records, setRecords] = useState<AttendanceRecord[]>([])
@@ -150,27 +163,53 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   // Served by the records API so day breakdowns here charge the same hours the
   // server did. Defaults only apply until the first response lands.
   const [policy, setPolicy] = useState<AttendancePolicy>(DEFAULT_ATTENDANCE_POLICY)
+  // The day's closing time (early closure or policy end), from the records API.
+  const [closeTime, setCloseTime] = useState<string | null>(null)
+  // Ticks each minute so an open page switches from arrivals to departures at closing.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ start_date: rosterDate, end_date: rosterDate, include_all: "1" })
-      if (lockedDepartment) params.set("department", lockedDepartment)
-      const res = await apiFetch(`/api/admin/hr/attendance/records?${params}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || "Failed to load roster")
-      setRecords(payload.records || [])
-      if (payload?.policy) setPolicy({ ...DEFAULT_ATTENDANCE_POLICY, ...payload.policy })
-    } catch {
-      toast.error("Failed to load daily roster")
-    } finally {
-      setLoading(false)
-    }
-  }, [rosterDate, lockedDepartment])
+  const load = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) setLoading(true)
+      try {
+        const params = new URLSearchParams({ start_date: rosterDate, end_date: rosterDate, include_all: "1" })
+        if (lockedDepartment) params.set("department", lockedDepartment)
+        const res = await apiFetch(`/api/admin/hr/attendance/records?${params}`, { cache: "no-store" })
+        const payload = await res.json().catch(() => null)
+        if (!res.ok) throw new Error(payload?.error || "Failed to load roster")
+        setRecords(payload.records || [])
+        if (payload?.policy) setPolicy({ ...DEFAULT_ATTENDANCE_POLICY, ...payload.policy })
+        setCloseTime(typeof payload?.close_time === "string" ? payload.close_time : null)
+      } catch {
+        if (!options?.silent) toast.error("Failed to load daily roster")
+      } finally {
+        if (!options?.silent) setLoading(false)
+      }
+    },
+    [rosterDate, lockedDepartment]
+  )
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Default order only - clicking a column header still sorts by that column.
+  const phase = rosterPhase({ rosterDate, now, closeTime: closeTime ?? policy.endTime })
+  const orderedRecords = useMemo(() => orderRoster(records, phase), [records, phase])
+  const closingLabel = formatClock12((closeTime ?? policy.endTime).slice(0, 5))
+
+  // A live check should not need a Refresh button: reload quietly every two
+  // minutes while today's roster is open. Past days do not change.
+  const isLive = phase !== null
+  useEffect(() => {
+    if (!isLive) return
+    const timer = window.setInterval(() => void load({ silent: true }), AUTO_REFRESH_MS)
+    return () => window.clearInterval(timer)
+  }, [isLive, load])
 
   function openEdit(record: AttendanceRecord) {
     const clockIn = record.clock_in ?? null
@@ -407,6 +446,74 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
 
   const tableFilters: DataTableFilter<AttendanceRecord>[] = [
     {
+      // Chooses which day is loaded rather than filtering rows; lives in the
+      // filter row like the Month filter on the Summary and Change log tabs.
+      key: "date",
+      label: "Date",
+      options: [],
+      mode: "custom",
+      filterFn: () => true,
+      // One control the same height, border and width as the dropdowns beside it,
+      // so it sits in a single filter cell instead of spilling into the next.
+      render: () => (
+        <div className="border-input flex h-9 w-full items-center overflow-hidden rounded-md border shadow-sm">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-full w-8 shrink-0 rounded-none"
+                onClick={() => shiftDate(-1)}
+                aria-label="Previous day"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Previous day</TooltipContent>
+          </Tooltip>
+          <input
+            type="date"
+            value={rosterDate}
+            max={toLocalISODate()}
+            onChange={(e) => e.target.value && setRosterDate(e.target.value)}
+            aria-label="Roster date"
+            className="border-input h-full min-w-0 flex-1 border-x bg-transparent px-2 text-sm focus:outline-none"
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-full w-8 shrink-0 rounded-none"
+                onClick={() => shiftDate(1)}
+                disabled={rosterDate >= toLocalISODate()}
+                aria-label="Next day"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Next day</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="border-input h-full w-8 shrink-0 rounded-none border-l"
+                onClick={() => void load()}
+                aria-label="Refresh now"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {isLive ? "Refresh now (also refreshes every 2 min)" : "Refresh"}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      ),
+    },
+    {
       key: "department",
       label: "Department",
       options: departmentOptions,
@@ -497,53 +604,16 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         />
       </StatGrid>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Label className="text-sm font-medium">Date</Label>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => shiftDate(-1)}
-                aria-label="Previous day"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Previous day</TooltipContent>
-          </Tooltip>
-          <input
-            type="date"
-            value={rosterDate}
-            max={todayIso}
-            onChange={(e) => setRosterDate(e.target.value)}
-            className="border-input bg-background rounded-md border px-3 py-1.5 text-sm"
-          />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => shiftDate(1)}
-                disabled={rosterDate >= todayIso}
-                aria-label="Next day"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Next day</TooltipContent>
-          </Tooltip>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => void load()}>
-          Refresh
-        </Button>
-      </div>
+      {phase && (
+        <p className="text-muted-foreground mb-2 text-xs">
+          {phase === "arrivals"
+            ? `Newest clock-ins first, until ${closingLabel} closing. Not in yet are at the bottom.`
+            : `Newest clock-outs first (closing was ${closingLabel}). Still in are at the bottom.`}
+        </p>
+      )}
 
       <DataTable<AttendanceRecord>
-        data={records}
+        data={orderedRecords}
         columns={columns}
         filters={tableFilters}
         getRowId={(r) => r.id}

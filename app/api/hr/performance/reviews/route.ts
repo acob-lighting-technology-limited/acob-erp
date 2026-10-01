@@ -105,6 +105,47 @@ function reviewStatusPriority(status: string | null | undefined) {
   return 0
 }
 
+/**
+ * Who may write or change the status of someone's review: a global admin, or
+ * the lead of the employee's department. Never the employee themselves — a
+ * completed review replaces the live KPI, so self-review would let anyone
+ * award themselves a score, leads included.
+ */
+async function canReviewTarget(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  actorId: string,
+  targetUserId: string
+): Promise<boolean> {
+  if (actorId === targetUserId) return false
+
+  const [{ data: profile }, { data: targetProfile }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("role, department, is_department_lead, lead_departments")
+      .eq("id", actorId)
+      .single<{
+        role?: string | null
+        department?: string | null
+        is_department_lead?: boolean | null
+        lead_departments?: string[] | null
+      }>(),
+    supabase.from("profiles").select("department").eq("id", targetUserId).maybeSingle<{ department?: string | null }>(),
+  ])
+
+  const reviewsScope = await getRequestScope()
+  const isAdmin = reviewsScope?.isAdminLike === true && reviewsScope.scopeMode !== "lead"
+  if (isAdmin) return true
+
+  const managedDepartments = Array.isArray(profile?.lead_departments) ? profile.lead_departments : []
+  return (
+    profile?.is_department_lead === true &&
+    Boolean(
+      targetProfile?.department &&
+        (targetProfile.department === profile?.department || managedDepartments.includes(targetProfile.department))
+    )
+  )
+}
+
 function pickCanonicalReview(reviews: ExistingReviewRow[]) {
   return [...reviews].sort((left, right) => {
     const statusDiff = reviewStatusPriority(right.status) - reviewStatusPriority(left.status)
@@ -215,36 +256,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
     }
 
-    // Check scope: admin can always create; department lead only for their own departments
-    const [{ data: profile }, { data: targetProfile }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("role, department, is_department_lead, lead_departments")
-        .eq("id", user.id)
-        .single<{
-          role?: string | null
-          department?: string | null
-          is_department_lead?: boolean | null
-          lead_departments?: string[] | null
-        }>(),
-      supabase
-        .from("profiles")
-        .select("department")
-        .eq("id", parsed.data.user_id)
-        .maybeSingle<{ department?: string | null }>(),
-    ])
-
-    const reviewsScope = await getRequestScope()
-    const isAdmin = reviewsScope?.isAdminLike === true && reviewsScope.scopeMode !== "lead"
-    const managedDepartments = Array.isArray(profile?.lead_departments) ? profile.lead_departments : []
-    const canLeadTarget =
-      profile?.is_department_lead === true &&
-      Boolean(
-        targetProfile?.department &&
-          (targetProfile.department === profile?.department || managedDepartments.includes(targetProfile.department))
-      )
-
-    if (!isAdmin && !canLeadTarget) {
+    if (!(await canReviewTarget(supabase, user.id, parsed.data.user_id))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
     const {
@@ -503,6 +515,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (parsed.data.status) {
+      // This branch had no permission check at all: any signed-in user could
+      // move any review, their own included, to completed.
+      if (!(await canReviewTarget(supabase, user.id, review.user_id))) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+
       if (
         parsed.data.status === "completed" &&
         ![review.kpi_score, review.cbt_score, review.attendance_score, review.behaviour_score].every(

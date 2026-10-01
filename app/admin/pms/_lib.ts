@@ -15,13 +15,6 @@ type ScopedProfileRow = {
   department: string | null
 }
 
-type GoalRow = {
-  department?: string | null
-  approval_status: string | null
-  status: string | null
-  review_cycle_id?: string | null
-}
-
 type DepartmentScore = Awaited<ReturnType<typeof computeDepartmentPerformanceScore>>
 
 function round(value: number) {
@@ -104,45 +97,27 @@ export async function getAdminPmsData(requestedCycleId?: string) {
   const scopedUsers = scopedProfiles || []
   const scopedUserIds = scopedUsers.map((row) => row.id)
 
-  let goalsQuery = supabase.from("goals_objectives").select("department, approval_status, status, review_cycle_id")
-
-  if (departments.length > 0) {
-    goalsQuery = goalsQuery.in("department", departments)
-  }
-  if (activeCycleId) {
-    goalsQuery = goalsQuery.eq("review_cycle_id", activeCycleId)
-  }
-
-  const { data: goalRows } = departments.length > 0 ? await goalsQuery.returns<GoalRow[]>() : { data: [] as GoalRow[] }
-
   const departmentScores: DepartmentScore[] = await Promise.all(
     departments.map((department) => computeDepartmentPerformanceScore(supabase, { department, cycleId: activeCycleId }))
   )
 
-  const goalBreakdown = departments.map((department) => {
-    const rows = (goalRows || []).filter((row) => (row.department || "Unassigned") === department)
-    return {
-      department,
-      total: rows.length,
-      approved: rows.filter((row) => row.approval_status === "approved").length,
-      completed: rows.filter((row) => row.status === "completed").length,
-    }
-  })
+  // Company figures average every individual, not every department: averaging
+  // departments let a 3-person team weigh as much as a 20-person one. Each
+  // person sits in exactly one department, so nobody is counted twice.
+  const members = departmentScores.flatMap((entry) => entry.members)
 
   return {
     departments,
     scopedUserCount: scopedUserIds.length,
     departmentScores,
-    goalBreakdown,
     cycles,
     activeCycleId,
     summary: {
-      overallPms: average(departmentScores.map((entry) => entry.department_pms)),
-      overallKpi: average(departmentScores.map((entry) => entry.department_kpi)),
-      attendance: average(departmentScores.map((entry) => entry.breakdown.attendance_compliance_score)),
-      cbt: average(departmentScores.map((entry) => entry.breakdown.learning_capability_score)),
-      behaviour: average(departmentScores.map((entry) => entry.breakdown.behaviour_leadership_score)),
-      approvedGoals: goalBreakdown.reduce((sum, item) => sum + item.approved, 0),
+      overallPms: average(members.map((member) => member.final_score)),
+      overallKpi: average(members.map((member) => member.kpi_score)),
+      attendance: average(members.map((member) => member.attendance_score)),
+      cbt: average(members.map((member) => member.cbt_score)),
+      behaviour: average(members.map((member) => member.behaviour_score)),
     },
   }
 }

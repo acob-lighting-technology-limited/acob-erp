@@ -235,3 +235,21 @@ export function getScopedDepartmentIds(scope: AdminScope): string[] | null {
   if (!scope.isDepartmentLead && !scope.isAdminLike) return []
   return scope.managedDepartmentIds.length > 0 ? scope.managedDepartmentIds : []
 }
+
+/**
+ * Attendance Manager actions are Admin & HR only: granting leave, exemptions,
+ * Out-of-Station directives and bulk changes. Department leads used to reach
+ * them through /admin/hr/attendance, and on 28 Sep 2026 a lead granted nine
+ * days of annual leave straight from the manager - approved on creation, with
+ * no reliever, supervisor or HR stage. Leads keep single-day edits and appeal
+ * review, where the monthly permission cap applies.
+ *
+ * Returns a 403 response for anyone who is not admin-like, otherwise null.
+ */
+export function requireAttendanceAdmin(scope: Pick<AdminScope, "isAdminLike">): NextResponse | null {
+  if (scope.isAdminLike) return null
+  return NextResponse.json(
+    { error: "Only Admin & HR can do this. Leave must go through the normal leave request." },
+    { status: 403 }
+  )
+}

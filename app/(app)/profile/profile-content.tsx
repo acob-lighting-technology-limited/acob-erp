@@ -6,7 +6,13 @@ import { toast } from "sonner"
 import { ProfileHero } from "@/components/profile/profile-hero"
 import { ProfileEditDialog } from "@/components/profile/profile-edit-dialog"
 import { NeedsAttention } from "@/components/profile/needs-attention"
-import { MyTasksCard, TicketsCard, AssetsCard, LunchHistoryCard } from "@/components/profile/work-lists"
+import {
+  MyTasksCard,
+  LeaveCard,
+  AssetsCard,
+  LunchHistoryCard,
+  RecentAttendanceCard,
+} from "@/components/profile/work-lists"
 import {
   PersonalRecentActivityFeed,
   type PersonalRecentActivityItem,
@@ -22,6 +28,7 @@ import type {
   AttendanceItem,
   LunchLogItem,
   TodayAttendanceStatus,
+  WorkDayAttendanceItem,
 } from "./page"
 
 const MAX_ACTIVITY_ENTRIES = 12
@@ -37,6 +44,7 @@ interface ProfileContentProps {
   leave: LeaveItem[]
   annualLeaveRemaining?: number
   attendance: AttendanceItem[]
+  recentWorkDaysAttendance?: WorkDayAttendanceItem[]
   todayStatus?: TodayAttendanceStatus | null
   lunchLogs: LunchLogItem[]
   recentActivity: PersonalRecentActivityItem[]
@@ -54,6 +62,7 @@ export function ProfileContent({
   leave,
   annualLeaveRemaining = 0,
   attendance,
+  recentWorkDaysAttendance = [],
   todayStatus,
   lunchLogs,
   recentActivity,
@@ -100,18 +109,20 @@ export function ProfileContent({
         annualLeaveRemaining={annualLeaveRemaining}
       />
 
-      {/* Work first (2/3), secondary context in the rail (1/3) */}
+      {/* Two aligned rows of three: daily records stretch to a shared height; the
+          services row is pinned to one height so the activity feed scrolls instead
+          of pushing its column past its neighbours. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <MyTasksCard tasks={tasks} />
-          <TicketsCard helpDesk={helpDesk} />
-        </div>
+        <MyTasksCard tasks={tasks} />
+        <RecentAttendanceCard items={recentWorkDaysAttendance} />
+        <LunchHistoryCard lunchLogs={lunchLogs} />
 
-        <div className="space-y-6">
-          <LunchHistoryCard lunchLogs={lunchLogs} />
-          <AssetsCard assets={assets} />
-          <PersonalRecentActivityFeed activity={recentActivity.slice(0, MAX_ACTIVITY_ENTRIES)} className="h-[400px]" />
-        </div>
+        <LeaveCard leave={leave} className="lg:h-[360px]" />
+        <AssetsCard assets={assets} className="lg:h-[360px]" />
+        <PersonalRecentActivityFeed
+          activity={recentActivity.slice(0, MAX_ACTIVITY_ENTRIES)}
+          className="h-[400px] lg:h-[360px]"
+        />
       </div>
 
       <ProfileEditDialog open={isEditOpen} onOpenChange={setIsEditOpen} profile={profile} />

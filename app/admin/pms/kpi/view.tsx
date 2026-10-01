@@ -1,16 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { BarChart2, Target } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { BarChart2, Flag, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PmsMetricTabsPage } from "../_components/pms-metric-tabs-page"
 import { CorporateScorecardRegister } from "@/app/admin/corporate-scorecard/_components/corporate-scorecard-register"
+import { StrategicGoalsView } from "@/app/admin/corporate-scorecard/_components/strategic-goals-view"
 
 export function AdminPmsKpiPage({
   backLinkHref,
   attendanceBasePath,
 }: { backLinkHref?: string; attendanceBasePath?: string } = {}) {
-  const [activeTab, setActiveTab] = useState<"master_kpis" | "appraisal_scores">("master_kpis")
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<"master_kpis" | "goals" | "appraisal_scores">(() =>
+    searchParams.get("tab") === "goals" ? "goals" : "master_kpis"
+  )
 
   return (
     <div className="space-y-4">
@@ -27,6 +32,14 @@ export function AdminPmsKpiPage({
             </Button>
             <Button
               size="sm"
+              variant={activeTab === "goals" ? "default" : "outline"}
+              onClick={() => setActiveTab("goals")}
+            >
+              <Flag className="mr-1.5 h-4 w-4" />
+              Goals
+            </Button>
+            <Button
+              size="sm"
               variant={activeTab === "appraisal_scores" ? "default" : "outline"}
               onClick={() => setActiveTab("appraisal_scores")}
             >
@@ -37,13 +50,17 @@ export function AdminPmsKpiPage({
           <span className="text-muted-foreground hidden text-xs sm:inline-block">
             {activeTab === "master_kpis"
               ? "Master catalog of 2026 corporate KPIs, strategic pillars, and RACI ownership"
-              : "Employee and departmental appraisal score calculations"}
+              : activeTab === "goals"
+                ? "Company goals, the work linked to each, and which have none"
+                : "Employee and departmental appraisal score calculations"}
           </span>
         </div>
       </div>
 
       {activeTab === "master_kpis" ? (
         <CorporateScorecardRegister />
+      ) : activeTab === "goals" ? (
+        <StrategicGoalsView scope="all" backHref={backLinkHref ?? "/admin/pms"} backLabel="Back to PMS" />
       ) : (
         <PmsMetricTabsPage
           metric="kpi"

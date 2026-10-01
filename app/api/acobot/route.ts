@@ -10,8 +10,9 @@ import { buildAcobotContext } from "@/lib/acobot/context"
 
 export const dynamic = "force-dynamic"
 const log = logger("acobot")
-// Flagship Llama 3.3 70B model on Groq — fast, high intelligence, 1,000 req/day free tier.
-const MODEL_ID = "llama-3.3-70b-versatile"
+// GPT-OSS 120B on Groq. Groq retired llama-3.3-70b-versatile (model_not_found), which
+// surfaced in the widget as a bare "An error occurred."
+const MODEL_ID = "openai/gpt-oss-120b"
 
 type ChatRole = "system" | "user" | "assistant"
 type ChatMessage = { role: ChatRole; content: string }
@@ -138,8 +139,12 @@ export async function POST(request: NextRequest) {
     const result = await streamText({
       model: groq(MODEL_ID),
       messages: finalMessages,
-      maxTokens: 1000,
+      // Reasoning model: hidden reasoning tokens count against this budget too.
+      maxTokens: 3000,
       temperature: 0.6,
+      onError: ({ error }) => {
+        log.error({ err: String(error) }, "acobot stream failed")
+      },
       onFinish: async ({ text }) => {
         if (!lastUser) return
         await logAcobotTurn(supabase, {

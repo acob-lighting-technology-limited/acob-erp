@@ -68,6 +68,8 @@ export interface EmployeeAuditLog {
   old_values: any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new_values: any
+  /** Carries the raw action ("task.status_update") the activity sentence reads its verb from. */
+  metadata?: Record<string, unknown> | null
   created_at: string
 }
 

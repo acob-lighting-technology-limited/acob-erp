@@ -402,11 +402,21 @@ export class OneDriveService {
       buildChildrenEndpoint(target.relativePath)
     )
 
+    // Graph pages children at 200; follow nextLink (an absolute URL) so large
+    // folders are returned whole rather than silently truncated.
+    const items = [...response.value]
+    let nextLink = response["@odata.nextLink"]
+    while (nextLink) {
+      const page: OneDriveFolderResponse = await this.driveRequest<OneDriveFolderResponse>(nextLink, "")
+      items.push(...page.value)
+      nextLink = page["@odata.nextLink"]
+    }
+
     const parentPath = target.libraryName
       ? normalizeGraphPath(`/${target.libraryName}${target.relativePath === "/" ? "" : target.relativePath}`)
       : normalizeGraphPath(folderPath)
 
-    return response.value.map((item) => this.transformItem(item, parentPath))
+    return items.map((item) => this.transformItem(item, parentPath))
   }
 
   async getItem(itemPath: string): Promise<FileItem> {

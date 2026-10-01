@@ -4,8 +4,8 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
-import { freezeExemptionAtToday } from "@/lib/hr/exemptions"
+import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
+import { freezeExemptionAtToday, recordExemptionChange, snapshotExemption } from "@/lib/hr/exemptions"
 
 const ExemptionSchema = z.object({
   user_id: z.string().uuid(),
@@ -207,6 +207,8 @@ const AddPeriodSchema = z.object({
 export async function POST(request: NextRequest) {
   const auth = await ensureAdmin(request)
   if ("error" in auth) return auth.error
+  const adminOnly = requireAttendanceAdmin(auth.scope)
+  if (adminOnly) return adminOnly
 
   const parsed = AddPeriodSchema.safeParse(await request.json())
   if (!parsed.success) {
@@ -274,6 +276,8 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const auth = await ensureAdmin(request)
   if ("error" in auth) return auth.error
+  const adminOnly = requireAttendanceAdmin(auth.scope)
+  if (adminOnly) return adminOnly
 
   const parsed = ExemptionSchema.safeParse(await request.json())
   if (!parsed.success) {
@@ -296,12 +300,21 @@ export async function PATCH(request: NextRequest) {
     }
   }
   const attendance_exempt = mode === "infinite"
+  const before = await snapshotExemption(dataClient, user_id)
 
   // "Off" freezes the exemption at today instead of wiping history: an open infinite
   // exemption becomes a closed [start..today] window and future windows are dropped, so
   // past days stay exempt when re-derived. (Fixes the retroactive un-exempt bug.)
   if (mode === "off") {
     await freezeExemptionAtToday(dataClient, user_id, auth.user.id)
+    await recordExemptionChange(dataClient, {
+      userId: user_id,
+      actorId: auth.user.id,
+      mode,
+      reason,
+      before,
+      after: await snapshotExemption(dataClient, user_id),
+    })
     await writeAuditLog(
       auth.supabase,
       {
@@ -368,6 +381,15 @@ export async function PATCH(request: NextRequest) {
     if (rows.length > 0) await dataClient.from("attendance_exempt_periods").insert(rows)
   }
 
+  await recordExemptionChange(dataClient, {
+    userId: user_id,
+    actorId: auth.user.id,
+    mode,
+    reason,
+    before,
+    after: await snapshotExemption(dataClient, user_id),
+  })
+
   await writeAuditLog(
     auth.supabase,
     {
@@ -386,6 +408,8 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const auth = await ensureAdmin(request)
   if ("error" in auth) return auth.error
+  const adminOnly = requireAttendanceAdmin(auth.scope)
+  if (adminOnly) return adminOnly
 
   const periodId = String(request.nextUrl.searchParams.get("period_id") || "")
   if (!periodId) return NextResponse.json({ error: "period_id is required" }, { status: 400 })

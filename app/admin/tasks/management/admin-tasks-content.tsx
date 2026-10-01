@@ -91,16 +91,10 @@ interface ReviewCycleOption {
   status?: string | null
 }
 
-interface GoalFilterOption {
-  id: string
-  title: string
-}
-
 interface AdminTasksContentProps {
   initialTasks: Task[]
   initialemployee: employee[]
   initialDepartments: string[]
-  initialGoals?: GoalFilterOption[]
   initialReviewCycles?: ReviewCycleOption[]
   initialProjects?: Array<{ id: string; project_name: string }>
   userProfile: UserProfile
@@ -162,7 +156,6 @@ export function AdminTasksContent({
   initialTasks,
   initialemployee,
   initialDepartments,
-  initialGoals = [],
   initialReviewCycles = [],
   initialProjects = [],
   userProfile,
@@ -183,7 +176,6 @@ export function AdminTasksContent({
   const scopedAssignableEmployees = filterAssignableTaskUsers(assignerProfile, activeEmployees)
   const assignableEmployees = scopedAssignableEmployees.length > 0 ? scopedAssignableEmployees : activeEmployees
   const [departments] = useState<string[]>(initialDepartments)
-  const goals = useMemo(() => (Array.isArray(initialGoals) ? initialGoals : []), [initialGoals])
   const projects = useMemo(() => (Array.isArray(initialProjects) ? initialProjects : []), [initialProjects])
   const departmentOptions = useMemo(() => (Array.isArray(departments) ? departments : []), [departments])
   const scopedAssignableDepartments = filterAssignableTaskDepartments(assignerProfile, departments)
@@ -927,7 +919,6 @@ export function AdminTasksContent({
         isSaving={isSaving}
         scopedAssignableEmployees={assignableEmployees}
         scopedAssignableDepartments={scopedAssignableDepartments}
-        initialGoals={goals}
         initialProjects={projects}
       />
 

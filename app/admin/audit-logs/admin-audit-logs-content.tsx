@@ -170,6 +170,14 @@ export function AdminAuditLogsContent({
         ),
       },
       {
+        key: "summary",
+        label: "What happened",
+        resizable: true,
+        initialWidth: 320,
+        accessor: (r) => getAuditLogSummary(r),
+        render: (r) => <span className="line-clamp-2 block max-w-[320px] text-sm">{getAuditLogSummary(r)}</span>,
+      },
+      {
         key: "target",
         label: "Target",
         resizable: true,

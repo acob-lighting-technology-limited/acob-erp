@@ -43,7 +43,7 @@ export function renderInternalNotificationEmail({ pendingUser, preparedBy }: Int
     <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 32px 28px;">
         <div style="font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 20px;">New Employee Onboarded</div>
         <p style="font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 18px 0;">Dear Management,</p>
-        <p style="font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 18px 0;">This is an automated notification that a new employee has been successfully approved and added to the system for your awareness.</p>
+        <p style="font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 18px 0;">This is an automated notification that a new employee has been onboarded and their official company email has been set up. Their details are below for your awareness.</p>
         
         <div style="margin-top: 22px; border: 1px solid #e5e7eb; overflow: hidden; background: #fbfbfb; border-radius: 6px;">
             <div style="padding: 12px 18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #e5e7eb; background: #f8fafc; color: #64748b;">Onboarding Details</div>

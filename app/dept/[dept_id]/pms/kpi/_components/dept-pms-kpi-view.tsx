@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { BarChart2, Target } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { BarChart2, Flag, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
 import { PmsMetricTabsPage } from "@/app/admin/pms/_components/pms-metric-tabs-page"
+import { StrategicGoalsView } from "@/app/admin/corporate-scorecard/_components/strategic-goals-view"
 
 interface DeptPmsKpiViewProps {
   deptId: string
@@ -12,7 +14,10 @@ interface DeptPmsKpiViewProps {
 }
 
 export function DeptPmsKpiView({ deptId, deptName }: DeptPmsKpiViewProps) {
-  const [activeTab, setActiveTab] = useState<"department_kpis" | "appraisal_scores">("department_kpis")
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<"department_kpis" | "goals" | "appraisal_scores">(() =>
+    searchParams.get("tab") === "goals" ? "goals" : "department_kpis"
+  )
 
   return (
     <div className="space-y-4">
@@ -29,6 +34,14 @@ export function DeptPmsKpiView({ deptId, deptName }: DeptPmsKpiViewProps) {
             </Button>
             <Button
               size="sm"
+              variant={activeTab === "goals" ? "default" : "outline"}
+              onClick={() => setActiveTab("goals")}
+            >
+              <Flag className="mr-1.5 h-4 w-4" />
+              Goals
+            </Button>
+            <Button
+              size="sm"
               variant={activeTab === "appraisal_scores" ? "default" : "outline"}
               onClick={() => setActiveTab("appraisal_scores")}
             >
@@ -39,7 +52,9 @@ export function DeptPmsKpiView({ deptId, deptName }: DeptPmsKpiViewProps) {
           <span className="text-muted-foreground hidden text-xs sm:inline-block">
             {activeTab === "department_kpis"
               ? `Core & Support KPIs, targets, and progress for ${deptName}`
-              : `Quarterly appraisal scoring for ${deptName} staff`}
+              : activeTab === "goals"
+                ? `Company goals ${deptName} works towards, and which have no tasks yet`
+                : `Quarterly appraisal scoring for ${deptName} staff`}
           </span>
         </div>
       </div>
@@ -50,6 +65,13 @@ export function DeptPmsKpiView({ deptId, deptName }: DeptPmsKpiViewProps) {
           initialDepartment={deptName}
           lockedDepartment={deptName}
           backLink={{ href: `/dept/${deptId}/pms`, label: "Back to PMS" }}
+        />
+      ) : activeTab === "goals" ? (
+        <StrategicGoalsView
+          scope="department"
+          department={deptName}
+          backHref={`/dept/${deptId}/pms`}
+          backLabel="Back to PMS"
         />
       ) : (
         <PmsMetricTabsPage

@@ -74,6 +74,7 @@ import {
   type LunchMenuViewRecord,
 } from "@/lib/hr/lunch-voting"
 import { formatWATDate, formatWATTime } from "@/lib/utils/date"
+import { buildLunchWhatsAppMessage } from "@/lib/hr/lunch-share"
 
 export interface LunchEmployee {
   id: string
@@ -509,6 +510,22 @@ export function LunchRegisterPage({
       void loadMenus()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update menu")
+    }
+  }
+
+  // The dated link previews the day's dishes in WhatsApp — see lib/hr/lunch-share.ts.
+  async function copyWhatsAppMessage(menu: AdminLunchMenu) {
+    const message = buildLunchWhatsAppMessage({
+      date: menu.date,
+      today: todayDate,
+      deadline: menu.resolvedDeadline,
+      origin: window.location.origin,
+    })
+    try {
+      await navigator.clipboard.writeText(message)
+      toast.success("WhatsApp message copied.")
+    } catch {
+      toast.error("Couldn't copy to the clipboard.")
     }
   }
 
@@ -1652,6 +1669,12 @@ export function LunchRegisterPage({
                 label: "Change deadline",
                 hidden: (row) => row.date < todayDate,
                 onClick: (row) => setDeadlineMenu(row),
+              },
+              {
+                // Only a published, open poll is worth posting to the group.
+                label: "Copy WhatsApp message",
+                hidden: (row) => !row.votingOpen,
+                onClick: (row) => void copyWhatsAppMessage(row),
               },
               {
                 label: "Change someone's answer",

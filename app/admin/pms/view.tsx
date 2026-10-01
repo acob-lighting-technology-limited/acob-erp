@@ -3,7 +3,6 @@ import {
   Award,
   BookOpen,
   Brain,
-  CheckCircle2,
   ChevronRight,
   Clock3,
   FileText,
@@ -36,17 +35,6 @@ const adminPmsLinks = [
     hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
     hoverText: "group-hover:text-blue-500",
     subLabel: "KPI drivers & scores",
-  },
-  {
-    title: "Goals",
-    href: "/admin/pms/goals",
-    icon: CheckCircle2,
-    description: "See goal volume and approval movement by department.",
-    color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    fill: "bg-emerald-500",
-    hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
-    hoverText: "group-hover:text-emerald-500",
-    subLabel: "Goal approvals & deliverables",
   },
   {
     title: "Attendance",
@@ -183,14 +171,14 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
           title="Avg PMS"
           value={formatPercent(summary.overallPms)}
           icon={Award}
-          description="Average department PMS"
+          description="Average individual PMS"
         />
         <StatCard
           variant="compact"
           title="Avg KPI"
           value={formatPercent(summary.overallKpi)}
           icon={Target}
-          description="Average department KPI"
+          description="Average individual KPI"
         />
         <StatCard
           variant="compact"
@@ -205,13 +193,6 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
           value={formatPercent(summary.attendance)}
           icon={Clock3}
           description="Attendance compliance"
-        />
-        <StatCard
-          variant="compact"
-          title="Approved Goals"
-          value={summary.approvedGoals}
-          icon={CheckCircle2}
-          description="Approved goals in scope"
         />
       </StatGrid>
 

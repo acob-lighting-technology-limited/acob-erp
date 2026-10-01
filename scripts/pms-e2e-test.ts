@@ -255,23 +255,13 @@ async function testPMSScoring() {
   })
   assert("A3.1 Employee count", dept.employee_count, 2)
 
-  // Dynamic action items score verification
-  const { data: actionItemsRaw } = await supabase
-    .from("tasks")
-    .select("status")
-    .eq("department", "IT and Communications")
-    .eq("category", "weekly_action")
-    .gte("created_at", "2026-04-01")
-    .lte("created_at", "2026-06-30")
-  const expectedActionScore =
-    actionItemsRaw && actionItemsRaw.length > 0
-      ? Math.round(
-          (actionItemsRaw.filter((t: any) => t.status === "completed").length / actionItemsRaw.length) * 10000
-        ) / 100
-      : 0
-  assert("A3.2 Action items score", dept.breakdown.action_item_score, expectedActionScore, 0.5)
-  assertTruthy("A3.3 Help desk score >= 0", (dept.breakdown.help_desk_score ?? 0) >= 0)
-  assertTruthy("A3.4 Task delivery (no double count)", (dept.breakdown.task_project_delivery_score ?? 0) >= 0)
+  // Department PMS is the plain average of its members' final scores.
+  const memberFinals = dept.members.map((m) => m.final_score).filter((v): v is number => typeof v === "number")
+  const expectedDeptPms =
+    memberFinals.length > 0
+      ? Math.round((memberFinals.reduce((sum, v) => sum + v, 0) / memberFinals.length) * 100) / 100
+      : null
+  assert("A3.2 Dept PMS = average of member finals", dept.department_pms, expectedDeptPms, 0.01)
 
   // Calibration (Fix 3)
   assertTruthy("A3.5 Calibration mean present", typeof dept.calibration?.mean === "number")
@@ -1001,7 +991,7 @@ async function testHelpDesk() {
     department: "IT and Communications",
     cycleId: CYCLE_ID,
   })
-  assertTruthy("D8.1 Help desk score calculated", (deptScore.breakdown.help_desk_score ?? 0) >= 0)
+  assertTruthy("D8.1 Dept PMS still computes", (deptScore.department_pms ?? 0) >= 0)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1275,14 +1265,13 @@ async function testWeeklyReports() {
     .single()
   assertTruthy("G2.2 Action item (completed) created", action2?.id)
 
-  // G3: Action items scored in dept PMS, not double-counted
+  // G3: Action items reach dept PMS only through members' own task scores
   console.log("\n  ── G3: Action Item Impact on Dept PMS ──")
   const dept = await computeDepartmentPerformanceScore(supabase, {
     department: "IT and Communications",
     cycleId: CYCLE_ID,
   })
-  assertTruthy("G3.1 Action item score > 0", (dept.breakdown.action_item_score ?? 0) > 0)
-  assertTruthy("G3.2 Task delivery score calculated", (dept.breakdown.task_project_delivery_score ?? 0) >= 0)
+  assertTruthy("G3.1 Dept PMS computes from members", dept.members.length > 0)
 
   // Cleanup
   if (report?.id) await supabase.from("weekly_reports").delete().eq("id", report.id)

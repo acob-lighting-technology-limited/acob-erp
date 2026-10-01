@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvents } from "@/lib/hr/attendance-events"
-import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
 import {
   DB_WRITABLE_STATUSES,
   deriveUnifiedAttendanceStatus,
@@ -14,6 +14,7 @@ import {
 import { toLocalISODate } from "@/lib/utils/date"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
+import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
 
 const log = logger("admin-hr-attendance-records-bulk")
 export const dynamic = "force-dynamic"
@@ -52,6 +53,8 @@ export async function POST(request: NextRequest) {
     const scopeResult = await requireApiAdminScope()
     if (!scopeResult.ok) return scopeResult.response
     const { scope, supabase } = scopeResult
+    const adminOnly = requireAttendanceAdmin(scope)
+    if (adminOnly) return adminOnly
     const policy = await loadAttendancePolicy(supabase)
 
     const parsed = BulkCreateSchema.safeParse(await request.json())
@@ -164,6 +167,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // A bulk change acts on the day directly, so any pending appeal for a changed
+    // day is closed as resolved - otherwise a later approval would overwrite it.
+    const resolveAppealsFor = async (changed: Array<{ user_id: string; date: string }>) => {
+      const datesByUser = new Map<string, string[]>()
+      for (const row of changed) datesByUser.set(row.user_id, [...(datesByUser.get(row.user_id) ?? []), row.date])
+      for (const [userId, userDates] of datesByUser) {
+        await resolvePendingAppealsOnManualStatus(dataClient, {
+          userId,
+          dates: userDates,
+          status,
+          comment: manual_comment,
+          actorId: scope.userId,
+        })
+      }
+    }
+
     // Override existing records' status while keeping their clock-ins/outs intact.
     const overridden = overrides.filter((o) => Boolean(o.clock_in || o.clock_out))
     if (overrides.length > 0) {
@@ -211,6 +230,7 @@ export async function POST(request: NextRequest) {
           metadata: { override: true, had_punch: Boolean(o.clock_in || o.clock_out) },
         }))
       )
+      await resolveAppealsFor(overrides)
     }
 
     if (toInsert.length === 0 && overrides.length === 0) {
@@ -305,6 +325,7 @@ export async function POST(request: NextRequest) {
         actorId: scope.userId,
       }))
     )
+    await resolveAppealsFor(createdRows)
 
     return NextResponse.json({
       message: `Created ${totalCreated} record(s)`,
@@ -331,6 +352,8 @@ export async function DELETE(request: NextRequest) {
     const scopeResult = await requireApiAdminScope()
     if (!scopeResult.ok) return scopeResult.response
     const { scope, supabase } = scopeResult
+    const adminOnly = requireAttendanceAdmin(scope)
+    if (adminOnly) return adminOnly
     const policy = await loadAttendancePolicy(supabase)
 
     const parsed = BulkDeleteSchema.safeParse(await request.json())

@@ -6,6 +6,7 @@ import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { notifyAttendanceMail } from "@/lib/hr/attendance-notify"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
+import { liveAppealDayStatus } from "@/lib/hr/attendance-appeals"
 import { logger } from "@/lib/logger"
 
 const log = logger("admin-hr-attendance-appeals")
@@ -19,6 +20,8 @@ type AppealWithProfile = {
   department: string
   appeal_date: string
   current_status: string
+  /** The day's status now; differs from current_status when the day changed after the appeal. */
+  live_status: string
   requested_status: string
   appeal_reason: string
   status: string
@@ -63,7 +66,7 @@ export async function GET(request: NextRequest) {
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
     const statusParam = request.nextUrl.searchParams.get("status") ?? "all"
-    const validStatuses = ["pending", "approved", "rejected", "all"]
+    const validStatuses = ["pending", "approved", "rejected", "resolved", "all"]
     if (!validStatuses.includes(statusParam)) {
       return NextResponse.json({ error: "Invalid status filter" }, { status: 400 })
     }
@@ -113,6 +116,28 @@ export async function GET(request: NextRequest) {
     const profileMap = new Map<string, ProfileRow>()
     for (const p of profiles ?? []) profileMap.set(p.id, p)
 
+    // current_status is a snapshot from submission. The device can deliver
+    // punches hours late, so the day may have changed since; reviewers need
+    // both to tell a real appeal from one a late sync has already answered.
+    const policy = await loadAttendancePolicy(dataClient)
+    const appealDates = [...new Set(rows.map((r) => r.appeal_date))]
+    const { data: dayRecords } = await dataClient
+      .from("attendance_records")
+      .select("user_id, date, clock_in, clock_out, status, waived")
+      .in("user_id", uniqueUserIds)
+      .in("date", appealDates)
+      .returns<
+        Array<{
+          user_id: string
+          date: string
+          clock_in: string | null
+          clock_out: string | null
+          status: string | null
+          waived: boolean | null
+        }>
+      >()
+    const recordByDay = new Map((dayRecords ?? []).map((record) => [`${record.user_id}::${record.date}`, record]))
+
     const data: AppealWithProfile[] = rows.map((r) => {
       const p = profileMap.get(r.user_id)
       const user_name = p?.full_name?.trim() || [p?.first_name, p?.last_name].filter(Boolean).join(" ") || "Unknown"
@@ -120,6 +145,11 @@ export async function GET(request: NextRequest) {
         ...r,
         user_name,
         department: p?.department ?? "",
+        live_status: liveAppealDayStatus(
+          recordByDay.get(`${r.user_id}::${r.appeal_date}`) ?? null,
+          r.appeal_date,
+          policy
+        ),
       }
     })
 
@@ -211,25 +241,11 @@ export async function PATCH(request: NextRequest) {
     const now = new Date().toISOString()
     const newStatus = action === "approve" ? "approved" : "rejected"
 
-    // Update the appeal
-    const { data: updatedAppeal, error: updateError } = await dataClient
-      .from("attendance_appeals")
-      .update({
-        status: newStatus,
-        reviewed_by: scope.userId,
-        reviewed_at: now,
-        resolution_note: resolutionNote || null,
-        updated_at: now,
-      })
-      .eq("id", appealId)
-      .select()
-      .single()
-
-    if (updateError || !updatedAppeal) {
-      log.error({ err: updateError }, "Failed to update appeal")
-      return NextResponse.json({ error: "Failed to update appeal" }, { status: 500 })
-    }
-
+    // Approval changes the day before the appeal is marked approved. This used
+    // to run the other way round: the appeal was set to approved first, so a
+    // failed monthly-limit check or record write returned an error to the
+    // reviewer but left the appeal "approved" on an unchanged day - and, no
+    // longer pending, it could never be reviewed again.
     let approvedRecordId: string | null = appeal.attendance_record_id
     if (action === "approve") {
       const quotaCheck = await validateLwpAwpMonthlyQuota({
@@ -244,7 +260,6 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: quotaCheck.error }, { status: 403 })
       }
 
-      // Upsert the attendance record to reflect the approved status
       const { data: upserted, error: upsertError } = await dataClient
         .from("attendance_records")
         .upsert(
@@ -262,10 +277,35 @@ export async function PATCH(request: NextRequest) {
 
       if (upsertError) {
         log.error({ err: upsertError }, "Failed to upsert attendance record on approval")
-        // Non-fatal — appeal is still approved
-      } else if (upserted?.id) {
-        approvedRecordId = upserted.id
+        return NextResponse.json(
+          { error: "Could not update the attendance record, so the appeal was left pending. Please try again." },
+          { status: 500 }
+        )
       }
+      if (upserted?.id) approvedRecordId = upserted.id
+    }
+
+    // `status = pending` guards against a second reviewer deciding it in the meantime.
+    const { data: updatedAppeal, error: updateError } = await dataClient
+      .from("attendance_appeals")
+      .update({
+        status: newStatus,
+        reviewed_by: scope.userId,
+        reviewed_at: now,
+        resolution_note: resolutionNote || null,
+        updated_at: now,
+      })
+      .eq("id", appealId)
+      .eq("status", "pending")
+      .select()
+      .maybeSingle()
+
+    if (updateError || !updatedAppeal) {
+      log.error({ err: updateError }, "Failed to update appeal")
+      return NextResponse.json(
+        { error: updateError ? "Failed to update appeal" : "This appeal was already decided by someone else" },
+        { status: updateError ? 500 : 409 }
+      )
     }
 
     // Provenance: record the decision on the day's timeline + org-wide compliance audit.

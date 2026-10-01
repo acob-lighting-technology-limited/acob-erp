@@ -8,6 +8,7 @@ import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { deriveUnifiedAttendanceStatus, isPermissionAttendanceStatus } from "@/lib/hr/attendance-status"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { applyLunchBreak } from "@/lib/hr/attendance-ssot"
+import { closeAppealsMadeMootByDevice } from "@/lib/hr/attendance-appeals"
 
 const log = logger("hikvision-events")
 
@@ -182,6 +183,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
         { userId, prevDate, time, employeeNoString },
         "Hikvision after-midnight exit rolled back to close prior day"
       )
+      await closeAppealsMadeMootByDevice(supabase, { userId, date: prevDate, policy })
       return
     }
   }
@@ -322,6 +324,10 @@ async function processHikvisionEvent(event: ParsedEvent) {
       metadata: { clock_out: time, total_hours: totalHours, employee_no: employeeNoString },
     })
   }
+
+  // A punch that arrives late (the device has held a backlog for hours) can
+  // make a pending appeal for this day pointless; close it if so.
+  await closeAppealsMadeMootByDevice(supabase, { userId, date, policy })
 
   log.info({ userId, date, action, employeeNoString }, "Hikvision attendance recorded")
 }
