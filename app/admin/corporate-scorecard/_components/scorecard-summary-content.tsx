@@ -15,6 +15,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
 import { exportSummaryToExcel, exportSummaryToPdf } from "@/lib/corporate-scorecard/export"
+import { PlanYearSelect } from "./plan-year-select"
 
 type PerspectiveRollup = {
   perspective: string
@@ -36,6 +37,8 @@ type SummaryResponse = {
     companyPct: number | null
     departments: DepartmentRow[]
   }
+  year?: number
+  years?: number[]
 }
 
 function ragBadge(status: RagStatus | null) {
@@ -55,7 +58,7 @@ export interface ScorecardSummaryContentProps {
 }
 
 /**
- * The MD view: how the company is doing against the 2026 plan, rolled up
+ * The MD view: how the company is doing against one year's plan, rolled up
  * KPI → objective → perspective → company (equal-weighted at every level),
  * and by department using CORE ownership only — the same rule and the same
  * shared formula (lib/corporate-scorecard/attainment) every other scorecard
@@ -69,11 +72,14 @@ export function ScorecardSummaryContent({
 }: ScorecardSummaryContentProps = {}) {
   const router = useRouter()
   const [isExportOpen, setIsExportOpen] = useState(false)
+  // null = let the server pick (current year, or the latest loaded plan).
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery<SummaryResponse>({
-    queryKey: ["corporate-scorecard-summary"],
+    queryKey: ["corporate-scorecard-summary", selectedYear],
     queryFn: async () => {
-      const res = await apiFetch("/api/corporate-scorecard/summary", { cache: "no-store" })
+      const query = selectedYear ? `?year=${selectedYear}` : ""
+      const res = await apiFetch(`/api/corporate-scorecard/summary${query}`, { cache: "no-store" })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to load the scorecard summary")
       return payload
@@ -83,6 +89,7 @@ export function ScorecardSummaryContent({
   const perspectives = useMemo(() => data?.data.perspectives ?? [], [data])
   const departments = useMemo(() => data?.data.departments ?? [], [data])
   const companyPct = data?.data.companyPct ?? null
+  const planYear = data?.year ?? selectedYear ?? new Date().getFullYear()
 
   const columns = useMemo<DataTableColumn<DepartmentRow>[]>(
     () => [
@@ -139,17 +146,20 @@ export function ScorecardSummaryContent({
   return (
     <DataTablePage
       title={tabs ? "Corporate Scorecard" : "Scorecard Summary"}
-      description="Company-wide attainment against the 2026 plan. Departments are scored on CORE ownership only."
+      description={`Company-wide attainment against the ${planYear} plan. Departments are scored on CORE ownership only.`}
       icon={BarChart3}
       backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}
       actions={
-        <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)}>
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <PlanYearSelect year={data?.year} years={data?.years} onChange={setSelectedYear} />
+          <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        </div>
       }
       stats={
         <div className="space-y-4">

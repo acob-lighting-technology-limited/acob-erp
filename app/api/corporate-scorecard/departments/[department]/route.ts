@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { resolvePlanYear } from "@/lib/corporate-scorecard/plan-year"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
   if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
 
   const isAll = department.toLowerCase() === "all"
+  const { year, years } = await resolvePlanYear(supabase, request.nextUrl.searchParams.get("year"))
 
   let assignmentQuery = supabase
     .from("kpi_assignments")
@@ -80,6 +82,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
        )`
     )
     .eq("corporate_kpis.is_archived", false)
+    .eq("corporate_kpis.plan_year", year)
 
   if (!isAll) {
     assignmentQuery = assignmentQuery.eq("department", department)
@@ -182,5 +185,5 @@ export async function GET(request: NextRequest, props: { params: Promise<{ depar
     })
     .sort((a, b) => a.source_sn - b.source_sn)
 
-  return NextResponse.json({ data, department })
+  return NextResponse.json({ data, department, year, years })
 }

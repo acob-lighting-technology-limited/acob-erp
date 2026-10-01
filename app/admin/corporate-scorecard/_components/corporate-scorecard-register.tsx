@@ -41,6 +41,7 @@ import { apiFetch } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
 import { exportScorecardRegisterToExcel, exportScorecardRegisterToPdf } from "@/lib/corporate-scorecard/export"
 import { CreateKpiDialog, EditKpiDialog, ArchiveKpiDialog, PERSPECTIVES } from "./kpi-dialogs"
+import { PlanYearSelect } from "./plan-year-select"
 
 type Assignment = {
   id: string
@@ -96,23 +97,26 @@ export interface CorporateScorecardRegisterProps {
 }
 
 /**
- * The master register: what the 2026 plan says, and who owns it.
+ * The master register: what one year's strategic plan says, and who owns it.
  * "How we're doing against it" lives on each department's own cascade page —
  * this view is the plan, with administrative CRUD to add, edit, and archive KPIs.
  */
 export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: CorporateScorecardRegisterProps = {}) {
   const queryClient = useQueryClient()
-  const queryKey = ["corporate-scorecard-register"]
+  // null = let the server pick (current year, or the latest loaded plan).
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const queryKey = ["corporate-scorecard-register", selectedYear]
   const [managingRow, setManagingRow] = useState<RegisterRow | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [editingRow, setEditingRow] = useState<RegisterRow | null>(null)
   const [archivingRow, setArchivingRow] = useState<RegisterRow | null>(null)
 
-  const { data, isLoading, error, refetch } = useQuery<{ data: RegisterRow[] }>({
+  const { data, isLoading, error, refetch } = useQuery<{ data: RegisterRow[]; year?: number; years?: number[] }>({
     queryKey,
     queryFn: async () => {
-      const res = await apiFetch("/api/corporate-scorecard/register", { cache: "no-store" })
+      const query = selectedYear ? `?year=${selectedYear}` : ""
+      const res = await apiFetch(`/api/corporate-scorecard/register${query}`, { cache: "no-store" })
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to load the corporate scorecard")
       return payload
@@ -120,6 +124,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
   })
 
   const rows = useMemo(() => data?.data ?? [], [data])
+  const planYear = data?.year ?? selectedYear ?? new Date().getFullYear()
 
   const departmentOptions = useMemo(() => {
     const set = new Set<string>()
@@ -168,7 +173,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
       },
       {
         key: "target_text",
-        label: "2026 Target",
+        label: `${planYear} Target`,
         sortable: true,
         resizable: true,
         initialWidth: 320,
@@ -218,7 +223,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         ),
       },
     ],
-    []
+    [planYear]
   )
 
   const filters = useMemo<DataTableFilter<RegisterRow>[]>(
@@ -248,7 +253,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
   return (
     <DataTablePage
       title="Corporate Scorecard"
-      description="The 2026 strategic plan's master corporate KPIs and which departments own them. Use Add Corporate KPI to register new strategic measures."
+      description={`The ${planYear} strategic plan's master corporate KPIs and which departments own them. Use Add Corporate KPI to register new strategic measures.`}
       icon={Target}
       backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
@@ -256,6 +261,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
       onTabChange={onTabChange}
       actions={
         <div className="flex items-center gap-2">
+          <PlanYearSelect year={data?.year} years={data?.years} onChange={setSelectedYear} />
           <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)}>
             <Download className="mr-2 h-4 w-4" />
             Export
@@ -323,7 +329,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
-                      2026 Timeline Pacing:
+                      {planYear} Timeline Pacing:
                     </span>
                     {pacing?.status === "ahead" && (
                       <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-600">
@@ -560,6 +566,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
       />
 
       <CreateKpiDialog
+        planYear={data?.year}
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onChanged={() => void queryClient.invalidateQueries({ queryKey })}
@@ -586,8 +593,8 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
           { id: "pdf", label: "PDF", icon: "pdf" },
         ]}
         onSelect={(id) => {
-          if (id === "excel") void exportScorecardRegisterToExcel(rows)
-          else if (id === "pdf") void exportScorecardRegisterToPdf(rows)
+          if (id === "excel") void exportScorecardRegisterToExcel(rows, undefined, planYear)
+          else if (id === "pdf") void exportScorecardRegisterToPdf(rows, undefined, planYear)
         }}
       />
     </DataTablePage>

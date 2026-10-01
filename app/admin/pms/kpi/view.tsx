@@ -49,7 +49,7 @@ export function AdminPmsKpiPage({
           </div>
           <span className="text-muted-foreground hidden text-xs sm:inline-block">
             {activeTab === "master_kpis"
-              ? "Master catalog of 2026 corporate KPIs, strategic pillars, and RACI ownership"
+              ? "Master catalog of corporate KPIs, strategic pillars, and RACI ownership"
               : activeTab === "goals"
                 ? "Company goals, the work linked to each, and which have none"
                 : "Employee and departmental appraisal score calculations"}

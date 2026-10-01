@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { resolvePlanYear } from "@/lib/corporate-scorecard/plan-year"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
@@ -18,6 +19,7 @@ const log = logger("corporate-scorecard-goals")
 const QuerySchema = z.object({
   scope: z.enum(["mine", "department", "all"]).default("all"),
   department: z.string().trim().optional(),
+  year: z.string().trim().optional(),
 })
 
 type KpiRow = {
@@ -98,11 +100,15 @@ export async function GET(request: NextRequest) {
   const parsed = QuerySchema.safeParse({
     scope: request.nextUrl.searchParams.get("scope") ?? undefined,
     department: request.nextUrl.searchParams.get("department") ?? undefined,
+    year: request.nextUrl.searchParams.get("year") ?? undefined,
   })
   if (!parsed.success) {
     return apiError(parsed.error.issues[0]?.message ?? "Invalid query", ApiErrorCode.VALIDATION_ERROR, 400)
   }
   const { scope, department } = parsed.data
+  // Assignments, actuals and tasks are joined through kpiById below, so only
+  // this plan year's KPIs ever reach a goal.
+  const { year, years } = await resolvePlanYear(supabase, parsed.data.year)
   if (scope === "department" && !department) {
     return apiError("A department is required", ApiErrorCode.VALIDATION_ERROR, 400)
   }
@@ -137,6 +143,7 @@ export async function GET(request: NextRequest) {
       .from("corporate_kpis")
       .select("id, perspective, strategic_priority, strategic_objective, target_text, measure_type, direction")
       .eq("is_archived", false)
+      .eq("plan_year", year)
       .order("source_sn")
       .returns<KpiRow[]>(),
     scope === "mine"
@@ -243,5 +250,5 @@ export async function GET(request: NextRequest) {
     }))
     .sort((a, b) => a.perspective.localeCompare(b.perspective) || a.objective.localeCompare(b.objective))
 
-  return NextResponse.json({ data })
+  return NextResponse.json({ data, year, years })
 }

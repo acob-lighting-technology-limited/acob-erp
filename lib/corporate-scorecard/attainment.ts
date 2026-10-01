@@ -333,12 +333,14 @@ export type PacingResult = {
 }
 
 /**
- * Evaluates whether current attainment is on pace relative to elapsed time in the target year.
+ * Evaluates whether current attainment is on pace relative to elapsed time in
+ * the KPI's plan year. Callers pass the KPI's plan_year; the fallback is the
+ * year of `now`, never a fixed year.
  */
 export function computePacingStatus(
   cappedPct: number | null | undefined,
   now: Date = new Date(),
-  targetYear = 2026
+  targetYear: number = now.getFullYear()
 ): PacingResult {
   const currentYear = now.getFullYear()
   if (currentYear < targetYear) {

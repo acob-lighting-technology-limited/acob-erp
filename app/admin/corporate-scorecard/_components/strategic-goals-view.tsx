@@ -5,6 +5,7 @@ import type { DataTableTab } from "@/components/ui/data-table"
 import { PmsTablePage } from "@/app/admin/pms/_components/pms-table-page"
 import { RAG_AMBER_THRESHOLD, RAG_GREEN_THRESHOLD } from "@/lib/corporate-scorecard/attainment"
 import type { StrategicGoalRow } from "@/app/api/corporate-scorecard/goals/route"
+import { PlanYearSelect } from "./plan-year-select"
 
 type GoalScope = "mine" | "department" | "all"
 
@@ -65,15 +66,21 @@ export function StrategicGoalsView({
   onTabChange,
 }: StrategicGoalsViewProps) {
   const [goals, setGoals] = useState<StrategicGoalRow[]>([])
+  // null = let the server pick (current year, or the latest loaded plan).
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const [planYears, setPlanYears] = useState<{ year?: number; years?: number[] }>({})
 
   useEffect(() => {
     const params = new URLSearchParams({ scope })
     if (department) params.set("department", department)
+    if (selectedYear) params.set("year", String(selectedYear))
     let cancelled = false
     fetch(`/api/corporate-scorecard/goals?${params.toString()}`)
       .then((res) => (res.ok ? res.json() : { data: [] }))
       .then((payload) => {
-        if (!cancelled) setGoals((payload.data ?? []) as StrategicGoalRow[])
+        if (cancelled) return
+        setGoals((payload.data ?? []) as StrategicGoalRow[])
+        setPlanYears({ year: payload.year, years: payload.years })
       })
       .catch(() => {
         if (!cancelled) setGoals([])
@@ -81,7 +88,7 @@ export function StrategicGoalsView({
     return () => {
       cancelled = true
     }
-  }, [scope, department])
+  }, [scope, department, selectedYear])
 
   const rows = useMemo(
     () =>
@@ -132,6 +139,7 @@ export function StrategicGoalsView({
         { key: "progress", label: scope === "mine" ? "My Score" : "Attainment" },
         { key: "status", label: "Status" },
       ]}
+      headerActions={<PlanYearSelect year={planYears.year} years={planYears.years} onChange={setSelectedYear} />}
       searchPlaceholder="Search goals..."
       filterKey="perspective"
       filterLabel="Perspective"
