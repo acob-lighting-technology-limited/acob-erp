@@ -85,9 +85,6 @@ function getBypassSummary(log: EnrichedBypassLog): string {
     if (status === "absent_with_permission") {
       return `Absence override (AWP) granted to ${targetName} for ${date}`
     }
-    if (source === "remote_web") {
-      return `Remote web clock-in bypass used by ${targetName} for ${date}`
-    }
     return `Manual attendance alteration for ${targetName} for ${date}`
   }
 
@@ -107,7 +104,6 @@ function getBypassType(row: EnrichedBypassLog): string {
     if (status === "lateness_with_permission") return "Lateness Override (LWP)"
     if (status === "incomplete_with_permission") return "Incomplete Override (IWP)"
     if (status === "absent_with_permission") return "Absence Override (AWP)"
-    if (source === "remote_web") return "Remote Check-In Bypass"
     return "Manual Punch Alteration"
   }
   return "Policy Override"
@@ -283,9 +279,8 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
       { value: "Emergency Requisition", label: "Emergency Requisitions" },
       { value: "Manual Leave Grant", label: "Manual Leave Grants" },
       { value: "Correspondence Bypass", label: "Correspondence Bypasses" },
-      { value: "LWP", label: "Liveness/Lateness Overrides (LWP)" },
+      { value: "LWP", label: "Lateness Overrides (LWP)" },
       { value: "AWP", label: "Absence Overrides (AWP)" },
-      { value: "Remote Check-In Bypass", label: "Remote Clock-In Bypasses" },
       { value: "Manual Punch Alteration", label: "Manual Punch Alterations" },
     ],
     []

@@ -327,7 +327,6 @@ const adminNavigation: NavItem[] = [
       { name: "Lunch Register", href: "/admin/hr/lunch" },
       { name: "Resource Booking", href: "/admin/hr/resources" },
       { name: "Offices & Rooms", href: "/admin/hr/offices-rooms" },
-      { name: "Site Locations", href: "/admin/hr/site-locations" },
     ],
   },
   {
