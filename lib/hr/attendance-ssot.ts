@@ -83,16 +83,26 @@ export const COVERED_STATUSES = new Set([
   "absent_with_permission",
   "absence_with_permission",
   "awp",
-  "lateness_with_permission",
-  "lwp",
-  "incomplete_with_permission",
-  "iwp",
-  "early_departure_with_permission",
-  "lewp",
   "early_closure",
   "late_resumption",
   "early",
   "cds",
+])
+
+/**
+ * Permissions that excuse one thing, not the whole day: LWP the late arrival,
+ * LEWP the early departure, IWP the missing punch. Anything else wrong with the
+ * same day still costs hours (decided 1 Oct 2026 — between 17 Sep and then these
+ * sat in COVERED_STATUSES and waived the entire day, so e.g. early-departure
+ * permission also wiped out that morning's lateness).
+ */
+export const PARTIAL_PERMISSION_STATUSES = new Set([
+  "lateness_with_permission",
+  "lwp",
+  "early_departure_with_permission",
+  "lewp",
+  "incomplete_with_permission",
+  "iwp",
 ])
 
 export function isCoveredAttendanceStatus(status: string | null | undefined): boolean {
@@ -108,7 +118,7 @@ export function isPositiveAttendanceStatus(status: string | null | undefined): b
   if (!status) return false
   const s = String(status).toLowerCase().trim()
   if (s === "absent" || s === "lwop" || s === "leave_without_pay" || s === "no_record" || s === "weekend") return false
-  if (COVERED_STATUSES.has(s)) return true
+  if (COVERED_STATUSES.has(s) || PARTIAL_PERMISSION_STATUSES.has(s)) return true
   if (s === "present" || s === "late" || s === "early_departure" || s === "incomplete") return true
   return false
 }
@@ -321,24 +331,9 @@ export function computeAttendanceDay(input: AttendanceDayInput): AttendanceDayRe
 
   const effectiveEnd = input.earlyCloseTime || policy.endTime
 
-  // UNREACHABLE for the six "with permission" statuses named below, and that
-  // is an open question rather than a tidy-up.
-  //
-  // These three flags implement partial forgiveness: LWP excuses the late
-  // arrival but still charges an early departure on the same day, LEWP the
-  // reverse, IWP the missing punch. But all six statuses are also members of
-  // COVERED_STATUSES, so step 1 above returns first with every bracket zeroed
-  // and the whole day covered. The branches only ever fire via the explicit
-  // input.latenessApproved / earlyOutApproved / incompleteApproved booleans.
-  //
-  // So today a permission of any kind waives the entire day. Two readings:
-  //   - intended: a permission covers the day, and this logic is obsolete;
-  //   - regression: the granular rules are the intent and the six statuses
-  //     should come out of COVERED_STATUSES.
-  //
-  // attendance-ssot.test.ts "LEWP forgives the early departure but never the
-  // lateness" asserts the second, and currently fails. It is money either way,
-  // so it needs a decision before either side is changed.
+  // Partial forgiveness: a permission excuses only what it names (see
+  // PARTIAL_PERMISSION_STATUSES). LWP zeroes the late bracket, LEWP the early
+  // one, IWP the missing-punch penalty; the rest of the day is charged as usual.
   const forgiveLateArrival =
     Boolean(input.latenessApproved) || status === "lateness_with_permission" || status === "lwp"
   const forgiveEarlyOut =

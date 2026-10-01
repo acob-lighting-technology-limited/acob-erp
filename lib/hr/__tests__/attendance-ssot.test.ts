@@ -189,6 +189,23 @@ describe("approvals and org-wide overrides", () => {
     assert.equal(result.hoursLost, 2)
   })
 
+  it("LWP forgives the lateness but never the early departure", () => {
+    const result = computeAttendanceDay({
+      status: "lateness_with_permission",
+      clockIn: "09:30",
+      clockOut: "14:00",
+    })
+    assert.equal(result.lateBracket, 0)
+    assert.ok(result.earlyBracket > 0)
+    assert.equal(result.hoursLost, result.earlyBracket)
+  })
+
+  it("IWP forgives the missing punch but still charges the known side", () => {
+    const result = computeAttendanceDay({ status: "incomplete_with_permission", clockIn: "09:30", clockOut: null })
+    assert.equal(result.lateBracket, 2)
+    assert.equal(result.hoursLost, 2)
+  })
+
   it("early closure measures the early departure against the closing time", () => {
     // Office closed at 14:00, employee left at 14:00 — nothing owed.
     const result = computeAttendanceDay({
