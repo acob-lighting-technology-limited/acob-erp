@@ -53,8 +53,10 @@ export function extractTargetValueFromText(
   targetText: string | null | undefined,
   measureType: MeasureType
 ): { targetValue: number | null; unit: string | null } {
+  // A percentage KPI with no stated figure has no target yet; it is not
+  // measured against 100%. "% decrease in operational cost — to be finalised"
+  // used to read a 5% saving as 5% attainment.
   if (!targetText || !targetText.trim()) {
-    if (measureType === "percentage") return { targetValue: 100, unit: "%" }
     if (measureType === "milestone") return { targetValue: 3, unit: "milestones" }
     return { targetValue: null, unit: null }
   }
@@ -77,9 +79,6 @@ export function extractTargetValueFromText(
   if (pctMatches.length > 0) {
     const lastVal = Number(pctMatches[pctMatches.length - 1][1])
     return { targetValue: lastVal, unit: "%" }
-  }
-  if (measureType === "percentage") {
-    return { targetValue: 100, unit: "%" }
   }
 
   // 3. Milestones like "All 3 milestones"
@@ -144,9 +143,6 @@ export function computeAttainment(input: AttainmentInput): Attainment {
   let target = input.targetValue
   if (target == null && input.targetText) {
     target = extractTargetValueFromText(input.targetText, input.measureType).targetValue
-  }
-  if (target == null && input.measureType === "percentage") {
-    target = 100
   }
 
   const actual = input.actualValue

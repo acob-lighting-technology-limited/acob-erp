@@ -198,3 +198,29 @@ test("a recorded actual wins over task-derived progress", () => {
   assert.equal(resolved.source, "manual")
   assert.equal(attainment.cappedPct, 70)
 })
+
+test("a percentage KPI with no stated target has no attainment, not a 100% target", () => {
+  const result = computeAttainment({
+    measureType: "percentage",
+    direction: "at_least",
+    targetValue: null,
+    targetText: "Target reduction to be finalised departmentally",
+    actualValue: 5,
+    milestonesCompleted: null,
+    milestonesTotal: null,
+  })
+  assert.equal(result.cappedPct, null)
+})
+
+test("a currency KPI reads its target in the unit the plan states", () => {
+  const result = computeAttainment({
+    measureType: "currency",
+    direction: "at_least",
+    targetValue: null,
+    targetText: "₦27.2 billion revenue by 31/12/2026",
+    actualValue: 13.6,
+    milestonesCompleted: null,
+    milestonesTotal: null,
+  })
+  assert.equal(result.cappedPct, 50)
+})
