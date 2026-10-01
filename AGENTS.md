@@ -4,18 +4,21 @@ This file defines the minimum engineering standards that AI agents must follow w
 
 ## Delivery Standard
 
-Do not treat a task as complete until all required checks pass:
+Do not treat a task as complete until all required checks pass. Run them on the files you changed — they are fast:
 
-- `npx eslint . --ext .ts,.tsx`
-- `npx tsc --noEmit`
-- **Commit Every Good Work Done**: Once changes satisfy all required checks (`npx eslint`, `npx tsc --noEmit`) and migrations are verified, **always commit the verified work promptly** following the [Commit Grouping Strategy](#commit-grouping-strategy--mandatory-before-any-commit). Never leave completed, verified work uncommitted in the working tree across conversational turns or user requests. Do not wait for the user to prompt you to commit good work.
+- `npx eslint <changed files>`
+- `npx tsc --noEmit -p tsconfig.json`
+- The relevant unit suite (`npm run test:<area>`), or `npm test` when shared code changed
+
+**Never run `npm run build`.** It takes ~3 minutes and fights the running dev server for `.next/`. Nothing builds locally or in CI — Vercel is the only place `next build` runs. The only exception is debugging a failure that reproduces *only* in a production build; say why before running it.
+
+- **Commit when the work is tangible.** A commit is a complete, verified unit someone could review and revert on its own: a fix, a feature slice, a refactor — with its migration, passing the checks above. Commit it then, following the [Commit Grouping Strategy](#commit-grouping-strategy--mandatory-before-any-commit). Do **not** commit half-done work, exploratory edits, or "WIP" to save progress, and do not leave a finished unit uncommitted when you hand back to the user.
 - **Database Migration Execution**: If any new `.sql` migrations were created or modified under `supabase/migrations/`:
   - **Always run `npx supabase migration list` to determine actual deployment status.** This is the sole source of truth — not `git status`.
   - A migration file that is untracked or unstaged in git is **not** automatically pending. Check the output of `migration list`: if the `remote` column is populated for that version, it has already been applied. Only flag a migration as pending if its `remote` field is empty.
   - Do **not** infer migration status from `git status` alone. Untracked files may already be live.
-  - If any migration has an empty `remote` field, push it: `npx supabase db push --include-all --yes`
+  - If any migration has an empty `remote` field, **show the user which migration(s) will be applied and what they change, and wait for an explicit yes** before pushing — there is no staging database, so every push hits production. Then push: `npx supabase db push --include-all --yes` (add `--db-url` with `connect_timeout` if the pooler times out). Never apply migrations through the MCP `apply_migration` tool.
   - If a migration cannot be pushed automatically or is intentionally held back, **always explicitly state and remind the user that the SQL migration is pending and has not been pushed to the live database**.
-<!-- - `npm run build` -->
 
 If a change cannot satisfy all checks or if migrations remain unapplied without explicit user consent, report the blocker/pending status clearly instead of claiming completion.
 
@@ -45,15 +48,131 @@ it on the merits and say what you actually think **before** acting.
 call.** State the trade-off once, then implement what they asked, fully and well. Do not
 re-litigate it, do not quietly implement a different thing, and do not sandbag the work.
 
+## Engineering Practices — Mandatory
+
+Distilled from the 2026-10 full-repo audit (`docs/audit/2026-10-01-full-repo-critique.md`).
+Every rule here exists because breaking it already cost us something.
+
+### Reuse before you write
+- **Search first.** Before writing a helper, component, or route, grep for an existing one:
+  `components/ui/` and `components/ui/patterns/` (EmptyState, ErrorState, StatusBadge,
+  ResponsiveModal, PaginationControls, ListToolbar, FormFieldGroup), `components/skeletons/`,
+  `lib/utils/date.ts`, `lib/admin/rbac.ts`, `lib/admin/api-scope.ts`, `lib/api/errors.ts`,
+  `lib/query-keys.ts`, `shared/departments.ts`.
+- **One screen, one component.** The same screen for staff (`app/(app)`), admin
+  (`app/admin`) and dept (`app/dept/[dept_id]`) is **one** feature component under
+  `components/<feature>/`. Route files are thin wrappers inside their scope provider;
+  the API route decides what that scope may see. **Never copy a page to make the admin
+  or dept version** — the audit found 14 such pairs at 65–93% similarity, and a fix in
+  one copy never reaches the others.
+- **No local copies of shared helpers.** Do not define `formatDate`, `formatCurrency`,
+  `getInitials`, `formatName`, `getStatusColor`, `escapeHtml`, `normalizeDepartment`,
+  `safeCompare` or `ensureAdmin` in a feature file — import the shared one, or create it
+  once in `lib/` and import it everywhere. Business rules (e.g. `pickCanonicalReview`)
+  live in exactly one `lib/<domain>/` module.
+- **Extend the shared component instead of forking it.** If `DataTable`, `StatusBadge` or a
+  skeleton is missing a capability, add a prop there. A parallel wrapper
+  (`AdminTablePage`, a second `EmptyState`, a second skeleton barrel) is a duplicate.
+
+### Fix the cause, not the symptom
+- A wrong colour is fixed in the **token** (`app/globals.css`), not with `/50`, `!`, or
+  `dark:` on one component.
+- A lint rule is fixed, not disabled. `eslint-disable` needs an inline reason, and never
+  for `no-explicit-any` when the real problem is missing types.
+- A missing table/column is a bug to fix, not an error code to swallow — do not add new
+  `if (error.code === "42P01") return []` or `42703` fallbacks.
+- `as unknown as X` is not a typing strategy. Type the query result.
+- Legacy URLs go in `redirects()` in `next.config.mjs`, not as redirect-only `page.tsx` files.
+- Anything temporary (a campaign tool, a sandbox page, an allowlist) gets an owner and a
+  removal date in a comment, or it does not ship.
+
+### Backend / API routes
+- **All writes happen server-side.** Browser code never calls `.insert/.update/.delete/.upsert`
+  or a mutating RPC on Supabase — it calls an `/api/` route that authorises, validates and
+  audits, then writes with the service-role client.
+- **Validate every request body with zod** (`safeParse` → 400 with field errors). Share the
+  schema with the client form where possible.
+- **Never return `error.message` to the client.** Log it with the logger; return a generic
+  message plus a code (`lib/api/errors.ts`).
+- **Authorisation uses the shared guards** (`requireApiAdminScope`, `getRequestScope`,
+  `lib/admin/rbac.ts`). Do not write a local `ensureAdmin()` or a new permission module.
+- **Cron and webhook auth**: secret in the `Authorization` header only (never a query
+  string), compared with a constant-time compare from one shared helper.
+- **Queries select explicit columns and are bounded** (`.limit()` / `.range()`); no
+  `select("*")` in new list routes. Large lists (>500 possible rows) paginate server-side.
+- **Randomness:** `crypto.getRandomValues` / `crypto.randomUUID()` for passwords, tokens,
+  ids and shuffles (Fisher–Yates). Never `Math.random()` for anything security- or
+  fairness-relevant, and never `sort(() => 0.5 - Math.random())`.
+- **Dates/times**: business dates are Africa/Lagos. Use `@/lib/utils/date` helpers; do not
+  add new bare `toLocaleString()` / `toLocaleDateString()` calls without an explicit
+  `en-NG` locale and `timeZone: "Africa/Lagos"`.
+
+### Frontend
+- **Data fetching is TanStack Query** with keys from `lib/query-keys.ts`. No `fetch` inside
+  `useEffect`.
+- **Forms use react-hook-form + zod** (shadcn `Form`). Do not hand-roll new `useState` forms.
+- **Server components by default.** Put `"use client"` on the smallest interactive leaf,
+  not the whole page.
+- **Keep files reviewable.** A new component over ~400 lines is split into `_components/`,
+  a `use-…` hook, and pure logic in `lib/`. Do not grow the 1,000+ line files further —
+  extract when you touch them.
+- **Images** use `next/image`. Raw `<img>` only in email/PDF renderers.
+- **Toasts** use `sonner` only. **Confirmations** use `AlertDialog` — never
+  `window.confirm()` / `alert()`.
+- **Stable keys** — never `key={index}` on lists that can reorder or filter.
+
+### UI and accessibility
+- **Minimum text size is `text-xs` (12px).** No `text-[10px]` / `text-[11px]`.
+- **Every icon-only button has an accessible name** (`aria-label`) and a `Tooltip`.
+- **Prefer scale values over arbitrary ones** (`w-[…]`, `h-[…]`). Repeated arbitrary values
+  become a `@theme` token.
+- **Tailwind classes are static strings.** Never build a class name at runtime
+  (`` `min-w-[${x}]` `` never generates); use `style` for dynamic values.
+- **Dialogs on phones**: use `ResponsiveModal` (Dialog on desktop, bottom sheet on mobile)
+  for forms, not a bare centred `Dialog`.
+- **Every empty state** says what happened and offers one primary next action.
+
+### Loading states and skeletons
+- **Every non-redirect route has a `loading.tsx`** using a skeleton from
+  `@/components/skeletons` (see "Route `loading.tsx` skeletons" below). Import from the
+  folder barrel `@/components/skeletons`; do not add skeleton exports anywhere else.
+- **Skeletons, not spinners, for content.** `Loader2` spinners are only for a button that
+  is submitting. Never a full-page spinner.
+- **The skeleton mirrors the real page.** Drive both from the same config (stats count,
+  tabs, filters, view mode) where possible, so the page does not jump on load.
+- Slow sections stream behind `<Suspense>` with a section skeleton instead of blocking
+  the whole page.
+
+### Data tables
+- Follow the **Table Page Standard** below. Additionally:
+- Tables that can exceed ~500 rows use **server-side pagination** (`serverSide: true`,
+  API accepts `page/pageSize/sort/q`, returns `{ data, total }`). Do not download whole
+  tables to the browser.
+- Do not render a raw `<table>` or shadcn `<Table>` for a *list of records* — that is a
+  `DataTable`. Raw tables are only for fixed-shape breakdowns (payslip lines, heat-maps,
+  PDF/email templates).
+- New table capabilities are added to `components/ui/data-table/` (split into a new file
+  there), never by wrapping or forking `DataTable`.
+
+### Repository hygiene
+- No business files at the repo root or in `docs/` (vouchers, memos, inventories, PDFs).
+- `docs/` holds runbooks, architecture, module docs and ADRs — not agent prompts or
+  "completion summaries".
+- One-off scripts go in `scripts/archive/` or are deleted after use.
+- Dependencies: do not add a package without removing what it replaces; remove packages
+  that end up unused.
+
 ## Git and Hook Policy
 
-- Always commit every good, verified work done promptly. Never leave completed tasks unstaged or uncommitted.
+- Commit tangible, verified units of work (see Delivery Standard). Never commit half-done work.
 - Never use `git commit --no-verify`.
 - Never use `git push --no-verify`.
 - Do not bypass failing hooks. Fix the underlying issue.
-- Pre-commit must pass `lint-staged` including ESLint and Prettier.
-- Pre-push must pass `npm run build`.
-- Confirm the build passes locally before pushing.
+- Pre-commit runs `lint-staged` (ESLint + Prettier on staged files).
+- Pre-push runs `npm run lint:strict` and `npm run type-check` — **not** `build` (removed in `2c38430b`). CI (`.github/workflows/ci.yml`) runs lint, type-check and `npm test`. Do not claim a push "builds" the project.
+- One feature per branch. Do not pile unrelated features onto a branch named for something else; if you find unrelated uncommitted work, leave it alone and commit only your own paths.
+- Never add a `Co-Authored-By` trailer to commits.
+- Never commit business documents, exports or one-off artefacts (`.pdf`, `.docx`, `.xlsx`, vouchers, screenshots, `~$*` lock files, `*.tsbuildinfo`, `test-results/`) — they belong in SharePoint, not git. Never commit DB dumps or backups containing personal data.
 
 ## Commit Grouping Strategy — Mandatory Before Any Commit
 
@@ -132,6 +251,11 @@ Non-negotiable rules:
 11. **Mandatory Remote Push & Live Sync Verification**: Writing a migration file in `supabase/migrations/` is only step one. Always run `npx supabase migration list` to confirm live sync status. A migration is only considered applied if its `remote` column is populated in that output. Do **not** use `git status` or the presence/absence of a local file as a proxy for deployment status — an untracked file may already be live.
 12. **Enforce Pending Migration Reminders**: Never claim or imply a task is complete if a migration's `remote` field is empty in `npx supabase migration list`. If a migration is not yet applied to the remote database for any reason, **always explicitly remind the user and clearly state that the SQL migration is pending and has not been pushed to the live database**. Conversely, do **not** flag a migration as pending purely because it is untracked or unstaged in git — verify against the live output first.
 13. **PostgreSQL View Mutation Rule**: Never use standalone `CREATE OR REPLACE VIEW` when modifying existing views if columns, column order, or data types change (PostgreSQL will reject this with `cannot drop columns from view (SQLSTATE 42P16)`). Always prefix with `DROP VIEW IF EXISTS <view_name> CASCADE;` followed by `CREATE VIEW <view_name> AS ...` and explicit grants (`GRANT SELECT ON <view_name> TO authenticated, service_role;`).
+14. **Column-level UPDATE grants on tables with privileged columns.** Never leave table-wide `UPDATE` granted to `authenticated` on a table where a user can edit their own row but must not edit some columns (`profiles.role`, `is_admin`, `admin_routes`, `admin_domains`, `is_department_lead`, `employment_status`, bank fields; any `status`/`approved_by` on a request table). `REVOKE UPDATE` and `GRANT UPDATE (<safe columns>)`, plus a `BEFORE UPDATE` guard trigger that raises when a non-service caller changes a privileged column. An own-row `USING (id = auth.uid())` policy alone lets a user promote themselves — this exact hole was found live on `profiles` in the 2026-10 audit.
+15. **Every `UPDATE` policy needs a `WITH CHECK`**, and `USING (true)` is never acceptable on `UPDATE`/`DELETE` for `authenticated` (found live on `requisitions`).
+16. **Mutating `SECURITY DEFINER` functions are `service_role`-only** unless they check the caller's role/ownership internally. A function that approves, rejects, assigns, dispatches, or notifies must not be callable from the browser with arbitrary ids. `COALESCE(p_actor, auth.uid())` is not a permission check.
+17. **Secrets never live in SQL.** No keys or webhook secrets in function bodies or migration files — read them from Vault (`vault.decrypted_secrets`). Generate secrets with `gen_random_bytes(32)`, never a readable string.
+18. **Storage buckets** holding staff, finance, or customer documents are private (serve with `createSignedUrl`), and every bucket sets `file_size_limit` and `allowed_mime_types`.
 
 ## Query Construction Rules
 
@@ -287,7 +411,7 @@ Some pages are inherently org-wide and correct not to dept-filter:
 
 - `app/admin/dev/*` — developer-only diagnostics
 - `app/admin/settings/*` — role/user management (super_admin only)
-- `app/admin/finance/*` — org-wide finance
+- `app/admin/accounts/*` — org-wide finance (API under `/api/admin/finance/*`)
 - `app/admin/inventory/*` — org-wide stock
 - `app/admin/purchasing/*` — org-wide purchasing
 - `app/admin/hr/office-location` — org-wide location list
@@ -536,6 +660,12 @@ table or filter bar. Use `ExportOptionsDialog` from
 | Red stat icon | `bg-red-500/10` + `text-red-500` |
 | Purple stat icon | `bg-violet-500/10` + `text-violet-500` |
 
+These five icon tints are the **only** sanctioned raw palette classes. Status colour
+(badges, pills, row tints) goes through `StatusBadge` from
+`@/components/ui/patterns/status-badge` — never a local `getStatusColor()` map or
+hand-picked `bg-green-100 text-green-700`. Never add `dark:` overrides to fix a colour;
+if a token is wrong in one theme, fix the token in `app/globals.css`.
+
 ### Hard prohibitions
 
 - ❌ Raw `<Table>` / `<TableHeader>` inside a page component
@@ -700,7 +830,7 @@ Every feature that produces events the user should see must write to the `notifi
 
 ### How to call
 
-Use the Supabase client (user context is fine — the function is `SECURITY DEFINER`):
+Call it **server-side only** (API route, cron, server lib) and prefer the service-role client. Never call it from browser code: it is `SECURITY DEFINER` and takes an arbitrary `p_user_id` and `p_link_url`, so a browser-callable version is an in-app phishing channel. The 2026-10 audit plans to revoke `EXECUTE` from `authenticated`; any route still calling it with the user's session client will then fail, so new code must use the service client now:
 
 ```ts
 try {
