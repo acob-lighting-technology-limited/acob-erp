@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { isCronRequest } from "@/lib/security/bearer-auth"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
@@ -10,11 +10,6 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("cron-reminders-health")
-
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
 
 /** Must match max_attempts in process_reminder_schedules(). */
 const MAX_ATTEMPTS = 3
@@ -227,9 +222,7 @@ async function alertStaleExpiry(supabase: Supabase, staleCount: number): Promise
  * edge functions does not also take out the alert.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? ""
-  const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
+  if (!isCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

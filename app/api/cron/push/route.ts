@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { isCronRequest } from "@/lib/security/bearer-auth"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { sendPushToUsers, isPushConfigured } from "@/lib/push/server"
@@ -16,11 +16,6 @@ const BATCH_LIMIT = 200
  * quiet — the in-app bell and email already carry the backlog.
  */
 const MAX_PUSH_AGE_MINUTES = 15
-
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
 
 interface ClaimedNotification {
   id: string
@@ -45,9 +40,7 @@ function toNotificationKey(category: string | null): NotificationKey {
 }
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? ""
-  const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
+  if (!isCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
