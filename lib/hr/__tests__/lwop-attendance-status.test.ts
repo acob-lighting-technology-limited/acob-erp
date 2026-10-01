@@ -59,6 +59,9 @@ test("an lwop day produces no absent day in payroll", () => {
   const result = derivePayrollAttendance({
     userId: "u1",
     attendanceExempt: false,
+    // Payroll only charges days from a person's attendance start date (first
+    // clock-in or manual record); without one, record-less days are skipped.
+    effectiveAttendanceStartDate: "2026-08-01",
     workdayDates,
     attendanceByDate: new Map(),
     ctx,
