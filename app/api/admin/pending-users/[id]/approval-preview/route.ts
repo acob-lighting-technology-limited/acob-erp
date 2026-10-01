@@ -4,7 +4,7 @@ import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-previ
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { normalizeDepartmentName } from "@/shared/departments"
 
-export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const supabase = await createServerClient()
   const {
@@ -43,28 +43,13 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "System configuration error" }, { status: 500 })
   }
 
-  const employeeId = new URL(req.url).searchParams.get("employeeId")?.trim()
-  if (!employeeId) {
-    return NextResponse.json({ error: "Missing employeeId" }, { status: 400 })
-  }
-
-  const empNumPattern = /^ACOB\/([A-Z0-9-]+\/)?[0-9]{4}\/[0-9]{3}$/
-  if (!empNumPattern.test(employeeId)) {
-    return NextResponse.json(
-      { error: "Employee number must be in format: ACOB/YEAR/NUMBER (e.g., ACOB/2026/058)" },
-      { status: 400 }
-    )
-  }
-
   const supabaseAdmin = createAdminClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
   const { data: pendingUser, error } = await supabaseAdmin
     .from("pending_users")
-    .select(
-      "first_name, last_name, department, designation, company_email, personal_email, phone_number, office_location, residential_address"
-    )
+    .select("first_name, last_name, department, designation, company_email, personal_email, office_location")
     .eq("id", params.id)
     .single()
 
@@ -99,7 +84,7 @@ export async function GET(req: Request, props: { params: Promise<{ id: string }>
   const preview = await buildApprovalEmailPreview({
     supabase: supabaseAdmin,
     pendingUser,
-    preparedBy: {
+    approvedBy: {
       name:
         callerProfile?.full_name ||
         [callerProfile?.first_name, callerProfile?.last_name].filter(Boolean).join(" ").trim() ||

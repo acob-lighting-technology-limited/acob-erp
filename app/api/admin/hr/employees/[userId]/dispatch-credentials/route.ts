@@ -2,10 +2,16 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
+import {
+  sendNotificationEmailWithRetry,
+  sendNotificationEmailsIndividuallyWithRetry,
+} from "@/lib/notifications/email-gateway"
 import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
+import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
+import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
+import { resolveOnboardedNoticeRecipients } from "@/lib/onboarding/recipients"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 
@@ -46,7 +52,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const { data: profile, error: profileErr } = await dataClient
       .from("profiles")
       .select(
-        "id, first_name, last_name, employee_number, department, designation, company_email, personal_email, office_location, residential_address, phone_number"
+        "id, first_name, last_name, employee_number, department, designation, company_email, personal_email, office_location, residential_address, phone_number, mailbox_credentials_sent_at"
       )
       .eq("id", id)
       .single()
@@ -120,6 +126,47 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const dispatchedAt = new Date().toISOString()
+    const warnings: string[] = []
+
+    // First dispatch only: tell HCS, the Admin & HR lead and the new hire's
+    // department lead that they are onboarded. A resend (wrong password, lost
+    // mail) concerns the employee alone and must not re-announce the hire.
+    if (!profile.mailbox_credentials_sent_at) {
+      try {
+        const recipients = await resolveOnboardedNoticeRecipients(dataClient, profile.department)
+        const name = `${profile.first_name || ""} ${profile.last_name || ""}`.replace(/[\r\n]/g, "").trim()
+        const result = await sendNotificationEmailsIndividuallyWithRetry({
+          ...ORG_MAIL_ROUTING.Onboarding,
+          to: recipients,
+          subject: withSubjectPrefix("Onboarding", `New Employee Onboarded - ${name}`),
+          html: renderInternalNotificationEmail({
+            pendingUser: {
+              first_name: profile.first_name || "",
+              last_name: profile.last_name || "",
+              department: profile.department || "General",
+              designation: profile.designation || "Staff",
+              company_email: profile.company_email,
+              personal_email: profile.personal_email,
+              office_location: profile.office_location || undefined,
+              phone_number: profile.phone_number || undefined,
+            },
+            preparedBy: {
+              name: callerProfile?.full_name || "Admin & IT",
+              designation: callerProfile?.designation || null,
+              department: callerProfile?.department || "Admin and HR",
+            },
+          }),
+        })
+        if (!result.sent) {
+          const summary = result.failedRecipients.map((f) => `${f.recipient}: ${f.reason}`).join("; ")
+          warnings.push(`Onboarded notice: ${summary || "not delivered"}`)
+          log.error({ failedRecipients: result.failedRecipients }, "Onboarded notice failed for some recipients")
+        }
+      } catch (noticeError) {
+        warnings.push(`Onboarded notice: ${noticeError instanceof Error ? noticeError.message : String(noticeError)}`)
+        log.error({ err: noticeError, profileId: id }, "Failed to send onboarded notice")
+      }
+    }
 
     // Update mailbox_credentials_sent_at on profile
     const { error: updateErr } = await dataClient
@@ -171,6 +218,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       success: true,
       message: "Webmail credentials dispatched successfully",
       dispatchedAt,
+      warnings,
     })
   } catch (error) {
     log.error({ error }, "Unhandled error in dispatch-credentials")

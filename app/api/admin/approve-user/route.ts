@@ -1,3 +1,4 @@
+import crypto from "crypto"
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -5,15 +6,11 @@ import { buildApprovalEmailPreview } from "@/lib/onboarding/approval-email-previ
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
-import {
-  sendNotificationEmailWithRetry,
-  sendNotificationEmailsIndividuallyWithRetry,
-} from "@/lib/notifications/email-gateway"
-import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
+import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { normalizeDepartmentName } from "@/shared/departments"
-import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
+import { ORG_MAIL_ROUTING } from "@/lib/org-config"
 
 const log = logger("approve-user")
 
@@ -21,9 +18,6 @@ const ApproveUserSchema = z.object({
   pendingUserId: z.string().trim().min(1, "Missing pendingUserId"),
   employeeId: z.string().trim().optional(),
   hireDate: z.string().trim().nullable().optional(),
-  // When false (default for UI), skip auto-sending emails and return the built preview so the
-  // frontend can ask the admin whether to send before dispatching.
-  sendEmails: z.boolean().optional().default(false),
   employmentType: z.enum(["full_time", "part_time", "contract"]).optional().default("full_time"),
   contractCategoryCode: z.string().trim().nullable().optional(),
   nyscCdsDay: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]).nullable().optional(),
@@ -69,7 +63,7 @@ export async function POST(req: Request) {
   log.info({ callerId: caller.id }, "Starting approval process")
   try {
     const emailWarnings: Array<{
-      audience: "employee" | "management"
+      audience: "ict" | "management"
       reason: string
       recipients: string[]
     }> = []
@@ -135,7 +129,6 @@ export async function POST(req: Request) {
       pendingUserId,
       employeeId: manualEmployeeId,
       hireDate,
-      sendEmails,
       employmentType = "full_time",
       contractCategoryCode,
     } = parsed.data
@@ -206,19 +199,9 @@ export async function POST(req: Request) {
       contractCategoryId = catData?.id || null
     }
 
-    const emailPreview = await buildApprovalEmailPreview({
-      supabase: supabaseAdmin,
-      pendingUser,
-      preparedBy: {
-        name:
-          callerProfile?.full_name ||
-          [callerProfile?.first_name, callerProfile?.last_name].filter(Boolean).join(" ").trim() ||
-          caller.email ||
-          "Admin and HR Lead",
-        designation: callerProfile?.designation || null,
-        department: callerProfile?.department || "Admin and HR",
-      },
-    })
+    // Matrix login password. Never mailed: the employee signs in with a code
+    // sent to their webmail, so this only has to be unguessable.
+    const tempPassword = crypto.randomBytes(12).toString("base64url").slice(0, 16)
 
     // 3. Create or Update Auth User
     // First check if profile or auth user already exists
@@ -301,7 +284,7 @@ export async function POST(req: Request) {
     if (!authUserId) {
       const { data: newAuthUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: pendingUser.company_email,
-        password: emailPreview.tempPassword,
+        password: tempPassword,
         email_confirm: true,
         user_metadata: {
           first_name: pendingUser.first_name,
@@ -326,7 +309,7 @@ export async function POST(req: Request) {
           const probeEmail = `probe-${Date.now()}@org.acoblighting.com`
           const { data: probeData, error: probeError } = await supabaseAdmin.auth.admin.createUser({
             email: probeEmail,
-            password: emailPreview.tempPassword,
+            password: tempPassword,
             email_confirm: true,
             user_metadata: {
               first_name: "Probe",
@@ -368,7 +351,7 @@ export async function POST(req: Request) {
 
         if (recoveredAuthUserId) {
           const { error: recoveredUpdateError } = await supabaseAdmin.auth.admin.updateUserById(recoveredAuthUserId, {
-            password: emailPreview.tempPassword,
+            password: tempPassword,
             email_confirm: true,
             user_metadata: {
               first_name: pendingUser.first_name,
@@ -389,7 +372,7 @@ export async function POST(req: Request) {
       }
     } else {
       const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
-        password: emailPreview.tempPassword,
+        password: tempPassword,
         email_confirm: true,
       })
       if (updateAuthError) {
@@ -443,79 +426,43 @@ export async function POST(req: Request) {
     // No leave records to create: entitlement is derived from the leave type's allowance minus
     // the employee's own requests, so the new employee has their full allowance immediately.
 
-    if (sendEmails) {
-      // 6. Send Welcome Email
+    // 6. Ask ICT to create the webmail account. The employee's welcome letter
+    // and the HCS / HR / department-lead notice follow from dispatch-credentials
+    // once ICT has set the mailbox password.
+    const ictEmail = await buildApprovalEmailPreview({
+      supabase: supabaseAdmin,
+      pendingUser,
+      employeeNumber: employeeId,
+      approvedBy: {
+        name:
+          callerProfile?.full_name ||
+          [callerProfile?.first_name, callerProfile?.last_name].filter(Boolean).join(" ").trim() ||
+          caller.email ||
+          "Admin and HR Lead",
+        designation: callerProfile?.designation || null,
+        department: callerProfile?.department || "Admin and HR",
+      },
+    })
+      .then((preview) => preview.ict)
+      .catch((error: unknown) => {
+        log.error({ err: String(error) }, "Failed to build ICT webmail setup email")
+        return null
+      })
+
+    if (ictEmail?.enabled) {
       try {
-        const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
-        if (onboardingMailEnabled) {
-          const result = await sendNotificationEmailWithRetry({
-            // The welcome letter speaks as the company ("We are excited to
-            // welcome you to ..."), not as the platform. Same speaker as
-            // birthday mail — see ORG_EMAIL_SENDERS in lib/org-config.ts.
-            from: ORG_EMAIL_SENDERS.company,
-            // Technical setup questions are routed in-body to ICT Support; a
-            // reply is therefore about the job, not the login, so it lands
-            // with HR rather than in the unread notifications mailbox.
-            ...ORG_MAIL_ROUTING.Onboarding,
-            to: emailPreview.welcome.recipients,
-            subject: emailPreview.welcome.subject,
-            html: emailPreview.welcome.html,
-          })
-
-          if (!result.sent) {
-            emailWarnings.push({
-              audience: "employee",
-              reason: result.reason,
-              recipients: emailPreview.welcome.recipients,
-            })
-            log.error(
-              { reason: result.reason, recipients: emailPreview.welcome.recipients },
-              "Welcome email was not sent"
-            )
-          }
-        }
-      } catch (emailError) {
-        emailWarnings.push({
-          audience: "employee",
-          reason: emailError instanceof Error ? emailError.message : String(emailError),
-          recipients: emailPreview.welcome.recipients,
+        if (ictEmail.recipients.length === 0) throw new Error("No ICT inbox configured")
+        const result = await sendNotificationEmailWithRetry({
+          ...ORG_MAIL_ROUTING.Onboarding,
+          to: ictEmail.recipients,
+          subject: ictEmail.subject,
+          html: ictEmail.html,
         })
-        log.error({ err: String(emailError) }, "Failed to send welcome email")
-      }
-
-      // 7. Send Internal Confirmation Email to Department Leads
-      try {
-        const onboardingMailEnabled = await isSystemNotificationChannelEnabled(supabaseAdmin, "onboarding", "email")
-        if (onboardingMailEnabled && emailPreview.internal.recipients.length > 0) {
-          const result = await sendNotificationEmailsIndividuallyWithRetry({
-            ...ORG_MAIL_ROUTING.Onboarding,
-            to: emailPreview.internal.recipients,
-            subject: emailPreview.internal.subject,
-            html: emailPreview.internal.html,
-          })
-
-          if (!result.sent) {
-            const failureSummary = result.failedRecipients
-              .map((failure) => `${failure.recipient}: ${failure.reason}`)
-              .join("; ")
-            emailWarnings.push({
-              audience: "management",
-              reason: failureSummary || "failed to send to one or more recipients",
-              recipients: result.failedRecipients.map((failure) => failure.recipient),
-            })
-            log.error(
-              { failedRecipients: result.failedRecipients, deliveredRecipients: result.deliveredRecipients },
-              "Internal onboarding email failed for one or more recipients"
-            )
-          }
-        }
+        if (!result.sent) throw new Error(result.reason)
       } catch (emailError) {
-        emailWarnings.push({
-          audience: "management",
-          reason: emailError instanceof Error ? emailError.message : String(emailError),
-          recipients: emailPreview.internal.recipients,
-        })
-        log.error({ err: String(emailError) }, "Failed to send stakeholder notification emails")
+        const reason = emailError instanceof Error ? emailError.message : String(emailError)
+        emailWarnings.push({ audience: "ict", reason, recipients: ictEmail.recipients })
+        log.error({ reason, recipients: ictEmail.recipients }, "ICT webmail setup email was not sent")
       }
     }
 
@@ -560,13 +507,6 @@ export async function POST(req: Request) {
       employeeId,
       profileId: authUserId,
       emailWarnings,
-      // Returned when sendEmails=false so the frontend can prompt before dispatching.
-      pendingEmailPreview: sendEmails
-        ? null
-        : {
-            welcome: emailPreview.welcome,
-            internal: emailPreview.internal,
-          },
     })
   } catch (error: unknown) {
     log.error({ err: String(error) }, "Approval process failed")
