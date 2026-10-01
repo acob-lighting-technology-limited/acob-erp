@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { resolvePlanYear } from "@/lib/corporate-scorecard/plan-year"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -25,6 +26,7 @@ type KpiRow = {
   target_text: string
   measure_type: MeasureType
   direction: Direction
+  plan_year: number
 }
 
 type AssignmentRow = {
@@ -74,6 +76,8 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser()
   if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
 
+  const { year, years } = await resolvePlanYear(supabase, request.nextUrl.searchParams.get("year"))
+
   const [
     { data: kpis, error: kpiError },
     { data: assignments, error: assignmentError },
@@ -83,9 +87,10 @@ export async function GET(request: NextRequest) {
     supabase
       .from("corporate_kpis")
       .select(
-        "id, source_sn, perspective, strategic_priority, strategic_objective, measure, target_text, measure_type, direction"
+        "id, source_sn, perspective, strategic_priority, strategic_objective, measure, target_text, measure_type, direction, plan_year"
       )
       .eq("is_archived", false)
+      .eq("plan_year", year)
       .order("source_sn")
       .returns<KpiRow[]>(),
     supabase
@@ -203,7 +208,7 @@ export async function GET(request: NextRequest) {
       .filter((a) => a.role === "core" && a.capped_pct != null)
       .map((a) => a.capped_pct)
     const overallAttainment = averageCappedPct(coreAttainments)
-    const pacing = computePacingStatus(overallAttainment)
+    const pacing = computePacingStatus(overallAttainment, new Date(), kpi.plan_year)
     const taskStats = taskCountsByKpi.get(kpi.id) || { total: 0, completed: 0, in_progress: 0 }
 
     return {
@@ -218,5 +223,5 @@ export async function GET(request: NextRequest) {
     }
   })
 
-  return NextResponse.json({ data })
+  return NextResponse.json({ data, year, years })
 }

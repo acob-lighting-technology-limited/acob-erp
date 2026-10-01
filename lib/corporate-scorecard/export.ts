@@ -80,7 +80,11 @@ function ragLabel(pct: number | null): string {
 
 // ─── 1. Master KPI Register Export ───────────────────────────────────────────
 
-export async function exportScorecardRegisterToExcel(rows: RegisterExportRow[], filename?: string): Promise<void> {
+export async function exportScorecardRegisterToExcel(
+  rows: RegisterExportRow[],
+  filename?: string,
+  planYear: number = new Date().getFullYear()
+): Promise<void> {
   try {
     const XLSX = await import("@e965/xlsx")
     const { default: saveAs } = await import("file-saver")
@@ -105,7 +109,7 @@ export async function exportScorecardRegisterToExcel(rows: RegisterExportRow[], 
         Pillar: r.strategic_priority || "-",
         Perspective: r.perspective,
         "Strategic Objective": r.strategic_objective,
-        "2026 Target": r.target_text,
+        [`${planYear} Target`]: r.target_text,
         "KPI Measure": r.measure,
         Type: r.measure_type,
         Direction: r.direction === "at_most" ? "At most (lower is better)" : "At least (higher is better)",
@@ -139,7 +143,11 @@ export async function exportScorecardRegisterToExcel(rows: RegisterExportRow[], 
   }
 }
 
-export async function exportScorecardRegisterToPdf(rows: RegisterExportRow[], filename?: string): Promise<void> {
+export async function exportScorecardRegisterToPdf(
+  rows: RegisterExportRow[],
+  filename?: string,
+  planYear: number = new Date().getFullYear()
+): Promise<void> {
   try {
     const jsPDF = (await import("jspdf")).default
     const autoTable = (await import("jspdf-autotable")).default
@@ -147,11 +155,19 @@ export async function exportScorecardRegisterToPdf(rows: RegisterExportRow[], fi
     const doc = new jsPDF({ orientation: "landscape" })
 
     doc.setFontSize(15)
-    doc.text("Corporate Scorecard — Master KPI Register (2026)", 14, 15)
+    doc.text(`Corporate Scorecard — Master KPI Register (${planYear})`, 14, 15)
     doc.setFontSize(9)
     doc.text(`Generated on: ${formatWATDate(new Date())} · Total KPIs: ${rows.length}`, 14, 21)
 
-    const headers = ["S/N", "Pillar", "Perspective", "KPI Measure", "2026 Target", "CORE Departments", "Attainment"]
+    const headers = [
+      "S/N",
+      "Pillar",
+      "Perspective",
+      "KPI Measure",
+      `${planYear} Target`,
+      "CORE Departments",
+      "Attainment",
+    ]
     const body = rows.map((r) => {
       const coreDepts = (r.assignments || [])
         .filter((a) => a.role === "core")

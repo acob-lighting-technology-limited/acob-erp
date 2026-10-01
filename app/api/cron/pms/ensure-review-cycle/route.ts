@@ -100,6 +100,22 @@ async function ensureCadence(
   let currentId = existing?.id ?? null
   let created = false
 
+  // Close ended cycles BEFORE activating the current one. review_cycles has a
+  // unique index allowing one active cycle per review_type, so activating Q4
+  // while Q3 was still active failed the whole run every night from 1 Oct
+  // 2026 — Q4 stayed "planned" and Q3 stayed "active" until fixed by hand.
+  const staleActiveIds = (cycles || [])
+    .filter((cycle) => cycle.status === "active" && cycle.id !== currentId && cycle.end_date < today)
+    .map((cycle) => cycle.id)
+
+  if (staleActiveIds.length > 0) {
+    const { error: closeError } = await supabase
+      .from("review_cycles")
+      .update({ status: "closed", updated_at: new Date().toISOString() })
+      .in("id", staleActiveIds)
+    if (closeError) throw closeError
+  }
+
   if (!existing) {
     const { data: inserted, error: insertError } = await supabase
       .from("review_cycles")
@@ -122,18 +138,6 @@ async function ensureCadence(
       .update({ status: "active", updated_at: new Date().toISOString() })
       .eq("id", existing.id)
     if (activateError) throw activateError
-  }
-
-  const staleActiveIds = (cycles || [])
-    .filter((cycle) => cycle.status === "active" && cycle.id !== currentId && cycle.end_date < today)
-    .map((cycle) => cycle.id)
-
-  if (staleActiveIds.length > 0) {
-    const { error: closeError } = await supabase
-      .from("review_cycles")
-      .update({ status: "closed", updated_at: new Date().toISOString() })
-      .in("id", staleActiveIds)
-    if (closeError) throw closeError
   }
 
   return { cycle_id: currentId, name: window.name, created, closed: staleActiveIds.length }
@@ -184,7 +188,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: { quarterly, biannual, annual } })
   } catch (error) {
-    log.error({ err: String(error) }, "Review cycle upkeep failed")
+    // Supabase errors are plain objects, so String() logged "[object Object]".
+    const err = error instanceof Error ? error.message : JSON.stringify(error)
+    log.error({ err }, "Review cycle upkeep failed")
     return NextResponse.json({ error: "Failed to ensure current review cycles" }, { status: 500 })
   }
 }

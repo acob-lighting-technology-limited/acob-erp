@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { resolvePlanYear } from "@/lib/corporate-scorecard/plan-year"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -56,6 +57,8 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser()
   if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
 
+  const { year, years } = await resolvePlanYear(supabase, request.nextUrl.searchParams.get("year"))
+
   const { data: assignments, error: assignmentError } = await supabase
     .from("kpi_assignments")
     .select(
@@ -64,6 +67,7 @@ export async function GET(request: NextRequest) {
     )
     .eq("role", "core")
     .eq("corporate_kpis.is_archived", false)
+    .eq("corporate_kpis.plan_year", year)
     .returns<AssignmentRow[]>()
 
   if (assignmentError) {
@@ -73,7 +77,7 @@ export async function GET(request: NextRequest) {
 
   const rows = assignments || []
   if (rows.length === 0) {
-    return NextResponse.json({ data: { perspectives: [], companyPct: null, departments: [] } })
+    return NextResponse.json({ data: { perspectives: [], companyPct: null, departments: [] }, year, years })
   }
 
   const kpiIds = Array.from(new Set(rows.map((r) => r.kpi_id)))
@@ -159,5 +163,5 @@ export async function GET(request: NextRequest) {
     })
     .sort((a, b) => (b.attainmentPct ?? -1) - (a.attainmentPct ?? -1))
 
-  return NextResponse.json({ data: { perspectives, companyPct, departments } })
+  return NextResponse.json({ data: { perspectives, companyPct, departments }, year, years })
 }

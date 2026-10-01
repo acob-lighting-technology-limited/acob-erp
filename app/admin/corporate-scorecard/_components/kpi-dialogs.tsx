@@ -60,9 +60,11 @@ interface CreateKpiDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onChanged: () => void
+  /** Plan year the new KPI belongs to — the year being viewed. Defaults server-side to the current year. */
+  planYear?: number | null
 }
 
-export function CreateKpiDialog({ open, onOpenChange, onChanged }: CreateKpiDialogProps) {
+export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: CreateKpiDialogProps) {
   const [perspective, setPerspective] = useState<string>("Financial")
   const [strategicPriority, setStrategicPriority] = useState<string>(STANDARD_PILLARS[0])
   const [customPillar, setCustomPillar] = useState<string>("")
@@ -143,6 +145,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged }: CreateKpiDial
           direction,
           core_departments: coreDepartments,
           support_departments: supportDepartments,
+          ...(planYear ? { plan_year: planYear } : {}),
         }),
       })
 

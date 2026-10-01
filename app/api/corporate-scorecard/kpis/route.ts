@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { currentPlanYear, resolvePlanYear } from "@/lib/corporate-scorecard/plan-year"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -47,6 +48,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: [] })
   }
 
+  // Tasks are tagged to this year's plan (or the latest loaded one).
+  const { year } = await resolvePlanYear(supabase, request.nextUrl.searchParams.get("year"))
+
   const { data, error } = await supabase
     .from("kpi_assignments")
     .select(
@@ -56,6 +60,7 @@ export async function GET(request: NextRequest) {
     )
     .eq("department", department)
     .eq("corporate_kpis.is_archived", false)
+    .eq("corporate_kpis.plan_year", year)
     .returns<KpiAssignmentRow[]>()
 
   if (error) {
@@ -97,6 +102,7 @@ const CreateKpiSchema = z.object({
   direction: z.enum(["at_least", "at_most"]).default("at_least"),
   core_departments: z.array(z.string().trim()).optional().default([]),
   support_departments: z.array(z.string().trim()).optional().default([]),
+  plan_year: z.number().int().min(2020).max(2100).optional(),
 })
 
 /**
@@ -129,10 +135,13 @@ export async function POST(request: NextRequest) {
 
   const db = getServiceRoleClientOrFallback(supabase)
 
-  // Find next source_sn
+  const planYear = parsed.data.plan_year ?? currentPlanYear()
+
+  // Next S/N within that plan year (source_sn is unique per year).
   const { data: maxRow } = await db
     .from("corporate_kpis")
     .select("source_sn")
+    .eq("plan_year", planYear)
     .order("source_sn", { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -143,6 +152,7 @@ export async function POST(request: NextRequest) {
     .from("corporate_kpis")
     .insert({
       source_sn: nextSn,
+      plan_year: planYear,
       perspective: parsed.data.perspective,
       strategic_priority: parsed.data.strategic_priority,
       strategic_objective: parsed.data.strategic_objective,

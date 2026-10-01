@@ -28,6 +28,7 @@ import { apiFetch } from "@/lib/api-client"
 import { averageCappedPct, ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
 import { formatWATDate } from "@/lib/utils/date"
 import { exportDepartmentCascadeToExcel, exportDepartmentCascadeToPdf } from "@/lib/corporate-scorecard/export"
+import { PlanYearSelect } from "./plan-year-select"
 
 type CascadeRow = {
   assignment_id: string
@@ -159,12 +160,15 @@ export function DepartmentCascadeContent({
     }
   }, [department, lockedDepartment])
 
-  const queryKey = ["corporate-scorecard-department", department]
+  // null = let the server pick (current year, or the latest loaded plan).
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const queryKey = ["corporate-scorecard-department", department, selectedYear]
 
-  const { data, isLoading, error, refetch } = useQuery<{ data: CascadeRow[] }>({
+  const { data, isLoading, error, refetch } = useQuery<{ data: CascadeRow[]; year?: number; years?: number[] }>({
     queryKey,
     queryFn: async () => {
-      const res = await apiFetch(`/api/corporate-scorecard/departments/${encodeURIComponent(department)}`, {
+      const query = selectedYear ? `?year=${selectedYear}` : ""
+      const res = await apiFetch(`/api/corporate-scorecard/departments/${encodeURIComponent(department)}${query}`, {
         cache: "no-store",
       })
       const payload = await res.json()
@@ -175,6 +179,7 @@ export function DepartmentCascadeContent({
   })
 
   const rows = useMemo(() => data?.data ?? [], [data])
+  const planYear = data?.year ?? selectedYear ?? new Date().getFullYear()
   const coreRows = useMemo(() => rows.filter((r) => r.role === "core"), [rows])
 
   const departmentAttainment = useMemo(() => averageCappedPct(coreRows.map((r) => r.capped_pct)), [coreRows])
@@ -391,7 +396,7 @@ export function DepartmentCascadeContent({
   return (
     <DataTablePage
       title={tabs ? "Corporate Scorecard" : "Department KPIs"}
-      description="Each department's assigned KPIs, confirmed targets, proposed action plans, and recorded actual progress against the 2026 plan."
+      description={`Each department's assigned KPIs, confirmed targets, proposed action plans, and recorded actual progress against the ${planYear} plan.`}
       icon={Target}
       backLink={backLink || { href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
@@ -399,6 +404,7 @@ export function DepartmentCascadeContent({
       onTabChange={onTabChange}
       actions={
         <div className="flex items-center gap-2">
+          <PlanYearSelect year={data?.year} years={data?.years} onChange={setSelectedYear} />
           <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)}>
             <Download className="mr-2 h-4 w-4" />
             Export

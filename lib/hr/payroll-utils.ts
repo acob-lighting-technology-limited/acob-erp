@@ -428,8 +428,7 @@ export function isCoveredPayrollStatus(status: string): boolean {
     status === "lwop" ||
     status === "holiday" ||
     status === "out_of_station" ||
-    status === "absent_with_permission" ||
-    status === "lateness_with_permission"
+    status === "absent_with_permission"
   )
 }
 
