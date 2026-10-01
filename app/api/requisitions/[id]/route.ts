@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isRequisitionApprover, resolveRequisitionActor } from "@/lib/requisitions/authorization"
+import { normalizeDepartmentName } from "@/shared/departments"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
@@ -44,6 +46,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (error || !req) {
       return apiError("Requisition not found", ApiErrorCode.NOT_FOUND, 404)
+    }
+
+    // Same visibility as the list: the requester, stage approvers/admins, or the
+    // lead of the requisition's department. Anyone else gets a 404, not a 403,
+    // so ids cannot be probed.
+    if (req.user_id !== user.id) {
+      const actor = await resolveRequisitionActor(supabase, user.id)
+      const reqDept = normalizeDepartmentName(String(req.department || ""))
+      const allowed = actor && (isRequisitionApprover(actor) || actor.ledDepartments.includes(reqDept))
+      if (!allowed) return apiError("Requisition not found", ApiErrorCode.NOT_FOUND, 404)
     }
 
     return NextResponse.json({ data: req })

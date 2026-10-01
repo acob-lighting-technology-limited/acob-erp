@@ -7,7 +7,6 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { formatName, cn } from "@/lib/utils"
 import { formatWATDate, formatDateOfBirth, formatDDMMYYYY } from "@/lib/utils/date"
@@ -110,9 +109,6 @@ export interface Employee {
   residential_address: string | null
   office_location: string | null
   device_key?: string | null
-  bank_name: string | null
-  bank_account_number: string | null
-  bank_account_name: string | null
   date_of_birth: string | null
   birthday: string | null
   employment_date: string | null
@@ -204,9 +200,25 @@ function isContractStaff(employee: Employee): boolean {
   )
 }
 
+type EmployeeProfileRecord = EmployeeProfile & {
+  contract_categories?: { code?: string } | null
+  separation_reason?: string | null
+  suspension_reason?: string | null
+  suspension_end_date?: string | null
+  separation_date?: string | null
+  birth_year?: number | null
+  attendance_exempt?: boolean | null
+}
+
+async function fetchEmployeeProfile(userId: string): Promise<EmployeeProfileRecord> {
+  const res = await apiFetch(`/api/admin/hr/employees/${userId}/profile`, { cache: "no-store" })
+  const payload = (await res.json().catch(() => ({}))) as { error?: string; data?: EmployeeProfileRecord }
+  if (!res.ok || !payload.data) throw new Error(payload.error || "Employee not found")
+  return payload.data
+}
+
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
   const searchParams = useSearchParams()
-  const [supabase] = useState(() => createClient())
   const queryClient = useQueryClient()
 
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
@@ -282,9 +294,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     phone_number: "",
     additional_phone: "",
     residential_address: "",
-    bank_name: "",
-    bank_account_number: "",
-    bank_account_name: "",
     birthday: "",
     birth_year: "",
     employment_date: "",
@@ -365,15 +374,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
       try {
         setSelectedEmployee(employee)
-        const { data: fullProfile, error: profileErr } = await supabase
-          .from("profiles")
-          .select("*, contract_categories(code)")
-          .eq("id", employee.id)
-          .single()
-
-        if (profileErr) {
-          throw profileErr
-        }
+        const fullProfile = await fetchEmployeeProfile(employee.id)
 
         if (fullProfile) {
           const isDepartmentLead = Boolean(fullProfile.is_department_lead)
@@ -402,9 +403,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             phone_number: fullProfile.phone_number || "",
             additional_phone: fullProfile.additional_phone || "",
             residential_address: fullProfile.residential_address || "",
-            bank_name: fullProfile.bank_name || "",
-            bank_account_number: fullProfile.bank_account_number || "",
-            bank_account_name: fullProfile.bank_account_name || "",
             birthday: fullProfile.birthday || "",
             birth_year: fullProfile.birth_year != null ? String(fullProfile.birth_year) : "",
             employment_date: fullProfile.employment_date ? fullProfile.employment_date.split("T")[0] : "",
@@ -431,7 +429,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         toast.error("Failed to load employee details")
       }
     },
-    [canManageUsers, supabase]
+    [canManageUsers]
   )
 
   const handleViewEmployeeDetails = async (employee: Employee) => {
@@ -480,15 +478,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user && selectedEmployee.id === user.id && editForm.role !== selectedEmployee.role) {
-        toast.error("You cannot change your own role from the HR employee editor")
-        setIsSaving(false)
-        return
-      }
-
       const companyEmail = editForm.company_email.trim().toLowerCase()
       const additionalEmail = editForm.additional_email.trim().toLowerCase()
       const personalEmail = editForm.personal_email.trim().toLowerCase()
@@ -500,13 +489,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       }
 
       // 1. Fetch current profile state from DB to compare changes
-      const { data: currentProfile, error: fetchErr } = await supabase
-        .from("profiles")
-        .select("*, contract_categories(code)")
-        .eq("id", selectedEmployee.id)
-        .single()
-
-      if (fetchErr || !currentProfile) {
+      const currentProfile = await fetchEmployeeProfile(selectedEmployee.id).catch(() => null)
+      if (!currentProfile) {
         throw new Error("Could not retrieve current employee record for verification")
       }
 
@@ -613,63 +597,17 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }
       }
 
-      // 4. Update general profile fields
+      // 4. Update general profile fields — the API route derives department_id
+      //    and lead departments, and refuses a self role change.
       const canonicalDepartment = normalizeDepartmentName(editForm.department)
       const leadDepartments = deriveLeadDepartments(
         canonicalDepartment,
         editForm.is_department_lead,
         editForm.lead_departments
       )
-
       if (editForm.is_department_lead && leadDepartments.length === 0) {
         throw new Error("A department lead must lead at least one department")
       }
-
-      let departmentId: string | null = null
-      if (canonicalDepartment) {
-        const { data: deptRow } = await supabase
-          .from("departments")
-          .select("id")
-          .eq("name", canonicalDepartment)
-          .maybeSingle()
-        departmentId = deptRow?.id || null
-      }
-
-      const updateData: Database["public"]["Tables"]["profiles"]["Update"] = {
-        role: editForm.role,
-        admin_routes: editForm.role === "admin" ? editForm.admin_routes : null,
-        department: canonicalDepartment || null,
-        department_id: departmentId,
-        office_location: editForm.office_location || null,
-        designation: editForm.designation || null,
-        is_department_lead: editForm.is_department_lead,
-        lead_departments: leadDepartments,
-        updated_at: new Date().toISOString(),
-        first_name: editForm.first_name || "",
-        last_name: editForm.last_name || "",
-        other_names: editForm.other_names || null,
-        company_email: companyEmail,
-        additional_email: additionalEmail || null,
-        phone_number: editForm.phone_number || null,
-        additional_phone: editForm.additional_phone || null,
-        residential_address: editForm.residential_address || null,
-        bank_name: editForm.bank_name || null,
-        bank_account_number: editForm.bank_account_number || null,
-        bank_account_name: editForm.bank_account_name || null,
-        birthday: editForm.birthday || null,
-        birth_year: editForm.birth_year ? Number(editForm.birth_year) : null,
-        employment_date: editForm.employment_date || null,
-        confirmation_date: editForm.confirmation_date || null,
-        job_description: editForm.job_description || null,
-      }
-
-      ;(updateData as Record<string, unknown>).attendance_exempt = editForm.attendance_exempt
-      ;(updateData as Record<string, unknown>).personal_email = personalEmail || null
-      ;(updateData as Record<string, unknown>).nysc_cds_day =
-        editForm.employment_type === "contract" &&
-        (editForm.contract_category_code || "").toUpperCase().includes("NYSC")
-          ? editForm.nysc_cds_day || null
-          : null
 
       const emailSyncResponse = await apiFetch(`/api/admin/hr/employees/${selectedEmployee.id}/email`, {
         method: "PATCH",
@@ -678,18 +616,48 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       })
       if (!emailSyncResponse.ok) throw new Error("Failed to sync employee login email")
 
-      const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
-      if (error) throw error
+      const isNysc =
+        editForm.employment_type === "contract" &&
+        (editForm.contract_category_code || "").toUpperCase().includes("NYSC")
+      const profileRes = await apiFetch(`/api/admin/hr/employees/${selectedEmployee.id}/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: editForm.role,
+          admin_routes: editForm.role === "admin" ? editForm.admin_routes : null,
+          department: canonicalDepartment || "",
+          office_location: editForm.office_location || null,
+          designation: editForm.designation || null,
+          is_department_lead: editForm.is_department_lead,
+          lead_departments: leadDepartments,
+          first_name: editForm.first_name || "",
+          last_name: editForm.last_name || "",
+          other_names: editForm.other_names || null,
+          company_email: companyEmail,
+          additional_email: additionalEmail || null,
+          personal_email: personalEmail || null,
+          phone_number: editForm.phone_number || null,
+          additional_phone: editForm.additional_phone || null,
+          residential_address: editForm.residential_address || null,
+          birthday: editForm.birthday || null,
+          birth_year: editForm.birth_year || null,
+          employment_date: editForm.employment_date || null,
+          confirmation_date: editForm.confirmation_date || null,
+          job_description: editForm.job_description || null,
+          attendance_exempt: editForm.attendance_exempt,
+          nysc_cds_day: isNysc ? editForm.nysc_cds_day || null : null,
+        }),
+      })
+      const profilePayload = (await profileRes.json().catch(() => ({}))) as {
+        error?: string
+        data?: EmployeeProfile | null
+      }
+      if (!profileRes.ok) throw new Error(profilePayload.error || "Failed to update employee")
 
       toast.success("Employee updated successfully")
       if (isViewDialogOpen) {
         setModalViewMode("profile")
-        const { data: updatedProfile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", selectedEmployee.id)
-          .single()
-        if (updatedProfile) setViewEmployeeProfile(updatedProfile as EmployeeProfile)
+        if (profilePayload.data) setViewEmployeeProfile(profilePayload.data)
       }
       loadData()
     } catch (_error: unknown) {

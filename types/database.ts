@@ -24,9 +24,6 @@ export type Database = {
           residential_address: string | null
           current_work_location: string | null
           office_location: string | null
-          bank_name: string | null
-          bank_account_number: string | null
-          bank_account_name: string | null
           date_of_birth: string | null // DERIVED (trigger) from birthday + birth_year; not directly writable
           birthday: string | null // MM-DD, canonical month/day; source for birthday emails & derived date_of_birth
           birth_year: number | null // year only, null until known; combines with birthday to form date_of_birth
@@ -70,9 +67,6 @@ export type Database = {
           residential_address?: string | null
           current_work_location?: string | null
           office_location?: string | null
-          bank_name?: string | null
-          bank_account_number?: string | null
-          bank_account_name?: string | null
           birthday?: string | null
           birth_year?: number | null
           employment_date?: string | null
@@ -108,9 +102,6 @@ export type Database = {
           residential_address?: string | null
           current_work_location?: string | null
           office_location?: string | null
-          bank_name?: string | null
-          bank_account_number?: string | null
-          bank_account_name?: string | null
           birthday?: string | null
           birth_year?: number | null
           employment_date?: string | null
@@ -317,9 +308,6 @@ export interface Profile {
   residential_address?: string
   current_work_location?: string
   office_location?: string
-  bank_name?: string
-  bank_account_number?: string
-  bank_account_name?: string
   date_of_birth?: string // DERIVED from birthday + birth_year
   birthday?: string | null // MM-DD canonical month/day
   birth_year?: number | null // year only, null until known

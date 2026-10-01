@@ -13,6 +13,7 @@ import {
 } from "@/lib/tasks/overdue"
 import { addIsoDays, eachIsoDate, isWorkingDay, type HolidaySet } from "@/lib/hr/leave-days"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("cron-tasks-expire-overdue")
 
@@ -308,7 +309,7 @@ async function notifyBoth(
     if (params.cooldown && (await recentlyNotified(supabase, userId, task.id, params.type))) continue
     try {
       // supabase-js reports RPC failures in the result rather than throwing.
-      const { error: notifyRpcError } = await supabase.rpc("create_notification", {
+      const { error: notifyRpcError } = await createNotification({
         p_user_id: userId,
         p_type: params.type,
         p_category: "tasks",

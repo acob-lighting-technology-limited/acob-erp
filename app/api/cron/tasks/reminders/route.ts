@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
 import { computeProjectHealth, describeAttention, type ProjectHealthTask } from "@/lib/projects/health"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("cron-tasks-reminders")
 
@@ -142,7 +143,7 @@ async function notify(
 ): Promise<boolean> {
   try {
     // supabase-js reports RPC failures in the result rather than throwing.
-    const { error } = await supabase.rpc("create_notification", {
+    const { error } = await createNotification({
       p_user_id: params.userId,
       p_type: params.type,
       p_category: "tasks",

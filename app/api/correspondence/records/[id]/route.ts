@@ -14,6 +14,7 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("correspondence-records")
 
@@ -344,7 +345,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
               { onConflict: "correspondence_id,approval_stage" }
             )
             // Notify exec lead
-            await supabase.rpc("create_notification", {
+            await createNotification({
               p_user_id: execLead.id,
               p_type: "task_assigned",
               p_category: "operations",
@@ -371,7 +372,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
               },
               { onConflict: "correspondence_id,approval_stage" }
             )
-            await supabase.rpc("create_notification", {
+            await createNotification({
               p_user_id: deptLead.id,
               p_type: "task_assigned",
               p_category: "operations",
@@ -486,7 +487,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     ) {
       try {
         const displayRef = record.reference_number || updated.reference_number || "Draft"
-        await supabase.rpc("create_notification", {
+        await createNotification({
           p_user_id: record.originator_id,
           p_type:
             updated.status === "approved"

@@ -12,6 +12,7 @@ import {
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("help-desk-tickets-approvals")
 const ProcessHelpDeskApprovalSchema = z.object({
@@ -177,7 +178,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         actorId: user.id,
       })
 
-      await supabase.rpc("create_notification", {
+      await createNotification({
         p_user_id: ticket.requester_id,
         p_type: "approval_rejected",
         p_category: "approvals",
@@ -231,7 +232,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
         const notificationTargets = [ticket.requester_id, ticket.assigned_to].filter(Boolean)
         for (const targetId of notificationTargets) {
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: targetId,
             p_type: "approval_granted",
             p_category: "approvals",
@@ -305,7 +306,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         }
 
         if (nextApprover?.id) {
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: nextApprover.id,
             p_type: "approval_request",
             p_category: "approvals",

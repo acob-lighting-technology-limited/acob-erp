@@ -8,6 +8,7 @@ import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 import { renderPasswordChangedEmail } from "@/lib/email-templates/password-changed"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { writeLoginLog, REAUTH_SOURCE } from "@/lib/auth/login-log"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("change-password")
 
@@ -120,7 +121,7 @@ export async function POST(req: Request) {
 
     // Send in-app notification
     try {
-      await supabase.rpc("create_notification", {
+      await createNotification({
         p_user_id: user.id,
         p_type: "security_alert",
         p_category: "security",

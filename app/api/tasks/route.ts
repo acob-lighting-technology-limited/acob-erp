@@ -17,6 +17,7 @@ import { addIsoDays, type HolidaySet } from "@/lib/hr/leave-days"
 import { getHolidaySet } from "@/lib/hr/leave-workflow"
 import { toLocalISODate } from "@/lib/utils/date"
 import type { Task, TaskPersonSummary } from "@/types/task"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("tasks-route")
 
@@ -434,7 +435,7 @@ export async function POST(request: NextRequest) {
         if (t.assigned_to && t.assigned_to !== user.id) {
           try {
             const notifyPriority = t.priority === "urgent" ? "urgent" : t.priority === "high" ? "high" : "normal"
-            await supabase.rpc("create_notification", {
+            await createNotification({
               p_user_id: t.assigned_to,
               p_type: "task_assigned",
               p_category: "tasks",
@@ -524,7 +525,7 @@ export async function POST(request: NextRequest) {
     if (task.assigned_to && task.assigned_to !== user.id) {
       try {
         const notifyPriority = task.priority === "urgent" ? "urgent" : task.priority === "high" ? "high" : "normal"
-        await supabase.rpc("create_notification", {
+        await createNotification({
           p_user_id: task.assigned_to,
           p_type: "task_assigned",
           p_category: "tasks",

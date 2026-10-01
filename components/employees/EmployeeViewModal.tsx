@@ -75,9 +75,6 @@ export interface EditForm {
   phone_number: string
   additional_phone: string
   residential_address: string
-  bank_name: string
-  bank_account_number: string
-  bank_account_name: string
   birthday: string
   birth_year: string
   employment_date: string

@@ -3,10 +3,15 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { getNextStage } from "@/lib/requisitions/workflow"
-import { canApproveEmergencyRequisition } from "@/lib/requisitions/authorization"
+import {
+  canActOnRequisitionStage,
+  canApproveEmergencyRequisition,
+  resolveRequisitionActor,
+} from "@/lib/requisitions/authorization"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("api-requisitions-approve")
 
@@ -68,6 +73,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         ApiErrorCode.FORBIDDEN,
         403
       )
+    }
+
+    // Normal route: only the lead who owns the current stage (or an admin-like
+    // role) may act, and never on their own requisition.
+    if (!req.is_emergency) {
+      const actor = await resolveRequisitionActor(supabase, user.id)
+      if (!actor || !canActOnRequisitionStage(actor, req.current_stage_code, req.user_id)) {
+        return apiError("You are not the approver for this stage of the requisition.", ApiErrorCode.FORBIDDEN, 403)
+      }
     }
 
     const now = new Date().toISOString()
@@ -148,7 +162,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Send notifications
     try {
       if (action === "reject") {
-        await adminClient.rpc("create_notification", {
+        await createNotification({
           p_user_id: req.user_id,
           p_type: "requisition_rejected",
           p_category: "approvals",
@@ -161,7 +175,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           p_entity_id: req.id,
         })
       } else if (updatedReq.status === "approved") {
-        await adminClient.rpc("create_notification", {
+        await createNotification({
           p_user_id: req.user_id,
           p_type: "requisition_approved",
           p_category: "approvals",
@@ -177,7 +191,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         })
       } else {
         // Notify next stage group or requester
-        await adminClient.rpc("create_notification", {
+        await createNotification({
           p_user_id: req.user_id,
           p_type: "requisition_stage_passed",
           p_category: "approvals",

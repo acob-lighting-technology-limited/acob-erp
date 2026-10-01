@@ -9,8 +9,10 @@ import {
   getInitialStage,
   getStageLabel,
 } from "@/lib/requisitions/workflow"
+import { isRequisitionApprover, resolveRequisitionActor } from "@/lib/requisitions/authorization"
 import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("api-requisitions")
 
@@ -66,7 +68,13 @@ export async function GET(request: NextRequest) {
     const statusParam = url.searchParams.get("status")
     const stageParam = url.searchParams.get("stage")
 
-    let query = supabase
+    // Visibility: everyone sees their own; admins and the leads who sign a stage
+    // see the whole queue; other department leads see their department's.
+    const actor = await resolveRequisitionActor(supabase, user.id)
+    const seesAll = actor ? isRequisitionApprover(actor) : false
+    const dataClient = getAdminClient() || supabase
+
+    let query = dataClient
       .from("requisitions")
       .select(
         `
@@ -76,8 +84,14 @@ export async function GET(request: NextRequest) {
       )
       .order("created_at", { ascending: false })
 
-    if (userOnly) {
+    if (userOnly || !actor) {
       query = query.eq("user_id", user.id)
+    } else if (!seesAll) {
+      const depts = actor.ledDepartments
+      query =
+        depts.length > 0
+          ? query.or(`user_id.eq.${user.id},department.in.(${depts.map((d) => `"${d}"`).join(",")})`)
+          : query.eq("user_id", user.id)
     }
 
     if (statusParam) {
@@ -92,7 +106,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       log.error("Error fetching requisitions:", error)
-      return apiError(error.message, ApiErrorCode.INTERNAL_ERROR, 500)
+      return apiError("Failed to load requisitions", ApiErrorCode.INTERNAL_ERROR, 500)
     }
 
     return NextResponse.json({ data: data || [] })
@@ -202,7 +216,7 @@ export async function POST(request: NextRequest) {
           : `Requisition ${newReq.requisition_number} (₦${payload.amount.toLocaleString()}) submitted for ${getStageLabel(initialStage).replace(/^Pending /, "")}.`
 
         for (const target of adminHrProfiles) {
-          await adminClient.rpc("create_notification", {
+          await createNotification({
             p_user_id: target.id,
             p_type: "approval_request",
             p_category: "approvals",

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { clampWeight } from "@/lib/tasks/scoring"
 import { logger } from "@/lib/logger"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { createNotification } from "@/lib/notifications/create"
 
 export const dynamic = "force-dynamic"
 const log = logger("project-tasks-api")
@@ -18,7 +19,7 @@ async function notifyProjectTaskAssigned(
   params: { taskId: string; title: string; priority: string | null; assigneeId: string; actorId: string }
 ) {
   try {
-    const { error } = await supabase.rpc("create_notification", {
+    const { error } = await createNotification({
       p_user_id: params.assigneeId,
       p_type: "task_assigned",
       p_category: "tasks",
