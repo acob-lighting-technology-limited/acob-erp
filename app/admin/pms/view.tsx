@@ -1,17 +1,5 @@
 import Link from "next/link"
-import {
-  Award,
-  BookOpen,
-  Brain,
-  ChevronRight,
-  Clock3,
-  FileText,
-  MessageSquare,
-  RefreshCw,
-  Settings,
-  ShieldCheck,
-  Target,
-} from "lucide-react"
+import { Award, Brain, ChevronRight, Clock3, FileText, RefreshCw, Settings, ShieldCheck, Target } from "lucide-react"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -81,17 +69,6 @@ const adminPmsLinks = [
     subLabel: "Review forms & acknowledgements",
   },
   {
-    title: "Peer Feedback",
-    href: "/admin/pms/peer-feedback",
-    icon: MessageSquare,
-    description: "View all peer feedback submissions across departments.",
-    color: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
-    fill: "bg-teal-500",
-    hoverBorder: "hover:border-teal-500/60 dark:hover:border-teal-400/60",
-    hoverText: "group-hover:text-teal-500",
-    subLabel: "Peer evaluation logs",
-  },
-  {
     title: "Review Cycles",
     href: "/admin/pms/cycles",
     icon: RefreshCw,
@@ -112,17 +89,6 @@ const adminPmsLinks = [
     hoverBorder: "hover:border-orange-500/60 dark:hover:border-orange-400/60",
     hoverText: "group-hover:text-orange-500",
     subLabel: "Calibration & distribution",
-  },
-  {
-    title: "Development Plans",
-    href: "/admin/pms/development-plans",
-    icon: BookOpen,
-    description: "Create and track employee development plans linked to reviews.",
-    color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    fill: "bg-emerald-500",
-    hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
-    hoverText: "group-hover:text-emerald-500",
-    subLabel: "Personal growth & actions",
   },
   {
     title: "Competencies",

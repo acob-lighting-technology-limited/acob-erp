@@ -2,16 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Award, Brain, CheckCircle2, Clock3, MessageSquare, ShieldCheck, Target, TrendingUp } from "lucide-react"
+import { Award, Brain, Clock3, ShieldCheck, Target, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { pmsNavChildren } from "@/lib/pms/sections"
 
 const PMS_NAV_ICONS: Record<string, React.ElementType> = {
-  goals: CheckCircle2,
   kpi: Target,
   reviews: Award,
-  "peer-feedback": MessageSquare,
-  "development-plans": Award,
   behaviour: ShieldCheck,
   cbt: Brain,
   attendance: Clock3,

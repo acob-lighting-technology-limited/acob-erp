@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Award, BookOpen, Brain, ChevronRight, Clock3, ShieldCheck, Target, TrendingUp } from "lucide-react"
+import { Award, Brain, ChevronRight, Clock3, ShieldCheck, Target, TrendingUp } from "lucide-react"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -81,18 +81,6 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       fill: "bg-indigo-500",
       hoverBorder: "hover:border-indigo-500/60 dark:hover:border-indigo-400/60",
       hoverText: "group-hover:text-indigo-500",
-    },
-    {
-      title: "Development Plans",
-      description: "View and track your personal development goals and action steps.",
-      href: "/pms/development-plans",
-      icon: BookOpen,
-      score: "Active",
-      scoreSub: "Personal growth & actions",
-      color: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
-      fill: "bg-teal-500",
-      hoverBorder: "hover:border-teal-500/60 dark:hover:border-teal-400/60",
-      hoverText: "group-hover:text-teal-500",
     },
   ]
 

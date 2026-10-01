@@ -4,6 +4,10 @@ import type { NavChild } from "@/lib/nav/types"
  * PMS sub-pages, in nav order. Shared by the three sidebars and the /pms
  * sub-nav so a viewer sees the same order in both places on the same screen.
  *
+ * Peer feedback and development plans are left out on purpose (1 Oct 2026):
+ * both were empty and fed nothing. Their pages and tables still exist, so they
+ * can be re-listed here if HR starts running them.
+ *
  * `adminOnly` marks the pages that exist only on the admin and dept shells —
  * staff have no cycle or competency management of their own.
  */
@@ -12,8 +16,6 @@ export const PMS_SECTIONS = [
   { slug: "cycles", name: "Cycles", adminOnly: true },
   { slug: "kpi", name: "KPI" },
   { slug: "reviews", name: "Reviews" },
-  { slug: "peer-feedback", name: "Peer Feedback" },
-  { slug: "development-plans", name: "Development Plans" },
   { slug: "behaviour", name: "Behaviour" },
   { slug: "competencies", name: "Competencies", adminOnly: true },
   { slug: "cbt", name: "CBT" },
