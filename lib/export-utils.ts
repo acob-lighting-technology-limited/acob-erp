@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf"
+import { shuffle } from "@/lib/utils/random"
 import { saveAs } from "file-saver"
 import { DEPT_EXECUTIVE_MANAGEMENT } from "@/config/constants"
 import {
@@ -3117,7 +3118,7 @@ export const exportAllToPPTX = async (
           normalizeDepartmentName(a.department).localeCompare(normalizeDepartmentName(b.department))
         )
       : order === "random"
-        ? [...reports].sort(() => Math.random() - 0.5)
+        ? shuffle(reports)
         : sortReportsByDepartment(reports)
   const departments = sortedReports.map((entry) => entry.department)
 
