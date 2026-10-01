@@ -15,9 +15,22 @@ import {
   Ticket,
   Utensils,
 } from "lucide-react"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
-import type { Task, Asset, LeaveItem, HelpDeskItem, CorrespondenceItem, LunchLogItem } from "@/app/(app)/profile/page"
+import {
+  ATTENDANCE_STATUS_COLORS,
+  ATTENDANCE_STATUS_LABELS,
+  type UnifiedAttendanceStatus,
+} from "@/lib/hr/attendance-status"
+import type {
+  Task,
+  Asset,
+  LeaveItem,
+  HelpDeskItem,
+  CorrespondenceItem,
+  LunchLogItem,
+  WorkDayAttendanceItem,
+} from "@/app/(app)/profile/page"
 import { getTaskUrgency, isOpenCorrespondence, isOpenTicket, sortTasksByUrgency } from "./work-items"
 
 const MAX_TASKS = 6
@@ -246,6 +259,102 @@ export function AssetsCard({ assets }: { assets: Asset[] }) {
             title="No assets assigned"
             description="Company assets assigned to you will appear here."
             icon={Package}
+            className="border-0 py-2"
+          />
+        </div>
+      )}
+    </ListCard>
+  )
+}
+
+function formatClockTime(value: string | null | undefined): string {
+  if (!value || value === "-") return "-"
+  const parts = value.split(":")
+  if (parts.length >= 2) {
+    return `${parts[0]}:${parts[1]}`
+  }
+  return value
+}
+
+/* ------------------------- Recent Workday Attendance ------------------------- */
+
+export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[] }) {
+  const todayIso = toLocalISODate()
+
+  return (
+    <ListCard
+      title="Recent Attendance"
+      icon={CalendarClock}
+      count={items.length}
+      viewAllHref="/hr/attendance"
+      viewAllLabel="All records"
+    >
+      {items.length > 0 ? (
+        <ul className="divide-y border-t">
+          {items.map((item) => {
+            const isToday = item.date === todayIso
+            const clockIn = formatClockTime(item.clock_in)
+            const clockOut = formatClockTime(item.clock_out)
+            const statusKey = item.status as UnifiedAttendanceStatus
+            const statusLabel =
+              item.status === "not_clocked_in"
+                ? "Not Clocked In"
+                : ATTENDANCE_STATUS_LABELS[statusKey] || humanizeStatus(item.status)
+            const statusColor =
+              item.status === "not_clocked_in"
+                ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                : ATTENDANCE_STATUS_COLORS[statusKey] || statusBadgeClass(item.status)
+
+            return (
+              <Row key={item.date} href="/hr/attendance">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-foreground text-xs font-semibold">
+                    {formatWATDate(item.date, { weekday: "short", month: "short", day: "numeric" })}
+                    {isToday && <span className="text-muted-foreground ml-1 font-normal">(Today)</span>}
+                  </p>
+                  <Badge
+                    variant="outline"
+                    className={cn("shrink-0 border px-1.5 py-0 text-[10px] font-medium", statusColor)}
+                  >
+                    {statusLabel}
+                  </Badge>
+                </div>
+                <div className="text-muted-foreground mt-0.5 flex items-center justify-between text-[11px]">
+                  <span>
+                    {item.clock_in ? (
+                      <>
+                        <span>
+                          In: <strong className="text-foreground font-mono">{clockIn}</strong>
+                        </span>
+                        <span className="mx-1.5">·</span>
+                        <span>
+                          Out:{" "}
+                          <strong className="text-foreground font-mono">
+                            {clockOut !== "-" ? clockOut : isToday ? "Active" : "—"}
+                          </strong>
+                        </span>
+                      </>
+                    ) : item.status === "on_leave" || item.status === "lwop" ? (
+                      <span className="text-purple-600 dark:text-purple-400">{item.leave_type || "On Leave"}</span>
+                    ) : item.status === "exempted" ? (
+                      <span className="text-violet-600 dark:text-violet-400">Attendance exempt</span>
+                    ) : isToday ? (
+                      <span className="text-muted-foreground">Not clocked in yet</span>
+                    ) : (
+                      <span className="text-red-600 dark:text-red-400">No clock-in</span>
+                    )}
+                  </span>
+                </div>
+              </Row>
+            )
+          })}
+        </ul>
+      ) : (
+        <div className="border-t px-6 py-8 text-center">
+          <EmptyState
+            title="No attendance records"
+            description="Recent working day attendance will appear here."
+            icon={CalendarClock}
             className="border-0 py-2"
           />
         </div>

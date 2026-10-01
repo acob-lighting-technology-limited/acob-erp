@@ -6,7 +6,13 @@ import { toast } from "sonner"
 import { ProfileHero } from "@/components/profile/profile-hero"
 import { ProfileEditDialog } from "@/components/profile/profile-edit-dialog"
 import { NeedsAttention } from "@/components/profile/needs-attention"
-import { MyTasksCard, TicketsCard, AssetsCard, LunchHistoryCard } from "@/components/profile/work-lists"
+import {
+  MyTasksCard,
+  TicketsCard,
+  AssetsCard,
+  LunchHistoryCard,
+  RecentAttendanceCard,
+} from "@/components/profile/work-lists"
 import {
   PersonalRecentActivityFeed,
   type PersonalRecentActivityItem,
@@ -22,6 +28,7 @@ import type {
   AttendanceItem,
   LunchLogItem,
   TodayAttendanceStatus,
+  WorkDayAttendanceItem,
 } from "./page"
 
 const MAX_ACTIVITY_ENTRIES = 12
@@ -37,6 +44,7 @@ interface ProfileContentProps {
   leave: LeaveItem[]
   annualLeaveRemaining?: number
   attendance: AttendanceItem[]
+  recentWorkDaysAttendance?: WorkDayAttendanceItem[]
   todayStatus?: TodayAttendanceStatus | null
   lunchLogs: LunchLogItem[]
   recentActivity: PersonalRecentActivityItem[]
@@ -54,6 +62,7 @@ export function ProfileContent({
   leave,
   annualLeaveRemaining = 0,
   attendance,
+  recentWorkDaysAttendance = [],
   todayStatus,
   lunchLogs,
   recentActivity,
@@ -100,11 +109,15 @@ export function ProfileContent({
         annualLeaveRemaining={annualLeaveRemaining}
       />
 
-      {/* Work first (2/3), secondary context in the rail (1/3) */}
+      {/* 3-Column Layout: Work Execution (1/3), Attendance (1/3), Services & Activity (1/3) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-6">
           <MyTasksCard tasks={tasks} />
           <TicketsCard helpDesk={helpDesk} />
+        </div>
+
+        <div className="space-y-6">
+          <RecentAttendanceCard items={recentWorkDaysAttendance} />
         </div>
 
         <div className="space-y-6">

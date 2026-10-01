@@ -11,6 +11,7 @@ import type { Task, TaskUserProfile } from "@/types/task"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { loadAttendancePolicy, toLocalISODate, isWeekend } from "@/lib/hr/attendance-utils"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { addIsoDays } from "@/lib/hr/leave-days"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,14 @@ export type { Task }
 export interface TodayAttendanceStatus {
   status: string
   clock_in?: string | null
+}
+
+export interface WorkDayAttendanceItem {
+  date: string
+  clock_in: string | null
+  clock_out: string | null
+  status: string
+  leave_type?: string | null
 }
 
 export interface UserProfile {
@@ -229,6 +238,7 @@ async function getProfileData() {
       leave: [],
       annualLeaveRemaining: 0,
       attendance: [],
+      recentWorkDaysAttendance: [],
       recentActivity: [],
     }
   }
@@ -403,6 +413,7 @@ async function getProfileData() {
   }
 
   const todayIso = toLocalISODate()
+  const lookbackStartIso = addIsoDays(todayIso, -20)
 
   const [{ data: todayRecord }, { data: attendanceData, error: attendanceError }] = await Promise.all([
     dataClient
@@ -423,7 +434,7 @@ async function getProfileData() {
   if (attendanceError) loadErrors.push("attendance")
 
   const [dayCtx, policy] = await Promise.all([
-    loadDayContext(dataClient, { userIds: [userId], start: todayIso, end: todayIso }),
+    loadDayContext(dataClient, { userIds: [userId], start: lookbackStartIso, end: todayIso }),
     loadAttendancePolicy(dataClient),
   ])
 
@@ -451,6 +462,63 @@ async function getProfileData() {
     status: derivedTodayStatus,
     clock_in: todayRecord?.clock_in ?? null,
   }
+
+  // Calculate the last 5 actual company workdays (Mon–Fri, excluding org holidays)
+  const recentWorkDays: string[] = []
+  let workDayCursor = todayIso
+  while (recentWorkDays.length < 5) {
+    if (!isWeekend(workDayCursor) && !dayCtx.isHoliday(workDayCursor)) {
+      recentWorkDays.push(workDayCursor)
+    }
+    workDayCursor = addIsoDays(workDayCursor, -1)
+  }
+
+  const attendanceByDate = new Map<string, AttendanceItem>()
+  for (const rec of attendanceData || []) {
+    if (rec.date) attendanceByDate.set(rec.date, rec)
+  }
+  if (todayRecord) {
+    attendanceByDate.set(todayIso, todayRecord)
+  }
+
+  const recentWorkDaysAttendance: WorkDayAttendanceItem[] = recentWorkDays.map((d) => {
+    const record = attendanceByDate.get(d) || null
+    const isToday = d === todayIso
+
+    let status: string
+    if (isToday) {
+      status = derivedTodayStatus
+    } else {
+      status = deriveUnifiedAttendanceStatus(
+        {
+          record,
+          isHoliday: dayCtx.isHoliday(d),
+          isOnLeave: dayCtx.isOnLeave(userId, d),
+          isOnUnpaidLeave: dayCtx.isOnUnpaidLeave(userId, d),
+          isExempted: Boolean(profileData.attendance_exempt) || dayCtx.isExempt(userId, d),
+          isCdsDay: dayCtx.isCdsDay(userId, d),
+          recordDate: d,
+          earlyClosure: dayCtx.earlyCloseTime(d) ? { closeTime: dayCtx.earlyCloseTime(d)! } : null,
+          lateResumption: dayCtx.lateResumptionTime(d) ? { resumptionTime: dayCtx.lateResumptionTime(d)! } : null,
+        },
+        policy
+      )
+    }
+
+    let leaveType: string | null = null
+    if (status === "on_leave" || status === "lwop") {
+      const matched = leaveData.find((l) => d >= l.start_date && d <= l.end_date)
+      if (matched) leaveType = matched.leave_type
+    }
+
+    return {
+      date: d,
+      clock_in: record?.clock_in || null,
+      clock_out: record?.clock_out || null,
+      status,
+      leave_type: leaveType,
+    }
+  })
 
   const { data: lunchLogsData } = await dataClient
     .from("attendance_lunch_log")
@@ -504,6 +572,7 @@ async function getProfileData() {
     leave: leaveData,
     annualLeaveRemaining,
     attendance: attendanceData || [],
+    recentWorkDaysAttendance,
     todayStatus,
     lunchLogs: lunchLogsData || [],
     recentActivity,
@@ -533,6 +602,7 @@ export default async function ProfilePage() {
       leave={profileData.leave}
       annualLeaveRemaining={profileData.annualLeaveRemaining}
       attendance={profileData.attendance}
+      recentWorkDaysAttendance={profileData.recentWorkDaysAttendance || []}
       todayStatus={profileData.todayStatus}
       lunchLogs={profileData.lunchLogs || []}
       recentActivity={profileData.recentActivity}
