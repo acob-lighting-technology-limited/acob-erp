@@ -25,13 +25,6 @@ type ReviewRow = {
   final_score: number | null
 }
 
-type GoalRow = {
-  id: string
-  department?: string | null
-  approval_status: string | null
-  status: string | null
-}
-
 export type IndividualPmsScore = Awaited<ReturnType<typeof computeIndividualPerformanceScore>>
 
 export type ReviewCycleOption = {
@@ -60,14 +53,7 @@ export async function getCurrentUserPmsData(cycleId?: string) {
     .eq("id", user.id)
     .maybeSingle<ProfileRow>()
 
-  const [{ data: goals }, { data: latestReview }, { data: cycleRows }] = await Promise.all([
-    profile?.department
-      ? supabase
-          .from("goals_objectives")
-          .select("id, department, approval_status, status")
-          .eq("department", profile.department)
-          .returns<GoalRow[]>()
-      : Promise.resolve({ data: [] as GoalRow[] }),
+  const [{ data: latestReview }, { data: cycleRows }] = await Promise.all([
     supabase
       .from("performance_reviews")
       .select("id, created_at, status, final_score")
@@ -104,7 +90,6 @@ export async function getCurrentUserPmsData(cycleId?: string) {
     recentAttendance = attendance || []
   }
 
-  const goalRows = goals || []
   const cycles: ReviewCycleOption[] = (cycleRows || []).map((c) => ({
     id: c.id,
     name: c.name || "Review Cycle",
@@ -124,11 +109,6 @@ export async function getCurrentUserPmsData(cycleId?: string) {
       name: score.cycle_name || (cycleId === "all" ? "All Quarters" : "Active Review Cycle"),
       startDate: score.cycle_start_date,
       endDate: score.cycle_end_date,
-    },
-    goalSummary: {
-      total: goalRows.length,
-      approved: goalRows.filter((goal) => goal.approval_status === "approved").length,
-      completed: goalRows.filter((goal) => goal.status === "completed").length,
     },
     attendance: {
       recent: recentAttendance,

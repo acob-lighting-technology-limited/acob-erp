@@ -1,15 +1,5 @@
 import Link from "next/link"
-import {
-  Award,
-  BookOpen,
-  Brain,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  ShieldCheck,
-  Target,
-  TrendingUp,
-} from "lucide-react"
+import { Award, BookOpen, Brain, ChevronRight, Clock3, ShieldCheck, Target, TrendingUp } from "lucide-react"
 import { PageHeader, PageWrapper, Section } from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -26,33 +16,20 @@ function formatPercent(value: number | null | undefined) {
 
 export default async function PmsPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
-  const { profile, score, cycles, activeCycleId, goalSummary, attendance, latestReview } =
-    await getCurrentUserPmsData(cycle_id)
+  const { profile, score, cycles, activeCycleId, attendance, latestReview } = await getCurrentUserPmsData(cycle_id)
 
   const pmsAreaCards = [
     {
       title: "KPI",
-      description: "See your approved goal breakdown and current KPI score.",
+      description: "See your scored work, KPI score, and the company goals your tasks serve.",
       href: "/pms/kpi",
       icon: Target,
       score: formatPercent(score.kpi_score),
-      scoreSub: `${goalSummary.approved} approved goals`,
+      scoreSub: "Weighted task score",
       color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
       fill: "bg-blue-500",
       hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
       hoverText: "group-hover:text-blue-500",
-    },
-    {
-      title: "Goals",
-      description: "Open your goals workspace and track approved deliverables.",
-      href: "/pms/goals",
-      icon: CheckCircle2,
-      score: `${goalSummary.approved}`,
-      scoreSub: `${goalSummary.completed} completed goals`,
-      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-      fill: "bg-emerald-500",
-      hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
-      hoverText: "group-hover:text-emerald-500",
     },
     {
       title: "Attendance",
@@ -142,7 +119,7 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
           title="KPI"
           value={formatPercent(score.kpi_score)}
           icon={Target}
-          description={`${goalSummary.approved} approved goals`}
+          description="Weighted task score"
         />
         <StatCard
           variant="compact"

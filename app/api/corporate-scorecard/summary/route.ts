@@ -4,11 +4,10 @@ import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import {
-  computeAttainment,
   ragStatus,
   rollupByPerspective,
   averageCappedPct,
-  resolveEffectiveActual,
+  resolveKpiAttainment,
   type Direction,
   type MeasureType,
 } from "@/lib/corporate-scorecard/attainment"
@@ -112,47 +111,13 @@ export async function GET(request: NextRequest) {
     const latestManual = latestByKey.get(`${row.kpi_id}:${row.department}`) ?? null
     const taskStat = taskStatsByKey.get(`${row.kpi_id}:${row.department}`) ?? null
 
-    let autoDetected: {
-      value: number | null
-      milestones_completed?: number | null
-      milestones_total?: number | null
-      taskStats?: { total: number; completed: number; inProgress: number } | null
-    } | null = null
-
-    if (taskStat && taskStat.total > 0) {
-      if (kpi.measure_type === "milestone") {
-        autoDetected = {
-          value: null,
-          milestones_completed: taskStat.completed,
-          milestones_total: Math.max(taskStat.total, Number(row.target_value) || 3),
-          taskStats: taskStat,
-        }
-      } else if (kpi.measure_type === "percentage") {
-        autoDetected = {
-          value: Math.round((taskStat.completed / taskStat.total) * 100),
-          taskStats: taskStat,
-        }
-      } else {
-        autoDetected = {
-          value: taskStat.completed,
-          taskStats: taskStat,
-        }
-      }
-    }
-
-    const resolved = resolveEffectiveActual({
-      manualActual: latestManual,
-      autoDetected,
-    })
-
-    const attainment = computeAttainment({
+    const { resolved, attainment } = resolveKpiAttainment({
       measureType: kpi.measure_type,
       direction: kpi.direction,
       targetValue: row.target_value,
       targetText: kpi.target_text,
-      actualValue: resolved.effectiveActual,
-      milestonesCompleted: resolved.effectiveMilestonesCompleted,
-      milestonesTotal: resolved.effectiveMilestonesTotal,
+      manualActual: latestManual,
+      taskStats: taskStat,
     })
 
     return {

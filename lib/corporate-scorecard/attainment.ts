@@ -368,3 +368,53 @@ export function computePacingStatus(
   }
   return { status: "behind", elapsedPct, label: "Behind schedule" }
 }
+
+export type KpiTaskStats = { total: number; completed: number; inProgress: number }
+
+/**
+ * One department's attainment on one KPI — the only place this is worked out,
+ * so the register, the department cascade and the company summary cannot
+ * disagree about the same KPI.
+ *
+ * Tasks can stand in for a recorded actual on a MILESTONE KPI only, where
+ * "how many of the steps are done" genuinely is the measure. For count,
+ * currency and percentage KPIs the target is a business result (₦8bn PBT,
+ * 10,500 households), and a count of completed tasks says nothing about it —
+ * deriving one from the other produced figures like 19 tasks against 10,500
+ * households. Those KPIs read "no data" until a lead records a real actual;
+ * the task counts still travel with the result as the evidence trail.
+ */
+export function resolveKpiAttainment(params: {
+  measureType: MeasureType
+  direction: Direction
+  targetValue: number | null
+  targetText?: string | null
+  manualActual?: Parameters<typeof resolveEffectiveActual>[0]["manualActual"]
+  taskStats?: KpiTaskStats | null
+}): { resolved: ResolvedActual; attainment: Attainment } {
+  const taskStats = params.taskStats && params.taskStats.total > 0 ? params.taskStats : null
+
+  const autoDetected =
+    params.measureType === "milestone" && taskStats
+      ? {
+          value: null,
+          milestones_completed: taskStats.completed,
+          milestones_total: Math.max(taskStats.total, Number(params.targetValue) || 3),
+          taskStats,
+        }
+      : { value: null, taskStats }
+
+  const resolved = resolveEffectiveActual({ manualActual: params.manualActual ?? null, autoDetected })
+
+  const attainment = computeAttainment({
+    measureType: params.measureType,
+    direction: params.direction,
+    targetValue: params.targetValue,
+    targetText: params.targetText,
+    actualValue: resolved.effectiveActual,
+    milestonesCompleted: resolved.effectiveMilestonesCompleted,
+    milestonesTotal: resolved.effectiveMilestonesTotal,
+  })
+
+  return { resolved, attainment }
+}

@@ -1,6 +1,13 @@
 import { strict as assert } from "node:assert"
 import { test } from "node:test"
-import { averageCappedPct, companyAttainment, computeAttainment, ragStatus, rollupByPerspective } from "../attainment"
+import {
+  averageCappedPct,
+  companyAttainment,
+  computeAttainment,
+  ragStatus,
+  resolveKpiAttainment,
+  rollupByPerspective,
+} from "../attainment"
 
 test("at_least attainment is actual over target", () => {
   const result = computeAttainment({
@@ -143,4 +150,51 @@ test("an objective with no recorded actuals yet still appears, reading null rath
   assert.equal(objective.strategicObjective, "Improved process")
   assert.equal(objective.attainmentPct, null)
   assert.equal(rollup[0].attainmentPct, null)
+})
+
+test("task counts never stand in for a count KPI's actual", () => {
+  const { resolved, attainment } = resolveKpiAttainment({
+    measureType: "count",
+    direction: "at_least",
+    targetValue: 10500,
+    taskStats: { total: 25, completed: 19, inProgress: 3 },
+  })
+  assert.equal(resolved.source, "none")
+  assert.equal(attainment.cappedPct, null)
+  assert.deepEqual(resolved.taskStats, { total: 25, completed: 19, inProgress: 3 })
+})
+
+test("task counts never stand in for a currency or percentage KPI's actual", () => {
+  for (const measureType of ["currency", "percentage"] as const) {
+    const { attainment } = resolveKpiAttainment({
+      measureType,
+      direction: "at_least",
+      targetValue: 8,
+      taskStats: { total: 4, completed: 4, inProgress: 0 },
+    })
+    assert.equal(attainment.cappedPct, null)
+  }
+})
+
+test("milestone KPIs take progress from their tasks", () => {
+  const { resolved, attainment } = resolveKpiAttainment({
+    measureType: "milestone",
+    direction: "at_least",
+    targetValue: 4,
+    taskStats: { total: 4, completed: 2, inProgress: 1 },
+  })
+  assert.equal(resolved.source, "auto")
+  assert.equal(attainment.cappedPct, 50)
+})
+
+test("a recorded actual wins over task-derived progress", () => {
+  const { resolved, attainment } = resolveKpiAttainment({
+    measureType: "count",
+    direction: "at_least",
+    targetValue: 10,
+    manualActual: { actual_value: 7, milestones_completed: null, milestones_total: null },
+    taskStats: { total: 3, completed: 3, inProgress: 0 },
+  })
+  assert.equal(resolved.source, "manual")
+  assert.equal(attainment.cappedPct, 70)
 })

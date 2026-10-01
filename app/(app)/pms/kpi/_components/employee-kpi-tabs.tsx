@@ -2,15 +2,17 @@
 
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { BarChart2, Building2, Target } from "lucide-react"
+import { BarChart2, Building2, Flag, Target } from "lucide-react"
 import { PmsTablePage } from "@/app/admin/pms/_components/pms-table-page"
 import type { DataTableTab } from "@/components/ui/data-table"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
+import { StrategicGoalsView } from "@/app/admin/corporate-scorecard/_components/strategic-goals-view"
 import type { ReviewCycleOption } from "@/app/(app)/pms/_lib"
 
 const KPI_TABS: DataTableTab[] = [
   { key: "appraisal", label: "My Scored Work & Appraisal", icon: BarChart2 },
   { key: "department_kpis", label: "Department Corporate KPIs", icon: Target },
+  { key: "goals", label: "My Goals", icon: Flag },
 ]
 
 interface EmployeeKpiTabsProps {
@@ -19,8 +21,6 @@ interface EmployeeKpiTabsProps {
   cycles: ReviewCycleOption[]
   activeCycleId: string | null
   kpiScore: number | null
-  approvedGoals: number
-  completedGoals: number
   cycleName: string
   rows: Array<Record<string, unknown>>
 }
@@ -35,8 +35,6 @@ export function EmployeeKpiTabs({
   cycles,
   activeCycleId,
   kpiScore,
-  approvedGoals,
-  completedGoals,
   cycleName,
   rows,
 }: EmployeeKpiTabsProps) {
@@ -45,6 +43,19 @@ export function EmployeeKpiTabs({
 
   const handleTabChange = (value: string) => {
     setActiveTab(value)
+  }
+
+  if (activeTab === "goals") {
+    return (
+      <StrategicGoalsView
+        scope="mine"
+        backHref="/pms"
+        backLabel="Back to PMS"
+        tabs={KPI_TABS}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+      />
+    )
   }
 
   if (activeTab === "department_kpis") {
@@ -104,13 +115,9 @@ export function EmployeeKpiTabs({
       onTabChange={handleTabChange}
       cycles={cycles}
       activeCycleId={activeCycleId}
-      summaryCards={[
-        { label: "KPI Score", value: formatPercent(kpiScore) },
-        { label: "Approved Goals", value: approvedGoals },
-        { label: "Completed Goals", value: completedGoals },
-      ]}
+      summaryCards={[{ label: "KPI Score", value: formatPercent(kpiScore) }]}
       tableTitle="KPI Task Breakdown"
-      tableDescription={`Your scored tasks in ${cycleName}, grouped by goal. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
+      tableDescription={`Your scored tasks in ${cycleName}, grouped by quarter. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
       rows={rows}
       columns={[
         { key: "cycle", label: "Quarter" },

@@ -38,11 +38,6 @@ import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tas
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
 import { latestTaskDeadline, TASK_MAX_WORKING_DAYS, taskDeadlineWindowError } from "@/lib/tasks/deadline-window"
 
-interface GoalOption {
-  id: string
-  title: string
-}
-
 interface ProjectOption {
   id: string
   project_name: string
@@ -98,7 +93,6 @@ export interface TaskFormState {
 }
 
 // Stable default: a fresh [] each render changes hook deps and can loop effects.
-const EMPTY_GOALS: GoalOption[] = []
 const EMPTY_PROJECTS: ProjectOption[] = []
 
 interface TaskFormDialogProps {
@@ -111,7 +105,6 @@ interface TaskFormDialogProps {
   isSaving: boolean
   scopedAssignableEmployees: employee[]
   scopedAssignableDepartments: string[]
-  initialGoals?: GoalOption[]
   initialProjects?: ProjectOption[]
   assignmentAuthorityLabel?: string
   /** Set when the form is opened from inside a project: the project is fixed. */
@@ -132,7 +125,6 @@ export function TaskFormDialog({
   isSaving,
   scopedAssignableEmployees,
   scopedAssignableDepartments,
-  initialGoals = EMPTY_GOALS,
   initialProjects = EMPTY_PROJECTS,
   assignmentAuthorityLabel,
   lockedProjectId = null,
@@ -294,21 +286,6 @@ export function TaskFormDialog({
 
   const selectedKpi = useMemo(() => kpiOptions.find((k) => k.id === kpiId), [kpiOptions, kpiId])
 
-  useEffect(() => {
-    if (!kpiId || !selectedKpi) return
-    if (initialGoals && initialGoals.length > 0) {
-      const match = initialGoals.find(
-        (g) =>
-          g.title.toLowerCase() === selectedKpi.strategic_objective.toLowerCase() ||
-          g.title.toLowerCase().includes(selectedKpi.strategic_objective.toLowerCase()) ||
-          selectedKpi.strategic_objective.toLowerCase().includes(g.title.toLowerCase())
-      )
-      if (match) {
-        setValue("goal_id", match.id)
-      }
-    }
-  }, [kpiId, selectedKpi, initialGoals, setValue])
-
   const sortedKpis = useMemo(() => {
     return [...kpiOptions].sort((a, b) => {
       if (a.role === "core" && b.role !== "core") return -1
@@ -380,16 +357,6 @@ export function TaskFormDialog({
   function buildTaskFormState(): TaskFormState {
     const values = getValues()
     const targetUsers = isMultiAssign ? selectedUserIds : values.assigned_to ? [values.assigned_to] : []
-    const matchingGoalId = selectedKpi
-      ? initialGoals.find(
-          (g) =>
-            g.title.toLowerCase() === selectedKpi.strategic_objective.toLowerCase() ||
-            g.title.toLowerCase().includes(selectedKpi.strategic_objective.toLowerCase()) ||
-            selectedKpi.strategic_objective.toLowerCase().includes(g.title.toLowerCase())
-        )?.id ||
-        values.goal_id ||
-        ""
-      : values.goal_id || ""
 
     return {
       title: values.title ?? "",
@@ -404,7 +371,7 @@ export function TaskFormDialog({
       project_id: lockedProjectId || (values.project_id === "__none__" ? "" : (values.project_id ?? "")),
       plan_id: lockedPlanId || (values.plan_id ?? ""),
       weight: values.weight ?? TASK_WEIGHT_DEFAULT,
-      goal_id: matchingGoalId,
+      goal_id: values.goal_id || "",
       kpi_id: values.kpi_id === "__none__" ? "" : (values.kpi_id ?? ""),
       task_start_date: values.task_start_date ?? "",
       task_end_date: values.task_end_date ?? "",

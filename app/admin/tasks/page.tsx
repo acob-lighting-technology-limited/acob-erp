@@ -187,27 +187,15 @@ async function getAdminTasksData() {
     departments.sort()
   }
 
-  let goalsQuery = dataClient.from("goals_objectives").select("id, title, department").eq("is_archived", false)
-  if (departmentScope && departmentScope.length > 0) {
-    goalsQuery = goalsQuery.in("department", departmentScope)
-  }
-  const [{ data: goalRowsRaw }, { data: cyclesRaw }] = await Promise.all([
-    goalsQuery.order("title", { ascending: true }),
-    dataClient
-      .from("review_cycles")
-      .select("id, name, review_type, start_date, end_date, status")
-      .order("start_date", { ascending: false }),
-  ])
-  const goalRows = ((goalRowsRaw || []) as GoalRow[]).map((goal) => ({
-    id: goal.id,
-    title: goal.title,
-  })) as GoalFilterOption[]
+  const { data: cyclesRaw } = await dataClient
+    .from("review_cycles")
+    .select("id, name, review_type, start_date, end_date, status")
+    .order("start_date", { ascending: false })
 
   return {
     tasks: filteredTasks as Task[],
     employee: (employeeResult.data || []) as employee[],
     departments,
-    goals: goalRows,
     projects: (allProjectsRes.data || []) as Array<{ id: string; project_name: string }>,
     cycles: (cyclesRaw || []) as Array<{
       id: string
@@ -234,7 +222,6 @@ export default async function AdminTasksPage(props: { searchParams?: Promise<{ g
       initialTasks={data.tasks}
       initialemployee={data.employee}
       initialDepartments={data.departments}
-      initialGoals={data.goals}
       initialReviewCycles={data.cycles}
       initialProjects={data.projects}
       userProfile={data.userProfile}

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { loadAttendanceStartDate } from "@/lib/hr/attendance-start"
 import { toLocalISODate } from "@/lib/utils/date"
 import { deriveUnifiedAttendanceStatus, normalizeStoredAttendanceStatus } from "@/lib/hr/attendance-status"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
@@ -10,6 +11,7 @@ import {
 } from "@/lib/hr/attendance-ssot"
 import { pickCurrentCycle, getCoveredQuarterlyCycles, isQuarterlyCycle, rollupQuarterlyScores } from "@/lib/pms/cadence"
 import { computeWeightedTaskScore, isTaskInCycle } from "@/lib/tasks/scoring"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 type GoalScoreBreakdown = {
   goal_id: string
@@ -45,9 +47,6 @@ export type AttendanceBreakdown = {
 
 type DepartmentMetricBreakdown = {
   average_individual_kpi: number | null
-  action_item_score: number | null
-  help_desk_score: number | null
-  task_project_delivery_score: number | null
   learning_capability_score: number | null
   attendance_compliance_score: number | null
   behaviour_leadership_score: number | null
@@ -66,6 +65,7 @@ type PerformanceReviewScoreRow = {
   id: string
   created_at: string
   reviewer_id: string | null
+  status: string | null
   kpi_score: number | null
   cbt_score: number | null
   attendance_score: number | null
@@ -109,20 +109,6 @@ function averageDefined(values: Array<number | null | undefined>) {
   const valid = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
   if (valid.length === 0) return null
   return roundScore(valid.reduce((sum, value) => sum + value, 0) / valid.length)
-}
-
-/**
- * Weighted mean over whatever parts are present, ignoring the missing ones.
- *
- * Same rule as `weightedScore` but without the fixed kpi/cbt/attendance/
- * behaviour vocabulary — the department roll-up combines different metrics
- * entirely, and reusing those key names made `applied_weights` meaningless.
- */
-function weightedMean(parts: Array<{ value: MetricValue; weight: number }>): number | null {
-  const available = parts.filter((part) => typeof part.value === "number" && Number.isFinite(part.value))
-  const totalWeight = available.reduce((sum, part) => sum + part.weight, 0)
-  if (totalWeight <= 0) return null
-  return roundScore(available.reduce((sum, part) => sum + (part.value as number) * part.weight, 0) / totalWeight)
 }
 
 function weightedScore(
@@ -345,13 +331,10 @@ export async function computeIndividualPerformanceScore(
     .select("id, status, date, clock_in, clock_out, total_hours, waived")
     .eq("user_id", params.userId)
 
-  const earliestRecordQuery = supabase
-    .from("attendance_records")
-    .select("date")
-    .eq("user_id", params.userId)
-    .order("date", { ascending: true })
-    .limit(1)
-    .maybeSingle<{ date: string }>()
+  // One row per person from the start-dates view (first clock-in or manual edit).
+  const earliestRecordQuery = loadAttendanceStartDate(supabase, params.userId).then((date) => ({
+    data: date ? { date } : null,
+  }))
 
   if (cycle) {
     leaveRequestQuery = leaveRequestQuery.gte("end_date", cycle.start_date).lte("start_date", cycle.end_date)
@@ -616,7 +599,7 @@ export async function computeIndividualPerformanceScore(
 
   let latestReviewQuery = supabase
     .from("performance_reviews")
-    .select("id, created_at, reviewer_id, kpi_score, cbt_score, attendance_score, behaviour_score")
+    .select("id, created_at, reviewer_id, status, kpi_score, cbt_score, attendance_score, behaviour_score")
     .eq("user_id", params.userId)
     .order("created_at", { ascending: false })
 
@@ -633,10 +616,35 @@ export async function computeIndividualPerformanceScore(
   // cycle (the unique constraint is per reviewer, not per person/cycle). The
   // reviewer's review is authoritative, so it wins regardless of which was
   // submitted more recently; among same-authority rows, the newest wins.
-  const latestReview =
-    (latestReviewRows || []).find((row) => row.reviewer_id && row.reviewer_id !== params.userId) ||
-    latestReviewRows?.[0] ||
-    null
+  const reviewerReview =
+    (latestReviewRows || []).find((row) => row.reviewer_id && row.reviewer_id !== params.userId) || null
+  const latestReview = reviewerReview || latestReviewRows?.[0] || null
+  // Only a completed review by someone else may replace the live KPI. A draft
+  // used to do it too, which froze KPI at whatever it was when the draft was
+  // first saved — later task ratings never reached the score.
+  const finalReview = reviewerReview?.status === "completed" ? reviewerReview : null
+
+  // A missed CBT counts as zero, but only once the quarter has closed, only if
+  // that quarter's CBT actually ran (it has questions), and only for someone
+  // who had started before it ended. Otherwise its 10% is redistributed, which
+  // made skipping the exam score better than sitting it and doing badly.
+  // cbt_questions is admin-only under RLS, hence the service client for what
+  // is only an existence check.
+  async function cyclesWithCbt(cycleIds: string[]): Promise<Set<string>> {
+    if (cycleIds.length === 0) return new Set()
+    const { data } = await getServiceRoleClientOrFallback(supabase)
+      .from("cbt_questions")
+      .select("review_cycle_id")
+      .in("review_cycle_id", cycleIds)
+    return new Set((data || []).map((row) => row.review_cycle_id as string))
+  }
+  const missedCbtCountsAsZero = (quarter: { end_date?: string | null }) =>
+    Boolean(
+      quarter.end_date &&
+        quarter.end_date < todayIso &&
+        effectiveAttendanceStartDate &&
+        effectiveAttendanceStartDate <= quarter.end_date
+    )
 
   let cbtScore: number | null = null
 
@@ -685,7 +693,12 @@ export async function computeIndividualPerformanceScore(
         }
       }
 
-      const quarterlyValues = targetQuarterIds.map((qid) => scoreByQuarter.get(qid))
+      const heldQuarters = await cyclesWithCbt(targetQuarterIds)
+      const quarterlyValues = coveredQuarters.map((quarter) => {
+        const score = scoreByQuarter.get(quarter.id)
+        if (score !== undefined) return score
+        return heldQuarters.has(quarter.id) && missedCbtCountsAsZero(quarter) ? 0 : undefined
+      })
       cbtScore = rollupQuarterlyScores(quarterlyValues)
     }
   }
@@ -732,11 +745,17 @@ export async function computeIndividualPerformanceScore(
     }
   }
 
-  // ── Fix 2: 360° feedback — blend peer + manager for behaviour ──
-  // Query manager behaviour score from performance_reviews
+  if (cbtScore === null && !isMultiQuarter && cycle && missedCbtCountsAsZero(cycle)) {
+    const held = await cyclesWithCbt([cycle.id])
+    if (held.has(cycle.id)) cbtScore = 0
+  }
+
+  // ── 360° feedback — blend peer + manager for behaviour ──
+  // The manager's figure comes from someone else's review only: a self-review
+  // is not a manager assessment.
   const managerBehaviourScore: number | null =
-    latestReview && typeof latestReview.behaviour_score === "number"
-      ? roundScore(Number(latestReview.behaviour_score) || 0)
+    reviewerReview && typeof reviewerReview.behaviour_score === "number"
+      ? roundScore(Number(reviewerReview.behaviour_score) || 0)
       : null
 
   // Query peer feedback scores (360° feedback) if the table exists
@@ -772,18 +791,15 @@ export async function computeIndividualPerformanceScore(
     behaviourScore = peerBehaviourScore
   }
 
-  if (latestReview && typeof latestReview.kpi_score === "number") {
-    kpiScore = roundScore(Number(latestReview.kpi_score) || 0)
+  // The behaviour blend above is final. This used to be followed by a second
+  // assignment from the review's behaviour_score, which silently threw the
+  // peer share away whenever a manager review existed.
+  if (finalReview && typeof finalReview.kpi_score === "number") {
+    kpiScore = roundScore(Number(finalReview.kpi_score) || 0)
   }
 
-  if (latestReview && typeof latestReview.behaviour_score === "number") {
-    behaviourScore = roundScore(Number(latestReview.behaviour_score) || 0)
-  }
-
-  // ── Fix 1: CBT dead weight redistribution ──
-  // When CBT = 0 (system not built yet), redistribute its 10% proportionally
-  // among the other 3 components so scores aren't artificially deflated.
-  // Standard weights: KPI=70%, CBT=10%, Attendance=10%, Behaviour=10%
+  // Standard weights: KPI=70%, CBT=10%, Attendance=10%, Behaviour=10%. A
+  // component with no data has its weight redistributed over the others.
   const { finalScore, appliedWeights } = weightedScore([
     { key: "kpi", value: kpiScore, weight: 70 },
     { key: "cbt", value: cbtScore, weight: 10 },
@@ -813,66 +829,44 @@ export async function computeIndividualPerformanceScore(
   }
 }
 
+export type DepartmentMemberScore = {
+  user_id: string
+  final_score: number | null
+  kpi_score: number | null
+  cbt_score: number | null
+  attendance_score: number | null
+  behaviour_score: number | null
+}
+
+/**
+ * Department PMS is the average of its members' final individual PMS scores.
+ *
+ * It used to re-weight its own blend (individual KPI plus weekly action items,
+ * help desk resolution and a task completion ratio), but those are all tasks
+ * that already sit in each member's weighted KPI, so the same work was counted
+ * twice and the department read differently from the people in it. Averaging
+ * the finals means a department of 70, 80 and 90 reads 80, checkable by hand.
+ *
+ * Members are the active employees whose profile department is this one, so
+ * each person counts in exactly one department. Nobody with no score yet is
+ * averaged in as zero; they are simply not scored.
+ */
 export async function computeDepartmentPerformanceScore(
   supabase: SupabaseClient,
   params: { department: string; cycleId?: string | null }
 ) {
   const cycle = await getCycleWindow(supabase, params.cycleId)
   // The resolved cycle, so the default view (no cycle in the URL) still scopes
-  // its filters instead of silently falling back to all-time data.
+  // every member to the same window instead of each resolving its own.
   const scopedCycleId = cycle?.id ?? params.cycleId ?? null
 
-  // ── Fix 3: Derive department membership from actual work records, not current profile ──
-  // This prevents department transfers from breaking scores. A person who worked in
-  // Department A during Q1 but transferred to Department B in Q2 will still count
-  // toward Department A's Q1 score — because their tasks/goals have department = A.
-  //
-  // We also include currently-active employees as a fallback (for people with no
-  // records yet in the cycle who are still valid department members).
-  const employeeIdSet = new Set<string>()
-
-  // Source 1: Users with tasks in this department during the cycle
-  let taskUsersQuery = supabase
-    .from("tasks")
-    .select("assigned_to")
-    .eq("department", params.department)
-    .not("assigned_to", "is", null)
-  if (cycle) {
-    taskUsersQuery = taskUsersQuery.gte("created_at", cycle.start_date).lte("created_at", cycle.end_date)
-  }
-  const { data: taskUsers } = await taskUsersQuery
-  for (const row of taskUsers || []) {
-    if (row.assigned_to) employeeIdSet.add(row.assigned_to)
-  }
-
-  // Source 2: Users with an approved goal belonging to this department.
-  // Goals carry their own department column, so this no longer needs to fetch
-  // every approved goal in the company and throw away the ones that do not
-  // match — which is what it did before, for no effect on the result.
-  let goalUsersQuery = supabase
-    .from("goals_objectives")
-    .select("user_id")
-    .eq("approval_status", "approved")
-    .eq("department", params.department)
-  if (scopedCycleId) {
-    goalUsersQuery = goalUsersQuery.eq("review_cycle_id", scopedCycleId)
-  }
-  const { data: goalUsers } = await goalUsersQuery
-  for (const row of goalUsers || []) {
-    if (row.user_id) employeeIdSet.add(row.user_id)
-  }
-
-  // Source 3: Currently active employees (fallback — catches new hires with no records yet)
-  const { data: activeEmployees } = await supabase
+  const { data: memberRows } = await supabase
     .from("profiles")
     .select("id")
     .eq("department", params.department)
     .eq("employment_status", "active")
-  for (const row of activeEmployees || []) {
-    employeeIdSet.add(row.id)
-  }
 
-  const employeeIds = Array.from(employeeIdSet)
+  const employeeIds = (memberRows || []).map((row) => row.id as string)
 
   const individualScores =
     employeeIds.length > 0
@@ -881,123 +875,35 @@ export async function computeDepartmentPerformanceScore(
         )
       : []
 
-  const averageIndividualKpi = averageDefined(individualScores.map((score) => score.kpi_score))
+  const members: DepartmentMemberScore[] = individualScores.map((score) => ({
+    user_id: score.user_id,
+    final_score: score.final_score,
+    kpi_score: score.kpi_score,
+    cbt_score: score.cbt_score,
+    attendance_score: score.attendance_score,
+    behaviour_score: score.behaviour_score,
+  }))
 
-  const averageLearningCapability = averageDefined(individualScores.map((score) => score.cbt_score))
+  const departmentPms = averageDefined(members.map((member) => member.final_score))
 
-  const averageAttendanceCompliance = averageDefined(individualScores.map((score) => score.attendance_score))
-
-  // Query action items from the TASKS table (unified model), not the legacy action_items table.
-  // Use category='weekly_action' which is what weekly-report-sourced action items are tagged as.
-  let actionItemsQuery = supabase
-    .from("tasks")
-    .select("status")
-    .eq("department", params.department)
-    .eq("category", "weekly_action")
-
-  // Help desk tickets — scored from source table directly (separate lifecycle)
-  let helpDeskQuery = supabase.from("help_desk_tickets").select("status").eq("service_department", params.department)
-
-  // Task delivery: manual department tasks only.
-  // Excludes help_desk (scored separately above) AND weekly_action items (scored separately above)
-  // to prevent double-counting.
-  let taskDeliveryQuery = supabase
-    .from("tasks")
-    .select("status, source_type, category")
-    .eq("department", params.department)
-    .eq("source_type", "manual")
-    .eq("is_archived", false)
-    .or("category.is.null,category.neq.weekly_action")
-
-  if (cycle) {
-    actionItemsQuery = actionItemsQuery.gte("created_at", cycle.start_date).lte("created_at", cycle.end_date)
-    helpDeskQuery = helpDeskQuery.gte("created_at", cycle.start_date).lte("created_at", cycle.end_date)
-    taskDeliveryQuery = taskDeliveryQuery.gte("created_at", cycle.start_date).lte("created_at", cycle.end_date)
-  }
-
-  const [{ data: actionItems }, { data: helpDeskTickets }, { data: departmentTasks }] = await Promise.all([
-    actionItemsQuery,
-    helpDeskQuery,
-    taskDeliveryQuery,
-  ])
-
-  const actionItemScore =
-    actionItems && actionItems.length > 0
-      ? roundScore((actionItems.filter((item) => item.status === "completed").length / actionItems.length) * 100)
-      : null
-
-  const helpDeskScore =
-    helpDeskTickets && helpDeskTickets.length > 0
-      ? roundScore(
-          (helpDeskTickets.filter((ticket) =>
-            ["resolved", "closed"].includes(String(ticket.status || "").toLowerCase())
-          ).length /
-            helpDeskTickets.length) *
-            100
-        )
-      : null
-
-  const validDeptTasks = (departmentTasks || []).filter(
-    (task) => !["reassigned", "cancelled"].includes(String(task.status || "").toLowerCase())
-  )
-
-  const taskProjectDeliveryScore =
-    validDeptTasks.length > 0
-      ? roundScore((validDeptTasks.filter((task) => task.status === "completed").length / validDeptTasks.length) * 100)
-      : null
-
-  let behaviourLeadershipScore: number | null = null
-  if (employeeIds.length > 0) {
-    let reviewQuery = supabase
-      .from("performance_reviews")
-      .select("behaviour_score")
-      .in("user_id", employeeIds)
-      .not("behaviour_score", "is", null)
-    if (scopedCycleId) {
-      reviewQuery = reviewQuery.eq("review_cycle_id", scopedCycleId)
-    }
-    const { data: behaviourReviews } = await reviewQuery
-    if (behaviourReviews && behaviourReviews.length > 0) {
-      behaviourLeadershipScore = roundScore(
-        behaviourReviews.reduce((sum, row) => sum + (Number(row.behaviour_score) || 0), 0) / behaviourReviews.length
-      )
-    }
-  }
-
-  // Department delivery: individual KPI plus the three team-level delivery
-  // measures. These are their own metrics, not the individual components.
-  const departmentKpi = weightedMean([
-    { value: averageIndividualKpi, weight: 40 },
-    { value: actionItemScore, weight: 20 },
-    { value: helpDeskScore, weight: 20 },
-    { value: taskProjectDeliveryScore, weight: 20 },
-  ])
-
-  const departmentPms = weightedMean([
-    { value: departmentKpi, weight: 70 },
-    { value: averageLearningCapability, weight: 10 },
-    { value: averageAttendanceCompliance, weight: 10 },
-    { value: behaviourLeadershipScore, weight: 10 },
-  ])
-
+  // Component averages are a breakdown, not a recipe: each member's missing
+  // components are redistributed individually, so these will not multiply
+  // back out to department_pms exactly.
   const breakdown: DepartmentMetricBreakdown = {
-    average_individual_kpi: averageIndividualKpi,
-    action_item_score: actionItemScore,
-    help_desk_score: helpDeskScore,
-    task_project_delivery_score: taskProjectDeliveryScore,
-    learning_capability_score: averageLearningCapability,
-    attendance_compliance_score: averageAttendanceCompliance,
-    behaviour_leadership_score: behaviourLeadershipScore,
+    average_individual_kpi: averageDefined(members.map((member) => member.kpi_score)),
+    learning_capability_score: averageDefined(members.map((member) => member.cbt_score)),
+    attendance_compliance_score: averageDefined(members.map((member) => member.attendance_score)),
+    behaviour_leadership_score: averageDefined(members.map((member) => member.behaviour_score)),
   }
 
-  // ── Fix 3: Calibration — compute department mean/stddev for normalisation ──
-  // ── Fix 4: Percentile ranking — rank employees within the department ──
-  const sortedScores = individualScores
-    .filter((score) => typeof score.final_score === "number")
-    .map((s) => ({ user_id: s.user_id, final_score: s.final_score as number }))
+  const sortedScores = members
+    .filter(
+      (member): member is DepartmentMemberScore & { final_score: number } => typeof member.final_score === "number"
+    )
+    .map((member) => ({ user_id: member.user_id, final_score: member.final_score }))
     .sort((a, b) => b.final_score - a.final_score)
 
-  const mean = averageDefined(sortedScores.map((entry) => entry.final_score)) ?? 0
+  const mean = departmentPms ?? 0
 
   const variance =
     sortedScores.length > 1
@@ -1018,10 +924,12 @@ export async function computeDepartmentPerformanceScore(
   return {
     department: params.department,
     cycle_id: scopedCycleId,
-    department_kpi: departmentKpi,
+    department_kpi: breakdown.average_individual_kpi,
     department_pms: departmentPms,
     breakdown,
     employee_count: employeeIds.length,
+    scored_count: sortedScores.length,
+    members,
     calibration: { mean, stddev },
     rankings,
   }
