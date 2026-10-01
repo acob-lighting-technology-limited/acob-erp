@@ -4,7 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { resolvePendingAppealOnManualStatus } from "@/lib/hr/attendance-appeals"
+import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
 import { notifyAttendanceInApp } from "@/lib/hr/attendance-notify"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import {
@@ -186,9 +186,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       actorId: user.id,
       metadata: { clock_in: clockIn ?? null, clock_out: clockOut ?? null },
     })
-    await resolvePendingAppealOnManualStatus(dataClient, {
+    await resolvePendingAppealsOnManualStatus(dataClient, {
       userId: record.user_id,
-      date: record.date,
+      dates: [record.date],
       status: nextStatus,
       attendanceRecordId: id,
       comment: parsed.data.manual_comment,

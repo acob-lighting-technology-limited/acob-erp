@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { loadAttendanceStartDates } from "@/lib/hr/attendance-start"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
@@ -158,19 +159,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: attendanceError.message }, { status: 500 })
     }
 
-    // Query earliest attendance record for each employee to establish their scorable start date
-    const { data: earliestRows } = await dataClient
-      .from("attendance_records")
-      .select("user_id, date")
-      .in("user_id", allowedProfileIds)
-      .order("date", { ascending: true })
-
-    const earliestLogByEmployee = new Map<string, string>()
-    for (const row of earliestRows ?? []) {
-      if (row.user_id && row.date && !earliestLogByEmployee.has(row.user_id)) {
-        earliestLogByEmployee.set(row.user_id, row.date)
-      }
-    }
+    // Each employee's first clock-in or manual edit establishes their scorable start date.
+    // Loading every record to find it hit the 1,000-row API cap, so anyone whose
+    // first record came after mid-July 2026 had no start and no absences counted.
+    const earliestLogByEmployee = await loadAttendanceStartDates(dataClient, allowedProfileIds)
 
     // Appeals filed for days within the selected range, per employee
     const { data: appealRows } = await dataClient

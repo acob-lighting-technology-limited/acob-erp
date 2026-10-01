@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
 import { formatLeaveReference, getHolidaySet, notifyUsers } from "@/lib/hr/leave-workflow"
 import { addIsoDays, countLeaveDays, nextWorkingDayAfter, trimRangeToWorkingDays } from "@/lib/hr/leave-days"
 
@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
     const scopeResult = await requireApiAdminScope()
     if (!scopeResult.ok) return scopeResult.response
     const { scope, supabase } = scopeResult
+    const adminOnly = requireAttendanceAdmin(scope)
+    if (adminOnly) return adminOnly
 
     const parsed = ManualLeaveSchema.safeParse(await request.json())
     if (!parsed.success) {
@@ -293,6 +295,8 @@ export async function DELETE(request: NextRequest) {
     const scopeResult = await requireApiAdminScope()
     if (!scopeResult.ok) return scopeResult.response
     const { scope, supabase } = scopeResult
+    const adminOnly = requireAttendanceAdmin(scope)
+    if (adminOnly) return adminOnly
 
     const id = String(request.nextUrl.searchParams.get("id") || "")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })

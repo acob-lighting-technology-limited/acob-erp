@@ -29,6 +29,9 @@ function statusBadge(status: AppealRow["status"]) {
     )
   if (status === "rejected")
     return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Rejected</Badge>
+  // Closed because the day was changed directly rather than through the appeal.
+  if (status === "resolved")
+    return <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
   return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending</Badge>
 }
 
@@ -109,16 +112,24 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
       },
       {
         key: "current_status",
-        label: "Current Status",
+        label: "Status when appealed",
         accessor: (r) => r.current_status,
         render: (r) => (
-          <Badge
-            className={
-              ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
-            }
-          >
-            {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
-          </Badge>
+          <div className="flex flex-col items-start gap-1">
+            <Badge
+              className={
+                ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
+              }
+            >
+              {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
+            </Badge>
+            {/* The snapshot can go stale when device punches arrive late. */}
+            {r.status === "pending" && r.live_status && r.live_status !== r.current_status && (
+              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                Now: {ATTENDANCE_STATUS_LABELS[r.live_status as UnifiedAttendanceStatus] ?? r.live_status}
+              </span>
+            )}
+          </div>
         ),
       },
       {
@@ -168,6 +179,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           { value: "pending", label: "Pending" },
           { value: "approved", label: "Approved" },
           { value: "rejected", label: "Rejected" },
+          { value: "resolved", label: "Resolved manually" },
         ],
         placeholder: "All Statuses",
       },

@@ -8,7 +8,7 @@ import { ProfileEditDialog } from "@/components/profile/profile-edit-dialog"
 import { NeedsAttention } from "@/components/profile/needs-attention"
 import {
   MyTasksCard,
-  TicketsCard,
+  LeaveCard,
   AssetsCard,
   LunchHistoryCard,
   RecentAttendanceCard,
@@ -109,22 +109,20 @@ export function ProfileContent({
         annualLeaveRemaining={annualLeaveRemaining}
       />
 
-      {/* 3-Column Layout: Work Execution (1/3), Attendance (1/3), Services & Activity (1/3) */}
+      {/* Two aligned rows of three: daily records stretch to a shared height; the
+          services row is pinned to one height so the activity feed scrolls instead
+          of pushing its column past its neighbours. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6">
-          <MyTasksCard tasks={tasks} />
-          <TicketsCard helpDesk={helpDesk} />
-        </div>
+        <MyTasksCard tasks={tasks} />
+        <RecentAttendanceCard items={recentWorkDaysAttendance} />
+        <LunchHistoryCard lunchLogs={lunchLogs} />
 
-        <div className="space-y-6">
-          <RecentAttendanceCard items={recentWorkDaysAttendance} />
-        </div>
-
-        <div className="space-y-6">
-          <LunchHistoryCard lunchLogs={lunchLogs} />
-          <AssetsCard assets={assets} />
-          <PersonalRecentActivityFeed activity={recentActivity.slice(0, MAX_ACTIVITY_ENTRIES)} className="h-[400px]" />
-        </div>
+        <LeaveCard leave={leave} className="lg:h-[360px]" />
+        <AssetsCard assets={assets} className="lg:h-[360px]" />
+        <PersonalRecentActivityFeed
+          activity={recentActivity.slice(0, MAX_ACTIVITY_ENTRIES)}
+          className="h-[400px] lg:h-[360px]"
+        />
       </div>
 
       <ProfileEditDialog open={isEditOpen} onOpenChange={setIsEditOpen} profile={profile} />

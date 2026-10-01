@@ -3,26 +3,21 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Users, Package, ClipboardList, FileText, MessageSquare, Shield } from "lucide-react"
+import { AlertTriangle, CalendarClock, ClipboardList, Clock, Shield, Stamp, Users } from "lucide-react"
 import { formatName } from "@/lib/utils"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { RecentActivityFeed } from "@/components/admin/recent-activity-feed"
-import {
-  AdminActivityTabs,
-  type AdminAssetActivityRow,
-  type AdminAttendanceActivityRow,
-  type AdminCorrespondenceActivityRow,
-  type AdminDocumentationActivityRow,
-  type AdminFeedbackActivityRow,
-  type AdminHelpDeskActivityRow,
-  type AdminLeaveActivityRow,
-  type AdminPaymentActivityRow,
-  type AdminTaskActivityRow,
-} from "@/components/admin/activity-tabs"
-import { normalizeToken, buildRecentActivity, isExcludedActivity } from "@/components/admin/dashboard-helpers"
+import { ActionQueue } from "@/components/admin/action-queue"
+import { AwayToday } from "@/components/admin/away-today"
+import { loadAwayToday } from "@/lib/admin/away-today"
+import { addIsoDays } from "@/lib/hr/leave-days"
+import type { ActionQueueItem } from "@/components/admin/dashboard-types"
+import { buildRecentActivity, isExcludedActivity } from "@/components/admin/dashboard-helpers"
 import { logger } from "@/lib/logger"
+import { taskDeadline } from "@/lib/tasks/overdue"
+import { toLocalISODate } from "@/lib/utils/date"
 import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
 const log = logger("")
@@ -34,6 +29,30 @@ type ProfileIdRow = {
 type DepartmentIdRow = {
   id: string
 }
+
+type OpenTaskRow = {
+  id: string
+  status: string
+  due_date: string | null
+  task_end_date: string | null
+}
+
+type LeaveQueueRow = {
+  id: string
+  current_approver_user_id: string | null
+  reliever_id: string | null
+  current_stage_code: string | null
+  approval_stage: string | null
+}
+
+/** Statuses where a task is still live; matches `OPEN_TASK_STATUSES` on the profile. */
+const OPEN_TASK_STATUSES = ["pending", "in_progress", "submitted_for_review", "unable_to_complete"]
+/** Only these can be overdue: submitted and blocked work is with the lead (see `isTaskEscalated`). */
+const WORKABLE_TASK_STATUSES = new Set(["pending", "in_progress"])
+const PENDING_LEAVE_STATUSES = ["pending", "pending_evidence"]
+const TERMINAL_TICKET_STATUSES = "(resolved,closed,cancelled,rejected)"
+/** A recurring payment sits on "due" permanently, so only the next week counts as due. */
+const PAYMENT_DUE_WINDOW_DAYS = 7
 
 type ActivityActorRow = {
   id: string
@@ -82,263 +101,162 @@ export default async function AdminDashboardPage() {
   const { data: profile } = await dataClient.from("profiles").select("*").eq("id", user?.id).single()
   const canSeeAuditActivity = Boolean(scope?.isAdminLike || scope?.isDepartmentLead)
 
-  // Fetch stats
-  const profilesQ = dataClient.from("profiles").select("*", { count: "exact", head: true })
-  const assetsQ = dataClient.from("assets").select("*", { count: "exact", head: true }).is("deleted_at", null)
-  const tasksQ = dataClient.from("tasks").select("*", { count: "exact", head: true }).neq("category", "weekly_action")
-  const docsQ = dataClient.from("user_documentation").select("*", { count: "exact", head: true })
-  const feedbackQ = dataClient.from("feedback").select("*", { count: "exact", head: true })
+  const todayIso = toLocalISODate()
+  const departments = queryDepartmentScope || []
+  const hasDepartments = departments.length > 0
 
-  const [employeeStats, assetStats, taskStats, docStats, feedbackStats] = await Promise.all([
-    departmentScope
-      ? queryDepartmentScope && queryDepartmentScope.length > 0
-        ? profilesQ.in("department", queryDepartmentScope)
-        : profilesQ.eq("id", "__none__")
-      : profilesQ,
-    departmentScope
-      ? queryDepartmentScope && queryDepartmentScope.length > 0
-        ? assetsQ.in("department", queryDepartmentScope)
-        : assetsQ.eq("id", "__none__")
-      : assetsQ,
-    departmentScope
-      ? queryDepartmentScope && queryDepartmentScope.length > 0
-        ? tasksQ.in("department", queryDepartmentScope)
-        : tasksQ.eq("id", "__none__")
-      : tasksQ,
-    departmentScope
-      ? scopedUserIds.length > 0
-        ? docsQ.in("user_id", scopedUserIds)
-        : docsQ.eq("id", "__none__")
-      : docsQ,
-    departmentScope
-      ? scopedUserIds.length > 0
-        ? feedbackQ.in("user_id", scopedUserIds)
-        : feedbackQ.eq("id", "__none__")
-      : feedbackQ,
-  ])
+  // The KPI row used to show all-time totals: every task ever created under
+  // "Active Tasks", every profile including leavers, documents, feedback.
+  // Numbers that only grow say nothing about today, so these are all live.
+  let activeStaffQ = dataClient
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("employment_status", "active")
+  let clockedInQ = dataClient
+    .from("attendance_records")
+    .select("id", { count: "exact", head: true })
+    .eq("date", todayIso)
+    .not("clock_in", "is", null)
+  // `.neq` alone drops rows whose category is null, so the null case is spelled out.
+  let openTasksQ = dataClient
+    .from("tasks")
+    .select("id, status, due_date, task_end_date")
+    .in("status", OPEN_TASK_STATUSES)
+    .or("category.is.null,category.neq.weekly_action")
+  let pendingLeaveQ = dataClient
+    .from("leave_requests")
+    .select("id", { count: "exact", head: true })
+    .in("status", PENDING_LEAVE_STATUSES)
+  let pendingUsersQ = dataClient
+    .from("pending_users")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending")
+  let openTicketsQ = dataClient
+    .from("help_desk_tickets")
+    .select("id", { count: "exact", head: true })
+    .not("status", "in", TERMINAL_TICKET_STATUSES)
+  let openFeedbackQ = dataClient.from("feedback").select("id", { count: "exact", head: true }).eq("status", "open")
+  // Requisitions move through role-based stages, so this is the pipeline in
+  // scope rather than "awaiting you"; the requisitions page shows each stage.
+  let pendingAppealsQ = dataClient
+    .from("attendance_appeals")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending")
+  let ticketApprovalsQ = dataClient
+    .from("help_desk_tickets")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending_approval")
+  let pendingRequisitionsQ = dataClient
+    .from("requisitions")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending")
+  let paymentsDueQ = dataClient
+    .from("department_payments")
+    .select("id", { count: "exact", head: true })
+    .or(`status.eq.overdue,and(status.eq.due,next_payment_due.lte.${addIsoDays(todayIso, PAYMENT_DUE_WINDOW_DAYS)})`)
 
-  if (employeeStats.error) log.error("profiles count failed", employeeStats.error)
-  if (assetStats.error) log.error("assets count failed", assetStats.error)
-  if (taskStats.error) log.error("tasks count failed", taskStats.error)
-  if (docStats.error) log.error("user_documentation count failed", docStats.error)
-  if (feedbackStats.error) log.error("feedback count failed", feedbackStats.error)
-
-  const scopedDepartmentIds =
-    departmentScope && queryDepartmentScope && queryDepartmentScope.length > 0
+  if (departmentScope) {
+    activeStaffQ = hasDepartments ? activeStaffQ.in("department", departments) : activeStaffQ.eq("id", "__none__")
+    openTasksQ = hasDepartments ? openTasksQ.in("department", departments) : openTasksQ.eq("id", "__none__")
+    pendingUsersQ = hasDepartments ? pendingUsersQ.in("department", departments) : pendingUsersQ.eq("id", "__none__")
+    openTicketsQ = hasDepartments
+      ? openTicketsQ.in("service_department", departments)
+      : openTicketsQ.eq("id", "__none__")
+    clockedInQ = scopedUserIds.length > 0 ? clockedInQ.in("user_id", scopedUserIds) : clockedInQ.eq("id", "__none__")
+    pendingLeaveQ =
+      scopedUserIds.length > 0 ? pendingLeaveQ.in("user_id", scopedUserIds) : pendingLeaveQ.eq("id", "__none__")
+    openFeedbackQ =
+      scopedUserIds.length > 0 ? openFeedbackQ.in("user_id", scopedUserIds) : openFeedbackQ.eq("id", "__none__")
+    pendingAppealsQ =
+      scopedUserIds.length > 0 ? pendingAppealsQ.in("user_id", scopedUserIds) : pendingAppealsQ.eq("id", "__none__")
+    ticketApprovalsQ = hasDepartments
+      ? ticketApprovalsQ.in("service_department", departments)
+      : ticketApprovalsQ.eq("id", "__none__")
+    pendingRequisitionsQ = hasDepartments
+      ? pendingRequisitionsQ.in("department", departments)
+      : pendingRequisitionsQ.eq("id", "__none__")
+    // department_payments is keyed by department id, not name.
+    const scopedDepartmentIds = hasDepartments
       ? (
-          (
-            await dataClient
-              .from("departments")
-              .select("id")
-              .in("name", queryDepartmentScope)
-              .returns<DepartmentIdRow[]>()
-          ).data || []
+          (await dataClient.from("departments").select("id").in("name", departments).returns<DepartmentIdRow[]>())
+            .data || []
         ).map((department) => department.id)
       : []
-
-  const loadAssetsActivity = () => {
-    let query = dataClient
-      .from("assets")
-      .select(
-        "id, asset_type, asset_model, unique_code, status, assignment_type, department, office_location, created_at"
-      )
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(50)
-    if (departmentScope) {
-      query =
-        queryDepartmentScope && queryDepartmentScope.length > 0
-          ? query.in("department", queryDepartmentScope)
-          : query.eq("id", "__none__")
-    }
-    return query.returns<AdminAssetActivityRow[]>()
+    paymentsDueQ =
+      scopedDepartmentIds.length > 0
+        ? paymentsDueQ.in("department_id", scopedDepartmentIds)
+        : paymentsDueQ.eq("id", "__none__")
   }
 
-  const loadTasksActivity = () => {
-    let query = dataClient
-      .from("tasks")
-      .select("id, title, status, priority, department, due_date, created_at")
-      .neq("category", "weekly_action")
-      .order("created_at", { ascending: false })
-      .limit(50)
-    if (departmentScope) {
-      query =
-        queryDepartmentScope && queryDepartmentScope.length > 0
-          ? query.in("department", queryDepartmentScope)
-          : query.eq("id", "__none__")
-    }
-    return query.returns<AdminTaskActivityRow[]>()
-  }
-
-  const loadDocsActivity = () => {
-    let query = dataClient
-      .from("user_documentation")
-      .select("id, title, category, user_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50)
-    if (departmentScope) {
-      query = scopedUserIds.length > 0 ? query.in("user_id", scopedUserIds) : query.eq("id", "__none__")
-    }
-    return query.returns<AdminDocumentationActivityRow[]>()
-  }
-
-  const loadFeedbackActivity = () => {
-    let query = dataClient
-      .from("feedback")
-      .select("id, feedback_type, title, status, user_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50)
-    if (departmentScope) {
-      query = scopedUserIds.length > 0 ? query.in("user_id", scopedUserIds) : query.eq("id", "__none__")
-    }
-    return query.returns<AdminFeedbackActivityRow[]>()
-  }
-
-  const mergeRowsById = <T extends { id: string; created_at: string | null }>(rows: T[][]): T[] =>
-    Array.from(new Map(rows.flat().map((row) => [row.id, row])).values())
-      .sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime())
-      .slice(0, 50)
-
-  const loadCorrespondenceActivity = async () => {
-    const select = "id, reference_number, subject, status, department_name, assigned_department_name, created_at"
-    if (departmentScope) {
-      if (!queryDepartmentScope || queryDepartmentScope.length === 0) {
-        return { data: [] as AdminCorrespondenceActivityRow[], error: null }
-      }
-      const [departmentRecords, assignedRecords] = await Promise.all([
-        dataClient
-          .from("correspondence_records")
-          .select(select)
-          .in("department_name", queryDepartmentScope)
-          .order("created_at", { ascending: false })
-          .limit(50)
-          .returns<AdminCorrespondenceActivityRow[]>(),
-        dataClient
-          .from("correspondence_records")
-          .select(select)
-          .in("assigned_department_name", queryDepartmentScope)
-          .order("created_at", { ascending: false })
-          .limit(50)
-          .returns<AdminCorrespondenceActivityRow[]>(),
-      ])
-      return {
-        data: mergeRowsById([departmentRecords.data || [], assignedRecords.data || []]),
-        error: departmentRecords.error || assignedRecords.error,
-      }
-    }
-    return dataClient
-      .from("correspondence_records")
-      .select(select)
-      .order("created_at", { ascending: false })
-      .limit(50)
-      .returns<AdminCorrespondenceActivityRow[]>()
-  }
-
-  const loadHelpDeskActivity = async () => {
-    const select = "id, ticket_number, title, status, priority, service_department, requester_id, created_at"
-    if (departmentScope) {
-      if (!queryDepartmentScope || queryDepartmentScope.length === 0) {
-        return { data: [] as AdminHelpDeskActivityRow[], error: null }
-      }
-      const [serviceTickets, requesterTickets] = await Promise.all([
-        dataClient
-          .from("help_desk_tickets")
-          .select(select)
-          .in("service_department", queryDepartmentScope)
-          .order("created_at", { ascending: false })
-          .limit(50)
-          .returns<AdminHelpDeskActivityRow[]>(),
-        scopedUserIds.length > 0
-          ? dataClient
-              .from("help_desk_tickets")
-              .select(select)
-              .in("requester_id", scopedUserIds)
-              .order("created_at", { ascending: false })
-              .limit(50)
-              .returns<AdminHelpDeskActivityRow[]>()
-          : Promise.resolve({ data: [] as AdminHelpDeskActivityRow[], error: null }),
-      ])
-      return {
-        data: mergeRowsById([serviceTickets.data || [], requesterTickets.data || []]),
-        error: serviceTickets.error || requesterTickets.error,
-      }
-    }
-    return dataClient
-      .from("help_desk_tickets")
-      .select(select)
-      .order("created_at", { ascending: false })
-      .limit(50)
-      .returns<AdminHelpDeskActivityRow[]>()
-  }
-
-  const loadPaymentsActivity = () => {
-    let query = dataClient
-      .from("department_payments")
-      .select("id, title, payment_type, status, amount, currency, payment_date, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50)
-    if (departmentScope) {
-      query =
-        scopedDepartmentIds.length > 0 ? query.in("department_id", scopedDepartmentIds) : query.eq("id", "__none__")
-    }
-    return query.returns<AdminPaymentActivityRow[]>()
-  }
-
-  const loadLeaveActivity = () => {
-    let query = dataClient
-      .from("leave_requests")
-      .select("id, user_id, request_kind, status, start_date, end_date, days_count, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50)
-    if (departmentScope) {
-      query = scopedUserIds.length > 0 ? query.in("user_id", scopedUserIds) : query.eq("id", "__none__")
-    }
-    return query.returns<AdminLeaveActivityRow[]>()
-  }
-
-  const loadAttendanceActivity = () => {
-    let query = dataClient
-      .from("attendance_records")
-      .select("id, user_id, date, status, clock_in, clock_out, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50)
-    if (departmentScope) {
-      query = scopedUserIds.length > 0 ? query.in("user_id", scopedUserIds) : query.eq("id", "__none__")
-    }
-    return query.returns<AdminAttendanceActivityRow[]>()
-  }
+  // Leave waiting on *this* user, by the same rule as the approval queue API
+  // (/api/hr/leave/queue): they are the current approver, or the reliever while
+  // the request sits at the reliever stage.
+  const myLeaveQueueQ = user
+    ? dataClient
+        .from("leave_requests")
+        .select("id, current_approver_user_id, reliever_id, current_stage_code, approval_stage")
+        .in("status", PENDING_LEAVE_STATUSES)
+        .or(`current_approver_user_id.eq.${user.id},reliever_id.eq.${user.id}`)
+        .returns<LeaveQueueRow[]>()
+    : Promise.resolve({ data: [] as LeaveQueueRow[], error: null })
 
   const [
-    assetsActivity,
-    tasksActivity,
-    docsActivity,
-    feedbackActivity,
-    correspondenceActivity,
-    helpDeskActivity,
-    paymentsActivity,
-    leaveActivity,
-    attendanceActivity,
+    activeStaff,
+    clockedIn,
+    openTasks,
+    pendingLeave,
+    pendingUsers,
+    openTickets,
+    openFeedback,
+    myLeaveQueue,
+    pendingRequisitions,
+    paymentsDue,
+    awayToday,
+    pendingAppeals,
+    ticketApprovals,
   ] = await Promise.all([
-    loadAssetsActivity(),
-    loadTasksActivity(),
-    loadDocsActivity(),
-    loadFeedbackActivity(),
-    loadCorrespondenceActivity(),
-    loadHelpDeskActivity(),
-    loadPaymentsActivity(),
-    loadLeaveActivity(),
-    loadAttendanceActivity(),
+    activeStaffQ,
+    clockedInQ,
+    openTasksQ.returns<OpenTaskRow[]>(),
+    pendingLeaveQ,
+    pendingUsersQ,
+    openTicketsQ,
+    openFeedbackQ,
+    myLeaveQueueQ,
+    pendingRequisitionsQ,
+    paymentsDueQ,
+    loadAwayToday(dataClient, todayIso, departmentScope ? scopedUserIds : null),
+    pendingAppealsQ,
+    ticketApprovalsQ,
   ])
 
-  if (assetsActivity.error) log.error("assets activity query failed", assetsActivity.error)
-  if (tasksActivity.error) log.error("tasks activity query failed", tasksActivity.error)
-  if (docsActivity.error) log.error("user_documentation activity query failed", docsActivity.error)
-  if (feedbackActivity.error) log.error("feedback activity query failed", feedbackActivity.error)
-  if (correspondenceActivity.error) log.error("correspondence activity query failed", correspondenceActivity.error)
-  if (helpDeskActivity.error) log.error("help desk activity query failed", helpDeskActivity.error)
-  if (paymentsActivity.error) log.error("payments activity query failed", paymentsActivity.error)
-  if (leaveActivity.error) log.error("leave activity query failed", leaveActivity.error)
-  if (attendanceActivity.error) log.error("attendance activity query failed", attendanceActivity.error)
+  if (activeStaff.error) log.error("active staff count failed", activeStaff.error)
+  if (clockedIn.error) log.error("clocked-in count failed", clockedIn.error)
+  if (openTasks.error) log.error("open tasks query failed", openTasks.error)
+  if (pendingLeave.error) log.error("pending leave count failed", pendingLeave.error)
+  if (pendingUsers.error) log.error("pending users count failed", pendingUsers.error)
+  if (openTickets.error) log.error("open tickets count failed", openTickets.error)
+  if (openFeedback.error) log.error("open feedback count failed", openFeedback.error)
+  if (myLeaveQueue.error) log.error("leave approval queue query failed", myLeaveQueue.error)
+  if (pendingRequisitions.error) log.error("pending requisitions count failed", pendingRequisitions.error)
+  if (paymentsDue.error) log.error("payments due count failed", paymentsDue.error)
+  if (pendingAppeals.error) log.error("pending appeals count failed", pendingAppeals.error)
+  if (ticketApprovals.error) log.error("ticket approvals count failed", ticketApprovals.error)
+
+  const openTaskRows = openTasks.data || []
+  const overdueTaskCount = openTaskRows.filter((task) => {
+    if (!WORKABLE_TASK_STATUSES.has(task.status)) return false
+    const deadline = taskDeadline(task)
+    return Boolean(deadline && deadline < todayIso)
+  }).length
+  const awaitingReviewCount = openTaskRows.filter((task) => task.status === "submitted_for_review").length
+  const blockedTaskCount = openTaskRows.filter((task) => task.status === "unable_to_complete").length
+
+  const myLeaveApprovals = (myLeaveQueue.data || []).filter((row) => {
+    if (row.current_approver_user_id === user?.id) return true
+    const stage = String(row.current_stage_code || row.approval_stage || "").toLowerCase()
+    return row.reliever_id === user?.id && (stage === "pending_reliever" || stage === "reliever_pending")
+  }).length
 
   let filteredRawActivity: ActivityLogRow[] = []
   if (canSeeAuditActivity) {
@@ -423,6 +341,121 @@ export default async function AdminDashboardPage() {
   const canAccessAction = (_requiredRoles: string[], href: string) =>
     Boolean(accessContext && canAccessRouteV2(accessContext, resolveAdminRouteKeyV2(href)))
 
+  const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`
+  const pendingLeaveCount = pendingLeave.count || 0
+  const actionQueue: ActionQueueItem[] = [
+    // Approvals first: they are the items only an admin can unblock.
+    {
+      id: "leave-approvals",
+      group: "approvals" as const,
+      tone: "attention" as const,
+      title: "Leave awaiting your approval",
+      description: `${plural(myLeaveApprovals, "request")} at your approval or reliever stage`,
+      count: myLeaveApprovals,
+      href: "/admin/hr/leave",
+    },
+    {
+      id: "leave-pending",
+      group: "approvals" as const,
+      tone: "attention" as const,
+      title: "Leave requests pending",
+      description: "Every undecided request in your scope, at any stage",
+      count: pendingLeaveCount,
+      href: "/admin/hr/leave",
+    },
+    {
+      id: "attendance-appeals",
+      group: "approvals" as const,
+      tone: "attention" as const,
+      title: "Attendance appeals",
+      description: "Staff asking for an attendance status to be corrected",
+      count: pendingAppeals.count || 0,
+      href: "/admin/hr/attendance?tab=appeals",
+    },
+    {
+      id: "ticket-approvals",
+      group: "approvals" as const,
+      tone: "attention" as const,
+      title: "Help desk tickets awaiting approval",
+      description: "Requests that need sign-off before work starts",
+      count: ticketApprovals.count || 0,
+      href: "/admin/help-desk/management",
+    },
+    {
+      id: "pending-requisitions",
+      group: "approvals" as const,
+      tone: "attention" as const,
+      title: "Requisitions in approval",
+      description: "Pending at review, authorization or verification",
+      count: pendingRequisitions.count || 0,
+      href: "/admin/accounts/requisitions",
+    },
+    {
+      id: "pending-users",
+      group: "approvals" as const,
+      tone: "attention" as const,
+      title: "New users awaiting approval",
+      description: "Sign-ups waiting to be approved or rejected",
+      count: pendingUsers.count || 0,
+      href: "/admin/hr/employees",
+    },
+    {
+      id: "tasks-awaiting-review",
+      group: "approvals" as const,
+      tone: "attention" as const,
+      title: "Tasks awaiting review",
+      description: "Submitted by staff and waiting on a reviewer",
+      count: awaitingReviewCount,
+      href: "/admin/tasks",
+    },
+    // Then work that is late or stuck.
+    {
+      id: "overdue-tasks",
+      group: "attention" as const,
+      tone: "critical" as const,
+      title: "Overdue tasks",
+      description: "Pending or in progress past their deadline",
+      count: overdueTaskCount,
+      href: "/admin/tasks",
+    },
+    {
+      id: "payments-due",
+      group: "attention" as const,
+      tone: "critical" as const,
+      title: "Payments overdue or due this week",
+      description: `Overdue, or due within ${PAYMENT_DUE_WINDOW_DAYS} days`,
+      count: paymentsDue.count || 0,
+      href: "/admin/accounts/payments",
+    },
+    {
+      id: "blocked-tasks",
+      group: "attention" as const,
+      tone: "attention" as const,
+      title: "Tasks reported blocked",
+      description: "Unable to complete: extend, reassign or cancel",
+      count: blockedTaskCount,
+      href: "/admin/tasks",
+    },
+    {
+      id: "open-tickets",
+      group: "attention" as const,
+      tone: "info" as const,
+      title: "Open help desk tickets",
+      description: "Not yet resolved, closed or cancelled",
+      count: openTickets.count || 0,
+      href: "/admin/help-desk/management",
+    },
+    {
+      id: "open-feedback",
+      group: "attention" as const,
+      tone: "info" as const,
+      title: "Open feedback",
+      description: "Staff feedback not yet responded to",
+      count: openFeedback.count || 0,
+      href: "/admin/feedback",
+    },
+  ].filter((item) => canAccessAction([], item.href))
+
   const canManageEmployees = canAccessAction(["developer", "super_admin", "admin"], "/admin/hr/employees")
   const canReviewTasks = canAccessAction(["developer", "super_admin", "admin"], "/admin/tasks")
   const canOpenReports = canAccessAction(["developer", "super_admin", "admin"], "/admin/reports")
@@ -431,7 +464,7 @@ export default async function AdminDashboardPage() {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Admin Dashboard"
-        description={`Operational control center for ${formatName(profile?.first_name) || "Admin"}: review queues, monitor workload, and execute priority actions.`}
+        description={`Welcome back, ${formatName(profile?.first_name) || "Admin"}. Here is what needs action across your scope.`}
         icon={Shield}
         actions={
           <>
@@ -454,71 +487,79 @@ export default async function AdminDashboardPage() {
         }
       />
 
-      <Section title="Core KPIs" description="Current operational totals across core business areas.">
+      {/* StatGrid keeps the first three on a phone, so source order is the mobile priority. */}
+      <Section title="Today" description="Live counts for the people and work in your scope.">
         <StatGrid>
           <StatCard
             variant="compact"
-            title="Total Employees"
-            value={employeeStats.count || 0}
-            description="Registered user profiles"
-            icon={Users}
+            title="Clocked In Today"
+            value={clockedIn.count || 0}
+            description={`of ${activeStaff.count || 0} active staff`}
+            icon={Clock}
             iconBgColor="bg-blue-100 dark:bg-blue-900/30"
             iconColor="text-blue-600 dark:text-blue-400"
           />
           <StatCard
             variant="compact"
-            title="Assets"
-            value={assetStats.count || 0}
-            description="Tracked inventory records"
-            icon={Package}
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            iconColor="text-purple-600 dark:text-purple-400"
+            title="Overdue Tasks"
+            value={overdueTaskCount}
+            description={overdueTaskCount > 0 ? "Past their deadline" : "Nothing overdue"}
+            icon={AlertTriangle}
+            iconBgColor={overdueTaskCount > 0 ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"}
+            iconColor={overdueTaskCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}
           />
           <StatCard
             variant="compact"
-            title="Active Tasks"
-            value={taskStats.count || 0}
-            description="Total tasks in system"
+            title="Pending Leave"
+            value={pendingLeave.count || 0}
+            description="Requests not yet decided"
+            icon={CalendarClock}
+            iconBgColor="bg-amber-100 dark:bg-amber-900/30"
+            iconColor="text-amber-600 dark:text-amber-400"
+          />
+          <StatCard
+            variant="compact"
+            title="Open Tasks"
+            value={openTaskRows.length}
+            description="Pending, in progress, in review or blocked"
             icon={ClipboardList}
             iconBgColor="bg-green-100 dark:bg-green-900/30"
             iconColor="text-green-600 dark:text-green-400"
           />
           <StatCard
             variant="compact"
-            title="Documents"
-            value={docStats.count || 0}
-            description="User documentation files"
-            icon={FileText}
-            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            iconColor="text-orange-600 dark:text-orange-400"
-          />
-          <StatCard
-            variant="compact"
-            title="Feedback"
-            value={feedbackStats.count || 0}
-            description="Submitted feedback records"
-            icon={MessageSquare}
-            iconBgColor="bg-cyan-100 dark:bg-cyan-900/30"
-            iconColor="text-cyan-600 dark:text-cyan-400"
+            title="Active Staff"
+            value={activeStaff.count || 0}
+            description="Current employees"
+            icon={Users}
+            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
+            iconColor="text-purple-600 dark:text-purple-400"
           />
         </StatGrid>
       </Section>
 
-      {canSeeAuditActivity && (
-        <RecentActivityFeed activity={recentActivity} showViewAll={canAccessAction([], "/admin/audit-logs")} />
-      )}
-
-      <AdminActivityTabs
-        assets={assetsActivity.data || []}
-        tasks={tasksActivity.data || []}
-        documentation={docsActivity.data || []}
-        feedback={feedbackActivity.data || []}
-        correspondence={correspondenceActivity.data || []}
-        helpDesk={helpDeskActivity.data || []}
-        payments={paymentsActivity.data || []}
-        leave={leaveActivity.data || []}
-        attendance={attendanceActivity.data || []}
-      />
+      {/* 2x2 on desktop with every row the same height; each card scrolls inside
+          it instead of leaving the grid ragged. Phones stack at natural height. */}
+      <div className="grid grid-cols-1 gap-6 lg:auto-rows-[400px] lg:grid-cols-2">
+        <ActionQueue
+          title="Pending approvals"
+          icon={Stamp}
+          items={actionQueue.filter((item) => item.group === "approvals")}
+          emptyTitle="No approvals waiting"
+          emptyDescription="Leave, appeals, requisitions and sign-ups awaiting a decision will appear here."
+        />
+        <ActionQueue
+          title="Needs attention"
+          icon={AlertTriangle}
+          items={actionQueue.filter((item) => item.group === "attention")}
+          emptyTitle="Nothing overdue or stuck"
+          emptyDescription="Overdue tasks, due payments and open tickets will appear here."
+        />
+        <AwayToday items={awayToday} todayIso={todayIso} />
+        {canSeeAuditActivity && (
+          <RecentActivityFeed activity={recentActivity} showViewAll={canAccessAction([], "/admin/audit-logs")} />
+        )}
+      </div>
     </PageWrapper>
   )
 }

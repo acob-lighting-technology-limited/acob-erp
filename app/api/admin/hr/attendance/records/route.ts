@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { resolvePendingAppealOnManualStatus } from "@/lib/hr/attendance-appeals"
+import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
 import { notifyAttendanceInApp } from "@/lib/hr/attendance-notify"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
@@ -117,8 +117,10 @@ export async function GET(request: NextRequest) {
     // Collect unique user IDs and date bounds for context lookups
     const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
     const allDates = rows.map((r) => r.date).sort()
-    const minDate = allDates[0] ?? toLocalISODate()
-    const maxDate = allDates[allDates.length - 1] ?? toLocalISODate()
+    // Cover the requested range too, so a day's closing time is known even
+    // before anyone has a record for it.
+    const minDate = [startDate, allDates[0]].filter(Boolean).sort()[0] ?? toLocalISODate()
+    const maxDate = [endDate, allDates[allDates.length - 1]].filter(Boolean).sort().reverse()[0] ?? toLocalISODate()
 
     const recordIds = rows.map((r) => r.id).filter((id) => id && !id.startsWith("missing-"))
 
@@ -377,7 +379,10 @@ export async function GET(request: NextRequest) {
 
     // The active policy travels with the payload so client-side day breakdowns
     // charge the same hours the server does, instead of falling back to defaults.
-    return NextResponse.json({ records, policy })
+    // A single day's closing time - the early closure if one is set, otherwise
+    // the policy's - so the Daily Roster can switch from arrivals to departures then.
+    const closeTime = startDate && startDate === endDate ? (ctx.earlyCloseTime(startDate) ?? policy.endTime) : null
+    return NextResponse.json({ records, policy, close_time: closeTime })
   } catch (error) {
     log.error({ err: String(error) }, "Error in GET /api/admin/hr/attendance/records")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
@@ -529,9 +534,9 @@ export async function POST(request: NextRequest) {
       actorId: scope.userId,
       metadata: { clock_in: clock_in ?? null, clock_out: clock_out ?? null },
     })
-    await resolvePendingAppealOnManualStatus(dataClient, {
+    await resolvePendingAppealsOnManualStatus(dataClient, {
       userId: user_id,
-      date,
+      dates: [date],
       status,
       attendanceRecordId: created.id,
       comment: manual_comment,

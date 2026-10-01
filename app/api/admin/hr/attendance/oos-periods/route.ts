@@ -4,8 +4,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
-import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
+import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
 import { materializeOos, oosWorkdays } from "@/lib/hr/oos-materialize"
+import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("admin-hr-attendance-oos-periods")
@@ -38,6 +39,8 @@ export async function POST(request: NextRequest) {
     const scopeResult = await requireApiAdminScope()
     if (!scopeResult.ok) return scopeResult.response
     const { scope } = scopeResult
+    const adminOnly = requireAttendanceAdmin(scope)
+    if (adminOnly) return adminOnly
     const dataClient = getServiceRoleClientOrFallback(scopeResult.supabase)
 
     const parsed = CreateSchema.safeParse(await request.json())
@@ -176,6 +179,8 @@ export async function DELETE(request: NextRequest) {
   const scopeResult = await requireApiAdminScope()
   if (!scopeResult.ok) return scopeResult.response
   const { scope } = scopeResult
+  const adminOnly = requireAttendanceAdmin(scope)
+  if (adminOnly) return adminOnly
   const dataClient = getServiceRoleClientOrFallback(scopeResult.supabase)
 
   const id = String(request.nextUrl.searchParams.get("id") || "")
@@ -222,6 +227,22 @@ export async function DELETE(request: NextRequest) {
     },
     { failOpen: true }
   )
+
+  await recordAttendanceEvent(dataClient, {
+    userId: period.user_id,
+    eventDate: today,
+    eventType: "oos_stopped",
+    fromStatus: "out_of_station",
+    source: "manual",
+    comment: null,
+    actorId: scope.userId,
+    metadata: {
+      oos_period_id: id,
+      start_date: period.start_date,
+      end_date: today,
+      summary: `Open-ended Out of Station (from ${period.start_date}) stopped; days up to ${today} are kept.`,
+    },
+  })
 
   return NextResponse.json({ message: "Indefinite OOS stopped — days up to today are kept" })
 }

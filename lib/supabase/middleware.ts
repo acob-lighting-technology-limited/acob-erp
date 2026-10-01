@@ -8,6 +8,7 @@ import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "
 import { resolveCookieMaxAge } from "@/lib/supabase/cookie-policy"
 import { getCbtSettings, canAccessCbt, resolveCbtAccessScope } from "@/lib/cbt-config"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { LUNCH_SHARE_PATH_PATTERN } from "@/lib/hr/lunch-share"
 
 type CookieSetOptions = Parameters<NextResponse["cookies"]["set"]>[2]
 
@@ -326,6 +327,8 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !pathname.startsWith("/auth") &&
     !pathname.startsWith("/launch") &&
+    // Dated lunch share links — WhatsApp's preview crawler has no session.
+    !LUNCH_SHARE_PATH_PATTERN.test(pathname) &&
     !pathname.startsWith("/employee/new") &&
     !pathname.startsWith("/api/public") &&
     !pathname.startsWith("/api/devices") &&

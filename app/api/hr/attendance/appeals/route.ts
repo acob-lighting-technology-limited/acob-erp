@@ -3,8 +3,11 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { toLocalYearMonth, monthBounds, loadAttendancePolicy } from "@/lib/hr/attendance-utils"
+import { toLocalISODate } from "@/lib/utils/date"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
+import { notifyAppealSubmittedMail } from "@/lib/hr/attendance-notify"
+import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 
 const log = logger("hr-attendance-appeals")
 export const dynamic = "force-dynamic"
@@ -120,6 +123,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "appeal_date must be in YYYY-MM-DD format" }, { status: 400 })
     }
 
+    // A day can only be appealed once it is over. Until then "absent" or
+    // "incomplete" usually means not-arrived-yet or a punch the device has not
+    // delivered - two of the stuck appeals in Sep 2026 were raised at 09:00 on
+    // the day itself, before the device synced.
+    if (appealDate >= toLocalISODate()) {
+      return NextResponse.json(
+        { error: "You can appeal a day once it has ended. Check back tomorrow if it still looks wrong." },
+        { status: 400 }
+      )
+    }
+
     // Validate requested_status first — it determines how far back the appeal may reach.
     if (!isAllowedRequestedStatus(requestedStatus)) {
       return NextResponse.json(
@@ -215,6 +229,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Same monthly cap a department lead is held to when approving (3 LWP/AWP/IWP
+    // days), checked here so the employee is told up front instead of raising an
+    // appeal that can only fail at review. Admin & HR can still grant more days
+    // manually; OOS appeals are not permission days and are not capped.
+    const quotaCheck = await validateLwpAwpMonthlyQuota({
+      dataClient,
+      userId: user.id,
+      targetStatus: requestedStatus,
+      date: appealDate,
+      isAdminLike: false,
+      excludeRecordId: attendanceRecord?.id ?? null,
+    })
+    if (!quotaCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "You already have 3 permission days (LWP/AWP/IWP) this month, which is the most an appeal can grant. Speak to Admin & HR if this day needs to be adjusted.",
+        },
+        { status: 422 }
+      )
+    }
+
     // Insert the appeal
     const { data: appeal, error: insertError } = await dataClient
       .from("attendance_appeals")
@@ -300,7 +336,7 @@ export async function POST(request: NextRequest) {
             p_title: "Attendance Appeal Submitted",
             p_message: `${employeeName} has submitted an attendance appeal for ${appealDate} (${currentStatus} → ${requestedStatus}).`,
             p_priority: "normal",
-            p_link_url: "/admin/hr/employees/attendance?tab=appeals",
+            p_link_url: "/admin/hr/attendance?tab=appeals",
             p_actor_id: user.id,
             p_entity_type: "attendance_appeal",
             p_entity_id: appeal.id,
@@ -312,6 +348,16 @@ export async function POST(request: NextRequest) {
     } catch (notifyErr) {
       log.error({ err: String(notifyErr) }, "Failed to send appeal notifications")
     }
+
+    // Email the department lead and the Admin & HR lead, so an appeal does not
+    // depend on someone opening the app to be seen.
+    await notifyAppealSubmittedMail(dataClient, {
+      appellantId: user.id,
+      date: appealDate,
+      fromStatus: currentStatus,
+      requestedStatus,
+      reason: appealReason,
+    })
 
     return NextResponse.json({ data: appeal }, { status: 201 })
   } catch (err) {

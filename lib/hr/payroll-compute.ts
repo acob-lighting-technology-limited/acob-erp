@@ -12,6 +12,7 @@
 
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { getEffectiveAttendanceStartDate } from "@/lib/hr/attendance-ssot"
+import { loadAttendanceStartDates } from "@/lib/hr/attendance-start"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import {
   calculatePayroll,
@@ -142,40 +143,27 @@ export async function computePayrollBatch(
 
   const workdayDates = getPayrollWorkdays(period.start_date, period.end_date, ctx)
 
-  const [
-    { data: salaries },
-    { data: attendance },
-    { data: earliestLogs },
-    { data: lunchLogs },
-    { data: existingEntries },
-  ] = await Promise.all([
-    dataClient.from("employee_salaries").select("*").in("user_id", userIds).eq("is_active", true),
-    dataClient
-      .from("attendance_records")
-      .select("user_id, date, clock_in, clock_out, waived, status")
-      .in("user_id", userIds)
-      .gte("date", period.start_date)
-      .lte("date", period.end_date),
-    dataClient
-      .from("attendance_records")
-      .select("user_id, date")
-      .in("user_id", userIds)
-      .order("date", { ascending: true }),
-    dataClient
-      .from("attendance_lunch_log")
-      .select("user_id, employee_deduction")
-      .in("user_id", userIds)
-      .gte("date", period.start_date)
-      .lte("date", period.end_date),
-    dataClient.from("payroll_entries").select("*").eq("payroll_period_id", periodId),
-  ])
-
-  const earliestLogByUser = new Map<string, string>()
-  for (const row of earliestLogs || []) {
-    if (row.user_id && row.date && !earliestLogByUser.has(row.user_id)) {
-      earliestLogByUser.set(row.user_id, row.date)
-    }
-  }
+  const [{ data: salaries }, { data: attendance }, earliestLogByUser, { data: lunchLogs }, { data: existingEntries }] =
+    await Promise.all([
+      dataClient.from("employee_salaries").select("*").in("user_id", userIds).eq("is_active", true),
+      dataClient
+        .from("attendance_records")
+        .select("user_id, date, clock_in, clock_out, waived, status")
+        .in("user_id", userIds)
+        .gte("date", period.start_date)
+        .lte("date", period.end_date),
+      // One row per person from the start-dates view. Loading every record here
+      // hit the 1,000-row API cap, leaving later starters with no start date and
+      // so no absences deducted.
+      loadAttendanceStartDates(dataClient, userIds),
+      dataClient
+        .from("attendance_lunch_log")
+        .select("user_id, employee_deduction")
+        .in("user_id", userIds)
+        .gte("date", period.start_date)
+        .lte("date", period.end_date),
+      dataClient.from("payroll_entries").select("*").eq("payroll_period_id", periodId),
+    ])
 
   const existingMap = new Map<string, any>((existingEntries || []).map((e: any) => [e.user_id, e]))
 

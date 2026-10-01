@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { buttonVariants } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/patterns"
 import { cn } from "@/lib/utils"
+import { activityModuleNoun, activitySentenceCase, describeAuditActivity } from "@/lib/audit/describe-activity"
 import { CheckSquare, Laptop, Package, FileText, MessageSquare, ScrollText } from "lucide-react"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import Link from "next/link"
@@ -375,9 +376,8 @@ export function EmployeeDetailTabs({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Entity Type</TableHead>
-                    <TableHead>Entity ID</TableHead>
+                    <TableHead>What happened</TableHead>
+                    <TableHead>Module</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -385,11 +385,12 @@ export function EmployeeDetailTabs({
                 <TableBody>
                   {auditLogs.map((entry) => (
                     <TableRow key={entry.id}>
+                      <TableCell className="text-sm">{describeAuditActivity(entry)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{entry.action}</Badge>
+                        <Badge variant="outline" className="font-normal">
+                          {activitySentenceCase(activityModuleNoun(entry))}
+                        </Badge>
                       </TableCell>
-                      <TableCell>{entry.entity_type}</TableCell>
-                      <TableCell className="font-mono text-xs">{entry.entity_id?.substring(0, 8) || "N/A"}</TableCell>
                       <TableCell>{formatWATDateTime(entry.created_at)}</TableCell>
                       <TableCell>
                         <Link

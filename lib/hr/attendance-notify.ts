@@ -30,7 +30,7 @@ type LeadProfileRow = {
 }
 
 /** How the attendance state was changed — drives subject + wording. */
-export type AttendanceMailDecision = "created" | "updated" | "approved" | "rejected"
+export type AttendanceMailDecision = "created" | "updated" | "approved" | "rejected" | "resolved"
 
 export interface NotifyAttendanceMailParams {
   /** Employee whose attendance was altered / whose appeal was decided. */
@@ -75,6 +75,8 @@ function decisionVerb(decision: AttendanceMailDecision): string {
       return "approved"
     case "rejected":
       return "rejected"
+    case "resolved":
+      return "resolved"
     case "created":
       return "recorded"
     default:
@@ -96,10 +98,11 @@ function formatTimestamp(iso: string): string {
 }
 
 /**
- * Resolve the Admin & HR lead's email addresses. Mirrors leave routing: the profile that is a
- * department lead for "Admin & HR". Falls back to super admins when no such lead is configured.
+ * Emails of the leads of one department: a lead whose own department matches, or who manages
+ * it through `lead_departments`. No fallback - callers decide what an empty result means.
  */
-async function resolveAdminHrLeadEmails(client: NotifyClient): Promise<string[]> {
+async function departmentLeadEmails(client: NotifyClient, department: string): Promise<string[]> {
+  const target = normalizeDepartmentName(department)
   const { data: leads } = await client
     .from("profiles")
     .select("id, department, lead_departments, company_email, additional_email")
@@ -108,12 +111,20 @@ async function resolveAdminHrLeadEmails(client: NotifyClient): Promise<string[]>
   const matches = ((leads ?? []) as LeadProfileRow[]).filter((profile) => {
     const managed = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
     return (
-      normalizeDepartmentName(profile.department ?? "") === ADMIN_HR_DEPARTMENT ||
-      managed.some((dept) => normalizeDepartmentName(dept) === ADMIN_HR_DEPARTMENT)
+      normalizeDepartmentName(profile.department ?? "") === target ||
+      managed.some((dept) => normalizeDepartmentName(dept) === target)
     )
   })
 
-  let emails = matches.flatMap((lead) => collectEmails(lead))
+  return matches.flatMap((lead) => collectEmails(lead))
+}
+
+/**
+ * Resolve the Admin & HR lead's email addresses. Mirrors leave routing: the profile that is a
+ * department lead for "Admin & HR". Falls back to super admins when no such lead is configured.
+ */
+async function resolveAdminHrLeadEmails(client: NotifyClient): Promise<string[]> {
+  let emails = await departmentLeadEmails(client, ADMIN_HR_DEPARTMENT)
 
   if (emails.length === 0) {
     const { data: superAdmins } = await client
@@ -164,7 +175,7 @@ export async function notifyAttendanceMail(client: NotifyClient, params: NotifyA
     const leadEmails = await resolveAdminHrLeadEmails(client)
 
     const verb = decisionVerb(params.decision)
-    const isAppeal = params.decision === "approved" || params.decision === "rejected"
+    const isAppeal = params.decision === "approved" || params.decision === "rejected" || params.decision === "resolved"
     const statusTransition =
       params.fromStatus && params.toStatus
         ? `${statusLabel(params.fromStatus)} → ${statusLabel(params.toStatus)}`
@@ -267,5 +278,70 @@ export async function notifyAttendanceInApp(client: NotifyClient, params: Notify
     })
   } catch (err) {
     log.error({ err: String(err) }, "Failed to create attendance in-app notification")
+  }
+}
+
+export interface NotifyAppealSubmittedParams {
+  /** Employee who raised the appeal. */
+  appellantId: string
+  /** Day appealed, YYYY-MM-DD. */
+  date: string
+  fromStatus: string
+  requestedStatus: string
+  reason: string
+}
+
+/**
+ * Emails the appellant's department lead and the Admin & HR lead when an appeal is raised.
+ * Until this, a new appeal only produced an in-app notification for the department lead, so an
+ * appeal could sit unseen by anyone who did not open the app, and HR heard nothing until it was
+ * decided. Same two gates as every other attendance email. Best-effort: never throws.
+ */
+export async function notifyAppealSubmittedMail(
+  client: NotifyClient,
+  params: NotifyAppealSubmittedParams
+): Promise<void> {
+  try {
+    if (!(await isSystemNotificationChannelEnabled(client, "attendance", "email"))) return
+    const policy = await loadAttendancePolicy(client)
+    if (policy.emailNotificationsEnabled === false) return
+
+    const { data: appellant } = await client
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, department")
+      .eq("id", params.appellantId)
+      .maybeSingle<
+        Pick<ProfileNameEmailRow, "id" | "full_name" | "first_name" | "last_name"> & {
+          department: string | null
+        }
+      >()
+
+    const appellantName = formatName(appellant)
+    const department = appellant?.department ?? null
+    const [deptLeadEmails, hrLeadEmails] = await Promise.all([
+      department ? departmentLeadEmails(client, department) : Promise.resolve([] as string[]),
+      resolveAdminHrLeadEmails(client),
+    ])
+    const recipients = Array.from(new Set([...deptLeadEmails, ...hrLeadEmails].map((email) => email.toLowerCase())))
+    if (recipients.length === 0) return
+
+    await sendAttendanceMail({
+      to: recipients,
+      subject: `Attendance Appeal Submitted — ${params.date} (${appellantName})`,
+      title: "Attendance Appeal Submitted",
+      message: `${appellantName} has appealed their attendance for ${params.date}. It is waiting for review on the Appeals tab of Attendance.`,
+      detailsTitle: "Appeal Details",
+      ctaPath: "/admin/hr/attendance?tab=appeals",
+      details: [
+        { label: "Employee", value: appellantName },
+        { label: "Department", value: department || "N/A" },
+        { label: "Date", value: params.date },
+        { label: "Status", value: `${statusLabel(params.fromStatus)} → ${statusLabel(params.requestedStatus)}` },
+        { label: "Reason", value: params.reason.trim() || "N/A" },
+        { label: "Submitted", value: formatTimestamp(new Date().toISOString()) },
+      ],
+    })
+  } catch (err) {
+    log.error({ err: String(err) }, "Failed to send appeal submitted email")
   }
 }

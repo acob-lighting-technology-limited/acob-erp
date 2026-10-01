@@ -1,24 +1,14 @@
-import type { LucideIcon } from "lucide-react"
+export type ActionQueueTone = "critical" | "attention" | "info"
+export type ActionQueueGroup = "approvals" | "attention"
 
-export type NotificationType = "error" | "warning" | "info"
-
-export interface NotificationItem {
+export interface ActionQueueItem {
   id: string
-  type: NotificationType
-  title: string
-  message: string
-  timestamp: string
-  link: string
-  linkText: string
-}
-
-export interface ModuleAction {
+  group: ActionQueueGroup
+  tone: ActionQueueTone
   title: string
   description: string
+  count: number
   href: string
-  icon: LucideIcon
-  color: string
-  roles: string[]
 }
 
 export interface RecentActivityItem {

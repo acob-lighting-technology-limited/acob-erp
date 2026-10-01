@@ -6,6 +6,7 @@
  */
 
 import { formatName } from "@/lib/utils"
+import { actionVerb, describeAuditActivity, describeAuditEvent } from "@/lib/audit/describe-activity"
 import { ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { AuditLog } from "@/app/admin/audit-logs/types"
 
@@ -126,9 +127,8 @@ export function getAuditSiteId(log: AuditLog): string {
 }
 
 export function getAuditLogSummary(log: AuditLog): string {
-  if (log.metadata?.event) return String(log.metadata.event)
-  if (log.task_info?.title) return `Task: ${log.task_info.title}`
-  if (log.asset_info?.unique_code) return `Asset: ${log.asset_info.unique_code}`
+  const event = describeAuditEvent(log)
+  if (event) return event
 
   const entityType = (log.entity_type || "").toLowerCase()
   const nv = (log.new_values || {}) as Record<string, unknown>
@@ -180,7 +180,10 @@ export function getAuditLogSummary(log: AuditLog): string {
   }
 
   if (log.leave_request_info?.leave_type_name) return log.leave_request_info.leave_type_name
-  return `Modified ${log.entity_type}`
+  // Joined titles beat whatever the row captured; otherwise the shared sentence.
+  if (log.task_info?.title) return `${actionVerb(log.action || "update")} task “${log.task_info.title}”`
+  if (log.asset_info?.unique_code) return `${actionVerb(log.action || "update")} asset ${log.asset_info.unique_code}`
+  return describeAuditActivity(log)
 }
 
 export function getActionDisplay(log: AuditLog): string {

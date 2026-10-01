@@ -30,6 +30,7 @@ export type AttendanceEventType =
   | "leave_revoked"
   | "exemption_added"
   | "exemption_removed"
+  | "oos_stopped"
   | "holiday_added"
   | "holiday_removed"
   | "marked_incomplete"

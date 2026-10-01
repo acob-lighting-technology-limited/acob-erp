@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { recordAttendanceEvents } from "@/lib/hr/attendance-events"
+import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
 import { toLocalISODate } from "@/lib/utils/date"
 
 /** Inclusive list of ISO dates between start and end (includes weekends for OOS directives). */
@@ -24,6 +25,9 @@ export function oosWorkdays(start: string, end: string): string[] {
  *   - incomplete day (clock-in, no clock-out)     → overridden (the "left mid-day" case),
  *   - empty day                                   → fresh OOS record.
  * Overrides preserve the punches, so removing OOS re-derives the real status.
+ *
+ * Any pending appeal on a day this changes is closed as resolved, so a later
+ * approval cannot overwrite the OOS.
  */
 export async function materializeOos(
   dataClient: SupabaseClient,
@@ -68,6 +72,7 @@ export async function materializeOos(
     }
   }
 
+  const changed: Array<{ user_id: string; date: string }> = []
   let overrode = 0
   if (overrides.length > 0) {
     const { error } = await dataClient
@@ -79,6 +84,7 @@ export async function materializeOos(
       )
     if (!error) {
       overrode = overrides.length
+      changed.push(...overrides)
       await recordAttendanceEvents(
         dataClient,
         overrides.map((o) => ({
@@ -104,6 +110,7 @@ export async function materializeOos(
       .select("id, user_id, date")
     if (!error && inserted) {
       created = inserted.length
+      changed.push(...(inserted as Array<{ user_id: string; date: string }>))
       await recordAttendanceEvents(
         dataClient,
         (inserted as Array<{ id: string; user_id: string; date: string }>).map((row) => ({
@@ -119,6 +126,18 @@ export async function materializeOos(
         }))
       )
     }
+  }
+
+  const datesByUser = new Map<string, string[]>()
+  for (const row of changed) datesByUser.set(row.user_id, [...(datesByUser.get(row.user_id) ?? []), row.date])
+  for (const [userId, userDates] of datesByUser) {
+    await resolvePendingAppealsOnManualStatus(dataClient, {
+      userId,
+      dates: userDates,
+      status: "out_of_station",
+      comment,
+      actorId,
+    })
   }
 
   return { created, overrode, skipped }

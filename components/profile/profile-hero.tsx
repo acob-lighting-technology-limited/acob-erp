@@ -345,7 +345,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 ) : profile.employment_date ? (
                   <Badge
                     variant="outline"
-                    className="border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400"
+                    className="border-border text-muted-foreground px-2 py-0.5 text-[11px] font-medium"
                   >
                     Probation (Pending Confirmation)
                   </Badge>
@@ -424,10 +424,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                     Confirmed
                   </Badge>
                 ) : profile.employment_date ? (
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-700 dark:text-amber-400"
-                  >
+                  <Badge variant="outline" className="border-border text-muted-foreground text-xs font-medium">
                     Probation (Pending Confirmation)
                   </Badge>
                 ) : null}

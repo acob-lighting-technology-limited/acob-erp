@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -10,8 +10,10 @@ import { DailyRosterView } from "./_components/daily-roster-view"
 import { CalendarView } from "./_components/calendar-view"
 import type { EmployeeOption } from "./_components/calendar-view"
 import { AppealsView } from "./_components/appeals-view"
+import { ChangeLogView, type ChangeLogViewHandle } from "./_components/change-log-view"
 import { LeaderboardView } from "./_components/leaderboard-view"
 import { AttendanceManagerDialog } from "./_components/attendance-manager-dialog"
+import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { AttendanceReportDialog } from "./_components/attendance-report-dialog"
 import { AttendanceExportDialog } from "./_components/attendance-export-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -812,7 +814,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
   )
 }
 
-type AttendanceTab = "summary" | "daily" | "calendar" | "appeals" | "leaderboard"
+type AttendanceTab = "summary" | "daily" | "calendar" | "appeals" | "change-log" | "leaderboard"
 
 const ATTENDANCE_TABS: DataTableTab[] = [
   { key: "daily", label: "Daily Roster" },
@@ -820,6 +822,7 @@ const ATTENDANCE_TABS: DataTableTab[] = [
   { key: "leaderboard", label: "Leaderboard" },
   { key: "calendar", label: "Calendar" },
   { key: "appeals", label: "Appeals" },
+  { key: "change-log", label: "Change log" },
 ]
 
 export function AttendanceReportsPage({
@@ -846,6 +849,14 @@ export function AttendanceReportsPage({
   const [quarterYear, setQuarterYear] = useState(new Date().getFullYear())
   const reportDepartment = lockedDepartment || "all"
   const [isExportOpen, setIsExportOpen] = useState(false)
+  // Admin & HR only: department leads could grant leave from the manager with no
+  // approval (see requireAttendanceAdmin). The server enforces it; this hides it.
+  const adminScope = useAdminScopeOptional()
+  const canUseAttendanceManager = Boolean(adminScope?.isAdminLike) && !lockedDepartment
+  // Export follows the open tab: on the Change log it exports the log, not attendance.
+  const changeLogRef = useRef<ChangeLogViewHandle>(null)
+  const [changeLogCount, setChangeLogCount] = useState(0)
+  const isChangeLogTab = activeTab === "change-log"
   const [holidays, setHolidays] = useState<Array<{ holiday_date: string; name?: string | null }>>([])
   // Unified Attendance Manager dialog
   const [managerOpen, setManagerOpen] = useState(false)
@@ -1097,7 +1108,9 @@ export function AttendanceReportsPage({
               ? "Month-view calendar for an individual employee."
               : activeTab === "leaderboard"
                 ? "Rankings across punctuality, hours, and reliability for the selected period."
-                : "Records needing attention — late arrivals, missing clock-outs, absences."
+                : activeTab === "change-log"
+                  ? "Every change made to attendance by hand or by an appeal decision, for audit and export."
+                  : "Records needing attention — late arrivals, missing clock-outs, absences."
       }
       icon={BarChart3}
       backLink={{ href: backLinkHref ?? "/admin/hr", label: "Back to HR" }}
@@ -1116,7 +1129,7 @@ export function AttendanceReportsPage({
             </TooltipTrigger>
             <TooltipContent side="top">Attendance Reports</TooltipContent>
           </Tooltip>
-          {!lockedDepartment && (
+          {canUseAttendanceManager && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1137,8 +1150,8 @@ export function AttendanceReportsPage({
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
-                onClick={() => setIsExportOpen(true)}
-                disabled={reports.length === 0}
+                onClick={() => (isChangeLogTab ? changeLogRef.current?.exportToExcel() : setIsExportOpen(true))}
+                disabled={isChangeLogTab ? changeLogCount === 0 : reports.length === 0}
                 size="sm"
                 aria-label="Export"
               >
@@ -1147,7 +1160,9 @@ export function AttendanceReportsPage({
                 <span className="sr-only sm:hidden">Export</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Export Attendance Data</TooltipContent>
+            <TooltipContent side="top">
+              {isChangeLogTab ? "Export Change Log" : "Export Attendance Data"}
+            </TooltipContent>
           </Tooltip>
         </div>
       }
@@ -1186,6 +1201,13 @@ export function AttendanceReportsPage({
       {activeTab === "leaderboard" && <LeaderboardView departments={departments} lockedDepartment={lockedDepartment} />}
       {activeTab === "calendar" && <CalendarView employees={employeeOptions} />}
       {activeTab === "appeals" && <AppealsView lockedDepartment={lockedDepartment} />}
+      {activeTab === "change-log" && (
+        <ChangeLogView
+          ref={changeLogRef}
+          lockedDepartment={lockedDepartment}
+          onVisibleCountChange={setChangeLogCount}
+        />
+      )}
       {activeTab === "summary" && (
         <DataTable<AttendanceReport>
           data={reports}
@@ -1268,7 +1290,7 @@ export function AttendanceReportsPage({
         monthOptions={monthOptions}
       />
 
-      {!lockedDepartment && (
+      {canUseAttendanceManager && (
         <AttendanceManagerDialog
           open={managerOpen}
           onOpenChange={setManagerOpen}

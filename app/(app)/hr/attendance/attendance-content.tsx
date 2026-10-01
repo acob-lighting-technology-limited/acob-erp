@@ -432,7 +432,9 @@ export function AttendanceContent({
           const pendingAppeal = rowAppeals.find((a) => a.status === "pending")
           const approvedAppeal = rowAppeals.find((a) => a.status === "approved")
           const hasRejected = rowAppeals.some((a) => a.status === "rejected")
-          const isEligible = (["absent", "late", "incomplete"] as string[]).includes(row.normalizedStatus)
+          // Today is not appealable until it ends: the server refuses it (punches may still arrive).
+          const isEligible =
+            row.date < toLocalISODate() && (["absent", "late", "incomplete"] as string[]).includes(row.normalizedStatus)
 
           if (!isEligible && rowAppeals.length === 0) {
             return null
@@ -774,7 +776,9 @@ export function AttendanceContent({
                                 ? "Pending approval"
                                 : latestAppeal.status === "approved"
                                   ? "Approved"
-                                  : "Rejected",
+                                  : latestAppeal.status === "resolved"
+                                    ? "Resolved manually by Admin & HR"
+                                    : "Rejected",
                             copyable: false,
                           },
                           {
@@ -800,7 +804,10 @@ export function AttendanceContent({
                 actions: (row) => {
                   const rowAppeals = appeals.filter((a) => a.appeal_date === row.date)
                   const pendingAppeal = rowAppeals.find((a) => a.status === "pending")
-                  const isEligible = (["absent", "late", "incomplete"] as string[]).includes(row.normalizedStatus)
+                  // Today is not appealable until it ends: the server refuses it (punches may still arrive).
+                  const isEligible =
+                    row.date < toLocalISODate() &&
+                    (["absent", "late", "incomplete"] as string[]).includes(row.normalizedStatus)
                   if (pendingAppeal) {
                     return [
                       {
@@ -917,8 +924,12 @@ export function AttendanceContent({
               const rowAppeals = appeals.filter((a) => a.appeal_date === row.date)
               const pendingAppeal = rowAppeals.find((a) => a.status === "pending")
               const approvedAppeal = rowAppeals.find((a) => a.status === "approved")
+              const resolvedAppeal = rowAppeals.find((a) => a.status === "resolved")
               const hasRejected = rowAppeals.some((a) => a.status === "rejected")
-              const isEligible = (["absent", "late", "incomplete"] as string[]).includes(row.normalizedStatus)
+              // Today is not appealable until it ends: the server refuses it (punches may still arrive).
+              const isEligible =
+                row.date < toLocalISODate() &&
+                (["absent", "late", "incomplete"] as string[]).includes(row.normalizedStatus)
 
               return (
                 <div className="bg-card text-card-foreground border-border/60 hover:border-primary/40 space-y-3 rounded-xl border p-3.5 shadow-sm transition-all sm:p-4">
@@ -968,6 +979,10 @@ export function AttendanceContent({
                       ) : approvedAppeal ? (
                         <Badge variant="outline" className="border-emerald-500 bg-emerald-500/5 text-emerald-500">
                           Appeal Approved
+                        </Badge>
+                      ) : resolvedAppeal ? (
+                        <Badge variant="outline" className="border-sky-500 bg-sky-500/5 text-sky-500">
+                          Appeal Resolved
                         </Badge>
                       ) : hasRejected ? (
                         <Button

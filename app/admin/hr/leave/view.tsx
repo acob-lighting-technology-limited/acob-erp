@@ -32,6 +32,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { LeaveDetailDialog } from "./_components/leave-detail-dialog"
 import { AddLeaveDialog } from "./_components/add-leave-dialog"
+import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { LeaveCalendarView } from "./_components/leave-calendar-view"
 import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
@@ -308,6 +309,9 @@ export function LeaveApprovePage({
   const [selectedLeaveDetail, setSelectedLeaveDetail] = useState<LeaveItem | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [addLeaveOpen, setAddLeaveOpen] = useState(false)
+  // Adding leave here creates it already approved, skipping the workflow, so it is
+  // Admin & HR only - the server refuses leads too (requireAttendanceAdmin).
+  const canAddLeave = Boolean(useAdminScopeOptional()?.isAdminLike)
   const [calendarStats, setCalendarStats] = useState<{
     total_days: number
     active_leaves: number
@@ -611,11 +615,13 @@ export function LeaveApprovePage({
         icon={CalendarCheck2}
         backLink={backLinkHref ? { href: backLinkHref, label: "Back" } : undefined}
         actions={
-          <Button size="sm" onClick={() => setAddLeaveOpen(true)} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Leave</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          canAddLeave ? (
+            <Button size="sm" onClick={() => setAddLeaveOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Leave</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          ) : undefined
         }
         stats={
           activeTab === "calendar" ? (

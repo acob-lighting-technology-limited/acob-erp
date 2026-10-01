@@ -41,6 +41,8 @@ export type TaskUrgency =
   | { kind: "due_soon"; days: number }
   | { kind: "scheduled"; dueDate: string }
   | { kind: "no_date" }
+  | { kind: "awaiting_review" }
+  | { kind: "blocked" }
 
 /**
  * Urgency is measured in whole WAT calendar days, not in elapsed milliseconds.
@@ -53,6 +55,13 @@ export function getTaskUrgency(task: Task, now: Date): TaskUrgency {
   // task_end_date wins over due_date, matching the nightly expiry job and the
   // project health rollup - a plan task carries both, and measuring the badge
   // against the wrong one would put the screen a day out from the job again.
+  // Submitted and blocked tasks are waiting on the lead, not the assignee, and
+  // the nightly job never escalates them (`isTaskEscalated`). Showing them as
+  // overdue told staff to act on work that is out of their hands.
+  if (!isTaskTerminal(task)) {
+    if (task.status === "submitted_for_review") return { kind: "awaiting_review" }
+    if (task.status === "unable_to_complete") return { kind: "blocked" }
+  }
   const deadline = taskDeadline(task)
   if (!deadline) return { kind: "no_date" }
   if (isTaskTerminal(task)) return { kind: "scheduled", dueDate: deadline }
@@ -67,9 +76,11 @@ const URGENCY_RANK: Record<TaskUrgency["kind"], number> = {
   due_soon: 1,
   scheduled: 2,
   no_date: 3,
+  blocked: 4,
+  awaiting_review: 5,
 }
 
-/** Open tasks sorted most-urgent first (overdue → due soon → scheduled → undated). */
+/** Open tasks sorted most-urgent first (overdue → due soon → scheduled → undated → with the lead). */
 export function sortTasksByUrgency(tasks: Task[], now: Date): Task[] {
   return tasks
     .filter(isOpenTask)

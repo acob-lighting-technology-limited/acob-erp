@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
-import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
-import { freezeExemptionAtToday } from "@/lib/hr/exemptions"
+import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
+import { freezeExemptionAtToday, recordExemptionChange, snapshotExemption } from "@/lib/hr/exemptions"
 
 const BulkExemptionSchema = z.object({
   user_ids: z.array(z.string().uuid()).min(1),
@@ -62,6 +62,8 @@ async function ensureAdmin(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const auth = await ensureAdmin(request)
   if ("error" in auth) return auth.error
+  const adminOnly = requireAttendanceAdmin(auth.scope)
+  if (adminOnly) return adminOnly
 
   const parsed = BulkExemptionSchema.safeParse(await request.json())
   if (!parsed.success) {
@@ -90,12 +92,22 @@ export async function PATCH(request: NextRequest) {
   // freezeExemptionAtToday). Past exempt days are preserved; nothing new going forward.
   if (mode === "off") {
     for (const userId of user_ids) {
+      const before = await snapshotExemption(dataClient, userId)
       await freezeExemptionAtToday(dataClient, userId, auth.userId)
+      await recordExemptionChange(dataClient, {
+        userId,
+        actorId: auth.userId,
+        mode,
+        reason,
+        before,
+        after: await snapshotExemption(dataClient, userId),
+      })
     }
     return NextResponse.json({ message: "Exemptions stopped — history preserved up to today" })
   }
 
   for (const userId of user_ids) {
+    const before = await snapshotExemption(dataClient, userId)
     const insertExemptRows = async (
       rows: Array<{
         user_id: string
@@ -243,6 +255,15 @@ export async function PATCH(request: NextRequest) {
         )
       }
     }
+
+    await recordExemptionChange(dataClient, {
+      userId,
+      actorId: auth.userId,
+      mode,
+      reason,
+      before,
+      after: await snapshotExemption(dataClient, userId),
+    })
   }
 
   return NextResponse.json({ message: "Exemption settings saved" })

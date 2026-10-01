@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowRight, ScrollText } from "lucide-react"
 import { EmptyState } from "@/components/ui/patterns"
 import type { RecentActivityItem } from "./dashboard-types"
+import { cn } from "@/lib/utils"
 import { formatWATRelative } from "@/lib/utils/date"
 
 const activityRouteMap: Record<string, string> = {
@@ -16,8 +17,8 @@ const activityRouteMap: Record<string, string> = {
   pending_users: "/admin/hr/employees",
   department_payments: "/admin/accounts/payments",
   payment_documents: "/admin/accounts/payments",
-  help_desk_ticket: "/admin/help-desk",
-  help_desk_tickets: "/admin/help-desk",
+  help_desk_ticket: "/admin/help-desk/management",
+  help_desk_tickets: "/admin/help-desk/management",
   correspondence_record: "/admin/correspondence",
   correspondence_records: "/admin/correspondence",
   asset: "/admin/assets",
@@ -39,12 +40,13 @@ function formatDate(dateString: string): string {
 interface RecentActivityFeedProps {
   activity: RecentActivityItem[]
   showViewAll?: boolean
+  className?: string
 }
 
-export function RecentActivityFeed({ activity, showViewAll = true }: RecentActivityFeedProps) {
+export function RecentActivityFeed({ activity, showViewAll = true, className }: RecentActivityFeedProps) {
   return (
-    <Card>
-      <CardHeader className="px-4 py-3">
+    <Card className={cn("flex min-h-0 flex-col", className)}>
+      <CardHeader className="shrink-0 px-4 py-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm">
             <ScrollText className="text-muted-foreground h-4 w-4" />
@@ -60,9 +62,9 @@ export function RecentActivityFeed({ activity, showViewAll = true }: RecentActiv
           )}
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="flex min-h-0 flex-1 flex-col p-0">
         {activity.length > 0 ? (
-          <ul className="max-h-72 divide-y overflow-y-auto">
+          <ul className="max-h-72 flex-1 divide-y overflow-y-auto border-t lg:max-h-none">
             {activity.map((item) => (
               <li key={item.id}>
                 <Link
@@ -71,8 +73,7 @@ export function RecentActivityFeed({ activity, showViewAll = true }: RecentActiv
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm leading-snug">
-                      <span className="font-medium">{item.actorName}</span>{" "}
-                      <span className="text-muted-foreground">{item.actionLabel}</span>
+                      <span className="font-medium">{item.actorName}</span> <span>{item.actionLabel}</span>
                     </p>
                     <div className="mt-0.5 flex items-center gap-1.5">
                       <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">

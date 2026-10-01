@@ -116,9 +116,13 @@ export function isPositiveAttendanceStatus(status: string | null | undefined): b
 /**
  * Resolves the date when an employee's attendance should start being scorable.
  * - Exempt staff: null (exempt from biometric attendance scoring).
- * - Staff with no logs in the DB: null (not started yet, no absence penalty).
- * - Trial period logs (< 2026-06-01): clamped to 2026-06-01.
- * - Live logs (>= 2026-06-01): starts on their actual earliest log date.
+ * - Staff with no clock-in or manual edit yet: null (not started, no absence penalty).
+ * - Trial period (< 2026-06-01): clamped to 2026-06-01.
+ * - Live (>= 2026-06-01): starts on their first clock-in or manual edit.
+ *
+ * Load `earliestLogDate` with loadAttendanceStartDates. A manual edit made
+ * before someone joins (e.g. LWP to cover their pre-join days) therefore
+ * becomes their start date, so pre-join days should be left alone, not covered.
  */
 export function getEffectiveAttendanceStartDate(params: {
   earliestLogDate?: string | null
