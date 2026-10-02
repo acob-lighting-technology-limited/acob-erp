@@ -2,12 +2,13 @@ import type { CSSProperties } from "react"
 
 const CONFETTI_COLORS = ["var(--bd-gold)", "var(--bd-green)", "var(--bd-cream)", "var(--bd-gold-deep)"]
 
-// Deterministic scatter (no Math.random) so server and client render identical markup.
-const CONFETTI = Array.from({ length: 34 }, (_, i) => ({
-  left: (i * 37 + 11) % 100,
-  delay: -((i * 1.7) % 14),
-  duration: 11 + ((i * 7) % 9),
-  size: 6 + ((i * 5) % 7),
+// A light sprinkle, not a storm. Deterministic scatter (no Math.random) so server and
+// client render identical markup.
+const CONFETTI = Array.from({ length: 12 }, (_, i) => ({
+  left: (i * 41 + 7) % 100,
+  delay: -((i * 2.9) % 18),
+  duration: 16 + ((i * 7) % 8),
+  size: 5 + ((i * 3) % 4),
   drift: ((i % 5) - 2) * 18,
   color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
   round: i % 3 === 0,

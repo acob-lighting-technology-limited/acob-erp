@@ -10,10 +10,6 @@
   display: none;
 }
 
-.birthday-page[data-variant="3"] .birthday-confetti {
-  opacity: 0.45;
-}
-
 .birthday-page[data-variant="3"] .birthday-card-item {
   align-items: center;
   border: 0;
