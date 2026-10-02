@@ -1,4 +1,5 @@
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
+import { BirthdayDecor } from "./birthday-decor"
 import { BirthdayExplorer } from "./birthday-explorer"
 
 export default async function BirthdayPage() {
@@ -7,8 +8,7 @@ export default async function BirthdayPage() {
 
   return (
     <main className="birthday-page">
-      <div className="birthday-page__ambient" aria-hidden="true" />
-      <div className="birthday-page__ambient birthday-page__ambient--secondary" aria-hidden="true" />
+      <BirthdayDecor />
 
       <section className="birthday-hero">
         <BirthdayExplorer />
