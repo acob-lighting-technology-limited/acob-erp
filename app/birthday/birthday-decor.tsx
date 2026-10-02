@@ -16,10 +16,10 @@ const CONFETTI = Array.from({ length: 12 }, (_, i) => ({
 }))
 
 // Two tethered bunches, one tied at each bottom corner. Coordinates are in the
-// bunch's own 260×480 viewBox; the right bunch mirrors x so highlights stay top-left.
+// bunch's own 260×380 viewBox; the right bunch mirrors x so highlights stay top-left.
 const BUNCH_W = 260
-const BUNCH_H = 480
-const TIE = { x: 34, y: 466 }
+const BUNCH_H = 380
+const TIE = { x: 34, y: 366 }
 
 const BUNCH = [
   { x: 82, y: 118, s: 0.95, color: "var(--bd-green)", sway: 7, delay: 0 },
