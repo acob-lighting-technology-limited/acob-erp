@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useNow } from "@/hooks/use-now"
 import { ArrowUpRight, Clock, FileText, Inbox, Wallet } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,10 +24,10 @@ const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN
 
 /** MD's Desk → Overview: everything currently waiting on the MD's decision. */
 export function WaitingOnMd() {
+  const now = useNow()
   const { data, isLoading, error, refetch } = useMdDeskOverview()
   const items = data?.queue.items ?? []
   const counts = data?.queue.counts
-  const now = Date.now()
   const overdue = items.filter((i) => now - new Date(i.waiting_since).getTime() > 3 * 86_400_000).length
 
   const columns: DataTableColumn<MdDeskQueueItem>[] = [

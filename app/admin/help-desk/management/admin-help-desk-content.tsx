@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
+import { useNow } from "@/hooks/use-now"
 import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -65,6 +66,7 @@ export function AdminHelpDeskContent({
   lockedDepartment,
   backLinkHref = "/admin",
 }: AdminHelpDeskContentProps) {
+  const now = useNow()
   const [tickets, setTickets] = useState(initialTickets)
   const [activeTab, setActiveTab] = useState("my-actions")
   const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({})
@@ -73,7 +75,6 @@ export function AdminHelpDeskContent({
   const [requisitionTicket, setRequisitionTicket] = useState<HelpDeskTicket | null>(null)
 
   const stats = useMemo(() => {
-    const now = Date.now()
     const breached = tickets.filter(
       (t) => t.sla_target_at && new Date(t.sla_target_at).getTime() < now && !["resolved", "closed"].includes(t.status)
     ).length
@@ -83,7 +84,7 @@ export function AdminHelpDeskContent({
       inProgress: tickets.filter((t) => t.status === "in_progress").length,
       breached,
     }
-  }, [tickets])
+  }, [tickets, now])
 
   const managedDepartments = useMemo(
     () =>

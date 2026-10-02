@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNow } from "@/hooks/use-now"
 import { Brain, ChevronLeft, ChevronRight, AlertCircle, Clock, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -104,6 +105,7 @@ export default function CbtPage() {
   // ?verify=identity deep-links straight to the date-of-birth form, which is
   // what the retired /cbt/identity route now redirects to. Read from the URL
   // rather than useSearchParams so the page needs no Suspense boundary.
+  const [tabSwitchCount, setTabSwitchCount] = useState(0)
   useEffect(() => {
     try {
       if (new URLSearchParams(window.location.search).get("verify") === "identity") {
@@ -206,7 +208,6 @@ export default function CbtPage() {
   // Track when the candidate leaves the tab (switches tab / minimizes /
   // switches app) during an active test, and warn them it's recorded and
   // visible to admins — see the "Tab Switches" column on the admin CBT page.
-  const [tabSwitchCount, setTabSwitchCount] = useState(0)
   const tabSwitchCountRef = useRef(0)
 
   useEffect(() => {
@@ -376,16 +377,18 @@ export default function CbtPage() {
   // On the resume screen, show what's actually left on the clock rather than
   // the full allowance — the deadline keeps counting down in real time even
   // while the candidate is away, so this reflects genuine elapsed time.
+  // Ticks every second so the resume screen counts down live.
+  const now = useNow(1000)
   const resumeTimeLeftSeconds = useMemo(() => {
     if (!session || !session.is_resume || session.is_completed) return null
     try {
       const storedExpiresAt = localStorage.getItem(`acob_cbt_timer_${session.attempt_id}`)
       if (!storedExpiresAt || isNaN(Number(storedExpiresAt))) return null
-      return Math.max(0, Math.floor((Number(storedExpiresAt) - Date.now()) / 1000))
+      return Math.max(0, Math.floor((Number(storedExpiresAt) - now) / 1000))
     } catch (e) {
       return null
     }
-  }, [session])
+  }, [session, now])
 
   const startSession = async () => {
     setStarting(true)

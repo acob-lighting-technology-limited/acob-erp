@@ -73,10 +73,10 @@ export function AdminAttendanceRecordsPage({
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRecords, setProcessedRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(false)
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState(() => ({
     start_date: toLocalISODate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
     end_date: toLocalISODate(),
-  })
+  }))
 
   const [exportOpen, setExportOpen] = useState(false)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)

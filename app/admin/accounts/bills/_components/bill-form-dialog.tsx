@@ -39,14 +39,14 @@ interface BillFormDialogProps {
 export function BillFormDialog({ open, onOpenChange, queryClient }: BillFormDialogProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     supplier_name: "",
     supplier_email: "",
     bill_date: toLocalISODate(),
     due_date: toLocalISODate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
     currency: "NGN",
     notes: "",
-  })
+  }))
   const [items, setItems] = useState<BillItem[]>([
     { id: crypto.randomUUID(), description: "", quantity: 1, unit_price: 0, amount: 0 },
   ])

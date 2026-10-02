@@ -11,12 +11,19 @@ export default defineConfig([
   {
     rules: {
       "react-hooks/exhaustive-deps": "warn",
-      "react-hooks/immutability": "off",
+      // React 19 correctness rules — on, and kept at zero violations.
+      "react-hooks/immutability": "error",
+      "react-hooks/purity": "error",
+      "react-hooks/error-boundaries": "error",
+      "react-hooks/static-components": "error",
+      // Off, with reasons:
+      // - incompatible-library flags library APIs (react-hook-form `watch`, etc.)
+      //   that the React Compiler cannot optimise; nothing to fix on our side.
+      // - preserve-manual-memoization only matters once the React Compiler is on.
+      // - set-state-in-effect: ~155 fetch-in-effect sites remain; they are being
+      //   moved to TanStack Query (audit 6.2). Turn on when that reaches zero.
       "react-hooks/incompatible-library": "off",
       "react-hooks/preserve-manual-memoization": "off",
-      "react-hooks/purity": "off",
-      "react-hooks/error-boundaries": "off",
-      "react-hooks/static-components": "off",
       "react-hooks/set-state-in-effect": "off",
       "react/no-unescaped-entities": "warn",
       "import/no-anonymous-default-export": "off",

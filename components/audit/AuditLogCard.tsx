@@ -21,16 +21,23 @@ interface AuditLogCardProps {
   onViewDetails: (log: AuditLog) => void
 }
 
-function FormatValues({ values }: { values: Record<string, unknown> }) {
+/** JSON.stringify throws on circular values; render nothing rather than crash. */
+function safeStringify(values: Record<string, unknown>): string | null {
   try {
-    return (
-      <div className="bg-muted/50 mt-2 rounded-lg p-3">
-        <pre className="text-muted-foreground overflow-x-auto text-xs">{JSON.stringify(values, null, 2)}</pre>
-      </div>
-    )
+    return JSON.stringify(values, null, 2)
   } catch {
     return null
   }
+}
+
+function FormatValues({ values }: { values: Record<string, unknown> }) {
+  const text = safeStringify(values)
+  if (text === null) return null
+  return (
+    <div className="bg-muted/50 mt-2 rounded-lg p-3">
+      <pre className="text-muted-foreground overflow-x-auto text-xs">{text}</pre>
+    </div>
+  )
 }
 
 export function AuditLogCard({ log, onViewDetails }: AuditLogCardProps) {

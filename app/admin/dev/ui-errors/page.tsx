@@ -36,6 +36,12 @@ function readMetaString(metadata: Record<string, unknown> | null, key: string) {
   return typeof value === "string" ? value : ""
 }
 
+/** Rows created in the last `hours` hours, relative to request time (server-side). */
+function countSince(rows: UiErrorRow[], hours: number): number {
+  const cutoff = Date.now() - hours * 60 * 60 * 1000
+  return rows.filter((r) => new Date(r.created_at).getTime() > cutoff).length
+}
+
 export default async function DevUiErrorsPage() {
   const scope = await getRequestScope()
   if (!scope?.isAdminLike || !canAccessAdminSection(scope, "dev")) notFound()
@@ -106,7 +112,7 @@ export default async function DevUiErrorsPage() {
 
   const stats = {
     total: rows.length,
-    last24h: rows.filter((r) => new Date(r.created_at).getTime() > Date.now() - 24 * 60 * 60 * 1000).length,
+    last24h: countSince(rows, 24),
     boundaries: rows.filter((r) => r.source.includes("error_boundary")).length,
     unresolved: rows.filter((r) => !r.resolved).length,
   }
