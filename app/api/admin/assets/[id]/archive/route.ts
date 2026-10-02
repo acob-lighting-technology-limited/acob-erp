@@ -27,7 +27,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .eq("id", assetId)
     .single()
   if (fetchError || !asset) {
-    return NextResponse.json({ error: fetchError?.message ?? "Asset not found" }, { status: 404 })
+    return NextResponse.json({ error: "Asset not found" }, { status: 404 })
   }
   if (asset.deleted_at) {
     return NextResponse.json({ error: "Asset is already archived" }, { status: 400 })

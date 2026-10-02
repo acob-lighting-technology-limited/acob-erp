@@ -33,7 +33,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const db = getServiceRoleClientOrFallback(supabase)
   const { data, error } = await db.from("products").select("*, category:product_categories(name)").eq("id", id).single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+  if (error) return NextResponse.json({ error: "Not found" }, { status: 404 })
   const row = data as Record<string, unknown> & { category?: CategoryJoin }
   return NextResponse.json({ data: { ...row, category_name: row.category?.name || undefined } })
 }

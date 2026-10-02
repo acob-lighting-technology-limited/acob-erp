@@ -127,7 +127,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
     if (error) {
       log.error({ err: error.message }, "Failed to create task")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     if (task.assigned_to && task.assigned_to !== user.id) {
@@ -202,7 +202,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
     if (error) {
       log.error({ err: error.message }, "Failed to update task")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     if (task.assigned_to && task.assigned_to !== previous?.assigned_to && task.assigned_to !== user.id) {
@@ -246,7 +246,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
     if (error) {
       log.error({ err: error.message }, "Failed to delete task")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     return NextResponse.json({ success: true })

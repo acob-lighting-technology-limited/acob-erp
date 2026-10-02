@@ -40,7 +40,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   ])
 
   if (supError || !supplier) {
-    return NextResponse.json({ error: supError?.message ?? "Supplier not found" }, { status: 404 })
+    return NextResponse.json({ error: "Supplier not found" }, { status: 404 })
   }
   return NextResponse.json({ data: { supplier, orders: orders ?? [] } })
 }

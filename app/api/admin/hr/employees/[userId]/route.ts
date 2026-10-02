@@ -17,7 +17,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const { data: profileData, error: profileError } = await db.from("profiles").select("*").eq("id", userId).single()
   if (profileError || !profileData) {
-    return NextResponse.json({ error: profileError?.message ?? "Employee not found" }, { status: 404 })
+    return NextResponse.json({ error: "Employee not found" }, { status: 404 })
   }
 
   const { data: tasksData } = await db

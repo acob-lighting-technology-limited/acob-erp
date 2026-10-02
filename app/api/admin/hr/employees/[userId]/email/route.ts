@@ -9,6 +9,7 @@ import { formValidation } from "@/lib/validation"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { renameStaffMailbox } from "@/lib/employees/mailbox-rename"
 import { MailboxRenameOptionsSchema, type MailboxRenameResult } from "@/lib/employees/mailbox-rename-types"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("admin-hr-employee-email")
 
@@ -111,7 +112,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ use
       .maybeSingle<{ id: string }>()
 
     if (duplicateProfileError) {
-      return NextResponse.json({ error: duplicateProfileError.message }, { status: 400 })
+      return serverError(log, duplicateProfileError)
     }
 
     if (duplicateProfile) {
@@ -134,6 +135,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ use
     })
 
     if (authUpdateError) {
+      // Auth messages are user-facing ("A user with this email address has already been registered").
       return NextResponse.json({ error: authUpdateError.message }, { status: 400 })
     }
 
@@ -147,7 +149,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ use
       .eq("id", employeeId)
 
     if (profileUpdateError) {
-      return NextResponse.json({ error: profileUpdateError.message }, { status: 400 })
+      return serverError(log, profileUpdateError)
     }
 
     const previousEmail = (currentProfile.company_email ?? "").trim().toLowerCase()
