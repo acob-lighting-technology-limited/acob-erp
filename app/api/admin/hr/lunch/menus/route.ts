@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { CreateMenuSchema } from "@/lib/hr/lunch-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -135,12 +137,9 @@ export async function POST(request: NextRequest) {
     const scope = await getRequestScope()
     if (!scope?.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    const body = (await request.json()) as {
-      date?: string
-      status?: LunchMenuStatus
-      deadline_time?: string | null
-      groups?: MenuGroupInput[]
-    }
+    const parsed = await parseJsonBody(request, CreateMenuSchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
 
     if (!body.date || !DATE_PATTERN.test(body.date)) {
       return NextResponse.json({ error: "A valid date is required" }, { status: 400 })

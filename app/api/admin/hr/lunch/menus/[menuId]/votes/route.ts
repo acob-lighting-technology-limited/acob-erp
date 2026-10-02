@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { AdminVoteSchema } from "@/lib/hr/lunch-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -26,12 +28,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const scope = await getRequestScope()
     if (!scope?.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    const body = (await request.json()) as {
-      userId?: string
-      /** false = the NO answer; null = remove the vote entirely. */
-      eating?: boolean | null
-      selections?: Record<string, string>
-    }
+    const parsed = await parseJsonBody(request, AdminVoteSchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
 
     const userId = body.userId
     if (!userId) return NextResponse.json({ error: "userId is required" }, { status: 400 })

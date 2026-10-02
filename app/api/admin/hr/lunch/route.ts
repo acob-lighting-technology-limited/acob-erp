@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { LunchAttendanceSchema } from "@/lib/hr/lunch-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -122,8 +124,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { date, userIds } = body as { date: string; userIds: string[] }
+    const parsed = await parseJsonBody(request, LunchAttendanceSchema)
+    if (!parsed.ok) return parsed.response
+    const { date, userIds } = parsed.data
 
     if (!date || !Array.isArray(userIds)) {
       return NextResponse.json({ error: "Invalid date or userIds list" }, { status: 400 })

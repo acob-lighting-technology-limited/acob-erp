@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -40,11 +42,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = (await req.json()) as { password?: string }
-    const rawPassword = body.password?.trim()
-    if (!rawPassword || rawPassword.length < 6) {
-      return NextResponse.json({ error: "A valid password of at least 6 characters is required" }, { status: 400 })
-    }
+    const parsed = await parseJsonBody(
+      req,
+      z.object({
+        password: z.string().trim().min(6, "A valid password of at least 6 characters is required").max(128),
+      })
+    )
+    if (!parsed.ok) return parsed.response
+    const rawPassword = parsed.data.password
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
 

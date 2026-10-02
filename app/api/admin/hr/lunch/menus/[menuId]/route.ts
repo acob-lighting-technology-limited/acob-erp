@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { UpdateMenuSchema } from "@/lib/hr/lunch-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -115,15 +117,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const scope = await getRequestScope()
     if (!scope?.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    const body = (await request.json()) as {
-      status?: LunchMenuStatus
-      deadline_time?: string | null
-      groups?: MenuGroupInput[]
-      /** Required to rebuild the dishes once votes exist — it discards them. */
-      clear_votes?: boolean
-      /** Cancels or reinstates the day, taking the lunch charges with it. */
-      archived?: boolean
-    }
+    const parsed = await parseJsonBody(request, UpdateMenuSchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
     const { data: menu } = await dataClient.from("lunch_menus").select(MENU_COLUMNS).eq("id", menuId).maybeSingle()

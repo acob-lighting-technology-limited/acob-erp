@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { groq } from "@ai-sdk/groq"
 import { streamText } from "ai"
 import { createClient } from "@/lib/supabase/server"
@@ -52,6 +54,14 @@ async function logAcobotTurn(
   }
 }
 
+const MAX_HISTORY_MESSAGES = 12
+const MAX_MESSAGE_CHARS = 4000
+
+const AcobotRequestSchema = z.object({
+  messages: z.array(z.unknown()).max(200),
+  currentPath: z.string().max(500).nullable().optional(),
+})
+
 function isChatMessage(value: unknown): value is ChatMessage {
   if (typeof value !== "object" || value === null) return false
   const m = value as Record<string, unknown>
@@ -83,14 +93,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "ACOBot is not configured" }, { status: 500 })
     }
 
-    // 3. Validate body.
-    const body = (await request.json()) as { messages?: unknown; currentPath?: unknown }
-    const currentPath = typeof body.currentPath === "string" ? body.currentPath : null
-    const incoming = Array.isArray(body.messages) ? body.messages : []
-    const messages: ChatMessage[] = incoming
+    // 3. Validate body. History is capped so a long chat cannot run up token cost:
+    //    only the most recent turns are sent, each truncated.
+    const parsed = await parseJsonBody(request, AcobotRequestSchema)
+    if (!parsed.ok) return parsed.response
+    const currentPath = parsed.data.currentPath ?? null
+    const messages: ChatMessage[] = parsed.data.messages
       .filter(isChatMessage)
       // Never trust a client-supplied system prompt — we set our own below.
       .filter((m) => m.role !== "system")
+      .slice(-MAX_HISTORY_MESSAGES)
+      .map((m) => ({ ...m, content: m.content.slice(0, MAX_MESSAGE_CHARS) }))
     if (messages.length === 0) {
       return NextResponse.json({ error: "No messages provided" }, { status: 400 })
     }
