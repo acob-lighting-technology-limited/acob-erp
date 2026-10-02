@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 
@@ -16,7 +18,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = (await req.json().catch(() => ({}))) as { endpoint?: string }
+    const parsed = await parseJsonBody(req, z.object({ endpoint: z.string().url().max(2000) }))
+    if (!parsed.ok) return NextResponse.json({ error: "Missing endpoint." }, { status: 400 })
+    const body = parsed.data
     if (!body.endpoint) {
       return NextResponse.json({ error: "Missing endpoint." }, { status: 400 })
     }

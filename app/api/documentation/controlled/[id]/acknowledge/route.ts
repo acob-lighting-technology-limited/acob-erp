@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
@@ -27,7 +29,9 @@ export async function POST(request: Request, { params }: Params) {
     return apiError("Only published policies can be acknowledged", ApiErrorCode.INVALID_STATE, 409)
   }
 
-  const body = (await request.json().catch(() => null)) as { version_id?: unknown } | null
+  const parsed = await parseJsonBody(request, z.object({ version_id: z.string().uuid().optional() }))
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
   // The client names the version it showed. If the policy changed in the
   // meantime, refuse rather than record agreement to text the user never saw.
   if (body?.version_id && body.version_id !== doc.current_version_id) {

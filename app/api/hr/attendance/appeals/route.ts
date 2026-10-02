@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
@@ -92,6 +94,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const APPEAL_FIELDS_REQUIRED = "appeal_date, requested_status, and appeal_reason are required"
+
+const CreateAppealSchema = z.object({
+  appeal_date: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "appeal_date must be in YYYY-MM-DD format"),
+  requested_status: z.string().trim().min(1, APPEAL_FIELDS_REQUIRED),
+  appeal_reason: z.string().trim().min(1, APPEAL_FIELDS_REQUIRED).max(2000),
+})
+
+const UpdateAppealSchema = z.object({
+  id: z.string().trim().min(1, "id and appeal_reason are required"),
+  appeal_reason: z.string().trim().min(10, "appeal_reason must be at least 10 characters").max(2000),
+})
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -101,15 +119,11 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = (await request.json()) as {
-      appeal_date?: unknown
-      requested_status?: unknown
-      appeal_reason?: unknown
-    }
-
-    const appealDate = typeof body.appeal_date === "string" ? body.appeal_date.trim() : ""
-    const requestedStatus = typeof body.requested_status === "string" ? body.requested_status.trim() : ""
-    const appealReason = typeof body.appeal_reason === "string" ? body.appeal_reason.trim() : ""
+    const parsed = await parseJsonBody(request, CreateAppealSchema)
+    if (!parsed.ok) return parsed.response
+    const appealDate = parsed.data.appeal_date
+    const requestedStatus = parsed.data.requested_status
+    const appealReason = parsed.data.appeal_reason
 
     // Validate presence
     if (!appealDate || !requestedStatus || !appealReason) {
@@ -375,13 +389,9 @@ export async function PATCH(request: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = (await request.json()) as {
-      id?: unknown
-      appeal_reason?: unknown
-    }
-
-    const id = typeof body.id === "string" ? body.id.trim() : ""
-    const appealReason = typeof body.appeal_reason === "string" ? body.appeal_reason.trim() : ""
+    const parsed = await parseJsonBody(request, UpdateAppealSchema)
+    if (!parsed.ok) return parsed.response
+    const { id, appeal_reason: appealReason } = parsed.data
 
     if (!id || !appealReason) {
       return NextResponse.json({ error: "id and appeal_reason are required" }, { status: 400 })

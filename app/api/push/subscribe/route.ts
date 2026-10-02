@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
@@ -29,7 +31,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = (await req.json().catch(() => ({}))) as SubscriptionBody
+    const parsed = await parseJsonBody(
+      req,
+      z.object({
+        subscription: z.object({
+          endpoint: z.string().url().max(2000),
+          keys: z.object({ p256dh: z.string().min(1).max(500), auth: z.string().min(1).max(500) }),
+        }),
+      })
+    )
+    if (!parsed.ok) return NextResponse.json({ error: "Invalid push subscription." }, { status: 400 })
+    const body: SubscriptionBody = parsed.data
     const endpoint = body.subscription?.endpoint
     const p256dh = body.subscription?.keys?.p256dh
     const auth = body.subscription?.keys?.auth
