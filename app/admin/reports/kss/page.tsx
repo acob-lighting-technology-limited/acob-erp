@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { canOverrideReportsWeekLock, resolveAdminScope } from "@/lib/admin/rbac"
 import { KssRosterTable } from "@/components/reports/kss-roster-table"
 
 export default async function AdminKssPage() {
@@ -22,6 +23,8 @@ export default async function AdminKssPage() {
   const isAllowed = ["developer", "super_admin", "admin"].includes(role) || profile?.is_department_lead === true
   if (!isAllowed) redirect("/admin/reports/general-meeting")
 
+  const scope = await resolveAdminScope(supabase, user.id)
+
   const { data: employees } = await supabase
     .from("profiles")
     .select("id, full_name, department, employment_status")
@@ -41,7 +44,7 @@ export default async function AdminKssPage() {
       backLabel="Back to General Meeting"
       title="Knowledge Sharing Session"
       currentUserId={user.id}
-      currentUserRole={role}
+      canOverrideWeekLock={scope ? canOverrideReportsWeekLock(scope) : false}
       enableScoring
     />
   )
