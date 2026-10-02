@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- static asset, not optimizable by next/image */
 
-import { ArrowLeft, Cake, Loader2, PartyPopper } from "lucide-react"
+import { ArrowLeft, Loader2, PartyPopper } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -21,10 +21,6 @@ export function BirthdayPicker({ state }: { state: BirthdayCelebrantsState }) {
           alt="ACOB Lighting Logo"
           className="birthday-logo birthday-logo--setup"
         />
-
-        <div className="birthday-setup-icon" aria-hidden="true">
-          <Cake className="h-7 w-7" />
-        </div>
 
         <div className="text-center">
           <h2 className="birthday-script">Birthday Spotlight</h2>
