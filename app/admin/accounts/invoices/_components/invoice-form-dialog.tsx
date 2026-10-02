@@ -66,7 +66,7 @@ export function InvoiceFormDialog({
   const router = useRouter()
   const isEditing = Boolean(invoice?.id)
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     customer_name: "",
     customer_email: "",
     customer_address: "",
@@ -75,7 +75,7 @@ export function InvoiceFormDialog({
     currency: "NGN",
     notes: "",
     terms: "Payment is due within 30 days of invoice date.",
-  })
+  }))
   const [items, setItems] = useState<InvoiceItemFormValue[]>([createDefaultItem()])
 
   useEffect(() => {

@@ -63,13 +63,13 @@ async function fetchNewPOFormData(): Promise<NewPOFormData> {
 export function PurchaseOrderFormDialog({ open, onOpenChange, queryClient }: PurchaseOrderFormDialogProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     supplier_id: "",
     order_date: toLocalISODate(),
     expected_date: toLocalISODate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
     currency: "NGN",
     notes: "",
-  })
+  }))
   const [items, setItems] = useState<POItem[]>([
     { id: crypto.randomUUID(), product_id: "", product_name: "", quantity: 1, unit_price: 0, amount: 0 },
   ])

@@ -15,10 +15,6 @@ export function MaintenanceToggle() {
   const [updating, setUpdating] = useState(false)
   const [canToggle, setCanToggle] = useState(false)
 
-  useEffect(() => {
-    fetchState()
-  }, [])
-
   async function fetchState() {
     try {
       const response = await apiFetch("/api/dev/maintenance", { cache: "no-store" })
@@ -34,6 +30,12 @@ export function MaintenanceToggle() {
       setLoading(false)
     }
   }
+
+  // Declared before the effect that calls it (a function declaration used
+  // ahead of its definition is hoisted, but the React Compiler rejects it).
+  useEffect(() => {
+    fetchState()
+  }, [])
 
   async function handleToggle(checked: boolean) {
     // Prevent overlapping requests

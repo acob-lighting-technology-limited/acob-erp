@@ -69,6 +69,19 @@ async function fetchPendingApplications(): Promise<PendingUser[]> {
   return payload?.data || []
 }
 
+// Declared at module level: a component defined inside render is a new type on
+// every render, so React remounted each row and the inputs lost focus per keystroke.
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="border-border hover:bg-muted/50 grid grid-cols-4 border-b transition-colors">
+      <div className="border-border bg-muted/40 flex items-center border-r p-3">
+        <span className="text-muted-foreground text-xs font-bold uppercase">{label}</span>
+      </div>
+      <div className="bg-background col-span-3 flex items-center p-3">{value}</div>
+    </div>
+  )
+}
+
 export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicationsModalProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<PendingUser | null>(null)
@@ -236,15 +249,6 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
       setIsProcessing(false)
     }
   }
-
-  const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div className="border-border hover:bg-muted/50 grid grid-cols-4 border-b transition-colors">
-      <div className="border-border bg-muted/40 flex items-center border-r p-3">
-        <span className="text-muted-foreground text-xs font-bold uppercase">{label}</span>
-      </div>
-      <div className="bg-background col-span-3 flex items-center p-3">{value}</div>
-    </div>
-  )
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
