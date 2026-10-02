@@ -129,7 +129,7 @@
 /* Fill the row's height whatever the group size:
    --room  height left after the caption (~7.5rem incl. stagger + outline)
    --slot  width each person gets in the single row
-   Small groups keep the classic 3:4.4 pill; big groups go slimmer (up to 1:2.3)
+   Small groups keep the classic 3:4.4 pill; big groups go a little slimmer (up to 1:1.8)
    instead of shrinking and leaving empty bands above and below. */
 .bd1-portrait {
   --room: calc(100cqh - 7.5rem);
@@ -137,7 +137,7 @@
 
   position: relative;
   width: min(var(--slot), calc(var(--room) / 1.4667), 42vh);
-  height: min(var(--room), calc(var(--slot) * 2.3), 62vh);
+  height: min(var(--room), calc(var(--slot) * 1.8), 62vh);
   overflow: hidden;
   border-radius: 999px;
   outline: 2px solid var(--bd-gold);
