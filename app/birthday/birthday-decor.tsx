@@ -16,9 +16,9 @@ const CONFETTI = Array.from({ length: 12 }, (_, i) => ({
 }))
 
 // Two tethered bunches, one tied at each bottom corner. Coordinates are in the
-// bunch's own 260×380 viewBox; the right bunch mirrors x so highlights stay top-left.
+// bunch's own 260×310 viewBox; the right bunch mirrors x so highlights stay top-left.
 const BUNCH_W = 260
-const BUNCH_H = 380
+const BUNCH_H = 310
 // Strings meet exactly at the screen corner (bottom-left / bottom-right of the box).
 const TIE = { x: 0, y: BUNCH_H }
 

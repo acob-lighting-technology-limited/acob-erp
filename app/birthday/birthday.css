@@ -100,9 +100,9 @@
 .birthday-balloons {
   position: absolute;
   bottom: 0;
-  height: min(38vh, 350px);
+  height: min(31vh, 285px);
   width: auto;
-  aspect-ratio: 260 / 380;
+  aspect-ratio: 260 / 310;
   overflow: visible;
   opacity: 0.92;
 }
