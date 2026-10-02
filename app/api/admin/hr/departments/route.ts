@@ -3,6 +3,10 @@ import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scop
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { getDefaultDepartmentDescription } from "@/shared/departments"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/hr/departments")
 
 export const dynamic = "force-dynamic"
 
@@ -35,7 +39,7 @@ export async function GET() {
     query = depts.length > 0 ? query.in("name", depts) : query.eq("name", "__none__")
   }
   const { data: departments, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   const { data: profiles } = await db
     .from("profiles")

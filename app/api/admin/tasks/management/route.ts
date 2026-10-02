@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import type { Task } from "@/types/task"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/tasks/management")
 
 export const dynamic = "force-dynamic"
 
@@ -25,7 +29,7 @@ export async function GET() {
     .select("*")
     .neq("category", "weekly_action")
     .order("created_at", { ascending: false })
-  if (tasksError) return NextResponse.json({ error: tasksError.message }, { status: 500 })
+  if (tasksError) return serverError(log, tasksError)
 
   const tasks = (tasksData ?? []).filter((task) => String(task.source_type || "") !== "action_item") as Task[]
 

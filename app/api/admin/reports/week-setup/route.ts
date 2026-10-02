@@ -4,6 +4,10 @@ import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/reports/week-setup")
 
 export const dynamic = "force-dynamic"
 
@@ -100,6 +104,6 @@ export async function POST(request: NextRequest) {
     },
     { onConflict: "week_number,year" }
   )
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

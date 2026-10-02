@@ -7,6 +7,10 @@ import { tmpdir } from "os"
 import { hasBinary } from "@/lib/pdf/binaries"
 import { callDocumentService, isDocumentServiceConfigured } from "@/lib/pdf/document-service"
 import JSZip from "jszip"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/pdf/convert")
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -202,7 +206,7 @@ export async function POST(request: NextRequest) {
       console.error("Error during cleanup:", cleanupErr)
     }
 
-    return NextResponse.json({ error: error.message || "Failed to convert PDF to images." }, { status: 500 })
+    return serverError(log, error, "Failed to convert PDF to images.")
   }
 }
 

@@ -6,6 +6,10 @@ import path from "path"
 import { tmpdir } from "os"
 import { callDocumentService, isDocumentServiceConfigured } from "@/lib/pdf/document-service"
 import { PDFDocument } from "pdf-lib"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/pdf/ocr")
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -195,7 +199,7 @@ export async function POST(request: NextRequest) {
     } catch (cleanupErr) {
       console.error("Error during cleanup:", cleanupErr)
     }
-    return NextResponse.json({ error: error.message || "Failed to perform OCR." }, { status: 500 })
+    return serverError(log, error, "Failed to perform OCR.")
   }
 }
 

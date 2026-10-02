@@ -4,6 +4,10 @@ import { tmpdir } from "os"
 import { unlink } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/convert/image")
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
-    return NextResponse.json({ error: error.message || "Image conversion failed" }, { status: 500 })
+    return serverError(log, error, "Image conversion failed")
   }
 }
 

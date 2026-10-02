@@ -5,6 +5,7 @@ import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("compress-video")
 
@@ -162,7 +163,7 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
-    return NextResponse.json({ error: error.message || "Video compression failed" }, { status: 500 })
+    return serverError(log, error, "Video compression failed")
   }
 }
 

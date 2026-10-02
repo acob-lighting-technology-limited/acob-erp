@@ -10,6 +10,7 @@ import {
   canUpdateActionProgress,
   type ActionTrackerScopeProfile,
 } from "@/lib/reports/action-tracker-permissions"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("action-tracker-item-route")
 
@@ -209,7 +210,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       .single()
 
     if (error || !updatedItem) {
-      return NextResponse.json({ error: error?.message || "Failed to update action item" }, { status: 500 })
+      return serverError(log, error, "Failed to update action item")
     }
 
     // Responsible staff are replaced wholesale — the dialog always submits the
@@ -291,7 +292,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     }
 
     const { error } = await supabase.from(entity.table).delete().eq("id", params.id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase,

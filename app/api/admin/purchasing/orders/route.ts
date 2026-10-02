@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/purchasing/orders")
 
 export const dynamic = "force-dynamic"
 
@@ -37,7 +41,7 @@ export async function GET() {
 
   if (error) {
     if (error.code === "42P01") return NextResponse.json({ data: [] })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   const orders = (data ?? []).map((o) => {
@@ -80,7 +84,7 @@ export async function POST(request: NextRequest) {
     })
     .select()
     .single()
-  if (poError) return NextResponse.json({ error: poError.message }, { status: 500 })
+  if (poError) return serverError(log, poError)
 
   const poItems = items.map((i) => ({
     purchase_order_id: (po as { id: string }).id,
@@ -90,7 +94,7 @@ export async function POST(request: NextRequest) {
     amount: i.amount,
   }))
   const { error: itemsError } = await db.from("purchase_order_items").insert(poItems)
-  if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 })
+  if (itemsError) return serverError(log, itemsError)
 
   return NextResponse.json({ ok: true, po_number: poNumber })
 }

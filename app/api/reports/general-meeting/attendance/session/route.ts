@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/reports/general-meeting/attendance/session")
 
 export const dynamic = "force-dynamic"
 
@@ -69,7 +73,7 @@ export async function GET(request: NextRequest) {
     .maybeSingle()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   let session = initialSession
@@ -91,7 +95,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (createErr) {
-      return NextResponse.json({ error: createErr.message }, { status: 500 })
+      return serverError(log, createErr)
     }
     session = created
   }
@@ -183,7 +187,7 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
     return NextResponse.json({ session: data })
   }
 

@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/dev/impersonation")
 
 const StartImpersonationSchema = z.object({
   targetUserId: z.string().uuid("Invalid user id"),
@@ -77,7 +81,7 @@ export async function GET(request: NextRequest) {
     .limit(3000)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   const rows = ((data || []) as DevImpersonationProfileRow[])
@@ -163,7 +167,7 @@ export async function POST(request: NextRequest) {
   const actionLink = linkData?.properties?.action_link
   const hashedToken = linkData?.properties?.hashed_token
   if (linkError || !actionLink) {
-    return NextResponse.json({ error: linkError?.message || "Failed to generate impersonation link." }, { status: 500 })
+    return serverError(log, linkError, "Failed to generate impersonation link.")
   }
 
   const directConfirmLink = hashedToken

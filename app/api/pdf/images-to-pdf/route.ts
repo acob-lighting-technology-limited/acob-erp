@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PDFDocument } from "pdf-lib"
 import sharp from "sharp"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/pdf/images-to-pdf")
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error("Error converting images to PDF:", error)
-    return NextResponse.json({ error: error.message || "Failed to convert images to PDF" }, { status: 500 })
+    return serverError(log, error, "Failed to convert images to PDF")
   }
 }
 

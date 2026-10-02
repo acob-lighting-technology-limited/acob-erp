@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/reports/weekly-report-schedules/id")
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +17,6 @@ export async function PATCH(_request: NextRequest, { params }: { params: Promise
   const { id } = await params
   const db = getServiceRoleClientOrFallback(supabase)
   const { error } = await db.from("weekly_report_schedules").update({ is_active: false }).eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

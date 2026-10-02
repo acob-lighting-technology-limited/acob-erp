@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/purchasing/receipts")
 
 export const dynamic = "force-dynamic"
 
@@ -22,7 +26,7 @@ export async function GET() {
 
   if (error) {
     if (error.code === "42P01") return NextResponse.json({ data: [] })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   const receipts = ((data ?? []) as ReceiptRow[]).map((receipt) => ({

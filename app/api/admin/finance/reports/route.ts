@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/finance/reports")
 
 export const dynamic = "force-dynamic"
 
@@ -34,7 +38,7 @@ export async function GET() {
 
   if (error) {
     if (error.code === "42P01") return NextResponse.json({ data: [] })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   const normalizedDepts = depts?.map((d) => normalizeDepartmentName(d))

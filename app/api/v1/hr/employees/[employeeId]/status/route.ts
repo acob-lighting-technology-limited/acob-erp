@@ -9,6 +9,7 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { applyEmployeeMailboxActions, type MailboxActionResult } from "@/lib/employees/mailbox-offboarding"
 import { EmployeeMailboxActionsSchema } from "@/lib/employees/mailbox-state"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-employee-status")
 
@@ -121,7 +122,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     if (updateError) {
       log.error({ error: updateError, employeeId: ctx.employeeId }, "Profile status update failed")
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return serverError(log, updateError)
     }
 
     // Record suspension history

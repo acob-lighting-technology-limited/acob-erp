@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/inventory/categories/options")
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +17,6 @@ export async function GET() {
 
   const db = getServiceRoleClientOrFallback(supabase)
   const { data, error } = await db.from("product_categories").select("id, name").order("name")
-  if (error && error.code !== "42P01") return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error && error.code !== "42P01") return serverError(log, error)
   return NextResponse.json({ data: data ?? [] })
 }

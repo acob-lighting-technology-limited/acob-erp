@@ -4,6 +4,7 @@ import { clampWeight } from "@/lib/tasks/scoring"
 import { logger } from "@/lib/logger"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
 import { createNotification } from "@/lib/notifications/create"
+import { serverError } from "@/lib/api/errors"
 
 export const dynamic = "force-dynamic"
 const log = logger("project-tasks-api")
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     if (error) {
       log.error({ err: error.message }, "Failed to fetch project tasks")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ data: tasks || [] })
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     return NextResponse.json({ data: task })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project tasks POST")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }
 
@@ -217,7 +218,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     return NextResponse.json({ data: task })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project tasks PUT")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }
 
@@ -251,6 +252,6 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     return NextResponse.json({ success: true })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project tasks DELETE")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }

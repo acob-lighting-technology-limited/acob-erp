@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/reports/general-meeting/attendance/check-in")
 
 export const dynamic = "force-dynamic"
 
@@ -115,7 +119,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (saveErr) {
-    return NextResponse.json({ error: saveErr.message }, { status: 500 })
+    return serverError(log, saveErr)
   }
 
   await writeAuditLog(

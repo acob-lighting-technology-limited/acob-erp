@@ -6,6 +6,10 @@ import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
 import JSZip from "jszip"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/song/batch-download")
 
 export async function POST(request: NextRequest) {
   const tempDir = path.join(tmpdir(), "song-batch-downloads")
@@ -144,7 +148,7 @@ export async function POST(request: NextRequest) {
       console.error("Error cleaning up on error:", err)
     }
 
-    return NextResponse.json({ error: error.message || "Batch download failed" }, { status: 500 })
+    return serverError(log, error, "Batch download failed")
   }
 }
 

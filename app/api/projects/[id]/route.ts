@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { PROJECT_PRIORITIES } from "@/lib/projects/priority"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 export const dynamic = "force-dynamic"
 const log = logger("projects-detail-api")
@@ -73,6 +74,6 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     return NextResponse.json({ data })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project PUT")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }

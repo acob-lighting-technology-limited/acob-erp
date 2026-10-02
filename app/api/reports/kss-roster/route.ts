@@ -10,6 +10,7 @@ import { logger } from "@/lib/logger"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-reports-kss-roster")
 
@@ -170,7 +171,7 @@ export async function GET(request: Request) {
 
     const wantsPage = searchParams.has("page") || searchParams.has("per_page")
     const { data, error, count } = wantsPage ? await query.range(from, to) : await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     const rows = data || []
     const now = new Date()
@@ -281,7 +282,7 @@ export async function POST(request: Request) {
           { status: 409 }
         )
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     await writeAuditLog(
@@ -391,7 +392,7 @@ export async function PATCH(request: Request) {
       )
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase as ReportsClient,
@@ -462,7 +463,7 @@ export async function DELETE(request: Request) {
 
     await assertWeekIsMutable(supabase as ReportsClient, existing.meeting_week, existing.meeting_year)
     const { error } = await dataClient.from("kss_weekly_roster").delete().eq("id", id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase as ReportsClient,

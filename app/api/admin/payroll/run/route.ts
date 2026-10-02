@@ -13,6 +13,7 @@ import {
 } from "@/lib/hr/payroll-utils"
 import { computePayrollBatch, loadUnpaidLeaveDays } from "@/lib/hr/payroll-compute"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-admin-hr-payroll-run")
 export const dynamic = "force-dynamic"
@@ -223,7 +224,7 @@ export async function POST(request: NextRequest) {
 
     if (upsertErr) {
       log.error({ err: upsertErr.message }, "Error saving payroll entries")
-      return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+      return serverError(log, upsertErr)
     }
 
     if (lockPeriod) {
@@ -239,7 +240,7 @@ export async function POST(request: NextRequest) {
 
       if (lockErr) {
         log.error({ err: lockErr.message }, "Error locking payroll period")
-        return NextResponse.json({ error: lockErr.message }, { status: 500 })
+        return serverError(log, lockErr)
       }
     }
 

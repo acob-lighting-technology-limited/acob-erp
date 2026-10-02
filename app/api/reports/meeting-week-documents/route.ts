@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger"
 import { getOneDriveService } from "@/lib/onedrive"
 import { buildReportDocumentPath, isOneDriveReportDocumentPath } from "@/lib/reports/document-storage"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-reports-meeting-week-documents")
 const BUCKET = "meeting_documents"
@@ -223,7 +224,7 @@ export async function GET(request: Request) {
         .from(BUCKET)
         .createSignedUrl(row.file_path, 3600)
       if (signedError || !signed?.signedUrl) {
-        return NextResponse.json({ error: signedError?.message || "Failed to create download link" }, { status: 500 })
+        return serverError(log, signedError, "Failed to create download link")
       }
 
       return NextResponse.redirect(signed.signedUrl)
@@ -255,7 +256,7 @@ export async function GET(request: Request) {
 
       const { data: fileData, error: downloadError } = await supabase.storage.from(BUCKET).download(row.file_path)
       if (downloadError || !fileData) {
-        return NextResponse.json({ error: downloadError?.message || "Failed to load preview file" }, { status: 500 })
+        return serverError(log, downloadError, "Failed to load preview file")
       }
 
       const bytes = new Uint8Array(await fileData.arrayBuffer())
@@ -285,7 +286,7 @@ export async function GET(request: Request) {
     if (currentOnly) query = query.eq("is_current", true)
 
     const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     const rows = data || []
     const meetingDateByWeekYear = new Map<string, string>()
@@ -497,7 +498,7 @@ export async function POST(request: Request) {
         contentType: uploadMimeType,
         upsert: false,
       })
-      if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      if (uploadError) return serverError(log, uploadError)
       filePath = legacyFilePath
     }
 
@@ -519,7 +520,7 @@ export async function POST(request: Request) {
     const { data: currentRows, error: currentError } = await scopedCurrentRowsQuery
 
     if (currentError) {
-      return NextResponse.json({ error: currentError.message }, { status: 500 })
+      return serverError(log, currentError)
     }
 
     const current = currentRows?.[0] || null
@@ -530,7 +531,7 @@ export async function POST(request: Request) {
         .from("meeting_week_documents")
         .update({ is_current: false })
         .eq("id", current.id)
-      if (clearCurrentError) return NextResponse.json({ error: clearCurrentError.message }, { status: 500 })
+      if (clearCurrentError) return serverError(log, clearCurrentError)
     }
 
     const { data: saved, error: saveError } = await supabase
@@ -557,7 +558,7 @@ export async function POST(request: Request) {
       )
       .single()
 
-    if (saveError) return NextResponse.json({ error: saveError.message }, { status: 500 })
+    if (saveError) return serverError(log, saveError)
 
     if (current?.id) {
       await supabase.from("meeting_week_documents").update({ replaced_by: saved.id }).eq("id", current.id)
@@ -650,7 +651,7 @@ export async function PATCH(request: Request) {
         ? clearQuery.eq("department_id", doc.department_id)
         : clearQuery.eq("department", doc.department))
 
-      if (clearError) return NextResponse.json({ error: clearError.message }, { status: 500 })
+      if (clearError) return serverError(log, clearError)
     }
 
     const patch: Record<string, unknown> = {}
@@ -670,7 +671,7 @@ export async function PATCH(request: Request) {
       )
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase as ReportsClient,
@@ -744,7 +745,7 @@ export async function DELETE(request: Request) {
     }
 
     const { error: deleteError } = await supabase.from("meeting_week_documents").delete().eq("id", id)
-    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    if (deleteError) return serverError(log, deleteError)
 
     await writeAuditLog(
       supabase as ReportsClient,

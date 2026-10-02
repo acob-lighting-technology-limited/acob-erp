@@ -5,6 +5,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/hr/fleet/bookings/id/review")
 
 const ReviewFleetBookingSchema = z.object({
   action: z.enum(["approve", "reject"], {
@@ -85,7 +89,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       .select("id, status, admin_note, reviewed_by, reviewed_at")
       .single()
 
-    if (error) return NextResponse.json({ error: error.message || "Failed to review booking" }, { status: 500 })
+    if (error) return serverError(log, error, "Failed to review booking")
 
     await writeAuditLog(
       supabase,

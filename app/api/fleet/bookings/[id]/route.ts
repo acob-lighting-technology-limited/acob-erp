@@ -4,6 +4,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { assertBookingWindow, assertNoFleetOverlap, assertReason } from "@/lib/fleet-booking"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/fleet/bookings/id")
 
 export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params
@@ -69,7 +73,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       .single()
 
     if (updateError || !updated) {
-      return NextResponse.json({ error: updateError?.message || "Failed to update booking" }, { status: 500 })
+      return serverError(log, updateError, "Failed to update booking")
     }
 
     return NextResponse.json({ data: updated })
@@ -111,7 +115,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
     const { error: deleteError } = await adminClient.from("fleet_bookings").delete().eq("id", id)
     if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+      return serverError(log, deleteError)
     }
 
     await writeAuditLog(

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { run, parseHttpUrl } from "@/lib/shell/run"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/info")
 
 const SUPPORTED_PLATFORMS: Record<string, string> = {
   // Video Platforms
@@ -191,6 +195,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error("Error fetching video info:", error)
-    return NextResponse.json({ error: error.message || "Failed to fetch video information" }, { status: 500 })
+    return serverError(log, error, "Failed to fetch video information")
   }
 }

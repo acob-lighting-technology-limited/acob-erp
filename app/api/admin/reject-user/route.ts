@@ -4,6 +4,10 @@ import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/reject-user")
 
 const RejectUserSchema = z.object({
   pendingUserId: z.string().trim().min(1, "Missing pendingUserId"),
@@ -92,7 +96,7 @@ export async function POST(req: Request) {
     })
     .eq("id", parsed.data.pendingUserId)
   if (rejectError) {
-    return NextResponse.json({ error: rejectError.message }, { status: 500 })
+    return serverError(log, rejectError)
   }
 
   return NextResponse.json({ success: true })

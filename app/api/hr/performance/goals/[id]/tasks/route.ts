@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("goal-linked-tasks-route")
 
@@ -65,7 +66,7 @@ export async function GET(_: NextRequest, props: { params: Promise<{ id: string 
       .eq("goal_id", params.id)
       .order("created_at", { ascending: false })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
     return NextResponse.json({ data: tasks || [] })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in goal linked tasks GET")
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       .in("id", parsed.data.task_ids)
       .select("id")
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase,

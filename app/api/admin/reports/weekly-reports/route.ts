@@ -3,6 +3,10 @@ import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getDepartmentAliases } from "@/shared/departments"
 import type { WeeklyReport } from "@/lib/export-utils"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/reports/weekly-reports")
 
 export const dynamic = "force-dynamic"
 
@@ -48,7 +52,7 @@ export async function GET(request: NextRequest) {
     .eq("week_number", week)
     .eq("year", year)
     .order("department", { ascending: true })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   const { data: actions, error: actionsError } = await db
     .from("tasks")

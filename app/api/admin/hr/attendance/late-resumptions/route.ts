@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdminRole } from "@/lib/admin/require-admin-role"
 import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/hr/attendance/late-resumptions")
 
 const ResumptionSchema = z.object({
   resumption_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest) {
     .from("attendance_late_resumptions")
     .select("resumption_date, resumption_time, name")
     .order("resumption_date", { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ data: data || [] })
 }
 
@@ -74,7 +78,7 @@ export async function POST(request: NextRequest) {
 
   const dataClient = getServiceRoleClientOrFallback(auth.supabase)
   const { error } = await dataClient.from("attendance_late_resumptions").upsert(rows, { onConflict: "resumption_date" })
-  if (error) return NextResponse.json({ error: error.message || "Failed to add late resumption" }, { status: 500 })
+  if (error) return serverError(log, error, "Failed to add late resumption")
 
   return NextResponse.json({
     message: dates.length > 1 ? `${dates.length} late-resumption days added` : "Late resumption added",
@@ -92,6 +96,6 @@ export async function DELETE(request: NextRequest) {
 
   const dataClient = getServiceRoleClientOrFallback(auth.supabase)
   const { error } = await dataClient.from("attendance_late_resumptions").delete().eq("resumption_date", resumptionDate)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ message: "Late resumption removed" })
 }
