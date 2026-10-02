@@ -48,8 +48,9 @@ export function BirthdayPoster() {
 
   return (
     <section className="bd1">
+      <img src="/images/acob-logo-dark.webp" alt="ACOB Lighting Logo" className="bd1-logo" />
+
       <header className="bd1-top">
-        <img src="/images/acob-logo-dark.webp" alt="ACOB Lighting Logo" className="bd1-logo" />
         <span className="bd1-presents">The ACOB Family presents</span>
       </header>
 
