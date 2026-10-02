@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/issues")
 
 export const dynamic = "force-dynamic"
 
@@ -31,7 +35,7 @@ export async function GET() {
     .from("asset_issues")
     .select("*")
     .order("created_at", { ascending: false })
-  if (issuesError) return NextResponse.json({ error: issuesError.message }, { status: 500 })
+  if (issuesError) return serverError(log, issuesError)
 
   const issuesWithDetails = await Promise.all(
     (issuesData ?? []).map(async (issue) => {

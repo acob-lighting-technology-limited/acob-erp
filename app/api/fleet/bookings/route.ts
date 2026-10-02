@@ -14,6 +14,10 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
 import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/idempotency"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/fleet/bookings")
 
 type FleetBookingAttachmentRow = {
   id: string
@@ -70,7 +74,7 @@ export async function GET(request: NextRequest) {
     const { data: bookings, error, count } = wantsPage ? await orderedQuery.range(from, to) : await orderedQuery
 
     if (error) {
-      return NextResponse.json({ error: error.message || "Failed to load bookings" }, { status: 500 })
+      return serverError(log, error, "Failed to load bookings")
     }
 
     const bookingIds = ((bookings || []) as FleetBookingRow[]).map((row) => row.id)

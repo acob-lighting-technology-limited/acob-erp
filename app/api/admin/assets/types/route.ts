@@ -5,6 +5,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/types")
 
 interface CreateAssetTypePayload {
   label?: string
@@ -54,7 +58,7 @@ export async function GET() {
   }
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   return NextResponse.json({ data: data || [] })
@@ -108,7 +112,7 @@ export async function POST(request: NextRequest) {
     if (error.code === "23505") {
       return NextResponse.json({ error: "Asset type already exists", code: error.code }, { status: 409 })
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   await writeAuditLog(

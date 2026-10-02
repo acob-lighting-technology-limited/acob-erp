@@ -6,6 +6,10 @@ import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { getPaginationRange, paginatedResponse, PaginationSchema } from "@/lib/pagination"
 import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/snapshot")
 
 type AdminAssetsSnapshotClient = Awaited<ReturnType<typeof createClient>>
 
@@ -98,7 +102,7 @@ export async function GET(request: Request) {
   }
 
   if (assetsError) {
-    return NextResponse.json({ error: assetsError.message }, { status: 500 })
+    return serverError(log, assetsError)
   }
 
   const { data: assignmentsData } = await dataClient

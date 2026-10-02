@@ -4,6 +4,10 @@ import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { monthBounds } from "@/lib/hr/attendance-utils"
 import { repriceLeaveForHolidayChange } from "@/lib/hr/leave-holiday-recalc"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/hr/attendance/holidays")
 
 const HolidaySchema = z.object({
   holiday_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -50,7 +54,7 @@ export async function GET(request: NextRequest) {
     query = query.gte("holiday_date", start).lte("holiday_date", end)
   }
   const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ data: data || [] })
 }
 
@@ -89,7 +93,7 @@ export async function POST(request: NextRequest) {
         .upsert(fallbackRows, { onConflict: "holiday_date,location", ignoreDuplicates: true })
     ).error
   }
-  if (insertError) return NextResponse.json({ error: insertError.message || "Failed to add holiday" }, { status: 500 })
+  if (insertError) return serverError(log, insertError, "Failed to add holiday")
 
   // Leave booked before this holiday existed was priced without it. Hand the
   // day back on any request that has not started yet.
@@ -131,7 +135,7 @@ export async function DELETE(request: NextRequest) {
     .delete()
     .eq("holiday_date", holidayDate)
     .eq("location", location)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   // Removing a holiday puts the day back on the clock for future leave.
   const reprice = await repriceLeaveForHolidayChange(dataClient, {

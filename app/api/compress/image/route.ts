@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import sharp from "sharp"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/compress/image")
 
 export async function POST(request: Request) {
   try {
@@ -132,7 +136,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error("Error compressing image:", error)
 
-    return NextResponse.json({ error: error.message || "Image compression failed" }, { status: 500 })
+    return serverError(log, error, "Image compression failed")
   }
 }
 

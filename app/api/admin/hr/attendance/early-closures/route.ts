@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdminRole } from "@/lib/admin/require-admin-role"
 import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/hr/attendance/early-closures")
 
 const ClosureSchema = z.object({
   closure_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest) {
     .from("attendance_early_closures")
     .select("closure_date, close_time, name")
     .order("closure_date", { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ data: data || [] })
 }
 
@@ -69,7 +73,7 @@ export async function POST(request: NextRequest) {
 
   const dataClient = getServiceRoleClientOrFallback(auth.supabase)
   const { error } = await dataClient.from("attendance_early_closures").upsert(rows, { onConflict: "closure_date" })
-  if (error) return NextResponse.json({ error: error.message || "Failed to add early closure" }, { status: 500 })
+  if (error) return serverError(log, error, "Failed to add early closure")
 
   return NextResponse.json({
     message: dates.length > 1 ? `${dates.length} early-closure days added` : "Early closure added",
@@ -87,6 +91,6 @@ export async function DELETE(request: NextRequest) {
 
   const dataClient = getServiceRoleClientOrFallback(auth.supabase)
   const { error } = await dataClient.from("attendance_early_closures").delete().eq("closure_date", closureDate)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ message: "Early closure removed" })
 }

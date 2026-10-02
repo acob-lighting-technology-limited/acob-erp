@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { REAUTH_SOURCE } from "@/lib/auth/login-log"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/dev/login-logs")
 
 type LoginLogsClient = Awaited<ReturnType<typeof createClient>>
 
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
       .limit(50)
 
     if (auditError) {
-      return NextResponse.json({ error: auditError.message }, { status: 500 })
+      return serverError(log, auditError)
     }
 
     return NextResponse.json({ data: auditLogs || [] })
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
     const { data: auditLogs, error: auditError } = await query
 
     if (auditError) {
-      return NextResponse.json({ error: auditError.message }, { status: 500 })
+      return serverError(log, auditError)
     }
 
     return NextResponse.json({ data: auditLogs || [] })
@@ -93,7 +97,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   const rows = data || []

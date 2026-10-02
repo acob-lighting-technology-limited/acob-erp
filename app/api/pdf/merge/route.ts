@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PDFDocument } from "pdf-lib"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/pdf/merge")
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +55,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error("Error merging PDFs:", error)
-    return NextResponse.json({ error: error.message || "Failed to merge PDFs" }, { status: 500 })
+    return serverError(log, error, "Failed to merge PDFs")
   }
 }
 

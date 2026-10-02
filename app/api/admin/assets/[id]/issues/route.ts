@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/id/issues")
 
 export const dynamic = "force-dynamic"
 
@@ -24,7 +28,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .select("*")
     .eq("asset_id", assetId)
     .order("created_at", { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ data: data ?? [] })
 }
 
@@ -47,6 +51,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     description: parsed.data.description.trim(),
     created_by: scope.userId,
   })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

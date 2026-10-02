@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-reports-kss-results")
 
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ data: data || [] })
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !saved) {
-      return NextResponse.json({ error: error?.message || "Failed to save KSS result" }, { status: 500 })
+      return serverError(log, error, "Failed to save KSS result")
     }
 
     await writeAuditLog(

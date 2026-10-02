@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/inventory/categories")
 
 export const dynamic = "force-dynamic"
 
@@ -20,7 +24,7 @@ export async function GET() {
   const { data, error } = await db.from("product_categories").select("*").order("name")
   if (error) {
     if (error.code === "42P01") return NextResponse.json({ data: [] })
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   const categoriesWithCounts = await Promise.all(
@@ -50,6 +54,6 @@ export async function POST(request: NextRequest) {
   const { error } = await db
     .from("product_categories")
     .insert({ name: parsed.data.name, description: parsed.data.description || null })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

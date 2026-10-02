@@ -5,6 +5,10 @@ import { z } from "zod"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { DEFAULT_AGENDA } from "@/app/admin/communications/_components/composer-utils"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/reports/meeting-agenda-default")
 
 const SETTING_KEY = "meeting_reminder_default_agenda"
 
@@ -129,7 +133,7 @@ export async function GET() {
     .eq("key", SETTING_KEY)
     .maybeSingle()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ data: { agenda: parseAgendaSetting(data?.value) } })
 }
 
@@ -168,7 +172,7 @@ export async function POST(request: Request) {
     { onConflict: "key" }
   )
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   await updateActiveMeetingSchedules(persistenceClient, parsed.data.agenda)
 
   return NextResponse.json({ data: { agenda: parsed.data.agenda } })

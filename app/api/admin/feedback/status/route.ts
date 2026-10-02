@@ -3,6 +3,10 @@ import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/feedback/status")
 
 export const dynamic = "force-dynamic"
 
@@ -26,7 +30,7 @@ export async function PATCH(request: NextRequest) {
   const db = getServiceRoleClientOrFallback(supabase)
 
   const { error } = await db.from("feedback").update({ status, updated_at: new Date().toISOString() }).eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   await writeAuditLog(
     db,

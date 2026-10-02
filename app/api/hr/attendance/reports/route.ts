@@ -23,6 +23,7 @@ import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("hr-attendance-reports-api")
 
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
             .eq("employment_status", "active")
             .returns<ProfileRow[]>()
           if (legacyError) {
-            return NextResponse.json({ error: legacyError.message }, { status: 500 })
+            return serverError(log, legacyError)
           }
           allProfiles = legacyData || []
         }
@@ -156,7 +157,7 @@ export async function GET(request: NextRequest) {
 
     const { data: attendanceRows, error: attendanceError } = await attendanceQuery.returns<AttendanceRow[]>()
     if (attendanceError) {
-      return NextResponse.json({ error: attendanceError.message }, { status: 500 })
+      return serverError(log, attendanceError)
     }
 
     // Each employee's first clock-in or manual edit establishes their scorable start date.

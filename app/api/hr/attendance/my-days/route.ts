@@ -12,6 +12,10 @@ import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { getEffectiveAttendanceStartDate } from "@/lib/hr/attendance-ssot"
 import { loadAttendanceStartDate } from "@/lib/hr/attendance-start"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/hr/attendance/my-days")
 
 type AttendanceRow = {
   id: string
@@ -55,7 +59,7 @@ export async function GET(request: NextRequest) {
     // One row per person from the start-dates view (first clock-in or manual edit).
     loadAttendanceStartDate(dataClient, userId).then((date) => ({ data: date ? { date } : null })),
   ])
-  if (recordsError) return NextResponse.json({ error: recordsError.message }, { status: 500 })
+  if (recordsError) return serverError(log, recordsError)
 
   const effectiveStartDate = getEffectiveAttendanceStartDate({
     earliestLogDate: earliestRecord?.date ?? null,

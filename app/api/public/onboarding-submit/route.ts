@@ -9,6 +9,10 @@ import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { resolveSubmissionRecipients } from "@/lib/onboarding/recipients"
 import { renderOnboardingSubmissionEmail } from "@/lib/email-templates/onboarding-submission"
 import { formatName } from "@/lib/utils"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/public/onboarding-submit")
 
 const OnboardingSubmitSchema = z.object({
   first_name: z.string().trim().min(2),
@@ -85,7 +89,7 @@ export async function POST(req: Request) {
     .maybeSingle()
 
   if (pendingError) {
-    return NextResponse.json({ error: pendingError.message }, { status: 500 })
+    return serverError(log, pendingError)
   }
 
   // Resolve contract category ID if contract
@@ -133,7 +137,7 @@ export async function POST(req: Request) {
 
     const { error: updateError } = await supabase.from("pending_users").update(payload).eq("id", existingPending.id)
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return serverError(log, updateError)
     }
     // Notify HR department of the updated submission in the background
     void notifyHROfSubmission(supabase, parsed.data, personalEmail)
@@ -147,7 +151,7 @@ export async function POST(req: Request) {
     },
   ])
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return serverError(log, insertError)
   }
 
   // Notify HR department of the new submission in the background

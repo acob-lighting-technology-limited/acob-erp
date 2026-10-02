@@ -3,6 +3,10 @@ import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/dev/acobot")
 
 type AcobotLogsClient = Awaited<ReturnType<typeof createClient>>
 
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await query
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   return NextResponse.json({ data: data || [] })

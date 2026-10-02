@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-admin-hr-payroll-periods")
 export const dynamic = "force-dynamic"
@@ -22,7 +23,7 @@ export async function GET() {
 
     if (error) {
       log.error({ err: error.message }, "Error fetching payroll periods")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ data: periods || [] })
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       log.error({ err: error.message }, "Error creating payroll period")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ data: period })

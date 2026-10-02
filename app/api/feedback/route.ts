@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger"
 import { checkRequestSize } from "@/lib/api/request-size"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { resolveLeadFeedbackTarget, watDayStampISO } from "@/lib/feedback/lead-feedback"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("feedback-route")
 
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
         updated_at: dayStamp,
       })
       if (leadError) {
-        return NextResponse.json({ error: leadError.message || "Failed to submit feedback" }, { status: 500 })
+        return serverError(log, leadError, "Failed to submit feedback")
       }
 
       // No audit entry, deliberately. Any "created at <precise time>" record —
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
       .select("*")
       .single()
     if (error || !createdFeedback) {
-      return NextResponse.json({ error: error?.message || "Failed to submit feedback" }, { status: 500 })
+      return serverError(log, error, "Failed to submit feedback")
     }
 
     await writeAuditLog(

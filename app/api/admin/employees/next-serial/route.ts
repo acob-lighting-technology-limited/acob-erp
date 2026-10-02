@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("admin-employees-next-serial")
 
@@ -31,7 +32,7 @@ export async function GET() {
 
     if (error) {
       log.error({ err: String(error) }, "Error fetching next serial:")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ serial: data })

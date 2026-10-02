@@ -8,6 +8,7 @@ import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { buildPaymentDocumentFolderPathByType, buildPaymentDocumentPath } from "@/lib/payments/document-storage"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("payments-documents")
 
@@ -130,7 +131,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const { data: documents, error } = await query
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ data: documents })
@@ -246,7 +247,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     if (dbError) {
       log.error({ err: String(dbError) }, "Database insert error:")
-      return NextResponse.json({ error: dbError.message || "Failed to save document record" }, { status: 500 })
+      return serverError(log, dbError, "Failed to save document record")
     }
 
     // If replacing an existing document, archive the old one

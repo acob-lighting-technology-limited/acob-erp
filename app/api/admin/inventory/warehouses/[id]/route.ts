@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/inventory/warehouses/id")
 
 export const dynamic = "force-dynamic"
 
@@ -29,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from("warehouses")
     .update({ name, code, address: address || null, is_active })
     .eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }
 
@@ -42,6 +46,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { id } = await params
   const db = getServiceRoleClientOrFallback(supabase)
   const { error } = await db.from("warehouses").delete().eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

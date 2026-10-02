@@ -7,6 +7,7 @@ import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { fetchActionTrackerItems } from "@/lib/reports/action-tracker-data"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { canEditActionContent, type ActionTrackerScopeProfile } from "@/lib/reports/action-tracker-permissions"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("action-tracker-route")
 
@@ -101,8 +102,7 @@ export async function POST(request: NextRequest) {
       .select("*")
       .single()
 
-    if (error || !item)
-      return NextResponse.json({ error: error?.message || "Failed to create action item" }, { status: 500 })
+    if (error || !item) return serverError(log, error, "Failed to create action item")
 
     const assigneeIds = Array.from(new Set(parsed.data.assignee_ids || []))
     if (origin === "management_directive" && assigneeIds.length > 0) {

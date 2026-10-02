@@ -4,6 +4,10 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/reports/office-year-config")
 
 async function createClient() {
   const cookieStore = await cookies()
@@ -30,7 +34,7 @@ export async function GET() {
     .select("year, anchor_day, is_locked")
     .order("year", { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ data })
 }
 
@@ -77,6 +81,6 @@ export async function POST(request: Request) {
     .from("office_year_config")
     .upsert({ year, anchor_day, updated_at: new Date().toISOString() }, { onConflict: "year" })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ data: { year, anchor_day } })
 }

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/inventory/products/id")
 
 export const dynamic = "force-dynamic"
 
@@ -52,6 +56,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from("products")
     .update({ ...rest, description: description || null, category_id: category_id || null })
     .eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

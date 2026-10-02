@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/settings/users")
 
 export const dynamic = "force-dynamic"
 
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
       )
       .eq("employment_status", "active")
       .order("first_name")
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
     return NextResponse.json({ users: (data ?? []).map((u) => shape(u as ProfileRow)) })
   }
 
@@ -55,7 +59,7 @@ export async function GET(request: NextRequest) {
       "id, company_email, first_name, last_name, role, admin_routes, department, employment_status, employment_date, created_at"
     )
     .order("created_at", { ascending: false })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   return NextResponse.json({
     users: (data ?? []).map((u) => shape(u as ProfileRow)),

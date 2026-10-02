@@ -10,6 +10,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { toLocalISODate } from "@/lib/utils/date"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("hr-performance-reviews")
 
@@ -556,7 +557,7 @@ export async function PATCH(request: NextRequest) {
           },
           "PATCH review status update failed"
         )
-        return NextResponse.json({ error: updateError?.message || "Failed to update review status" }, { status: 500 })
+        return serverError(log, updateError, "Failed to update review status")
       }
 
       await writeAuditLog(
@@ -604,7 +605,7 @@ export async function PATCH(request: NextRequest) {
         { actor_id: user.id, review_id: review.id, error: updateError?.message || null },
         "PATCH review acknowledge update failed"
       )
-      return NextResponse.json({ error: updateError?.message || "Failed to acknowledge review" }, { status: 500 })
+      return serverError(log, updateError, "Failed to acknowledge review")
     }
 
     await writeAuditLog(

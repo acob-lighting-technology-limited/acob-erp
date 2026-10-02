@@ -5,6 +5,10 @@ import { readFile, unlink, mkdir } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/download")
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -167,7 +171,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ error: error.message || "Download failed" }, { status: 500 })
+    return serverError(log, error, "Download failed")
   }
 }
 

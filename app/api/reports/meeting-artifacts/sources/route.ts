@@ -5,6 +5,7 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveOnlineMeetingId, isValidGraphEmail } from "@/lib/graph/meeting-calendar"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-meeting-artifact-sources")
 
@@ -69,7 +70,7 @@ export async function GET() {
       )
       .order("created_at", { ascending: false })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
     return NextResponse.json({ data: (data || []) as MeetingArtifactSource[] })
   } catch (error) {
     log.error({ err: String(error) }, "GET meeting-artifact-sources failed")
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
       if (error.code === "23505") {
         return NextResponse.json({ error: "This meeting is already configured." }, { status: 409 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     await writeAuditLog(
@@ -207,7 +208,7 @@ export async function PATCH(request: Request) {
       .select("id")
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase as SupabaseClient,
@@ -239,7 +240,7 @@ export async function DELETE(request: Request) {
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
     const { error } = await supabase.from("meeting_artifact_sources").delete().eq("id", id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase as SupabaseClient,

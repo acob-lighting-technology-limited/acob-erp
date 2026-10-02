@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PDFDocument } from "pdf-lib"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/pdf/split")
 
 function parsePageRanges(pagesStr: string, totalPages: number): number[] {
   const pages: number[] = []
@@ -79,7 +83,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error("Error splitting PDF:", error)
-    return NextResponse.json({ error: error.message || "Failed to split PDF" }, { status: 500 })
+    return serverError(log, error, "Failed to split PDF")
   }
 }
 

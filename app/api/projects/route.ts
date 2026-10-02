@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 export const dynamic = "force-dynamic"
 const log = logger("projects-api")
@@ -141,6 +142,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: project })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in projects POST")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }
