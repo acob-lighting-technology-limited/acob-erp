@@ -11,7 +11,7 @@ export function useBirthdayCelebrants() {
   const today = toLocalISODate()
   const currentOfficeWeek = getCurrentOfficeWeek()
 
-  const [mode, setMode] = useState<Mode>("week")
+  const [mode, setMode] = useState<Mode>("month")
   const [dayValue, setDayValue] = useState(today)
   const [weekNumber, setWeekNumber] = useState(currentOfficeWeek.week)
   const [weekYear, setWeekYear] = useState(currentOfficeWeek.year)
