@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { writeAuditLog } from "@/lib/audit/write-audit"
@@ -161,21 +163,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const ReviewAppealSchema = z.object({
+  id: z.string().trim().min(1, "id is required"),
+  action: z.enum(["approve", "reject"], { errorMap: () => ({ message: "action must be approve or reject" }) }),
+  resolution_note: z.string().trim().max(2000).optional(),
+})
 export async function PATCH(request: NextRequest) {
   try {
     const scopeResult = await requireApiAdminScope()
     if (!scopeResult.ok) return scopeResult.response
     const { scope, supabase } = scopeResult
 
-    const body = (await request.json()) as {
-      id?: unknown
-      action?: unknown
-      resolution_note?: unknown
-    }
-
-    const appealId = typeof body.id === "string" ? body.id.trim() : ""
-    const action = typeof body.action === "string" ? body.action.trim() : ""
-    const resolutionNote = typeof body.resolution_note === "string" ? body.resolution_note.trim() : ""
+    const parsed = await parseJsonBody(request, ReviewAppealSchema)
+    if (!parsed.ok) return parsed.response
+    const appealId = parsed.data.id
+    const action = parsed.data.action
+    const resolutionNote = parsed.data.resolution_note ?? ""
 
     if (!appealId) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })

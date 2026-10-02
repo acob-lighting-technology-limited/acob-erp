@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { PayslipEmailSchema } from "@/lib/hr/payroll-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -24,10 +26,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json().catch(() => null)
-    const payrollPeriodId = body?.payroll_period_id
-    const userId = body?.user_id
-    const protect = body?.protect !== false // password-protect unless explicitly disabled
+    const parsed = await parseJsonBody(request, PayslipEmailSchema)
+    if (!parsed.ok) return parsed.response
+    const payrollPeriodId = parsed.data.payroll_period_id
+    const userId = parsed.data.user_id
+    const protect = parsed.data.protect !== false // password-protect unless explicitly disabled
 
     if (!payrollPeriodId || !userId) {
       return NextResponse.json({ error: "payroll_period_id and user_id are required" }, { status: 400 })

@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { validationError } from "@/lib/api/errors"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getScopedDepartments } from "@/lib/admin/api-scope"
@@ -45,11 +47,19 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = (await req.json().catch(() => ({}))) as { password?: string }
-    const manualPassword = body.password?.trim() || null
-    if (manualPassword !== null && manualPassword.length < 6) {
-      return NextResponse.json({ error: "A valid password of at least 6 characters is required" }, { status: 400 })
-    }
+    // The body is optional: no password means the mailbox password is generated via cPanel.
+    const parsed = z
+      .object({
+        password: z
+          .string()
+          .trim()
+          .max(128)
+          .optional()
+          .refine((v) => !v || v.length >= 6, "A valid password of at least 6 characters is required"),
+      })
+      .safeParse(await req.json().catch(() => ({})))
+    if (!parsed.success) return validationError(parsed.error.issues)
+    const manualPassword = parsed.data.password || null
     if (manualPassword === null && !isCpanelConfigured()) {
       return NextResponse.json(
         { error: "Automatic mailbox setup is unavailable (cPanel not configured). Enter the password ICT set." },

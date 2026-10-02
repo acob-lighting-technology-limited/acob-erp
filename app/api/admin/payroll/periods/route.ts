@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { CreatePayrollPeriodSchema } from "@/lib/hr/payroll-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -41,12 +43,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json().catch(() => null)
-    if (!body || !body.name || !body.start_date || !body.end_date || !body.pay_date) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    const { name, start_date, end_date, pay_date } = body
+    const parsed = await parseJsonBody(request, CreatePayrollPeriodSchema)
+    if (!parsed.ok) return parsed.response
+    const { name, start_date, end_date, pay_date } = parsed.data
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
     const { data: period, error } = await dataClient
