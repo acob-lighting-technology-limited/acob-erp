@@ -44,6 +44,8 @@ import {
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
+import { TableGridSkeleton } from "@/components/skeletons/table-grid-skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -130,32 +132,7 @@ function TableSkeleton({
   headerClassName: string
   borderless?: boolean
 }) {
-  const table = (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader className={headerClassName}>
-          <TableRow>
-            {Array.from({ length: cols }).map((_, i) => (
-              <TableHead key={i}>
-                <Skeleton className="h-4 w-24" />
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: rows }).map((_, rowIdx) => (
-            <TableRow key={rowIdx}>
-              {Array.from({ length: cols }).map((_, colIdx) => (
-                <TableCell key={colIdx}>
-                  <Skeleton className={cn("h-4", colIdx === 0 ? "w-32" : colIdx === cols - 1 ? "w-16" : "w-24")} />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  )
+  const table = <TableGridSkeleton columns={cols} rows={rows} headerClassName={headerClassName} />
 
   if (borderless) return table
 
@@ -1219,7 +1196,7 @@ export function DataTable<TData>({
       onDragEnd={handleColumnDragEnd}
     >
       <div className="overflow-x-auto">
-        <Table style={minWidth ? { minWidth } : undefined} className={minWidth ? `min-w-[${minWidth}]` : undefined}>
+        <Table style={minWidth ? { minWidth } : undefined}>
           <TableHeader className={cn(headerClassName, "sticky top-0 z-10")}>
             <SortableContext items={visibleColumns.map((c) => c.key)} strategy={horizontalListSortingStrategy}>
               <TableRow>
@@ -1267,7 +1244,7 @@ export function DataTable<TData>({
             {paginatedData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={totalCols} className="p-0">
-                  <EmptyState
+                  <TableEmptyState
                     EmptyIcon={EmptyIcon}
                     emptyTitle={emptyTitle}
                     emptyDescription={emptyDescription}
@@ -1294,14 +1271,7 @@ export function DataTable<TData>({
                       }}
                       onClick={(e) => {
                         const target = e.target as HTMLElement
-                        if (
-                          target.closest("button") ||
-                          target.closest("a") ||
-                          target.closest("input") ||
-                          target.closest("label") ||
-                          target.closest("[role='menuitem']") ||
-                          target.closest("[role='checkbox']")
-                        ) {
+                        if (isInteractiveTarget(target)) {
                           return
                         }
                         // Highlighting text inside a row must not trigger selection.
@@ -1751,7 +1721,7 @@ export function DataTable<TData>({
             </Card>
           )}
           {paginatedData.length === 0 ? (
-            <EmptyState
+            <TableEmptyState
               EmptyIcon={EmptyIcon}
               emptyTitle={emptyTitle}
               emptyDescription={emptyDescription}
@@ -1764,14 +1734,7 @@ export function DataTable<TData>({
                 const rowId = getRowId(row)
                 const handleCardClick = (e: ReactMouseEvent<HTMLDivElement>) => {
                   const target = e.target as HTMLElement
-                  if (
-                    target.closest("button") ||
-                    target.closest("a") ||
-                    target.closest("input") ||
-                    target.closest("label") ||
-                    target.closest("[role='menuitem']") ||
-                    target.closest("[role='checkbox']")
-                  ) {
+                  if (isInteractiveTarget(target)) {
                     return
                   }
                   if (detailConfig) setDetailRow(row)
@@ -1849,7 +1812,7 @@ export function DataTable<TData>({
             <>
               <div className="border-t md:hidden">
                 {listSource.length === 0 ? (
-                  <EmptyState
+                  <TableEmptyState
                     EmptyIcon={EmptyIcon}
                     emptyTitle={emptyTitle}
                     emptyDescription={emptyDescription}
@@ -1866,7 +1829,7 @@ export function DataTable<TData>({
             /* Contacts mode: the same list at every width, no table underneath. */
             <div className="border-t">
               {listSource.length === 0 ? (
-                <EmptyState
+                <TableEmptyState
                   EmptyIcon={EmptyIcon}
                   emptyTitle={emptyTitle}
                   emptyDescription={emptyDescription}
@@ -1883,7 +1846,7 @@ export function DataTable<TData>({
             <>
               <div className="border-t md:hidden">
                 {paginatedData.length === 0 ? (
-                  <EmptyState
+                  <TableEmptyState
                     EmptyIcon={EmptyIcon}
                     emptyTitle={emptyTitle}
                     emptyDescription={emptyDescription}
@@ -1937,30 +1900,42 @@ export function DataTable<TData>({
 
 // ─── Empty state ─────────────────────────────────────────────────────────────
 
-function EmptyState({
+const INTERACTIVE_SELECTOR =
+  "button, a, input, select, textarea, label, [role='menuitem'], [role='checkbox'], [data-row-click='ignore']"
+
+/** Clicks on controls inside a row/card must not also trigger the row action. Mark any
+ * other interactive cell content with data-row-click="ignore". */
+function isInteractiveTarget(target: HTMLElement) {
+  return target.closest(INTERACTIVE_SELECTOR) !== null
+}
+
+function TableEmptyState({
   EmptyIcon,
   emptyTitle,
   emptyDescription,
   hasActiveFilters,
   onClearFilters,
 }: {
-  EmptyIcon: React.ElementType
+  EmptyIcon: React.ElementType<{ className?: string }>
   emptyTitle: string
   emptyDescription: string
   hasActiveFilters: boolean
   onClearFilters: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <EmptyIcon className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
-      <p className="text-foreground font-medium">{emptyTitle}</p>
-      <p className="text-muted-foreground mt-1 text-sm">{emptyDescription}</p>
-      {hasActiveFilters && (
-        <Button variant="outline" size="sm" onClick={onClearFilters} className="mt-4 gap-2">
-          <X className="h-3.5 w-3.5" />
-          Clear filters
-        </Button>
-      )}
-    </div>
+    <EmptyState
+      icon={EmptyIcon}
+      title={emptyTitle}
+      description={emptyDescription}
+      className="border-0 bg-transparent py-16 sm:py-16"
+      action={
+        hasActiveFilters ? (
+          <Button variant="outline" size="sm" onClick={onClearFilters} className="gap-2">
+            <X className="h-3.5 w-3.5" />
+            Clear filters
+          </Button>
+        ) : null
+      }
+    />
   )
 }
