@@ -41,12 +41,6 @@ export function formatMMDDLabel(mmdd: string): string {
   return `${MONTHS[month - 1]?.slice(0, 3) ?? "?"} ${day}`
 }
 
-/** Split MM-DD into a big day numeral and a short month, for date-forward layouts. */
-export function splitMMDD(mmdd: string): { day: string; month: string } {
-  const [month, day] = mmdd.split("-").map(Number)
-  return { day: String(day), month: MONTHS[month - 1]?.slice(0, 3) ?? "?" }
-}
-
 export function displayName(firstName: string): string {
   const lower = firstName.trim().toLowerCase()
   return lower === "eliah" ? "Elijah" : firstName

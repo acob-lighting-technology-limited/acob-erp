@@ -136,7 +136,7 @@
 .birthday-confetti {
   position: absolute;
   top: -5vh;
-  opacity: 0.85;
+  opacity: 0.5;
   animation-name: birthday-fall;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
