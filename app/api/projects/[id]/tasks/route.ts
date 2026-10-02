@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { ProjectTaskInputSchema } from "@/lib/projects/schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { clampWeight } from "@/lib/tasks/scoring"
 import { logger } from "@/lib/logger"
@@ -101,12 +103,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
   }
 
   try {
-    const body = await request.json()
-    const { title, description, status, assigned_to, priority, weight, goal_id } = body
-
-    if (!title) {
-      return NextResponse.json({ error: "Task title is required" }, { status: 400 })
-    }
+    const parsed = await parseJsonBody(request, ProjectTaskInputSchema)
+    if (!parsed.ok) return parsed.response
+    const { title, description, status, assigned_to, priority, weight, goal_id } = parsed.data
 
     const { data: task, error } = await (supabase as any)
       .from("tasks")
