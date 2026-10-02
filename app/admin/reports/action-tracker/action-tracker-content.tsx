@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useConfirm } from "@/providers/confirm-provider"
 import { useSearchParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDateTime } from "@/lib/utils/date"
@@ -173,6 +174,7 @@ export function ActionTrackerContent({
   editableDepartments = [],
   canGlobalEdit = false,
 }: ActionTrackerContentProps) {
+  const confirm = useConfirm()
   const currentOfficeWeek = getCurrentOfficeWeek()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
@@ -295,7 +297,13 @@ export function ActionTrackerContent({
       toast.error("You can only edit actions in your departments")
       return
     }
-    if (!window.confirm(`Delete this directive?\n\n${directive.title}`)) return
+    const ok = await confirm({
+      title: "Delete this directive?",
+      description: directive.title,
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const response = await apiFetch(`/api/reports/action-tracker/${directive.id}`, { method: "DELETE" })
       const payload = (await response.json().catch(() => null)) as { error?: string } | null

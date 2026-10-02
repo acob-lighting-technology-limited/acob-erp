@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { toast } from "sonner"
 import type { Requisition } from "@/lib/requisitions/types"
 import { getStageLabel, isStageBypassed } from "@/lib/requisitions/workflow"
 import { CheckCircle2, Clock, XCircle, FileText, Download, Printer, Siren, MinusCircle } from "lucide-react"
@@ -144,7 +145,7 @@ export function RequisitionPdfDocument({
               disabled={isSubmitting}
               onClick={() => {
                 if (!comments.trim()) {
-                  alert("Please provide comments explaining the rejection.")
+                  toast.error("Please provide comments explaining the rejection.")
                   return
                 }
                 onReject?.(comments)

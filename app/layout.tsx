@@ -1,4 +1,5 @@
 import type React from "react"
+import { ConfirmProvider } from "@/providers/confirm-provider"
 import type { Metadata, Viewport } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
@@ -101,16 +102,18 @@ export default function RootLayout({
           {/* Theme follows system preference automatically (light/dark mode) */}
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="acob-theme">
             <QueryProvider>
-              <SeasonalFaviconSwitcher />
-              <SidebarProvider>
-                <NProgressProvider />
-                <NProgressHandler />
-                <ClientErrorMonitor />
-                <HeaderWrapperWithData />
-                {/* Intentionally public routes outside (app): /employee/new, /maintenance */}
-                {children}
-                <Toaster />
-              </SidebarProvider>
+              <ConfirmProvider>
+                <SeasonalFaviconSwitcher />
+                <SidebarProvider>
+                  <NProgressProvider />
+                  <NProgressHandler />
+                  <ClientErrorMonitor />
+                  <HeaderWrapperWithData />
+                  {/* Intentionally public routes outside (app): /employee/new, /maintenance */}
+                  {children}
+                  <Toaster />
+                </SidebarProvider>
+              </ConfirmProvider>
             </QueryProvider>
           </ThemeProvider>
         </Suspense>

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useCallback, use } from "react"
+import { toast } from "sonner"
 import type { Requisition } from "@/lib/requisitions/types"
 import { RequisitionPdfDocument } from "../_components/requisition-pdf-document"
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
@@ -55,7 +56,7 @@ export default function RequisitionDetailPage({ params }: { params: Promise<{ id
 
       await fetchDetail()
     } catch (err: any) {
-      alert(err.message || "Failed to approve requisition")
+      toast.error(err.message || "Failed to approve requisition")
     } finally {
       setIsSubmitting(false)
     }
@@ -78,7 +79,7 @@ export default function RequisitionDetailPage({ params }: { params: Promise<{ id
 
       await fetchDetail()
     } catch (err: any) {
-      alert(err.message || "Failed to reject requisition")
+      toast.error(err.message || "Failed to reject requisition")
     } finally {
       setIsSubmitting(false)
     }

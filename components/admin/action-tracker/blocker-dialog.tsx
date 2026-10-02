@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useConfirm } from "@/providers/confirm-provider"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { AlertTriangle, FileText, Loader2, Paperclip, Play, Save, Trash2, Upload } from "lucide-react"
@@ -58,6 +59,7 @@ function formatSize(bytes: number) {
 }
 
 export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: BlockerDialogProps) {
+  const confirm = useConfirm()
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [note, setNote] = useState("")
@@ -150,7 +152,8 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
   }
 
   const handleDeleteEvidence = async (row: EvidenceRow) => {
-    if (!window.confirm(`Remove ${row.file_name}?`)) return
+    const ok = await confirm({ title: `Remove ${row.file_name}?`, confirmLabel: "Remove", destructive: true })
+    if (!ok) return
     try {
       const response = await apiFetch(
         `/api/reports/action-tracker/${targetId}/evidence?evidence_id=${encodeURIComponent(row.id)}`,

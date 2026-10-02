@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useConfirm } from "@/providers/confirm-provider"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { CalendarClock, Loader2, Mail, MailX, Pencil, Plus, RefreshCw, Send, Trash2, Users, Video } from "lucide-react"
@@ -185,6 +186,7 @@ function MeetingSendPanel({ source, occurrences }: { source: SourceRow; occurren
 }
 
 export function MeetingSyncModal({ open, onOpenChange }: Props) {
+  const confirm = useConfirm()
   const queryClient = useQueryClient()
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<MeetingSource | null>(null)
@@ -249,7 +251,13 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
   }
 
   const remove = async (row: SourceRow) => {
-    if (!window.confirm(`Stop watching "${row.label}"? Stored history is kept.`)) return
+    const ok = await confirm({
+      title: `Stop watching "${row.label}"?`,
+      description: "Stored history is kept.",
+      confirmLabel: "Stop watching",
+      destructive: true,
+    })
+    if (!ok) return
     setDeletingId(row.id)
     try {
       const res = await apiFetch(`/api/reports/meeting-artifacts/sources?id=${row.id}`, { method: "DELETE" })
