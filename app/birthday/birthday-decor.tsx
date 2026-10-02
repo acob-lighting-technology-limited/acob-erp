@@ -19,12 +19,13 @@ const CONFETTI = Array.from({ length: 12 }, (_, i) => ({
 // bunch's own 260×380 viewBox; the right bunch mirrors x so highlights stay top-left.
 const BUNCH_W = 260
 const BUNCH_H = 380
-const TIE = { x: 34, y: 366 }
+// Strings meet exactly at the screen corner (bottom-left / bottom-right of the box).
+const TIE = { x: 0, y: BUNCH_H }
 
 const BUNCH = [
   { x: 82, y: 118, s: 0.95, color: "var(--bd-green)", sway: 7, delay: 0 },
-  { x: 178, y: 92, s: 0.8, color: "var(--bd-gold)", sway: 8.5, delay: -2.5 },
-  { x: 140, y: 214, s: 0.72, color: "var(--bd-green)", sway: 6.2, delay: -4.2 },
+  { x: 178, y: 92, s: 0.8, color: "var(--bd-green)", sway: 8.5, delay: -2.5 },
+  { x: 140, y: 214, s: 0.72, color: "var(--bd-gold)", sway: 6.2, delay: -4.2 },
 ]
 
 /** Teardrop balloon body centred on (0,0): ~100 wide, ~122 tall, knot at y≈62. */
@@ -90,13 +91,6 @@ function BalloonBunch({ side }: { side: "left" | "right" }) {
           </g>
         )
       })}
-
-      {/* Gold bow where the strings are tied. */}
-      <g transform={`translate(${tieX} ${TIE.y})`}>
-        <ellipse cx="-8" cy="-2" rx="8" ry="4.5" fill="var(--bd-gold)" transform="rotate(-25 -8 -2)" />
-        <ellipse cx="8" cy="-2" rx="8" ry="4.5" fill="var(--bd-gold)" transform="rotate(25 8 -2)" />
-        <circle r="3.2" fill="var(--bd-gold-deep)" />
-      </g>
     </svg>
   )
 }
