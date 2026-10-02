@@ -7,7 +7,7 @@ import { Settings, Users, Building2, Shield, Mail, Clock, Brain } from "lucide-r
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { IconFill } from "@/components/ui/icon-fill"
-import { resolveAdminScope } from "@/lib/admin/rbac"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { canManageMaintenanceMode } from "@/lib/maintenance"
 
 export default async function AdminSettingsPage() {
@@ -132,7 +132,7 @@ export default async function AdminSettingsPage() {
           </Card>
         )}
 
-        {(scope.role === "super_admin" || scope.role === "developer") && (
+        {scopeHoldsAdminRoute(scope, "settings.main") && (
           <Card className="group">
             <CardHeader>
               <CardTitle className="flex items-center gap-2.5">
@@ -154,7 +154,7 @@ export default async function AdminSettingsPage() {
           </Card>
         )}
 
-        {(scope.role === "super_admin" || scope.role === "developer") && (
+        {scopeHoldsAdminRoute(scope, "settings.main") && (
           <Card className="group">
             <CardHeader>
               <CardTitle className="flex items-center gap-2.5">

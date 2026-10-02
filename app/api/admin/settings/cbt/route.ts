@@ -3,6 +3,7 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
+import { scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { DEFAULT_CBT_SETTINGS, getCbtSettings } from "@/lib/cbt-config"
 import { logger } from "@/lib/logger"
 
@@ -21,7 +22,7 @@ export async function GET() {
     const supabase = await createClient()
     const scope = await getRequestScope()
 
-    if (!scope || (scope.role !== "super_admin" && scope.role !== "developer")) {
+    if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
       return NextResponse.json({ error: "Only super_admin and developer can access CBT settings" }, { status: 403 })
     }
 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const scope = await getRequestScope()
 
-    if (!scope || (scope.role !== "super_admin" && scope.role !== "developer")) {
+    if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
       return NextResponse.json({ error: "Only super_admin and developer can modify CBT settings" }, { status: 403 })
     }
 

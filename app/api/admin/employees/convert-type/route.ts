@@ -16,7 +16,7 @@ const ConvertTypeSchema = z.object({
 })
 
 function ensureAdmin(request: NextRequest) {
-  return requireAdminRole(request, "admin-convert-type", 30)
+  return requireAdminRole(request, "hr.main", "admin-convert-type", 30)
 }
 
 /** POST /api/admin/employees/convert-type — convert employment type and issue new ID */

@@ -6,7 +6,12 @@ import {
   normalizeDepartmentList as normalizeCanonicalDepartmentList,
   getDepartmentAliases,
 } from "@/shared/departments"
-import { GRANTABLE_ADMIN_ROUTES, type AdminRouteKeyV2 } from "@/lib/admin/policy-v2"
+import {
+  GRANTABLE_ADMIN_ROUTES,
+  buildAccessContextV2,
+  canAccessRouteV2,
+  type AdminRouteKeyV2,
+} from "@/lib/admin/policy-v2"
 
 export type AdminRole = "developer" | "super_admin" | "admin" | "employee" | "visitor" | string
 export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
@@ -329,12 +334,23 @@ export async function requireAdminSectionAccess(section: AdminSection): Promise<
 }
 
 /**
- * True when the scope sees every department for the "general" domain (meeting
- * documents, KSS, reports) — i.e. it may write org-wide report data rather than
- * only its own departments'.
+ * True when the scope holds `route` as an admin (not via department-lead
+ * visibility). An admin is a super_admin scoped to their assigned routes:
+ * developer/super_admin hold every route, an admin holds what admin_routes
+ * grants (with the hr.main / accounts aliases canAccessRouteV2 applies).
+ */
+export function scopeHoldsAdminRoute(scope: AdminScope, route: AdminRouteKeyV2): boolean {
+  if (scope.scopeMode === "lead" || !scope.isAdminLike) return false
+  return canAccessRouteV2(buildAccessContextV2(scope), route)
+}
+
+/**
+ * True when the scope may write org-wide general-meeting data (meeting
+ * documents, KSS, meeting artifacts) — the /admin/reports pages other than
+ * weekly reports, i.e. the reports.other route.
  */
 export function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
-  return getDepartmentScope(scope, "general") === null
+  return scopeHoldsAdminRoute(scope, "reports.other")
 }
 
 /**
@@ -347,8 +363,5 @@ export function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
  * every employee's own weekly report submissions, which must stay locked.
  */
 export function canOverrideReportsWeekLock(scope: AdminScope): boolean {
-  if (scope.scopeMode === "lead") return false
-  const role = normalizeRoleValue(scope.role)
-  if (role === "developer" || role === "super_admin") return true
-  return role === "admin" && Array.isArray(scope.adminRoutes) && scope.adminRoutes.includes("reports.other")
+  return scopeHoldsAdminRoute(scope, "reports.other")
 }

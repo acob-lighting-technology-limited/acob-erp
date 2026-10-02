@@ -20,7 +20,7 @@ const CategoryPatchSchema = CategorySchema.extend({
 })
 
 function ensureAdmin(request: NextRequest) {
-  return requireAdminRole(request, "admin-employment-categories", 30)
+  return requireAdminRole(request, "hr.main", "admin-employment-categories", 30)
 }
 
 /** GET /api/admin/hr/employment-categories — list all categories */
