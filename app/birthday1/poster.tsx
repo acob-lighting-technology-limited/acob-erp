@@ -6,7 +6,7 @@ import type { CSSProperties } from "react"
 import { BirthdayEmpty, CelebrantPhoto } from "../birthday/birthday-explorer"
 import { cn } from "@/lib/utils"
 import { BirthdayBackButton, BirthdayPicker } from "../birthday/birthday-picker"
-import { displayName, formatMMDDLabel, formatNamesList, isBirthdayToday } from "../birthday/birthday-utils"
+import { displayName, formatMMDDLabel, isBirthdayToday } from "../birthday/birthday-utils"
 import { useBirthdayCelebrants } from "../birthday/use-birthday-celebrants"
 import "./poster.css"
 
@@ -34,10 +34,6 @@ export function BirthdayPoster() {
         <span className="bd1-happy">Happy</span>
         <span className="bd1-birthday">Birthday</span>
       </h1>
-
-      {celebrants.length > 0 && (
-        <p className="bd1-names">{formatNamesList(celebrants.map((c) => displayName(c.firstName)))}</p>
-      )}
 
       {error ? (
         <p className="birthday-error">{error}</p>
