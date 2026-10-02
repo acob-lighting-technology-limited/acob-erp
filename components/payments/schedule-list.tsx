@@ -31,13 +31,13 @@ export function ScheduleList({ items, onUpload, onView, onMarkPaid, onReplace }:
 
   return (
     <div className="divide-y rounded-md border">
-      {items.map((item, index) => {
+      {items.map((item) => {
         const invoiceDoc = item.documents.find((d) => d.document_type === "invoice")
         const receiptDoc = item.documents.find((d) => d.document_type === "receipt")
 
         return (
           <div
-            key={index}
+            key={item.date.toISOString()}
             className={cn(
               "flex flex-col justify-between gap-3 p-3 sm:flex-row sm:items-center",
               item.status === "overdue" && "bg-red-50 dark:bg-red-950/20"

@@ -22,6 +22,16 @@ import { Plus, Trash2, Upload, FileText, Loader2, AlertCircle, Siren } from "luc
 import { createClient } from "@/lib/supabase/client"
 import { apiFetch } from "@/lib/api-client"
 
+/** A beneficiary row plus a client-only key, so removing a row never shifts another row's inputs. */
+type BeneficiaryRow = BeneficiaryDetail & { key: string }
+
+const emptyBeneficiary = (): BeneficiaryRow => ({
+  key: crypto.randomUUID(),
+  account_name: "",
+  account_number: "",
+  bank_name: "",
+})
+
 interface NewRequisitionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -41,9 +51,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
   const [amount, setAmount] = useState<string>("")
   const [amountInWords, setAmountInWords] = useState<string>("")
   const [purpose, setPurpose] = useState("")
-  const [beneficiaries, setBeneficiaries] = useState<BeneficiaryDetail[]>([
-    { account_name: "", account_number: "", bank_name: "" },
-  ])
+  const [beneficiaries, setBeneficiaries] = useState<BeneficiaryRow[]>(() => [emptyBeneficiary()])
   const [attachments, setAttachments] = useState<RequisitionAttachment[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -82,7 +90,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
   }
 
   const handleAddBeneficiary = () => {
-    setBeneficiaries((prev) => [...prev, { account_name: "", account_number: "", bank_name: "" }])
+    setBeneficiaries((prev) => [...prev, emptyBeneficiary()])
   }
 
   const handleRemoveBeneficiary = (index: number) => {
@@ -199,7 +207,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
           amount: numAmount,
           amount_in_words: amountInWords || numberToNairaWords(numAmount),
           purpose,
-          beneficiary_details: beneficiaries,
+          beneficiary_details: beneficiaries.map(({ key: _key, ...detail }) => detail),
           attachments,
           funding_category_id: fundingCategoryId,
           is_emergency: isEmergency,
@@ -383,7 +391,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
 
             {beneficiaries.map((b, idx) => (
               <div
-                key={idx}
+                key={b.key}
                 className="bg-muted/30 relative grid grid-cols-1 gap-2 rounded-lg border p-2 sm:grid-cols-3"
               >
                 <div>
@@ -462,7 +470,10 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
             {attachments.length > 0 && (
               <div className="mt-2 space-y-1.5">
                 {attachments.map((att, i) => (
-                  <div key={i} className="bg-card flex items-center justify-between rounded border p-2 text-xs">
+                  <div
+                    key={att.file_url}
+                    className="bg-card flex items-center justify-between rounded border p-2 text-xs"
+                  >
                     <div className="flex items-center gap-2 truncate">
                       <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
                       <span className="truncate font-medium">{att.file_name}</span>
