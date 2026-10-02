@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback, syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
@@ -49,25 +51,28 @@ export async function GET(_: Request, { params }: RouteContext) {
 }
 
 // PATCH — update employment status
+const ChangeStatusSchema = z.object({
+  status: z.enum(["active", "suspended", "exited", "on_leave", "contract"], {
+    errorMap: () => ({ message: "status is required" }),
+  }),
+  reason_code: z.string().trim().max(100).optional(),
+  reason_label: z.string().trim().max(200).optional(),
+  leave_type_id: z.union([z.string().uuid(), z.literal("")]).optional(),
+  leave_type_name: z.string().trim().max(100).optional(),
+  suspension_end_date: z.string().trim().max(40).nullable().optional(),
+  separation_date: z.string().trim().max(40).optional(),
+})
+
 export async function PATCH(request: Request, { params }: RouteContext) {
   const { employeeId } = await params
   try {
     const ctx = await getAdminContext(employeeId)
     if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
 
-    const body = (await request.json()) as {
-      status: EmploymentStatus
-      reason_code?: string
-      reason_label?: string
-      leave_type_id?: string
-      leave_type_name?: string
-      suspension_end_date?: string | null
-      separation_date?: string
-    }
-
+    const parsed = await parseJsonBody(request, ChangeStatusSchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
     const { status, reason_code, reason_label, leave_type_id, suspension_end_date, separation_date } = body
-
-    if (!status) return NextResponse.json({ error: "status is required" }, { status: 400 })
 
     // Block exit if employee has active assignments
     if (status === "exited") {

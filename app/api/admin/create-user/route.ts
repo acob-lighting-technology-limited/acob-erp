@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
@@ -71,7 +73,9 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const body = await request.json()
+    const parsed = await parseJsonBody(request, CreateUserSchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
     const {
       firstName: rawFirstName,
       lastName: rawLastName,
@@ -94,16 +98,8 @@ export async function PATCH(request: NextRequest) {
     const lastName = formatName(rawLastName)
     const otherNames = rawOtherNames ? formatName(rawOtherNames) : ""
     const resolvedEmploymentType = employmentType || "full_time"
-    const resolvedDesignation = String(designation ?? body?.companyRole ?? "").trim()
-    const adminRoutes = Array.isArray(body?.admin_routes)
-      ? body.admin_routes
-          .map((value: unknown) =>
-            String(value || "")
-              .trim()
-              .toLowerCase()
-          )
-          .filter(Boolean)
-      : []
+    const resolvedDesignation = String(designation ?? body.companyRole ?? "").trim()
+    const adminRoutes = (body.admin_routes ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean)
     const { GRANTABLE_ADMIN_ROUTES: allowedAdminRoutes } = await import("@/lib/admin/policy-v2")
 
     // Validate role if provided
@@ -395,6 +391,30 @@ export async function PATCH(request: NextRequest) {
 }
 
 // POST kept for backwards compat — prefer PATCH
+const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value)
+
+const optionalText = (max: number) => z.string().trim().max(max).nullable().optional()
+
+const CreateUserSchema = z.object({
+  firstName: z.string().trim().min(1, "First name is required").max(100),
+  lastName: z.string().trim().min(1, "Last name is required").max(100),
+  otherNames: optionalText(100),
+  email: z.string().trim().toLowerCase().email("A valid email is required"),
+  department: optionalText(100),
+  designation: optionalText(150),
+  companyRole: optionalText(150),
+  phoneNumber: optionalText(30),
+  role: z.preprocess(emptyToUndefined, z.enum(ASSIGNABLE_ROLES).optional()),
+  employmentType: z.preprocess(emptyToUndefined, z.enum(["full_time", "part_time", "contract"]).optional()),
+  contractCategoryCode: optionalText(30),
+  gender: optionalText(30),
+  dateOfBirth: optionalText(30),
+  additionalPhone: optionalText(30),
+  residentialAddress: optionalText(500),
+  officeLocation: optionalText(200),
+  admin_routes: z.array(z.string().max(100)).max(100).optional(),
+})
+
 export async function POST(request: NextRequest) {
   const rl = await rateLimit(`admin-create-user:${getClientId(request)}`, { limit: 30, windowSec: 60 })
   if (!rl.allowed)
