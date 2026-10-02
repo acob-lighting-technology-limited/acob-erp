@@ -2,14 +2,22 @@
    On desktop the whole poster fits one screen (100vh): type and portraits size
    off the viewport height, and portraits shrink with the celebrant count. */
 
-/* Palette discipline: gold is the only bright colour, on black. Green stays as a
-   deep, quiet glow; the bright green used elsewhere is swapped out of the decor. */
+/* Palette: gold for type and lines, ONE deep brand green for surfaces, black
+   base. A single green (no bright/mid/dark mix) is what keeps it from clashing. */
 .birthday-page.bd-poster {
-  --bd-green-bright: var(--bd-gold-deep);
+  --bd-green: #17733b;
+  --bd-green-bright: var(--bd-green);
 
   background:
-    radial-gradient(ellipse at 50% 40%, rgb(15 90 48 / 0.32), transparent 62%),
-    radial-gradient(ellipse at 50% 120%, rgb(15 90 48 / 0.28), transparent 55%), #030403;
+    radial-gradient(ellipse at 50% 42%, rgb(23 115 59 / 0.42), transparent 62%),
+    radial-gradient(ellipse at 50% 120%, rgb(23 115 59 / 0.35), transparent 55%), #030403;
+}
+
+.bd-poster .birthday-photo-placeholder {
+  background:
+    radial-gradient(circle at 50% 30%, rgb(255 255 255 / 0.08), transparent 60%),
+    linear-gradient(160deg, #17733b, #0b3d1f);
+  color: var(--bd-cream);
 }
 
 /* No bunting on the poster — the headline carries the top of the page. */
@@ -184,8 +192,8 @@
   flex-shrink: 0;
   align-items: stretch;
   border-radius: 0.75rem;
-  background: linear-gradient(110deg, var(--bd-gold), var(--bd-gold-deep));
-  color: var(--bd-ink);
+  background: linear-gradient(110deg, #17733b, #0e5229);
+  color: var(--bd-cream);
   text-align: left;
   -webkit-mask:
     radial-gradient(circle at 0 50%, transparent 14px, #000 15px) left / 51% 100% no-repeat,
@@ -201,11 +209,11 @@
   justify-content: center;
   gap: 0.2rem;
   padding: 0.7rem 1.5rem 0.7rem 2rem;
-  border-right: 2px dashed rgb(10 18 12 / 0.35);
+  border-right: 2px dashed rgb(232 189 79 / 0.45);
 }
 
 .bd1-ticket-stub span {
-  color: rgb(10 18 12 / 0.7);
+  color: var(--bd-gold);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.2em;
