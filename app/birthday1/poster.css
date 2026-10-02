@@ -1,0 +1,230 @@
+/* Style 1 — event poster. Builds on birthday.css tokens and decor. */
+
+.birthday-page.bd-poster {
+  height: auto;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgb(47 162 87 / 0.22), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgb(232 189 79 / 0.18), transparent 55%), #040604;
+}
+
+.bd1 {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+  padding: 5rem 2rem 4rem;
+  text-align: center;
+}
+
+.bd1-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bd1-logo {
+  height: 34px;
+  width: auto;
+}
+
+.bd1-presents {
+  color: var(--bd-gold);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+.bd1-headline {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.85;
+  animation: birthday-rise 800ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bd1-happy {
+  position: relative;
+  z-index: 1;
+  margin-bottom: -0.3em;
+  rotate: -5deg;
+  color: var(--bd-gold);
+  font-family: var(--font-birthday-script), cursive;
+  font-size: clamp(3.25rem, 7.5vw, 6.5rem);
+  font-weight: 400;
+  text-shadow: 0 6px 24px rgb(0 0 0 / 0.7);
+}
+
+.bd1-birthday {
+  color: transparent;
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: clamp(3.5rem, 13vw, 11.5rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  -webkit-text-stroke: 2px var(--bd-gold);
+}
+
+.bd1-names {
+  max-width: 60rem;
+  margin: -0.5rem 0 0;
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: clamp(1.25rem, 2.4vw, 2rem);
+  font-style: italic;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.bd1-lineup {
+  display: flex;
+  max-width: 90rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem 2rem;
+  padding: 0.5rem 0 1.5rem;
+}
+
+.bd1-member {
+  display: flex;
+  width: clamp(8.5rem, calc(78vw / var(--n, 4)), 14rem);
+  margin: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  animation: birthday-pop 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 110ms + 250ms);
+}
+
+/* Staggered heights read as a line-up rather than a grid. */
+.bd1-member:nth-child(even) {
+  margin-top: 2.5rem;
+}
+
+.bd1-portrait {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4.4;
+  overflow: hidden;
+  border-radius: 999px;
+  outline: 2px solid var(--bd-gold);
+  outline-offset: 6px;
+  background: var(--bd-forest);
+  box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.95);
+}
+
+.bd1-member--today .bd1-portrait {
+  outline-width: 3px;
+  box-shadow:
+    0 30px 60px -30px rgb(0 0 0 / 0.95),
+    0 0 50px 6px rgb(232 189 79 / 0.4);
+}
+
+.bd1-member figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.bd1-member-name {
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: clamp(1.05rem, 1.6vw, 1.4rem);
+  font-weight: 700;
+}
+
+.bd1-member-date {
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  background: var(--bd-gold);
+  color: var(--bd-ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bd1-member--today .bd1-member-date {
+  background: var(--bd-green);
+  color: white;
+}
+
+/* Gold ticket stub with punched notches on both ends. */
+.bd1-ticket {
+  display: flex;
+  max-width: 44rem;
+  align-items: stretch;
+  border-radius: 0.75rem;
+  background: linear-gradient(110deg, var(--bd-gold), var(--bd-gold-deep));
+  color: var(--bd-ink);
+  text-align: left;
+  -webkit-mask:
+    radial-gradient(circle at 0 50%, transparent 14px, #000 15px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 14px, #000 15px) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle at 0 50%, transparent 14px, #000 15px) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 14px, #000 15px) right / 51% 100% no-repeat;
+}
+
+.bd1-ticket-stub {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 1rem 1.5rem 1rem 2rem;
+  border-right: 2px dashed rgb(10 18 12 / 0.35);
+}
+
+.bd1-ticket-stub span {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.bd1-ticket-stub strong {
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: 1.15rem;
+  white-space: nowrap;
+}
+
+.bd1-ticket-wish {
+  margin: 0;
+  padding: 1rem 2rem 1rem 1.5rem;
+  align-self: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .bd1 {
+    padding: 4.5rem 1rem 5rem;
+  }
+
+  .bd1-birthday {
+    -webkit-text-stroke-width: 1.5px;
+  }
+
+  .bd1-member {
+    width: calc(50% - 1rem);
+  }
+
+  .bd1-ticket {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .bd1-ticket-stub {
+    border-right: 0;
+    border-bottom: 2px dashed rgb(10 18 12 / 0.35);
+    padding: 1rem 2rem;
+  }
+}

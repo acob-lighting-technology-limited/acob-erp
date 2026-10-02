@@ -1,0 +1,341 @@
+/* Style 2 — magazine cover. Builds on birthday.css tokens and decor. */
+
+.birthday-page.bd-magazine {
+  background: #050705;
+}
+
+/* Bunting sits over the side column only; the cover photo stays clean. */
+.bd-magazine .birthday-decor__bunting {
+  left: auto;
+  width: 46%;
+}
+
+.bd2 {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  height: 100vh;
+  grid-template-columns: minmax(0, 1.2fr) minmax(22rem, 1fr);
+}
+
+/* ── Cover ── */
+
+.bd2-cover {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-right: 1px solid rgb(232 189 79 / 0.35);
+  background: var(--bd-forest);
+}
+
+.bd2-cover-inner {
+  position: absolute;
+  inset: 0;
+  animation: bd2-fade 600ms ease both;
+}
+
+.bd2-cover-photo.birthday-photo {
+  object-position: center 25%;
+}
+
+.bd2-cover-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(5 7 5 / 0.35) 0%, transparent 25%, transparent 50%, rgb(5 7 5 / 0.92) 100%),
+    linear-gradient(90deg, transparent 70%, rgb(5 7 5 / 0.5) 100%);
+}
+
+.bd2-cover-date {
+  position: absolute;
+  top: 2rem;
+  left: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 2px solid var(--bd-gold);
+  border-radius: 999px;
+  padding: 1rem 0.9rem 0.9rem;
+  background: rgb(5 7 5 / 0.55);
+  backdrop-filter: blur(10px);
+  color: var(--bd-gold);
+  line-height: 1;
+}
+
+.bd2-cover-day {
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+
+.bd2-cover-month {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.bd2-cover-caption {
+  position: absolute;
+  right: 2rem;
+  bottom: 2.25rem;
+  left: 2rem;
+}
+
+.bd2-cover-kicker {
+  display: inline-block;
+  margin: 0 0 0.75rem;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  background: var(--bd-gold);
+  color: var(--bd-ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.bd2-cover-name {
+  margin: 0;
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: clamp(3.5rem, 9vw, 8.5rem);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  text-shadow: 0 8px 40px rgb(0 0 0 / 0.6);
+}
+
+.bd2-cover-dept {
+  margin: 0.75rem 0 0;
+  color: var(--bd-gold);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/* ── Side column ── */
+
+.bd2-side {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 5rem 2.5rem 2rem;
+}
+
+.bd2-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 2px solid var(--bd-gold);
+  padding-bottom: 0.75rem;
+}
+
+.bd2-logo {
+  height: 30px;
+  width: auto;
+}
+
+.bd2-masthead span {
+  color: var(--bd-gold);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: 1.1rem;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.bd2-issue {
+  margin: -0.4rem 0 0;
+  color: var(--bd-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.bd2-happy {
+  margin: 0.5rem 0 0;
+  color: var(--bd-gold);
+  font-family: var(--font-birthday-script), cursive;
+  font-size: clamp(3rem, 4.5vw, 4.25rem);
+  line-height: 1;
+}
+
+.bd2-lede {
+  margin: 0;
+  color: var(--bd-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.bd2-contents {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bd2-contents-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  border-bottom: 1px solid var(--bd-glass-border);
+  padding-bottom: 0.4rem;
+  color: var(--bd-cream);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.bd2-contents-title span {
+  color: var(--bd-gold);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: 1.5rem;
+  letter-spacing: 0;
+}
+
+.bd2-list {
+  min-height: 0;
+  margin: 0;
+  overflow-y: auto;
+  padding: 0;
+  list-style: none;
+}
+
+.bd2-entry {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  border: 0;
+  border-bottom: 1px solid var(--bd-glass-border);
+  padding: 0.6rem 0.25rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+
+.bd2-entry:hover {
+  background: rgb(255 255 255 / 0.04);
+}
+
+.bd2-entry:focus-visible {
+  outline: 2px solid var(--bd-gold);
+  outline-offset: 2px;
+}
+
+.bd2-entry-thumb {
+  position: relative;
+  width: 2.75rem;
+  height: 2.75rem;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: var(--bd-forest);
+}
+
+.bd2-entry-thumb .birthday-photo-placeholder {
+  font-size: 1.1rem;
+}
+
+.bd2-entry--active .bd2-entry-thumb {
+  border-color: var(--bd-gold);
+}
+
+.bd2-entry-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.bd2-entry-name {
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.bd2-entry--active .bd2-entry-name {
+  color: var(--bd-gold);
+}
+
+.bd2-entry-dept {
+  overflow: hidden;
+  color: var(--bd-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bd2-entry-date {
+  color: var(--bd-gold);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bd2-signoff {
+  margin: 0;
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: 1rem;
+  font-style: italic;
+}
+
+@keyframes bd2-fade {
+  from {
+    opacity: 0;
+    scale: 1.03;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@media (max-width: 1000px) {
+  .birthday-page.bd-magazine {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .bd-magazine .birthday-decor__bunting {
+    width: 100%;
+  }
+
+  .bd2 {
+    height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .bd2-cover {
+    height: 72vh;
+    border-right: 0;
+    border-bottom: 1px solid rgb(232 189 79 / 0.35);
+  }
+
+  .bd2-side {
+    padding: 2rem 1.25rem 5rem;
+  }
+
+  .bd2-list {
+    overflow: visible;
+  }
+}
