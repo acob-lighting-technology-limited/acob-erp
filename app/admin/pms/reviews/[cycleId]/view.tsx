@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { pickCanonicalReview } from "@/lib/pms/reviews"
 import { useQueryClient } from "@tanstack/react-query"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Download, FileText, Plus, Users, CheckCircle2, Clock, BarChart3 } from "lucide-react"
@@ -70,22 +71,6 @@ type CycleSummaryRow = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function reviewStatusPriority(status: string | null | undefined) {
-  const n = String(status || "").toLowerCase()
-  if (n === "completed") return 3
-  if (n === "submitted") return 2
-  if (n === "draft") return 1
-  return 0
-}
-
-function pickCanonicalReview(rows: ReviewRow[]) {
-  return [...rows].sort((a, b) => {
-    const diff = reviewStatusPriority(b.status) - reviewStatusPriority(a.status)
-    if (diff !== 0) return diff
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })[0]
-}
 
 function fmt(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2).replace(/\.00$/, "") : "-"

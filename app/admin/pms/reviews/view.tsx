@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { pickCanonicalReview } from "@/lib/pms/reviews"
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { Download, FileText, Plus, Users, BarChart3, CheckCircle2, RefreshCw, Clock, TrendingUp } from "lucide-react"
@@ -86,22 +87,6 @@ function isSubmittedReview(r: ReviewRow) {
 
 function isCompletedReview(r: ReviewRow) {
   return String(r.status ?? "").toLowerCase() === "completed"
-}
-
-function reviewStatusPriority(status: string | null | undefined) {
-  const s = String(status ?? "").toLowerCase()
-  if (s === "completed") return 3
-  if (s === "submitted") return 2
-  if (s === "draft") return 1
-  return 0
-}
-
-function pickCanonicalReview(rows: ReviewRow[]): ReviewRow {
-  return [...rows].sort((a, b) => {
-    const diff = reviewStatusPriority(b.status) - reviewStatusPriority(a.status)
-    if (diff !== 0) return diff
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })[0]
 }
 
 function employeeName(r: ReviewRow) {

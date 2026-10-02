@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { pickCanonicalReview, reviewStatusPriority } from "@/lib/pms/reviews"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
@@ -97,14 +98,6 @@ function coerceOptionalNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function reviewStatusPriority(status: string | null | undefined) {
-  const normalized = String(status || "").toLowerCase()
-  if (normalized === "completed") return 3
-  if (normalized === "submitted") return 2
-  if (normalized === "draft") return 1
-  return 0
-}
-
 /**
  * Who may write or change the status of someone's review: a global admin, or
  * the lead of the employee's department. Never the employee themselves — a
@@ -144,14 +137,6 @@ async function canReviewTarget(
         (targetProfile.department === profile?.department || managedDepartments.includes(targetProfile.department))
     )
   )
-}
-
-function pickCanonicalReview(reviews: ExistingReviewRow[]) {
-  return [...reviews].sort((left, right) => {
-    const statusDiff = reviewStatusPriority(right.status) - reviewStatusPriority(left.status)
-    if (statusDiff !== 0) return statusDiff
-    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-  })[0]
 }
 
 export async function GET(request: NextRequest) {
