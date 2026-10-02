@@ -58,6 +58,8 @@ interface Props {
   backHref: string
   backLabel: string
   readOnly?: boolean
+  /** Server-resolved: may change weeks past their lock deadline (canOverrideReportsWeekLock). */
+  canOverrideWeekLock?: boolean
 }
 
 function compareWeekYear(aWeek: number, aYear: number, bWeek: number, bYear: number): number {
@@ -79,6 +81,7 @@ export function MeetingDocumentTypeTable({
   backHref,
   backLabel,
   readOnly = false,
+  canOverrideWeekLock = false,
 }: Props) {
   const supabase = createClient()
   const officeWeek = getCurrentOfficeWeek()
@@ -161,7 +164,9 @@ export function MeetingDocumentTypeTable({
     [officeWeek.week, officeWeek.year, rows]
   )
 
-  const isSelectedWeekLocked = Boolean(selectedWeekLockState)
+  // The lock RPC only exempts developer/super_admin; route-scoped reports admins
+  // get the same override (see canOverrideReportsWeekLock).
+  const isSelectedWeekLocked = Boolean(selectedWeekLockState) && !canOverrideWeekLock
   const selectedWeekExistingRow = useMemo(
     () => rows.find((row) => row.meeting_week === weekNumber && row.meeting_year === yearNumber) || null,
     [rows, weekNumber, yearNumber]

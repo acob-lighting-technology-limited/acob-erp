@@ -1,5 +1,5 @@
 import { createServerClient } from "@supabase/ssr"
-import { hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
+import { canOverrideReportsWeekLock, hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
@@ -289,6 +289,7 @@ export async function GET(request: Request) {
     if (error) return serverError(log, error)
 
     const rows = data || []
+    const canOverrideLock = scope ? canOverrideReportsWeekLock(scope) : false
     const meetingDateByWeekYear = new Map<string, string>()
     await Promise.all(
       Array.from(new Set(rows.map((row) => `${row.meeting_year}-${row.meeting_week}`))).map(async (key) => {
@@ -306,7 +307,7 @@ export async function GET(request: Request) {
         return {
           ...row,
           meeting_date: meetingDateByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`) || null,
-          is_locked: !Boolean(canMutate),
+          is_locked: !canOverrideLock && !Boolean(canMutate),
           signed_url: `/api/reports/meeting-week-documents?id=${row.id}&mode=download`,
         }
       })
@@ -371,13 +372,15 @@ export async function POST(request: Request) {
       : { data: null }
     const departmentId: string | null = deptLookup?.id ?? null
 
-    await assertWeekAllowsDocumentCreate(supabase, {
-      meetingWeek,
-      meetingYear,
-      documentType,
-      department,
-      departmentId,
-    })
+    if (!canOverrideReportsWeekLock(scope)) {
+      await assertWeekAllowsDocumentCreate(supabase, {
+        meetingWeek,
+        meetingYear,
+        documentType,
+        department,
+        departmentId,
+      })
+    }
 
     if (documentType === "knowledge_sharing_session") {
       if (!department) {
@@ -637,7 +640,9 @@ export async function PATCH(request: Request) {
 
     if (fetchError || !doc) return NextResponse.json({ error: "Document not found" }, { status: 404 })
 
-    await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
+    if (!canOverrideReportsWeekLock(scope)) {
+      await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
+    }
 
     if (makeCurrent) {
       const clearQuery = supabase
@@ -733,7 +738,9 @@ export async function DELETE(request: Request) {
 
     if (fetchError || !doc) return NextResponse.json({ error: "Document not found" }, { status: 404 })
 
-    await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
+    if (!canOverrideReportsWeekLock(scope)) {
+      await assertWeekIsMutable(supabase, doc.meeting_week, doc.meeting_year)
+    }
 
     if (doc.file_path) {
       if (isOneDriveReportDocumentPath(doc.file_path)) {
