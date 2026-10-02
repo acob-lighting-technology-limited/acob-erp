@@ -1,4 +1,5 @@
 import { sendNotificationEmailsIndividuallyWithRetry } from "@/lib/notifications/email-gateway"
+import { escapeHtml } from "@/lib/email-templates/utils"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { createClient } from "@/lib/supabase/server"
 import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
@@ -16,15 +17,6 @@ export type CorrespondenceDecision = "approved" | "rejected" | "returned_for_cor
 
 export interface CorrespondenceDecisionEmailPayload extends CorrespondenceApprovalEmailPayload {
   decision: CorrespondenceDecision
-}
-
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
 }
 
 function getTypeLabel(letterType?: string | null) {

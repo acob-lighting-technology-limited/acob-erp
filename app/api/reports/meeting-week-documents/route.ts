@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr"
+import { hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
+import { resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { buildMeetingDocumentFileName, resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
@@ -67,10 +68,6 @@ function resolveExtension(file: File): string {
 function baseNameWithoutExtension(fileName: string): string {
   const dotIdx = fileName.lastIndexOf(".")
   return dotIdx > 0 ? fileName.slice(0, dotIdx) : fileName
-}
-
-function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
-  return getDepartmentScope(scope, "general") === null
 }
 
 /**

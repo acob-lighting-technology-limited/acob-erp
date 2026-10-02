@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
+import { hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
 import { createClient } from "@/lib/supabase/server"
-import { resolveAdminScope, getDepartmentScope } from "@/lib/admin/rbac"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 import { listOrganizerTeamsMeetings, isValidGraphEmail } from "@/lib/graph/meeting-calendar"
 import { isGraphConfigured } from "@/lib/graph/client"
 import { logger } from "@/lib/logger"
@@ -8,10 +9,6 @@ import { logger } from "@/lib/logger"
 const log = logger("api-meeting-artifact-calendar")
 
 type AdminScope = NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>
-
-function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
-  return getDepartmentScope(scope, "general") === null
-}
 
 /**
  * Powers the meeting-picker dropdown: returns the organizer's distinct Teams
@@ -39,7 +36,9 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const organizer = String(searchParams.get("organizer") || "").trim().toLowerCase()
+    const organizer = String(searchParams.get("organizer") || "")
+      .trim()
+      .toLowerCase()
     if (!isValidGraphEmail(organizer)) {
       return NextResponse.json({ error: "A valid ?organizer=email is required" }, { status: 400 })
     }

@@ -1,8 +1,9 @@
 import { createServerClient } from "@supabase/ssr"
+import { hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { resolveAdminScope, getDepartmentScope, normalizeDepartmentName } from "@/lib/admin/rbac"
+import { resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { resolveEffectiveMeetingDateIso } from "@/lib/reports/meeting-date"
 import { logger } from "@/lib/logger"
@@ -60,10 +61,6 @@ async function createClient() {
 
 function normalizeDepartment(value: string): string {
   return normalizeDepartmentName(String(value || "").trim())
-}
-
-function hasGlobalReportsWriteAccess(scope: NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>): boolean {
-  return getDepartmentScope(scope, "general") === null
 }
 
 function resolvePresenterInput(input: { presenterId?: string | null; presenterName?: string | null }): {
