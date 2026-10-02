@@ -2,10 +2,14 @@
    On desktop the whole poster fits one screen (100vh): type and portraits size
    off the viewport height, and portraits shrink with the celebrant count. */
 
+/* Palette discipline: gold is the only bright colour, on black. Green stays as a
+   deep, quiet glow; the bright green used elsewhere is swapped out of the decor. */
 .birthday-page.bd-poster {
+  --bd-green-bright: var(--bd-gold-deep);
+
   background:
-    radial-gradient(ellipse at 50% 35%, rgb(47 162 87 / 0.13), transparent 60%),
-    radial-gradient(ellipse at 50% 120%, rgb(47 162 87 / 0.12), transparent 55%), #030403;
+    radial-gradient(ellipse at 50% 40%, rgb(15 90 48 / 0.32), transparent 62%),
+    radial-gradient(ellipse at 50% 120%, rgb(15 90 48 / 0.28), transparent 55%), #030403;
 }
 
 /* No bunting on the poster — the headline carries the top of the page. */
@@ -58,7 +62,7 @@
   z-index: 1;
   margin-bottom: -0.2em;
   rotate: -5deg;
-  color: #ffffff;
+  color: var(--bd-gold);
   font-family: var(--font-birthday-script), cursive;
   font-size: clamp(2.25rem, min(6vw, 7.5vh), 5.5rem);
   font-weight: 400;
@@ -130,7 +134,7 @@
   aspect-ratio: 3 / 4.4;
   overflow: hidden;
   border-radius: 999px;
-  outline: 1.5px solid rgb(232 189 79 / 0.75);
+  outline: 2px solid var(--bd-gold);
   outline-offset: 6px;
   background: var(--bd-forest);
   box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.95);
@@ -160,8 +164,8 @@
 .bd1-member-date {
   border-radius: 999px;
   padding: 0.2rem 0.75rem;
-  background: var(--bd-green);
-  color: #ffffff;
+  background: var(--bd-gold);
+  color: var(--bd-ink);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -169,7 +173,7 @@
 }
 
 .bd1-member--today .bd1-member-date {
-  background: var(--bd-gold);
+  background: var(--bd-cream);
   color: var(--bd-ink);
 }
 
@@ -180,8 +184,8 @@
   flex-shrink: 0;
   align-items: stretch;
   border-radius: 0.75rem;
-  background: linear-gradient(110deg, var(--bd-green), #1a6b37);
-  color: #ffffff;
+  background: linear-gradient(110deg, var(--bd-gold), var(--bd-gold-deep));
+  color: var(--bd-ink);
   text-align: left;
   -webkit-mask:
     radial-gradient(circle at 0 50%, transparent 14px, #000 15px) left / 51% 100% no-repeat,
@@ -197,11 +201,11 @@
   justify-content: center;
   gap: 0.2rem;
   padding: 0.7rem 1.5rem 0.7rem 2rem;
-  border-right: 2px dashed rgb(255 255 255 / 0.35);
+  border-right: 2px dashed rgb(10 18 12 / 0.35);
 }
 
 .bd1-ticket-stub span {
-  color: var(--bd-gold);
+  color: rgb(10 18 12 / 0.7);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.2em;
