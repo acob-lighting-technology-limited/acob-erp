@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react"
 
-const CONFETTI_COLORS = ["var(--bd-gold)", "var(--bd-green)", "var(--bd-cream)", "var(--bd-gold-deep)"]
+const CONFETTI_COLORS = ["var(--bd-green)", "var(--bd-green-bright)", "var(--bd-cream)", "var(--bd-gold)"]
 
 // A light sprinkle, not a storm. Deterministic scatter (no Math.random) so server and
 // client render identical markup.
@@ -16,7 +16,7 @@ const CONFETTI = Array.from({ length: 12 }, (_, i) => ({
 
 const BALLOONS = [
   { left: "3%", color: "var(--bd-green)", delay: "0s", scale: 1 },
-  { left: "9%", color: "var(--bd-gold)", delay: "-3s", scale: 0.8 },
+  { left: "9%", color: "var(--bd-green-bright)", delay: "-3s", scale: 0.8 },
   { left: "88%", color: "var(--bd-green)", delay: "-1.5s", scale: 0.9 },
   { left: "94%", color: "var(--bd-gold)", delay: "-4.5s", scale: 0.75 },
 ]
