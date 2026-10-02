@@ -5,6 +5,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { NOTIFICATION_KEYS, isNotificationKey } from "@/lib/notifications/delivery-policy"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/settings/mail")
 
 type PolicyUpdatePayload = {
   notification_key: string
@@ -58,7 +62,7 @@ export async function GET() {
       .in("notification_key", [...NOTIFICATION_KEYS])
       .order("notification_key")
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return serverError(log, error)
 
     return NextResponse.json({ policies: data || [] })
   } catch (error) {
@@ -123,7 +127,7 @@ export async function PUT(request: NextRequest) {
       onConflict: "notification_key",
     })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase,

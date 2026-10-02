@@ -31,7 +31,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .eq("id", id)
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+  if (error) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   const row = data as Record<string, unknown> & { supplier?: SupplierJoin; items?: POItemRow[] }
   const order = {

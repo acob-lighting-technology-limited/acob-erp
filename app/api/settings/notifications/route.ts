@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server"
 import { NOTIFICATION_KEYS, isNotificationKey } from "@/lib/notifications/delivery-policy"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/settings/notifications")
 
 type ModulePreferencePayload = {
   notification_key: string
@@ -173,7 +177,7 @@ export async function PUT(request: NextRequest) {
       if (globalPrefs.quiet_hours_end !== undefined) payload.quiet_hours_end = globalPrefs.quiet_hours_end
 
       const { error } = await supabase.from("notification_preferences").upsert(payload, { onConflict: "user_id" })
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+      if (error) return serverError(log, error)
     }
 
     if (modules.length > 0) {
@@ -219,7 +223,7 @@ export async function PUT(request: NextRequest) {
           .from("notification_user_delivery_preferences")
           .upsert(payload, { onConflict: "user_id,notification_key" })
 
-        if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+        if (error) return serverError(log, error)
       }
     }
 

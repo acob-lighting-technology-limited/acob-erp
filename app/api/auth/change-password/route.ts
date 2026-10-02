@@ -75,6 +75,8 @@ export async function POST(req: Request) {
 
     if (updateError) {
       log.error({ err: updateError.message }, "Failed to update password in Supabase Auth")
+      // Supabase Auth messages are written for end users (e.g. "Password should be
+      // at least 8 characters"), so this one is safe — and useful — to show.
       return NextResponse.json({ error: updateError.message }, { status: 400 })
     }
 

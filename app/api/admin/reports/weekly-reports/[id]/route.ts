@@ -30,7 +30,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     .eq("id", id)
     .single()
   if (fetchError || !report) {
-    return NextResponse.json({ error: fetchError?.message ?? "Report not found" }, { status: 404 })
+    return NextResponse.json({ error: "Report not found" }, { status: 404 })
   }
 
   const normalizedRole = (scope.role || "").toLowerCase()

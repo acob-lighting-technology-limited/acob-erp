@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
     if (error) {
       log.error({ err: error.message }, "Failed to update project")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     return NextResponse.json({ data })

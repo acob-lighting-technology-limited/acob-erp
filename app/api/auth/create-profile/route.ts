@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("auth-create-profile")
 
@@ -46,7 +47,7 @@ export async function POST(_request: Request) {
 
     if (insertError) {
       log.error({ err: String(insertError) }, "[v0] Profile creation error:")
-      return NextResponse.json({ error: insertError.message }, { status: 400 })
+      return serverError(log, insertError)
     }
 
     return NextResponse.json({ message: "Profile created successfully" }, { status: 201 })

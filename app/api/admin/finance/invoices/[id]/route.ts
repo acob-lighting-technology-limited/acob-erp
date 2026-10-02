@@ -51,7 +51,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     db.from("invoices").select("*").eq("id", id).single(),
     db.from("invoice_items").select("*").eq("invoice_id", id).order("created_at"),
   ])
-  if (invoiceError) return NextResponse.json({ error: invoiceError.message }, { status: 404 })
+  if (invoiceError) return NextResponse.json({ error: "Not found" }, { status: 404 })
   if (itemsError) return serverError(log, itemsError)
 
   return NextResponse.json({ data: { invoice, items: items ?? [] } })

@@ -6,6 +6,10 @@ import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/payments/id")
 
 type PaymentsClient = Awaited<ReturnType<typeof createClient>>
 
@@ -74,7 +78,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 })
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
     if (scope) {
@@ -208,7 +212,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error)
     }
 
     await writeAuditLog(
@@ -291,7 +295,7 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error)
     }
 
     await writeAuditLog(

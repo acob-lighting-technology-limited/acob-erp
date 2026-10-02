@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       log.error({ err: error.message }, "Failed to create project")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     return NextResponse.json({ data: project })

@@ -17,7 +17,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const db = getServiceRoleClientOrFallback(supabase)
   const { data, error } = await db.from("bills").select("*, items:bill_items(*)").eq("id", id).single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+  if (error) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json({ data })
 }
 

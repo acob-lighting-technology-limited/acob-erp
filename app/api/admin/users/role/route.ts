@@ -126,7 +126,7 @@ export async function PATCH(request: Request) {
         .eq("role", "super_admin")
 
       if (superAdminCountError) {
-        return NextResponse.json({ error: superAdminCountError.message }, { status: 400 })
+        return serverError(log, superAdminCountError, "The request could not be completed")
       }
 
       if ((count || 0) <= 1) {
