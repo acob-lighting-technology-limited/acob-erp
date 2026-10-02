@@ -286,6 +286,7 @@ export function PurchaseOrderFormDialog({ open, onOpenChange, queryClient }: Pur
                       </div>
                       <div className="sm:col-span-1">
                         <Button
+                          aria-label="Delete"
                           type="button"
                           variant="ghost"
                           size="icon"

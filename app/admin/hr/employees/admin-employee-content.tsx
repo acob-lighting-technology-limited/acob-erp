@@ -1038,7 +1038,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8">
+              <Button aria-label="More actions" variant="outline" size="icon" className="h-8 w-8">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

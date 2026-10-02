@@ -445,6 +445,7 @@ export function EmployeeViewModal({
                           </span>
                           {viewEmployeeProfile.company_email && (
                             <Button
+                              aria-label="Confirm"
                               type="button"
                               variant="ghost"
                               size="icon"

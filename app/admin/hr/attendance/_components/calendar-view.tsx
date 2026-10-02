@@ -273,6 +273,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
         </div>
         <div className="flex items-center gap-1">
           <Button
+            aria-label="Previous"
             variant="outline"
             size="icon"
             className="h-8 w-8"
@@ -282,6 +283,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
           </Button>
           <span className="min-w-36 text-center text-sm font-medium">{formatMonthLabel(calendarMonth)}</span>
           <Button
+            aria-label="Next"
             variant="outline"
             size="icon"
             className="h-8 w-8"

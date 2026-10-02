@@ -176,6 +176,7 @@ export function EmployeeCalendarView() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
           <Button
+            aria-label="Previous"
             variant="outline"
             size="icon"
             className="h-8 w-8"
@@ -185,6 +186,7 @@ export function EmployeeCalendarView() {
           </Button>
           <span className="min-w-32 text-center text-sm font-medium">{formatMonthLabel(calendarMonth)}</span>
           <Button
+            aria-label="Next"
             variant="outline"
             size="icon"
             className="h-8 w-8"

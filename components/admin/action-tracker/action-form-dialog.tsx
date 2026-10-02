@@ -307,6 +307,7 @@ export function ActionFormDialog({
                           {idx + 1}. {item}
                         </span>
                         <Button
+                          aria-label="Close"
                           size="icon"
                           variant="ghost"
                           className="text-destructive h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"

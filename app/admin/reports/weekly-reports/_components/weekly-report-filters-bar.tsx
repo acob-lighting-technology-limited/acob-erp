@@ -106,6 +106,7 @@ export function WeeklyReportFiltersBar({
             </Select>
           </div>
           <Button
+            aria-label="Refresh"
             variant="outline"
             size="icon"
             onClick={() => refetchReports()}

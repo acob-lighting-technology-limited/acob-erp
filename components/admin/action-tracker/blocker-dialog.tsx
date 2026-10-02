@@ -245,6 +245,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground text-xs">{formatSize(file.size)}</span>
                       <Button
+                        aria-label="Delete"
                         size="icon"
                         variant="ghost"
                         className="text-destructive h-6 w-6"
@@ -295,6 +296,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                       </div>
                       {canEdit ? (
                         <Button
+                          aria-label="Delete"
                           size="icon"
                           variant="ghost"
                           className="text-destructive h-6 w-6 shrink-0"

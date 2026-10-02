@@ -262,6 +262,7 @@ export function LeaveDetailDialog({
                           </span>
                           {employeeEmail && (
                             <Button
+                              aria-label="Confirm"
                               type="button"
                               variant="ghost"
                               size="icon"

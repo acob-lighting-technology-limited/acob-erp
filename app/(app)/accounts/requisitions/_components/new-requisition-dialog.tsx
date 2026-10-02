@@ -414,6 +414,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
                   />
                   {beneficiaries.length > 1 && (
                     <Button
+                      aria-label="Delete"
                       type="button"
                       variant="ghost"
                       size="icon"
@@ -467,6 +468,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
                       <span className="truncate font-medium">{att.file_name}</span>
                     </div>
                     <Button
+                      aria-label="Delete"
                       type="button"
                       variant="ghost"
                       size="icon"

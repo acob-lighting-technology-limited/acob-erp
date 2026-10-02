@@ -196,6 +196,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
               />
               {query && (
                 <Button
+                  aria-label="Close"
                   variant="ghost"
                   size="icon"
                   className="absolute top-1/2 right-1 h-7 w-7 -translate-y-1/2"

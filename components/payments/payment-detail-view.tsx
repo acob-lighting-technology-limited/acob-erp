@@ -457,7 +457,7 @@ export function PaymentDetailView({ paymentId, basePath, scope }: PaymentDetailV
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon">
+                      <Button aria-label="More actions" variant="outline" size="icon">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

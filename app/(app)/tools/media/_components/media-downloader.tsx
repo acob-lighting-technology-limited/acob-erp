@@ -528,6 +528,7 @@ export function MediaDownloader() {
                       </p>
                     </div>
                     <Button
+                      aria-label="Download"
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 shrink-0"
