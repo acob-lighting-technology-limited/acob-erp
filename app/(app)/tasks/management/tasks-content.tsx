@@ -246,12 +246,12 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     if (!selectedTask || !content.trim()) return
     setIsPostingComment(true)
     try {
-      await supabase.from("task_updates").insert({
-        task_id: selectedTask.id,
-        user_id: userId,
-        update_type: "comment",
-        content: content.trim(),
+      const res = await apiFetch(`/api/tasks/${selectedTask.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: content.trim() }),
       })
+      if (!res.ok) throw new Error("Failed to add comment")
       toast.success("Comment added")
       await loadTaskUpdates(selectedTask.id)
       await loadTasks()

@@ -93,7 +93,8 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       .single()
 
     if (error || !comment) {
-      return apiError(error?.message || "Failed to create comment", ApiErrorCode.DATABASE_ERROR, 500)
+      log.error({ err: error?.message }, "Failed to create comment")
+      return apiError("Failed to add comment", ApiErrorCode.DATABASE_ERROR, 500)
     }
 
     await writeAuditLog(

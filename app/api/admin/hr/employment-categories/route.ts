@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -39,8 +40,14 @@ async function ensureAdmin(request: NextRequest) {
 
 /** GET /api/admin/hr/employment-categories — list all categories */
 export async function GET(request: NextRequest) {
-  const auth = await ensureAdmin(request)
-  if ("error" in auth) return auth.error
+  // Reading the category list is needed by leads too (they approve applicants in
+  // their department); create/update stay admin-only below.
+  const scopeResult = await requireApiAdminScope()
+  if (!scopeResult.ok) return scopeResult.response
+  if (!scopeResult.scope.isAdminLike && !scopeResult.scope.isDepartmentLead) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  const auth = { supabase: scopeResult.supabase }
 
   const includeInactive = request.nextUrl.searchParams.get("include_inactive") === "true"
   const dataClient = getServiceRoleClientOrFallback(auth.supabase)

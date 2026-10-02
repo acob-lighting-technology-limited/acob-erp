@@ -66,18 +66,5 @@ export default defineConfig([
       ],
     },
   },
-  // Temporary allowlist — pre-existing violators pending migration to scoped API
-  // routes (Phase 3b). Remove each entry as its module is migrated; delete this
-  // block once empty. DO NOT add new files here.
-  {
-    files: [
-      "app/admin/employees/admin-employee-content.tsx",
-      "app/admin/hr/employees/admin-employee-content.tsx",
-      "app/admin/hr/employees/pending-applications-modal.tsx",
-    ],
-    rules: {
-      "no-restricted-imports": "off",
-    },
-  },
   globalIgnores(["scripts/**"]),
 ])

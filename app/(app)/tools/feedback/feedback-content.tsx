@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { deleteOwnFeedback } from "@/lib/feedback/client"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { Edit2, FileText, MessageSquare, Plus, Star, Trash2 } from "lucide-react"
@@ -26,7 +26,6 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import type { Feedback } from "./page"
 import type { SystemSatisfactionSurvey } from "@/types/survey"
-import { writeAuditLogClient } from "@/lib/audit/client"
 import { logger } from "@/lib/logger"
 
 const log = logger("feedback-feedback-content")
@@ -88,39 +87,8 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
   )
 
   const handleDelete = async (id: string) => {
-    const supabase = createClient()
-
     try {
-      const feedbackToDelete = userFeedback.find((item) => item.id === id)
-      const { error } = await supabase.from("feedback").delete().eq("id", id)
-      if (error) throw error
-
-      if (feedbackToDelete) {
-        try {
-          await writeAuditLogClient(
-            supabase,
-            {
-              action: "delete",
-              entityType: "feedback",
-              entityId: id,
-              oldValues: {
-                feedback_type: feedbackToDelete.feedback_type,
-                title: feedbackToDelete.title,
-                description: feedbackToDelete.description,
-                status: feedbackToDelete.status,
-              },
-              context: {
-                source: "ui",
-                route: "/tools/feedback",
-              },
-            },
-            { failOpen: true }
-          )
-        } catch (auditError) {
-          log.error("Failed to log audit for feedback deletion:", auditError)
-        }
-      }
-
+      await deleteOwnFeedback(id)
       setUserFeedback((current) => current.filter((item) => item.id !== id))
       toast.success("Feedback deleted successfully!")
     } catch (error: unknown) {

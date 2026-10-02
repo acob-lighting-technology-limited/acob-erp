@@ -9,6 +9,7 @@ export const QUERY_KEYS = {
   leaveTypes: () => ["leave-types"],
   leaveHolidays: () => ["leave-holidays"],
   leavePolicies: () => ["leave-policies"],
+  contractCategories: () => ["contract-categories"],
 
   // Attendance
   attendance: (userId?: string) => ["attendance", userId],

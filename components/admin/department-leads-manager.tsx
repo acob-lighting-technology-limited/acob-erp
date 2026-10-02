@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { createClient } from "@/lib/supabase/client"
+import { apiFetch } from "@/lib/api-client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,6 @@ import { Label } from "@/components/ui/label"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { applyAssignableStatusFilter } from "@/lib/workforce/assignment-policy"
 import type { PostgrestError } from "@supabase/supabase-js"
 
 interface Department {
@@ -98,31 +97,20 @@ const filters: DataTableFilter<Department>[] = [
   },
 ]
 
+interface DepartmentLeadsPayload {
+  departments: Department[]
+  candidates: Profile[]
+}
+
+async function fetchDepartmentLeads(): Promise<DepartmentLeadsPayload> {
+  const res = await apiFetch("/api/admin/hr/department-leads", { cache: "no-store" })
+  const body = (await res.json().catch(() => ({}))) as { data?: DepartmentLeadsPayload; error?: string }
+  if (!res.ok || !body.data) throw new Error(body.error || "Failed to load department leads")
+  return body.data
+}
+
 async function fetchDepartmentsWithLeads(): Promise<Department[]> {
-  const supabase = createClient()
-  const { data: depts, error: deptsError } = await supabase
-    .from("departments")
-    .select("*")
-    .eq("is_active", true)
-    .order("name")
-  if (deptsError) throw deptsError
-
-  const { data: leads, error: leadsError } = await supabase
-    .from("profiles")
-    .select("id, first_name, last_name, company_email, department, role")
-    .eq("is_department_lead", true)
-  if (leadsError) throw leadsError
-
-  return depts.map((d) => {
-    const lead = leads.find((l) => l.department === d.name)
-    return {
-      id: d.id,
-      name: d.name,
-      lead_id: lead ? lead.id : null,
-      lead_name: lead ? `${lead.first_name || ""} ${lead.last_name || ""}`.trim() : null,
-      lead_email: lead ? lead.company_email : null,
-    }
-  })
+  return (await fetchDepartmentLeads()).departments
 }
 
 export function DepartmentLeadsManager() {
@@ -145,12 +133,15 @@ export function DepartmentLeadsManager() {
 
   const { mutate: assignLead, isPending: isSubmitting } = useMutation({
     mutationFn: async ({ deptId, userId }: { deptId: string; userId: string }) => {
-      const supabase = createClient()
-      const { error } = await supabase.rpc("assign_department_lead", {
-        p_department_id: deptId,
-        p_new_lead_id: userId,
+      const res = await apiFetch("/api/admin/hr/department-leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ departmentId: deptId, userId }),
       })
-      if (error) throw error
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || "Failed to assign lead")
+      }
     },
     onSuccess: () => {
       const user = users.find((u) => u.id === selectedUserId)
@@ -169,20 +160,8 @@ export function DepartmentLeadsManager() {
     setConfirmWarning(null)
 
     try {
-      const supabase = createClient()
-      const baseQuery = supabase
-        .from("profiles")
-        .select("id, first_name, last_name, company_email, role, department, is_department_lead")
-        .neq("role", "visitor")
-        .order("first_name")
-      const { data, error } = await applyAssignableStatusFilter(baseQuery, { allowLegacyNullStatus: false })
-
-      if (error) {
-        toast.error("Failed to load potential leads. Please try again.")
-        return
-      }
-
-      setUsers(data as Profile[])
+      const { candidates } = await fetchDepartmentLeads()
+      setUsers(candidates)
       setIsDialogOpen(true)
     } catch {
       toast.error("An unexpected error occurred.")
