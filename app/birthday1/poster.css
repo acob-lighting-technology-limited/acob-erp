@@ -87,17 +87,6 @@
   -webkit-text-stroke: 2px var(--bd-gold);
 }
 
-.bd1-names {
-  max-width: 60rem;
-  margin: -0.25rem 0 0;
-  color: var(--bd-cream);
-  font-family: var(--font-birthday-serif), Georgia, serif;
-  font-size: clamp(1.1rem, min(2.4vw, 3.2vh), 1.9rem);
-  font-style: italic;
-  font-weight: 600;
-  text-wrap: balance;
-}
-
 /* The line-up is a size container, so portraits can fill whatever height the
    headline and ticket leave over — and narrow when a big group shares the row. */
 .bd1-lineup {
