@@ -1,0 +1,332 @@
+/* Style options for the birthday spotlight, previewed at /birthday1–/birthday5.
+   Each block only overrides birthday.css; once one is picked it gets folded
+   into birthday.css and the rest of this file and those routes are deleted. */
+
+/* ── 1 · Emerald Gala — deep emerald, art-deco gold frames ─────── */
+
+.birthday-page[data-variant="1"] {
+  --bd-night: #04170d;
+  --bd-forest: #0a2e1b;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(232 189 79 / 0.14), transparent 50%),
+    radial-gradient(ellipse at 50% 50%, #0d4227 0%, #072a17 55%, #031009 100%);
+}
+
+.birthday-page[data-variant="1"] .birthday-decor__stars {
+  opacity: 0.35;
+}
+
+.birthday-page[data-variant="1"] .birthday-card-item {
+  border: 2px solid var(--bd-gold);
+  border-radius: 0.35rem;
+  outline: 1px solid rgb(232 189 79 / 0.45);
+  outline-offset: 5px;
+  background: #062213;
+}
+
+.birthday-page[data-variant="1"] .birthday-card-photo-wrapper {
+  border-radius: 0.2rem;
+}
+
+.birthday-page[data-variant="1"] .birthday-title {
+  color: var(--bd-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.birthday-page[data-variant="1"] .birthday-meta-card {
+  border: 1px solid rgb(232 189 79 / 0.45);
+  border-radius: 0.35rem;
+  background: rgb(4 23 13 / 0.6);
+}
+
+/* ── 2 · Ivory & Gold — light, editorial, print-friendly ──────── */
+
+.birthday-page[data-variant="2"] {
+  --bd-gold: #c49a2c;
+  --bd-gold-deep: #a07a1c;
+  --bd-cream: #d9c79a; /* confetti / bunting tone that still reads on ivory */
+  --bd-text: #0f3d22;
+  --bd-muted: #56675b;
+  --bd-glass: rgb(255 255 255 / 0.75);
+  --bd-glass-border: rgb(15 61 34 / 0.14);
+
+  --background: #faf6ec;
+  --foreground: #0f3d22;
+  --card: #ffffff;
+  --muted: rgb(15 61 34 / 0.06);
+  --accent: rgb(15 61 34 / 0.08);
+  --accent-foreground: #0f3d22;
+  --input: rgb(15 61 34 / 0.22);
+  --primary-foreground: #ffffff;
+
+  color-scheme: light;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgb(196 154 44 / 0.18), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(47 162 87 / 0.1), transparent 50%), #faf6ec;
+}
+
+.birthday-page[data-variant="2"] .birthday-decor__stars,
+.birthday-page[data-variant="2"] .birthday-decor__glow {
+  display: none;
+}
+
+.birthday-page[data-variant="2"] .birthday-decor__bunting path:first-child {
+  stroke: var(--bd-gold-deep);
+}
+
+.birthday-page[data-variant="2"] .birthday-script {
+  color: var(--bd-gold-deep);
+}
+
+.birthday-page[data-variant="2"] .birthday-kicker,
+.birthday-page[data-variant="2"] .birthday-meta-label {
+  color: #0f5a30;
+}
+
+.birthday-page[data-variant="2"] .birthday-kicker {
+  border-color: rgb(15 90 48 / 0.25);
+  background: rgb(15 90 48 / 0.07);
+}
+
+.birthday-page[data-variant="2"] .birthday-title,
+.birthday-page[data-variant="2"] .birthday-meta-card strong,
+.birthday-page[data-variant="2"] .birthday-card-name,
+.birthday-page[data-variant="2"] .birthday-empty p {
+  color: #0f3d22;
+}
+
+.birthday-page[data-variant="2"] .birthday-meta-card {
+  box-shadow: 0 18px 40px -30px rgb(15 61 34 / 0.45);
+}
+
+.birthday-page[data-variant="2"] .birthday-meta-card--wish {
+  background: rgb(47 162 87 / 0.08);
+}
+
+.birthday-page[data-variant="2"] .birthday-card-item {
+  border: 0;
+  border-top: 4px solid var(--bd-gold);
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 24px 50px -28px rgb(15 61 34 / 0.5);
+}
+
+.birthday-page[data-variant="2"] .birthday-setup-card {
+  background: rgb(255 255 255 / 0.85);
+  box-shadow: 0 40px 80px -48px rgb(15 61 34 / 0.55);
+}
+
+.birthday-page[data-variant="2"] .birthday-back {
+  background: rgb(255 255 255 / 0.85);
+}
+
+.birthday-page[data-variant="2"] .birthday-error {
+  color: #b42318;
+}
+
+/* ── 3 · Minimal Noir — pure black, gold rings, nothing extra ─── */
+
+.birthday-page[data-variant="3"] {
+  background: #000000;
+}
+
+.birthday-page[data-variant="3"] .birthday-decor__stars,
+.birthday-page[data-variant="3"] .birthday-decor__glow {
+  display: none;
+}
+
+.birthday-page[data-variant="3"] .birthday-confetti {
+  opacity: 0.45;
+}
+
+.birthday-page[data-variant="3"] .birthday-card-item {
+  align-items: center;
+  border: 0;
+  padding: 0.5rem;
+  background: transparent;
+  box-shadow: none;
+}
+
+.birthday-page[data-variant="3"] .birthday-card-item:hover {
+  box-shadow: none;
+}
+
+.birthday-page[data-variant="3"] .birthday-card-photo-wrapper {
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  outline: 2px solid var(--bd-gold);
+  outline-offset: 6px;
+}
+
+.birthday-page[data-variant="3"] .birthday-card-item--today .birthday-card-photo-wrapper {
+  outline-width: 3px;
+  box-shadow: 0 0 40px 6px rgb(232 189 79 / 0.35);
+}
+
+.birthday-page[data-variant="3"] .birthday-photo__veil {
+  display: none;
+}
+
+.birthday-page[data-variant="3"] .birthday-photo__badge {
+  top: auto;
+  bottom: 8%;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.birthday-page[data-variant="3"] .birthday-card-details {
+  margin-top: 0.6rem;
+}
+
+.birthday-page[data-variant="3"] .birthday-script--hero {
+  font-size: clamp(2.4rem, 4vw, 3.25rem);
+}
+
+.birthday-page[data-variant="3"] .birthday-title {
+  font-weight: 600;
+}
+
+.birthday-page[data-variant="3"] .birthday-meta-card {
+  border: 0;
+  border-top: 1px solid rgb(232 189 79 / 0.5);
+  border-radius: 0;
+  padding: 0.9rem 0 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* ── 4 · Stage Spotlight — light beams, full-bleed photo cards ── */
+
+.birthday-page[data-variant="4"] {
+  background: radial-gradient(ellipse at 50% 110%, rgb(47 162 87 / 0.35), transparent 45%), #050605;
+}
+
+.birthday-page[data-variant="4"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    conic-gradient(from 180deg at 30% -8%, transparent 165deg, rgb(232 189 79 / 0.13) 172deg, transparent 180deg),
+    conic-gradient(from 180deg at 70% -8%, transparent 180deg, rgb(232 189 79 / 0.13) 188deg, transparent 195deg);
+  pointer-events: none;
+}
+
+.birthday-page[data-variant="4"] .birthday-decor__stars {
+  display: none;
+}
+
+.birthday-page[data-variant="4"] .birthday-card-item {
+  border: 1px solid rgb(232 189 79 / 0.3);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  box-shadow:
+    0 30px 60px -30px rgb(0 0 0 / 0.95),
+    0 20px 50px -30px rgb(232 189 79 / 0.35);
+}
+
+.birthday-page[data-variant="4"] .birthday-card-photo-wrapper {
+  border-radius: 0;
+}
+
+.birthday-page[data-variant="4"] .birthday-photo__veil {
+  background: linear-gradient(180deg, transparent 45%, rgb(0 0 0 / 0.88) 100%);
+}
+
+.birthday-page[data-variant="4"] .birthday-card-details {
+  position: absolute;
+  inset: auto 0 0 0;
+  align-items: flex-start;
+  padding: 0 1rem 1rem;
+  text-align: left;
+}
+
+.birthday-page[data-variant="4"] .birthday-card-dept {
+  color: var(--bd-gold);
+}
+
+.birthday-page[data-variant="4"] .birthday-title {
+  font-family: inherit;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1100px) {
+  .birthday-page[data-variant="4"] .birthday-card-photo-wrapper {
+    aspect-ratio: 4 / 5;
+  }
+}
+
+/* ── 5 · Green Panel — brand-green story panel, gold arch frames ─ */
+
+.birthday-page[data-variant="5"] {
+  background: #060906;
+}
+
+.birthday-page[data-variant="5"] .birthday-decor__stars {
+  opacity: 0.25;
+}
+
+.birthday-page[data-variant="5"] .birthday-hero__copy {
+  border: 1px solid rgb(232 189 79 / 0.45);
+  border-radius: 1.75rem;
+  padding: 2.25rem;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(232 189 79 / 0.16), transparent 45%),
+    linear-gradient(160deg, #11653a, #0a3d22);
+  box-shadow: 0 40px 80px -40px rgb(0 0 0 / 0.9);
+}
+
+.birthday-page[data-variant="5"] .birthday-subtitle {
+  color: #cfe3d4;
+}
+
+.birthday-page[data-variant="5"] .birthday-meta-card {
+  border-color: rgb(232 189 79 / 0.35);
+  background: rgb(0 0 0 / 0.22);
+}
+
+.birthday-page[data-variant="5"] .birthday-meta-card--wish .birthday-meta-label {
+  color: var(--bd-gold);
+}
+
+.birthday-page[data-variant="5"] .birthday-card-item {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.birthday-page[data-variant="5"] .birthday-card-photo-wrapper {
+  border: 3px solid var(--bd-gold);
+  border-radius: 999px 999px 0.75rem 0.75rem;
+  box-shadow: 0 24px 50px -28px rgb(0 0 0 / 0.95);
+}
+
+.birthday-page[data-variant="5"] .birthday-card-item--today .birthday-card-photo-wrapper {
+  box-shadow:
+    0 24px 50px -28px rgb(0 0 0 / 0.95),
+    0 0 36px 4px rgb(232 189 79 / 0.35);
+}
+
+.birthday-page[data-variant="5"] .birthday-photo__badge {
+  top: auto;
+  bottom: 0.6rem;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.birthday-page[data-variant="5"] .birthday-photo__veil {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .birthday-page[data-variant="5"] .birthday-hero__copy {
+    padding: 1.5rem;
+  }
+}
