@@ -90,7 +90,9 @@ export function WeeklyReportCardGrid({
       {reports.map((report) => {
         const trackerStatus = getActionTrackerStatus(report.department, trackingData)
         const submitterProfile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-        const submitterName = submitterProfile ? `${submitterProfile.first_name} ${submitterProfile.last_name}` : "Unknown"
+        const submitterName = submitterProfile
+          ? `${submitterProfile.first_name} ${submitterProfile.last_name}`
+          : "Unknown"
         const formattedMeetingDate = (() => {
           const date = new Date(`${meetingDate}T00:00:00`)
           if (Number.isNaN(date.getTime())) return "-"
@@ -114,7 +116,7 @@ export function WeeklyReportCardGrid({
                   {!isFilteredWeekLocked && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button aria-label="More actions" variant="ghost" size="icon" className="h-8 w-8">
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

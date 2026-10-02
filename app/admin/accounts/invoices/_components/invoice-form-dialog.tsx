@@ -318,6 +318,7 @@ export function InvoiceFormDialog({
                       </div>
                       <div className="sm:col-span-1">
                         <Button
+                          aria-label="Delete"
                           type="button"
                           variant="ghost"
                           size="icon"

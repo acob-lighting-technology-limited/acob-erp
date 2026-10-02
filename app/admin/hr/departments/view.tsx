@@ -731,7 +731,7 @@ export function DepartmentsPage({
                         </td>
                         <td className="px-3 py-2 text-right">
                           <Link href={`${employeesBasePath ?? "/admin/hr/employees"}?userId=${member.id}`}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button aria-label="Edit" variant="ghost" size="icon" className="h-8 w-8">
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </Link>

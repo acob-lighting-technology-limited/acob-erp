@@ -107,7 +107,12 @@ export function WatermarkSidebar({
                 ))}
               </SelectContent>
             </Select>
-            <Button size="icon" variant="outline" onClick={() => document.getElementById("watermark-upload")?.click()}>
+            <Button
+              aria-label="Add"
+              size="icon"
+              variant="outline"
+              onClick={() => document.getElementById("watermark-upload")?.click()}
+            >
               <Plus className="h-4 w-4" />
             </Button>
             <input id="watermark-upload" type="file" accept="image/*" className="hidden" onChange={onWatermarkUpload} />

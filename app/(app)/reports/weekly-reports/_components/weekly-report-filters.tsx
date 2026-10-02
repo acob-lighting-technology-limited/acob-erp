@@ -109,7 +109,14 @@ export function WeeklyReportFilters({
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" size="icon" onClick={onRefresh} disabled={loading} className="shrink-0">
+        <Button
+          aria-label="Refresh"
+          variant="outline"
+          size="icon"
+          onClick={onRefresh}
+          disabled={loading}
+          className="shrink-0"
+        >
           <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
         </Button>
       </div>

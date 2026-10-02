@@ -250,7 +250,7 @@ export function ExceptionsView({ departments, lockedDepartment }: ExceptionsView
       key: "actions",
       label: "",
       render: (r) => (
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(r)}>
+        <Button aria-label="Edit" variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(r)}>
           <Pencil className="h-3.5 w-3.5" />
         </Button>
       ),

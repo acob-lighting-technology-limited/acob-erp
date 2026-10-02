@@ -202,6 +202,7 @@ export function ApprovalFlowBuilderCard({
                 </Select>
                 {canEditFlow && (
                   <Button
+                    aria-label="Delete"
                     variant="ghost"
                     size="icon"
                     onClick={() => onFlowRolesChange(flowRoles.filter((_, i) => i !== idx))}
@@ -294,6 +295,7 @@ export function ApprovalFlowBuilderCard({
               <div className="flex justify-end">
                 {canEditFlow && (
                   <Button
+                    aria-label="Delete"
                     variant="ghost"
                     size="icon"
                     onClick={() => onFlowRoutesChange(flowRoutes.filter((_, i) => i !== idx))}
@@ -393,6 +395,7 @@ export function ApprovalFlowBuilderCard({
               <div className="flex justify-end">
                 {canEditFlow && (
                   <Button
+                    aria-label="Delete"
                     variant="ghost"
                     size="icon"
                     onClick={() => onFlowAssignmentsChange(flowAssignments.filter((_, i) => i !== idx))}
