@@ -16,6 +16,7 @@ import { logger } from "@/lib/logger"
 import type { QueryClient } from "@tanstack/react-query"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { formatCurrency } from "@/lib/format"
 
 const log = logger("finance-invoice-dialog")
 
@@ -137,10 +138,6 @@ export function InvoiceFormDialog({
       return sum + itemSubtotal * (item.tax_rate / 100)
     }, 0)
     return { subtotal, taxAmount, total: subtotal + taxAmount }
-  }
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: formData.currency }).format(amount)
   }
 
   async function handleSubmit(e: React.FormEvent, status: "draft" | "sent" = "draft") {
@@ -317,7 +314,7 @@ export function InvoiceFormDialog({
                       </div>
                       <div className="space-y-2 text-right sm:col-span-1">
                         <Label>Amount</Label>
-                        <p className="py-2 font-medium">{formatCurrency(item.amount)}</p>
+                        <p className="py-2 font-medium">{formatCurrency(item.amount, formData.currency)}</p>
                       </div>
                       <div className="sm:col-span-1">
                         <Button
@@ -401,15 +398,15 @@ export function InvoiceFormDialog({
                 <CardContent className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(totals.subtotal)}</span>
+                    <span>{formatCurrency(totals.subtotal, formData.currency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax</span>
-                    <span>{formatCurrency(totals.taxAmount)}</span>
+                    <span>{formatCurrency(totals.taxAmount, formData.currency)}</span>
                   </div>
                   <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
-                    <span>{formatCurrency(totals.total)}</span>
+                    <span>{formatCurrency(totals.total, formData.currency)}</span>
                   </div>
                 </CardContent>
               </Card>

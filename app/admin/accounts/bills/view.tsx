@@ -13,6 +13,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { BillFormDialog } from "./_components/bill-form-dialog"
+import { formatCurrency } from "@/lib/format"
 
 export interface Bill {
   id: string
@@ -43,13 +44,6 @@ async function fetchBillsList(): Promise<Bill[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load bills")
   const json = await res.json()
   return (json.data || []) as Bill[]
-}
-
-function formatCurrency(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-  }).format(amount)
 }
 
 function formatDate(date: string) {

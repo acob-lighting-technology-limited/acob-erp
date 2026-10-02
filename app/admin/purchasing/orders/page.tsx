@@ -13,6 +13,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { PurchaseOrderFormDialog } from "./_components/purchase-order-form-dialog"
+import { formatCurrency } from "@/lib/format"
 
 interface PurchaseOrder {
   id: string
@@ -42,10 +43,6 @@ async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load purchase orders")
   const json = await res.json()
   return (json.data || []) as PurchaseOrder[]
-}
-
-function formatCurrency(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
 }
 
 function formatDate(date: string) {

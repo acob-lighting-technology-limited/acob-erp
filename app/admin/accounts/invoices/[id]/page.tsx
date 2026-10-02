@@ -18,6 +18,7 @@ import { InvoiceFormDialog } from "../_components/invoice-form-dialog"
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { formatCurrency } from "@/lib/format"
 
 const log = logger("finance-invoices")
 
@@ -119,10 +120,6 @@ export default function InvoiceDetailPage() {
       log.error("Error updating invoice:", error)
       toast.error("Failed to update invoice")
     }
-  }
-
-  function formatCurrency(amount: number, currency: string = "NGN") {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
   }
 
   function formatDate(date: string) {

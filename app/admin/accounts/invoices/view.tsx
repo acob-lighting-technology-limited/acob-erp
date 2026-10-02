@@ -13,6 +13,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
+import { formatCurrency } from "@/lib/format"
 
 export interface Invoice {
   id: string
@@ -44,13 +45,6 @@ async function fetchInvoicesList(): Promise<Invoice[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load invoices")
   const json = await res.json()
   return (json.data || []) as Invoice[]
-}
-
-function formatCurrency(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-  }).format(amount)
 }
 
 function formatDate(date: string) {

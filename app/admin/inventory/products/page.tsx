@@ -13,6 +13,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import type { BadgeProps } from "@/components/ui/badge"
 import { ProductFormDialog } from "./_components/product-form-dialog"
+import { formatCurrency } from "@/lib/format"
 
 interface Product {
   id: string
@@ -40,13 +41,6 @@ async function fetchProductsList(): Promise<Product[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load products")
   const json = await res.json()
   return (json.data || []) as Product[]
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-  }).format(amount)
 }
 
 function getStockBand(product: Product) {

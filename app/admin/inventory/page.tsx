@@ -10,6 +10,7 @@ import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { IconFill } from "@/components/ui/icon-fill"
+import { formatCurrency } from "@/lib/format"
 
 async function fetchInventoryStats(): Promise<InventoryStats> {
   const res = await fetch("/api/admin/inventory/stats", { cache: "no-store" })
@@ -32,10 +33,6 @@ export default function InventoryDashboard() {
     queryKey: QUERY_KEYS.adminInventoryDashboard(),
     queryFn: fetchInventoryStats,
   })
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
-  }
 
   return (
     <PageWrapper maxWidth="full" background="gradient">

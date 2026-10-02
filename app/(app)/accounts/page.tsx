@@ -4,15 +4,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { getCurrentUserAccountsData } from "./_lib"
+import { formatCurrency } from "@/lib/format"
 
-function formatCurrency(amount: number | null | undefined): string {
-  if (typeof amount !== "number" || !Number.isFinite(amount)) return "—"
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
+const formatNaira = (amount: number | null | undefined) => formatCurrency(amount, { whole: true })
 
 export default async function AccountsPage() {
   const { profile, requisitions, payments, payroll, assets } = await getCurrentUserAccountsData()
@@ -103,7 +97,7 @@ export default async function AccountsPage() {
         <StatCard
           variant="compact"
           title="Latest Net Pay"
-          value={payroll.latestNetSalary !== null ? formatCurrency(payroll.latestNetSalary) : "Available"}
+          value={payroll.latestNetSalary !== null ? formatNaira(payroll.latestNetSalary) : "Available"}
           icon={Wallet}
           description={payroll.latestPeriodName || "Monthly salary records"}
         />
