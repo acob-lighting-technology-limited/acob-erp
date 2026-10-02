@@ -45,29 +45,27 @@ export function RequisitionPdfDocument({
 
     return (
       <div className="space-y-1.5 rounded border border-slate-400 bg-slate-50/50 p-2.5">
-        <span className="block border-b border-slate-300 pb-1 text-[10px] font-bold text-slate-600 uppercase">
+        <span className="block border-b border-slate-300 pb-1 text-xs font-bold text-slate-600 uppercase">
           {params.title}
         </span>
         {params.signedAt ? (
           <div className="space-y-1">
             <p className="font-bold text-slate-900">{params.signedName || params.fallbackName}</p>
-            <p className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+            <p className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
               <CheckCircle2 className="h-3 w-3" /> {params.signedLabel}
             </p>
-            <p className="font-mono text-[9px] text-slate-400">
-              {new Date(params.signedAt).toLocaleDateString("en-GB")}
-            </p>
-            {params.comments && <p className="text-[9px] text-slate-500 italic">&quot;{params.comments}&quot;</p>}
+            <p className="font-mono text-xs text-slate-400">{new Date(params.signedAt).toLocaleDateString("en-GB")}</p>
+            {params.comments && <p className="text-xs text-slate-500 italic">&quot;{params.comments}&quot;</p>}
           </div>
         ) : bypassed ? (
           <div className="space-y-1 py-1">
-            <p className="flex items-center gap-1 text-[10px] font-semibold text-red-600">
+            <p className="flex items-center gap-1 text-xs font-semibold text-red-600">
               <MinusCircle className="h-3 w-3" /> Bypassed
             </p>
-            <p className="text-[9px] text-slate-500 italic">Emergency route</p>
+            <p className="text-xs text-slate-500 italic">Emergency route</p>
           </div>
         ) : (
-          <p className="py-2 text-[10px] text-slate-400 italic">{params.pendingLabel}</p>
+          <p className="py-2 text-xs text-slate-400 italic">{params.pendingLabel}</p>
         )}
       </div>
     )
@@ -178,11 +176,11 @@ export function RequisitionPdfDocument({
               <span className="text-2xl font-bold tracking-tight text-slate-800">LIGHTING</span>
             </div>
             <div className="text-xs font-semibold tracking-wider text-emerald-600 uppercase">technology limited</div>
-            <div className="font-serif text-[10px] text-slate-500 italic">...Lighting up Nigeria</div>
-            <div className="mt-1 font-mono text-[10px] text-slate-400">RC: 1324192</div>
+            <div className="font-serif text-xs text-slate-500 italic">...Lighting up Nigeria</div>
+            <div className="mt-1 font-mono text-xs text-slate-400">RC: 1324192</div>
           </div>
 
-          <div className="space-y-0.5 text-right text-[11px] text-slate-600">
+          <div className="space-y-0.5 text-right text-xs text-slate-600">
             <p>Plot 2, Block 14 Extension, Federal Ministry of Works and Housing Sites and Services Scheme,</p>
             <p>Gwarinpa Phase 2, Abuja FCT.</p>
             <p>Email: info@acoblighting.com, infoacob@gmail.com</p>
@@ -246,7 +244,7 @@ export function RequisitionPdfDocument({
           {/* Emergency justification */}
           {requisition.is_emergency && (
             <div className="border border-red-600 bg-red-50 p-2">
-              <span className="flex items-center gap-1 text-[10px] font-bold tracking-wider text-red-700 uppercase">
+              <span className="flex items-center gap-1 text-xs font-bold tracking-wider text-red-700 uppercase">
                 <Siren className="h-3 w-3" /> Emergency justification:
               </span>
               <span className="mt-1 block leading-relaxed font-medium whitespace-pre-wrap text-slate-900">
@@ -258,15 +256,15 @@ export function RequisitionPdfDocument({
           {/* Project, Funding, Date, Amount */}
           <div className="my-4 grid grid-cols-1 gap-2 border border-slate-900 bg-slate-50 p-2 font-semibold sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <span className="block text-[10px] text-slate-600 uppercase">PROJECT:</span>
+              <span className="block text-xs text-slate-600 uppercase">PROJECT:</span>
               <span className="text-slate-900">{requisition.project_name}</span>
             </div>
             <div>
-              <span className="block text-[10px] text-slate-600 uppercase">FUNDING:</span>
+              <span className="block text-xs text-slate-600 uppercase">FUNDING:</span>
               <span className="text-slate-900">{requisition.funding_category_name || "—"}</span>
             </div>
             <div>
-              <span className="block text-[10px] text-slate-600 uppercase">DATE:</span>
+              <span className="block text-xs text-slate-600 uppercase">DATE:</span>
               <span className="text-slate-900">
                 {new Date(requisition.created_at).toLocaleDateString("en-GB", {
                   day: "2-digit",
@@ -276,7 +274,7 @@ export function RequisitionPdfDocument({
               </span>
             </div>
             <div>
-              <span className="block text-[10px] text-slate-600 uppercase">AMOUNT (₦):</span>
+              <span className="block text-xs text-slate-600 uppercase">AMOUNT (₦):</span>
               <span className="text-sm font-bold text-emerald-700">
                 ₦{Number(requisition.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </span>
@@ -289,7 +287,7 @@ export function RequisitionPdfDocument({
               BENEFICIARY DETAILS:
             </h4>
             <div className="overflow-hidden border border-slate-900">
-              <table className="w-full border-collapse text-left text-[11px]">
+              <table className="w-full border-collapse text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-900 bg-slate-100 font-bold text-slate-800 uppercase">
                     <th className="w-1/3 border-r border-slate-900 p-2">ACCOUNT NAME</th>
@@ -343,7 +341,7 @@ export function RequisitionPdfDocument({
 
           {/* Footer Approval Grid */}
           <div className="mt-10 space-y-4 border-t border-slate-300 pt-6">
-            <div className="grid grid-cols-2 gap-4 text-[11px] md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 text-xs md:grid-cols-4">
               {renderApprovalCell({
                 title: "REVIEWED BY:",
                 stageCode: "pending_reviewed_by",
@@ -389,7 +387,7 @@ export function RequisitionPdfDocument({
               })}
             </div>
 
-            <div className="pt-4 text-center text-[10px] font-bold tracking-wider text-slate-500 uppercase">
+            <div className="pt-4 text-center text-xs font-bold tracking-wider text-slate-500 uppercase">
               ATTACH RELEVANT SUPPORTING DOCUMENTS
             </div>
           </div>

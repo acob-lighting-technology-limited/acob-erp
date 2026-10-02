@@ -362,7 +362,7 @@ export function InvoicesPage({
           subtitle: (invoice) =>
             `${formatCurrency(invoice.total_amount, invoice.currency)} · Due ${formatDate(invoice.due_date)}`,
           trailing: (invoice) => (
-            <Badge variant={statusColors[invoice.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[invoice.status]} className="text-xs capitalize">
               {invoice.status}
             </Badge>
           ),

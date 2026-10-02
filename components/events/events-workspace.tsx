@@ -492,8 +492,8 @@ export function EventsWorkspace({
             },
             trailing: (e) => (
               <div className="flex items-center gap-1.5">
-                <EventTypeBadge type={e.type} className="text-[10px]" />
-                <EventStatusBadge status={e.status} className="text-[10px]" />
+                <EventTypeBadge type={e.type} className="text-xs" />
+                <EventStatusBadge status={e.status} className="text-xs" />
               </div>
             ),
             onSelect: openEvent,
@@ -502,8 +502,8 @@ export function EventsWorkspace({
               subtitle: (e) => whenLabel(e),
               badges: (e) => (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <EventTypeBadge type={e.type} className="text-[10px]" />
-                  <EventStatusBadge status={e.status} className="text-[10px]" />
+                  <EventTypeBadge type={e.type} className="text-xs" />
+                  <EventStatusBadge status={e.status} className="text-xs" />
                   <MdInvolvementBadge value={e.md_involvement} />
                 </div>
               ),

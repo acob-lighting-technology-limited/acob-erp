@@ -84,7 +84,7 @@ export function FundingCategoryDialog({
               className="text-xs"
             />
             {!category && (
-              <p className="text-muted-foreground text-[10px]">
+              <p className="text-muted-foreground text-xs">
                 A short code is generated from the name and cannot be changed afterwards.
               </p>
             )}
@@ -111,7 +111,7 @@ export function FundingCategoryDialog({
               onChange={(event) => setSortOrder(event.target.value)}
               className="text-xs"
             />
-            <p className="text-muted-foreground text-[10px]">Lower numbers appear first in the requisition form.</p>
+            <p className="text-muted-foreground text-xs">Lower numbers appear first in the requisition form.</p>
           </div>
 
           <DialogFooter className="gap-2">

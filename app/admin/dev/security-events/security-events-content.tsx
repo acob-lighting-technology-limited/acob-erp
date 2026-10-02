@@ -221,7 +221,7 @@ export function SecurityEventsContent({ rows, error }: { rows: AuditLogRow[]; er
           title: (row) => row.action || row.operation || "Unknown action",
           subtitle: (row) => `${row.entity_type || "Security"} · ${formatWATDateTime(row.created_at)}`,
           trailing: (row) => (
-            <Badge variant={getSeverity(row) === "Critical" ? "destructive" : "outline"} className="text-[10px]">
+            <Badge variant={getSeverity(row) === "Critical" ? "destructive" : "outline"} className="text-xs">
               {getSeverity(row)}
             </Badge>
           ),

@@ -76,7 +76,7 @@ export function ControlledDocsLibrary({ type }: { type: ControlledDocType }) {
         render: (r) => (
           <div className="flex flex-col">
             <span className="line-clamp-2 font-medium">{r.title}</span>
-            {r.category && <span className="text-muted-foreground text-[11px]">{r.category}</span>}
+            {r.category && <span className="text-muted-foreground text-xs">{r.category}</span>}
           </div>
         ),
       },

@@ -398,7 +398,7 @@ export default function RolesPage() {
           title: (role) => role.name.replace(/_/g, " "),
           subtitle: (role) => `${role.user_count || 0} users · ${role.permissions?.length || 0} permissions`,
           trailing: (role) => (
-            <Badge variant={role.is_system ? "destructive" : "outline"} className="text-[10px]">
+            <Badge variant={role.is_system ? "destructive" : "outline"} className="text-xs">
               {role.is_system ? "System" : "Custom"}
             </Badge>
           ),

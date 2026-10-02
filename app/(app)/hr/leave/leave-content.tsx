@@ -470,7 +470,7 @@ export function LeaveContent({
                   ? "destructive"
                   : "outline"
             }
-            className="text-[11px] capitalize"
+            className="text-xs capitalize"
           >
             {formatName(r.status)}
           </Badge>
@@ -896,7 +896,7 @@ export function LeaveContent({
                     ? "destructive"
                     : "outline"
               }
-              className="text-[10px] capitalize"
+              className="text-xs capitalize"
             >
               {formatName(r.status)}
             </Badge>
@@ -908,7 +908,7 @@ export function LeaveContent({
                 : leaveTypeMap.get(r.leave_type_id)?.name || "—",
             subtitle: (r) => (
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
-                <Badge variant="outline" className="text-[10px] font-medium">
+                <Badge variant="outline" className="text-xs font-medium">
                   {leaveTypeMap.get(r.leave_type_id)?.name || "—"}
                 </Badge>
                 <span className="inline-flex items-center gap-1">
@@ -928,7 +928,7 @@ export function LeaveContent({
                       ? "destructive"
                       : "outline"
                 }
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {formatName(r.status)}
               </Badge>
@@ -1048,45 +1048,41 @@ export function LeaveContent({
             <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Leave Type</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Leave Type</span>
                   <span className="font-medium">{leaveTypeMap.get(r.leave_type_id)?.name || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Duration</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Duration</span>
                   <span className="font-medium">
                     {r.start_date} to {r.end_date} ({r.days_count} day{Number(r.days_count) > 1 ? "s" : ""})
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Reliever</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Reliever</span>
                   <span className="font-medium">{resolvePersonName(r.reliever) || "Not assigned"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Current Stage</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Current Stage</span>
                   <span className="font-medium">{approvalStageLabel(r.current_stage_code || r.approval_stage)}</span>
                 </div>
               </div>
 
               {r.reason && (
                 <div className="space-y-1 border-t pt-3">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Reason for Leave
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Reason for Leave</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">{r.reason}</p>
                 </div>
               )}
 
               {r.handover_note && !r.handover_note.startsWith("Attached:") && (
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Handover Note</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Handover Note</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">{r.handover_note}</p>
                 </div>
               )}
 
               <div className="space-y-1 border-t pt-3">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                  Approval Timeline
-                </span>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Approval Timeline</span>
                 <p className="text-muted-foreground font-mono text-xs">{getApprovalTimeline(r)}</p>
               </div>
             </div>
@@ -1121,7 +1117,7 @@ export function LeaveContent({
                       ? "destructive"
                       : "outline"
                 }
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {formatName(row.status)}
               </Badge>

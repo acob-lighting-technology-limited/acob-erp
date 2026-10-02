@@ -156,7 +156,7 @@ export function HRAdminDashboard({
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Employee Roster</span>
+                <span className="text-muted-foreground text-xs font-medium">Employee Roster</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-blue-500"
@@ -195,7 +195,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">Manage company departments</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Department Units</span>
+                <span className="text-muted-foreground text-xs font-medium">Department Units</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-purple-500"
@@ -234,7 +234,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">View rooms and assigned employees</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Offices & Rooms</span>
+                <span className="text-muted-foreground text-xs font-medium">Offices & Rooms</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-teal-500"
@@ -273,7 +273,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">Review and approve leave requests</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Leave Queue</span>
+                <span className="text-muted-foreground text-xs font-medium">Leave Queue</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-amber-500"
@@ -315,7 +315,7 @@ export function HRAdminDashboard({
                   </p>
                 </div>
                 <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">Shared Assets</span>
+                  <span className="text-muted-foreground text-xs font-medium">Shared Assets</span>
                   <IconFill
                     icon={ChevronRight}
                     fillColor="bg-indigo-500"
@@ -355,7 +355,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">View and export attendance data</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Clocking Logs</span>
+                <span className="text-muted-foreground text-xs font-medium">Clocking Logs</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-emerald-500"
@@ -396,7 +396,7 @@ export function HRAdminDashboard({
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Payslip Calculations</span>
+                <span className="text-muted-foreground text-xs font-medium">Payslip Calculations</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-blue-500"
@@ -437,7 +437,7 @@ export function HRAdminDashboard({
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Performance System</span>
+                <span className="text-muted-foreground text-xs font-medium">Performance System</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-amber-500"

@@ -136,7 +136,7 @@ export function CycleSelector({ cycles, activeCycleId, showLabel = false }: Cycl
               <div className="flex w-full items-center justify-between gap-2">
                 <span className="truncate">{cycleOptionLabel(cycle, visibleCycles)}</span>{" "}
                 {cycle.status === "active" && (
-                  <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-500">
+                  <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-500">
                     Active
                   </span>
                 )}
@@ -292,7 +292,7 @@ export function useCycleUrlFilters<TRow = Record<string, unknown>>({
                   <div className="flex w-full items-center justify-between gap-2">
                     <span className="truncate">{cycleOptionLabel(cycle, visibleCycles)}</span>{" "}
                     {cycle.status === "active" && (
-                      <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-500">
+                      <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-500">
                         Active
                       </span>
                     )}

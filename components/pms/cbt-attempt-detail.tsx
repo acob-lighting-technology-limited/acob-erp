@@ -128,7 +128,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
         <div>
           <h4 className="text-foreground text-sm font-semibold">CBT Performance Summary</h4>
           {attempt.submitted_at && (
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
+            <p className="text-muted-foreground mt-0.5 text-xs">
               Completed at: {formatWATDateTime(attempt.submitted_at)}
             </p>
           )}
@@ -215,23 +215,20 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                         isCorrect ? (
                           <Badge
                             variant="outline"
-                            className="gap-1 border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-500"
+                            className="gap-1 border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-500"
                           >
                             <CheckCircle2 className="h-3 w-3" /> Correct
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
-                            className="gap-1 border-red-500/20 bg-red-500/10 text-[10px] text-red-500"
+                            className="gap-1 border-red-500/20 bg-red-500/10 text-xs text-red-500"
                           >
                             <XCircle className="h-3 w-3" /> Incorrect
                           </Badge>
                         )
                       ) : (
-                        <Badge
-                          variant="outline"
-                          className="border-amber-500/20 bg-amber-500/10 text-[10px] text-amber-500"
-                        >
+                        <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-xs text-amber-500">
                           Unanswered
                         </Badge>
                       )}

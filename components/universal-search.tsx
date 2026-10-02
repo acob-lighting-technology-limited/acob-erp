@@ -167,7 +167,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
         <span className="group-hover:text-foreground transition-colors">Search anything...</span>
         <kbd
           className={cn(
-            "border-border/60 bg-background/80 text-muted-foreground group-hover:border-border group-hover:bg-background group-hover:text-foreground pointer-events-none absolute top-1.5 right-1.5 hidden h-6 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium transition-colors select-none sm:flex",
+            "border-border/60 bg-background/80 text-muted-foreground group-hover:border-border group-hover:bg-background group-hover:text-foreground pointer-events-none absolute top-1.5 right-1.5 hidden h-6 items-center gap-1 rounded border px-1.5 font-mono text-xs font-medium transition-colors select-none sm:flex",
             isScoped &&
               "bg-background/40 group-hover:bg-background/60 border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))] text-[var(--navbar-admin-primary,var(--admin-primary))]"
           )}
@@ -247,7 +247,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
                           </p>
                           <Badge
                             variant="outline"
-                            className="border-primary/30 bg-primary/10 text-primary text-[11px] font-medium"
+                            className="border-primary/30 bg-primary/10 text-primary text-xs font-medium"
                           >
                             {typeLabels[result.type]}
                           </Badge>

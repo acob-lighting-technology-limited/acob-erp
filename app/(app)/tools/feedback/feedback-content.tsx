@@ -218,14 +218,14 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
                 {userSurvey ? (
                   <Badge
                     variant="outline"
-                    className="border-emerald-500/30 bg-emerald-50 text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    className="border-emerald-500/30 bg-emerald-50 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
                   >
                     Completed
                   </Badge>
                 ) : (
                   <Badge
                     variant="outline"
-                    className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                    className="border-amber-500/30 bg-amber-50 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
                   >
                     Pending Feedback
                   </Badge>
@@ -270,7 +270,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
           title: (row) => row.title,
           subtitle: (row) => `${row.feedback_type.replaceAll("_", " ")} · ${row.is_anonymous ? "anonymous" : "named"}`,
           trailing: (row) => (
-            <Badge className={`${getStatusColor(row.status)} text-[10px] capitalize`}>
+            <Badge className={`${getStatusColor(row.status)} text-xs capitalize`}>
               {row.status.replaceAll("_", " ")}
             </Badge>
           ),
@@ -280,7 +280,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
               <span className="text-muted-foreground text-xs capitalize">{row.feedback_type.replaceAll("_", " ")}</span>
             ),
             badges: (row) => (
-              <Badge className={`${getStatusColor(row.status)} text-[10px] capitalize`}>
+              <Badge className={`${getStatusColor(row.status)} text-xs capitalize`}>
                 {row.status.replaceAll("_", " ")}
               </Badge>
             ),
@@ -330,7 +330,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
           render: (row) => (
             <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
               <div className="space-y-1">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">
                   Feedback Description
                 </span>
                 <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
@@ -340,17 +340,15 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Category / Type
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Category / Type</span>
                   <span className="font-medium capitalize">{row.feedback_type.replaceAll("_", " ")}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Status</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Status</span>
                   <span className="font-medium capitalize">{row.status.replaceAll("_", " ")}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Submitted</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Submitted</span>
                   <span className="font-medium">{formatWATDate(row.created_at)}</span>
                 </div>
               </div>

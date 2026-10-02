@@ -109,7 +109,7 @@ export function WeeklyReportCardGrid({
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={cn("px-2.5 py-1 text-[10px] font-bold uppercase", trackerStatus.color)}>
+                  <Badge className={cn("px-2.5 py-1 text-xs font-bold uppercase", trackerStatus.color)}>
                     {trackerStatus.label}
                   </Badge>
                   {!isFilteredWeekLocked && (

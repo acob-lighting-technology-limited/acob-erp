@@ -313,7 +313,7 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
                   disabled={isWeekLocked || (f === "tasks_new_week" && isNextWeekActive)}
                 />
                 {f === "tasks_new_week" && isNextWeekActive && !isWeekLocked && (
-                  <p className="text-muted-foreground text-[10px] italic">
+                  <p className="text-muted-foreground text-xs italic">
                     Locked: Next week&apos;s tracker is already active.
                   </p>
                 )}

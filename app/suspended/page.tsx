@@ -168,7 +168,7 @@ export default function SuspendedPage() {
                       Until {format(new Date(suspension.end_date), "MMMM d, yyyy")}
                     </span>
                   ) : (
-                    <Badge variant="destructive" className="text-[10px] font-bold uppercase">
+                    <Badge variant="destructive" className="text-xs font-bold uppercase">
                       Indefinite Hold
                     </Badge>
                   )}

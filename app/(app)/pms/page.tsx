@@ -168,7 +168,7 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
                   <p className="text-muted-foreground text-xs leading-relaxed">{item.description}</p>
                 </div>
                 <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">{item.scoreSub}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{item.scoreSub}</span>
                   <IconFill
                     icon={ChevronRight}
                     fillColor={item.fill}

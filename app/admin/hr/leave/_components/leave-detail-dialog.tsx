@@ -167,7 +167,7 @@ export function LeaveDetailDialog({
                   <DialogTitle className="truncate text-base font-semibold">{formatName(employeeName)}</DialogTitle>
                   <Badge
                     variant="outline"
-                    className="border-blue-200 bg-blue-50/50 font-mono text-[11px] font-medium text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
+                    className="border-blue-200 bg-blue-50/50 font-mono text-xs font-medium text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
                   >
                     {leaveTypeName}
                   </Badge>
@@ -222,7 +222,7 @@ export function LeaveDetailDialog({
                   <TabIcon className="h-3.5 w-3.5" />
                   {label}
                   {count !== undefined && count > 0 && (
-                    <span className="bg-muted text-muted-foreground ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-[10px] font-semibold">
+                    <span className="bg-muted text-muted-foreground ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 font-mono text-xs font-semibold">
                       {count}
                     </span>
                   )}
@@ -250,12 +250,12 @@ export function LeaveDetailDialog({
 
                     <div className="space-y-2.5 text-xs">
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Employee Name</span>
+                        <span className="text-muted-foreground block text-xs">Employee Name</span>
                         <span className="text-foreground mt-0.5 block font-medium">{formatName(employeeName)}</span>
                       </div>
 
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Company Email</span>
+                        <span className="text-muted-foreground block text-xs">Company Email</span>
                         <div className="group mt-0.5 flex items-center justify-between">
                           <span className="text-foreground truncate font-mono font-medium select-all">
                             {employeeEmail || "—"}
@@ -279,19 +279,19 @@ export function LeaveDetailDialog({
                       </div>
 
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Department</span>
+                        <span className="text-muted-foreground block text-xs">Department</span>
                         <span className="text-foreground mt-0.5 block font-medium">{employeeDept}</span>
                       </div>
 
                       <div className="border-t pt-2.5">
-                        <span className="text-muted-foreground block text-[11px]">Assigned Reliever</span>
+                        <span className="text-muted-foreground block text-xs">Assigned Reliever</span>
                         <span className="text-foreground mt-0.5 block font-medium">
                           {leave.reliever?.full_name || resolvePersonName(leave.reliever) || "None required"}
                         </span>
                       </div>
 
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Department Lead / Supervisor</span>
+                        <span className="text-muted-foreground block text-xs">Department Lead / Supervisor</span>
                         <span className="text-foreground mt-0.5 block font-medium">
                           {leave.supervisor?.full_name || resolvePersonName(leave.supervisor) || "Department Lead"}
                         </span>
@@ -305,16 +305,16 @@ export function LeaveDetailDialog({
                     <div className="space-y-2.5 text-xs">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Leave Category</span>
+                          <span className="text-muted-foreground block text-xs">Leave Category</span>
                           <span className="text-foreground mt-0.5 block font-medium">{leaveTypeName}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Evidence Status</span>
+                          <span className="text-muted-foreground block text-xs">Evidence Status</span>
                           <div className="mt-0.5">
                             <Badge
                               variant={leave.evidence_complete ? "outline" : "secondary"}
                               className={cn(
-                                "px-1.5 py-0 text-[10px] font-medium",
+                                "px-1.5 py-0 text-xs font-medium",
                                 leave.evidence_complete
                                   ? "text-success-foreground border-emerald-500/30 bg-emerald-500/10"
                                   : "bg-muted text-muted-foreground"
@@ -328,21 +328,21 @@ export function LeaveDetailDialog({
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Leave Period</span>
-                          <span className="text-foreground mt-0.5 block font-mono text-[11px]">
+                          <span className="text-muted-foreground block text-xs">Leave Period</span>
+                          <span className="text-foreground mt-0.5 block font-mono text-xs">
                             {leave.start_date} to {leave.end_date}
                           </span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Resume Date</span>
-                          <span className="text-foreground mt-0.5 block font-mono text-[11px]">
+                          <span className="text-muted-foreground block text-xs">Resume Date</span>
+                          <span className="text-foreground mt-0.5 block font-mono text-xs">
                             {leave.resume_date || "—"}
                           </span>
                         </div>
                       </div>
 
                       <div className="border-t pt-2.5">
-                        <span className="text-muted-foreground block text-[11px]">Reason / Justification</span>
+                        <span className="text-muted-foreground block text-xs">Reason / Justification</span>
                         <div className="bg-muted/40 text-foreground/90 mt-1 rounded-md border p-2.5 text-xs italic">
                           &ldquo;{leave.reason || "No explicit reason provided."}&rdquo;
                         </div>
@@ -351,7 +351,7 @@ export function LeaveDetailDialog({
                       {leave.handover_note &&
                         (!leave.handover_checklist_url || !leave.handover_note.startsWith("Attached:")) && (
                           <div className="border-t pt-2">
-                            <span className="text-muted-foreground block text-[11px]">Handover Notes</span>
+                            <span className="text-muted-foreground block text-xs">Handover Notes</span>
                             <div className="bg-muted/40 text-foreground/90 mt-1 rounded-md border p-2.5 text-xs">
                               {leave.handover_note}
                             </div>
@@ -398,7 +398,7 @@ export function LeaveDetailDialog({
                             ? "Leave Request Cancelled"
                             : `Currently in Progress: Awaiting ${currentStageKey.replace(/_/g, " ").toUpperCase()}`}
                     </p>
-                    <p className="mt-0.5 text-[11px] opacity-90">
+                    <p className="mt-0.5 text-xs opacity-90">
                       {isApproved
                         ? "All required approvals have been completed. The employee is scheduled for leave."
                         : isRejected
@@ -429,7 +429,7 @@ export function LeaveDetailDialog({
                             <span className="text-foreground text-xs font-semibold">Direct Admin Manual Approval</span>
                             <Badge
                               variant="outline"
-                              className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600"
+                              className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600"
                             >
                               Approved
                             </Badge>
@@ -443,7 +443,7 @@ export function LeaveDetailDialog({
                             </span>
                           </p>
                           {leave.approved_at && (
-                            <p className="text-muted-foreground font-mono text-[11px]">
+                            <p className="text-muted-foreground font-mono text-xs">
                               {formatWATDateTime(leave.approved_at)}
                             </p>
                           )}
@@ -488,7 +488,7 @@ export function LeaveDetailDialog({
                             {/* Timeline Node Point */}
                             <div
                               className={cn(
-                                "absolute top-0.5 -left-[27px] flex h-5 w-5 items-center justify-center rounded-full border-2 text-[10px] font-bold shadow-xs transition-colors",
+                                "absolute top-0.5 -left-[27px] flex h-5 w-5 items-center justify-center rounded-full border-2 text-xs font-bold shadow-xs transition-colors",
                                 nodeColor
                               )}
                             >
@@ -503,19 +503,19 @@ export function LeaveDetailDialog({
                                 {item ? (
                                   <Badge
                                     variant="outline"
-                                    className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600 capitalize"
+                                    className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600 capitalize"
                                   >
                                     {item.status || "Approved"}
                                   </Badge>
                                 ) : isCurrent ? (
                                   <Badge
                                     variant="outline"
-                                    className="border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-600"
+                                    className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-600"
                                   >
                                     Awaiting Action
                                   </Badge>
                                 ) : (
-                                  <span className="text-muted-foreground text-[10px]">
+                                  <span className="text-muted-foreground text-xs">
                                     {stageKey === "reliever" && !hasRelieverAssignee
                                       ? "Not Required"
                                       : isApproved
@@ -534,15 +534,13 @@ export function LeaveDetailDialog({
                                     {item.approved_at && (
                                       <>
                                         <span>•</span>
-                                        <span className="font-mono text-[11px]">
-                                          {formatWATDateTime(item.approved_at)}
-                                        </span>
+                                        <span className="font-mono text-xs">{formatWATDateTime(item.approved_at)}</span>
                                       </>
                                     )}
                                   </div>
 
                                   {item.comments && (
-                                    <div className="bg-muted/40 text-foreground mt-1 flex items-start gap-1.5 rounded border p-2 text-[11px] italic">
+                                    <div className="bg-muted/40 text-foreground mt-1 flex items-start gap-1.5 rounded border p-2 text-xs italic">
                                       <MessageSquare className="text-muted-foreground mt-0.5 h-3 w-3 shrink-0" />
                                       <span>&ldquo;{item.comments}&rdquo;</span>
                                     </div>
@@ -605,7 +603,7 @@ export function LeaveDetailDialog({
                         </div>
                         <div>
                           <p className="text-foreground text-xs font-semibold">Attached Handover Checklist</p>
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-xs">
                             {leave.handover_note ? leave.handover_note : "Official handover document submission"}
                           </p>
                         </div>
@@ -641,7 +639,7 @@ export function LeaveDetailDialog({
                     <Badge
                       variant={leave.evidence_complete ? "outline" : "secondary"}
                       className={cn(
-                        "text-[10px] font-medium",
+                        "text-xs font-medium",
                         leave.evidence_complete ? "text-success-foreground border-emerald-500/30 bg-emerald-500/10" : ""
                       )}
                     >
@@ -668,7 +666,7 @@ export function LeaveDetailDialog({
                                 <Badge
                                   variant="outline"
                                   className={cn(
-                                    "px-1.5 py-0 text-[9px] uppercase",
+                                    "px-1.5 py-0 text-xs uppercase",
                                     doc.status === "verified"
                                       ? "text-success-foreground border-emerald-500/30 bg-emerald-500/10"
                                       : doc.status === "rejected"
@@ -679,9 +677,7 @@ export function LeaveDetailDialog({
                                   {doc.status}
                                 </Badge>
                               </div>
-                              {doc.notes && (
-                                <p className="text-muted-foreground mt-0.5 text-[11px] italic">{doc.notes}</p>
-                              )}
+                              {doc.notes && <p className="text-muted-foreground mt-0.5 text-xs italic">{doc.notes}</p>}
                             </div>
                           </div>
 
@@ -698,7 +694,7 @@ export function LeaveDetailDialog({
                     <div className="rounded-lg border border-dashed p-6 text-center">
                       <Paperclip className="text-muted-foreground/40 mx-auto mb-2 h-7 w-7" />
                       <p className="text-foreground text-xs font-medium">No evidence documents uploaded</p>
-                      <p className="text-muted-foreground mt-0.5 text-[11px]">
+                      <p className="text-muted-foreground mt-0.5 text-xs">
                         Supporting documents (e.g. medical certificates, travel tickets) appear here once uploaded.
                       </p>
                     </div>
@@ -708,12 +704,12 @@ export function LeaveDetailDialog({
                 {/* Required Documents Checklist (if specified) */}
                 {leave.required_documents && leave.required_documents.length > 0 && (
                   <div className="bg-card space-y-2 rounded-lg border p-4 shadow-xs">
-                    <span className="text-muted-foreground block text-[11px] font-semibold tracking-wider uppercase">
+                    <span className="text-muted-foreground block text-xs font-semibold tracking-wider uppercase">
                       Required Documents Policy
                     </span>
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {leave.required_documents.map((reqDoc) => (
-                        <Badge key={reqDoc} variant="secondary" className="text-[11px] font-normal">
+                        <Badge key={reqDoc} variant="secondary" className="text-xs font-normal">
                           {reqDoc}
                         </Badge>
                       ))}
@@ -727,7 +723,7 @@ export function LeaveDetailDialog({
 
         {/* Modal Footer */}
         <DialogFooter className="bg-muted/20 flex flex-row items-center justify-between gap-2 border-t px-5 py-3 sm:px-6">
-          <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <span className="hidden sm:inline">Request ID:</span>
             <Tooltip>
               <TooltipTrigger asChild>

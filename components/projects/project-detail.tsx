@@ -250,7 +250,7 @@ export function ProjectDetail({
                 <div key={fact.label} className="flex min-w-0 items-start gap-2.5">
                   <fact.icon className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
                   <div className="min-w-0">
-                    <dt className="text-muted-foreground text-[11px] font-medium">{fact.label}</dt>
+                    <dt className="text-muted-foreground text-xs font-medium">{fact.label}</dt>
                     <dd className="truncate text-sm font-medium">{fact.value}</dd>
                   </div>
                 </div>

@@ -162,7 +162,7 @@ export function TicketQueueTable({
             <TableCell className="text-muted-foreground font-medium">{ticket.ticket_number}</TableCell>
             <TableCell>
               <div className="font-medium">{ticket.title}</div>
-              <div className="text-muted-foreground mt-1 text-[11px]">
+              <div className="text-muted-foreground mt-1 text-xs">
                 {ticket.request_type} | requester: {ticket.requester_department || "-"} | service:{" "}
                 {ticket.service_department}
               </div>

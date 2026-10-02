@@ -597,7 +597,7 @@ export function OfficeLocationsPage({
           subtitle: (location) =>
             `${OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type} · ${location.department || "All Departments"} · ${location.employee_count || 0} employees`,
           trailing: (location) => (
-            <Badge variant={location.is_active ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={location.is_active ? "default" : "secondary"} className="text-xs">
               {location.is_active ? "Active" : "Inactive"}
             </Badge>
           ),
@@ -606,7 +606,7 @@ export function OfficeLocationsPage({
             subtitle: (location) =>
               OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type,
             badges: (location) => (
-              <Badge variant={location.is_active ? "default" : "secondary"} className="text-[10px]">
+              <Badge variant={location.is_active ? "default" : "secondary"} className="text-xs">
                 {location.is_active ? "Active" : "Inactive"}
               </Badge>
             ),

@@ -526,7 +526,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
                 <span>{r.technology_type || "General"}</span>
               </div>
               {r.portfolio && (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-xs">
                   {r.portfolio.code || r.portfolio.name}
                 </Badge>
               )}

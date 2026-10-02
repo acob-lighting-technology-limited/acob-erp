@@ -220,7 +220,7 @@ export function DirectiveFormDialog({
         <div className="grid gap-5 py-2">
           <div className="bg-muted/30 grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
             <div className="col-span-2 space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Meeting Date</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Meeting Date</Label>
               <Input
                 type="date"
                 value={meetingDate}
@@ -229,7 +229,7 @@ export function DirectiveFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Week</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Week</Label>
               <Input
                 type="number"
                 min={1}
@@ -240,7 +240,7 @@ export function DirectiveFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Year</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Year</Label>
               <Input
                 type="number"
                 value={year}

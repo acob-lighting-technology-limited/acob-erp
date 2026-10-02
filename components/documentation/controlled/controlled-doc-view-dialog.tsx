@@ -38,7 +38,7 @@ interface ControlledDocViewDialogProps {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">{label}</p>
+      <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{label}</p>
       <div className="text-sm">{children}</div>
     </div>
   )

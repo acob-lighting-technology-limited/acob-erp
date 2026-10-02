@@ -155,7 +155,7 @@ export default function AdminRequisitionsPage() {
             {r.requisition_number}
           </Link>
           {r.is_emergency && (
-            <span className="inline-flex w-fit items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
+            <span className="inline-flex w-fit items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-xs font-semibold text-red-600">
               <Siren className="h-2.5 w-2.5" /> Emergency
             </span>
           )}
@@ -171,7 +171,7 @@ export default function AdminRequisitionsPage() {
       render: (r) => (
         <div className="flex flex-col">
           <span className="text-xs font-semibold">{r.requester?.full_name || "Unknown"}</span>
-          <span className="text-muted-foreground text-[10px]">{r.department}</span>
+          <span className="text-muted-foreground text-xs">{r.department}</span>
         </div>
       ),
       initialWidth: 170,
@@ -213,20 +213,20 @@ export default function AdminRequisitionsPage() {
       render: (r) => {
         if (r.status === "approved") {
           return (
-            <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
+            <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600">
               <CheckCircle2 className="h-3 w-3" /> Fully Approved
             </span>
           )
         }
         if (r.status === "rejected") {
           return (
-            <span className="inline-flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-600">
+            <span className="inline-flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-600">
               <AlertCircle className="h-3 w-3" /> Rejected
             </span>
           )
         }
         return (
-          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600">
+          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">
             <Clock className="h-3 w-3" /> {getStageLabel(r.current_stage_code)}
           </span>
         )
@@ -312,7 +312,7 @@ export default function AdminRequisitionsPage() {
       render: (c) => (
         <div className="flex flex-col">
           <span className="text-xs font-semibold">{c.name}</span>
-          {c.description && <span className="text-muted-foreground text-[10px]">{c.description}</span>}
+          {c.description && <span className="text-muted-foreground text-xs">{c.description}</span>}
         </div>
       ),
       initialWidth: 260,
@@ -471,7 +471,7 @@ export default function AdminRequisitionsPage() {
             trailing: (r) => (
               <Badge
                 variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "secondary"}
-                className="text-[10px]"
+                className="text-xs"
               >
                 {r.status}
               </Badge>
@@ -520,7 +520,7 @@ export default function AdminRequisitionsPage() {
             title: (c) => c.name,
             subtitle: (c) => `${c.code} · ${c.description || "No description"}`,
             trailing: (c) => (
-              <Badge variant={c.is_active ? "default" : "outline"} className="text-[10px]">
+              <Badge variant={c.is_active ? "default" : "outline"} className="text-xs">
                 {c.is_active ? "Active" : "Inactive"}
               </Badge>
             ),
@@ -535,7 +535,7 @@ export default function AdminRequisitionsPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-semibold">{c.name}</p>
-                  <span className="text-muted-foreground font-mono text-[10px]">{c.code}</span>
+                  <span className="text-muted-foreground font-mono text-xs">{c.code}</span>
                 </div>
                 <Badge variant={c.is_active ? "default" : "outline"}>{c.is_active ? "Active" : "Inactive"}</Badge>
               </div>

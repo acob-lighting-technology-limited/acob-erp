@@ -349,12 +349,12 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                     className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-[10px]">
+                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-xs">
                         {i + 1}
                       </Badge>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-medium">{row.report.user_name}</div>
-                        <div className="text-muted-foreground truncate text-[10px]">{row.report.department}</div>
+                        <div className="text-muted-foreground truncate text-xs">{row.report.department}</div>
                       </div>
                     </div>
                     <span className="shrink-0 text-xs font-semibold">{metric.formatValue(row.value)}</span>
@@ -401,12 +401,12 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                     className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-[10px]">
+                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-xs">
                         {i + 1}
                       </Badge>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-medium">{dept.department}</div>
-                        <div className="text-muted-foreground truncate text-[10px]">
+                        <div className="text-muted-foreground truncate text-xs">
                           {dept.employee_count} employee{dept.employee_count === 1 ? "" : "s"}
                         </div>
                       </div>

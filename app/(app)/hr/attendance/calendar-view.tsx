@@ -197,13 +197,11 @@ export function EmployeeCalendarView() {
         {!loading && monthWorkedHours !== null && (
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="bg-card text-card-foreground min-w-[80px] rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-[90px] sm:px-3 sm:py-1.5">
-              <p className="text-muted-foreground mb-0.5 text-[10px] leading-none sm:mb-1 sm:text-[11px]">Work Hours</p>
+              <p className="text-muted-foreground mb-0.5 text-xs leading-none sm:mb-1 sm:text-xs">Work Hours</p>
               <p className="text-xs leading-none font-semibold text-emerald-600 sm:text-sm">{monthWorkedHours} hrs</p>
             </div>
             <div className="bg-card text-card-foreground min-w-[80px] rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-[90px] sm:px-3 sm:py-1.5">
-              <p className="text-muted-foreground mb-0.5 text-[10px] leading-none sm:mb-1 sm:text-[11px]">
-                Missed Hours
-              </p>
+              <p className="text-muted-foreground mb-0.5 text-xs leading-none sm:mb-1 sm:text-xs">Missed Hours</p>
               <p className="text-xs leading-none font-semibold text-amber-600 sm:text-sm">{monthMissedHours} hrs</p>
             </div>
           </div>
@@ -219,7 +217,7 @@ export function EmployeeCalendarView() {
             {DAY_HEADERS.map((d) => (
               <div
                 key={d}
-                className="text-muted-foreground py-1.5 text-center text-[11px] font-semibold sm:py-2 sm:text-xs"
+                className="text-muted-foreground py-1.5 text-center text-xs font-semibold sm:py-2 sm:text-xs"
               >
                 {d}
               </div>
@@ -255,14 +253,14 @@ export function EmployeeCalendarView() {
                   className={`min-h-14 border-b p-1 text-xs sm:min-h-16 sm:p-1.5 ${isLastInRow ? "" : "border-r"} ${bg}`}
                 >
                   <div
-                    className={`mb-0.5 text-[11px] font-medium sm:text-xs ${date === today ? "text-primary font-bold" : "text-muted-foreground"}`}
+                    className={`mb-0.5 text-xs font-medium sm:text-xs ${date === today ? "text-primary font-bold" : "text-muted-foreground"}`}
                   >
                     {date.slice(8)}
                   </div>
                   {!isFuture && day && status && status !== "weekend" && (
                     <>
                       <Badge
-                        className={`max-w-full truncate px-1 py-0 text-[9px] font-medium sm:text-[10px] ${
+                        className={`max-w-full truncate px-1 py-0 text-xs font-medium sm:text-xs ${
                           ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
                           "bg-neutral-muted text-neutral-foreground"
                         }`}
@@ -271,9 +269,7 @@ export function EmployeeCalendarView() {
                         <span className="hidden sm:inline">{fullLabel}</span>
                       </Badge>
                       {timeLabel && (
-                        <div className="text-muted-foreground mt-0.5 text-[9px] leading-tight sm:text-[10px]">
-                          {timeLabel}
-                        </div>
+                        <div className="text-muted-foreground mt-0.5 text-xs leading-tight sm:text-xs">{timeLabel}</div>
                       )}
                     </>
                   )}

@@ -150,7 +150,7 @@ function deriveLeadDepartments(department: string, isDepartmentLead: boolean, se
 }
 
 const AVATAR_SIZES = {
-  sm: "h-8 w-8 text-[10px]",
+  sm: "h-8 w-8 text-xs",
   md: "h-10 w-10 text-xs",
   lg: "h-12 w-12 text-sm",
   xl: "h-16 w-16 text-lg",
@@ -765,7 +765,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 {ELEVATED_ROLES.includes(r.role) && (
                   <Badge
                     className={cn(
-                      "shrink-0 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap shadow-none",
+                      "shrink-0 px-1.5 py-0 text-xs font-medium whitespace-nowrap shadow-none",
                       getRoleBadgeColor(r.role)
                     )}
                   >
@@ -830,7 +830,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             {r.is_department_lead && (
               <Badge
                 variant="outline"
-                className="text-warning-foreground shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap"
+                className="text-warning-foreground shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-xs font-medium whitespace-nowrap"
               >
                 <Shield className="h-2.5 w-2.5" />
                 Dept Lead
@@ -871,7 +871,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             display = "Contract Staff"
             badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
           }
-          return <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap", badgeColor)}>{display}</Badge>
+          return <Badge className={cn("px-1.5 py-0 text-xs whitespace-nowrap", badgeColor)}>{display}</Badge>
         },
       },
       {
@@ -1122,7 +1122,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           render: (r) => (
             <div className="animate-in fade-in slide-in-from-top-2 grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
               <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-blue-600 uppercase">
                   <IdCard className="h-4 w-4" /> Identity
                 </h4>
                 <div className="space-y-2 text-sm">
@@ -1145,7 +1145,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </div>
               </div>
               <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-600 uppercase">
+                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-emerald-600 uppercase">
                   <Building2 className="h-4 w-4" /> Work info
                 </h4>
                 <div className="space-y-2 text-sm">
@@ -1164,7 +1164,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 </div>
               </div>
               <div className="bg-muted/30 space-y-3 rounded-lg border p-4">
-                <h4 className="flex items-center gap-2 text-[10px] font-black tracking-widest text-amber-600 uppercase">
+                <h4 className="flex items-center gap-2 text-xs font-black tracking-widest text-amber-600 uppercase">
                   <Calendar className="h-4 w-4" /> Contact
                 </h4>
                 <div className="space-y-2 text-sm">
@@ -1314,7 +1314,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          className="hover:text-foreground truncate text-left text-[11px]"
+                          className="hover:text-foreground truncate text-left text-xs"
                           onClick={() => void handleCopyEmail(r.additional_email || "")}
                           aria-label="Copy additional email"
                         >

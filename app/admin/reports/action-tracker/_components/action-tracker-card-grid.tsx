@@ -62,7 +62,7 @@ export function ActionTrackerCardGrid({
                   <CardTitle className="text-base font-bold">{task.title}</CardTitle>
                   <p className="text-muted-foreground mt-1 text-sm">{task.department}</p>
                 </div>
-                <Badge className={cn("px-2.5 py-1 text-[10px] font-bold uppercase", deptStatus.color)}>
+                <Badge className={cn("px-2.5 py-1 text-xs font-bold uppercase", deptStatus.color)}>
                   {deptStatus.label}
                 </Badge>
               </div>
@@ -88,7 +88,7 @@ export function ActionTrackerCardGrid({
                   disabled={!canMutateTask(task)}
                   onValueChange={(value) => onStatusChange(task.id, value)}
                 >
-                  <SelectTrigger className={cn("h-9 w-full text-[11px] font-bold uppercase", statusColor(task.status))}>
+                  <SelectTrigger className={cn("h-9 w-full text-xs font-bold uppercase", statusColor(task.status))}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

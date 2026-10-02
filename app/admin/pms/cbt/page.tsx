@@ -810,7 +810,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             subtitle: (row) =>
               `${row.department} · ${formatCycleName(row.cycle)} · Score: ${scoreLabel(row.cbt_score)}`,
             trailing: (row) => (
-              <Badge variant={typeof row.cbt_score === "number" ? "default" : "secondary"} className="text-[10px]">
+              <Badge variant={typeof row.cbt_score === "number" ? "default" : "secondary"} className="text-xs">
                 {scoreLabel(row.cbt_score)}
               </Badge>
             ),

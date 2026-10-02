@@ -92,7 +92,7 @@ export function AttendanceForm({ initialPolicy }: AttendanceFormProps) {
                 required
                 className="w-full font-medium"
               />
-              <p className="text-muted-foreground text-[11px]">Official opening hour. Default is 08:00 AM.</p>
+              <p className="text-muted-foreground text-xs">Official opening hour. Default is 08:00 AM.</p>
             </div>
 
             <div className="space-y-2">
@@ -105,7 +105,7 @@ export function AttendanceForm({ initialPolicy }: AttendanceFormProps) {
                 required
                 className="w-full font-medium"
               />
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Clock-ins after this time are marked Late. Default is 08:20 AM.
               </p>
             </div>
@@ -120,7 +120,7 @@ export function AttendanceForm({ initialPolicy }: AttendanceFormProps) {
                 required
                 className="w-full font-medium"
               />
-              <p className="text-muted-foreground text-[11px]">Official closing hour. Default is 05:00 PM.</p>
+              <p className="text-muted-foreground text-xs">Official closing hour. Default is 05:00 PM.</p>
             </div>
 
             <div className="space-y-2">
@@ -136,7 +136,7 @@ export function AttendanceForm({ initialPolicy }: AttendanceFormProps) {
                 required
                 className="w-full font-medium"
               />
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Hours charged when an employee misses a punch, on top of the side that was recorded. Default is 1.0.
               </p>
             </div>
@@ -154,7 +154,7 @@ export function AttendanceForm({ initialPolicy }: AttendanceFormProps) {
                 required
                 className="w-full font-medium"
               />
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Unpaid break deducted from a qualifying day. Default is 30 minutes.
               </p>
             </div>
@@ -172,14 +172,14 @@ export function AttendanceForm({ initialPolicy }: AttendanceFormProps) {
                 required
                 className="w-full font-medium"
               />
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Shortest day that earns the lunch break. Default is 5 hours.
               </p>
             </div>
           </div>
 
           <div className="bg-muted/40 rounded-lg border p-4">
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               A full working day is{" "}
               <span className="text-foreground font-semibold">{netDayHours.toFixed(2)} hours</span> —{" "}
               {grossDayHours.toFixed(2)}h from {formData.startTime} to {formData.endTime}, less the{" "}
@@ -193,7 +193,7 @@ export function AttendanceForm({ initialPolicy }: AttendanceFormProps) {
               <Label htmlFor="emailNotificationsEnabled" className="text-sm font-semibold">
                 Email Notifications
               </Label>
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 When on, manual attendance alterations and LWP/AWP appeal decisions email the affected employee and the
                 Admin &amp; HR lead.
               </p>

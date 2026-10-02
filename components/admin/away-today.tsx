@@ -58,11 +58,11 @@ export function AwayToday({
               <li key={`${item.reason}-${item.userId}`} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{item.name}</p>
-                  <p className="text-muted-foreground truncate text-[11px]">
+                  <p className="text-muted-foreground truncate text-xs">
                     {[item.department, untilLabel(item, todayIso)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
-                <Badge className={`shrink-0 px-1.5 py-0 text-[10px] ${REASON_CLASSES[item.reason]}`}>
+                <Badge className={`shrink-0 px-1.5 py-0 text-xs ${REASON_CLASSES[item.reason]}`}>
                   {item.label}
                 </Badge>
               </li>

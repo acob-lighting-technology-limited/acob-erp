@@ -395,7 +395,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             {isCollapsed ? (
               section.key !== "overview" && <div className="mx-1.5 my-1.5 border-t" />
             ) : (
-              <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
+              <p className="text-muted-foreground px-3 pt-1 pb-1 text-xs font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
               const hasChildren = !isCollapsed && item.children && item.children.length > 0
@@ -459,7 +459,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           {!isCollapsed && item.badge != null && item.badge > 0 && (
                             <span
                               className={cn(
-                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tracking-tight",
                                 highlighted
                                   ? "bg-primary-foreground text-primary"
                                   : "bg-emerald-600 text-white dark:bg-emerald-500"

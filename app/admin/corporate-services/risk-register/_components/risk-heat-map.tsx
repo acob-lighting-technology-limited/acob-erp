@@ -31,7 +31,7 @@ export function RiskHeatMap({ risks }: { risks: RiskRow[] }) {
               <tr key={l.value}>
                 <th scope="row" className="text-muted-foreground pr-2 text-right text-xs font-medium whitespace-nowrap">
                   <span className="text-foreground">{l.value}</span> {l.label}
-                  <span className="block text-[10px] font-normal">{l.band}</span>
+                  <span className="block text-xs font-normal">{l.band}</span>
                 </th>
                 {IMPACT_LEVELS.map((i) => {
                   const score = l.value * i.value
@@ -47,7 +47,7 @@ export function RiskHeatMap({ risks }: { risks: RiskRow[] }) {
                       )}
                     >
                       <span className="block text-lg font-bold">{count || ""}</span>
-                      <span className="block text-[10px] opacity-70">{score}</span>
+                      <span className="block text-xs opacity-70">{score}</span>
                     </td>
                   )
                 })}
@@ -58,7 +58,7 @@ export function RiskHeatMap({ risks }: { risks: RiskRow[] }) {
               {IMPACT_LEVELS.map((i) => (
                 <th key={i.value} scope="col" className="text-muted-foreground pt-1 text-center text-xs font-medium">
                   <span className="text-foreground">{i.value}</span>
-                  <span className="block text-[10px] font-normal">{i.label}</span>
+                  <span className="block text-xs font-normal">{i.label}</span>
                 </th>
               ))}
             </tr>

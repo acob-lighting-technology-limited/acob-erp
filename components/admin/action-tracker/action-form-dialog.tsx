@@ -197,7 +197,7 @@ export function ActionFormDialog({
           {/* Common Metadata */}
           <div className="bg-muted/30 grid grid-cols-3 gap-4 rounded-lg border p-4">
             <div className="col-span-1 space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Department</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Department</Label>
               <Select value={dept} onValueChange={setDept}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Dept" />
@@ -212,11 +212,11 @@ export function ActionFormDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Week</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Week</Label>
               <Input type="number" value={week} onChange={(e) => setWeek(parseInt(e.target.value))} className="h-9" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Year</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Year</Label>
               <Input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="h-9" />
             </div>
           </div>

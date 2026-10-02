@@ -16,7 +16,7 @@ export function DocStatsCards({ total, published, draft }: DocStatsCardsProps) {
         <CardContent className="p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">
+              <p className="text-muted-foreground truncate text-xs font-medium sm:text-xs md:text-sm">
                 Total Documents
               </p>
               <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">{total}</p>
@@ -29,7 +29,7 @@ export function DocStatsCards({ total, published, draft }: DocStatsCardsProps) {
         <CardContent className="p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">Published</p>
+              <p className="text-muted-foreground truncate text-xs font-medium sm:text-xs md:text-sm">Published</p>
               <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">{published}</p>
             </div>
             <Eye className="h-5 w-5 shrink-0 text-green-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-green-400" />
@@ -40,7 +40,7 @@ export function DocStatsCards({ total, published, draft }: DocStatsCardsProps) {
         <CardContent className="p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground truncate text-[10px] font-medium sm:text-xs md:text-sm">Drafts</p>
+              <p className="text-muted-foreground truncate text-xs font-medium sm:text-xs md:text-sm">Drafts</p>
               <p className="text-foreground mt-1 text-lg font-bold sm:text-xl md:mt-2 md:text-3xl">{draft}</p>
             </div>
             <EyeOff className="h-5 w-5 shrink-0 text-yellow-600 sm:h-6 sm:w-6 md:h-8 md:w-8 dark:text-yellow-400" />

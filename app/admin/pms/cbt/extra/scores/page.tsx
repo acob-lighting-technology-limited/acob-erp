@@ -253,7 +253,7 @@ export default function AdminPmsCbtExtraScoresPage() {
           subtitle: (row) =>
             `${row.department} · ${row.cycle} · Bonus: ${row.bonus_score !== null ? `${row.bonus_score}%` : "None"}`,
           trailing: (row) => (
-            <Badge variant={row.bonus_score === 100 ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={row.bonus_score === 100 ? "default" : "secondary"} className="text-xs">
               {row.bonus_score !== null ? `${row.bonus_score}%` : "None"}
             </Badge>
           ),
@@ -269,7 +269,7 @@ export default function AdminPmsCbtExtraScoresPage() {
                 {row.bonus_score !== null ? `${row.bonus_score}%` : "None"}
               </Badge>
             </div>
-            <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
               <span>{row.department}</span>
               <span>{row.cycle}</span>
             </div>

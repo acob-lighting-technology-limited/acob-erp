@@ -115,7 +115,7 @@ export default function ToolsPage() {
                 <p className="text-muted-foreground text-xs leading-relaxed">{tool.description}</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">{tool.subLabel}</span>
+                <span className="text-muted-foreground text-xs font-medium">{tool.subLabel}</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor={tool.fill}

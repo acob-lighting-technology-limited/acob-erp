@@ -341,7 +341,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
                   {!isFuture && day && status && status !== "weekend" && (
                     <>
                       <Badge
-                        className={`max-w-full truncate px-1 py-0 text-[10px] font-medium ${
+                        className={`max-w-full truncate px-1 py-0 text-xs font-medium ${
                           ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
                           "bg-neutral-muted text-neutral-foreground"
                         }`}

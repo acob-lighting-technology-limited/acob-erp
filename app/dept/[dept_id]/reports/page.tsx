@@ -44,7 +44,7 @@ export default async function DeptReportsPage({ params }: Props) {
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Department Updates</span>
+                <span className="text-muted-foreground text-xs font-medium">Department Updates</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-indigo-500"

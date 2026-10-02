@@ -176,7 +176,7 @@ export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDia
                     <Badge
                       variant={c.daysUntil === 0 ? "default" : "outline"}
                       className={cn(
-                        "mt-0.5 gap-1 px-1.5 py-0 text-[10px]",
+                        "mt-0.5 gap-1 px-1.5 py-0 text-xs",
                         c.daysUntil === 0 && "bg-primary text-primary-foreground"
                       )}
                     >

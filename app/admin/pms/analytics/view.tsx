@@ -455,7 +455,7 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
           trailing: (row) => {
             const tier = scoreToTier(row.final)
             return (
-              <Badge variant={tier.variant} className="text-[10px]">
+              <Badge variant={tier.variant} className="text-xs">
                 {tier.label}
               </Badge>
             )

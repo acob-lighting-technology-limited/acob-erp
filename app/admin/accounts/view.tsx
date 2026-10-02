@@ -252,7 +252,7 @@ export async function AdminAccountsPage({ basePath, lockedDepartmentId }: AdminA
                   <p className="text-muted-foreground text-xs leading-relaxed">{item.description}</p>
                 </div>
                 <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">{item.subLabel}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{item.subLabel}</span>
                   <IconFill
                     icon={ChevronRight}
                     fillColor={item.fill}

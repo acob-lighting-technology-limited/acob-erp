@@ -165,7 +165,7 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground hover:text-foreground h-6 px-2 text-[11px]"
+                  className="text-muted-foreground hover:text-foreground h-6 px-2 text-xs"
                   onClick={handlePaste}
                 >
                   Paste from cPanel
@@ -174,7 +174,7 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-6 gap-1 px-2 text-[11px]"
+                  className="h-6 gap-1 px-2 text-xs"
                   onClick={() => setPassword(generateRandomPassword())}
                 >
                   <Sparkles className="h-3 w-3" />
@@ -230,7 +230,7 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
                 </Tooltip>
               </div>
             </div>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Paste the password you entered in cPanel when creating the account. This will be securely emailed to the
               employee.
             </p>

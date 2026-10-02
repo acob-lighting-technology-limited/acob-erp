@@ -469,7 +469,7 @@ export function DirectoryContent() {
           subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
           trailing: (r) =>
             r.is_department_lead ? (
-              <Badge variant="outline" className="text-success-foreground text-[10px]">
+              <Badge variant="outline" className="text-success-foreground text-xs">
                 Lead
               </Badge>
             ) : null,
@@ -481,7 +481,7 @@ export function DirectoryContent() {
               r.is_department_lead ? (
                 <Badge
                   variant="outline"
-                  className="text-success-foreground border-emerald-500/40 bg-emerald-500/10 text-[10px]"
+                  className="text-success-foreground border-emerald-500/40 bg-emerald-500/10 text-xs"
                 >
                   Lead
                 </Badge>

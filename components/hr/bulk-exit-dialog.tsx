@@ -238,7 +238,7 @@ export function BulkExitDialog({ open, onOpenChange, employees, onSuccess }: Bul
                           <span className="text-muted-foreground ml-2 text-xs">{emp.department}</span>
                         </div>
                         {hasOverride && (
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-xs">
                             Custom
                           </Badge>
                         )}

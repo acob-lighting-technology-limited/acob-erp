@@ -279,7 +279,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground mt-1 text-[10px]">Which funding line this payment is drawn against.</p>
+            <p className="text-muted-foreground mt-1 text-xs">Which funding line this payment is drawn against.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -331,7 +331,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
                 >
                   <Siren className="h-3.5 w-3.5" /> Emergency Requisition
                 </Label>
-                <p className="text-muted-foreground text-[10px]">
+                <p className="text-muted-foreground text-xs">
                   For urgent site needs only. Skips Admin &amp; HR review, Corporate Services authorization and Accounts
                   verification — it goes straight to the MD / Executive Management for a single decision.
                 </p>
@@ -356,7 +356,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
                   rows={2}
                   className="text-xs"
                 />
-                <p className="text-muted-foreground text-[10px]">
+                <p className="text-muted-foreground text-xs">
                   Minimum {EMERGENCY_JUSTIFICATION_MIN_LENGTH} characters. This is recorded on the form and shown to the
                   approver.
                 </p>
@@ -434,7 +434,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
               <Label className="text-xs font-bold tracking-wider text-emerald-700 uppercase dark:text-emerald-400">
                 Attach Supporting Receipts / Documents (Optional)
               </Label>
-              <span className="text-muted-foreground text-[10px]">PDF, PNG, JPG up to 10MB</span>
+              <span className="text-muted-foreground text-xs">PDF, PNG, JPG up to 10MB</span>
             </div>
 
             <div className="hover:bg-muted/30 relative rounded-lg border-2 border-dashed p-4 text-center transition">

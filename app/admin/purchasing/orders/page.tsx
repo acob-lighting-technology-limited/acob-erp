@@ -313,7 +313,7 @@ export default function PurchaseOrdersPage() {
           subtitle: (order) =>
             `${formatCurrency(order.total_amount, order.currency)} · Expected ${order.expected_date ? formatDate(order.expected_date) : "Not set"}`,
           trailing: (order) => (
-            <Badge variant={statusColors[order.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[order.status]} className="text-xs capitalize">
               {order.status}
             </Badge>
           ),

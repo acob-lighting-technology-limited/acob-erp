@@ -104,9 +104,7 @@ export function PortfolioDialog({
               Short Code
             </Label>
             <Input id="portfolio-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="MST" />
-            <p className="text-muted-foreground text-[11px]">
-              Shown on project rows where the full name would not fit.
-            </p>
+            <p className="text-muted-foreground text-xs">Shown on project rows where the full name would not fit.</p>
           </div>
 
           <div className="space-y-2">

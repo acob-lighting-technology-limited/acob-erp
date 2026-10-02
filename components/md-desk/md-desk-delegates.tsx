@@ -190,7 +190,7 @@ export function MdDeskDelegates({ basePath }: { basePath: string }) {
           title: (d) => d.name,
           subtitle: (d) => `${d.department || "General"} · Added ${formatWATDate(d.created_at)}`,
           trailing: (d) => (
-            <Badge variant={d.can_edit ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={d.can_edit ? "default" : "secondary"} className="text-xs">
               {d.can_edit ? "Can edit" : "View only"}
             </Badge>
           ),

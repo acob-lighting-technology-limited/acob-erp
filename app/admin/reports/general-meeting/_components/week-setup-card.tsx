@@ -383,7 +383,7 @@ export function WeekSetupCard() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-6 border-amber-500/40 text-[11px] text-amber-800 hover:bg-amber-100 dark:text-amber-200"
+                    className="h-6 border-amber-500/40 text-xs text-amber-800 hover:bg-amber-100 dark:text-amber-200"
                     onClick={() => setMeetingDateInput(tuesdayIso)}
                     disabled={isWeekSetupLocked}
                   >
@@ -542,7 +542,7 @@ export function WeekSetupCard() {
                   {savingMeetingWindow && <Loader2 className="h-4 w-4 animate-spin" />}
                   Save Week Setup
                 </Button>
-                <span className="text-muted-foreground text-[11px]">
+                <span className="text-muted-foreground text-xs">
                   {isWeekSetupLocked
                     ? "This week is locked after the meeting grace window, so the setup is read-only."
                     : lockState?.hasOverrideRole

@@ -109,7 +109,7 @@ export function MeetingReminderForm({
             The date updates automatically from the selected week&apos;s Admin Reports setup. This value is read-only
             here.
           </p>
-          <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
+          <Button variant="outline" size="sm" asChild className="h-7 px-2 text-xs">
             <Link href="/admin/reports/general-meeting">Manage Meeting Date</Link>
           </Button>
         </div>

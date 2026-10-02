@@ -551,15 +551,15 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 text-xs">
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Location</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Location</p>
                     <p className="font-medium">{r.location || "—"}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Technology</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Technology</p>
                     <p className="font-medium">{r.technology_type || "—"}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Capacity</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Capacity</p>
                     <p className="font-medium">{formatCapacity(r.capacity_w)}</p>
                   </div>
                 </div>

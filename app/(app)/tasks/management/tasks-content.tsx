@@ -79,7 +79,7 @@ function TaskStatusPill({ task }: { task: Task }) {
     return (
       <Badge
         variant="destructive"
-        className="text-danger-foreground border-rose-500/30 bg-rose-500/15 text-[10px] whitespace-nowrap"
+        className="text-danger-foreground border-rose-500/30 bg-rose-500/15 text-xs whitespace-nowrap"
       >
         {cfg.label} · Escalated
       </Badge>
@@ -90,7 +90,7 @@ function TaskStatusPill({ task }: { task: Task }) {
     return (
       <Badge
         variant="outline"
-        className="text-warning-foreground border-amber-500/30 bg-amber-500/15 text-[10px] whitespace-nowrap"
+        className="text-warning-foreground border-amber-500/30 bg-amber-500/15 text-xs whitespace-nowrap"
       >
         {cfg.label} · Grace
       </Badge>
@@ -98,7 +98,7 @@ function TaskStatusPill({ task }: { task: Task }) {
   }
 
   return (
-    <Badge variant={cfg.badgeVariant} className={cn("text-[10px] whitespace-nowrap capitalize", cfg.color)}>
+    <Badge variant={cfg.badgeVariant} className={cn("text-xs whitespace-nowrap capitalize", cfg.color)}>
       {cfg.label}
     </Badge>
   )
@@ -304,7 +304,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         t.goal_title ? (
           <div className="flex flex-col">
             <span className="text-foreground line-clamp-1 text-xs font-medium">{t.goal_title}</span>
-            {t.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-[10px]">{t.kpi_measure}</span>}
+            {t.kpi_measure && <span className="text-muted-foreground line-clamp-1 text-xs">{t.kpi_measure}</span>}
           </div>
         ) : t.kpi_measure ? (
           <span className="text-foreground line-clamp-1 text-xs font-medium">{t.kpi_measure}</span>
@@ -579,7 +579,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                 <TaskStatusPill task={t} />
                 <Badge
                   variant="outline"
-                  className={cn("font-mono text-[10px] font-medium", getTaskWeightBadgeClass(t.weight))}
+                  className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}
                 >
                   Weight {t.weight ?? TASK_WEIGHT_DEFAULT}
                 </Badge>
@@ -643,9 +643,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             <div className="space-y-4 p-4 text-xs">
               <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
-                  <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
-                    Task Title
-                  </span>
+                  <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Task Title</span>
                   <h3 className="text-foreground text-sm leading-snug font-semibold">{t.title}</h3>
                 </div>
                 <Tooltip>
@@ -668,7 +666,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-3">
-                  <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
+                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
                     Description & Scope
                   </h4>
 
@@ -710,20 +708,18 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-foreground text-[11px] font-semibold tracking-wider uppercase">
-                    Context & Details
-                  </h4>
+                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">Context & Details</h4>
                   <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Strategic Goal:</span>
+                      <span className="text-muted-foreground block text-xs">Strategic Goal:</span>
                       <span className="font-medium">{t.goal_title || "—"}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Corporate KPI:</span>
+                      <span className="text-muted-foreground block text-xs">Corporate KPI:</span>
                       <span className="font-medium">{t.kpi_measure || "—"}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Assigned By:</span>
+                      <span className="text-muted-foreground block text-xs">Assigned By:</span>
                       <span className="font-medium">
                         {t.assigned_by_user
                           ? formatFullName(t.assigned_by_user.first_name, t.assigned_by_user.last_name)
@@ -731,15 +727,15 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                       </span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Department:</span>
+                      <span className="text-muted-foreground block text-xs">Department:</span>
                       <span className="font-medium">{t.department || t.assigned_to_user?.department || "—"}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Start Date:</span>
+                      <span className="text-muted-foreground block text-xs">Start Date:</span>
                       <span>{t.task_start_date ? formatWATDate(t.task_start_date) : "—"}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground block text-[10px]">Due Date:</span>
+                      <span className="text-muted-foreground block text-xs">Due Date:</span>
                       <span className={isTaskOverdue(t) ? "text-destructive font-semibold" : "font-medium"}>
                         {t.due_date ? formatWATDate(t.due_date) : "No deadline"}
                       </span>

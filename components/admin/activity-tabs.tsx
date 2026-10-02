@@ -262,7 +262,7 @@ export function AdminActivityTabs({
                     className="data-[state=active]:border-primary data-[state=active]:text-foreground text-muted-foreground relative flex shrink-0 items-center gap-1 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs font-medium transition-none data-[state=active]:shadow-none"
                   >
                     {label}
-                    <span className="text-muted-foreground text-[10px] tabular-nums">({count})</span>
+                    <span className="text-muted-foreground text-xs tabular-nums">({count})</span>
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -280,9 +280,9 @@ export function AdminActivityTabs({
                       {a.asset_model ? ` — ${a.asset_model}` : ""}
                     </p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <span className="text-muted-foreground font-mono text-[10px]">{a.unique_code || "—"}</span>
-                      {a.department && <span className="text-muted-foreground text-[10px]">{a.department}</span>}
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(a.status)}`}>{a.status}</Badge>
+                      <span className="text-muted-foreground font-mono text-xs">{a.unique_code || "—"}</span>
+                      {a.department && <span className="text-muted-foreground text-xs">{a.department}</span>}
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(a.status)}`}>{a.status}</Badge>
                     </div>
                   </ItemRow>
                 ))}
@@ -300,10 +300,10 @@ export function AdminActivityTabs({
                   <ItemRow key={t.id} href="/admin/tasks">
                     <p className="truncate text-sm font-medium">{t.title}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(t.status)}`}>{t.status}</Badge>
-                      <Badge className={`px-1.5 py-0 text-[10px] ${priorityColor(t.priority)}`}>{t.priority}</Badge>
-                      {t.due_date && <span className="text-muted-foreground text-[10px]">{shortDate(t.due_date)}</span>}
-                      {t.department && <span className="text-muted-foreground text-[10px]">{t.department}</span>}
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(t.status)}`}>{t.status}</Badge>
+                      <Badge className={`px-1.5 py-0 text-xs ${priorityColor(t.priority)}`}>{t.priority}</Badge>
+                      {t.due_date && <span className="text-muted-foreground text-xs">{shortDate(t.due_date)}</span>}
+                      {t.department && <span className="text-muted-foreground text-xs">{t.department}</span>}
                     </div>
                   </ItemRow>
                 ))}
@@ -322,11 +322,11 @@ export function AdminActivityTabs({
                     <p className="truncate text-sm font-medium">{d.title}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
                       {d.category && (
-                        <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                        <Badge variant="outline" className="px-1.5 py-0 text-xs">
                           {d.category}
                         </Badge>
                       )}
-                      <span className="text-muted-foreground text-[10px]">{shortDate(d.created_at)}</span>
+                      <span className="text-muted-foreground text-xs">{shortDate(d.created_at)}</span>
                     </div>
                   </ItemRow>
                 ))}
@@ -344,10 +344,10 @@ export function AdminActivityTabs({
                   <ItemRow key={f.id} href="/admin/feedback">
                     <p className="truncate text-sm font-medium">{f.title}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                      <Badge variant="outline" className="px-1.5 py-0 text-xs">
                         {f.feedback_type}
                       </Badge>
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(f.status)}`}>{f.status}</Badge>
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(f.status)}`}>{f.status}</Badge>
                     </div>
                   </ItemRow>
                 ))}
@@ -365,8 +365,8 @@ export function AdminActivityTabs({
                   <ItemRow key={c.id} href="/admin/correspondence">
                     <p className="truncate text-sm font-medium">{c.subject}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <span className="text-muted-foreground font-mono text-[10px]">{c.reference_number}</span>
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(c.status)}`}>{c.status}</Badge>
+                      <span className="text-muted-foreground font-mono text-xs">{c.reference_number}</span>
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(c.status)}`}>{c.status}</Badge>
                     </div>
                   </ItemRow>
                 ))}
@@ -384,9 +384,9 @@ export function AdminActivityTabs({
                   <ItemRow key={h.id} href="/admin/help-desk">
                     <p className="truncate text-sm font-medium">{h.title}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <span className="text-muted-foreground font-mono text-[10px]">{h.ticket_number}</span>
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(h.status)}`}>{h.status}</Badge>
-                      <Badge className={`px-1.5 py-0 text-[10px] ${priorityColor(h.priority)}`}>{h.priority}</Badge>
+                      <span className="text-muted-foreground font-mono text-xs">{h.ticket_number}</span>
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(h.status)}`}>{h.status}</Badge>
+                      <Badge className={`px-1.5 py-0 text-xs ${priorityColor(h.priority)}`}>{h.priority}</Badge>
                     </div>
                   </ItemRow>
                 ))}
@@ -404,12 +404,12 @@ export function AdminActivityTabs({
                   <ItemRow key={p.id} href="/admin/accounts/payments">
                     <p className="truncate text-sm font-medium">{p.title}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                      <Badge variant="outline" className="px-1.5 py-0 text-xs">
                         {p.payment_type}
                       </Badge>
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(p.status)}`}>{p.status}</Badge>
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(p.status)}`}>{p.status}</Badge>
                       {p.amount != null && (
-                        <span className="text-muted-foreground text-[10px]">
+                        <span className="text-muted-foreground text-xs">
                           {p.currency || "NGN"} {Number(p.amount).toLocaleString()}
                         </span>
                       )}
@@ -430,12 +430,12 @@ export function AdminActivityTabs({
                   <ItemRow key={l.id} href="/admin/hr/leave">
                     <p className="truncate text-sm font-medium">{l.request_kind || "Standard leave"}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(l.status)}`}>{l.status}</Badge>
-                      <span className="text-muted-foreground text-[10px]">
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(l.status)}`}>{l.status}</Badge>
+                      <span className="text-muted-foreground text-xs">
                         {shortDate(l.start_date)} – {shortDate(l.end_date)}
                       </span>
                       {l.days_count != null && (
-                        <span className="text-muted-foreground text-[10px]">{l.days_count}d</span>
+                        <span className="text-muted-foreground text-xs">{l.days_count}d</span>
                       )}
                     </div>
                   </ItemRow>
@@ -454,14 +454,14 @@ export function AdminActivityTabs({
                   <ItemRow key={a.id} href="/admin/hr/attendance">
                     <p className="text-sm font-medium">{shortDate(a.date)}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(a.status)}`}>{a.status}</Badge>
+                      <Badge className={`px-1.5 py-0 text-xs ${statusColor(a.status)}`}>{a.status}</Badge>
                       {a.clock_in && (
-                        <span className="text-muted-foreground text-[10px]">
+                        <span className="text-muted-foreground text-xs">
                           In {(a.clock_in as string).substring(0, 5)}
                         </span>
                       )}
                       {a.clock_out && (
-                        <span className="text-muted-foreground text-[10px]">
+                        <span className="text-muted-foreground text-xs">
                           Out {(a.clock_out as string).substring(0, 5)}
                         </span>
                       )}

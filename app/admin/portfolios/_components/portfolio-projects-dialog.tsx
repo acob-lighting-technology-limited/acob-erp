@@ -215,11 +215,11 @@ export function PortfolioProjectsDialog({
                         />
                         <span className="min-w-0 flex-1 truncate text-sm">{project.project_name}</span>
                         {project.currentPortfolio ? (
-                          <Badge variant="outline" className="shrink-0 text-[10px]">
+                          <Badge variant="outline" className="shrink-0 text-xs">
                             In {portfolioLabel(project.currentPortfolio)}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground shrink-0 text-[11px]">Unassigned</span>
+                          <span className="text-muted-foreground shrink-0 text-xs">Unassigned</span>
                         )}
                       </label>
                     </li>

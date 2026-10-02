@@ -141,11 +141,11 @@ export function MyTasksCard({ tasks }: { tasks: Task[] }) {
                 </div>
               </div>
               <div className="mt-0.5 flex items-center gap-1.5">
-                <Badge className={cn("px-1.5 py-0 text-[10px] capitalize", statusBadgeClass(task.status))}>
+                <Badge className={cn("px-1.5 py-0 text-xs capitalize", statusBadgeClass(task.status))}>
                   {humanizeStatus(task.status)}
                 </Badge>
                 {task.priority && (
-                  <span className="text-muted-foreground text-[10px] capitalize">{task.priority} priority</span>
+                  <span className="text-muted-foreground text-xs capitalize">{task.priority} priority</span>
                 )}
               </div>
             </Row>
@@ -231,11 +231,11 @@ export function LeaveCard({ leave, className }: { leave: LeaveItem[]; className?
             <Row key={item.id} href="/hr/leave">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-medium">{item.leave_type}</p>
-                <Badge className={cn("shrink-0 px-1.5 py-0 text-[10px]", LEAVE_STATE_CLASSES[state])}>
+                <Badge className={cn("shrink-0 px-1.5 py-0 text-xs", LEAVE_STATE_CLASSES[state])}>
                   {LEAVE_STATE_LABELS[state]}
                 </Badge>
               </div>
-              <p className="text-muted-foreground mt-0.5 text-[11px]">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 {leaveDateRange(item)}
                 {item.days_requested > 0 && (
                   <span className="tabular-nums">
@@ -286,7 +286,7 @@ export function AssetsCard({ assets, className }: { assets: Asset[]; className?:
                 {asset.asset_type}
                 {asset.asset_model ? ` — ${asset.asset_model}` : ""}
               </p>
-              <p className="text-muted-foreground mt-0.5 font-mono text-[10px]">{asset.unique_code || "—"}</p>
+              <p className="text-muted-foreground mt-0.5 font-mono text-xs">{asset.unique_code || "—"}</p>
             </Row>
           ))}
         </ul>
@@ -351,12 +351,12 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
                   </p>
                   <Badge
                     variant="outline"
-                    className={cn("shrink-0 border px-1.5 py-0 text-[10px] font-medium", statusColor)}
+                    className={cn("shrink-0 border px-1.5 py-0 text-xs font-medium", statusColor)}
                   >
                     {statusLabel}
                   </Badge>
                 </div>
-                <div className="text-muted-foreground mt-0.5 flex items-center justify-between text-[11px]">
+                <div className="text-muted-foreground mt-0.5 flex items-center justify-between text-xs">
                   <span>
                     {item.clock_in ? (
                       <>
@@ -420,7 +420,7 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
       <div className="bg-muted/30 flex shrink-0 items-center justify-between border-t border-b px-4 py-3 text-sm">
         <div>
           <p className="text-muted-foreground font-medium">{currentMonthName} deductions</p>
-          <p className="text-muted-foreground text-[10px]">Your share, after the company meal subsidy</p>
+          <p className="text-muted-foreground text-xs">Your share, after the company meal subsidy</p>
         </div>
         <span className="font-mono font-semibold tabular-nums">
           ₦{totalDeduction.toLocaleString("en-US", { minimumFractionDigits: 2 })}
@@ -434,7 +434,7 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
                 <p className="text-foreground font-semibold">
                   {formatWATDate(log.date, { weekday: "short", month: "short", day: "numeric" })}
                 </p>
-                <p className="text-muted-foreground text-[10px]">Meal price: ₦{Number(log.cost).toLocaleString()}</p>
+                <p className="text-muted-foreground text-xs">Meal price: ₦{Number(log.cost).toLocaleString()}</p>
               </div>
               <span className="font-mono font-medium tabular-nums">
                 ₦{Number(log.employee_deduction).toLocaleString("en-US", { minimumFractionDigits: 2 })}

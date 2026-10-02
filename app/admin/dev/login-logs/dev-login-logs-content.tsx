@@ -235,8 +235,8 @@ function UserStatsView({
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={userStats.hourlyChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                <XAxis dataKey="hour" tickLine={false} axisLine={false} className="text-[10px]" />
-                <YAxis tickLine={false} axisLine={false} className="text-[10px]" />
+                <XAxis dataKey="hour" tickLine={false} axisLine={false} className="text-xs" />
+                <YAxis tickLine={false} axisLine={false} className="text-xs" />
                 <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
@@ -293,16 +293,16 @@ function UserStatsView({
                   <div key={log.id} className="flex items-start justify-between border-b pb-2 last:border-0 last:pb-0">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="px-1.5 py-0 text-[10px] capitalize">
+                        <Badge variant="outline" className="px-1.5 py-0 text-xs capitalize">
                           {log.action}
                         </Badge>
                         <span className="text-foreground font-medium capitalize">
                           {log.entity_type.replace(/_/g, " ")}
                         </span>
                       </div>
-                      <p className="text-muted-foreground font-mono text-[10px]">{route}</p>
+                      <p className="text-muted-foreground font-mono text-xs">{route}</p>
                     </div>
-                    <span className="text-muted-foreground text-[10px]">{formatWATRelative(log.created_at)}</span>
+                    <span className="text-muted-foreground text-xs">{formatWATRelative(log.created_at)}</span>
                   </div>
                 )
               })}
@@ -1022,12 +1022,12 @@ export function DevLoginLogsContent() {
                       >
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-foreground flex max-w-[80%] items-center gap-1.5 truncate font-semibold">
-                            <Badge variant="outline" className="px-1.5 py-0 text-[10px] capitalize">
+                            <Badge variant="outline" className="px-1.5 py-0 text-xs capitalize">
                               {item.action}
                             </Badge>
                             <span className="text-muted-foreground truncate font-mono">{item.route}</span>
                           </span>
-                          <span className="text-muted-foreground font-mono text-[10px]">{item.count} ops</span>
+                          <span className="text-muted-foreground font-mono text-xs">{item.count} ops</span>
                         </div>
                         <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
                           <div
@@ -1218,7 +1218,7 @@ export function DevLoginLogsContent() {
             subtitle: (row) =>
               `${row.department || "General"} · ${row.auth_method || "auth"} · ${formatWATDate(row.login_at)}`,
             trailing: (row) => (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 {row.role}
               </Badge>
             ),

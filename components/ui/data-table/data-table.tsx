@@ -894,7 +894,7 @@ export function DataTable<TData>({
                 <Button variant="outline" size="icon" className="relative h-9 w-9 md:hidden" aria-label="Filters">
                   <FiltersIcon className="h-4 w-4" />
                   {activeFilterPills.length > 0 && (
-                    <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold">
+                    <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold">
                       {activeFilterPills.length}
                     </span>
                   )}
@@ -1629,7 +1629,7 @@ export function DataTable<TData>({
                   <div className="flex h-full min-w-0 flex-col justify-between">
                     <div className="text-muted-foreground flex items-center gap-1.5">
                       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
-                      <span className="truncate text-[11px] font-medium tracking-tight">{field.label}</span>
+                      <span className="truncate text-xs font-medium tracking-tight">{field.label}</span>
                       {canOpen && <ExternalLink className="text-primary/70 ml-auto h-3 w-3 shrink-0" />}
                       {canCopy && <Copy className="text-muted-foreground ml-auto h-3 w-3 shrink-0" />}
                     </div>

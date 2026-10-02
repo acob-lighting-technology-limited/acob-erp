@@ -157,7 +157,7 @@ export function UserHelpDeskTicketDetailsDialog({
         <DialogHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
           <div className="flex flex-wrap items-center gap-1.5">
             {ticket?.ticket_number && (
-              <Badge variant="outline" className="font-mono text-[11px]">
+              <Badge variant="outline" className="font-mono text-xs">
                 {ticket.ticket_number}
               </Badge>
             )}
@@ -239,7 +239,7 @@ export function UserHelpDeskTicketDetailsDialog({
                   <TabsTrigger value="activity" className="gap-1.5">
                     <span>Activity</span>
                     {activity.length > 0 && (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs font-normal">
                         {activity.length}
                       </Badge>
                     )}

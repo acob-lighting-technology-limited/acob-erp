@@ -363,25 +363,25 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             <div className="flex flex-col">
               <span className="text-2xl font-bold">{isFetchingCounts ? "..." : blockers?.assets || 0}</span>
-              <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                 Assigned Assets
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold">{isFetchingCounts ? "..." : blockers?.tasks || 0}</span>
-              <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                 Individual Tasks
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold">{isFetchingCounts ? "..." : blockers?.task_assignments || 0}</span>
-              <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                 Multi-Task Assignments
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold">{isFetchingCounts ? "..." : blockers?.managed_projects || 0}</span>
-              <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                 Managed Projects
               </span>
             </div>
@@ -389,13 +389,13 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
               <span className="text-2xl font-bold">
                 {isFetchingCounts ? "..." : blockers?.project_memberships || 0}
               </span>
-              <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                 Project Memberships
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold">{isFetchingCounts ? "..." : blockers?.lead_roles || 0}</span>
-              <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+              <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                 Lead Responsibilities
               </span>
             </div>

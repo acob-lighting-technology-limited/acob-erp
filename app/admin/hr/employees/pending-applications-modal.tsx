@@ -253,7 +253,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
           <UserPlus className="h-4 w-4" />
           Review Applications
           {pendingUsers.length > 0 && (
-            <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-[10px]">
+            <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-xs">
               {pendingUsers.length}
             </Badge>
           )}
@@ -304,7 +304,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         >
                           {formatName(user.first_name)} {formatName(user.last_name)}
                         </div>
-                        <div className="text-muted-foreground mt-1 text-[11px] font-medium">
+                        <div className="text-muted-foreground mt-1 text-xs font-medium">
                           Applied {format(new Date(user.created_at), "MMM d, yyyy")}
                         </div>
                       </div>
@@ -331,7 +331,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                       <h2 className="text-xl font-bold tracking-tight">Applicant Verification Profile</h2>
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col items-end">
-                          <span className="text-muted-foreground mb-1 text-[10px] font-bold uppercase">Hire Date</span>
+                          <span className="text-muted-foreground mb-1 text-xs font-bold uppercase">Hire Date</span>
                           <Input
                             type="date"
                             value={hireDate}
@@ -340,7 +340,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                           />
                         </div>
                         <div className="flex flex-col items-start gap-1">
-                          <span className="text-muted-foreground text-[10px] font-bold uppercase">
+                          <span className="text-muted-foreground text-xs font-bold uppercase">
                             Staff Classification
                           </span>
                           <Select
@@ -380,7 +380,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                             </SelectContent>
                           </Select>
                         </div>
-                        <Badge variant="outline" className="mb-1 self-end py-0.5 text-[10px] font-bold">
+                        <Badge variant="outline" className="mb-1 self-end py-0.5 text-xs font-bold">
                           PENDING APPROVAL
                         </Badge>
                       </div>
@@ -420,7 +420,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         }
                       />
                       <div className="border-border grid grid-cols-1 border-b">
-                        <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-[10px] font-bold uppercase">
+                        <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-xs font-bold uppercase">
                           Organizational Data
                         </div>
                         <div className="grid grid-cols-1">
@@ -513,7 +513,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         </div>
                       </div>
                       <div className="grid grid-cols-1">
-                        <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-[10px] font-bold uppercase">
+                        <div className="bg-muted/20 text-muted-foreground border-border border-b p-2 text-xs font-bold uppercase">
                           Personal & Contact
                         </div>
                         <div className="grid grid-cols-1">
@@ -592,11 +592,11 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                               <span className="text-sm font-semibold">{approvalEmailPreview.ict.subject}</span>
                             </div>
                             <div className="mt-3 space-y-2">
-                              <p className="text-muted-foreground text-[11px] font-bold uppercase">Recipients</p>
+                              <p className="text-muted-foreground text-xs font-bold uppercase">Recipients</p>
                               <div className="flex flex-wrap gap-2">
                                 {approvalEmailPreview.ict.recipients.length > 0 ? (
                                   approvalEmailPreview.ict.recipients.map((email) => (
-                                    <Badge key={email} variant="outline" className="font-mono text-[11px]">
+                                    <Badge key={email} variant="outline" className="font-mono text-xs">
                                       {email}
                                     </Badge>
                                   ))

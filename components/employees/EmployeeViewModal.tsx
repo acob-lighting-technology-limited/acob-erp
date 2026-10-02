@@ -357,44 +357,44 @@ export function EmployeeViewModal({
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Department</span>
+                        <span className="text-muted-foreground block text-xs">Department</span>
                         <span className="text-foreground mt-0.5 block truncate text-xs font-medium">
                           {viewEmployeeProfile.department || "—"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Designation</span>
+                        <span className="text-muted-foreground block text-xs">Designation</span>
                         <span className="text-foreground mt-0.5 block truncate text-xs font-medium">
                           {viewEmployeeProfile.designation || "—"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Role</span>
+                        <span className="text-muted-foreground block text-xs">Role</span>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1">
                           <Badge
                             className={cn(
-                              "px-1.5 py-0 text-[10px]",
+                              "px-1.5 py-0 text-xs",
                               getRoleBadgeColor(viewEmployeeProfile.role as UserRole)
                             )}
                           >
                             {getRoleDisplayName(viewEmployeeProfile.role as UserRole)}
                           </Badge>
                           {viewEmployeeProfile.is_department_lead && (
-                            <Badge variant="outline" className="border-amber-300 px-1 py-0 text-[10px] text-amber-600">
+                            <Badge variant="outline" className="border-amber-300 px-1 py-0 text-xs text-amber-600">
                               Lead
                             </Badge>
                           )}
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Office / Room</span>
+                        <span className="text-muted-foreground block text-xs">Office / Room</span>
                         <span className="text-foreground mt-0.5 block truncate text-xs font-medium">
                           {viewEmployeeProfile.office_location || "—"}
                         </span>
                       </div>
                       <div className="col-span-2 flex items-center justify-between border-t pt-2">
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Staff Classification</span>
+                          <span className="text-muted-foreground block text-xs">Staff Classification</span>
                           <div className="mt-0.5 flex items-center gap-1.5">
                             <StaffTypeBadge
                               type={viewEmployeeProfile.employment_type}
@@ -407,7 +407,7 @@ export function EmployeeViewModal({
                         </div>
                         {displayedLeadDepartments.length > 0 && (
                           <div className="text-right">
-                            <span className="text-muted-foreground block text-[11px]">Leading Depts</span>
+                            <span className="text-muted-foreground block text-xs">Leading Depts</span>
                             <span className="text-foreground text-xs font-medium">
                               {displayedLeadDepartments.join(", ")}
                             </span>
@@ -416,13 +416,13 @@ export function EmployeeViewModal({
                       </div>
                       <div className="col-span-2 grid grid-cols-2 gap-2 border-t pt-2">
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Employment Date</span>
+                          <span className="text-muted-foreground block text-xs">Employment Date</span>
                           <span className="text-foreground mt-0.5 block text-xs font-medium">
                             {formatDDMMYYYY(viewEmployeeProfile.employment_date) || "—"}
                           </span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Confirmation Date</span>
+                          <span className="text-muted-foreground block text-xs">Confirmation Date</span>
                           <span className="text-foreground mt-0.5 block text-xs font-medium">
                             {formatDDMMYYYY(viewEmployeeProfile.confirmation_date) || "Probation (Pending)"}
                           </span>
@@ -438,7 +438,7 @@ export function EmployeeViewModal({
                     </div>
                     <div className="space-y-2 text-xs">
                       <div>
-                        <span className="text-muted-foreground block text-[11px]">Company Email</span>
+                        <span className="text-muted-foreground block text-xs">Company Email</span>
                         <div className="group mt-0.5 flex items-center justify-between">
                           <span className="text-foreground truncate font-mono font-medium select-all">
                             {viewEmployeeProfile.company_email || "—"}
@@ -462,13 +462,13 @@ export function EmployeeViewModal({
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Personal Email</span>
+                          <span className="text-muted-foreground block text-xs">Personal Email</span>
                           <span className="text-foreground mt-0.5 block truncate font-mono text-xs">
                             {viewEmployeeProfile.personal_email || "—"}
                           </span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground block text-[11px]">Phone Number</span>
+                          <span className="text-muted-foreground block text-xs">Phone Number</span>
                           <span className="text-foreground mt-0.5 block truncate font-mono text-xs">
                             {viewEmployeeProfile.phone_number || "—"}
                           </span>
@@ -476,7 +476,7 @@ export function EmployeeViewModal({
                       </div>
                       {viewEmployeeProfile.residential_address && (
                         <div className="border-t pt-2">
-                          <span className="text-muted-foreground block text-[11px]">Address</span>
+                          <span className="text-muted-foreground block text-xs">Address</span>
                           <span className="text-foreground mt-0.5 line-clamp-2 text-xs">
                             {viewEmployeeProfile.residential_address}
                           </span>
@@ -495,7 +495,7 @@ export function EmployeeViewModal({
                 <div className="bg-card space-y-4 rounded-lg border p-4 shadow-xs">
                   <div className="flex flex-col justify-between gap-3 border-b pb-3.5 sm:flex-row sm:items-center">
                     <div>
-                      <span className="text-muted-foreground mb-1 block text-[11px] font-semibold uppercase">
+                      <span className="text-muted-foreground mb-1 block text-xs font-semibold uppercase">
                         Employment Status & Type
                       </span>
                       <div className="flex items-center gap-2">
@@ -507,7 +507,7 @@ export function EmployeeViewModal({
                           !viewEmployeeProfile.mailbox_credentials_sent_at && (
                             <Badge
                               variant="outline"
-                              className="border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 shadow-none dark:text-amber-400"
+                              className="border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 shadow-none dark:text-amber-400"
                             >
                               Mailbox Pending
                             </Badge>
@@ -520,7 +520,7 @@ export function EmployeeViewModal({
                         {viewEmployeeProfile.nysc_cds_day && (
                           <Badge
                             variant="outline"
-                            className="border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[10px] font-semibold text-teal-700 capitalize shadow-none dark:text-teal-300"
+                            className="border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-xs font-semibold text-teal-700 capitalize shadow-none dark:text-teal-300"
                           >
                             CDS: {viewEmployeeProfile.nysc_cds_day}
                           </Badge>
@@ -560,7 +560,7 @@ export function EmployeeViewModal({
 
                   <div className="grid grid-cols-1 gap-4 pt-1 sm:grid-cols-2">
                     <div className="space-y-1">
-                      <span className="text-muted-foreground block text-[11px] font-semibold uppercase">
+                      <span className="text-muted-foreground block text-xs font-semibold uppercase">
                         Employment Date
                       </span>
                       <span className="text-foreground text-sm font-medium">
@@ -569,7 +569,7 @@ export function EmployeeViewModal({
                     </div>
 
                     <div className="space-y-1">
-                      <span className="text-muted-foreground block text-[11px] font-semibold uppercase">
+                      <span className="text-muted-foreground block text-xs font-semibold uppercase">
                         Confirmation Date
                       </span>
                       <div className="flex items-center gap-2">
@@ -577,7 +577,7 @@ export function EmployeeViewModal({
                           {formatDDMMYYYY(viewEmployeeProfile.confirmation_date) || "Not Confirmed"}
                         </span>
                         {!viewEmployeeProfile.confirmation_date && (
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="text-xs">
                             Probation (Pending)
                           </Badge>
                         )}
@@ -805,7 +805,7 @@ export function EmployeeViewModal({
                           )
                         })}
                       </div>
-                      <p className="text-muted-foreground text-[11px]">
+                      <p className="text-muted-foreground text-xs">
                         A lead must hold at least one department. Taking a department from another lead leaves the rest
                         of their departments intact.
                       </p>
@@ -819,7 +819,7 @@ export function EmployeeViewModal({
                         values={editForm.admin_routes}
                         onChange={(values) => setEditForm((prev) => ({ ...prev, admin_routes: values }))}
                       />
-                      <p className="text-muted-foreground text-[11px]">
+                      <p className="text-muted-foreground text-xs">
                         Admin role must have at least one authorized route.
                       </p>
                     </div>
@@ -1041,10 +1041,10 @@ export function EmployeeViewModal({
                   <div className="bg-muted/30 rounded border p-2.5 text-xs">
                     {isTypeOrCategoryChanged ? (
                       <div className="space-y-1 text-amber-800 dark:text-amber-300">
-                        <span className="flex items-center gap-1 text-[11px] font-semibold uppercase">
+                        <span className="flex items-center gap-1 text-xs font-semibold uppercase">
                           <AlertTriangle className="h-3 w-3 text-amber-600" /> Staff ID Conversion Notice
                         </span>
-                        <p className="text-[11px] leading-relaxed">
+                        <p className="text-xs leading-relaxed">
                           Saving changes will convert staff type and generate a new ID series:{" "}
                           <strong className="text-primary font-mono font-bold">{expectedIdPreview}</strong>. Current ID
                           (<strong className="font-mono">{editForm.employee_number || "None"}</strong>) will be archived
@@ -1052,14 +1052,14 @@ export function EmployeeViewModal({
                         </p>
                       </div>
                     ) : (
-                      <div className="text-muted-foreground flex items-center justify-between text-[11px]">
+                      <div className="text-muted-foreground flex items-center justify-between text-xs">
                         <span>
                           Current Staff ID:{" "}
                           <strong className="text-foreground font-mono font-semibold">
                             {editForm.employee_number || "None"}
                           </strong>
                         </span>
-                        <span className="font-mono text-[10px]">ID series active</span>
+                        <span className="font-mono text-xs">ID series active</span>
                       </div>
                     )}
                   </div>
@@ -1077,7 +1077,7 @@ export function EmployeeViewModal({
                         <Label htmlFor="edit_company_email" className="text-xs">
                           Company Email *
                         </Label>
-                        <span className="text-muted-foreground text-[10px] font-medium">Primary Login ID</span>
+                        <span className="text-muted-foreground text-xs font-medium">Primary Login ID</span>
                       </div>
                       <Input
                         id="edit_company_email"
@@ -1088,7 +1088,7 @@ export function EmployeeViewModal({
                         placeholder="user@acoblighting.com"
                         className="mt-1 h-8 font-mono text-xs"
                       />
-                      <p className="text-warning-foreground mt-1 flex items-center gap-1 text-[10px]">
+                      <p className="text-warning-foreground mt-1 flex items-center gap-1 text-xs">
                         <AlertCircle className="inline h-3 w-3 shrink-0" />
                         Changing this email updates the employee&apos;s login credentials.
                       </p>
@@ -1106,7 +1106,7 @@ export function EmployeeViewModal({
                         placeholder="secondary@acoblighting.com"
                         className="mt-1 h-8 font-mono text-xs"
                       />
-                      <p className="text-muted-foreground mt-1 text-[10px]">Secondary work/contact email.</p>
+                      <p className="text-muted-foreground mt-1 text-xs">Secondary work/contact email.</p>
                     </div>
 
                     <div>
@@ -1191,7 +1191,7 @@ export function EmployeeViewModal({
                         <Label htmlFor="edit_device_key" className="text-xs">
                           Biometric / Device Key
                         </Label>
-                        <span className="text-muted-foreground font-mono text-[10px]">Auto-generated</span>
+                        <span className="text-muted-foreground font-mono text-xs">Auto-generated</span>
                       </div>
                       <Input
                         id="edit_device_key"

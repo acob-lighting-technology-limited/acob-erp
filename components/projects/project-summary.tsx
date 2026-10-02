@@ -120,7 +120,7 @@ export function LabelledBar({
         <span className="text-foreground font-semibold tabular-nums">{value === null ? "—" : `${value}%`}</span>
       </div>
       <Progress value={value ?? 0} indicatorClassName={indicatorClassName} />
-      {note && <p className="text-muted-foreground truncate text-[11px]">{note}</p>}
+      {note && <p className="text-muted-foreground truncate text-xs">{note}</p>}
     </div>
   )
 }
@@ -148,7 +148,7 @@ export function WorkDoneCell({ health }: { health: Pick<ProjectHealth, "doneCoun
   return (
     <div className="w-36 space-y-1">
       <Progress value={health.workDonePct ?? 0} />
-      <p className="text-muted-foreground text-[11px]">
+      <p className="text-muted-foreground text-xs">
         <WorkDoneText health={health} />
       </p>
     </div>
@@ -267,7 +267,7 @@ export function ProjectSummary({
       <dl className="grid grid-cols-2 gap-3 border-t pt-3 sm:grid-cols-3">
         {facts.map((fact) => (
           <div key={fact.label} className="min-w-0 space-y-0.5">
-            <dt className="text-muted-foreground text-[11px] font-medium">{fact.label}</dt>
+            <dt className="text-muted-foreground text-xs font-medium">{fact.label}</dt>
             <dd className="truncate text-sm font-medium">{fact.value}</dd>
           </div>
         ))}

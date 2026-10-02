@@ -57,7 +57,7 @@ export function ActionTrackerFilters({
       </div>
       <div className="flex items-end gap-2">
         <div className="w-[140px]">
-          <Label className="text-muted-foreground ml-1 text-[10px] font-bold uppercase">Week</Label>
+          <Label className="text-muted-foreground ml-1 text-xs font-bold uppercase">Week</Label>
           <Select value={String(week)} onValueChange={(v) => onWeekChange(Number(v))}>
             <SelectTrigger>
               <SelectValue />
@@ -72,7 +72,7 @@ export function ActionTrackerFilters({
           </Select>
         </div>
         <div className="w-[120px]">
-          <Label className="text-muted-foreground ml-1 text-[10px] font-bold uppercase">Year</Label>
+          <Label className="text-muted-foreground ml-1 text-xs font-bold uppercase">Year</Label>
           <Select value={String(year)} onValueChange={(v) => onYearChange(Number(v))}>
             <SelectTrigger>
               <SelectValue />
@@ -87,7 +87,7 @@ export function ActionTrackerFilters({
           </Select>
         </div>
         <div className="w-52">
-          <Label className="text-muted-foreground ml-1 text-[10px] font-bold uppercase">Department</Label>
+          <Label className="text-muted-foreground ml-1 text-xs font-bold uppercase">Department</Label>
           <Select value={deptFilter} onValueChange={onDeptFilterChange}>
             <SelectTrigger>
               <SelectValue placeholder="All" />

@@ -191,7 +191,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-primary hover:text-primary h-6 px-2 text-[11px]"
+                className="text-primary hover:text-primary h-6 px-2 text-xs"
                 onClick={handleSetNow}
               >
                 Set to current time
@@ -206,7 +206,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
                 className="h-10 text-sm font-medium"
               />
             </div>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Adjust if the employee joined earlier or at a specific time.
             </p>
           </div>

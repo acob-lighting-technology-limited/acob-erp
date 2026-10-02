@@ -223,7 +223,7 @@ export function DepartmentCascadeContent({
         accessor: (r) => r.strategic_priority || "",
         render: (r) =>
           r.strategic_priority ? (
-            <Badge variant="secondary" className="text-left text-[11px] font-medium whitespace-normal">
+            <Badge variant="secondary" className="text-left text-xs font-medium whitespace-normal">
               {r.strategic_priority}
             </Badge>
           ) : (
@@ -240,7 +240,7 @@ export function DepartmentCascadeContent({
         render: (r) => (
           <div className="flex flex-col gap-0.5">
             <span className="text-xs leading-snug font-medium">{r.measure}</span>
-            <span className="text-muted-foreground text-[11px]">{r.strategic_objective}</span>
+            <span className="text-muted-foreground text-xs">{r.strategic_objective}</span>
           </div>
         ),
       },
@@ -262,9 +262,9 @@ export function DepartmentCascadeContent({
         accessor: (r) => r.role,
         render: (r) =>
           r.role === "core" ? (
-            <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">CORE</Badge>
+            <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">CORE</Badge>
           ) : (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               SUPPORT
             </Badge>
           ),
@@ -283,7 +283,7 @@ export function DepartmentCascadeContent({
             <div className="flex flex-col">
               <span className="text-xs font-medium">{targetDisplay}</span>
               {r.department_target && r.target_text && r.department_target !== r.target_text ? (
-                <span className="text-muted-foreground text-[10px]">Corp: {r.target_text}</span>
+                <span className="text-muted-foreground text-xs">Corp: {r.target_text}</span>
               ) : null}
             </div>
           )
@@ -311,13 +311,13 @@ export function DepartmentCascadeContent({
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-medium">{actualDisplay}</span>
               {r.source === "auto" && (
-                <span className="text-info-foreground inline-flex items-center gap-0.5 text-[10px] font-medium">
+                <span className="text-info-foreground inline-flex items-center gap-0.5 text-xs font-medium">
                   <Zap className="h-3 w-3" />
                   Auto ({r.task_stats?.completed || 0} tasks)
                 </span>
               )}
               {r.source === "manual" && r.is_override && (
-                <span className="text-warning-foreground text-[10px] font-medium">✏️ Adjusted</span>
+                <span className="text-warning-foreground text-xs font-medium">✏️ Adjusted</span>
               )}
             </div>
           )
@@ -334,7 +334,7 @@ export function DepartmentCascadeContent({
           ) : (
             <div className="w-28 space-y-1">
               <Progress value={r.capped_pct} />
-              <span className="text-muted-foreground text-[11px]">
+              <span className="text-muted-foreground text-xs">
                 {r.raw_pct}% {r.raw_pct !== r.capped_pct ? "(capped at 100 for rollup)" : ""}
               </span>
             </div>
@@ -483,7 +483,7 @@ export function DepartmentCascadeContent({
                 <p className="mt-1 text-sm">{r.department_target || "Not yet confirmed"}</p>
                 {r.task_stats && r.task_stats.total > 0 && (
                   <div className="mt-3 rounded-md border border-blue-500/20 bg-blue-500/5 p-2 text-xs">
-                    <p className="flex items-center gap-1 text-[10px] font-semibold text-blue-700 uppercase dark:text-blue-300">
+                    <p className="flex items-center gap-1 text-xs font-semibold text-blue-700 uppercase dark:text-blue-300">
                       <Zap className="h-3 w-3" /> Live Task Breakdown
                     </p>
                     <p className="mt-0.5 text-blue-900 dark:text-blue-100">
@@ -502,7 +502,7 @@ export function DepartmentCascadeContent({
                       Latest Recorded Actual
                     </p>
                     <p className="mt-1 text-sm">{r.latest_actual.note || "No note recorded"}</p>
-                    <p className="text-muted-foreground mt-1 text-[11px]">
+                    <p className="text-muted-foreground mt-1 text-xs">
                       Recorded {formatWATDate(r.latest_actual.recorded_at)}
                       {r.is_override ? " (Manual Override)" : ""}
                     </p>
@@ -536,7 +536,7 @@ export function DepartmentCascadeContent({
               {ragBadge(r.capped_pct != null ? ragStatus(r.capped_pct) : null)}
             </div>
             <p className="text-muted-foreground line-clamp-2 text-xs">{r.strategic_objective}</p>
-            <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="flex items-center justify-between border-t pt-2 text-xs">
               <span>Role: {r.role.toUpperCase()}</span>
               <span>Attainment: {r.capped_pct != null ? `${r.capped_pct}%` : "-"}</span>
             </div>
@@ -826,9 +826,7 @@ function RecordActualDialog({
               Detected <strong>{row.task_stats?.completed || 0} completed</strong> of {row.task_stats?.total || 0} tasks
               for this KPI in {targetDepartment}.
             </p>
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
-              Saving a value below will set a managerial override.
-            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">Saving a value below will set a managerial override.</p>
           </div>
         )}
 
@@ -879,7 +877,7 @@ function RecordActualDialog({
               placeholder="e.g. 3"
             />
             {row?.target_value != null && (
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Target is {row.target_value} {row.target_unit || ""}.
               </p>
             )}

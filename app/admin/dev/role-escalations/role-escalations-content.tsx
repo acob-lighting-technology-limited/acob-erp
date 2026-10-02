@@ -221,7 +221,7 @@ export function RoleEscalationsContent({ rows, error }: { rows: AuditLogRow[]; e
           title: (row) => row.action || row.operation || "Unknown action",
           subtitle: (row) => `${row.entity_type || "Role"} · ${formatWATDateTime(row.created_at)}`,
           trailing: (row) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {getRoleTier(row)}
             </Badge>
           ),

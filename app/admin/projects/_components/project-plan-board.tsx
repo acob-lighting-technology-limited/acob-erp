@@ -478,7 +478,7 @@ export function ProjectPlanBoard({
                 {task.title}
               </p>
               {task.work_item_number && (
-                <Badge variant="outline" className="text-muted-foreground shrink-0 px-1.5 py-0 font-mono text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground shrink-0 px-1.5 py-0 font-mono text-xs">
                   {task.work_item_number}
                 </Badge>
               )}
@@ -494,15 +494,15 @@ export function ProjectPlanBoard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Badge variant="outline" className="gap-1 text-[10px]">
+          <Badge variant="outline" className="gap-1 text-xs">
             <Scale className="h-3 w-3" />
             {task.weight ?? TASK_WEIGHT_DEFAULT}
           </Badge>
-          <Badge variant="outline" className="gap-1 text-[10px]">
+          <Badge variant="outline" className="gap-1 text-xs">
             <Star className="h-3 w-3" />
             {task.rating ? `${task.rating}/5` : "unrated"}
           </Badge>
-          <Badge variant={config?.badgeVariant ?? "outline"} className={cn("text-[10px] capitalize", config?.color)}>
+          <Badge variant={config?.badgeVariant ?? "outline"} className={cn("text-xs capitalize", config?.color)}>
             {config?.label ?? task.status.replaceAll("_", " ")}
           </Badge>
           {!readOnly && (
@@ -560,7 +560,7 @@ export function ProjectPlanBoard({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="truncate text-sm font-semibold">{title}</span>
-                <Badge variant="secondary" className="h-4 px-1.5 py-0 text-[10px] font-normal">
+                <Badge variant="secondary" className="h-4 px-1.5 py-0 text-xs font-normal">
                   {groupTasks.length} {groupTasks.length === 1 ? "task" : "tasks"}
                 </Badge>
               </div>
@@ -571,7 +571,7 @@ export function ProjectPlanBoard({
           <div className="flex shrink-0 items-center gap-3" onClick={(e) => e.stopPropagation()}>
             <div className="w-28">
               <Progress value={progress.workDonePct ?? 0} />
-              <p className="text-muted-foreground mt-1 text-[10px]">
+              <p className="text-muted-foreground mt-1 text-xs">
                 {progress.taskCount === 0 ? "No tasks yet" : `${progress.doneCount} of ${progress.taskCount} done`}
               </p>
             </div>

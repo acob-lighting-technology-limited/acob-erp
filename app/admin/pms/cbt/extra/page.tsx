@@ -593,7 +593,7 @@ export default function AdminPmsCbtExtraQuestionPage() {
           subtitle: (q) =>
             `${cycleNameById.get(q.review_cycle_id || "") || "No cycle"} · Targets: ${q.targeted_emails?.length || 0}`,
           trailing: (q) => (
-            <Badge variant={q.is_active === false ? "secondary" : "default"} className="text-[10px]">
+            <Badge variant={q.is_active === false ? "secondary" : "default"} className="text-xs">
               {q.is_active === false ? "Inactive" : "Active"}
             </Badge>
           ),

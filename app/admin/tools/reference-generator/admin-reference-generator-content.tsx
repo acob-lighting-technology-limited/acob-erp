@@ -622,7 +622,7 @@ export function AdminReferenceGeneratorContent({
           subtitle: (r) =>
             `${r.department_name || r.assigned_department_name || "No dept"} · ${r.recipient_name || "No recipient"} · ${formatWATDate(r.created_at)}`,
           trailing: (r) => (
-            <Badge variant="outline" className={`text-[10px] capitalize ${statusBadgeClass(r.status)}`}>
+            <Badge variant="outline" className={`text-xs capitalize ${statusBadgeClass(r.status)}`}>
               {statusLabel(r.status)}
             </Badge>
           ),
@@ -630,7 +630,7 @@ export function AdminReferenceGeneratorContent({
             title: (r) => r.reference_number || "Reference Pending",
             subtitle: (r) => (
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
-                <Badge variant="outline" className="text-[10px] font-medium uppercase">
+                <Badge variant="outline" className="text-xs font-medium uppercase">
                   {r.letter_type || "external"}
                 </Badge>
                 {(r.department_name || r.assigned_department_name) && (
@@ -642,7 +642,7 @@ export function AdminReferenceGeneratorContent({
               </div>
             ),
             badges: (r) => (
-              <Badge className={cn("text-[10px]", statusBadgeClass(r.status))}>{statusLabel(r.status)}</Badge>
+              <Badge className={cn("text-xs", statusBadgeClass(r.status))}>{statusLabel(r.status)}</Badge>
             ),
             fields: (r) => [
               {
@@ -745,7 +745,7 @@ export function AdminReferenceGeneratorContent({
             </div>
             <div className="text-muted-foreground space-y-1 border-t pt-2 text-xs">
               <p>Recipient: {r.recipient_name || "—"}</p>
-              <div className="flex items-center justify-between text-[10px]">
+              <div className="flex items-center justify-between text-xs">
                 <span>{r.department_name || r.assigned_department_name || "—"}</span>
                 <span>{formatWATDate(r.created_at)}</span>
               </div>

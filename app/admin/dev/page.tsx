@@ -133,7 +133,7 @@ export default function DevHomePage() {
                 <p className="text-muted-foreground text-xs leading-relaxed">{section.description}</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">{section.subLabel}</span>
+                <span className="text-muted-foreground text-xs font-medium">{section.subLabel}</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor={section.fill}

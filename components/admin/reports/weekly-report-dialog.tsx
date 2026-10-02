@@ -442,7 +442,7 @@ export function WeeklyReportAdminDialog({
                 disabled={f === "tasks_new_week" && isNextWeekActive}
               />
               {f === "tasks_new_week" && isNextWeekActive && (
-                <p className="text-muted-foreground text-[10px] italic">
+                <p className="text-muted-foreground text-xs italic">
                   Locked: Next week&apos;s tracker already has activity.
                 </p>
               )}

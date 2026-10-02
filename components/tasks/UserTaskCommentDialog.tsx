@@ -102,7 +102,7 @@ export function UserTaskCommentDialog({
                         </p>
                       )}
                       <p className="text-muted-foreground text-xs leading-5">{update.content}</p>
-                      <p className="text-muted-foreground mt-1 text-[11px]">{formatDateTime(update.created_at)}</p>
+                      <p className="text-muted-foreground mt-1 text-xs">{formatDateTime(update.created_at)}</p>
                     </div>
                   ))}
                 </div>

@@ -673,7 +673,7 @@ export default function CbtPage() {
                       }`}
                     >
                       <div
-                        className={`mt-1 flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-semibold ${
+                        className={`mt-1 flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold ${
                           isSelected
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-muted-foreground/40 bg-muted/50 text-muted-foreground"

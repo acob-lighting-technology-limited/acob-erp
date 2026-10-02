@@ -459,11 +459,11 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
           subtitle: (n) => n.message,
           trailing: (n) =>
             !n.read ? (
-              <Badge variant="default" className="text-[10px]">
+              <Badge variant="default" className="text-xs">
                 New
               </Badge>
             ) : (
-              <span className="text-muted-foreground text-[10px] whitespace-nowrap">
+              <span className="text-muted-foreground text-xs whitespace-nowrap">
                 {formatRelativeTime(n.created_at)}
               </span>
             ),
@@ -473,14 +473,14 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
             badges: (n) => (
               <>
                 {!n.read && (
-                  <Badge variant="default" className="text-[10px]">
+                  <Badge variant="default" className="text-xs">
                     New
                   </Badge>
                 )}
-                <Badge variant="outline" className={cn("text-[10px] capitalize", getPriorityBadgeClass(n.priority))}>
+                <Badge variant="outline" className={cn("text-xs capitalize", getPriorityBadgeClass(n.priority))}>
                   {n.priority}
                 </Badge>
-                <Badge variant="outline" className="text-[10px] capitalize">
+                <Badge variant="outline" className="text-xs capitalize">
                   {n.category}
                 </Badge>
               </>
@@ -554,16 +554,16 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
               </div>
               <div className="flex items-center justify-between pt-1">
                 <div className="flex gap-2">
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="px-1.5 py-0 text-xs">
                     {n.category}
                   </Badge>
                   {!n.read && (
-                    <Badge variant="default" className="px-1.5 py-0 text-[10px]">
+                    <Badge variant="default" className="px-1.5 py-0 text-xs">
                       New
                     </Badge>
                   )}
                 </div>
-                <span className="text-muted-foreground text-[10px]">{formatRelativeTime(n.created_at)}</span>
+                <span className="text-muted-foreground text-xs">{formatRelativeTime(n.created_at)}</span>
               </div>
             </div>
           )
@@ -572,7 +572,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
           render: (n) => (
             <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
               <div className="space-y-1">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">
                   Notification Message
                 </span>
                 <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">{n.message}</p>
@@ -580,21 +580,21 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Category</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Category</span>
                   <span className="font-medium capitalize">{n.category}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Priority</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Priority</span>
                   <span className="font-medium capitalize">{n.priority}</span>
                 </div>
                 {n.actor_name && (
                   <div>
-                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">From</span>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">From</span>
                     <span className="font-medium">{n.actor_name}</span>
                   </div>
                 )}
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Received</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Received</span>
                   <span className="font-medium">{formatWATDate(n.created_at)}</span>
                 </div>
               </div>

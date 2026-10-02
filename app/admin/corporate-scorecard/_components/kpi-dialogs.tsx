@@ -290,7 +290,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
           {/* Department Ownership */}
           <div className="space-y-2 border-t pt-3">
             <Label className="text-xs font-semibold">Department Ownership (RACI)</Label>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Click a department to assign as <strong className="text-emerald-600">CORE</strong> (scored owner). Click
               again to switch to <strong className="text-foreground">SUPPORT</strong> (collaborator), or remove.
             </p>
@@ -306,7 +306,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
                     <button
                       type="button"
                       onClick={() => toggleCoreDept(dept)}
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                      className={`rounded px-1.5 py-0.5 text-xs font-semibold transition-colors ${
                         isCore
                           ? "bg-emerald-600 text-white"
                           : "bg-muted text-muted-foreground hover:bg-emerald-500/20 hover:text-emerald-600"
@@ -317,7 +317,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
                     <button
                       type="button"
                       onClick={() => toggleSupportDept(dept)}
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                      className={`rounded px-1.5 py-0.5 text-xs font-semibold transition-colors ${
                         isSupport
                           ? "bg-blue-600 text-white"
                           : "bg-muted text-muted-foreground hover:bg-blue-500/20 hover:text-blue-600"
@@ -633,7 +633,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-xs font-semibold">Department Quotas & Accountability (RACI)</Label>
-                <p className="text-muted-foreground text-[11px]">
+                <p className="text-muted-foreground text-xs">
                   Assign Core owners and Support contributors. Define explicit numerical quotas and action commitments.
                 </p>
               </div>
@@ -668,7 +668,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                         <div className="flex items-center gap-2">
                           <span className="text-foreground text-xs font-semibold">{assignment.department}</span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
+                            className={`rounded-full px-2 py-0.5 text-xs font-bold tracking-wider uppercase ${
                               isCore ? "bg-success-muted text-success-foreground" : "bg-info-muted text-info-foreground"
                             }`}
                           >
@@ -680,7 +680,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className={`h-7 px-2 text-[11px] ${
+                            className={`h-7 px-2 text-xs ${
                               isCore
                                 ? "bg-emerald-100/50 font-bold text-emerald-700 dark:bg-emerald-900/40"
                                 : "text-muted-foreground"
@@ -693,7 +693,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className={`h-7 px-2 text-[11px] ${
+                            className={`h-7 px-2 text-xs ${
                               !isCore
                                 ? "bg-blue-100/50 font-bold text-blue-700 dark:bg-blue-900/40"
                                 : "text-muted-foreground"
@@ -717,7 +717,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">
+                          <Label className="text-muted-foreground text-xs font-medium">
                             Department Quota / Target Value
                           </Label>
                           <Input
@@ -734,7 +734,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">Target Unit</Label>
+                          <Label className="text-muted-foreground text-xs font-medium">Target Unit</Label>
                           <Input
                             placeholder="e.g. Projects, %, ₦"
                             className="h-8 text-xs"
@@ -745,7 +745,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-muted-foreground text-[11px] font-medium">
+                        <Label className="text-muted-foreground text-xs font-medium">
                           Action Commitment / Deliverable Plan
                         </Label>
                         <Input

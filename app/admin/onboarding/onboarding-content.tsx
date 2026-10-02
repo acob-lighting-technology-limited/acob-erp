@@ -448,11 +448,9 @@ export function OnboardingContent() {
             subtitle: (row) => [row.department, row.employee_number || row.email].filter(Boolean).join(" · ") || "—",
             trailing: (row) =>
               row.has_signed_in ? (
-                <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
-                  Signed in
-                </Badge>
+                <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">Signed in</Badge>
               ) : (
-                <Badge className="border-red-500/20 bg-red-500/10 text-[10px] text-red-600">Never</Badge>
+                <Badge className="border-red-500/20 bg-red-500/10 text-xs text-red-600">Never</Badge>
               ),
             detail: {
               title: (row) => row.full_name,

@@ -152,9 +152,7 @@ export default function DevelopmentPlansPage() {
         render: (plan) => (
           <div className="flex flex-col">
             <span className="font-medium">{plan.title}</span>
-            <span className="text-muted-foreground text-[11px]">
-              {FOCUS_LABELS[plan.focus_area] || plan.focus_area}
-            </span>
+            <span className="text-muted-foreground text-xs">{FOCUS_LABELS[plan.focus_area] || plan.focus_area}</span>
           </div>
         ),
       },
@@ -191,7 +189,7 @@ export default function DevelopmentPlansPage() {
           return (
             <div className="w-28 space-y-1">
               <Progress value={planProgress(plan)} />
-              <span className="text-muted-foreground text-[11px]">
+              <span className="text-muted-foreground text-xs">
                 {totalActions > 0 ? `${completedActions}/${totalActions} actions` : `${planProgress(plan)}%`}
               </span>
             </div>
@@ -293,7 +291,7 @@ export default function DevelopmentPlansPage() {
           title: (plan) => plan.title,
           subtitle: (plan) => FOCUS_LABELS[plan.focus_area] || plan.focus_area,
           trailing: (plan) => (
-            <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-[10px] capitalize">
+            <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-xs capitalize">
               {plan.status.replace("_", " ")}
             </Badge>
           ),
@@ -323,25 +321,25 @@ export default function DevelopmentPlansPage() {
             <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
               <div className="flex items-start justify-between gap-2">
                 <h4 className="line-clamp-2 text-sm font-semibold">{plan.title}</h4>
-                <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="shrink-0 text-[10px] capitalize">
+                <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="shrink-0 text-xs capitalize">
                   {plan.status.replace("_", " ")}
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-1.5 text-xs">
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Focus</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Focus</p>
                   <p className="font-medium">{FOCUS_LABELS[plan.focus_area] || plan.focus_area}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Priority</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Priority</p>
                   <p className="font-medium capitalize">{plan.priority}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Progress</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Progress</p>
                   <p className="font-medium">{planProgress(plan)}%</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Actions</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Actions</p>
                   <p className="font-medium">
                     {doneActions}/{totalActions}
                   </p>

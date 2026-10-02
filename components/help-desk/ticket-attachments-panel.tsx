@@ -141,7 +141,7 @@ export function TicketAttachmentsPanel({ ticketId, currentUserId }: TicketAttach
             <div key={attachment.id} className="bg-card flex items-center justify-between gap-2 rounded border p-2">
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium">{attachment.file_name}</p>
-                <p className="text-muted-foreground text-[11px]">
+                <p className="text-muted-foreground text-xs">
                   {formatSize(attachment.file_size)} · {formatWATDateTime(attachment.created_at)}
                 </p>
               </div>

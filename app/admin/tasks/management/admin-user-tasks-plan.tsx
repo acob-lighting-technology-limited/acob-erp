@@ -381,7 +381,7 @@ export function AdminUserTasksPlan({
             return <span className="text-muted-foreground text-xs italic">No tasks in period</span>
           }
           return (
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
               {r.completedCount > 0 && (
                 <span className="text-success-foreground inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 font-medium">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -435,7 +435,7 @@ export function AdminUserTasksPlan({
             <div className="flex items-center gap-1.5 text-xs font-semibold">
               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
               <span>{r.avgRating.toFixed(1)} / 5</span>
-              <span className="text-muted-foreground text-[10px] font-normal">({r.ratedCount} rated)</span>
+              <span className="text-muted-foreground text-xs font-normal">({r.ratedCount} rated)</span>
             </div>
           )
         },
@@ -608,7 +608,7 @@ export function AdminUserTasksPlan({
           subtitle: (r) =>
             `${r.department} · ${r.totalTasks} tasks · ${r.totalWeight} pts · Rate: ${r.completionRate}%`,
           trailing: (r) => (
-            <Badge variant="outline" className="font-mono text-[10px]">
+            <Badge variant="outline" className="font-mono text-xs">
               {r.avgRating !== null ? `★ ${r.avgRating}` : "Unrated"}
             </Badge>
           ),
@@ -617,13 +617,13 @@ export function AdminUserTasksPlan({
             subtitle: (r) => `${r.department} · ${r.email}`,
             badges: (r) => (
               <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-xs">
                   {r.totalTasks} tasks
                 </Badge>
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-xs">
                   {r.totalWeight} weight pts
                 </Badge>
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-xs">
                   {r.completionRate}% completed
                 </Badge>
               </div>
@@ -647,13 +647,13 @@ export function AdminUserTasksPlan({
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-semibold">{r.name}</p>
-                <p className="text-muted-foreground text-[11px]">{r.department}</p>
+                <p className="text-muted-foreground text-xs">{r.department}</p>
               </div>
-              <Badge variant="outline" className="font-mono text-[10px]">
+              <Badge variant="outline" className="font-mono text-xs">
                 {r.avgRating !== null ? `★ ${r.avgRating}` : "Unrated"}
               </Badge>
             </div>
-            <div className="grid grid-cols-3 gap-2 border-t pt-2 text-center text-[10px]">
+            <div className="grid grid-cols-3 gap-2 border-t pt-2 text-center text-xs">
               <div className="bg-muted/30 rounded p-1">
                 <span className="text-muted-foreground block">Tasks</span>
                 <span className="font-semibold">{r.totalTasks}</span>
@@ -687,7 +687,7 @@ export function AdminUserTasksPlan({
 
               <div className="bg-background overflow-x-auto rounded-lg border shadow-sm">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-muted/60 text-muted-foreground text-[11px] font-bold tracking-wide uppercase">
+                  <thead className="bg-muted/60 text-muted-foreground text-xs font-bold tracking-wide uppercase">
                     <tr>
                       <th className="px-3 py-2.5">Task</th>
                       <th className="px-3 py-2.5">Status</th>
@@ -711,10 +711,10 @@ export function AdminUserTasksPlan({
                           <td className="px-3 py-2.5">
                             <p className="text-foreground font-semibold">{task.title}</p>
                             {task.description ? (
-                              <p className="text-muted-foreground line-clamp-1 text-[11px]">{task.description}</p>
+                              <p className="text-muted-foreground line-clamp-1 text-xs">{task.description}</p>
                             ) : null}
                             {task.work_item_number && (
-                              <span className="text-muted-foreground font-mono text-[10px]">
+                              <span className="text-muted-foreground font-mono text-xs">
                                 {task.work_item_number}
                               </span>
                             )}
@@ -723,7 +723,7 @@ export function AdminUserTasksPlan({
                             <AdminTaskStatusBadge status={task.status} />
                           </td>
                           <td className="px-3 py-2.5 capitalize">
-                            <Badge variant="outline" className="text-[10px]">
+                            <Badge variant="outline" className="text-xs">
                               {String(task.assignment_type || "individual").replace(/_/g, " ")}
                             </Badge>
                           </td>

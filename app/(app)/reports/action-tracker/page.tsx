@@ -256,7 +256,7 @@ export default function ActionTrackerPortal() {
         <TriangleAlert className="h-3.5 w-3.5" />
         <span className="text-xs">{hasBlocker ? "Hindrance" : "Add"}</span>
         {evidenceCount > 0 ? (
-          <span className="flex items-center gap-0.5 text-[11px]">
+          <span className="flex items-center gap-0.5 text-xs">
             <Paperclip className="h-3 w-3" />
             {evidenceCount}
           </span>
@@ -554,7 +554,7 @@ export default function ActionTrackerPortal() {
           row.assignees && row.assignees.length > 0 ? (
             <div className="flex flex-wrap gap-1">
               {row.assignees.map((person) => (
-                <Badge key={person.id} variant="secondary" className="gap-1 pl-0.5 text-[11px] font-normal">
+                <Badge key={person.id} variant="secondary" className="gap-1 pl-0.5 text-xs font-normal">
                   <StaffAvatar
                     name={person.name}
                     src={staffAvatars[person.id]}
@@ -919,13 +919,13 @@ export default function ActionTrackerPortal() {
             subtitle: (row) =>
               `${row.completedPoints} of ${row.totalPoints} done · ${row.inProgressPoints} in progress · ${row.notStartedPoints} not started`,
             trailing: (row) => (
-              <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-[10px]`}>{row.summaryStatus}</Badge>
+              <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-xs`}>{row.summaryStatus}</Badge>
             ),
             detail: {
               title: (row) => row.department,
               subtitle: (row) => `${row.totalPoints} total action point${row.totalPoints === 1 ? "" : "s"}`,
               badges: (row) => (
-                <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-[10px]`}>{row.summaryStatus}</Badge>
+                <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-xs`}>{row.summaryStatus}</Badge>
               ),
               fields: (row) => [
                 { label: "Department", value: row.department },
@@ -1004,7 +1004,7 @@ export default function ActionTrackerPortal() {
                 .filter(Boolean)
                 .join(" · "),
             trailing: (row) => (
-              <Badge className={`${getItemStatusBadgeClass(row.status)} text-[10px] capitalize`}>
+              <Badge className={`${getItemStatusBadgeClass(row.status)} text-xs capitalize`}>
                 {row.status.replace(/_/g, " ")}
               </Badge>
             ),
@@ -1017,7 +1017,7 @@ export default function ActionTrackerPortal() {
                 </span>
               ),
               badges: (row) => (
-                <Badge className={`${getItemStatusBadgeClass(row.status)} text-[10px] capitalize`}>
+                <Badge className={`${getItemStatusBadgeClass(row.status)} text-xs capitalize`}>
                   {row.status.replace(/_/g, " ")}
                 </Badge>
               ),
@@ -1087,10 +1087,10 @@ export default function ActionTrackerPortal() {
           <DialogHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
             {viewingDepartment && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <Badge className={`${getSummaryBadgeClass(viewingDepartment.summaryStatus)} text-[11px]`}>
+                <Badge className={`${getSummaryBadgeClass(viewingDepartment.summaryStatus)} text-xs`}>
                   {viewingDepartment.summaryStatus}
                 </Badge>
-                <Badge variant="outline" className="text-[11px]">
+                <Badge variant="outline" className="text-xs">
                   Week {week} · {year}
                 </Badge>
               </div>

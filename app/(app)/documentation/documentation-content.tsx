@@ -419,7 +419,7 @@ export function DocumentationContent({
                   <h4 className="line-clamp-1 text-sm font-semibold">{d.title}</h4>
                   <Badge className={getStatusColor(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>
                 </div>
-                <p className="text-muted-foreground text-[11px]">{d.category ?? "-"}</p>
+                <p className="text-muted-foreground text-xs">{d.category ?? "-"}</p>
                 <p className="text-muted-foreground mt-2 line-clamp-3 text-xs">{d.content}</p>
               </div>
             )}

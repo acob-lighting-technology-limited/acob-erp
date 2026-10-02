@@ -15,20 +15,20 @@ import { useRouter } from "next/navigation"
 function StageBadge({ requisition }: { requisition: Requisition }) {
   if (requisition.status === "approved") {
     return (
-      <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-emerald-600">
+      <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-emerald-600">
         <CheckCircle2 className="h-3 w-3" /> Fully Approved
       </span>
     )
   }
   if (requisition.status === "rejected") {
     return (
-      <span className="inline-flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-red-600">
+      <span className="inline-flex items-center gap-1 rounded bg-red-500/10 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-red-600">
         <AlertCircle className="h-3 w-3" /> Rejected
       </span>
     )
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-amber-600">
+    <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-amber-600">
       <Clock className="h-3 w-3" /> {getStageLabel(requisition.current_stage_code)}
     </span>
   )
@@ -91,7 +91,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
             {r.requisition_number}
           </Link>
           {r.is_emergency && (
-            <span className="inline-flex w-fit items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
+            <span className="inline-flex w-fit items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-xs font-semibold text-red-600">
               <Siren className="h-2.5 w-2.5" /> Emergency
             </span>
           )}

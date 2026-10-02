@@ -413,7 +413,7 @@ export function ExceptionsView({ departments, lockedDepartment }: ExceptionsView
                 <span className="text-muted-foreground">Clock Out:</span> {formatTime(r.clock_out)}
               </div>
             </div>
-            <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="flex items-center justify-between border-t pt-2 text-xs">
               <span>{r.date}</span>
               <span>Source: {labelSource(r)}</span>
             </div>

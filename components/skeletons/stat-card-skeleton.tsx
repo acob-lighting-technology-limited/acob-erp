@@ -5,7 +5,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 /**
  * Placeholder for `<StatCard variant="compact">` — the only StatCard anatomy the
  * app renders. Each row is pinned to the real card's line box (title
- * `text-[10px]`/`sm:text-xs` leading-tight, value `text-base`/`sm:text-xl`
+ * `text-xs`/`sm:text-xs` leading-tight, value `text-base`/`sm:text-xl`
  * leading-tight, icon chip `p-1.5`/`sm:p-2`) so the card is the same height
  * before and after mount, not merely a similar one.
  */

@@ -323,14 +323,14 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 <Badge
                   variant="outline"
-                  className={`px-2 py-0.5 text-[11px] font-medium ${getRoleBadgeColor(profile.role as UserRole)}`}
+                  className={`px-2 py-0.5 text-xs font-medium ${getRoleBadgeColor(profile.role as UserRole)}`}
                 >
                   {getRoleDisplayName(profile.role as UserRole)}
                 </Badge>
                 {profile.is_department_lead && (
                   <Badge
                     variant="outline"
-                    className="text-warning-foreground border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium"
+                    className="text-warning-foreground border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium"
                   >
                     Dept Lead
                   </Badge>
@@ -338,14 +338,14 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {confirmationDate ? (
                   <Badge
                     variant="outline"
-                    className="text-success-foreground border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium"
+                    className="text-success-foreground border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium"
                   >
                     Confirmed
                   </Badge>
                 ) : profile.employment_date ? (
                   <Badge
                     variant="outline"
-                    className="border-border text-muted-foreground px-2 py-0.5 text-[11px] font-medium"
+                    className="border-border text-muted-foreground px-2 py-0.5 text-xs font-medium"
                   >
                     Probation (Pending Confirmation)
                   </Badge>

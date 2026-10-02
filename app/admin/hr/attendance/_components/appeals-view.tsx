@@ -121,7 +121,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
             </Badge>
             {/* The snapshot can go stale when device punches arrive late. */}
             {r.status === "pending" && r.live_status && r.live_status !== r.current_status && (
-              <span className="text-warning-foreground text-[11px] font-medium">
+              <span className="text-warning-foreground text-xs font-medium">
                 Now: {ATTENDANCE_STATUS_LABELS[r.live_status as UnifiedAttendanceStatus] ?? r.live_status}
               </span>
             )}
@@ -257,7 +257,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
               </span>
             </div>
             {r.appeal_reason && (
-              <p className="text-muted-foreground line-clamp-2 border-t pt-2 text-[11px]">{r.appeal_reason}</p>
+              <p className="text-muted-foreground line-clamp-2 border-t pt-2 text-xs">{r.appeal_reason}</p>
             )}
           </div>
         )}

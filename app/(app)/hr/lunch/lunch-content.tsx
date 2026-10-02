@@ -643,12 +643,10 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
                     {menu.groups.length > 1 && (
                       <div className="flex items-baseline gap-2 pb-1">
                         <span className="text-foreground text-sm font-semibold">{groupHeading(group, index)}</span>
-                        <span className="text-muted-foreground text-[11px] tracking-wider uppercase">
+                        <span className="text-muted-foreground text-xs tracking-wider uppercase">
                           Step {index + 1} of {menu.groups.length} · pick one
                         </span>
-                        {!group.is_required && (
-                          <span className="text-muted-foreground text-[11px] italic">optional</span>
-                        )}
+                        {!group.is_required && <span className="text-muted-foreground text-xs italic">optional</span>}
                       </div>
                     )}
 
@@ -783,7 +781,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
                   </div>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1 text-[11px] font-medium">What You Ate:</p>
+                  <p className="text-muted-foreground mb-1 text-xs font-medium">What You Ate:</p>
                   {row.picks.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {row.picks.map((pick) => (
@@ -945,7 +943,7 @@ function PollRow({
         <div className="mt-2 space-y-1 pl-8 sm:pl-9">
           {voters.map((voter) => (
             <div key={voter.user_id} className="flex items-center gap-2">
-              <VoterAvatar voter={voter} className="h-6 w-6 text-[10px]" />
+              <VoterAvatar voter={voter} className="h-6 w-6 text-xs" />
               <span className="text-muted-foreground truncate text-xs">
                 {voter.user_id === currentUserId ? "You" : voter.full_name}
               </span>
@@ -973,19 +971,19 @@ function AvatarStack({ voters, currentUserId }: { voters: LunchVoter[]; currentU
           key={voter.user_id}
           voter={voter}
           className={cn(
-            "ring-background h-6 w-6 text-[9px] ring-2",
+            "ring-background h-6 w-6 text-xs ring-2",
             voter.user_id === currentUserId && "ring-primary",
             idx === 3 && "hidden sm:inline-flex"
           )}
         />
       ))}
       {extraMobile > 0 && (
-        <span className="bg-muted text-muted-foreground ring-background flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:hidden">
+        <span className="bg-muted text-muted-foreground ring-background flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ring-2 sm:hidden">
           +{extraMobile}
         </span>
       )}
       {extraDesktop > 0 && (
-        <span className="bg-muted text-muted-foreground ring-background hidden h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:flex">
+        <span className="bg-muted text-muted-foreground ring-background hidden h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ring-2 sm:flex">
           +{extraDesktop}
         </span>
       )}
