@@ -8,6 +8,11 @@
     radial-gradient(ellipse at 50% 120%, rgb(232 189 79 / 0.18), transparent 55%), #040604;
 }
 
+/* No bunting on the poster — the headline carries the top of the page. */
+.bd-poster .birthday-decor__bunting {
+  display: none;
+}
+
 .bd1 {
   position: relative;
   z-index: 1;
@@ -16,7 +21,7 @@
   flex-direction: column;
   align-items: center;
   gap: clamp(0.5rem, 1.6vh, 1.25rem);
-  padding: 4.25rem 2rem 1.75rem;
+  padding: 2.5rem 2rem 1.75rem;
   text-align: center;
 }
 
@@ -219,7 +224,7 @@
     height: auto;
     min-height: 100vh;
     gap: 1.25rem;
-    padding: 4.5rem 1rem 5rem;
+    padding: 2.5rem 1rem 5rem;
   }
 
   .bd1-lineup {
