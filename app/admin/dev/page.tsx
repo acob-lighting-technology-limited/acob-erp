@@ -1,7 +1,4 @@
-import Link from "next/link"
-import { IconFill } from "@/components/ui/icon-fill"
-import { cn } from "@/lib/utils"
-import { PageHeader, PageWrapper } from "@/components/layout"
+import { PageHeader, PageWrapper, ModuleHubGrid } from "@/components/layout"
 import {
   Code2,
   ScrollText,
@@ -104,52 +101,20 @@ export default function DevHomePage() {
         backLink={{ href: "/admin", label: "Back to Admin" }}
       />
 
-      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-        {sections.map((section) => (
-          <Link key={section.href} href={section.href} className="group block">
-            <div
-              className={cn(
-                "bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl",
-                section.hoverBorder
-              )}
-            >
-              <div className="space-y-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <IconFill
-                      icon={section.icon}
-                      fillColor={section.fill}
-                      className={cn(
-                        "h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105",
-                        section.color
-                      )}
-                      iconClassName="h-5 w-5"
-                    />
-                    <h3 className={cn("text-foreground text-base font-semibold transition-colors", section.hoverText)}>
-                      {section.title}
-                    </h3>
-                  </div>
-                </div>
-                <p className="text-muted-foreground text-xs leading-relaxed">{section.description}</p>
-              </div>
-              <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">{section.subLabel}</span>
-                <IconFill
-                  icon={ChevronRight}
-                  fillColor={section.fill}
-                  hoverTextClassName="group-hover:text-white"
-                  className={cn(
-                    "border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5",
-                    section.hoverBorder
-                  )}
-                  iconClassName="text-muted-foreground h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+      <ModuleHubGrid
+        className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3"
+        cards={sections.map((c) => ({
+          title: c.title,
+          description: c.description,
+          href: c.href,
+          icon: c.icon,
+          footer: c.subLabel,
+          color: c.color,
+          fill: c.fill,
+          hoverBorder: c.hoverBorder,
+          hoverText: c.hoverText,
+        }))}
+      />
     </PageWrapper>
   )
 }
