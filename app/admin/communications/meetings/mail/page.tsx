@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { WeeklySummaryContent } from "@/app/admin/reports/mail/weekly-summary-content"
+import { WeeklySummaryContent } from "./weekly-summary-content"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 
 export default async function CommunicationsMeetingsMailPage() {

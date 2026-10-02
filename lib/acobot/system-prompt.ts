@@ -76,8 +76,8 @@ const ADMIN_PAGE_DESCRIPTIONS: Array<[string, string]> = [
     "Admin → KSS (Knowledge Sharing Sessions) — schedule sessions, manage presenters, mark attendance, and export records. Use 'Manage Weeks' to configure weekly schedules.",
   ],
   [
-    "/admin/tools/reference-generator",
-    "Admin → Reference Generator — create and track official reference letters and generate unique reference codes.",
+    "/admin/correspondence",
+    "Admin → Correspondence — the reference generator: create and track official letters and their unique reference codes.",
   ],
   [
     "/admin/meetings",
