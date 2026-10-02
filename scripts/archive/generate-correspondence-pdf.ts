@@ -17,12 +17,12 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { autoRefreshToken: false, persistSession: false }
+  auth: { autoRefreshToken: false, persistSession: false },
 })
 
 async function generatePDF() {
   console.log("Fetching correspondence records from Supabase...")
-  
+
   // Fetch up to 5000 records
   const { data: records, error } = await supabase
     .from("correspondence_records")
@@ -59,7 +59,7 @@ async function generatePDF() {
     month: "long",
     day: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
   })
   doc.text(`Generated on: ${dateStr}`, 14, 27)
   doc.text(`Total Records: ${records.length}`, 14, 33)
@@ -77,7 +77,7 @@ async function generatePDF() {
     const subject = record.subject || "-"
     const recName = record.recipient_name || "-"
     const recCode = record.recipient_code || "-"
-    
+
     return [String(index + 1), ref, subject, recName, recCode]
   })
 
@@ -88,24 +88,24 @@ async function generatePDF() {
     styles: {
       fontSize: 9,
       cellPadding: 3,
-      font: "helvetica"
+      font: "helvetica",
     },
     headStyles: {
       fillColor: [15, 23, 42], // Slate 900 for a clean premium look
       textColor: 255,
-      fontStyle: "bold"
+      fontStyle: "bold",
     },
     alternateRowStyles: {
-      fillColor: [248, 250, 252] // Slate 50
+      fillColor: [248, 250, 252], // Slate 50
     },
     columnStyles: {
       0: { cellWidth: 10, halign: "center" }, // S/N
-      1: { cellWidth: 45 },                  // Reference
-      2: { cellWidth: 67 },                  // Subject
-      3: { cellWidth: 35 },                  // Recipient Name
-      4: { cellWidth: 25 }                   // Recipient Code
+      1: { cellWidth: 45 }, // Reference
+      2: { cellWidth: 67 }, // Subject
+      3: { cellWidth: 35 }, // Recipient Name
+      4: { cellWidth: 25 }, // Recipient Code
     },
-    margin: { top: 40, bottom: 20, left: 14, right: 14 }
+    margin: { top: 40, bottom: 20, left: 14, right: 14 },
   })
 
   // Add page numbers
@@ -126,7 +126,7 @@ async function generatePDF() {
   const outputPath = path.resolve(process.cwd(), "all-correspondence.pdf")
   const arrayBuffer = doc.output("arraybuffer")
   fs.writeFileSync(outputPath, Buffer.from(arrayBuffer))
-  
+
   console.log(`Success! PDF generated at: ${outputPath}`)
 }
 

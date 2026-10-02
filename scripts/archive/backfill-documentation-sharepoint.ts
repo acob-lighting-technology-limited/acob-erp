@@ -105,7 +105,11 @@ async function main() {
 
     if (currentFolderPath && currentFolderPath !== desiredFolderPath) {
       await onedrive.createFolder(getParentFolderPath(desiredFolderPath))
-      await onedrive.moveItem(currentFolderPath, getParentFolderPath(desiredFolderPath), getFolderNameFromPath(desiredFolderPath))
+      await onedrive.moveItem(
+        currentFolderPath,
+        getParentFolderPath(desiredFolderPath),
+        getFolderNameFromPath(desiredFolderPath)
+      )
       folderPath = desiredFolderPath
     }
 

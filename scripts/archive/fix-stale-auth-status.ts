@@ -15,11 +15,9 @@ import { createClient } from "@supabase/supabase-js"
 
 const DRY_RUN = process.argv.includes("--dry-run")
 
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  auth: { autoRefreshToken: false, persistSession: false },
+})
 
 async function main() {
   console.log(DRY_RUN ? "DRY RUN — no changes will be made\n" : "LIVE RUN — changes will be applied\n")
