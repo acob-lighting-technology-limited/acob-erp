@@ -60,8 +60,9 @@ const numberFormatter = new Intl.NumberFormat("en-NG")
  */
 export function formatCurrency(
   amount: number | string | null | undefined,
-  options: { currency?: string; whole?: boolean; compact?: boolean; fallback?: string } = {}
+  currencyOrOptions: string | { currency?: string; whole?: boolean; compact?: boolean; fallback?: string } = {}
 ): string {
+  const options = typeof currencyOrOptions === "string" ? { currency: currencyOrOptions } : currencyOrOptions
   const value = typeof amount === "string" ? Number(amount) : amount
   if (value == null || Number.isNaN(value)) return options.fallback ?? "—"
   const currency = (options.currency || "NGN").toUpperCase()

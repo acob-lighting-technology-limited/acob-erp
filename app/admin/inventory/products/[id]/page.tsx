@@ -12,6 +12,7 @@ import { Pencil, Package } from "lucide-react"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
 import { ProductFormDialog } from "../_components/product-form-dialog"
+import { formatCurrency } from "@/lib/format"
 
 interface Product {
   id: string
@@ -45,10 +46,6 @@ export default function ProductDetailPage() {
     queryKey: QUERY_KEYS.adminProductDetail(id),
     queryFn: () => fetchProduct(id),
   })
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
-  }
 
   if (isLoading) return <PageLoader />
   if (!product) return null

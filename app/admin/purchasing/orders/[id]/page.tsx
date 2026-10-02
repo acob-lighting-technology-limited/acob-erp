@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
 import { apiFetch } from "@/lib/api-client"
+import { formatCurrency } from "@/lib/format"
 
 interface PurchaseOrder {
   id: string
@@ -47,10 +48,6 @@ async function fetchPurchaseOrderDetail(id: string): Promise<PurchaseOrder> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load purchase order")
   const json = await res.json()
   return json.data as PurchaseOrder
-}
-
-function formatCurrency(amount: number, currency: string = "NGN") {
-  return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
 }
 
 function formatDate(date: string) {

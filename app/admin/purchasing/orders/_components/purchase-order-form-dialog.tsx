@@ -18,6 +18,7 @@ import { FormFieldGroup } from "@/components/ui/patterns"
 import type { QueryClient } from "@tanstack/react-query"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { formatCurrency } from "@/lib/format"
 
 interface Supplier {
   id: string
@@ -115,10 +116,6 @@ export function PurchaseOrderFormDialog({ open, onOpenChange, queryClient }: Pur
 
   function calculateTotal() {
     return items.reduce((sum, i) => sum + i.amount, 0)
-  }
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: formData.currency }).format(amount)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -285,7 +282,7 @@ export function PurchaseOrderFormDialog({ open, onOpenChange, queryClient }: Pur
                       </div>
                       <div className="space-y-2 text-right sm:col-span-2">
                         <Label>Amount</Label>
-                        <p className="py-2 font-medium">{formatCurrency(item.amount)}</p>
+                        <p className="py-2 font-medium">{formatCurrency(item.amount, formData.currency)}</p>
                       </div>
                       <div className="sm:col-span-1">
                         <Button
@@ -312,7 +309,7 @@ export function PurchaseOrderFormDialog({ open, onOpenChange, queryClient }: Pur
               <StatCard
                 variant="compact"
                 title="Total Amount"
-                value={formatCurrency(calculateTotal())}
+                value={formatCurrency(calculateTotal(), formData.currency)}
                 icon={ShoppingCart}
               />
             </div>

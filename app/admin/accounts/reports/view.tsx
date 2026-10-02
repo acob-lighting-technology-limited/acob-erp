@@ -13,6 +13,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { EmptyState } from "@/components/ui/patterns"
 import { Badge } from "@/components/ui/badge"
+import { formatCurrency } from "@/lib/format"
 
 interface FinancePaymentRow {
   id: string
@@ -73,13 +74,6 @@ async function fetchFinanceReportData(): Promise<FinanceReportData> {
     paymentsByMonth,
     paymentsByCategory,
   }
-}
-
-function formatCurrency(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-  }).format(amount)
 }
 
 function formatMonth(monthStr: string) {
