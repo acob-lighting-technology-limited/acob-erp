@@ -1,0 +1,32 @@
+# Weekly dependency updates, grouped so they arrive as a few reviewable PRs
+# rather than dozens. Security updates are raised immediately regardless.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      radix:
+        patterns: ["@radix-ui/*"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+      supabase:
+        patterns: ["@supabase/*"]
+      dev-tooling:
+        dependency-type: development
+    ignore:
+      # Major framework upgrades are planned work, not a weekly bump.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
