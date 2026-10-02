@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
@@ -11,6 +13,14 @@ import { writeLoginLog, REAUTH_SOURCE } from "@/lib/auth/login-log"
 import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("change-password")
+
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().max(200).optional(),
+  newPassword: z
+    .string({ required_error: "New password is required" })
+    .min(6, "New password must be at least 6 characters long")
+    .max(200),
+})
 
 export async function POST(req: Request) {
   const ipAddress =
@@ -32,15 +42,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { currentPassword, newPassword } = await req.json()
-
-    if (!newPassword || typeof newPassword !== "string") {
-      return NextResponse.json({ error: "New password is required" }, { status: 400 })
-    }
-
-    if (newPassword.length < 6) {
-      return NextResponse.json({ error: "New password must be at least 6 characters long" }, { status: 400 })
-    }
+    const parsed = await parseJsonBody(req, ChangePasswordSchema)
+    if (!parsed.ok) return parsed.response
+    const { currentPassword, newPassword } = parsed.data
 
     // Verify current password if provided
     if (currentPassword && typeof currentPassword === "string") {

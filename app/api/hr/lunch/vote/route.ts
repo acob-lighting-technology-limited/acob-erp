@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { loadMenuById, loadVotesForMenu } from "@/lib/hr/lunch-menu-server"
@@ -21,11 +23,16 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = (await request.json()) as {
-      menuId?: string
-      eating?: boolean
-      selections?: Record<string, string>
-    }
+    const parsed = await parseJsonBody(
+      request,
+      z.object({
+        menuId: z.string().uuid("menuId is required"),
+        eating: z.boolean().optional(),
+        selections: z.record(z.string(), z.string()).optional(),
+      })
+    )
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
     const menuId = body.menuId
     // The poll's "NO" answer. It stores a vote so colleagues can see the
     // person opted out, but selects nothing and is never charged.

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getRequestScope, type AdminScope } from "@/lib/admin/api-scope"
@@ -24,6 +26,14 @@ export async function GET() {
   }
 }
 
+const SlaPolicySchema = z.object({
+  stage: z.string().trim().min(1).max(100),
+  due_hours: z.number().int().min(1).max(1440),
+  reminder_hours_before: z.number().int().min(0).max(1440).optional(),
+  escalate_to_role: z.string().trim().max(100).nullable().optional(),
+  is_active: z.boolean().optional(),
+})
+
 export async function PATCH(request: NextRequest) {
   const rl = await rateLimit(`hr-leave-sla:${getClientId(request)}`, { limit: 15, windowSec: 60 })
   if (!rl.allowed)
@@ -41,8 +51,10 @@ export async function PATCH(request: NextRequest) {
     const isHR = assertHR(await getRequestScope())
     if (!isHR) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-    const body = await request.json()
-    const payload = Array.isArray(body) ? body : [body]
+    // Only known columns are accepted; the upsert used to take the raw body.
+    const parsed = await parseJsonBody(request, z.union([z.array(SlaPolicySchema).max(50), SlaPolicySchema]))
+    if (!parsed.ok) return parsed.response
+    const payload = Array.isArray(parsed.data) ? parsed.data : [parsed.data]
 
     const { data, error } = await supabase
       .from("approval_sla_policies")
