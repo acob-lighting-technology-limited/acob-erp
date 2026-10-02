@@ -12,12 +12,12 @@ import { createClient } from "@supabase/supabase-js"
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 const USERS = {
-  chibuikem:    "1aeae0c5-ef2f-4790-be14-d0e696be01af",
-  abdulsamad:   "3791c0f4-dde9-41f8-a227-986273532d9c",
-  peter:        "90d64faf-863e-4d07-a500-186cd073fbd8",
-  alexander:    "d29aad5f-f382-4998-8bd2-9857435874e0",
+  chibuikem: "1aeae0c5-ef2f-4790-be14-d0e696be01af",
+  abdulsamad: "3791c0f4-dde9-41f8-a227-986273532d9c",
+  peter: "90d64faf-863e-4d07-a500-186cd073fbd8",
+  alexander: "d29aad5f-f382-4998-8bd2-9857435874e0",
   onyekachukwu: "c6d934f4-8d43-4c1c-967e-103c9f49f82a",
-  peace:        "b4395c0d-c599-4067-91db-e8b62d43b6b7",
+  peace: "b4395c0d-c599-4067-91db-e8b62d43b6b7",
 }
 
 async function seed() {
@@ -133,41 +133,69 @@ async function seed() {
   // ── 2. LEAVE REQUEST (Chibuikem requesting leave) ──
   console.log("\n── Leave Requests ──")
 
-  await sb.from("leave_approvals").delete().in("leave_request_id",
-    (await sb.from("leave_requests").select("id").eq("user_id", USERS.chibuikem).ilike("reason", "SEED:%")).data?.map((r: any) => r.id) || []
-  )
+  await sb
+    .from("leave_approvals")
+    .delete()
+    .in(
+      "leave_request_id",
+      (await sb.from("leave_requests").select("id").eq("user_id", USERS.chibuikem).ilike("reason", "SEED:%")).data?.map(
+        (r: any) => r.id
+      ) || []
+    )
   await sb.from("leave_requests").delete().eq("user_id", USERS.chibuikem).ilike("reason", "SEED:%")
 
   // First make sure Onyekachukwu is Admin & HR lead for leave to work
   const { data: hrDept } = await sb.from("departments").select("id").eq("name", "Admin & HR").single()
-  await sb.from("profiles").update({
-    is_department_lead: true,
-    lead_departments: ["Admin & HR"],
-    department_id: hrDept?.id,
-  }).eq("id", USERS.onyekachukwu)
+  await sb
+    .from("profiles")
+    .update({
+      is_department_lead: true,
+      lead_departments: ["Admin & HR"],
+      department_id: hrDept?.id,
+    })
+    .eq("id", USERS.onyekachukwu)
 
-  const { data: leaveReq, error: leaveErr } = await sb.from("leave_requests").insert({
-    user_id: USERS.chibuikem,
-    leave_type_id: "37ff322d-da8f-4e66-87a1-9a0eb45f7daa", // Annual Leave
-    start_date: "2026-04-14",
-    end_date: "2026-04-16",
-    resume_date: "2026-04-17",
-    days_count: 3,
-    reason: "SEED: Family event - cousin's wedding in Lagos",
-    status: "pending",
-    reliever_id: USERS.abdulsamad,
-    supervisor_id: USERS.abdulsamad,
-    approval_stage: "pending_reliever",
-    current_stage_code: "pending_reliever",
-    current_stage_order: 1,
-    current_approver_user_id: USERS.abdulsamad,
-    requester_route_kind: "employee",
-    route_snapshot: JSON.stringify([
-      { stage_order: 1, approver_role_code: "reliever", approver_user_id: USERS.abdulsamad, stage_code: "pending_reliever" },
-      { stage_order: 2, approver_role_code: "department_lead", approver_user_id: USERS.abdulsamad, stage_code: "pending_supervisor" },
-      { stage_order: 3, approver_role_code: "admin_hr_lead", approver_user_id: USERS.onyekachukwu, stage_code: "pending_hr" },
-    ]),
-  }).select("id").single()
+  const { data: leaveReq, error: leaveErr } = await sb
+    .from("leave_requests")
+    .insert({
+      user_id: USERS.chibuikem,
+      leave_type_id: "37ff322d-da8f-4e66-87a1-9a0eb45f7daa", // Annual Leave
+      start_date: "2026-04-14",
+      end_date: "2026-04-16",
+      resume_date: "2026-04-17",
+      days_count: 3,
+      reason: "SEED: Family event - cousin's wedding in Lagos",
+      status: "pending",
+      reliever_id: USERS.abdulsamad,
+      supervisor_id: USERS.abdulsamad,
+      approval_stage: "pending_reliever",
+      current_stage_code: "pending_reliever",
+      current_stage_order: 1,
+      current_approver_user_id: USERS.abdulsamad,
+      requester_route_kind: "employee",
+      route_snapshot: JSON.stringify([
+        {
+          stage_order: 1,
+          approver_role_code: "reliever",
+          approver_user_id: USERS.abdulsamad,
+          stage_code: "pending_reliever",
+        },
+        {
+          stage_order: 2,
+          approver_role_code: "department_lead",
+          approver_user_id: USERS.abdulsamad,
+          stage_code: "pending_supervisor",
+        },
+        {
+          stage_order: 3,
+          approver_role_code: "admin_hr_lead",
+          approver_user_id: USERS.onyekachukwu,
+          stage_code: "pending_hr",
+        },
+      ]),
+    })
+    .select("id")
+    .single()
 
   if (leaveErr) console.log(`  ❌ Leave request: ${leaveErr.message}`)
   else console.log(`  ✅ Annual leave request created (pending reliever: Abdulsamad)`)
@@ -261,4 +289,7 @@ async function seed() {
   console.log("═══════════════════════════════════════════")
 }
 
-seed().catch(err => { console.error("Fatal:", err); process.exit(1) })
+seed().catch((err) => {
+  console.error("Fatal:", err)
+  process.exit(1)
+})
