@@ -2,24 +2,27 @@ import { NextResponse } from "next/server"
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/server"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
-import { ADMIN_LIKE_ROLES } from "@/lib/role-management"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
+import type { AdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
 export type AdminRoleGuardResult =
   | { error: NextResponse }
   | { supabase: SupabaseClient; user: User; userId: string; role: string }
 
 /**
- * Guard for org-wide admin API routes that any admin-like role (admin,
- * super_admin, developer) may call, regardless of admin_routes or lead mode.
- * Rate-limits per client, then checks the session and role.
+ * Guard for org-wide admin API routes. Allows developer/super_admin, and an
+ * admin only when they hold `route` — an admin is a super_admin scoped to
+ * their assigned routes, so holding no grant for the route means no access.
+ * Rate-limits per client, then checks the session and route.
  *
- *   const auth = await requireAdminRole(request, "admin-attendance-holidays", 20)
+ *   const auth = await requireAdminRole(request, "hr.attendance", "admin-attendance-holidays", 20)
  *   if ("error" in auth) return auth.error
  *
  * Department-scoped routes use requireApiAdminScope() instead.
  */
 export async function requireAdminRole(
   request: Request,
+  route: AdminRouteKeyV2,
   rateKey: string,
   limitPerMinute = 30
 ): Promise<AdminRoleGuardResult> {
@@ -32,10 +35,9 @@ export async function requireAdminRole(
   } = await supabase.auth.getUser()
   if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
-  const role = String(profile?.role || "")
-  if (!(ADMIN_LIKE_ROLES as readonly string[]).includes(role)) {
+  const scope = await resolveAdminScope(supabase, user.id)
+  if (!scope || !scopeHoldsAdminRoute(scope, route)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
-  return { supabase, user, userId: user.id, role }
+  return { supabase, user, userId: user.id, role: scope.role }
 }

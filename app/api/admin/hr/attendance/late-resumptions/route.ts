@@ -35,7 +35,7 @@ function expandDateRange(start: string, end: string): string[] {
 }
 
 function ensureAdmin(request: NextRequest) {
-  return requireAdminRole(request, "admin-attendance-late-resumptions", 20)
+  return requireAdminRole(request, "hr.attendance", "admin-attendance-late-resumptions", 20)
 }
 
 export async function GET(request: NextRequest) {

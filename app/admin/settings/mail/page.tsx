@@ -3,6 +3,7 @@ import { Mail } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { MailPolicySettings } from "@/components/admin/mail-policy-settings"
 
 export default async function MailSettingsPage() {
@@ -13,8 +14,8 @@ export default async function MailSettingsPage() {
 
   if (!user) redirect("/auth/login")
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-  if (!["super_admin", "developer"].includes(profile?.role || "")) {
+  const scope = await resolveAdminScope(supabase, user.id)
+  if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
     redirect("/admin/settings")
   }
 

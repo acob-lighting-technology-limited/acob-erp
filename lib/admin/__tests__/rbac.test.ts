@@ -3,11 +3,14 @@ import test from "node:test"
 import {
   canAccessAdminSection,
   expandDepartmentScopeForQuery,
+  canOverrideReportsWeekLock,
   getDepartmentScope,
+  hasGlobalReportsWriteAccess,
   isAdminLikeRole,
   normalizeDepartmentName,
   roleCanEnterAdmin,
   scopeDepartmentIds,
+  scopeHoldsAdminRoute,
   type AdminScope,
 } from "@/lib/admin/rbac"
 
@@ -133,4 +136,40 @@ test("expandDepartmentScopeForQuery expands legacy aliases", () => {
 test("normalizeDepartmentName maps legacy Finance label to Accounts", () => {
   assert.equal(normalizeDepartmentName("Finance"), "Accounts")
   assert.equal(normalizeDepartmentName("finance"), "Accounts")
+})
+
+test("scopeHoldsAdminRoute: developer/super_admin hold every route", () => {
+  for (const role of ["developer", "super_admin"] as const) {
+    const scope = makeScope({ role, isAdminLike: true })
+    assert.equal(scopeHoldsAdminRoute(scope, "settings.main"), true)
+    assert.equal(scopeHoldsAdminRoute(scope, "hr.attendance"), true)
+  }
+})
+
+test("scopeHoldsAdminRoute: admin holds only granted routes (with hr.main alias)", () => {
+  const hrAdmin = makeScope({ role: "admin", isAdminLike: true, adminRoutes: ["hr.main"] })
+  assert.equal(scopeHoldsAdminRoute(hrAdmin, "hr.attendance"), true)
+  assert.equal(scopeHoldsAdminRoute(hrAdmin, "hr.leave"), true)
+  assert.equal(scopeHoldsAdminRoute(hrAdmin, "reports.other"), false)
+  assert.equal(scopeHoldsAdminRoute(hrAdmin, "settings.main"), false)
+
+  const commsAdmin = makeScope({ role: "admin", isAdminLike: true, adminRoutes: ["communications.main"] })
+  assert.equal(scopeHoldsAdminRoute(commsAdmin, "hr.attendance"), false)
+})
+
+test("scopeHoldsAdminRoute: department leads and lead mode never hold admin routes", () => {
+  const lead = makeScope({ isDepartmentLead: true, managedDepartments: ["Accounts"] })
+  assert.equal(scopeHoldsAdminRoute(lead, "hr.leave"), false)
+  const adminInLeadMode = makeScope({ role: "admin", isAdminLike: true, adminRoutes: ["hr.main"], scopeMode: "lead" })
+  assert.equal(scopeHoldsAdminRoute(adminInLeadMode, "hr.leave"), false)
+})
+
+test("reports write access and week-lock override follow the reports.other grant", () => {
+  const reportsAdmin = makeScope({ role: "admin", isAdminLike: true, adminRoutes: ["reports.other"] })
+  assert.equal(hasGlobalReportsWriteAccess(reportsAdmin), true)
+  assert.equal(canOverrideReportsWeekLock(reportsAdmin), true)
+
+  const hrAdmin = makeScope({ role: "admin", isAdminLike: true, adminRoutes: ["hr.main"] })
+  assert.equal(hasGlobalReportsWriteAccess(hrAdmin), false)
+  assert.equal(canOverrideReportsWeekLock(hrAdmin), false)
 })
