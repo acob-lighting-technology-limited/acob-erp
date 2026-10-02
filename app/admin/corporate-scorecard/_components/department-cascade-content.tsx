@@ -278,7 +278,7 @@ export function DepartmentCascadeContent({
             r.department_target ||
             r.target_text ||
             (r.target_value != null ? `${r.target_value} ${r.target_unit || ""}`.trim() : null)
-          if (!targetDisplay) return <span className="text-xs text-amber-600 dark:text-amber-400">Not set</span>
+          if (!targetDisplay) return <span className="text-warning-foreground text-xs">Not set</span>
           return (
             <div className="flex flex-col">
               <span className="text-xs font-medium">{targetDisplay}</span>
@@ -311,13 +311,13 @@ export function DepartmentCascadeContent({
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-medium">{actualDisplay}</span>
               {r.source === "auto" && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                <span className="text-info-foreground inline-flex items-center gap-0.5 text-[10px] font-medium">
                   <Zap className="h-3 w-3" />
                   Auto ({r.task_stats?.completed || 0} tasks)
                 </span>
               )}
               {r.source === "manual" && r.is_override && (
-                <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">✏️ Adjusted</span>
+                <span className="text-warning-foreground text-[10px] font-medium">✏️ Adjusted</span>
               )}
             </div>
           )
@@ -817,7 +817,7 @@ function RecordActualDialog({
         </DialogHeader>
 
         {row?.source === "auto" && (
-          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-700 dark:text-blue-300">
+          <div className="text-info-foreground rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-xs">
             <div className="flex items-center gap-1.5 font-semibold">
               <Zap className="h-3.5 w-3.5" />
               <span>Live Task Derivation Active</span>
@@ -833,7 +833,7 @@ function RecordActualDialog({
         )}
 
         {row?.source === "manual" && row.is_override && (
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
+          <div className="text-warning-foreground rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs">
             <div className="flex items-center justify-between font-semibold">
               <span>✏️ Manual Managerial Override Active</span>
             </div>

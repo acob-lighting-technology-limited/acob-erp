@@ -659,7 +659,7 @@ export function OfficeLocationsPage({
               remove the room or office space from the system.
             </AlertDialogDescription>
             {deletingLocation && (deletingLocation.employee_count || 0) > 0 && (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+              <div className="text-warning-foreground rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-medium">
                 Warning: This location currently has {deletingLocation.employee_count} assigned employee(s). You must
                 reassign them before this location can be deleted.
               </div>

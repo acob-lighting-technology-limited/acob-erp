@@ -209,14 +209,15 @@ const EVENT_LABELS: Record<string, string> = {
 
 function eventBadgeClass(eventType: string): string {
   if (eventType.startsWith("appeal_")) {
-    if (eventType === "appeal_rejected") return "bg-red-100 text-red-800"
-    if (eventType.includes("approved") || eventType.includes("resolved")) return "bg-emerald-100 text-emerald-800"
-    return "bg-amber-100 text-amber-800"
+    if (eventType === "appeal_rejected") return "bg-danger-muted text-danger-foreground"
+    if (eventType.includes("approved") || eventType.includes("resolved"))
+      return "bg-success-muted text-success-foreground"
+    return "bg-warning-muted text-warning-foreground"
   }
-  if (eventType.startsWith("device_")) return "bg-blue-100 text-blue-800"
+  if (eventType.startsWith("device_")) return "bg-info-muted text-info-foreground"
   if (eventType.startsWith("manual_") || eventType.startsWith("bulk_")) return "bg-violet-100 text-violet-800"
   if (eventType === "marked_incomplete") return "bg-cyan-100 text-cyan-800"
-  return "bg-gray-100 text-gray-800"
+  return "bg-neutral-muted text-neutral-foreground"
 }
 
 type ExemptionsPayload = {
@@ -1249,9 +1250,7 @@ export function AttendanceReportsPage({
                   Exempt
                 </Badge>
               ) : (
-                <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  {r.total_hours} hrs
-                </span>
+                <span className="text-success-foreground font-mono text-xs font-semibold">{r.total_hours} hrs</span>
               ),
           }}
           cardRenderer={(r) => (
@@ -1266,13 +1265,13 @@ export function AttendanceReportsPage({
               <div className="border-border/40 grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                 <div>
                   <span className="text-muted-foreground block text-[10px] uppercase">Early / Present</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-success-foreground font-semibold">
                     {r.early_days ?? 0} early / {r.present_days} present
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[10px] uppercase">Absent</span>
-                  <span className="font-semibold text-rose-600 dark:text-rose-400">{r.absent_days} days</span>
+                  <span className="text-danger-foreground font-semibold">{r.absent_days} days</span>
                 </div>
               </div>
             </div>

@@ -171,9 +171,7 @@ export default function RequisitionListPage() {
       sortable: true,
       accessor: (r) => r.amount,
       render: (r) => (
-        <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-          {formatNaira(r.amount)}
-        </span>
+        <span className="text-success-foreground font-mono text-xs font-semibold">{formatNaira(r.amount)}</span>
       ),
       initialWidth: 140,
     },
@@ -341,9 +339,7 @@ export default function RequisitionListPage() {
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground font-mono text-xs font-bold">{r.requisition_number}</span>
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                {formatNaira(r.amount)}
-              </span>
+              <span className="text-success-foreground font-mono text-xs font-bold">{formatNaira(r.amount)}</span>
             </div>
             <div>
               <h4 className="line-clamp-2 text-sm font-semibold">{r.purpose}</h4>

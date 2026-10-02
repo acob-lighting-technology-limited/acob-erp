@@ -199,7 +199,7 @@ export default function AdminRequisitionsPage() {
       sortable: true,
       accessor: (r) => r.amount,
       render: (r) => (
-        <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+        <span className="text-success-foreground font-mono text-xs font-semibold">
           ₦{Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
         </span>
       ),

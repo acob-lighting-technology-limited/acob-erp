@@ -56,10 +56,10 @@ const typeColors = {
 }
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {
-  urgent: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  high: "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  normal: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  low: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  urgent: "border-red-500/40 bg-red-500/10 text-danger-foreground",
+  high: "border-orange-500/40 bg-orange-500/10 text-warning-foreground",
+  normal: "border-blue-500/40 bg-blue-500/10 text-info-foreground",
+  low: "border-emerald-500/40 bg-emerald-500/10 text-success-foreground",
 }
 
 function getPriorityBadgeClass(priority: string | null | undefined): string {
@@ -162,12 +162,12 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full",
                 n.type === "error"
-                  ? "bg-red-100 text-red-600"
+                  ? "bg-danger-muted text-danger-foreground"
                   : n.type === "warning"
-                    ? "bg-yellow-100 text-yellow-600"
+                    ? "bg-warning-muted text-warning-foreground"
                     : n.type === "success"
-                      ? "bg-green-100 text-green-600"
-                      : "bg-blue-100 text-blue-600"
+                      ? "bg-success-muted text-success-foreground"
+                      : "bg-info-muted text-info-foreground"
               )}
             >
               <Icon className="h-4 w-4" />
@@ -363,12 +363,12 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                   className={cn(
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
                     n.type === "error"
-                      ? "bg-red-100 text-red-600"
+                      ? "bg-danger-muted text-danger-foreground"
                       : n.type === "warning"
-                        ? "bg-yellow-100 text-yellow-600"
+                        ? "bg-warning-muted text-warning-foreground"
                         : n.type === "success"
-                          ? "bg-green-100 text-green-600"
-                          : "bg-blue-100 text-blue-600"
+                          ? "bg-success-muted text-success-foreground"
+                          : "bg-info-muted text-info-foreground"
                   )}
                 >
                   <Icon className="h-5 w-5" />

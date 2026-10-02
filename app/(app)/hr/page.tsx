@@ -22,7 +22,7 @@ export default async function HrPage() {
       subLabel: todayAttendance.totalHours
         ? `${todayAttendance.totalHours.toFixed(1)} hrs today`
         : "Timesheets & Hours",
-      color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      color: "bg-amber-500/10 text-warning-foreground border-amber-500/20",
       fill: "bg-amber-500",
       hoverBorder: "hover:border-amber-500/60 dark:hover:border-amber-400/60",
       hoverText: "group-hover:text-amber-500",
@@ -37,7 +37,7 @@ export default async function HrPage() {
         leave.pendingRequestsCount > 0
           ? `${leave.pendingRequestsCount} in review`
           : `${leave.casualRemainingDays} casual days also available`,
-      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      color: "bg-emerald-500/10 text-success-foreground border-emerald-500/20",
       fill: "bg-emerald-500",
       hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
       hoverText: "group-hover:text-emerald-500",
@@ -49,7 +49,7 @@ export default async function HrPage() {
       icon: Utensils,
       badge: lunch.hasVoted ? "Submitted" : lunch.hasMenuToday ? "Menu Available" : "No Menu Today",
       subLabel: lunch.hasVoted ? "Choice recorded" : "Daily Menu & Voting",
-      color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+      color: "bg-orange-500/10 text-warning-foreground border-orange-500/20",
       fill: "bg-orange-500",
       hoverBorder: "hover:border-orange-500/60 dark:hover:border-orange-400/60",
       hoverText: "group-hover:text-orange-500",
@@ -61,7 +61,7 @@ export default async function HrPage() {
       icon: Car,
       badge: bookings.activeCount > 0 ? `${bookings.activeCount} Active` : "Available",
       subLabel: "Vehicles & Meeting Rooms",
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      color: "bg-blue-500/10 text-info-foreground border-blue-500/20",
       fill: "bg-blue-500",
       hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
       hoverText: "group-hover:text-blue-500",

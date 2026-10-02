@@ -124,7 +124,7 @@ function IndividualCard({ row }: { row: IndividualRow }) {
             className={
               hasTaken
                 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 shadow-none dark:text-emerald-400"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "text-warning-foreground border-amber-500/30 bg-amber-500/10"
             }
           >
             {hasTaken ? "Taken" : "Not Taken"}
@@ -145,7 +145,7 @@ function IndividualCard({ row }: { row: IndividualRow }) {
             variant="outline"
             className={
               row.tab_switch_count > 0
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                ? "text-warning-foreground border-amber-500/30 bg-amber-500/10"
                 : "border-border text-muted-foreground"
             }
           >
@@ -434,7 +434,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             Taken
           </Badge>
         ) : (
-          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <Badge variant="outline" className="text-warning-foreground border-amber-500/30 bg-amber-500/10">
             Not Taken
           </Badge>
         )
@@ -471,7 +471,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           variant="outline"
           className={
             row.tab_switch_count > 0
-              ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              ? "text-warning-foreground border-amber-500/30 bg-amber-500/10"
               : "border-border text-muted-foreground"
           }
         >

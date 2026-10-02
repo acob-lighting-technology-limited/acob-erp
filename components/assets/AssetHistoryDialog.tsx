@@ -35,17 +35,17 @@ interface AssetHistoryDialogProps {
 function getStatusColor(status: string) {
   switch (status) {
     case "assigned":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success-muted text-success-foreground"
     case "available":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info-muted text-info-foreground"
     case "maintenance":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning-muted text-warning-foreground"
     case "retired":
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-neutral-muted text-neutral-foreground"
     case "archived":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+      return "bg-danger-muted text-danger-foreground"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-neutral-muted text-neutral-foreground"
   }
 }
 

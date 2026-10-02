@@ -439,7 +439,7 @@ export function RiskRegisterView({
                   <RatingBadge rating={r.rating} score={r.score} className="text-[10px]" />
                   <StatusBadge status={r.status} className="text-[10px]" />
                   {isRiskOverdue(r, today) && (
-                    <Badge variant="outline" className="border-rose-300 text-[10px] text-rose-700 dark:text-rose-300">
+                    <Badge variant="outline" className="text-danger-foreground border-rose-300 text-[10px]">
                       Overdue
                     </Badge>
                   )}

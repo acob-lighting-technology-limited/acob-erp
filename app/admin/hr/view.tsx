@@ -146,7 +146,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400"
+                    className="text-info-foreground shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.totalEmployees} Staff
                   </Badge>
@@ -265,7 +265,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400"
+                    className="text-warning-foreground shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.pendingLeaveRequests} Pending
                   </Badge>
@@ -347,7 +347,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400"
+                    className="text-success-foreground shrink-0 rounded-full border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.todayAttendance} Today
                   </Badge>
@@ -386,7 +386,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400"
+                    className="text-info-foreground shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     Payroll Panel
                   </Badge>
@@ -427,7 +427,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400"
+                    className="text-warning-foreground shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.upcomingReviews} Reviews
                   </Badge>

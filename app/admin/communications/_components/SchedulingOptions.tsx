@@ -57,7 +57,7 @@ export function SchedulingOptions({
         >
           <Send className={`h-5 w-5 ${sendTiming === "now" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div className={`font-semibold ${sendTiming === "now" ? "text-orange-700 dark:text-orange-400" : ""}`}>
+            <div className={`font-semibold ${sendTiming === "now" ? "text-warning-foreground" : ""}`}>
               Send Immediately
             </div>
             <div className="text-muted-foreground text-xs">Email will be sent right away</div>
@@ -74,9 +74,7 @@ export function SchedulingOptions({
         >
           <Clock className={`h-5 w-5 ${sendTiming === "scheduled" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div
-              className={`font-semibold ${sendTiming === "scheduled" ? "text-orange-700 dark:text-orange-400" : ""}`}
-            >
+            <div className={`font-semibold ${sendTiming === "scheduled" ? "text-warning-foreground" : ""}`}>
               Schedule
             </div>
             <div className="text-muted-foreground text-xs">One-time, pick a date &amp; time</div>
@@ -93,9 +91,7 @@ export function SchedulingOptions({
         >
           <Repeat className={`h-5 w-5 ${sendTiming === "recurring" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div
-              className={`font-semibold ${sendTiming === "recurring" ? "text-orange-700 dark:text-orange-400" : ""}`}
-            >
+            <div className={`font-semibold ${sendTiming === "recurring" ? "text-warning-foreground" : ""}`}>
               Recurring
             </div>
             <div className="text-muted-foreground text-xs">Automatic every week (server-side)</div>

@@ -316,7 +316,7 @@ export function LeaveDetailDialog({
                               className={cn(
                                 "px-1.5 py-0 text-[10px] font-medium",
                                 leave.evidence_complete
-                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  ? "text-success-foreground border-emerald-500/30 bg-emerald-500/10"
                                   : "bg-muted text-muted-foreground"
                               )}
                             >
@@ -380,13 +380,13 @@ export function LeaveDetailDialog({
                   )}
                 >
                   {isApproved ? (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <CheckCircle2 className="text-success-foreground h-5 w-5 shrink-0" />
                   ) : isRejected ? (
-                    <XCircle className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                    <XCircle className="text-danger-foreground h-5 w-5 shrink-0" />
                   ) : isCancelled ? (
                     <AlertCircle className="text-muted-foreground h-5 w-5 shrink-0" />
                   ) : (
-                    <Clock className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <Clock className="text-warning-foreground h-5 w-5 shrink-0" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">
@@ -600,7 +600,7 @@ export function LeaveDetailDialog({
                   {leave.handover_checklist_url ? (
                     <div className="bg-muted/20 flex flex-col items-start justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
                       <div className="flex items-center gap-3">
-                        <div className="rounded-lg bg-blue-500/10 p-2.5 text-blue-600 dark:text-blue-400">
+                        <div className="text-info-foreground rounded-lg bg-blue-500/10 p-2.5">
                           <FileText className="h-5 w-5" />
                         </div>
                         <div>
@@ -642,9 +642,7 @@ export function LeaveDetailDialog({
                       variant={leave.evidence_complete ? "outline" : "secondary"}
                       className={cn(
                         "text-[10px] font-medium",
-                        leave.evidence_complete
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          : ""
+                        leave.evidence_complete ? "text-success-foreground border-emerald-500/30 bg-emerald-500/10" : ""
                       )}
                     >
                       {leave.evidence_complete ? "All Evidence Complete" : "Pending Evidence"}
@@ -672,10 +670,10 @@ export function LeaveDetailDialog({
                                   className={cn(
                                     "px-1.5 py-0 text-[9px] uppercase",
                                     doc.status === "verified"
-                                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                      ? "text-success-foreground border-emerald-500/30 bg-emerald-500/10"
                                       : doc.status === "rejected"
-                                        ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
-                                        : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                        ? "text-danger-foreground border-red-500/30 bg-red-500/10"
+                                        : "text-warning-foreground border-amber-500/30 bg-amber-500/10"
                                   )}
                                 >
                                   {doc.status}

@@ -9,8 +9,8 @@ import {
 } from "@/lib/documentation/controlled"
 
 const STATUS_CLASSES: Record<ControlledDocStatus, string> = {
-  draft: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  published: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  draft: "border-amber-500/30 bg-amber-500/10 text-warning-foreground",
+  published: "border-emerald-500/30 bg-emerald-500/10 text-success-foreground",
   retired: "border-muted-foreground/30 bg-muted text-muted-foreground",
 }
 
@@ -40,8 +40,8 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
       className={cn(
         "text-xs",
         state === "overdue"
-          ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+          ? "text-danger-foreground border-red-500/30 bg-red-500/10"
+          : "text-warning-foreground border-amber-500/30 bg-amber-500/10"
       )}
     >
       {state === "overdue" ? "Overdue" : "Due"} · {label}
@@ -53,17 +53,14 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
 export function MyAcknowledgementBadge({ doc }: { doc: Pick<ControlledDocRow, "my_acknowledged_at"> }) {
   if (doc.my_acknowledged_at) {
     return (
-      <Badge
-        variant="outline"
-        className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-700 dark:text-emerald-400"
-      >
+      <Badge variant="outline" className="text-success-foreground border-emerald-500/30 bg-emerald-500/10 text-xs">
         <CheckCircle2 className="mr-1 h-3 w-3" />
         Acknowledged
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400">
+    <Badge variant="outline" className="text-warning-foreground border-amber-500/30 bg-amber-500/10 text-xs">
       <CircleAlert className="mr-1 h-3 w-3" />
       Action needed
     </Badge>

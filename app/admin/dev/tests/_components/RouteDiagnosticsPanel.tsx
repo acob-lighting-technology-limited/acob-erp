@@ -108,9 +108,9 @@ export function RouteDiagnosticsPanel() {
                               </span>
                             ) : (
                               <div className="mt-1 space-y-1">
-                                <p className="text-red-600 dark:text-red-400">{row.fail_reason}</p>
+                                <p className="text-danger-foreground">{row.fail_reason}</p>
                                 {FIX_HINTS[row.approver_role_code] && (
-                                  <p className="text-amber-700 dark:text-amber-400">
+                                  <p className="text-warning-foreground">
                                     <strong>Fix:</strong> {FIX_HINTS[row.approver_role_code]}
                                   </p>
                                 )}

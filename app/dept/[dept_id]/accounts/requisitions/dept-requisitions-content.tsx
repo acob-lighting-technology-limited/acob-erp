@@ -302,7 +302,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground font-mono text-xs font-bold">{r.requisition_number}</span>
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-success-foreground font-mono text-xs font-bold">
                 ₦{(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}
               </span>
             </div>

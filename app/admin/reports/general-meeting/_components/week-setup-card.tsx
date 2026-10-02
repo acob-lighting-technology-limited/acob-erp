@@ -343,14 +343,12 @@ export function WeekSetupCard() {
             <span className="text-muted-foreground">{`Grace window: ${lockState.graceHours}h`}</span>
             <span className="text-muted-foreground">{`Deadline: ${computedDeadlineLabel || formatWATDateTime(lockState.lockDeadline)}`}</span>
             {lockState.hasOverrideRole && (
-              <span className="text-emerald-700 dark:text-emerald-300">
+              <span className="text-success-foreground">
                 Your developer/super-admin role can still create, update, and delete after the grace period.
               </span>
             )}
             {!lockState.hasOverrideRole && lockState.unlockUntil && !lockState.isLocked && (
-              <span className="text-amber-700 dark:text-amber-300">
-                This week is open through a temporary unlock window.
-              </span>
+              <span className="text-warning-foreground">This week is open through a temporary unlock window.</span>
             )}
             {!lockState.hasOverrideRole && lockState.isLocked && (
               <span className="text-muted-foreground">This week is read-only because the grace period has ended.</span>

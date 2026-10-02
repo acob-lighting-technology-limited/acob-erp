@@ -143,9 +143,7 @@ export function BehaviourContent({
         mobileRow={{
           title: (row) => row.competency,
           subtitle: (row) => row.cycle,
-          trailing: (row) => (
-            <span className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">{row.value}%</span>
-          ),
+          trailing: (row) => <span className="text-success-foreground font-mono text-sm font-bold">{row.value}%</span>,
           detail: {
             title: (row) => row.competency,
             fields: (_row) => [
@@ -160,7 +158,7 @@ export function BehaviourContent({
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold">{row.competency}</span>
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">{row.value}%</span>
+              <span className="text-success-foreground font-mono text-xs font-bold">{row.value}%</span>
             </div>
             <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
               <span>Cycle</span>

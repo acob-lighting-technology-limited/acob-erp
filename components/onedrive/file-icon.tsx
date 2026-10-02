@@ -67,16 +67,16 @@ export function getExtensionColor(extension: string): string {
 
   switch (ext) {
     case "pdf":
-      return "bg-red-100 text-red-700"
+      return "bg-danger-muted text-danger-foreground"
     case "doc":
     case "docx":
-      return "bg-blue-100 text-blue-700"
+      return "bg-info-muted text-info-foreground"
     case "xls":
     case "xlsx":
-      return "bg-emerald-100 text-emerald-700"
+      return "bg-success-muted text-success-foreground"
     case "ppt":
     case "pptx":
-      return "bg-orange-100 text-orange-700"
+      return "bg-warning-muted text-warning-foreground"
     case "jpg":
     case "jpeg":
     case "png":
@@ -90,8 +90,8 @@ export function getExtensionColor(extension: string): string {
     case "zip":
     case "rar":
     case "7z":
-      return "bg-amber-100 text-amber-700"
+      return "bg-warning-muted text-warning-foreground"
     default:
-      return "bg-gray-100 text-gray-700"
+      return "bg-neutral-muted text-neutral-foreground"
   }
 }

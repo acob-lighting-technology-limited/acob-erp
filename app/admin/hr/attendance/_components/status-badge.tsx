@@ -73,7 +73,7 @@ export function StatusBadge({
     <Badge
       className={
         ATTENDANCE_STATUS_COLORS[primaryStatus as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        "bg-neutral-muted text-neutral-foreground"
       }
     >
       {ATTENDANCE_STATUS_LABELS[primaryStatus as keyof typeof ATTENDANCE_STATUS_LABELS] ?? primaryStatus}

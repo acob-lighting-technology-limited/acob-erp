@@ -16,9 +16,9 @@ import { CHANGE_LOG_CATEGORY_LABELS, type ChangeLogCategory, type ChangeLogRow }
 const log = logger("admin-attendance-change-log-view")
 
 const CATEGORY_CLASSES: Record<ChangeLogCategory, string> = {
-  edits: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  edits: "bg-info-muted text-info-foreground",
   bulk: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
-  appeals: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  appeals: "bg-info-muted text-info-foreground",
   leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
   exemptions: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
   out_of_station: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300",
@@ -58,7 +58,11 @@ function fromText(row: ChangeLogRow): string {
 function StatusBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-muted-foreground">—</span>
   return (
-    <Badge className={ATTENDANCE_STATUS_COLORS[status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"}>
+    <Badge
+      className={
+        ATTENDANCE_STATUS_COLORS[status as UnifiedAttendanceStatus] ?? "bg-neutral-muted text-neutral-foreground"
+      }
+    >
       {statusText(status)}
     </Badge>
   )
@@ -305,7 +309,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
   return (
     <>
       {truncated && (
-        <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+        <p className="text-warning-foreground mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
           Showing the most recent 5,000 changes this month. Filter by type or person to export the rest in parts.
         </p>
       )}

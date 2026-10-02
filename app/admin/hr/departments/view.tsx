@@ -799,7 +799,7 @@ export function DepartmentsPage({
                 Are you sure you want to deactivate <strong>{deletingDepartment?.name}</strong>?
               </span>
               {(deletingDepartment?.employee_count ?? 0) > 0 ? (
-                <span className="block font-medium text-amber-600 dark:text-amber-400">
+                <span className="text-warning-foreground block font-medium">
                   Warning: This department currently has {deletingDepartment?.employee_count} employee(s). You must
                   reassign all employees before deactivating.
                 </span>

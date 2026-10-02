@@ -405,7 +405,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       render: (r) => {
         const { overtime } = getHourBreakdown(r, policy)
         return overtime != null && overtime >= 0.05 ? (
-          <span className="font-medium text-orange-600 dark:text-orange-400">+{overtime.toFixed(1)}h</span>
+          <span className="text-warning-foreground font-medium">+{overtime.toFixed(1)}h</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         )

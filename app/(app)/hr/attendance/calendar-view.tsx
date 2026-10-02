@@ -264,7 +264,7 @@ export function EmployeeCalendarView() {
                       <Badge
                         className={`max-w-full truncate px-1 py-0 text-[9px] font-medium sm:text-[10px] ${
                           ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-                          "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                          "bg-neutral-muted text-neutral-foreground"
                         }`}
                       >
                         <span className="sm:hidden">{shortStatusLabel(status, fullLabel)}</span>
@@ -291,7 +291,7 @@ export function EmployeeCalendarView() {
           .map(([key, label]) => (
             <Badge
               key={key}
-              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-gray-100 text-gray-800"}`}
+              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-neutral-muted text-neutral-foreground"}`}
             >
               {label}
             </Badge>

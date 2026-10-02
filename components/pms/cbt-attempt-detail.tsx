@@ -156,7 +156,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                   variant="outline"
                   className={
                     count > 0
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      ? "text-warning-foreground border-amber-500/30 bg-amber-500/10"
                       : "border-border text-foreground"
                   }
                 >
@@ -173,7 +173,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
         <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Detailed Responses</p>
 
         {isGated ? (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400">
+          <div className="text-warning-foreground flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-xs">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               {gatedReason ||

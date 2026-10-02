@@ -739,7 +739,7 @@ export function FleetContent() {
                     showOutsideDays
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     modifiers={{ resource_busy: (date) => bookedDayKeys.has(toLocalISODate(date)) }}
-                    modifiersClassNames={{ resource_busy: "bg-amber-100 text-amber-900 font-medium" }}
+                    modifiersClassNames={{ resource_busy: "bg-warning-muted text-warning-foreground font-medium" }}
                     className="mx-auto"
                   />
                   <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-4 text-xs">

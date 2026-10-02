@@ -540,9 +540,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                       className={`mt-0.5 h-5 w-5 shrink-0 ${contentChoice === opt.value ? "text-green-600" : "text-muted-foreground"}`}
                     />
                     <div>
-                      <div
-                        className={`font-semibold ${contentChoice === opt.value ? "text-green-700 dark:text-green-400" : ""}`}
-                      >
+                      <div className={`font-semibold ${contentChoice === opt.value ? "text-success-foreground" : ""}`}>
                         {opt.label}
                       </div>
                       <div className="text-muted-foreground mt-0.5 text-xs">{opt.desc}</div>
@@ -777,9 +775,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                 >
                   <Send className={`h-5 w-5 ${sendTiming === "now" ? "text-green-600" : "text-muted-foreground"}`} />
                   <div className="text-left">
-                    <div
-                      className={`font-semibold ${sendTiming === "now" ? "text-green-700 dark:text-green-400" : ""}`}
-                    >
+                    <div className={`font-semibold ${sendTiming === "now" ? "text-success-foreground" : ""}`}>
                       Send Immediately
                     </div>
                     <div className="text-muted-foreground text-xs">Email will be sent right away</div>
@@ -798,9 +794,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                     className={`h-5 w-5 ${sendTiming === "scheduled" ? "text-green-600" : "text-muted-foreground"}`}
                   />
                   <div className="text-left">
-                    <div
-                      className={`font-semibold ${sendTiming === "scheduled" ? "text-green-700 dark:text-green-400" : ""}`}
-                    >
+                    <div className={`font-semibold ${sendTiming === "scheduled" ? "text-success-foreground" : ""}`}>
                       Schedule
                     </div>
                     <div className="text-muted-foreground text-xs">One-time, pick a date & time</div>
@@ -819,9 +813,7 @@ export function MailDigestContent({ employees, currentUser }: Props) {
                     className={`h-5 w-5 ${sendTiming === "recurring" ? "text-green-600" : "text-muted-foreground"}`}
                   />
                   <div className="text-left">
-                    <div
-                      className={`font-semibold ${sendTiming === "recurring" ? "text-green-700 dark:text-green-400" : ""}`}
-                    >
+                    <div className={`font-semibold ${sendTiming === "recurring" ? "text-success-foreground" : ""}`}>
                       Recurring
                     </div>
                     <div className="text-muted-foreground text-xs">Automatic every week (server-side)</div>

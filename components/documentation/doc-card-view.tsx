@@ -27,7 +27,7 @@ export function DocCardView({ docs, formatDate, onView, onEdit, onDelete }: DocC
                 <CardTitle className="flex items-center gap-2 text-lg">
                   {doc.title}
                   {doc.is_draft && (
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30">
+                    <Badge variant="outline" className="bg-warning-muted text-warning-foreground">
                       Draft
                     </Badge>
                   )}

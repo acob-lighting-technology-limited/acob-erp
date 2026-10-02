@@ -45,22 +45,21 @@ interface WeeklyReportCardGridProps {
 
 function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
   const deptActions = trackingData.filter((a) => a.department === department)
-  if (deptActions.length === 0)
-    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+  if (deptActions.length === 0) return { label: "Pending", color: "bg-neutral-muted text-neutral-foreground" }
 
   if (deptActions.every((a) => a.status === "completed")) {
-    return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
+    return { label: "Finished", color: "bg-success-muted text-success-foreground" }
   }
 
   if (deptActions.some((a) => a.status === "in_progress" || a.status === "completed")) {
-    return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
+    return { label: "Started", color: "bg-info-muted text-info-foreground" }
   }
 
   if (deptActions.some((a) => a.status === "not_started")) {
-    return { label: "Not Started", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" }
+    return { label: "Not Started", color: "bg-warning-muted text-warning-foreground" }
   }
 
-  return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
+  return { label: "Pending", color: "bg-neutral-muted text-neutral-foreground" }
 }
 
 export function WeeklyReportCardGrid({
@@ -90,7 +89,9 @@ export function WeeklyReportCardGrid({
       {reports.map((report) => {
         const trackerStatus = getActionTrackerStatus(report.department, trackingData)
         const submitterProfile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-        const submitterName = submitterProfile ? `${submitterProfile.first_name} ${submitterProfile.last_name}` : "Unknown"
+        const submitterName = submitterProfile
+          ? `${submitterProfile.first_name} ${submitterProfile.last_name}`
+          : "Unknown"
         const formattedMeetingDate = (() => {
           const date = new Date(`${meetingDate}T00:00:00`)
           if (Number.isNaN(date.getTime())) return "-"

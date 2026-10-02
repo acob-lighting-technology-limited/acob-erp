@@ -638,10 +638,10 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                 </p>
               </div>
               <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40">
+                <Badge variant="outline" className="bg-success-muted text-success-foreground">
                   {assignments.filter((a) => a.role === "core").length} Core
                 </Badge>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950/40">
+                <Badge variant="outline" className="bg-info-muted text-info-foreground">
                   {assignments.filter((a) => a.role === "support").length} Support
                 </Badge>
               </div>
@@ -669,9 +669,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                           <span className="text-foreground text-xs font-semibold">{assignment.department}</span>
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
-                              isCore
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
-                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300"
+                              isCore ? "bg-success-muted text-success-foreground" : "bg-info-muted text-info-foreground"
                             }`}
                           >
                             {isCore ? "Core Owner" : "Support"}

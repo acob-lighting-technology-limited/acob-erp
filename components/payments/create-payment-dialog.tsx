@@ -308,9 +308,7 @@ export function CreatePaymentDialog({
                   onChange={(e) => onReceiptFileChange(e.target.files?.[0] || null)}
                   className="cursor-pointer"
                 />
-                {receiptFile && (
-                  <p className="text-sm text-green-600 dark:text-green-400">Selected: {receiptFile.name}</p>
-                )}
+                {receiptFile && <p className="text-success-foreground text-sm">Selected: {receiptFile.name}</p>}
               </div>
             </div>
           )}

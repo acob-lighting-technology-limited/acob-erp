@@ -44,10 +44,10 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
   )
 
   const statusClass = (status: string) => {
-    if (status === "assigned") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-    if (status === "maintenance") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    if (status === "available") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+    if (status === "assigned") return "bg-success-muted text-success-foreground"
+    if (status === "maintenance") return "bg-warning-muted text-warning-foreground"
+    if (status === "available") return "bg-info-muted text-info-foreground"
+    return "bg-neutral-muted text-neutral-foreground"
   }
 
   const columns = useMemo<DataTableColumn<AssetRow>[]>(

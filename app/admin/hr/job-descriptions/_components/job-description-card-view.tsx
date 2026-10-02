@@ -24,9 +24,7 @@ interface Profile {
 }
 
 function getCompletionColor(hasDescription: boolean): string {
-  return hasDescription
-    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-    : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+  return hasDescription ? "bg-success-muted text-success-foreground" : "bg-warning-muted text-warning-foreground"
 }
 
 function formatDate(dateString: string | null): string {

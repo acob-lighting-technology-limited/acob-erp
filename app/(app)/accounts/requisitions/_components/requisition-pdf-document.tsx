@@ -126,7 +126,7 @@ export function RequisitionPdfDocument({
             Action Required: You are tasked with approving this stage ({getStageLabel(requisition.current_stage_code)})
           </h4>
           {requisition.is_emergency && (
-            <p className="flex items-start gap-1.5 text-xs font-medium text-red-700 dark:text-red-400">
+            <p className="text-danger-foreground flex items-start gap-1.5 text-xs font-medium">
               <Siren className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               Expedited route: Admin &amp; HR review, Corporate Services authorization and Accounts verification were
               bypassed. Your decision is the only sign-off on this payment.
@@ -201,7 +201,9 @@ export function RequisitionPdfDocument({
         {/* Title Bar */}
         <div
           className={`mb-6 border py-2 text-center text-lg font-extrabold tracking-wide uppercase ${
-            requisition.is_emergency ? "border-red-700 bg-red-100 text-red-800" : "border-slate-900 bg-slate-100"
+            requisition.is_emergency
+              ? "bg-danger-muted text-danger-foreground border-red-700"
+              : "border-slate-900 bg-slate-100"
           }`}
         >
           {requisition.is_emergency ? "EMERGENCY PAYMENT REQUEST FORM" : "PAYMENT REQUEST FORM"}

@@ -232,7 +232,9 @@ export function AppealDialog({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Current Status</span>
-              <Badge className={ATTENDANCE_STATUS_COLORS[row.normalizedStatus] ?? "bg-gray-100 text-gray-800"}>
+              <Badge
+                className={ATTENDANCE_STATUS_COLORS[row.normalizedStatus] ?? "bg-neutral-muted text-neutral-foreground"}
+              >
                 {ATTENDANCE_STATUS_LABELS[row.normalizedStatus] ?? row.normalizedStatus}
               </Badge>
             </div>

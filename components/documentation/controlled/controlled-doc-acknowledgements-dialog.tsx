@@ -117,12 +117,12 @@ export function ControlledDocAcknowledgementsDialog({ doc, onOpenChange }: Contr
                       <p className="text-muted-foreground truncate text-xs">{row.department || "No department"}</p>
                     </div>
                     {row.acknowledged_at ? (
-                      <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
+                      <span className="text-success-foreground flex shrink-0 items-center gap-1 text-xs">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         {formatDocDate(row.acknowledged_at)}
                       </span>
                     ) : (
-                      <span className="flex shrink-0 items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                      <span className="text-warning-foreground flex shrink-0 items-center gap-1 text-xs">
                         <CircleAlert className="h-3.5 w-3.5" />
                         Pending
                       </span>

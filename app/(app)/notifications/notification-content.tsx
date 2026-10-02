@@ -81,10 +81,10 @@ const TYPE_CARD_BG: Record<string, string> = {
 }
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {
-  urgent: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  high: "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  normal: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  low: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  urgent: "border-red-500/40 bg-red-500/10 text-danger-foreground",
+  high: "border-orange-500/40 bg-orange-500/10 text-warning-foreground",
+  normal: "border-blue-500/40 bg-blue-500/10 text-info-foreground",
+  low: "border-emerald-500/40 bg-emerald-500/10 text-success-foreground",
 }
 
 function getPriorityBadgeClass(priority: string | null | undefined): string {

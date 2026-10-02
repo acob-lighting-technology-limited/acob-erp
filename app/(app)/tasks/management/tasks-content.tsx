@@ -79,7 +79,7 @@ function TaskStatusPill({ task }: { task: Task }) {
     return (
       <Badge
         variant="destructive"
-        className="border-rose-500/30 bg-rose-500/15 text-[10px] whitespace-nowrap text-rose-700 dark:text-rose-400"
+        className="text-danger-foreground border-rose-500/30 bg-rose-500/15 text-[10px] whitespace-nowrap"
       >
         {cfg.label} · Escalated
       </Badge>
@@ -90,7 +90,7 @@ function TaskStatusPill({ task }: { task: Task }) {
     return (
       <Badge
         variant="outline"
-        className="border-amber-500/30 bg-amber-500/15 text-[10px] whitespace-nowrap text-amber-700 dark:text-amber-400"
+        className="text-warning-foreground border-amber-500/30 bg-amber-500/15 text-[10px] whitespace-nowrap"
       >
         {cfg.label} · Grace
       </Badge>

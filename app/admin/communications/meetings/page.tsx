@@ -23,7 +23,7 @@ export default function CommunicationsMeetingsPage() {
       description: "Send meeting and knowledge-sharing reminders with scheduling controls.",
       href: "/admin/communications/meetings/reminders",
       icon: Megaphone,
-      color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+      color: "bg-orange-500/10 text-warning-foreground border-orange-500/20",
       fill: "bg-orange-500",
       hoverBorder: "hover:border-orange-500/60 dark:hover:border-orange-400/60",
       hoverText: "group-hover:text-orange-500",

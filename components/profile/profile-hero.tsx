@@ -330,7 +330,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {profile.is_department_lead && (
                   <Badge
                     variant="outline"
-                    className="border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400"
+                    className="text-warning-foreground border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium"
                   >
                     Dept Lead
                   </Badge>
@@ -338,7 +338,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {confirmationDate ? (
                   <Badge
                     variant="outline"
-                    className="border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+                    className="text-success-foreground border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium"
                   >
                     Confirmed
                   </Badge>
@@ -411,7 +411,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {profile.is_department_lead && (
                   <Badge
                     variant="outline"
-                    className="border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-600 dark:text-amber-400"
+                    className="text-warning-foreground border-amber-500/30 bg-amber-500/10 text-xs font-medium"
                   >
                     Dept Lead
                   </Badge>
@@ -419,7 +419,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {confirmationDate ? (
                   <Badge
                     variant="outline"
-                    className="border-emerald-500/30 bg-emerald-500/10 text-xs font-medium text-emerald-700 dark:text-emerald-400"
+                    className="text-success-foreground border-emerald-500/30 bg-emerald-500/10 text-xs font-medium"
                   >
                     Confirmed
                   </Badge>

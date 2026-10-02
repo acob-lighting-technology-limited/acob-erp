@@ -47,19 +47,19 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
   const [isDeletingFeedback, setIsDeletingFeedback] = useState(false)
 
   const getTypeColor = (type: string) => {
-    if (type === "concern") return "bg-yellow-100 text-yellow-800"
-    if (type === "complaint") return "bg-red-100 text-red-800"
-    if (type === "suggestion") return "bg-blue-100 text-blue-800"
+    if (type === "concern") return "bg-warning-muted text-warning-foreground"
+    if (type === "complaint") return "bg-danger-muted text-danger-foreground"
+    if (type === "suggestion") return "bg-info-muted text-info-foreground"
     if (type === "required_item") return "bg-violet-100 text-violet-800"
-    return "bg-gray-100 text-gray-800"
+    return "bg-neutral-muted text-neutral-foreground"
   }
 
   const getStatusColor = (status: string) => {
-    if (status === "open") return "bg-green-100 text-green-800"
-    if (status === "in_progress") return "bg-blue-100 text-blue-800"
+    if (status === "open") return "bg-success-muted text-success-foreground"
+    if (status === "in_progress") return "bg-info-muted text-info-foreground"
     if (status === "resolved") return "bg-violet-100 text-violet-800"
-    if (status === "closed") return "bg-gray-100 text-gray-800"
-    return "bg-gray-100 text-gray-800"
+    if (status === "closed") return "bg-neutral-muted text-neutral-foreground"
+    return "bg-neutral-muted text-neutral-foreground"
   }
 
   const handleFeedbackSubmitted = (newFeedback: Feedback) => {

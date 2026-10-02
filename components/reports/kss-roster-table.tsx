@@ -1230,7 +1230,7 @@ export function KssRosterTable({
                   </p>
                 ) : null}
                 {hasGraceOverride && editingId && isSelectedWeekLocked ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <p className="text-warning-foreground text-xs">
                     Override active: you are editing this KSS entry outside the normal grace period.
                   </p>
                 ) : null}

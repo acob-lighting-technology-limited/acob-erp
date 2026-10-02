@@ -830,7 +830,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             {r.is_department_lead && (
               <Badge
                 variant="outline"
-                className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:text-amber-400"
+                className="text-warning-foreground shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap"
               >
                 <Shield className="h-2.5 w-2.5" />
                 Dept Lead
@@ -863,7 +863,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 border-transparent shadow-none"
             } else if (catUpper.includes("NEXT") || catUpper.includes("GEN")) {
               badgeColor =
-                "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border-transparent shadow-none"
+                "bg-emerald-500/10 text-success-foreground hover:bg-emerald-500/10 border-transparent shadow-none"
             } else {
               badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
             }

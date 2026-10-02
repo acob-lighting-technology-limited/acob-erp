@@ -31,10 +31,10 @@ const notificationIcons = {
 }
 
 const notificationColors = {
-  info: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  success: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  error: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  info: "bg-info-muted text-info-foreground",
+  warning: "bg-warning-muted text-warning-foreground",
+  success: "bg-success-muted text-success-foreground",
+  error: "bg-danger-muted text-danger-foreground",
 }
 
 export function Notifications({ notifications, title = "Notifications", showDismiss = true }: NotificationsProps) {

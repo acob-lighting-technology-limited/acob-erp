@@ -52,9 +52,7 @@ export function ReminderTypeSelector({ reminderType, setReminderType }: Reminder
                 className={`mt-0.5 h-5 w-5 shrink-0 ${reminderType === opt.value ? "text-orange-600" : "text-muted-foreground"}`}
               />
               <div>
-                <div
-                  className={`font-semibold ${reminderType === opt.value ? "text-orange-700 dark:text-orange-400" : ""}`}
-                >
+                <div className={`font-semibold ${reminderType === opt.value ? "text-warning-foreground" : ""}`}>
                   {opt.label}
                 </div>
                 <div className="text-muted-foreground mt-0.5 text-xs">{opt.desc}</div>

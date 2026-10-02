@@ -140,15 +140,15 @@ function getAssetStatusColor(status: string | null | undefined): string {
     case "resolved":
     case "completed":
     case "approved":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success-muted text-success-foreground"
     case "in_progress":
     case "under_review":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info-muted text-info-foreground"
     case "pending":
     case "open":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning-muted text-warning-foreground"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-neutral-muted text-neutral-foreground"
   }
 }
 
@@ -1088,7 +1088,7 @@ export function EmployeeViewModal({
                         placeholder="user@acoblighting.com"
                         className="mt-1 h-8 font-mono text-xs"
                       />
-                      <p className="mt-1 flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
+                      <p className="text-warning-foreground mt-1 flex items-center gap-1 text-[10px]">
                         <AlertCircle className="inline h-3 w-3 shrink-0" />
                         Changing this email updates the employee&apos;s login credentials.
                       </p>

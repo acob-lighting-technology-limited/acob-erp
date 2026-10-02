@@ -340,12 +340,13 @@ export function LeaveRequestFormDialog({
                     modifiersClassNames={{
                       blackout: "line-through opacity-40",
                       holiday: "bg-violet-100 text-violet-900 font-medium dark:bg-violet-950/60 dark:text-violet-300",
-                      department_approved: "bg-red-100 text-red-900 font-medium dark:bg-red-950/60 dark:text-red-300",
+                      department_approved:
+                        "bg-danger-muted text-danger-foreground font-medium dark:bg-red-950/60 dark:text-red-300",
                       department_pending:
-                        "bg-amber-100 text-amber-900 font-medium dark:bg-amber-950/60 dark:text-amber-300",
+                        "bg-warning-muted text-warning-foreground font-medium dark:bg-amber-950/60 dark:text-amber-300",
                       committed:
-                        "bg-emerald-100 text-emerald-900 font-medium dark:bg-emerald-950/60 dark:text-emerald-300",
-                      selected_range: "bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300",
+                        "bg-success-muted text-success-foreground font-medium dark:bg-emerald-950/60 dark:text-emerald-300",
+                      selected_range: "bg-info-muted text-info-foreground",
                     }}
                     className="mx-auto"
                   />
@@ -408,20 +409,20 @@ export function LeaveRequestFormDialog({
                   {selectedDateBooking ? (
                     <div className="bg-muted/30 mt-2.5 space-y-0.5 rounded-md border p-2 text-xs">
                       {selectedDateBooking.approved_employees && selectedDateBooking.approved_employees.length > 0 ? (
-                        <p className="text-red-700 dark:text-red-400">
+                        <p className="text-danger-foreground">
                           <span className="font-semibold">Approved leave:</span>{" "}
                           {selectedDateBooking.approved_employees.join(", ")}
                         </p>
                       ) : null}
                       {selectedDateBooking.pending_employees && selectedDateBooking.pending_employees.length > 0 ? (
-                        <p className="text-amber-700 dark:text-amber-400">
+                        <p className="text-warning-foreground">
                           <span className="font-semibold">Pending review:</span>{" "}
                           {selectedDateBooking.pending_employees.join(", ")}
                         </p>
                       ) : null}
                       {!selectedDateBooking.approved_employees?.length &&
                       !selectedDateBooking.pending_employees?.length ? (
-                        <p className="text-amber-700 dark:text-amber-400">
+                        <p className="text-warning-foreground">
                           {selectedDateBooking.count} teammate(s) already booked this date:{" "}
                           {selectedDateBooking.employees.join(", ")}
                         </p>

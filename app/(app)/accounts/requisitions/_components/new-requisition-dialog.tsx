@@ -327,7 +327,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
               <div className="space-y-0.5">
                 <Label
                   htmlFor="requisition-emergency"
-                  className="flex items-center gap-1.5 text-xs font-bold text-red-700 dark:text-red-400"
+                  className="text-danger-foreground flex items-center gap-1.5 text-xs font-bold"
                 >
                   <Siren className="h-3.5 w-3.5" /> Emergency Requisition
                 </Label>

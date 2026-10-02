@@ -286,7 +286,7 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                  className="text-warning-foreground gap-1 border-amber-400/50 bg-amber-500/10 text-[11px]"
                 >
                   <AlertTriangle className="h-3 w-3" /> Missed scan
                 </Badge>
@@ -445,7 +445,7 @@ export default function AdminMeetingAttendancePage() {
         <div className="space-y-3">
           {holidayInfo?.isMondayHoliday && (
             <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <AlertTriangle className="text-warning-foreground h-4 w-4 shrink-0" />
               <div className="flex-1">
                 <span className="font-semibold">Public Holiday Notice: </span>
                 <span>{holidayInfo.mondayHolidayName} falls on Monday of this week.</span>
@@ -509,7 +509,7 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-sky-400/50 bg-sky-500/10 text-[10px] text-sky-700 dark:text-sky-400"
+                  className="text-info-foreground gap-1 border-sky-400/50 bg-sky-500/10 text-[10px]"
                 >
                   <Palmtree className="h-2.5 w-2.5" /> Leave
                 </Badge>
@@ -526,7 +526,7 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-400"
+                  className="text-warning-foreground gap-1 border-amber-400/50 bg-amber-500/10 text-[10px]"
                 >
                   <AlertTriangle className="h-2.5 w-2.5" /> Missed
                 </Badge>
@@ -614,13 +614,11 @@ export default function AdminMeetingAttendancePage() {
                   Meeting Check-In:
                 </span>
                 {r.meeting_clock_in ? (
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {formatTime(r.meeting_clock_in)}
-                  </span>
+                  <span className="text-success-foreground font-semibold">{formatTime(r.meeting_clock_in)}</span>
                 ) : r.office_clock_in && !r.is_on_leave ? (
                   <Badge
                     variant="outline"
-                    className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                    className="text-warning-foreground gap-1 border-amber-400/50 bg-amber-500/10 text-[11px]"
                   >
                     <AlertTriangle className="h-3 w-3" /> Missed scan
                   </Badge>

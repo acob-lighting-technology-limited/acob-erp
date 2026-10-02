@@ -188,7 +188,7 @@ export function AssetHandoverDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[650px]">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-600 dark:text-emerald-400">
+            <div className="text-success-foreground rounded-lg bg-emerald-500/10 p-2">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>

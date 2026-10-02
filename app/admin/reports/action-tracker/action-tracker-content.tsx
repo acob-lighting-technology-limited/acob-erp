@@ -134,15 +134,15 @@ function formatDueDate(task: ActionTask) {
 function getDueDateClassName(task: ActionTask) {
   const status = task.status.toLowerCase()
   if (status === "completed") {
-    return "font-medium text-green-600 dark:text-green-400"
+    return "font-medium text-success-foreground"
   }
 
   const dueDate = resolveDueDate(task)
   if (dueDate.getTime() < Date.now()) {
-    return "font-semibold text-red-600 dark:text-red-400"
+    return "font-semibold text-danger-foreground"
   }
 
-  return "font-semibold text-yellow-600 dark:text-yellow-400"
+  return "font-semibold text-warning-foreground"
 }
 
 function getDeptSummaryStatus(tasks: ActionTask[]): DepartmentActionRow["summaryStatus"] {
@@ -154,17 +154,17 @@ function getDeptSummaryStatus(tasks: ActionTask[]): DepartmentActionRow["summary
 }
 
 function getItemStatusBadgeClass(status: string) {
-  if (status === "completed") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "in_progress") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "not_started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
+  if (status === "completed") return "bg-success-muted text-success-foreground"
+  if (status === "in_progress") return "bg-info-muted text-info-foreground"
+  if (status === "not_started") return "bg-warning-muted text-warning-foreground"
+  return "bg-neutral-muted text-neutral-foreground"
 }
 
 function getSummaryBadgeClass(status: DepartmentActionRow["summaryStatus"]) {
-  if (status === "Finished") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "Started") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "Not Started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
+  if (status === "Finished") return "bg-success-muted text-success-foreground"
+  if (status === "Started") return "bg-info-muted text-info-foreground"
+  if (status === "Not Started") return "bg-warning-muted text-warning-foreground"
+  return "bg-neutral-muted text-neutral-foreground"
 }
 
 export function ActionTrackerContent({
@@ -329,7 +329,7 @@ export function ActionTrackerContent({
       <Button
         size="sm"
         variant={hasBlocker ? "secondary" : "ghost"}
-        className={`h-8 gap-1.5 ${hasBlocker ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}
+        className={`h-8 gap-1.5 ${hasBlocker ? "text-warning-foreground" : "text-muted-foreground"}`}
         onClick={() => openBlockerDialog(task)}
       >
         <TriangleAlert className="h-3.5 w-3.5" />
@@ -487,21 +487,21 @@ export function ActionTrackerContent({
             parts.push({
               label: "Done",
               count: row.completedPoints,
-              colorClass: "text-green-600 dark:text-green-400 font-medium",
+              colorClass: "text-success-foreground font-medium",
             })
           }
           if (row.inProgressPoints > 0) {
             parts.push({
               label: "In Progress",
               count: row.inProgressPoints,
-              colorClass: "text-blue-600 dark:text-blue-400 font-medium",
+              colorClass: "text-info-foreground font-medium",
             })
           }
           if (row.notStartedPoints > 0) {
             parts.push({
               label: "Not Started",
               count: row.notStartedPoints,
-              colorClass: "text-orange-600 dark:text-orange-400 font-medium",
+              colorClass: "text-warning-foreground font-medium",
             })
           }
           if (row.pendingPoints > 0) {

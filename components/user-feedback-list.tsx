@@ -34,30 +34,30 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
   const getTypeColor = (type: string) => {
     switch (type) {
       case "concern":
-        return "bg-yellow-100 text-yellow-800"
+        return "bg-warning-muted text-warning-foreground"
       case "complaint":
-        return "bg-red-100 text-red-800"
+        return "bg-danger-muted text-danger-foreground"
       case "suggestion":
-        return "bg-blue-100 text-blue-800"
+        return "bg-info-muted text-info-foreground"
       case "required_item":
         return "bg-purple-100 text-purple-800"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-neutral-muted text-neutral-foreground"
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "open":
-        return "bg-green-100 text-green-800"
+        return "bg-success-muted text-success-foreground"
       case "in_progress":
-        return "bg-blue-100 text-blue-800"
+        return "bg-info-muted text-info-foreground"
       case "resolved":
         return "bg-purple-100 text-purple-800"
       case "closed":
-        return "bg-gray-100 text-gray-800"
+        return "bg-neutral-muted text-neutral-foreground"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-neutral-muted text-neutral-foreground"
     }
   }
 

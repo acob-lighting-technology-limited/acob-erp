@@ -346,13 +346,13 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
   const getStatusColor = (status: string) => {
     switch (status) {
       case "paid":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+        return "bg-success-muted text-success-foreground"
       case "due":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+        return "bg-warning-muted text-warning-foreground"
       case "overdue":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+        return "bg-danger-muted text-danger-foreground"
       case "cancelled":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+        return "bg-neutral-muted text-neutral-foreground"
       default:
         return ""
     }

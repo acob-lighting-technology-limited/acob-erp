@@ -245,10 +245,10 @@ export function PaymentsTable({
     new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
 
   const getStatusColor = (status: string) => {
-    if (status === "paid") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-    if (status === "due") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    if (status === "overdue") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-    if (status === "cancelled") return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+    if (status === "paid") return "bg-success-muted text-success-foreground"
+    if (status === "due") return "bg-warning-muted text-warning-foreground"
+    if (status === "overdue") return "bg-danger-muted text-danger-foreground"
+    if (status === "cancelled") return "bg-neutral-muted text-neutral-foreground"
     return ""
   }
 
@@ -393,8 +393,8 @@ export function PaymentsTable({
           variant="outline"
           className={
             row.payment_type === "recurring"
-              ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
-              : "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
+              ? "bg-info-muted text-info-foreground border-blue-300"
+              : "bg-success-muted text-success-foreground border-green-300"
           }
         >
           {row.paymentTypeLabel}

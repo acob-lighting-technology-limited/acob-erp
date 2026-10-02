@@ -48,12 +48,12 @@ export function ScheduleList({ items, onUpload, onView, onMarkPaid, onReplace }:
                 className={cn(
                   "rounded-full p-2",
                   item.status === "paid"
-                    ? "bg-green-100 text-green-600 dark:bg-green-900/30"
+                    ? "bg-success-muted text-success-foreground"
                     : item.status === "overdue"
-                      ? "bg-red-100 text-red-600 dark:bg-red-900/30"
+                      ? "bg-danger-muted text-danger-foreground"
                       : item.status === "due"
-                        ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30"
-                        : "bg-gray-100 text-gray-600 dark:bg-gray-800"
+                        ? "bg-warning-muted text-warning-foreground"
+                        : "bg-neutral-muted text-neutral-foreground"
                 )}
               >
                 {item.status === "paid" ? (

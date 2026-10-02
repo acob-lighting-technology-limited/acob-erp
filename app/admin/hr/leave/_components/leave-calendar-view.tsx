@@ -530,7 +530,7 @@ export function LeaveCalendarView({
 
                       {holiday && (
                         <span
-                          className="py-0.2 max-w-[80px] truncate rounded-xs bg-amber-500/15 px-1 text-[8px] font-semibold text-amber-700 dark:text-amber-400"
+                          className="py-0.2 text-warning-foreground max-w-[80px] truncate rounded-xs bg-amber-500/15 px-1 text-[8px] font-semibold"
                           title={holiday.name}
                         >
                           {holiday.name}
@@ -564,9 +564,7 @@ export function LeaveCalendarView({
                               >
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${colorDef.dot}`} />
                                 <span className="flex-1 truncate font-medium">{empName}</span>
-                                {isPending && (
-                                  <Clock className="h-2.5 w-2.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                                )}
+                                {isPending && <Clock className="text-warning-foreground h-2.5 w-2.5 shrink-0" />}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent

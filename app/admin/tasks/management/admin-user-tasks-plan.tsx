@@ -383,13 +383,13 @@ export function AdminUserTasksPlan({
           return (
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
               {r.completedCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 font-medium text-emerald-600 dark:text-emerald-400">
+                <span className="text-success-foreground inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 font-medium">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   {r.completedCount} done
                 </span>
               )}
               {r.inProgressCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-medium text-sky-600 dark:text-sky-400">
+                <span className="text-info-foreground inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-medium">
                   <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
                   {r.inProgressCount} in prog
                 </span>
@@ -401,7 +401,7 @@ export function AdminUserTasksPlan({
                 </span>
               )}
               {r.pendingCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-600 dark:text-amber-400">
+                <span className="text-warning-foreground inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 font-medium">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                   {r.pendingCount} pending
                 </span>
@@ -451,9 +451,9 @@ export function AdminUserTasksPlan({
           }
           const score = r.kpiScore
           let color = "text-muted-foreground"
-          if (score >= 80) color = "text-emerald-600 dark:text-emerald-400 font-bold"
-          else if (score >= 60) color = "text-sky-600 dark:text-sky-400 font-medium"
-          else if (score >= 40) color = "text-amber-600 dark:text-amber-400 font-medium"
+          if (score >= 80) color = "text-success-foreground font-bold"
+          else if (score >= 60) color = "text-info-foreground font-medium"
+          else if (score >= 40) color = "text-warning-foreground font-medium"
           else color = "text-destructive font-medium"
 
           return <span className={cn("font-mono text-xs", color)}>{score}%</span>
@@ -664,7 +664,7 @@ export function AdminUserTasksPlan({
               </div>
               <div className="bg-muted/30 rounded p-1">
                 <span className="text-muted-foreground block">Rate</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">{r.completionRate}%</span>
+                <span className="text-success-foreground font-semibold">{r.completionRate}%</span>
               </div>
             </div>
           </div>
@@ -747,7 +747,7 @@ export function AdminUserTasksPlan({
                           </td>
                           <td className="px-3 py-2.5 font-mono">
                             {rating ? (
-                              <span className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
+                              <span className="text-warning-foreground inline-flex items-center gap-1 font-semibold">
                                 <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                                 {rating} / 5
                               </span>

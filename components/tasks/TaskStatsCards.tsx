@@ -25,7 +25,7 @@ export function TaskStatsCards({ stats }: TaskStatsCardsProps) {
               <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.total}</p>
             </div>
             <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
-              <ClipboardList className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <ClipboardList className="text-info-foreground h-6 w-6" />
             </div>
           </div>
         </CardContent>
@@ -38,7 +38,7 @@ export function TaskStatsCards({ stats }: TaskStatsCardsProps) {
               <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.pending}</p>
             </div>
             <div className="rounded-lg bg-yellow-100 p-3 dark:bg-yellow-900/30">
-              <ClipboardList className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              <ClipboardList className="text-warning-foreground h-6 w-6" />
             </div>
           </div>
         </CardContent>
@@ -51,7 +51,7 @@ export function TaskStatsCards({ stats }: TaskStatsCardsProps) {
               <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.in_progress}</p>
             </div>
             <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/30">
-              <ClipboardList className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <ClipboardList className="text-info-foreground h-6 w-6" />
             </div>
           </div>
         </CardContent>
@@ -64,7 +64,7 @@ export function TaskStatsCards({ stats }: TaskStatsCardsProps) {
               <p className="text-foreground mt-1 text-lg font-bold sm:mt-2 sm:text-3xl">{stats.completed}</p>
             </div>
             <div className="rounded-lg bg-green-100 p-3 dark:bg-green-900/30">
-              <ClipboardList className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <ClipboardList className="text-success-foreground h-6 w-6" />
             </div>
           </div>
         </CardContent>

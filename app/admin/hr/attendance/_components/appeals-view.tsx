@@ -23,16 +23,11 @@ interface AppealsViewProps {
 }
 
 function statusBadge(status: AppealRow["status"]) {
-  if (status === "approved")
-    return (
-      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Approved</Badge>
-    )
-  if (status === "rejected")
-    return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Rejected</Badge>
+  if (status === "approved") return <Badge className="bg-success-muted text-success-foreground">Approved</Badge>
+  if (status === "rejected") return <Badge className="bg-danger-muted text-danger-foreground">Rejected</Badge>
   // Closed because the day was changed directly rather than through the appeal.
-  if (status === "resolved")
-    return <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
-  return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending</Badge>
+  if (status === "resolved") return <Badge className="bg-info-muted text-info-foreground">Resolved</Badge>
+  return <Badge className="bg-warning-muted text-warning-foreground">Pending</Badge>
 }
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
@@ -118,14 +113,15 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           <div className="flex flex-col items-start gap-1">
             <Badge
               className={
-                ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
+                ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ??
+                "bg-neutral-muted text-neutral-foreground"
               }
             >
               {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
             </Badge>
             {/* The snapshot can go stale when device punches arrive late. */}
             {r.status === "pending" && r.live_status && r.live_status !== r.current_status && (
-              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+              <span className="text-warning-foreground text-[11px] font-medium">
                 Now: {ATTENDANCE_STATUS_LABELS[r.live_status as UnifiedAttendanceStatus] ?? r.live_status}
               </span>
             )}
@@ -139,7 +135,8 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         render: (r) => (
           <Badge
             className={
-              ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-blue-100 text-blue-800"
+              ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ??
+              "bg-info-muted text-info-foreground"
             }
           >
             {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}

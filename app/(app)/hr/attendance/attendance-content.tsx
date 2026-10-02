@@ -1066,7 +1066,7 @@ function StatusBadge({ status }: { status: AttendanceRow["normalizedStatus"] }) 
     <Badge
       className={
         ATTENDANCE_STATUS_COLORS[norm as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        "bg-neutral-muted text-neutral-foreground"
       }
     >
       {ATTENDANCE_STATUS_LABELS[norm as keyof typeof ATTENDANCE_STATUS_LABELS] ?? norm}

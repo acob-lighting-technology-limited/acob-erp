@@ -128,14 +128,14 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
-                    "bg-gray-100 text-gray-800"
+                    "bg-neutral-muted text-neutral-foreground"
                   }
                 >
                   {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
                 </Badge>
               </div>
               {appeal.live_status && appeal.live_status !== appeal.current_status && (
-                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+                <div className="text-warning-foreground rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
                   This day has changed since the appeal was raised and is now{" "}
                   <strong>
                     {ATTENDANCE_STATUS_LABELS[appeal.live_status as UnifiedAttendanceStatus] ?? appeal.live_status}
@@ -148,7 +148,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.requested_status as UnifiedAttendanceStatus] ??
-                    "bg-blue-100 text-blue-800"
+                    "bg-info-muted text-info-foreground"
                   }
                 >
                   {ATTENDANCE_STATUS_LABELS[appeal.requested_status as UnifiedAttendanceStatus] ??

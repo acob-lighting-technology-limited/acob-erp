@@ -97,7 +97,7 @@ function CopyValue({ value, className, muted }: { value: string | null; classNam
         >
           <span className="truncate">{value}</span>
           {copied ? (
-            <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <Check className="text-success-foreground h-3.5 w-3.5 shrink-0" />
           ) : (
             <Copy className="h-3 w-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" />
           )}
@@ -245,7 +245,7 @@ export function DirectoryContent() {
               <div className="flex items-center gap-2">
                 <CopyValue value={displayName(r)} className="font-medium" />
                 {r.is_department_lead && (
-                  <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400">
+                  <Badge variant="outline" className="text-success-foreground">
                     Lead
                   </Badge>
                 )}
@@ -469,7 +469,7 @@ export function DirectoryContent() {
           subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
           trailing: (r) =>
             r.is_department_lead ? (
-              <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400">
+              <Badge variant="outline" className="text-success-foreground text-[10px]">
                 Lead
               </Badge>
             ) : null,
@@ -481,7 +481,7 @@ export function DirectoryContent() {
               r.is_department_lead ? (
                 <Badge
                   variant="outline"
-                  className="border-emerald-500/40 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"
+                  className="text-success-foreground border-emerald-500/40 bg-emerald-500/10 text-[10px]"
                 >
                   Lead
                 </Badge>
@@ -531,7 +531,7 @@ export function DirectoryContent() {
                 </div>
               </div>
               {r.is_department_lead && (
-                <Badge variant="outline" className="shrink-0 text-emerald-600 dark:text-emerald-400">
+                <Badge variant="outline" className="text-success-foreground shrink-0">
                   Lead
                 </Badge>
               )}

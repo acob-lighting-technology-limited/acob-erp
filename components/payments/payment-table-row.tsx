@@ -57,8 +57,8 @@ export function PaymentTableRow({
           variant="outline"
           className={
             payment.payment_type === "recurring"
-              ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
-              : "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
+              ? "bg-info-muted text-info-foreground border-blue-300"
+              : "bg-success-muted text-success-foreground border-green-300"
           }
         >
           {payment.payment_type === "recurring" ? "Recurring" : "One-time"}

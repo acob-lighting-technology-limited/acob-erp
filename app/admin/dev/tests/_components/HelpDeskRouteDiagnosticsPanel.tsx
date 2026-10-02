@@ -106,9 +106,9 @@ export function HelpDeskRouteDiagnosticsPanel() {
                               </span>
                             ) : (
                               <div className="mt-1 space-y-1">
-                                <p className="text-red-600 dark:text-red-400">{row.fail_reason}</p>
+                                <p className="text-danger-foreground">{row.fail_reason}</p>
                                 {HELP_DESK_FIX_HINTS[row.stage_code] && (
-                                  <p className="text-amber-700 dark:text-amber-400">
+                                  <p className="text-warning-foreground">
                                     <strong>Fix:</strong> {HELP_DESK_FIX_HINTS[row.stage_code]}
                                   </p>
                                 )}
