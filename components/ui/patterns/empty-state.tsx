@@ -1,10 +1,9 @@
-import type { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface EmptyStateProps {
   title: string
   description?: string
-  icon?: LucideIcon
+  icon?: React.ElementType<{ className?: string }>
   action?: React.ReactNode
   className?: string
 }
