@@ -95,26 +95,26 @@
   -webkit-text-stroke: 2px var(--bd-gold);
 }
 
-/* The line-up is a size container, so portraits can fill whatever height the
-   headline and ticket leave over — and narrow when a big group shares the row. */
+/* The line-up fills whatever height the headline and ticket leave. poster-layout.ts
+   measures it and picks rows / gap / portrait size (set here as --vars) so the
+   faces are as big as possible: one staggered row for small groups, evenly
+   filled rows for big ones. */
 .bd1-lineup {
-  /* Tightens as the group grows so big groups get the width back for faces. */
-  --gap: clamp(0.75rem, calc(16vw / var(--n, 4)), 3.5rem);
-
   display: flex;
   width: 100%;
   min-height: 0;
   flex: 1;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  align-content: center;
   align-items: center;
   justify-content: center;
-  gap: var(--gap);
-  padding: 0.75rem 0 0.25rem;
-  container-type: size;
+  gap: 20px var(--gap, 2rem);
+  padding: 0;
 }
 
 .bd1-member {
   display: flex;
+  width: var(--mw, auto);
   margin: 0;
   flex-direction: column;
   align-items: center;
@@ -122,22 +122,15 @@
 }
 
 /* Staggered heights read as a line-up rather than a grid. */
-.bd1-member:nth-child(even) {
+.bd1-lineup[data-rows="1"] .bd1-member:nth-child(even) {
   margin-top: 2.5vh;
 }
 
-/* Fill the row's height whatever the group size:
-   --room  height left after the caption (~7.5rem incl. stagger + outline)
-   --slot  width each person gets in the single row
-   Small groups keep the classic 3:4.4 pill; big groups go a little slimmer (up to 1:1.8)
-   instead of shrinking and leaving empty bands above and below. */
+/* Sized by poster-layout.ts: classic 3:4.4 pill, up to 1:1.8 in big groups. */
 .bd1-portrait {
-  --room: calc(100cqh - 7.5rem);
-  --slot: calc((100cqw - (var(--n, 4) - 1) * var(--gap)) / var(--n, 4) - 16px);
-
   position: relative;
-  width: min(var(--slot), calc(var(--room) / 1.4667), 42vh);
-  height: min(var(--room), calc(var(--slot) * 1.8), 62vh);
+  width: var(--pw, 0);
+  height: var(--ph, 0);
   overflow: hidden;
   border-radius: 999px;
   outline: 2px solid var(--bd-gold);
@@ -163,13 +156,17 @@
 .bd1-member-name {
   color: var(--bd-cream);
   font-family: var(--font-birthday-serif), Georgia, serif;
-  /* Shrinks in big groups so long names don't run into their neighbours. */
-  font-size: clamp(0.8rem, calc(6.4vw / var(--n, 4)), 1.4rem);
+  /* Scales with the member width so long names fit in big groups. */
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--name, 1.2rem);
   font-weight: 700;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bd1-member-date {
+  white-space: nowrap;
   border-radius: 999px;
   padding: 0.2rem 0.75rem;
   background: var(--bd-gold);

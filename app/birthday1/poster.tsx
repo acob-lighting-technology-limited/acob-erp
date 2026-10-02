@@ -2,12 +2,13 @@
 
 /* eslint-disable @next/next/no-img-element -- static asset, not optimizable by next/image */
 
-import type { CSSProperties } from "react"
+import { useRef, type CSSProperties } from "react"
 import { BirthdayEmpty, CelebrantPhoto } from "../birthday/birthday-explorer"
 import { cn } from "@/lib/utils"
 import { BirthdayBackButton, BirthdayPicker } from "../birthday/birthday-picker"
 import { displayName, formatMMDDLabel, isBirthdayToday } from "../birthday/birthday-utils"
 import { useBirthdayCelebrants } from "../birthday/use-birthday-celebrants"
+import { useLineupLayout } from "./poster-layout"
 import "./poster.css"
 
 const HEADLINE = "Birthday"
@@ -37,6 +38,8 @@ const SPARKLES = [
 export function BirthdayPoster() {
   const state = useBirthdayCelebrants()
   const { celebrants, rangeLabel, isLoading, error } = state
+  const lineupRef = useRef<HTMLDivElement>(null)
+  const layout = useLineupLayout(lineupRef, state.isGenerated ? celebrants.length : 0)
 
   if (!state.isGenerated) {
     return (
@@ -96,7 +99,22 @@ export function BirthdayPoster() {
       {error ? (
         <p className="birthday-error">{error}</p>
       ) : celebrants.length > 0 ? (
-        <div className="bd1-lineup" style={{ "--n": celebrants.length } as CSSProperties}>
+        <div
+          ref={lineupRef}
+          className="bd1-lineup"
+          data-rows={layout?.rows ?? 1}
+          style={
+            (layout
+              ? {
+                  "--gap": `${layout.gap}px`,
+                  "--mw": `${layout.memberWidth}px`,
+                  "--pw": `${layout.portraitWidth}px`,
+                  "--ph": `${layout.portraitHeight}px`,
+                  "--name": `${layout.nameSize}px`,
+                }
+              : {}) as CSSProperties
+          }
+        >
           {celebrants.map((celebrant, index) => {
             const isToday = isBirthdayToday(celebrant)
             return (
