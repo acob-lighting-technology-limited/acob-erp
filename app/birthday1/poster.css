@@ -5,7 +5,7 @@
 .birthday-page.bd-poster {
   background:
     radial-gradient(ellipse at 50% 35%, rgb(47 162 87 / 0.22), transparent 60%),
-    radial-gradient(ellipse at 50% 120%, rgb(232 189 79 / 0.18), transparent 55%), #040604;
+    radial-gradient(ellipse at 50% 120%, rgb(47 162 87 / 0.22), transparent 55%), #040604;
 }
 
 /* No bunting on the poster — the headline carries the top of the page. */
@@ -72,7 +72,7 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  -webkit-text-stroke: 2px var(--bd-gold);
+  -webkit-text-stroke: 2px var(--bd-green-bright);
 }
 
 .bd1-names {
@@ -130,7 +130,7 @@
   aspect-ratio: 3 / 4.4;
   overflow: hidden;
   border-radius: 999px;
-  outline: 2px solid var(--bd-gold);
+  outline: 2px solid var(--bd-green-bright);
   outline-offset: 6px;
   background: var(--bd-forest);
   box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.95);
@@ -138,6 +138,7 @@
 
 .bd1-member--today .bd1-portrait {
   outline-width: 3px;
+  outline-color: var(--bd-gold);
   box-shadow:
     0 30px 60px -30px rgb(0 0 0 / 0.95),
     0 0 50px 6px rgb(232 189 79 / 0.4);
@@ -160,8 +161,8 @@
 .bd1-member-date {
   border-radius: 999px;
   padding: 0.2rem 0.75rem;
-  background: var(--bd-gold);
-  color: var(--bd-ink);
+  background: var(--bd-green);
+  color: #ffffff;
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -169,8 +170,8 @@
 }
 
 .bd1-member--today .bd1-member-date {
-  background: var(--bd-green);
-  color: white;
+  background: var(--bd-gold);
+  color: var(--bd-ink);
 }
 
 /* Gold ticket stub with punched notches on both ends. */
@@ -180,8 +181,8 @@
   flex-shrink: 0;
   align-items: stretch;
   border-radius: 0.75rem;
-  background: linear-gradient(110deg, var(--bd-gold), var(--bd-gold-deep));
-  color: var(--bd-ink);
+  background: linear-gradient(110deg, var(--bd-green), #1a6b37);
+  color: #ffffff;
   text-align: left;
   -webkit-mask:
     radial-gradient(circle at 0 50%, transparent 14px, #000 15px) left / 51% 100% no-repeat,
@@ -197,10 +198,11 @@
   justify-content: center;
   gap: 0.2rem;
   padding: 0.7rem 1.5rem 0.7rem 2rem;
-  border-right: 2px dashed rgb(10 18 12 / 0.35);
+  border-right: 2px dashed rgb(255 255 255 / 0.35);
 }
 
 .bd1-ticket-stub span {
+  color: var(--bd-gold);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.2em;

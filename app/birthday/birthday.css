@@ -13,6 +13,7 @@
   --bd-gold: #e8bd4f;
   --bd-gold-deep: #c8952a;
   --bd-green: #2fa257;
+  --bd-green-bright: #4cc26e; /* strokes + text on black */
   --bd-cream: #f7f1e1;
   --bd-ink: #0a120c;
   --bd-text: #f4f6f2;
@@ -30,9 +31,9 @@
   --accent-foreground: var(--bd-text);
   --border: var(--bd-glass-border);
   --input: rgb(255 255 255 / 0.18);
-  --ring: var(--bd-gold);
-  --primary: var(--bd-gold);
-  --primary-foreground: var(--bd-ink);
+  --ring: var(--bd-green);
+  --primary: var(--bd-green);
+  --primary-foreground: #ffffff;
 
   position: relative;
   height: 100vh;
@@ -40,7 +41,7 @@
   color-scheme: dark;
   background:
     radial-gradient(ellipse at 50% -10%, rgb(47 162 87 / 0.16), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, rgb(232 189 79 / 0.08), transparent 50%),
+    radial-gradient(ellipse at 100% 100%, rgb(47 162 87 / 0.12), transparent 50%),
     linear-gradient(160deg, var(--bd-forest) 0%, var(--bd-night) 55%, #020302 100%);
   color: var(--bd-text);
 }
@@ -72,7 +73,7 @@
 .birthday-decor__glow--gold {
   right: -12rem;
   bottom: -14rem;
-  background: rgb(200 149 42 / 0.35);
+  background: rgb(15 61 34 / 0.6);
 }
 
 .birthday-decor__stars {
@@ -252,7 +253,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--bd-gold);
+  color: var(--bd-green-bright);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -304,7 +305,7 @@
   min-height: 0;
   flex-direction: column;
   gap: 0.6rem;
-  border: 1px solid rgb(232 189 79 / 0.35);
+  border: 1px solid rgb(47 162 87 / 0.5);
   border-radius: 1rem;
   padding: 0.6rem 0.6rem 0.85rem;
   background: linear-gradient(180deg, var(--bd-forest), var(--bd-night));
@@ -320,7 +321,7 @@
 .birthday-card-item:hover {
   translate: 0 -6px;
   z-index: 10;
-  border-color: var(--bd-gold);
+  border-color: var(--bd-green-bright);
   box-shadow: 0 30px 60px -28px rgb(0 0 0 / 0.95);
 }
 
@@ -384,17 +385,17 @@
   gap: 0.35rem;
   border-radius: 999px;
   padding: 0.3rem 0.65rem;
-  background: linear-gradient(135deg, var(--bd-gold), var(--bd-gold-deep));
+  background: var(--bd-green);
   box-shadow: 0 6px 14px -6px rgb(0 0 0 / 0.6);
-  color: var(--bd-ink);
+  color: #ffffff;
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.04em;
 }
 
 .birthday-card-item--today .birthday-photo__badge {
-  background: var(--bd-green);
-  color: white;
+  background: var(--bd-gold);
+  color: var(--bd-ink);
   animation: birthday-pulse 1.8s ease-in-out infinite;
 }
 
@@ -442,7 +443,7 @@
   border-radius: 1.5rem;
   padding: 2.5rem 3rem;
   background: var(--bd-glass);
-  color: var(--bd-gold);
+  color: var(--bd-green-bright);
   text-align: center;
 }
 
@@ -482,9 +483,9 @@
 }
 
 .birthday-back.birthday-back:hover {
-  border-color: rgb(232 189 79 / 0.5);
+  border-color: rgb(47 162 87 / 0.6);
   background: rgb(12 26 17 / 0.85);
-  color: var(--bd-gold);
+  color: var(--bd-green-bright);
 }
 
 /* ── Setup screen ──────────────────────────────────────────────── */
@@ -525,9 +526,9 @@
   height: 3.75rem;
   place-items: center;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--bd-gold), var(--bd-gold-deep));
-  box-shadow: 0 12px 30px -12px rgb(232 189 79 / 0.6);
-  color: var(--bd-ink);
+  background: linear-gradient(135deg, var(--bd-green), #1f7a3f);
+  box-shadow: 0 12px 30px -12px rgb(47 162 87 / 0.7);
+  color: #ffffff;
   animation: birthday-bob 3s ease-in-out infinite;
 }
 
@@ -551,8 +552,8 @@
 }
 
 .birthday-tabs [data-state="active"] {
-  background: var(--bd-gold);
-  color: var(--bd-ink);
+  background: var(--bd-green);
+  color: #ffffff;
 }
 
 .birthday-picker__controls {
@@ -563,9 +564,9 @@
 .birthday-cta.birthday-cta {
   height: 2.75rem;
   border-radius: 999px;
-  background: linear-gradient(110deg, var(--bd-gold), var(--bd-gold-deep));
-  box-shadow: 0 14px 30px -16px rgb(232 189 79 / 0.8);
-  color: var(--bd-ink);
+  background: linear-gradient(110deg, var(--bd-green), #1f7a3f);
+  box-shadow: 0 14px 30px -16px rgb(47 162 87 / 0.9);
+  color: #ffffff;
   font-weight: 700;
   transition:
     translate 200ms ease,
@@ -576,7 +577,7 @@
 .birthday-cta.birthday-cta:hover:not(:disabled) {
   translate: 0 -1px;
   filter: brightness(1.06);
-  box-shadow: 0 18px 34px -16px rgb(232 189 79 / 0.9);
+  box-shadow: 0 18px 34px -16px rgb(47 162 87 / 1);
 }
 
 .birthday-skeleton {
