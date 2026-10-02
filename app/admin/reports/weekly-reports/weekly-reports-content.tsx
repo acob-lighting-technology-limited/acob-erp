@@ -24,7 +24,7 @@ import {
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
-import { PptxModeDialog } from "./_components/pptx-mode-dialog"
+import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"

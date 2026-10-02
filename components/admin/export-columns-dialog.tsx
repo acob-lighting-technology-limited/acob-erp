@@ -1,5 +1,7 @@
 "use client"
 
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
@@ -8,32 +10,28 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Download, CheckCircle2 } from "lucide-react"
 
-interface EmployeeExportDialogProps {
+interface ExportColumnsDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   exportType: "excel" | "pdf" | "word" | null
-  setExportType: (type: "excel" | "pdf" | "word" | null) => void
+  /** Column label → included? */
   selectedColumns: Record<string, boolean>
-  setSelectedColumns: (
-    columns: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)
-  ) => void
+  setSelectedColumns: (columns: Record<string, boolean>) => void
   onConfirm: () => void
 }
 
-export function EmployeeExportDialog({
+/** Pick which columns go into an Excel/PDF/Word export. Shared by every admin list that exports. */
+export function ExportColumnsDialog({
   isOpen,
   onOpenChange,
   exportType,
-  setExportType: _setExportType,
   selectedColumns,
   setSelectedColumns,
   onConfirm,
-}: EmployeeExportDialogProps) {
+}: ExportColumnsDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -86,10 +84,10 @@ export function EmployeeExportDialog({
                   id={column}
                   checked={selectedColumns[column]}
                   onCheckedChange={(checked) => {
-                    setSelectedColumns((prev) => ({
-                      ...prev,
+                    setSelectedColumns({
+                      ...selectedColumns,
                       [column]: checked === true,
-                    }))
+                    })
                   }}
                   className="data-[state=checked]:border-primary data-[state=checked]:bg-primary"
                 />
@@ -112,7 +110,8 @@ export function EmployeeExportDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={Object.values(selectedColumns).filter((v) => v).length === 0}>
+          <Button onClick={onConfirm} disabled={!Object.values(selectedColumns).some((v) => v)} className="gap-2">
+            <Download className="h-4 w-4" />
             Export to {exportType?.toUpperCase()}
           </Button>
         </DialogFooter>
