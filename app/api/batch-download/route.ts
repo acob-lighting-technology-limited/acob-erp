@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { run, parseHttpUrl } from "@/lib/shell/run"
 import { isSafeFormatSelector } from "@/lib/media/temp-files"
 import { readFile, unlink, mkdir, readdir } from "fs/promises"
@@ -11,6 +13,9 @@ import { logger } from "@/lib/logger"
 
 const log = logger("api/batch-download")
 
+// Each URL runs a yt-dlp process for up to two minutes, so a batch is capped.
+const MAX_BATCH_URLS = 20
+
 export async function POST(request: NextRequest) {
   const tempDir = path.join(tmpdir(), "batch-downloads")
   const batchId = `batch_${Date.now()}`
@@ -18,12 +23,18 @@ export async function POST(request: NextRequest) {
   const files: string[] = []
 
   try {
-    const body = await request.json()
-    const { urls, format_id } = body
-
-    if (!urls || !Array.isArray(urls) || urls.length === 0) {
-      return NextResponse.json({ error: "URLs array is required" }, { status: 400 })
-    }
+    const parsed = await parseJsonBody(
+      request,
+      z.object({
+        urls: z
+          .array(z.string().max(2000))
+          .min(1, "URLs array is required")
+          .max(MAX_BATCH_URLS, `At most ${MAX_BATCH_URLS} links per batch`),
+        format_id: z.string().max(100).optional(),
+      })
+    )
+    if (!parsed.ok) return parsed.response
+    const { urls, format_id } = parsed.data
 
     const validUrls = urls
       .map((url: string) => url.trim())

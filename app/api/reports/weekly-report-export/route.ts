@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import {
@@ -13,15 +15,15 @@ import { getClientId, rateLimit } from "@/lib/rate-limit"
 
 const log = logger("api-reports-weekly-report-export")
 
-type RequestBody = {
-  week: number
-  year: number
-  type?: "weekly_report" | "action_point"
-  format?: "pdf" | "docx"
-  department?: string
-  persist?: boolean
-  reuseStored?: boolean
-}
+const RequestBodySchema = z.object({
+  week: z.number().int().min(1).max(53),
+  year: z.number().int().min(2000).max(9999),
+  type: z.enum(["weekly_report", "action_point"]).optional(),
+  format: z.enum(["pdf", "docx"]).optional(),
+  department: z.string().max(100).nullable().optional(),
+  persist: z.boolean().optional(),
+  reuseStored: z.boolean().optional(),
+})
 
 export async function POST(request: NextRequest) {
   const rl = await rateLimit(`reports-weekly-report-export:${getClientId(request)}`, { limit: 10, windowSec: 60 })
@@ -31,7 +33,9 @@ export async function POST(request: NextRequest) {
       { status: 429 }
     )
   try {
-    const body = (await request.json()) as RequestBody
+    const parsedBody = await parseJsonBody(request, RequestBodySchema)
+    if (!parsedBody.ok) return parsedBody.response
+    const body = { ...parsedBody.data, department: parsedBody.data.department ?? undefined }
     const {
       week,
       year,
