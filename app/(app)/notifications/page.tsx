@@ -40,6 +40,9 @@ async function getNotificationData() {
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
+    // The inbox shows recent activity; older rows stay in the table but are not
+    // shipped to the browser on every visit.
+    .limit(300)
 
   if (error) {
     log.error("Error loading notifications:", error)
