@@ -2,62 +2,11 @@
 
 /* eslint-disable @next/next/no-img-element -- signed URLs / static asset, not optimizable by next/image */
 
-import { useMemo, useState } from "react"
-import { ArrowLeft, Cake, CalendarHeart, Gift, Heart, Loader2, PartyPopper, Sparkles } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { apiFetch } from "@/lib/api-client"
-import { toLocalISODate } from "@/lib/utils/date"
-import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
-
-type Mode = "day" | "week" | "month" | "range"
-
-interface Celebrant {
-  firstName: string
-  lastName: string
-  department: string
-  birthday: string
-  avatarUrl: string | null
-}
-
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-]
-
-const WEEK_OPTIONS = Array.from({ length: 53 }, (_, i) => i + 1)
-
-function toMMDD(date: Date): string {
-  return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function formatMMDDLabel(mmdd: string): string {
-  const [month, day] = mmdd.split("-").map(Number)
-  return `${MONTHS[month - 1]?.slice(0, 3) ?? "?"} ${day}`
-}
-
-function displayName(firstName: string): string {
-  const lower = firstName.trim().toLowerCase()
-  return lower === "eliah" ? "Elijah" : firstName
-}
+import { Cake, CalendarHeart, Gift, Heart, Loader2, Sparkles } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { BirthdayBackButton, BirthdayPicker } from "./birthday-picker"
+import { displayName, formatMMDDLabel, formatNamesList, isBirthdayToday } from "./birthday-utils"
+import { useBirthdayCelebrants } from "./use-birthday-celebrants"
 
 /** Roughly-square column count so N cards form a balanced grid instead of one stretched row. */
 function columnsForCount(count: number): number {
@@ -66,183 +15,13 @@ function columnsForCount(count: number): number {
 }
 
 export function BirthdayExplorer() {
-  const today = toLocalISODate()
-  const currentOfficeWeek = getCurrentOfficeWeek()
+  const state = useBirthdayCelebrants()
+  const { celebrants, rangeLabel, isLoading, error } = state
 
-  const [mode, setMode] = useState<Mode>("week")
-  const [dayValue, setDayValue] = useState(today)
-  const [weekNumber, setWeekNumber] = useState(currentOfficeWeek.week)
-  const [weekYear, setWeekYear] = useState(currentOfficeWeek.year)
-  const [monthValue, setMonthValue] = useState(String(new Date().getMonth() + 1))
-  const [rangeStart, setRangeStart] = useState(today)
-  const [rangeEnd, setRangeEnd] = useState(today)
-
-  const [celebrants, setCelebrants] = useState<Celebrant[]>([])
-  const [rangeLabel, setRangeLabel] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [isGenerated, setIsGenerated] = useState(false)
-
-  const yearOptions = useMemo(
-    () => [currentOfficeWeek.year - 1, currentOfficeWeek.year, currentOfficeWeek.year + 1],
-    [currentOfficeWeek.year]
-  )
-
-  function computeRange(): { start: string; end: string; label: string } {
-    if (mode === "day") {
-      const d = new Date(`${dayValue}T00:00:00`)
-      const mmdd = toMMDD(d)
-      return { start: mmdd, end: mmdd, label: formatMMDDLabel(mmdd) }
-    }
-    if (mode === "week") {
-      // Uses the same office-week numbering as /admin/reports/general-meeting
-      const monday = getOfficeWeekMonday(weekNumber, weekYear)
-      const sunday = addDays(monday, 6)
-      return {
-        start: toMMDD(monday),
-        end: toMMDD(sunday),
-        label: `Week ${weekNumber} · ${formatMMDDLabel(toMMDD(monday))} – ${formatMMDDLabel(toMMDD(sunday))}`,
-      }
-    }
-    if (mode === "month") {
-      const m = Number(monthValue)
-      const lastDay = new Date(2001, m, 0).getDate()
-      const start = `${String(m).padStart(2, "0")}-01`
-      const end = `${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
-      return { start, end, label: `${formatMMDDLabel(start)} – ${formatMMDDLabel(end)}` }
-    }
-    // custom range
-    const start = toMMDD(new Date(`${rangeStart}T00:00:00`))
-    const end = toMMDD(new Date(`${rangeEnd}T00:00:00`))
-    return { start, end, label: `${formatMMDDLabel(start)} – ${formatMMDDLabel(end)}` }
-  }
-
-  async function generate() {
-    const { start, end, label } = computeRange()
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await apiFetch(`/api/admin/hr/birthdays?start=${start}&end=${end}&photo=large`)
-      const payload = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(payload?.error || "Failed to load birthdays")
-      setCelebrants(payload?.data || [])
-      setRangeLabel(label)
-      setIsGenerated(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load birthdays")
-      setCelebrants([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const formatNamesList = (names: string[]) => {
-    if (names.length === 0) return ""
-    if (names.length === 1) return names[0]
-    if (names.length === 2) return `${names[0]} & ${names[1]}`
-    return `${names.slice(0, -1).join(", ")}, & ${names[names.length - 1]}`
-  }
+  if (!state.isGenerated) return <BirthdayPicker state={state} />
 
   const celebrantsTitle = formatNamesList(celebrants.map((c) => displayName(c.firstName)))
   const gridColumns = columnsForCount(celebrants.length)
-  const todayMMDD = toMMDD(new Date())
-
-  if (!isGenerated) {
-    return (
-      <div className="birthday-setup-container">
-        <div className="birthday-setup-card">
-          <img
-            src="/images/acob-logo-dark.webp"
-            alt="ACOB Lighting Logo"
-            className="birthday-logo birthday-logo--setup"
-          />
-
-          <div className="birthday-setup-icon" aria-hidden="true">
-            <Cake className="h-7 w-7" />
-          </div>
-
-          <div className="text-center">
-            <h2 className="birthday-script">Birthday Spotlight</h2>
-            <p className="birthday-setup-lead">
-              Pick a period and we&apos;ll roll out the confetti for everyone celebrating.
-            </p>
-          </div>
-
-          <div className="birthday-picker">
-            <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
-              <TabsList className="birthday-tabs grid grid-cols-4">
-                <TabsTrigger value="day">Day</TabsTrigger>
-                <TabsTrigger value="week">Week</TabsTrigger>
-                <TabsTrigger value="month">Month</TabsTrigger>
-                <TabsTrigger value="range">Range</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <div className="birthday-picker__controls">
-              {mode === "day" && (
-                <Input type="date" value={dayValue} onChange={(e) => setDayValue(e.target.value)} className="w-full" />
-              )}
-              {mode === "week" && (
-                <div className="flex w-full gap-2">
-                  <Select value={String(weekNumber)} onValueChange={(v) => setWeekNumber(Number(v))}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {WEEK_OPTIONS.map((week) => (
-                        <SelectItem key={week} value={String(week)}>
-                          Week {week}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={String(weekYear)} onValueChange={(v) => setWeekYear(Number(v))}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {yearOptions.map((year) => (
-                        <SelectItem key={year} value={String(year)}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {mode === "month" && (
-                <Select value={monthValue} onValueChange={setMonthValue}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((name, i) => (
-                      <SelectItem key={name} value={String(i + 1)}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {mode === "range" && (
-                <div className="flex w-full items-center gap-2">
-                  <Input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
-                  <span className="birthday-muted text-xs">to</span>
-                  <Input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
-                </div>
-              )}
-            </div>
-
-            <Button onClick={generate} disabled={isLoading} className="birthday-cta w-full gap-2">
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PartyPopper className="h-4 w-4" />}
-              Let&apos;s celebrate
-            </Button>
-          </div>
-          {error && <p className="birthday-error">{error}</p>}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <>
@@ -286,25 +65,15 @@ export function BirthdayExplorer() {
         ) : celebrants.length > 0 ? (
           <div className="birthday-grid" style={{ "--birthday-cols": gridColumns } as React.CSSProperties}>
             {celebrants.map((celebrant, index) => {
-              const isToday = celebrant.birthday === todayMMDD
+              const isToday = isBirthdayToday(celebrant)
               return (
                 <article
                   key={`${celebrant.firstName}-${index}`}
-                  className={`birthday-card-item${isToday ? "birthday-card-item--today" : ""}`}
+                  className={cn("birthday-card-item", isToday && "birthday-card-item--today")}
                   style={{ "--i": index } as React.CSSProperties}
                 >
                   <div className="birthday-card-photo-wrapper">
-                    {celebrant.avatarUrl ? (
-                      <img
-                        src={celebrant.avatarUrl}
-                        alt={displayName(celebrant.firstName)}
-                        className="birthday-photo"
-                      />
-                    ) : (
-                      <div className="birthday-photo-placeholder">
-                        <span>{displayName(celebrant.firstName).charAt(0)}</span>
-                      </div>
-                    )}
+                    <CelebrantPhoto celebrant={celebrant} />
                     <div className="birthday-photo__veil" aria-hidden="true" />
                     <div className="birthday-photo__badge">
                       {isToday ? <Cake className="h-3.5 w-3.5" /> : <Gift className="h-3.5 w-3.5" />}
@@ -320,26 +89,45 @@ export function BirthdayExplorer() {
             })}
           </div>
         ) : (
-          <div className="birthday-empty">
-            {isLoading ? (
-              <Loader2 className="h-8 w-8 animate-spin" />
-            ) : (
-              <>
-                <Gift className="h-9 w-9" />
-                <p>No birthdays in this period</p>
-                <span>Try another week or month.</span>
-              </>
-            )}
-          </div>
+          <BirthdayEmpty isLoading={isLoading} />
         )}
       </div>
 
-      <div className="fixed bottom-6 left-6 z-50">
-        <Button onClick={() => setIsGenerated(false)} variant="outline" size="sm" className="birthday-back gap-1.5">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Back</span>
-        </Button>
-      </div>
+      <BirthdayBackButton onClick={state.reset} />
     </>
+  )
+}
+
+export function BirthdayEmpty({ isLoading }: { isLoading: boolean }) {
+  return (
+    <div className="birthday-empty">
+      {isLoading ? (
+        <Loader2 className="h-8 w-8 animate-spin" />
+      ) : (
+        <>
+          <Gift className="h-9 w-9" />
+          <p>No birthdays in this period</p>
+          <span>Try another week or month.</span>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Photo or initial fallback, filling its (positioned) parent. Used by every design. */
+export function CelebrantPhoto({
+  celebrant,
+  className,
+}: {
+  celebrant: { firstName: string; avatarUrl: string | null }
+  className?: string
+}) {
+  const name = displayName(celebrant.firstName)
+  return celebrant.avatarUrl ? (
+    <img src={celebrant.avatarUrl} alt={name} className={cn("birthday-photo", className)} />
+  ) : (
+    <div className={cn("birthday-photo-placeholder", className)}>
+      <span>{name.charAt(0)}</span>
+    </div>
   )
 }
