@@ -112,7 +112,7 @@ export function BirthdayPicker({ state }: { state: BirthdayCelebrantsState }) {
 
 export function BirthdayBackButton({ onClick }: { onClick: () => void }) {
   return (
-    <div className="fixed bottom-6 left-6 z-50">
+    <div className="fixed top-6 right-6 z-50">
       <Button onClick={onClick} variant="outline" size="sm" className="birthday-back gap-1.5">
         <ArrowLeft className="h-3.5 w-3.5" />
         <span>Back</span>
