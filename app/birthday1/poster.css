@@ -98,7 +98,8 @@
 /* The line-up is a size container, so portraits can fill whatever height the
    headline and ticket leave over — and narrow when a big group shares the row. */
 .bd1-lineup {
-  --gap: clamp(1.5rem, 3vw, 3.5rem);
+  /* Tightens as the group grows so big groups get the width back for faces. */
+  --gap: clamp(0.75rem, calc(16vw / var(--n, 4)), 3.5rem);
 
   display: flex;
   width: 100%;
@@ -125,16 +126,18 @@
   margin-top: 2.5vh;
 }
 
-/* Height-led: everything the row has left after the caption (~7.5rem incl. the
-   stagger and outline), or less when the row width runs out. */
+/* Fill the row's height whatever the group size:
+   --room  height left after the caption (~7.5rem incl. stagger + outline)
+   --slot  width each person gets in the single row
+   Small groups keep the classic 3:4.4 pill; big groups go slimmer (up to 1:2.3)
+   instead of shrinking and leaving empty bands above and below. */
 .bd1-portrait {
+  --room: calc(100cqh - 7.5rem);
+  --slot: calc((100cqw - (var(--n, 4) - 1) * var(--gap)) / var(--n, 4) - 16px);
+
   position: relative;
-  height: min(
-    calc(100cqh - 7.5rem),
-    calc(((100cqw - (var(--n, 4) - 1) * var(--gap)) / var(--n, 4) - 16px) * 1.4667),
-    62vh
-  );
-  aspect-ratio: 3 / 4.4;
+  width: min(var(--slot), calc(var(--room) / 1.4667), 42vh);
+  height: min(var(--room), calc(var(--slot) * 2.3), 62vh);
   overflow: hidden;
   border-radius: 999px;
   outline: 2px solid var(--bd-gold);
@@ -160,8 +163,10 @@
 .bd1-member-name {
   color: var(--bd-cream);
   font-family: var(--font-birthday-serif), Georgia, serif;
-  font-size: clamp(1.05rem, 1.6vw, 1.4rem);
+  /* Shrinks in big groups so long names don't run into their neighbours. */
+  font-size: clamp(0.8rem, calc(6.4vw / var(--n, 4)), 1.4rem);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .bd1-member-date {
@@ -497,6 +502,11 @@
   .bd1-portrait {
     width: 100%;
     height: auto;
+    aspect-ratio: 3 / 4.4;
+  }
+
+  .bd1-member-name {
+    font-size: 1.05rem;
   }
 
   .bd1-birthday {
