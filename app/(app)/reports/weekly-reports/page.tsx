@@ -28,7 +28,7 @@ import { downloadWeeklyReportDocx, downloadWeeklyReportPdf } from "@/lib/reports
 import { Badge } from "@/components/ui/badge"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
-import { PptxModeDialog } from "./_components/pptx-mode-dialog"
+import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
@@ -832,12 +832,12 @@ export default function WeeklyReportsPortal() {
       />
 
       <PptxModeDialog
-        isOpen={pptxModeDialogOpen}
+        open={pptxModeDialogOpen}
         onOpenChange={(open) => {
           setPptxModeDialogOpen(open)
           if (!open) setPendingPptxExport(null)
         }}
-        onExport={runPptxExport}
+        onSelect={runPptxExport}
         showOrderStep={pendingPptxExport?.kind === "all"}
       />
     </DataTablePage>

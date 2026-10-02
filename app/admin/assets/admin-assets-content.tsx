@@ -46,7 +46,7 @@ import { AssetAssignDialog } from "@/components/assets/AssetAssignDialog"
 import { AssetHistoryDialog } from "@/components/assets/AssetHistoryDialog"
 import { AssetIssuesDialog } from "@/components/assets/AssetIssuesDialog"
 import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
-import { AssetExportDialog } from "@/components/assets/AssetExportDialog"
+import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
 import { EmployeeAssetsReportDialog } from "@/components/assets/EmployeeAssetsReportDialog"
 import { AssetHandoverDialog } from "@/components/assets/AssetHandoverDialog"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -1791,13 +1791,13 @@ export function AdminAssetsContent({
       />
 
       {/* Export Column Selection Dialog */}
-      <AssetExportDialog
+      <ExportColumnsDialog
         isOpen={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         exportType={exportType}
         selectedColumns={selectedColumns}
         setSelectedColumns={setSelectedColumns}
-        onExportConfirm={handleExportConfirm}
+        onConfirm={handleExportConfirm}
       />
 
       {/* Employee Assets Report Confirmation Dialog */}

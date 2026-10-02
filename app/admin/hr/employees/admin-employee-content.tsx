@@ -55,7 +55,7 @@ import {
   EXIT_REASONS,
 } from "@/components/employees/EmployeeViewModal"
 import { EmployeeDeletionDialog } from "@/components/employees/EmployeeDeletionDialog"
-import { EmployeeExportDialog } from "@/components/employees/EmployeeExportDialog"
+import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
 import {
   buildEmployeeExportRows,
   exportEmployeesToExcel,
@@ -1437,11 +1437,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         }}
       />
 
-      <EmployeeExportDialog
+      <ExportColumnsDialog
         isOpen={exportEmployeeDialogOpen}
         onOpenChange={setExportEmployeeDialogOpen}
         exportType={exportType}
-        setExportType={setExportType}
         selectedColumns={selectedColumns}
         setSelectedColumns={setSelectedColumns}
         onConfirm={handleExportExecute}
