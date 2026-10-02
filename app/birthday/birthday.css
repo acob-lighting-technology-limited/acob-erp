@@ -7,24 +7,22 @@
    The shadcn tokens are re-pointed inside it so inputs, selects and tabs stay
    legible on the dark backdrop even when the ERP is in light mode. */
 .birthday-page {
-  --bd-night: #160b24;
-  --bd-plum: #2a1240;
-  --bd-wine: #4a1640;
-  --bd-gold: #f6c453;
-  --bd-gold-deep: #e09a2b;
-  --bd-rose: #ff7aa8;
-  --bd-mint: #6fe3c1;
-  --bd-sky: #7cc4ff;
-  --bd-cream: #fff6e6;
-  --bd-ink: #2a1630;
-  --bd-text: #fbf3ff;
-  --bd-muted: #cdb9d9;
+  --bd-night: #050806;
+  --bd-forest: #0c1a11;
+  --bd-green-deep: #0f3d22;
+  --bd-gold: #e8bd4f;
+  --bd-gold-deep: #c8952a;
+  --bd-green: #2fa257;
+  --bd-cream: #f7f1e1;
+  --bd-ink: #0a120c;
+  --bd-text: #f4f6f2;
+  --bd-muted: #a9b8ad;
   --bd-glass: rgb(255 255 255 / 0.07);
   --bd-glass-border: rgb(255 255 255 / 0.14);
 
   --background: var(--bd-night);
   --foreground: var(--bd-text);
-  --card: var(--bd-plum);
+  --card: var(--bd-forest);
   --card-foreground: var(--bd-text);
   --muted: rgb(255 255 255 / 0.08);
   --muted-foreground: var(--bd-muted);
@@ -41,9 +39,9 @@
   overflow: hidden;
   color-scheme: dark;
   background:
-    radial-gradient(ellipse at 50% -10%, rgb(255 122 168 / 0.22), transparent 55%),
-    radial-gradient(ellipse at 100% 100%, rgb(246 196 83 / 0.14), transparent 50%),
-    linear-gradient(160deg, var(--bd-plum) 0%, var(--bd-night) 55%, #0e0718 100%);
+    radial-gradient(ellipse at 50% -10%, rgb(47 162 87 / 0.16), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgb(232 189 79 / 0.08), transparent 50%),
+    linear-gradient(160deg, var(--bd-forest) 0%, var(--bd-night) 55%, #020302 100%);
   color: var(--bd-text);
 }
 
@@ -62,19 +60,19 @@
   height: 34rem;
   border-radius: 999px;
   filter: blur(80px);
-  opacity: 0.45;
+  opacity: 0.3;
 }
 
-.birthday-decor__glow--rose {
+.birthday-decor__glow--green {
   top: -12rem;
   left: -10rem;
-  background: var(--bd-wine);
+  background: var(--bd-green-deep);
 }
 
 .birthday-decor__glow--gold {
   right: -12rem;
   bottom: -14rem;
-  background: rgb(224 154 43 / 0.45);
+  background: rgb(200 149 42 / 0.35);
 }
 
 .birthday-decor__stars {
@@ -83,7 +81,7 @@
   background-image:
     radial-gradient(1.5px 1.5px at 20px 30px, rgb(255 255 255 / 0.7), transparent),
     radial-gradient(1px 1px at 90px 110px, rgb(255 255 255 / 0.5), transparent),
-    radial-gradient(1.5px 1.5px at 160px 60px, rgb(246 196 83 / 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 160px 60px, rgb(232 189 79 / 0.8), transparent),
     radial-gradient(1px 1px at 230px 170px, rgb(255 255 255 / 0.45), transparent);
   background-size: 260px 220px;
   animation: birthday-twinkle 5s ease-in-out infinite alternate;
@@ -175,10 +173,10 @@
   width: fit-content;
   align-items: center;
   gap: 0.5rem;
-  border: 1px solid rgb(246 196 83 / 0.4);
+  border: 1px solid rgb(232 189 79 / 0.4);
   border-radius: 999px;
   padding: 0.45rem 0.9rem;
-  background: rgb(246 196 83 / 0.12);
+  background: rgb(232 189 79 / 0.12);
   color: var(--bd-gold);
   font-size: 0.75rem;
   font-weight: 700;
@@ -199,18 +197,12 @@
   font-size: clamp(2.4rem, 4vw, 3rem);
   font-weight: 400;
   line-height: 1.1;
-  background: linear-gradient(100deg, var(--bd-gold) 10%, var(--bd-rose) 60%, var(--bd-gold) 95%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: birthday-shimmer 6s linear infinite;
+  color: var(--bd-gold);
 }
 
 .birthday-script--hero {
   font-size: clamp(3rem, 5.5vw, 4.75rem);
   line-height: 1;
-  filter: drop-shadow(0 4px 18px rgb(255 122 168 / 0.25));
 }
 
 .birthday-title {
@@ -252,8 +244,8 @@
 }
 
 .birthday-meta-card--wish {
-  border-color: rgb(255 122 168 / 0.35);
-  background: linear-gradient(135deg, rgb(255 122 168 / 0.14), rgb(255 255 255 / 0.04));
+  border-color: rgb(47 162 87 / 0.35);
+  background: rgb(47 162 87 / 0.08);
 }
 
 .birthday-meta-label {
@@ -268,7 +260,7 @@
 }
 
 .birthday-meta-card--wish .birthday-meta-label {
-  color: var(--bd-rose);
+  color: #5cc47f;
 }
 
 .birthday-meta-card strong {
@@ -311,64 +303,32 @@
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 0.55rem;
-  border-radius: 0.9rem;
-  padding: 0.65rem 0.65rem 0.8rem;
-  background: linear-gradient(180deg, #fffaf1, var(--bd-cream));
-  box-shadow:
-    0 24px 50px -24px rgb(0 0 0 / 0.85),
-    0 0 0 1px rgb(255 255 255 / 0.4);
-  rotate: -1.6deg;
-  animation: birthday-pop 650ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  gap: 0.6rem;
+  border: 1px solid rgb(232 189 79 / 0.35);
+  border-radius: 1rem;
+  padding: 0.6rem 0.6rem 0.85rem;
+  background: linear-gradient(180deg, var(--bd-forest), var(--bd-night));
+  box-shadow: 0 24px 50px -28px rgb(0 0 0 / 0.9);
+  animation: birthday-pop 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--i, 0) * 90ms + 150ms);
   transition:
-    rotate 350ms cubic-bezier(0.22, 1, 0.36, 1),
     translate 350ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 300ms ease,
     box-shadow 300ms ease;
 }
 
-.birthday-card-item:nth-child(even) {
-  rotate: 1.8deg;
-}
-
-.birthday-card-item:nth-child(3n) {
-  rotate: -0.8deg;
-}
-
-/* A strip of washi tape holding each polaroid up. */
-.birthday-card-item::before {
-  content: "";
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  z-index: 2;
-  width: 72px;
-  height: 22px;
-  translate: -50% 0;
-  rotate: -3deg;
-  background: rgb(246 196 83 / 0.7);
-  box-shadow: 0 2px 4px rgb(0 0 0 / 0.15);
-}
-
-.birthday-card-item:nth-child(even)::before {
-  background: rgb(255 122 168 / 0.65);
-  rotate: 4deg;
-}
-
 .birthday-card-item:hover {
-  rotate: 0deg;
-  translate: 0 -8px;
+  translate: 0 -6px;
   z-index: 10;
-  box-shadow:
-    0 34px 60px -24px rgb(0 0 0 / 0.9),
-    0 0 0 1px rgb(255 255 255 / 0.6);
+  border-color: var(--bd-gold);
+  box-shadow: 0 30px 60px -28px rgb(0 0 0 / 0.95);
 }
 
 .birthday-card-item--today {
+  border-color: var(--bd-gold);
   box-shadow:
-    0 24px 50px -24px rgb(0 0 0 / 0.85),
-    0 0 0 3px var(--bd-gold),
-    0 0 40px 4px rgb(246 196 83 / 0.45);
+    0 24px 50px -28px rgb(0 0 0 / 0.9),
+    0 0 32px 2px rgb(232 189 79 / 0.3);
 }
 
 .birthday-card-photo-wrapper {
@@ -377,7 +337,7 @@
   flex: 1;
   overflow: hidden;
   border-radius: 0.5rem;
-  background: var(--bd-plum);
+  background: var(--bd-forest);
 }
 
 .birthday-photo {
@@ -401,8 +361,8 @@
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(circle at 30% 25%, rgb(255 122 168 / 0.45), transparent 55%),
-    linear-gradient(135deg, var(--bd-wine), var(--bd-plum));
+    radial-gradient(circle at 30% 25%, rgb(47 162 87 / 0.45), transparent 55%),
+    linear-gradient(135deg, var(--bd-green-deep), var(--bd-forest));
   color: var(--bd-cream);
   font-family: var(--font-birthday-serif), Georgia, serif;
   font-size: clamp(3rem, 7vw, 5rem);
@@ -412,7 +372,7 @@
 .birthday-photo__veil {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgb(22 11 36 / 0.35) 0%, transparent 28%);
+  background: linear-gradient(180deg, rgb(5 8 6 / 0.35) 0%, transparent 28%);
 }
 
 .birthday-photo__badge {
@@ -433,7 +393,7 @@
 }
 
 .birthday-card-item--today .birthday-photo__badge {
-  background: linear-gradient(135deg, var(--bd-rose), #ff4f8b);
+  background: var(--bd-green);
   color: white;
   animation: birthday-pulse 1.8s ease-in-out infinite;
 }
@@ -451,7 +411,7 @@
   margin: 0;
   overflow: hidden;
   max-width: 100%;
-  color: var(--bd-ink);
+  color: var(--bd-cream);
   font-family: var(--font-birthday-serif), Georgia, serif;
   font-size: clamp(1rem, 1.6vw, 1.35rem);
   font-weight: 700;
@@ -464,7 +424,7 @@
   margin: 0;
   overflow: hidden;
   max-width: 100%;
-  color: #8a6a7e;
+  color: var(--bd-muted);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -501,7 +461,7 @@
 
 .birthday-error {
   margin: 0;
-  color: #ff9ab5;
+  color: #f2a7a0;
   font-size: 0.9rem;
   text-align: center;
 }
@@ -515,15 +475,15 @@
   border-color: var(--bd-glass-border);
   border-radius: 999px;
   padding: 0 1rem;
-  background: rgb(22 11 36 / 0.7);
+  background: rgb(5 8 6 / 0.7);
   backdrop-filter: blur(12px);
   color: var(--bd-text);
   font-size: 0.8rem;
 }
 
 .birthday-back.birthday-back:hover {
-  border-color: rgb(246 196 83 / 0.5);
-  background: rgb(42 18 64 / 0.85);
+  border-color: rgb(232 189 79 / 0.5);
+  background: rgb(12 26 17 / 0.85);
   color: var(--bd-gold);
 }
 
@@ -565,8 +525,8 @@
   height: 3.75rem;
   place-items: center;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--bd-gold), var(--bd-rose));
-  box-shadow: 0 12px 30px -10px rgb(255 122 168 / 0.7);
+  background: linear-gradient(135deg, var(--bd-gold), var(--bd-gold-deep));
+  box-shadow: 0 12px 30px -12px rgb(232 189 79 / 0.6);
   color: var(--bd-ink);
   animation: birthday-bob 3s ease-in-out infinite;
 }
@@ -603,8 +563,8 @@
 .birthday-cta.birthday-cta {
   height: 2.75rem;
   border-radius: 999px;
-  background: linear-gradient(110deg, var(--bd-gold), var(--bd-rose));
-  box-shadow: 0 14px 30px -14px rgb(255 122 168 / 0.9);
+  background: linear-gradient(110deg, var(--bd-gold), var(--bd-gold-deep));
+  box-shadow: 0 14px 30px -16px rgb(232 189 79 / 0.8);
   color: var(--bd-ink);
   font-weight: 700;
   transition:
@@ -616,7 +576,7 @@
 .birthday-cta.birthday-cta:hover:not(:disabled) {
   translate: 0 -1px;
   filter: brightness(1.06);
-  box-shadow: 0 18px 34px -14px rgb(255 122 168 / 1);
+  box-shadow: 0 18px 34px -16px rgb(232 189 79 / 0.9);
 }
 
 .birthday-skeleton {
@@ -655,12 +615,6 @@
   }
 }
 
-@keyframes birthday-shimmer {
-  to {
-    background-position: 200% center;
-  }
-}
-
 @keyframes birthday-rise {
   from {
     opacity: 0;
@@ -686,10 +640,10 @@
 @keyframes birthday-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgb(255 122 168 / 0.6);
+    box-shadow: 0 0 0 0 rgb(47 162 87 / 0.6);
   }
   50% {
-    box-shadow: 0 0 0 8px rgb(255 122 168 / 0);
+    box-shadow: 0 0 0 8px rgb(47 162 87 / 0);
   }
 }
 

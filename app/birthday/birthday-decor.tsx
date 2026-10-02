@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react"
 
-const CONFETTI_COLORS = ["var(--bd-gold)", "var(--bd-rose)", "var(--bd-mint)", "var(--bd-sky)", "var(--bd-cream)"]
+const CONFETTI_COLORS = ["var(--bd-gold)", "var(--bd-green)", "var(--bd-cream)", "var(--bd-gold-deep)"]
 
 // Deterministic scatter (no Math.random) so server and client render identical markup.
 const CONFETTI = Array.from({ length: 34 }, (_, i) => ({
@@ -14,17 +14,17 @@ const CONFETTI = Array.from({ length: 34 }, (_, i) => ({
 }))
 
 const BALLOONS = [
-  { left: "3%", color: "var(--bd-rose)", delay: "0s", scale: 1 },
+  { left: "3%", color: "var(--bd-green)", delay: "0s", scale: 1 },
   { left: "9%", color: "var(--bd-gold)", delay: "-3s", scale: 0.8 },
-  { left: "88%", color: "var(--bd-sky)", delay: "-1.5s", scale: 0.9 },
-  { left: "94%", color: "var(--bd-rose)", delay: "-4.5s", scale: 0.75 },
+  { left: "88%", color: "var(--bd-green)", delay: "-1.5s", scale: 0.9 },
+  { left: "94%", color: "var(--bd-gold)", delay: "-4.5s", scale: 0.75 },
 ]
 
 /** Ambient party backdrop shared by the spotlight, its setup screen and the loading state. */
 export function BirthdayDecor() {
   return (
     <div className="birthday-decor" aria-hidden="true">
-      <div className="birthday-decor__glow birthday-decor__glow--rose" />
+      <div className="birthday-decor__glow birthday-decor__glow--green" />
       <div className="birthday-decor__glow birthday-decor__glow--gold" />
       <div className="birthday-decor__stars" />
 
