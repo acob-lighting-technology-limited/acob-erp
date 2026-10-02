@@ -1,28 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
-import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
-import { StatCard } from "@/components/ui/stat-card"
-import { StatGrid } from "@/components/ui/stat-grid"
-import { Badge } from "@/components/ui/badge"
-import { ShieldEllipsis, ShieldCheck, TriangleAlert, UserCog } from "lucide-react"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { ShieldCheck, ShieldEllipsis, TriangleAlert, UserCog } from "lucide-react"
+import { AuditStreamView, type AuditStreamClass, type AuditStreamRow } from "@/components/admin/audit-stream-view"
 
-export type AuditLogRow = {
-  id: string
-  action: string | null
-  operation: string | null
-  entity_type: string | null
-  entity_id: string | null
-  user_id: string | null
-  old_values: Record<string, unknown> | null
-  new_values: Record<string, unknown> | null
-  metadata: Record<string, unknown> | null
-  created_at: string
-}
+export type AuditLogRow = AuditStreamRow
 
-function getRoleTier(row: AuditLogRow) {
+function getRoleTier(row: AuditStreamRow) {
   const text = `${JSON.stringify(row.new_values || {})} ${JSON.stringify(row.metadata || {})}`.toLowerCase()
   if (text.includes("super_admin")) return "Super Admin"
   if (text.includes("developer")) return "Developer"
@@ -31,228 +14,40 @@ function getRoleTier(row: AuditLogRow) {
   return "Role Change"
 }
 
-export function RoleEscalationsContent({ rows, error }: { rows: AuditLogRow[]; error: string | null }) {
-  const stats = useMemo(
-    () => ({
-      total: rows.length,
-      superAdmin: rows.filter((row) => getRoleTier(row) === "Super Admin").length,
-      developer: rows.filter((row) => getRoleTier(row) === "Developer").length,
-      adminRelated: rows.filter((row) => getRoleTier(row) === "Admin").length,
-    }),
-    [rows]
-  )
+const ROLE_TIERS: AuditStreamClass[] = [
+  {
+    value: "Super Admin",
+    tone: "danger",
+    stat: { icon: TriangleAlert, iconBgColor: "bg-red-500/10", iconColor: "text-red-500" },
+  },
+  {
+    value: "Developer",
+    tone: "warning",
+    stat: { icon: UserCog, iconBgColor: "bg-amber-500/10", iconColor: "text-amber-500" },
+  },
+  {
+    value: "Admin",
+    tone: "info",
+    stat: { icon: ShieldCheck, iconBgColor: "bg-emerald-500/10", iconColor: "text-emerald-500" },
+  },
+  { value: "Department Lead", tone: "neutral" },
+  { value: "Role Change", tone: "neutral" },
+]
 
-  const roleTierOptions = useMemo(
-    () =>
-      ["Super Admin", "Developer", "Admin", "Department Lead", "Role Change"].map((value) => ({ value, label: value })),
-    []
-  )
-
-  const entityTypeOptions = useMemo(
-    () =>
-      Array.from(new Set(rows.map((row) => row.entity_type).filter((value): value is string => Boolean(value))))
-        .sort()
-        .map((value) => ({ value, label: value })),
-    [rows]
-  )
-
-  const columns: DataTableColumn<AuditLogRow>[] = useMemo(
-    () => [
-      {
-        key: "created_at",
-        label: "Time",
-        sortable: true,
-        accessor: (row) => row.created_at,
-        resizable: true,
-        initialWidth: 220,
-        hideOnMobile: true,
-        render: (row) => formatWATDateTime(row.created_at),
-      },
-      {
-        key: "action",
-        label: "Action",
-        sortable: true,
-        accessor: (row) => row.action || row.operation || "",
-        render: (row) => (
-          <div className="space-y-1">
-            <p className="font-medium">{row.action || row.operation || "Unknown action"}</p>
-            <p className="text-muted-foreground text-xs">{row.operation || "No operation"}</p>
-          </div>
-        ),
-      },
-      {
-        key: "entity_type",
-        label: "Entity",
-        sortable: true,
-        accessor: (row) => row.entity_type || "",
-        hideOnMobile: true,
-        render: (row) => row.entity_type || "Unknown",
-      },
-      {
-        key: "role_tier",
-        label: "Role Tier",
-        accessor: (row) => getRoleTier(row),
-        render: (row) => <Badge variant="outline">{getRoleTier(row)}</Badge>,
-      },
-      {
-        key: "user_id",
-        label: "Actor ID",
-        accessor: (row) => row.user_id || "",
-        resizable: true,
-        initialWidth: 220,
-        hideOnMobile: true,
-        render: (row) => <span className="font-mono text-xs">{row.user_id || "-"}</span>,
-      },
-    ],
-    []
-  )
-
-  const filters: DataTableFilter<AuditLogRow>[] = useMemo(
-    () => [
-      {
-        key: "entity_type",
-        label: "Entity Type",
-        options: entityTypeOptions,
-      },
-      {
-        key: "role_tier",
-        label: "Role Tier",
-        options: roleTierOptions,
-      },
-    ],
-    [entityTypeOptions, roleTierOptions]
-  )
-
+export function RoleEscalationsContent({ rows, error }: { rows: AuditStreamRow[]; error: string | null }) {
   return (
-    <DataTablePage
+    <AuditStreamView
+      rows={rows}
+      error={error}
       title="Role Escalations"
       description="High-sensitivity role elevation and privileged change stream."
       icon={ShieldEllipsis}
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
-      stats={
-        <StatGrid>
-          <StatCard
-            variant="compact"
-            title="Total Events"
-            value={stats.total}
-            icon={ShieldEllipsis}
-            iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Super Admin"
-            value={stats.superAdmin}
-            icon={TriangleAlert}
-            iconBgColor="bg-red-500/10"
-            iconColor="text-red-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Developer"
-            value={stats.developer}
-            icon={UserCog}
-            iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-500"
-          />
-          <StatCard
-            variant="compact"
-            title="Admin"
-            value={stats.adminRelated}
-            icon={ShieldCheck}
-            iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-500"
-          />
-        </StatGrid>
-      }
-    >
-      <DataTable<AuditLogRow>
-        data={rows}
-        columns={columns}
-        filters={filters}
-        getRowId={(row) => row.id}
-        pagination={{ pageSize: 50 }}
-        searchPlaceholder="Search action, entity, actor, or changed values..."
-        searchFn={(row, query) => {
-          const normalizedQuery = query.toLowerCase()
-          return (
-            (row.action || "").toLowerCase().includes(normalizedQuery) ||
-            (row.operation || "").toLowerCase().includes(normalizedQuery) ||
-            (row.entity_type || "").toLowerCase().includes(normalizedQuery) ||
-            (row.user_id || "").toLowerCase().includes(normalizedQuery) ||
-            JSON.stringify(row.new_values || {})
-              .toLowerCase()
-              .includes(normalizedQuery) ||
-            JSON.stringify(row.old_values || {})
-              .toLowerCase()
-              .includes(normalizedQuery)
-          )
-        }}
-        error={error}
-        expandable={{
-          render: (row) => (
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Before</p>
-                <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap">
-                  {JSON.stringify(row.old_values || {}, null, 2)}
-                </pre>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">After</p>
-                <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap">
-                  {JSON.stringify(row.new_values || {}, null, 2)}
-                </pre>
-              </div>
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">Metadata</p>
-                <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap">
-                  {JSON.stringify(row.metadata || {}, null, 2)}
-                </pre>
-              </div>
-            </div>
-          ),
-        }}
-        viewToggle
-        contactsView
-        stickyToolbar
-        defaultViewMode={{ mobile: "contacts", desktop: "list" }}
-        mobileRow={{
-          title: (row) => row.action || row.operation || "Unknown action",
-          subtitle: (row) => `${row.entity_type || "Role"} · ${formatWATDateTime(row.created_at)}`,
-          trailing: (row) => (
-            <Badge variant="outline" className="text-[10px]">
-              {getRoleTier(row)}
-            </Badge>
-          ),
-        }}
-        cardRenderer={(row) => (
-          <div className="space-y-3 rounded-xl border p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">{row.action || row.operation || "Unknown action"}</p>
-                <p className="text-muted-foreground text-sm">{formatWATDateTime(row.created_at)}</p>
-              </div>
-              <Badge variant="outline">{getRoleTier(row)}</Badge>
-            </div>
-            <div className="grid gap-1 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Entity</span>
-                <span>{row.entity_type || "Unknown"}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Actor</span>
-                <span className="font-mono text-xs">{row.user_id || "-"}</span>
-              </div>
-            </div>
-          </div>
-        )}
-        emptyTitle="No role escalations found"
-        emptyDescription="No privileged role elevation events were detected in the current log window."
-        emptyIcon={ShieldEllipsis}
-        skeletonRows={5}
-        urlSync
-      />
-    </DataTablePage>
+      classLabel="Role Tier"
+      classify={getRoleTier}
+      classes={ROLE_TIERS}
+      detail={(row) => row.operation || "No operation"}
+      emptyTitle="No role escalations found"
+      emptyDescription="No privileged role elevation events were detected in the current log window."
+    />
   )
 }
