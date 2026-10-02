@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server"
+import { hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
 import { createClient } from "@/lib/supabase/server"
-import { resolveAdminScope, getDepartmentScope } from "@/lib/admin/rbac"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
 
 const log = logger("api-meeting-artifact-sync")
 
 type AdminScope = NonNullable<Awaited<ReturnType<typeof resolveAdminScope>>>
-
-function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
-  return getDepartmentScope(scope, "general") === null
-}
 
 /**
  * Manual "Sync now" trigger — invokes the sync-meeting-artifacts edge function

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
+import { hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
 import { createClient } from "@/lib/supabase/server"
-import { resolveAdminScope, getDepartmentScope } from "@/lib/admin/rbac"
+import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveOnlineMeetingId, isValidGraphEmail } from "@/lib/graph/meeting-calendar"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
@@ -27,15 +28,13 @@ type MeetingArtifactSource = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
-  return getDepartmentScope(scope, "general") === null
-}
-
 function normalizeRecipients(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   const seen = new Set<string>()
   for (const raw of value) {
-    const email = String(raw || "").trim().toLowerCase()
+    const email = String(raw || "")
+      .trim()
+      .toLowerCase()
     if (email && EMAIL_RE.test(email)) seen.add(email)
   }
   return Array.from(seen)
@@ -87,7 +86,9 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const label = String(body?.label || "").trim()
     const joinWebUrl = String(body?.joinWebUrl || "").trim()
-    const organizerEmail = String(body?.organizerEmail || "").trim().toLowerCase()
+    const organizerEmail = String(body?.organizerEmail || "")
+      .trim()
+      .toLowerCase()
     const recipients = normalizeRecipients(body?.recipients)
     const emailEnabled = body?.emailEnabled !== false
     const isActive = body?.isActive !== false

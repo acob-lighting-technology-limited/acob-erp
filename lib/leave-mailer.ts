@@ -1,4 +1,5 @@
 import { sendNotificationEmailsIndividuallyWithRetry } from "@/lib/notifications/email-gateway"
+import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
 
@@ -20,15 +21,6 @@ export interface LeaveWorkflowEmailPayload {
   details?: LeaveWorkflowDetail[]
   ctaPath?: string
   ctaLabel?: string
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
 }
 
 function getBadgeStyle(variant?: LeaveBadgeVariant): string {

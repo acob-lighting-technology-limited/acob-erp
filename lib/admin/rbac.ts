@@ -327,3 +327,12 @@ export async function requireAdminSectionAccess(section: AdminSection): Promise<
 
   return scope
 }
+
+/**
+ * True when the scope sees every department for the "general" domain (meeting
+ * documents, KSS, reports) — i.e. it may write org-wide report data rather than
+ * only its own departments'.
+ */
+export function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
+  return getDepartmentScope(scope, "general") === null
+}

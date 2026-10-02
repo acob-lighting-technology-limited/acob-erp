@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr"
+import { isFinanceDepartment, normalizeDepartment } from "@/lib/payments/department"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { Buffer } from "node:buffer"
 import { getOneDriveService } from "@/lib/onedrive"
-import { getDepartmentScope, normalizeDepartmentName, resolveAdminScope } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { isOneDrivePaymentDocumentPath } from "@/lib/payments/document-storage"
 
@@ -33,14 +34,6 @@ async function createClient() {
       },
     },
   })
-}
-
-function normalizeDepartment(value: string | null | undefined): string {
-  return normalizeDepartmentName(String(value || "").trim()).toLowerCase()
-}
-
-function isFinanceDepartment(value: string | null | undefined): boolean {
-  return normalizeDepartment(value) === "accounts"
 }
 
 async function assertPaymentAccess(supabase: PaymentsClient, userId: string, paymentId: string) {

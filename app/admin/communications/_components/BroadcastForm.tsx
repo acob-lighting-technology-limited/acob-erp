@@ -1,6 +1,7 @@
 "use client"
 
 import type { ClipboardEvent } from "react"
+import { escapeHtml } from "@/lib/email-templates/utils"
 import { useRef, useEffect, useCallback, useState } from "react"
 import DOMPurify from "dompurify"
 import { toast } from "sonner"
@@ -41,15 +42,6 @@ interface BroadcastFormProps {
   departmentOptions: string[]
   attachments: File[]
   setAttachments: (files: File[]) => void
-}
-
-function escapeHtml(text: string) {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
 }
 
 function parseInlineMarkdown(text: string): string {

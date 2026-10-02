@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr"
+import { isFinanceDepartment, normalizeDepartment } from "@/lib/payments/department"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -39,14 +40,6 @@ function getRelatedDepartmentName(payment: PaymentDepartmentRecord | null | unde
   if (!relation) return null
   if (Array.isArray(relation)) return relation[0]?.name ?? null
   return relation?.name ?? null
-}
-
-function normalizeDepartment(value: string | null | undefined): string {
-  return normalizeDepartmentName(String(value || "").trim()).toLowerCase()
-}
-
-function isFinanceDepartment(value: string | null | undefined): boolean {
-  return normalizeDepartment(value) === "accounts"
 }
 
 // GET /api/payments/[id] - Get a single payment

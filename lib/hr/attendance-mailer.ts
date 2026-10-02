@@ -1,4 +1,5 @@
 import { sendNotificationEmailsIndividuallyWithRetry } from "@/lib/notifications/email-gateway"
+import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 
 export interface AttendanceMailDetail {
@@ -14,15 +15,6 @@ export interface AttendanceMailPayload {
   detailsTitle?: string
   details?: AttendanceMailDetail[]
   ctaPath?: string
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
 }
 
 function buildDetailsCard(title: string, details: AttendanceMailDetail[]): string {
