@@ -298,7 +298,7 @@ function CheckInContent() {
                       autoFocus
                       required
                     />
-                    <QrCode className="text-muted-foreground/60 pointer-events-none absolute top-3.5 right-3.5 h-5 w-5" />
+                    <QrCode className="text-muted-foreground pointer-events-none absolute top-3.5 right-3.5 h-5 w-5" />
                   </div>
                   <p className="text-muted-foreground text-center text-[11px]">
                     Shown on the printed sheet or QR poster in the conference room.

@@ -806,7 +806,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground/80 hover:text-foreground ml-5 text-left text-xs whitespace-nowrap transition-colors"
+                    className="text-muted-foreground hover:text-foreground ml-5 text-left text-xs whitespace-nowrap transition-colors"
                     onClick={() => void handleCopyEmail(r.additional_email || "")}
                     aria-label="Copy additional email"
                   >

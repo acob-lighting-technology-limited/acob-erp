@@ -451,7 +451,7 @@ export function LeaveCalendarView({
                 <div
                   key={day}
                   className={`py-1.5 text-[11px] font-semibold tracking-wider uppercase ${
-                    isWeekend ? "text-muted-foreground/80" : "text-foreground"
+                    isWeekend ? "text-muted-foreground" : "text-foreground"
                   }`}
                 >
                   {day}

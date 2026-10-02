@@ -912,7 +912,7 @@ export function LeaveContent({
                   {leaveTypeMap.get(r.leave_type_id)?.name || "—"}
                 </Badge>
                 <span className="inline-flex items-center gap-1">
-                  <CalendarDays className="text-muted-foreground/70 h-3.5 w-3.5" />
+                  <CalendarDays className="text-muted-foreground h-3.5 w-3.5" />
                   <span>
                     {r.start_date} to {r.end_date} ({r.days_count} day{Number(r.days_count) > 1 ? "s" : ""})
                   </span>

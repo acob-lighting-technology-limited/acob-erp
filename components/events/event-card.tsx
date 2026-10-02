@@ -78,7 +78,7 @@ export function EventCard({ event, onSelect, onEdit }: EventCardProps) {
         {/* Attendees / RSVP info */}
         <div className="bg-muted/40 border-muted flex items-center justify-between rounded-md border p-2 text-[11px]">
           <div className="text-muted-foreground flex items-center gap-1.5">
-            <Users className="text-muted-foreground/70 h-3.5 w-3.5 shrink-0" />
+            <Users className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
             <span>{totalCount > 0 ? `${goingCount} of ${totalCount} attending` : "Open attendance"}</span>
           </div>
           {event.my_rsvp && (

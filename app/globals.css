@@ -37,7 +37,9 @@
 
 :root {
   color-scheme: light;
-  /* Updated color tokens to use green (hsl(120, 100%, 25%)) as primary brand color */
+  /* Brand: ACOB green. `primary` is the brand; `secondary` and `accent` are
+     deliberately *neutral/subtle* surfaces (shadcn semantics): secondary buttons
+     and hover states must not compete with the primary action. */
   --background: oklch(0.955 0.003 75); /* warm light grey — cards float above this */
   --foreground: oklch(0.25 0 0);
   --card: oklch(1 0 0); /* pure white cards */
@@ -46,12 +48,15 @@
   --popover-foreground: oklch(0.25 0 0);
   --primary: oklch(0.45 0.2 142);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.65 0.15 142);
-  --secondary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.94 0.004 75);
+  --secondary-foreground: oklch(0.25 0 0);
   --muted: oklch(0.93 0.003 75); /* slightly darker than background */
-  --muted-foreground: oklch(0.25 0 0);
-  --accent: oklch(0.45 0.2 142);
-  --accent-foreground: oklch(1 0 0);
+  /* Secondary text. Was 0.25 (identical to --foreground), which flattened every
+     label/description to heading weight. 0.48 keeps >= 4.5:1 on card and page. */
+  --muted-foreground: oklch(0.48 0.008 75);
+  /* Hover/highlight surface for ghost & outline buttons and menu/select items. */
+  --accent: oklch(0.95 0.035 142);
+  --accent-foreground: oklch(0.3 0.09 142);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.875 0.002 75); /* slightly more visible borders */
@@ -61,11 +66,32 @@
      — had a border too faint to read in light mode. */
   --input: oklch(0.875 0.002 75);
   --ring: oklch(0.45 0.2 142);
-  --chart-1: oklch(0.45 0.2 142);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.65 0.15 142);
-  --chart-5: oklch(0.55 0.18 142);
+  /* Five distinct hues so multi-series charts stay readable (was 3x green). */
+  --chart-1: oklch(0.52 0.16 142); /* green — brand */
+  --chart-2: oklch(0.58 0.11 195); /* teal */
+  --chart-3: oklch(0.52 0.15 255); /* blue */
+  --chart-4: oklch(0.72 0.15 70); /* amber */
+  --chart-5: oklch(0.58 0.19 18); /* rose */
+
+  /* Status tones — the only way to colour a status (StatusBadge, row tints,
+     alerts). Each has a solid, a readable foreground on the muted tint, and
+     the tint itself. Use bg-success-muted text-success-foreground, never
+     bg-green-100 text-green-700. */
+  --success: oklch(0.55 0.15 150);
+  --success-foreground: oklch(0.36 0.1 150);
+  --success-muted: oklch(0.95 0.04 150);
+  --warning: oklch(0.75 0.15 75);
+  --warning-foreground: oklch(0.42 0.1 60);
+  --warning-muted: oklch(0.96 0.05 85);
+  --info: oklch(0.56 0.14 250);
+  --info-foreground: oklch(0.38 0.12 255);
+  --info-muted: oklch(0.95 0.03 250);
+  --danger: oklch(0.577 0.22 27);
+  --danger-foreground: oklch(0.43 0.17 27);
+  --danger-muted: oklch(0.95 0.035 25);
+  --neutral: oklch(0.6 0.01 75);
+  --neutral-foreground: oklch(0.38 0.01 75);
+  --neutral-muted: oklch(0.94 0.004 75);
   --radius: 0.625rem;
   --sidebar: oklch(0.972 0.003 75);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -126,22 +152,39 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.65 0.15 142);
   --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.45 0.2 142);
+  --secondary: oklch(0.26 0.004 72);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.255 0.003 72);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.65 0.15 142);
-  --accent-foreground: oklch(0.145 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --accent: oklch(0.3 0.05 142);
+  --accent-foreground: oklch(0.93 0.05 142);
+  /* Was L=0.396 with a red foreground — unreadable delete buttons. */
+  --destructive: oklch(0.58 0.2 27);
+  --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.255 0.003 72);
   --input: oklch(0.255 0.003 72);
   --ring: oklch(0.65 0.15 142);
-  --chart-1: oklch(0.65 0.15 142);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.45 0.2 142);
-  --chart-5: oklch(0.55 0.18 142);
+  --chart-1: oklch(0.68 0.16 142);
+  --chart-2: oklch(0.72 0.11 195);
+  --chart-3: oklch(0.68 0.14 255);
+  --chart-4: oklch(0.8 0.14 75);
+  --chart-5: oklch(0.7 0.17 18);
+
+  --success: oklch(0.68 0.15 150);
+  --success-foreground: oklch(0.85 0.1 150);
+  --success-muted: oklch(0.3 0.06 150);
+  --warning: oklch(0.8 0.15 80);
+  --warning-foreground: oklch(0.88 0.1 85);
+  --warning-muted: oklch(0.32 0.06 75);
+  --info: oklch(0.68 0.13 250);
+  --info-foreground: oklch(0.86 0.07 250);
+  --info-muted: oklch(0.3 0.06 255);
+  --danger: oklch(0.65 0.2 25);
+  --danger-foreground: oklch(0.85 0.09 25);
+  --danger-muted: oklch(0.3 0.08 25);
+  --neutral: oklch(0.6 0.01 72);
+  --neutral-foreground: oklch(0.85 0.005 72);
+  --neutral-muted: oklch(0.26 0.004 72);
   --sidebar: oklch(0.19 0.003 72);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.65 0.15 142);
@@ -167,14 +210,11 @@
 .admin-shell {
   --primary: var(--admin-primary);
   --primary-foreground: var(--admin-primary-foreground);
-  /* --secondary drives Badge variant="secondary" (the active filter pills) and
-     --accent drives hover states on ghost/outline buttons and menu items. Both
-     default to the green employee brand, so without these they stayed green on
-     gold admin and navy dept routes. */
-  --secondary: var(--admin-primary);
-  --secondary-foreground: var(--admin-primary-foreground);
-  --accent: var(--admin-primary);
-  --accent-foreground: var(--admin-primary-foreground);
+  /* --accent drives hover/highlight on ghost & outline buttons and menu items:
+     a light tint of the shell colour (gold admin, navy lead), never the solid
+     brand — a solid hover reads as "selected". --secondary stays neutral. */
+  --accent: color-mix(in oklch, var(--admin-primary) 14%, var(--card));
+  --accent-foreground: var(--foreground);
 }
 
 /* ── Lead scope mode: deep navy blue theme ─────────────────────────────────
@@ -238,6 +278,21 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-muted: var(--danger-muted);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-muted: var(--neutral-muted);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

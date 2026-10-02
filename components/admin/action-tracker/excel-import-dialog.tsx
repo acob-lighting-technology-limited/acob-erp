@@ -148,7 +148,7 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete }: ExcelImportDi
 
           <div className="bg-muted space-y-1 rounded-md p-3 text-xs">
             <p className="text-muted-foreground font-semibold">Supported Column Names:</p>
-            <ul className="text-muted-foreground/80 list-inside list-disc">
+            <ul className="text-muted-foreground list-inside list-disc">
               <li>Action Description / Action / Description</li>
               <li>Department</li>
               <li>Priority (low, medium, high, urgent)</li>

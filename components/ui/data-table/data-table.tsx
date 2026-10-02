@@ -1631,7 +1631,7 @@ export function DataTable<TData>({
                       {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
                       <span className="truncate text-[11px] font-medium tracking-tight">{field.label}</span>
                       {canOpen && <ExternalLink className="text-primary/70 ml-auto h-3 w-3 shrink-0" />}
-                      {canCopy && <Copy className="text-muted-foreground/60 ml-auto h-3 w-3 shrink-0" />}
+                      {canCopy && <Copy className="text-muted-foreground ml-auto h-3 w-3 shrink-0" />}
                     </div>
                     <span
                       className={cn(

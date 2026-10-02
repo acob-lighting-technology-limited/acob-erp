@@ -474,7 +474,7 @@ export function PortalReferenceGeneratorContent({
                 </Badge>
                 {(row.department_name || row.assigned_department_name) && (
                   <span className="inline-flex items-center gap-1">
-                    <Building2 className="text-muted-foreground/70 h-3.5 w-3.5" />
+                    <Building2 className="text-muted-foreground h-3.5 w-3.5" />
                     <span>{row.department_name || row.assigned_department_name}</span>
                   </span>
                 )}

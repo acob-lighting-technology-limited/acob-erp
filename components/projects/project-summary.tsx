@@ -74,7 +74,7 @@ const PRIORITY_BADGE: Record<ProjectPriority, string> = {
   critical: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
   high: "border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400",
   medium: "border-border text-muted-foreground",
-  low: "border-border text-muted-foreground/80",
+  low: "border-border text-muted-foreground",
 }
 
 /** Priority, set by hand. Only Critical and High are coloured, so they stand out. */
