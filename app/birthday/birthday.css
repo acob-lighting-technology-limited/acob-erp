@@ -361,10 +361,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Near-black with a hint of green: a missing photo should recede, not shout. */
   background:
-    radial-gradient(circle at 30% 25%, rgb(47 162 87 / 0.45), transparent 55%),
-    linear-gradient(135deg, var(--bd-green-deep), var(--bd-forest));
-  color: var(--bd-cream);
+    radial-gradient(circle at 50% 30%, rgb(47 162 87 / 0.18), transparent 65%),
+    linear-gradient(160deg, #0f1c14, #050806);
+  color: rgb(247 241 225 / 0.85);
   font-family: var(--font-birthday-serif), Georgia, serif;
   font-size: clamp(3rem, 7vw, 5rem);
   font-weight: 800;

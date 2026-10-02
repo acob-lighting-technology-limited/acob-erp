@@ -1,5 +1,5 @@
 /* Minimal Noir — the /birthday3 style option: the card-grid spotlight on pure
-   black with green-ringed round portraits. Overrides birthday.css only. */
+   black with gold-ringed round portraits. Overrides birthday.css only. */
 
 .birthday-page[data-variant="3"] {
   background: #000000;
@@ -27,13 +27,12 @@
   max-width: 100%;
   aspect-ratio: 1;
   border-radius: 999px;
-  outline: 2px solid var(--bd-green-bright);
+  outline: 1.5px solid rgb(232 189 79 / 0.75);
   outline-offset: 6px;
 }
 
 .birthday-page[data-variant="3"] .birthday-card-item--today .birthday-card-photo-wrapper {
-  outline-width: 3px;
-  outline-color: var(--bd-gold);
+  outline: 3px solid var(--bd-gold);
   box-shadow: 0 0 40px 6px rgb(232 189 79 / 0.35);
 }
 

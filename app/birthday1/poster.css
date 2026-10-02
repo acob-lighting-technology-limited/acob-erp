@@ -4,8 +4,8 @@
 
 .birthday-page.bd-poster {
   background:
-    radial-gradient(ellipse at 50% 35%, rgb(47 162 87 / 0.22), transparent 60%),
-    radial-gradient(ellipse at 50% 120%, rgb(47 162 87 / 0.22), transparent 55%), #040604;
+    radial-gradient(ellipse at 50% 35%, rgb(47 162 87 / 0.13), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgb(47 162 87 / 0.12), transparent 55%), #030403;
 }
 
 /* No bunting on the poster — the headline carries the top of the page. */
@@ -37,7 +37,7 @@
 }
 
 .bd1-presents {
-  color: var(--bd-gold);
+  color: var(--bd-text);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.32em;
@@ -58,7 +58,7 @@
   z-index: 1;
   margin-bottom: -0.2em;
   rotate: -5deg;
-  color: var(--bd-gold);
+  color: #ffffff;
   font-family: var(--font-birthday-script), cursive;
   font-size: clamp(2.25rem, min(6vw, 7.5vh), 5.5rem);
   font-weight: 400;
@@ -72,7 +72,7 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  -webkit-text-stroke: 2px var(--bd-green-bright);
+  -webkit-text-stroke: 2px var(--bd-gold);
 }
 
 .bd1-names {
@@ -130,15 +130,14 @@
   aspect-ratio: 3 / 4.4;
   overflow: hidden;
   border-radius: 999px;
-  outline: 2px solid var(--bd-green-bright);
+  outline: 1.5px solid rgb(232 189 79 / 0.75);
   outline-offset: 6px;
   background: var(--bd-forest);
   box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.95);
 }
 
 .bd1-member--today .bd1-portrait {
-  outline-width: 3px;
-  outline-color: var(--bd-gold);
+  outline: 3px solid var(--bd-gold);
   box-shadow:
     0 30px 60px -30px rgb(0 0 0 / 0.95),
     0 0 50px 6px rgb(232 189 79 / 0.4);
