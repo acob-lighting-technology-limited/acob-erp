@@ -336,3 +336,19 @@ export async function requireAdminSectionAccess(section: AdminSection): Promise<
 export function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
   return getDepartmentScope(scope, "general") === null
 }
+
+/**
+ * True when the scope may change general-meeting data (KSS roster, meeting
+ * documents) for a week whose lock deadline has passed. An admin is a
+ * super_admin scoped to their assigned routes, so an admin holding the
+ * reports route gets the same override developer/super_admin have there.
+ *
+ * Deliberately not done in weekly_report_lock_state: that function also locks
+ * every employee's own weekly report submissions, which must stay locked.
+ */
+export function canOverrideReportsWeekLock(scope: AdminScope): boolean {
+  if (scope.scopeMode === "lead") return false
+  const role = normalizeRoleValue(scope.role)
+  if (role === "developer" || role === "super_admin") return true
+  return role === "admin" && Array.isArray(scope.adminRoutes) && scope.adminRoutes.includes("reports.other")
+}

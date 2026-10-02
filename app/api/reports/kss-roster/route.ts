@@ -1,5 +1,5 @@
 import { createServerClient } from "@supabase/ssr"
-import { hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
+import { canOverrideReportsWeekLock, hasGlobalReportsWriteAccess } from "@/lib/admin/rbac"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -175,6 +175,8 @@ export async function GET(request: Request) {
 
     const rows = data || []
     const now = new Date()
+    const scope = await resolveAdminScope(supabase as ReportsClient, user.id)
+    const canOverrideLock = scope ? canOverrideReportsWeekLock(scope) : false
     const withLockState = await Promise.all(
       rows.map(async (row) => {
         const meetingDate = await resolveEffectiveMeetingDateIso(
@@ -197,7 +199,7 @@ export async function GET(request: Request) {
         return {
           ...row,
           meeting_date: meetingDate,
-          is_locked: !Boolean(canMutate),
+          is_locked: !canOverrideLock && !Boolean(canMutate),
           is_outside_grace_window: isOutsideGraceWindow,
         }
       })
@@ -254,7 +256,9 @@ export async function POST(request: Request) {
     })
     const notes = parsed.data.notes ? String(parsed.data.notes) : null
 
-    await assertWeekAllowsRosterCreate(supabase as ReportsClient, meetingWeek, meetingYear)
+    if (!canOverrideReportsWeekLock(scope)) {
+      await assertWeekAllowsRosterCreate(supabase as ReportsClient, meetingWeek, meetingYear)
+    }
 
     const { data: saved, error } = await dataClient
       .from("kss_weekly_roster")
@@ -362,7 +366,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
 
-    await assertWeekIsMutable(supabase as ReportsClient, existing.meeting_week, existing.meeting_year)
+    if (!canOverrideReportsWeekLock(scope)) {
+      await assertWeekIsMutable(supabase as ReportsClient, existing.meeting_week, existing.meeting_year)
+    }
 
     const patch: Record<string, unknown> = {}
     if (typeof parsed.data.department === "string" && parsed.data.department.trim()) {
@@ -461,7 +467,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Roster entry not found" }, { status: 404 })
     }
 
-    await assertWeekIsMutable(supabase as ReportsClient, existing.meeting_week, existing.meeting_year)
+    if (!canOverrideReportsWeekLock(scope)) {
+      await assertWeekIsMutable(supabase as ReportsClient, existing.meeting_week, existing.meeting_year)
+    }
     const { error } = await dataClient.from("kss_weekly_roster").delete().eq("id", id)
     if (error) return serverError(log, error)
 
