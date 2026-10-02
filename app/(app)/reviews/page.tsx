@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { pickCanonicalReview, reviewStatusPriority } from "@/lib/pms/reviews"
 import { unstable_noStore as noStore } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import { getUnifiedPerformanceReviews, type UnifiedReviewRow } from "@/lib/performance/review-data"
@@ -50,28 +51,6 @@ export interface Review {
     first_name: string
     last_name: string
   }
-}
-
-function reviewStatusPriority(status: string | null | undefined) {
-  const normalized = String(status || "").toLowerCase()
-  if (normalized === "completed") return 3
-  if (normalized === "submitted") return 2
-  if (normalized === "draft") return 1
-  return 0
-}
-
-function pickCanonicalReview(reviews: Review[]): Review {
-  return [...reviews].sort((left, right) => {
-    const leftStatus = reviewStatusPriority(left.status)
-    const rightStatus = reviewStatusPriority(right.status)
-    if (rightStatus !== leftStatus) return rightStatus - leftStatus
-
-    const leftHasNarrative = Number(Boolean(left.strengths || left.areas_for_improvement || left.manager_comments))
-    const rightHasNarrative = Number(Boolean(right.strengths || right.areas_for_improvement || right.manager_comments))
-    if (rightHasNarrative !== leftHasNarrative) return rightHasNarrative - leftHasNarrative
-
-    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-  })[0]
 }
 
 function mergeDuplicateReviews(reviews: Review[]): Review[] {
