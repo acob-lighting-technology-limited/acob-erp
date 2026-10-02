@@ -507,10 +507,7 @@ export default function AdminMeetingAttendancePage() {
           trailing: (r) => {
             if (r.is_on_leave) {
               return (
-                <Badge
-                  variant="outline"
-                  className="text-info-foreground gap-1 border-sky-400/50 bg-sky-500/10 text-xs"
-                >
+                <Badge variant="outline" className="text-info-foreground gap-1 border-sky-400/50 bg-sky-500/10 text-xs">
                   <Palmtree className="h-2.5 w-2.5" /> Leave
                 </Badge>
               )

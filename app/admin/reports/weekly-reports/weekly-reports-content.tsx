@@ -520,9 +520,7 @@ export function WeeklyReportsContent({
                 </div>
               </div>
               <div className="space-y-3">
-                <h4 className="text-xs font-black tracking-widest text-emerald-600 uppercase">
-                  Tasks for New Week
-                </h4>
+                <h4 className="text-xs font-black tracking-widest text-emerald-600 uppercase">Tasks for New Week</h4>
                 <div className="space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm dark:border-emerald-900/30">
                   {autoNumberLines(report.tasks_new_week)
                     .split("\n")

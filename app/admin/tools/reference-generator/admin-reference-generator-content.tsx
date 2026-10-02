@@ -641,9 +641,7 @@ export function AdminReferenceGeneratorContent({
                 )}
               </div>
             ),
-            badges: (r) => (
-              <Badge className={cn("text-xs", statusBadgeClass(r.status))}>{statusLabel(r.status)}</Badge>
-            ),
+            badges: (r) => <Badge className={cn("text-xs", statusBadgeClass(r.status))}>{statusLabel(r.status)}</Badge>,
             fields: (r) => [
               {
                 icon: FileText,

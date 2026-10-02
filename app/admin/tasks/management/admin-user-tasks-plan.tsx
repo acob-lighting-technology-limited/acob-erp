@@ -714,9 +714,7 @@ export function AdminUserTasksPlan({
                               <p className="text-muted-foreground line-clamp-1 text-xs">{task.description}</p>
                             ) : null}
                             {task.work_item_number && (
-                              <span className="text-muted-foreground font-mono text-xs">
-                                {task.work_item_number}
-                              </span>
+                              <span className="text-muted-foreground font-mono text-xs">{task.work_item_number}</span>
                             )}
                           </td>
                           <td className="px-3 py-2.5">

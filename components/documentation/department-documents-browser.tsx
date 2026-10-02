@@ -1174,9 +1174,7 @@ export function DepartmentDocumentsBrowser({
             <span className="text-muted-foreground mt-1 text-xs">
               {file.isFolder ? `${file.childCount ?? 0} items` : formatFileSize(file.size)}
             </span>
-            <div className="text-muted-foreground mt-1.5 space-y-0.5 text-center text-xs">
-              {renderActivity(file)}
-            </div>
+            <div className="text-muted-foreground mt-1.5 space-y-0.5 text-center text-xs">{renderActivity(file)}</div>
 
             <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100">
               <DropdownMenu>
@@ -1290,10 +1288,7 @@ export function DepartmentDocumentsBrowser({
                     </span>
                   ) : extension ? (
                     <span
-                      className={cn(
-                        "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
-                        getExtensionColor(extension)
-                      )}
+                      className={cn("shrink-0 rounded px-1.5 py-0.5 text-xs font-medium", getExtensionColor(extension))}
                     >
                       {extension}
                     </span>

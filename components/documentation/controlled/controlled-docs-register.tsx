@@ -161,9 +161,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
         render: (r) => (
           <div className="flex flex-col">
             <span className="text-xs font-medium">v{r.current_version?.version_number ?? "—"}</span>
-            <span className="text-muted-foreground text-xs">
-              {formatDocDate(r.current_version?.effective_date)}
-            </span>
+            <span className="text-muted-foreground text-xs">{formatDocDate(r.current_version?.effective_date)}</span>
           </div>
         ),
         hideOnMobile: true,

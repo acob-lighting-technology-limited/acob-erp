@@ -62,9 +62,7 @@ export function AwayToday({
                     {[item.department, untilLabel(item, todayIso)].filter(Boolean).join(" · ")}
                   </p>
                 </div>
-                <Badge className={`shrink-0 px-1.5 py-0 text-xs ${REASON_CLASSES[item.reason]}`}>
-                  {item.label}
-                </Badge>
+                <Badge className={`shrink-0 px-1.5 py-0 text-xs ${REASON_CLASSES[item.reason]}`}>{item.label}</Badge>
               </li>
             ))}
           </ul>

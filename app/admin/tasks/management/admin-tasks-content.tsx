@@ -895,9 +895,7 @@ export function AdminTasksContent({
                 <h4 className="line-clamp-1 text-sm font-semibold">{r.title}</h4>
                 <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">{r.description}</p>
               </div>
-              {r.kpi_measure && (
-                <div className="text-muted-foreground line-clamp-1 text-xs">🎯 {r.kpi_measure}</div>
-              )}
+              {r.kpi_measure && <div className="text-muted-foreground line-clamp-1 text-xs">🎯 {r.kpi_measure}</div>}
               <div className="flex items-center justify-between border-t pt-2">
                 <div className="flex items-center gap-1.5">
                   <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>

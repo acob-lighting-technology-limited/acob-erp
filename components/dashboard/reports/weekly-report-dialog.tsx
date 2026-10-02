@@ -297,9 +297,7 @@ export function WeeklyReportDialog({ isOpen, onClose, onSuccess, initialData }: 
                 <Label className="capitalize">
                   {f.replace(/_/g, " ")}
                   {f === "challenges" && (
-                    <span className="text-muted-foreground ml-1 font-normal normal-case">
-                      (leave blank if none)
-                    </span>
+                    <span className="text-muted-foreground ml-1 font-normal normal-case">(leave blank if none)</span>
                   )}
                 </Label>
                 <Textarea

@@ -434,9 +434,7 @@ export function AdminActivityTabs({
                       <span className="text-muted-foreground text-xs">
                         {shortDate(l.start_date)} – {shortDate(l.end_date)}
                       </span>
-                      {l.days_count != null && (
-                        <span className="text-muted-foreground text-xs">{l.days_count}d</span>
-                      )}
+                      {l.days_count != null && <span className="text-muted-foreground text-xs">{l.days_count}d</span>}
                     </div>
                   </ItemRow>
                 ))}
