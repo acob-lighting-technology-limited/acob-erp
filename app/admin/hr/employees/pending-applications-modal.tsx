@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { Loader2, CheckCircle, UserPlus, ChevronRight, ShieldCheck, Hash, Mail, RefreshCw } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { useContractCategories } from "@/hooks/use-contract-categories"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { cn, formatName } from "@/lib/utils"
@@ -94,7 +94,6 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
 
   const { departments: DEPARTMENTS = [] } = useDepartments()
 
-  const [supabase] = useState(() => createClient())
   const queryClient = useQueryClient()
 
   const { data: pendingUsers = [], isLoading } = useQuery({
@@ -105,19 +104,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
 
   const [hireDate, setHireDate] = useState(toLocalISODate())
 
-  const { data: contractCategories = [] } = useQuery<any[]>({
-    queryKey: ["contract-categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contract_categories")
-        .select("*")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true })
-      if (error) throw error
-      return data || []
-    },
-    enabled: isOpen,
-  })
+  const { data: contractCategories = [] } = useContractCategories(isOpen)
 
   const { data: approvalEmailPreview, isLoading: isLoadingApprovalPreview } = useQuery<ApprovalEmailPreview>({
     queryKey: ["pending-approval-email-preview", selectedUser?.id],
@@ -197,30 +184,23 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
     setIsProcessing(true)
 
     try {
-      // 1. Update the record in pending_users with the edited details
-      const { error: updateError } = await supabase
-        .from("pending_users")
-        .update({
-          first_name: formatName(firstName),
-          last_name: formatName(lastName),
-          other_names: otherNames ? formatName(otherNames) : null,
-          department: department,
-          designation: designation,
-          company_email: companyEmail,
-          personal_email: personalEmailState,
-          phone_number: phoneNumber,
-          residential_address: residentialAddress,
-          office_location: officeLocation || null,
-        })
-        .eq("id", selectedUser.id)
-
-      if (updateError) throw updateError
-
-      // 2. Call the approve-user API route
+      // Approve — the route saves the corrected details first, server-side.
       const response = await apiFetch("/api/admin/approve-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          details: {
+            first_name: formatName(firstName),
+            last_name: formatName(lastName),
+            other_names: otherNames ? formatName(otherNames) : null,
+            department,
+            designation,
+            company_email: companyEmail,
+            personal_email: personalEmailState,
+            phone_number: phoneNumber || null,
+            residential_address: residentialAddress || null,
+            office_location: officeLocation || null,
+          },
           pendingUserId: selectedUser.id,
           hireDate: hireDate,
           employmentType: employmentType,

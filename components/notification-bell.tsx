@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { deleteNotifications, markAllNotificationsRead, setNotificationsRead } from "@/lib/notifications/client"
 import { logger } from "@/lib/logger"
 import { formatWATDate } from "@/lib/utils/date"
 
@@ -236,13 +237,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   // Mark as read
   const markAsRead = async (notificationId: string) => {
     try {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true, read_at: new Date().toISOString() })
-        .eq("id", notificationId)
-
-      if (error) throw error
-
+      await setNotificationsRead([notificationId], true)
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
     } catch (error: unknown) {
       log.error("Error marking as read:", error)
@@ -252,18 +247,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   // Mark all as read
   const markAllAsRead = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { error } = await supabase.rpc("mark_notifications_read", {
-        p_user_id: user.id,
-        p_notification_ids: null,
-      })
-
-      if (error) throw error
-
+      await markAllNotificationsRead()
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
       toast.success("All notifications marked as read")
     } catch (error: unknown) {
@@ -275,10 +259,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
   // Delete notification
   const deleteNotification = async (notificationId: string) => {
     try {
-      const { error } = await supabase.from("notifications").delete().eq("id", notificationId)
-
-      if (error) throw error
-
+      await deleteNotifications([notificationId])
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
     } catch (error: unknown) {
       log.error("Error deleting notification:", error)

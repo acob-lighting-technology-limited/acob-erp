@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { apiFetch } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -26,23 +26,20 @@ export function NotificationPreferencesForm({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
 
     try {
-      // Upsert, because most users have never had a preferences row: the
-      // delivery gate defaults a missing row to "allowed", so opting out has
-      // to create the row rather than update a row that isn't there.
-      const { error } = await supabase.from("notification_preferences").upsert(
-        {
-          user_id: userId,
-          email_enabled: emailNotifications,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
-
-      if (error) throw error
+      // The settings route upserts the row (most users have never had one; the
+      // delivery gate treats a missing row as "allowed").
+      const res = await apiFetch("/api/settings/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ global: { email_enabled: emailNotifications } }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || "Failed to update notification preferences")
+      }
 
       toast.success("Notification preferences updated!")
     } catch (error: unknown) {

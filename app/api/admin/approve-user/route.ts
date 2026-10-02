@@ -25,6 +25,21 @@ const ApproveUserSchema = z.object({
   employmentType: z.enum(["full_time", "part_time", "contract"]).optional().default("full_time"),
   contractCategoryCode: z.string().trim().nullable().optional(),
   nyscCdsDay: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]).nullable().optional(),
+  /** Details the reviewer corrected in the approval dialog, written before approval. */
+  details: z
+    .object({
+      first_name: z.string().trim().min(1),
+      last_name: z.string().trim().min(1),
+      other_names: z.string().trim().nullable(),
+      department: z.string().trim().min(1),
+      designation: z.string().trim().min(1),
+      company_email: z.string().trim().toLowerCase().email(),
+      personal_email: z.string().trim().toLowerCase().email(),
+      phone_number: z.string().trim().nullable(),
+      residential_address: z.string().trim().nullable(),
+      office_location: z.string().trim().nullable(),
+    })
+    .optional(),
 })
 
 export async function POST(req: Request) {
@@ -138,24 +153,44 @@ export async function POST(req: Request) {
     } = parsed.data
 
     // 1. Fetch Pending User Details
-    const { data: pendingUser, error: fetchError } = await supabaseAdmin
+    const { data: originalPendingUser, error: fetchError } = await supabaseAdmin
       .from("pending_users")
       .select("*")
       .eq("id", pendingUserId)
       .single()
 
-    if (fetchError || !pendingUser) {
+    if (fetchError || !originalPendingUser) {
       return NextResponse.json({ error: "Pending user not found" }, { status: 404 })
     }
 
+    // A lead may only approve applicants for — and move them between — the
+    // departments they lead.
     if (!callerIsAdminLike) {
       const managedDepartments = Array.from(
         new Set([callerProfile?.department, ...(callerProfile?.lead_departments || [])].filter(Boolean) as string[])
       ).map((departmentName) => normalizeDepartmentName(departmentName))
-      const pendingDepartment = normalizeDepartmentName(String(pendingUser.department || ""))
-      if (managedDepartments.length === 0 || !managedDepartments.includes(pendingDepartment)) {
+      const departmentsTouched = [originalPendingUser.department, parsed.data.details?.department]
+        .filter(Boolean)
+        .map((name) => normalizeDepartmentName(String(name)))
+      if (managedDepartments.length === 0 || departmentsTouched.some((d) => !managedDepartments.includes(d))) {
         return NextResponse.json({ error: "Forbidden: Department scope mismatch" }, { status: 403 })
       }
+    }
+
+    // 1a. Apply the reviewer's corrections (previously written from the browser).
+    let pendingUser = originalPendingUser
+    if (parsed.data.details) {
+      const { data: updated, error: detailsError } = await supabaseAdmin
+        .from("pending_users")
+        .update(parsed.data.details)
+        .eq("id", pendingUserId)
+        .select("*")
+        .single()
+      if (detailsError || !updated) {
+        log.error({ err: detailsError?.message }, "Failed to save corrected applicant details")
+        return NextResponse.json({ error: "Could not save the applicant's details" }, { status: 500 })
+      }
+      pendingUser = updated
     }
 
     // 1b. Validate Required Fields
