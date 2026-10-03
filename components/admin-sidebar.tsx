@@ -66,6 +66,7 @@ import {
   type AdminRouteKeyV2,
 } from "@/lib/admin/policy-v2"
 import { useDepartmentCode } from "@/hooks/use-department-code"
+import { usePublishNavPages } from "@/lib/nav/page-index"
 
 interface AdminSidebarProps {
   user?: {
@@ -742,6 +743,8 @@ export function AdminSidebar({
       items: filteredNavigation.filter((item) => item.section === section.key),
     }))
     .filter((section) => section.items.length > 0)
+  // The navbar search offers these pages too, so it never lists one the viewer cannot open.
+  usePublishNavPages(groupedNavigation)
 
   const activeTopLevelHref = useMemo(() => {
     const shellRoot = deptId ? `/dept/${deptId}` : "/admin"

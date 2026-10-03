@@ -55,6 +55,7 @@ import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
 import { useDepartmentCode } from "@/hooks/use-department-code"
 import { isAnniversaryPeriod } from "@/lib/seasonal-branding"
+import { usePublishNavPages } from "@/lib/nav/page-index"
 
 interface SidebarProps {
   user?: {
@@ -342,6 +343,9 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
       items: withMdDesk,
     }
   })
+
+  // The navbar search offers these pages too, so it never lists one the viewer cannot open.
+  usePublishNavPages(visibleSections)
 
   // One winner, so a parent and its child never highlight at the same time —
   // the admin sidebar has always scored matches this way.

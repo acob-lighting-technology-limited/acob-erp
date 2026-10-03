@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
+import { matchNavPages, useNavPages } from "@/lib/nav/page-index"
 
 type SearchType =
   | "profile"
@@ -139,6 +140,17 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
     staleTime: 30 * 1000,
   })
 
+  // Pages from the sidebar the viewer is looking at — instant, no request.
+  const navPages = useNavPages()
+  const pageMatches = useMemo(() => matchNavPages(navPages, query), [navPages, query])
+
+  const goTo = (href: string) => {
+    router.push(href)
+    setOpen(false)
+    setQuery("")
+    setDebouncedQuery("")
+  }
+
   const handleResultClick = (result: SearchResult) => {
     router.push(result.href)
     setOpen(false)
@@ -188,7 +200,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
             <div className="relative">
               <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
               <Input
-                placeholder="Search employees, assets, tasks, tickets, leave, correspondence, payments..."
+                placeholder="Search pages, employees, assets, tasks, tickets, leave, payments..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="focus-visible:ring-primary focus-visible:border-primary/50 pl-9"
@@ -218,7 +230,27 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
               </div>
             )}
 
-            {!loading && query && results.length === 0 && (
+            {pageMatches.length > 0 && (
+              <div className="mb-3 space-y-1">
+                <p className="text-muted-foreground px-1 text-xs font-medium">Pages</p>
+                {pageMatches.map((page) => {
+                  const Icon = page.icon ?? FileText
+                  return (
+                    <button
+                      key={page.href}
+                      onClick={() => goTo(page.href)}
+                      className="group hover:bg-primary/5 flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm transition-colors"
+                    >
+                      <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate font-medium">{page.label}</span>
+                      <span className="text-muted-foreground truncate text-xs">{page.trail}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {!loading && query && results.length === 0 && pageMatches.length === 0 && (
               <div className="text-muted-foreground py-8 text-center text-sm">
                 No results found for &quot;{query}&quot;
               </div>
