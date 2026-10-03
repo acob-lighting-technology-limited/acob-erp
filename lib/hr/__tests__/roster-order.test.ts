@@ -64,9 +64,9 @@ test("departures: newest clock-out first, still-in at the bottom alphabetically"
   )
 })
 
-test("a past day is alphabetical", () => {
+test("a past day keeps the departures order instead of resetting to alphabetical", () => {
   assert.deepEqual(
     orderRoster(rows, null).map((r) => r.user_name),
-    ["Ada", "Ayo", "Bola", "Chidi", "Dayo"]
+    ["Chidi", "Dayo", "Ada", "Ayo", "Bola"]
   )
 })
