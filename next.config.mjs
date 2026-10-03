@@ -35,7 +35,8 @@ const securityHeaders = [
   //   - style-src: Tailwind CSS + Radix UI inject inline styles at runtime.
   //     Remove once CSS-in-JS is eliminated or a nonce/hash approach is used.
   //   - script-src 'unsafe-inline': Next.js inlines small hydration scripts.
-  //     Remove once Next.js supports nonce-based CSP (tracked roadmap item).
+  //     A stricter nonce policy is layered on top by proxy.ts when CSP_NONCE=on
+  //     (see lib/security/csp.ts); this baseline stays as the fallback.
   //   - script-src 'unsafe-eval': Required by xlsx, jspdf, and docx packages
   //     which use eval() internally for formula parsing / rendering. Cannot be
   //     removed until those libs ship eval-free builds or are replaced.

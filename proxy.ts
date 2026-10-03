@@ -1,6 +1,7 @@
 import { updateSession } from "@/lib/supabase/middleware"
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
+import { buildNonceCsp, createNonce, isNonceCspEnabled } from "@/lib/security/csp"
 
 const LEGACY_HOSTS = new Set(["acob-erp.vercel.app", "erp.acoblighting.com"])
 const CANONICAL_HOST = "matrix.acoblighting.com"
@@ -55,6 +56,17 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/profile"
     return NextResponse.redirect(url)
+  }
+
+  // Pages: attach a per-request nonce CSP when it is switched on (see lib/security/csp.ts).
+  if (isNonceCspEnabled()) {
+    const nonce = createNonce()
+    const policy = buildNonceCsp(nonce)
+    request.headers.set("x-nonce", nonce)
+    request.headers.set("content-security-policy", policy)
+    const response = await updateSession(request)
+    response.headers.set("Content-Security-Policy", policy)
+    return response
   }
 
   // Continue with normal session management
