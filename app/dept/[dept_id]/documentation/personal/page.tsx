@@ -7,6 +7,9 @@ import { AdminDocumentationContent } from "@/app/admin/documentation/admin-docum
 import type { Documentation, UserProfile, employeeMember } from "@/app/admin/documentation/admin-documentation-content"
 import type { UserRole } from "@/types/database"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }
@@ -67,21 +70,23 @@ export default async function DeptPersonalDocumentationPage({ params }: Props) {
   }
 
   return (
-    <AdminDocumentationContent
-      initialDocumentation={documentation}
-      initialemployee={(employeeData || []) as employeeMember[]}
-      userProfile={userProfile}
-      departmentDocs={{
-        initialPath: "/",
-        rootLabel: "Department Libraries",
-        enabled: false,
-        lockToInitialPath: false,
-        accessMode: "admin",
-      }}
-      defaultTab="knowledge-docs"
-      hideTabList={true}
-      backLinkHref={`/dept/${dept_id}/documentation`}
-      backLinkLabel="Back to Documentation"
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminDocumentationContent
+        initialDocumentation={documentation}
+        initialemployee={(employeeData || []) as employeeMember[]}
+        userProfile={userProfile}
+        departmentDocs={{
+          initialPath: "/",
+          rootLabel: "Department Libraries",
+          enabled: false,
+          lockToInitialPath: false,
+          accessMode: "admin",
+        }}
+        defaultTab="knowledge-docs"
+        hideTabList={true}
+        backLinkHref={`/dept/${dept_id}/documentation`}
+        backLinkLabel="Back to Documentation"
+      />
+    </TablePageLayoutProvider>
   )
 }

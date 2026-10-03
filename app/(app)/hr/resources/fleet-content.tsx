@@ -49,6 +49,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type FleetResource = {
   id: string
   name: string
@@ -472,6 +474,7 @@ export function FleetContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Resource Booking Center"
       description="Book shared resources like transport and spaces without time clashes."
       icon={Car}

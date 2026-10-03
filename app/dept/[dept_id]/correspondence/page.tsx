@@ -5,6 +5,9 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { AdminReferenceGeneratorContent } from "@/app/admin/correspondence/admin-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface DeptCorrespondencePageProps {
   params: Promise<{ dept_id: string }>
 }
@@ -30,10 +33,12 @@ export default async function DeptCorrespondencePage({ params }: DeptCorresponde
   )
 
   return (
-    <AdminReferenceGeneratorContent
-      initialRecords={scopedRecords}
-      lockedDepartment={scope.deptName}
-      backLinkHref={`/dept/${dept_id}`}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminReferenceGeneratorContent
+        initialRecords={scopedRecords}
+        lockedDepartment={scope.deptName}
+        backLinkHref={`/dept/${dept_id}`}
+      />
+    </TablePageLayoutProvider>
   )
 }

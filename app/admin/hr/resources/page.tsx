@@ -23,6 +23,8 @@ import type { FleetAttachment, FleetBooking, FleetResource } from "./_components
 import { apiFetch } from "@/lib/api-client"
 import { formatDateTime } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 async function fetchFleetResources(): Promise<FleetResource[]> {
   const response = await apiFetch("/api/admin/hr/fleet/resources")
   const payload = await response.json()
@@ -325,6 +327,7 @@ export default function AdminFleetPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Resource Booking Admin"
       description="Manage bookable resources and review booking applications"
       icon={CalendarCheck2}

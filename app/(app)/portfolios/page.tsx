@@ -5,6 +5,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PortfoliosContent } from "@/app/admin/portfolios/_components/portfolios-content"
 import { logger } from "@/lib/logger"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("app-app-portfolios")
 
 export const metadata: Metadata = {
@@ -41,5 +44,9 @@ export default async function AppPortfoliosPage() {
     department: p.department || "",
   }))
 
-  return <PortfoliosContent isAdmin={false} profiles={managerOptions} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PortfoliosContent isAdmin={false} profiles={managerOptions} />
+    </TablePageLayoutProvider>
+  )
 }

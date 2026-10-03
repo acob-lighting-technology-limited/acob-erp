@@ -30,6 +30,8 @@ import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { useHrProfiles } from "@/hooks/use-hr-profiles"
 import { formatDate, personName } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type Profile = {
   id: string
   first_name: string | null
@@ -230,6 +232,7 @@ export default function PeerFeedbackPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Peer Feedback"
       description="Give feedback to colleagues and view feedback you've received this cycle."
       icon={MessageSquare}

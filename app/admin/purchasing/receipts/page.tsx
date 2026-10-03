@@ -11,6 +11,8 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { formatDate } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface Receipt {
   id: string
   receipt_number: string
@@ -176,6 +178,7 @@ export default function ReceiptsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Goods Receipts"
       description="Track received deliveries, linked purchase orders, and inbound item volume."
       icon={Package}

@@ -35,6 +35,8 @@ import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface ReviewsContentProps {
   initialReviews: Review[]
   currentUserId: string
@@ -294,6 +296,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Performance Reviews"
       description="View and acknowledge your quarterly and annual evaluations."
       icon={FileText}

@@ -16,6 +16,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type PlanAction = {
   id: string
   title: string
@@ -230,6 +232,7 @@ export default function DevelopmentPlansPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Development Plans"
       description="Your personal development goals and action steps, set by your manager."
       icon={BookOpen}

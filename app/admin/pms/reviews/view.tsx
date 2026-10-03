@@ -24,6 +24,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { personName } from "@/lib/format"
 import { StatusBadge } from "@/components/ui/patterns/status-badge"
 
+import { layout as tablePageLayout } from "./_layout"
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ReviewRow = {
@@ -770,6 +772,7 @@ export function AdminPmsReviewsPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="PMS Reviews"
       description="Manage quarterly performance reviews by individual, department, or cycle."
       icon={FileText}

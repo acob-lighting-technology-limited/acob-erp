@@ -55,6 +55,8 @@ import {
   type TaskExportMeta,
 } from "@/lib/tasks/export"
 
+import { layout as tablePageLayout } from "../_layout"
+
 const log = logger("tasks-management-admin-tasks-content")
 
 export type { Task } from "@/types/task"
@@ -586,6 +588,7 @@ export function AdminTasksContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title={activeTab === "user_plan" ? "User Task Plan & Workload" : "Task Management"}
       description={
         activeTab === "user_plan"

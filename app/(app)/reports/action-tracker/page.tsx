@@ -51,6 +51,8 @@ import {
   type DepartmentSummaryStatus,
 } from "@/lib/reports/action-tracker-display"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("dashboard-reports-action-tracker")
 
 function getDisabledEditReason(task: {
@@ -680,6 +682,7 @@ export default function ActionTrackerPortal() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Action Tracker"
       description="Monitor and update weekly departmental action points and management directives."
       icon={FileSpreadsheet}

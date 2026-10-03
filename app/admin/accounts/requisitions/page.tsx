@@ -24,6 +24,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
 import { formatCurrency } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const TABS: DataTableTab[] = [
   { key: "requisitions", label: "Requisitions", icon: FileCheck2 },
   { key: "funding", label: "Funding Categories", icon: Wallet },
@@ -334,6 +336,7 @@ export default function AdminRequisitionsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Company Requisitions (Accounts Overview)"
       description="Manage, review, and audit company payment request forms, funding lines, and approvals."
       icon={FileCheck2}

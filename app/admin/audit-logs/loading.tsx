@@ -1,15 +1,6 @@
 import { TablePageSkeleton } from "@/components/skeletons"
+import { layout } from "./_layout"
 
-export default function AuditLogsLoading() {
-  return (
-    <TablePageSkeleton
-      filters={3}
-      columns={6}
-      rows={10}
-      showStats={true}
-      statCards={4}
-      actions={1}
-      showBackLink={true}
-    />
-  )
+export default function Loading() {
+  return <TablePageSkeleton {...layout} />
 }

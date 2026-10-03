@@ -26,6 +26,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("assets-issues")
 
 interface AssetIssue {
@@ -305,6 +307,7 @@ export function AssetIssuesPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Asset Issues"
       description="Track and manage asset issues across the organization."
       icon={AlertCircle}

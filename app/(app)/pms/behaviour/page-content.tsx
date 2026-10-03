@@ -10,6 +10,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import type { ReviewCycleOption } from "../_lib"
 import { useCycleUrlFilters } from "../_components/cycle-selector"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type BehaviourRow = {
   competency: string
   value: number
@@ -94,6 +96,7 @@ export function BehaviourContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="PMS Behaviour"
       description="Your behaviour review by competency with manager notes."
       icon={ShieldCheck}

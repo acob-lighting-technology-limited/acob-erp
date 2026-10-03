@@ -45,6 +45,8 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface LeaveContentProps {
   currentUserId: string
   initialRequests: LeaveRequest[]
@@ -784,6 +786,7 @@ export function LeaveContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Leave Center"
       description="Track eligibility, submit requests, and manage approvals in one view."
       icon={CalendarDays}

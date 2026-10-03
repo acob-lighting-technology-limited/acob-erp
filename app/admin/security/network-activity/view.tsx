@@ -9,6 +9,8 @@ import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNumber } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface ArchivedDay {
   date: string
   files: number
@@ -133,6 +135,7 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Network Activity"
       description={`Office network logs, archived daily to SharePoint and kept for ${data?.retentionMonths ?? 12} months. Download a day to investigate it in Excel.`}
       icon={ShieldCheck}

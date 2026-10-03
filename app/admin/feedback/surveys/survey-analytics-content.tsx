@@ -17,6 +17,8 @@ import type { AdminSurveyItem } from "@/app/api/admin/feedback/surveys/route"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const RATING_OPTIONS = [
   { value: "5", label: "5 Stars (Excellent)" },
   { value: "4", label: "4 Stars (Good)" },
@@ -247,6 +249,7 @@ export function SurveyAnalyticsContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="System Satisfaction & Adoption Surveys"
       description="Monitor post-deployment usability, system speed, module adoption, and employee feedback."
       icon={Star}

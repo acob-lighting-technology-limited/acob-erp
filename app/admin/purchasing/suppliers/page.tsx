@@ -25,6 +25,8 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { SupplierFormDialog } from "./_components/supplier-form-dialog"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface Supplier {
   id: string
   name: string
@@ -196,6 +198,7 @@ export default function SuppliersPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Suppliers"
       description="Manage vendor records, contact readiness, and supplier status."
       icon={Users}

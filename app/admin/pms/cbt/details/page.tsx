@@ -13,6 +13,8 @@ import { apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type AttemptRow = {
   id: string
   created_at: string
@@ -189,6 +191,7 @@ export default function CbtDetailsLogPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="CBT Log Auditing"
       description="Audit logins and detail records entered by candidates for standalone CBT tests."
       icon={FileClock}

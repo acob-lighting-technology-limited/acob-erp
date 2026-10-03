@@ -28,6 +28,8 @@ import type { Feedback } from "./page"
 import type { SystemSatisfactionSurvey } from "@/types/survey"
 import { FEEDBACK_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface FeedbackContentProps {
   initialFeedback: Feedback[]
   initialSurvey?: SystemSatisfactionSurvey | null
@@ -153,6 +155,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Feedback & Suggestions"
       description="Share concerns, complaints, suggestions, or required items with management."
       icon={MessageSquare}

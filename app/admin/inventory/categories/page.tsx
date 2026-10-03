@@ -27,6 +27,8 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface Category {
   id: string
   name: string
@@ -240,6 +242,7 @@ export default function CategoriesPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Categories"
       description="Organize products by category and track how each category is being used."
       icon={Boxes}

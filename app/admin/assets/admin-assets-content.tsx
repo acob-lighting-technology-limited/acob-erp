@@ -63,6 +63,8 @@ import { toLocalDateTimeInput, toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { ASSET_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("assets-admin-assets-content")
 
 async function fetchAssetTypes(): Promise<{ label: string; code: string; requiresSerialModel: boolean }[]> {
@@ -1436,6 +1438,7 @@ export function AdminAssetsContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Asset Management"
       description="Manage asset inventory, assignments, history, and issue tracking."
       icon={Package}

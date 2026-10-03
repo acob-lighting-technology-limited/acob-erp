@@ -2,6 +2,9 @@ import { redirect } from "next/navigation"
 import { AdminDocumentationContent } from "../admin-documentation-content"
 import { getAdminDocumentationData, type AdminDocumentationDataResult } from "../data"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default async function AdminPersonalDocumentationPage() {
   const data = await getAdminDocumentationData()
 
@@ -12,15 +15,17 @@ export default async function AdminPersonalDocumentationPage() {
   const pageData = data as Exclude<AdminDocumentationDataResult, { redirect: "/auth/login" | "/profile" }>
 
   return (
-    <AdminDocumentationContent
-      initialDocumentation={pageData.documentation}
-      initialemployee={pageData.employee}
-      userProfile={pageData.userProfile}
-      departmentDocs={pageData.departmentDocs}
-      defaultTab="knowledge-docs"
-      hideTabList={true}
-      backLinkHref="/admin/documentation"
-      backLinkLabel="Back to Documentation"
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminDocumentationContent
+        initialDocumentation={pageData.documentation}
+        initialemployee={pageData.employee}
+        userProfile={pageData.userProfile}
+        departmentDocs={pageData.departmentDocs}
+        defaultTab="knowledge-docs"
+        hideTabList={true}
+        backLinkHref="/admin/documentation"
+        backLinkLabel="Back to Documentation"
+      />
+    </TablePageLayoutProvider>
   )
 }

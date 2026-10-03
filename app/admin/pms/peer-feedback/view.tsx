@@ -18,6 +18,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { personName } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type Profile = {
   id: string
   first_name: string | null
@@ -254,6 +256,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Peer Feedback"
       description="Review peer feedback submissions across employees, quarters, and reviewers."
       icon={MessageSquare}

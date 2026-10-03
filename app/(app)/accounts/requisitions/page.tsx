@@ -22,6 +22,8 @@ import { useRequisitions } from "@/hooks/use-requisitions"
 import { useMyProfile } from "@/hooks/use-my-profile"
 import { formatCurrency } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const TABS: DataTableTab[] = [
   { key: "my", label: "My Requisitions" },
   { key: "approvals", label: "Pending Approvals" },
@@ -201,6 +203,7 @@ export default function RequisitionListPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Requisition Portal"
       description="Create, track, and approve digital ACOB payment request forms."
       icon={FileCheck2}

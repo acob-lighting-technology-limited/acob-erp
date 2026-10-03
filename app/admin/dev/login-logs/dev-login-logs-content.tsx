@@ -34,6 +34,8 @@ import { Input } from "@/components/ui/input"
 import { apiJson } from "@/lib/api-client"
 import { formatNumber } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type DevLoginLogRow = {
   id: string
   user_id: string | null
@@ -728,6 +730,7 @@ export function DevLoginLogsContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Developer Login Logs"
       description="Monitor successful sign-ins with network and actor context."
       backLink={{ href: "/admin/dev", label: "Back to DEV" }}

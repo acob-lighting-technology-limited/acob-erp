@@ -14,6 +14,8 @@ import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { MeetingSyncModal } from "./meeting-sync-modal"
 
+import { layout as tablePageLayout } from "../_layout"
+
 type ArtifactTab = "attendance" | "transcript"
 
 type Row = {
@@ -150,6 +152,7 @@ export function MeetingRecordsContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Meeting Records"
       description="Teams attendance reports and transcripts, auto-synced per meeting week."
       icon={Users}

@@ -14,6 +14,8 @@ import { useRouter } from "next/navigation"
 import { useRequisitions } from "@/hooks/use-requisitions"
 import { formatCurrency } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 function StageBadge({ requisition }: { requisition: Requisition }) {
   if (requisition.status === "approved") {
     return (
@@ -203,6 +205,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title={`${deptName} Requisitions`}
       description={`Manage and track payment request forms for ${deptName}.`}
       icon={FileCheck2}

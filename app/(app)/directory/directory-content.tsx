@@ -32,6 +32,8 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { fetchDirectoryRows } from "@/lib/directory/client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type DirectoryRow = {
   id: string
   first_name: string | null
@@ -326,6 +328,7 @@ export function DirectoryContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Staff Directory"
       description="Contact details for everyone at ACOB — search by name, department or office."
       tabs={tabs}

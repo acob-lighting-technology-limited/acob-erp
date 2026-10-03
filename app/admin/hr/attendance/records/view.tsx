@@ -32,6 +32,8 @@ import { StatusBadge, labelSource } from "../_components/status-badge"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface AttendanceRecord {
   id: string
   user_id: string
@@ -344,6 +346,7 @@ export function AdminAttendanceRecordsPage({
   return (
     <>
       <DataTablePage
+        layout={tablePageLayout}
         title="Attendance Records"
         description="View and fix individual attendance records."
         icon={Calendar}

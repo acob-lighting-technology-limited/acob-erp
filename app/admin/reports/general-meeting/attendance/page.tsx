@@ -35,6 +35,8 @@ import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
 import { formatTime as formatClockTime } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 function formatTime(value: string | null): string {
   if (!value) return "—"
 
@@ -413,6 +415,7 @@ export default function AdminMeetingAttendancePage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="General Meeting Attendance"
       description="Real-time biometric-verified attendance tracking for General Meeting & KSS."
       icon={UserCheck}

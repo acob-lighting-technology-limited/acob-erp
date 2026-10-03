@@ -13,6 +13,8 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type BonusQuestionDetail = {
   id: string
   prompt: string
@@ -134,6 +136,7 @@ export default function AdminPmsCbtExtraScoresPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="CBT Bonus Question Scores"
       description="Only visible here — bonus/joke question results never appear on the candidate's own CBT results or score."
       icon={Brain}

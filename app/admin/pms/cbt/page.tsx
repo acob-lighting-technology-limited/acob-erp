@@ -28,6 +28,8 @@ import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { personName } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type TabKey = "individual" | "department" | "cycle"
 
 type ReviewCycle = {
@@ -687,6 +689,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="PMS CBT"
       description="Review CBT results by employee, department, or cycle, then open the question manager to add or edit CBT tests."
       icon={Brain}

@@ -7,6 +7,9 @@ import { getCurrentUserPmsData } from "./_lib"
 import { CycleSelector } from "./_components/cycle-selector"
 import { formatScore } from "@/lib/format"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default async function PmsPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
   const { profile, score, cycles, activeCycleId, attendance, latestReview } = await getCurrentUserPmsData(cycle_id)
@@ -78,87 +81,89 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
   ]
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="PMS"
-        description={`Track your live performance scores across KPI, goals, attendance, CBT, behaviour, and reviews${profile?.department ? ` in ${profile.department}` : ""}.`}
-        icon={Award}
-        backLink={{ href: "/profile", label: "Back to Dashboard" }}
-        actions={<CycleSelector cycles={cycles} activeCycleId={activeCycleId} />}
-      />
-
-      <StatGrid>
-        <StatCard
-          variant="compact"
-          title="Overall PMS"
-          value={formatScore(score.final_score)}
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PageWrapper maxWidth="full" background="gradient">
+        <PageHeader
+          title="PMS"
+          description={`Track your live performance scores across KPI, goals, attendance, CBT, behaviour, and reviews${profile?.department ? ` in ${profile.department}` : ""}.`}
           icon={Award}
-          description="Live overall score"
+          backLink={{ href: "/profile", label: "Back to Dashboard" }}
+          actions={<CycleSelector cycles={cycles} activeCycleId={activeCycleId} />}
         />
-        <StatCard
-          variant="compact"
-          title="KPI"
-          value={formatScore(score.kpi_score)}
-          icon={Target}
-          description="Weighted task score"
-        />
-        <StatCard
-          variant="compact"
-          title="Attendance"
-          value={formatScore(score.attendance_score)}
-          icon={Clock3}
-          description={`${attendance.presentDays}/${attendance.trackedDays || 0} recent days positive`}
-        />
-        <StatCard
-          variant="compact"
-          title="CBT"
-          value={formatScore(score.cbt_score)}
-          icon={Brain}
-          description="Learning score in PMS"
-        />
-        <StatCard
-          variant="compact"
-          title="Behaviour"
-          value={formatScore(score.behaviour_score)}
-          icon={ShieldCheck}
-          description="Manager and peer feedback blend"
-        />
-      </StatGrid>
 
-      <Section title="Performance Areas" description="Open each PMS area to see the live score details behind it.">
-        <ModuleHubGrid
-          cards={pmsAreaCards.map((c) => ({
-            title: c.title,
-            description: c.description,
-            href: c.href,
-            icon: c.icon,
-            tag: c.score,
-            footer: c.scoreSub,
-            color: c.color,
-            fill: c.fill,
-            hoverBorder: c.hoverBorder,
-            hoverText: c.hoverText,
-          }))}
-        />
-      </Section>
+        <StatGrid>
+          <StatCard
+            variant="compact"
+            title="Overall PMS"
+            value={formatScore(score.final_score)}
+            icon={Award}
+            description="Live overall score"
+          />
+          <StatCard
+            variant="compact"
+            title="KPI"
+            value={formatScore(score.kpi_score)}
+            icon={Target}
+            description="Weighted task score"
+          />
+          <StatCard
+            variant="compact"
+            title="Attendance"
+            value={formatScore(score.attendance_score)}
+            icon={Clock3}
+            description={`${attendance.presentDays}/${attendance.trackedDays || 0} recent days positive`}
+          />
+          <StatCard
+            variant="compact"
+            title="CBT"
+            value={formatScore(score.cbt_score)}
+            icon={Brain}
+            description="Learning score in PMS"
+          />
+          <StatCard
+            variant="compact"
+            title="Behaviour"
+            value={formatScore(score.behaviour_score)}
+            icon={ShieldCheck}
+            description="Manager and peer feedback blend"
+          />
+        </StatGrid>
 
-      <Section
-        title="How This Updates"
-        description="These scores refresh from the same ERP records used for goals, attendance, and review workflows."
-      >
-        <Card>
-          <CardContent className="space-y-3 pt-6 text-sm">
-            <p>
-              KPI is calculated from approved goals and linked task completion. Attendance reflects your tracked
-              workdays, while behaviour comes from review feedback already in the ERP.
-            </p>
-            <p>
-              CBT scores appear here inside PMS, while the live objective test itself runs separately on the standalone
-              /cbt page.
-            </p>
-          </CardContent>
-        </Card>
-      </Section>
-    </PageWrapper>
+        <Section title="Performance Areas" description="Open each PMS area to see the live score details behind it.">
+          <ModuleHubGrid
+            cards={pmsAreaCards.map((c) => ({
+              title: c.title,
+              description: c.description,
+              href: c.href,
+              icon: c.icon,
+              tag: c.score,
+              footer: c.scoreSub,
+              color: c.color,
+              fill: c.fill,
+              hoverBorder: c.hoverBorder,
+              hoverText: c.hoverText,
+            }))}
+          />
+        </Section>
+
+        <Section
+          title="How This Updates"
+          description="These scores refresh from the same ERP records used for goals, attendance, and review workflows."
+        >
+          <Card>
+            <CardContent className="space-y-3 pt-6 text-sm">
+              <p>
+                KPI is calculated from approved goals and linked task completion. Attendance reflects your tracked
+                workdays, while behaviour comes from review feedback already in the ERP.
+              </p>
+              <p>
+                CBT scores appear here inside PMS, while the live objective test itself runs separately on the
+                standalone /cbt page.
+              </p>
+            </CardContent>
+          </Card>
+        </Section>
+      </PageWrapper>
+    </TablePageLayoutProvider>
   )
 }

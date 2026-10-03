@@ -6,6 +6,9 @@ import { ProjectContent } from "@/components/projects/project-list-content"
 import type { Metadata } from "next"
 import { logger } from "@/lib/logger"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("app-admin-projects")
 
 export const metadata: Metadata = {
@@ -85,5 +88,9 @@ export default async function AdminProjectsPage() {
     userProfile: { id: string; role: string; department: string | null }
   }
 
-  return <ProjectContent admin profiles={result.profiles} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <ProjectContent admin profiles={result.profiles} />
+    </TablePageLayoutProvider>
+  )
 }

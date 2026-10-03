@@ -28,6 +28,8 @@ import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import type { AuditLog, EmployeeMember, UserProfile } from "./types"
 import { formatName } from "@/lib/utils"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export type { AuditLog, EmployeeMember, UserProfile }
 
 interface AdminAuditLogsContentProps {
@@ -229,6 +231,7 @@ export function AdminAuditLogsContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Audit Logs"
       description="Comprehensive system activity trail for security and transparency."
       icon={ScrollText}

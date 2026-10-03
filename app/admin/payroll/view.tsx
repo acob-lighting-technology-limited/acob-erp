@@ -26,6 +26,8 @@ import { FileText, Plus, DollarSign, Calendar, ClipboardList, Calculator } from 
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export interface PayrollPeriod {
   id: string
   name: string
@@ -414,6 +416,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Payroll Management"
       description="Create monthly payroll periods, then open a period's worksheet to run the bulk calculation and publish payslips."
       icon={FileText}

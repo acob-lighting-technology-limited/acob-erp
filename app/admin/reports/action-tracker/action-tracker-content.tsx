@@ -47,6 +47,8 @@ import {
   type DepartmentSummaryStatus,
 } from "@/lib/reports/action-tracker-display"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("reports-action-tracker-action-tracker-co")
 
 interface ActionTask {
@@ -727,6 +729,7 @@ export function ActionTrackerContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Action Tracker"
       description="Monitor and update weekly departmental action points and management directives."
       icon={FileSpreadsheet}

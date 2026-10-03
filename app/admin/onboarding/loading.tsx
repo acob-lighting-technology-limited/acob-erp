@@ -1,16 +1,6 @@
 import { TablePageSkeleton } from "@/components/skeletons"
+import { layout } from "./_layout"
 
-export default function OnboardingLoading() {
-  return (
-    <TablePageSkeleton
-      tabs={3}
-      filters={3}
-      columns={7}
-      rows={10}
-      showStats={true}
-      statCards={3}
-      actions={2}
-      showBackLink={true}
-    />
-  )
+export default function Loading() {
+  return <TablePageSkeleton {...layout} />
 }

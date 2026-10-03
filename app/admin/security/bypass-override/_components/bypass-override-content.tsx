@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { formatCurrency } from "@/lib/format"
 
+import { layout as tablePageLayout } from "../_layout"
+
 export type AuditLogRow = {
   id: string
   action: string | null
@@ -434,6 +436,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Bypass & Override Audit Logs"
       description="Centralized audit trail of manual policy alterations, emergency bypasses, and validation overrides."
       icon={ShieldAlert}

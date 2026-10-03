@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { canOverrideReportsWeekLock, resolveAdminScope } from "@/lib/admin/rbac"
 import { KssRosterTable } from "@/components/reports/kss-roster-table"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default async function AdminKssPage() {
   const supabase = await createClient()
 
@@ -31,21 +34,23 @@ export default async function AdminKssPage() {
     .order("full_name")
 
   return (
-    <KssRosterTable
-      employees={(employees || []).map(
-        (e: { id: string; full_name: string; department: string | null; employment_status?: string | null }) => ({
-          id: e.id,
-          full_name: e.full_name,
-          department: e.department,
-          employment_status: e.employment_status || null,
-        })
-      )}
-      backHref="/admin/reports/general-meeting"
-      backLabel="Back to General Meeting"
-      title="Knowledge Sharing Session"
-      currentUserId={user.id}
-      canOverrideWeekLock={scope ? canOverrideReportsWeekLock(scope) : false}
-      enableScoring
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <KssRosterTable
+        employees={(employees || []).map(
+          (e: { id: string; full_name: string; department: string | null; employment_status?: string | null }) => ({
+            id: e.id,
+            full_name: e.full_name,
+            department: e.department,
+            employment_status: e.employment_status || null,
+          })
+        )}
+        backHref="/admin/reports/general-meeting"
+        backLabel="Back to General Meeting"
+        title="Knowledge Sharing Session"
+        currentUserId={user.id}
+        canOverrideWeekLock={scope ? canOverrideReportsWeekLock(scope) : false}
+        enableScoring
+      />
+    </TablePageLayoutProvider>
   )
 }

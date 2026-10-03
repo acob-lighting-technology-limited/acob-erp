@@ -41,6 +41,8 @@ import { logger } from "@/lib/logger"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("lunch-content")
 
 interface LunchDay {
@@ -450,6 +452,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Lunch"
       spacing="tight"
       description="Vote for what you want to eat and see what everyone else picked."

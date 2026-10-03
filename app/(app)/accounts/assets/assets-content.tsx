@@ -13,6 +13,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface AssetsContentProps {
   initialAssignments: AssetAssignment[]
   initialError?: string | null
@@ -154,6 +156,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Assets"
       description="View your currently assigned personal assets and equipment."
       icon={Package}

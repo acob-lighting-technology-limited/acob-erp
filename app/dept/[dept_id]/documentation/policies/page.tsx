@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { ControlledDocsRegister } from "@/components/documentation/controlled/controlled-docs-register"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }
@@ -10,10 +13,12 @@ export default async function Page({ params }: Props) {
   const scope = await requireDeptScope(dept_id)
 
   return (
-    <ControlledDocsRegister
-      type="policy"
-      departmentName={scope.deptName}
-      backLink={{ href: `/dept/${dept_id}/documentation`, label: "Back to Documentation" }}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <ControlledDocsRegister
+        type="policy"
+        departmentName={scope.deptName}
+        backLink={{ href: `/dept/${dept_id}/documentation`, label: "Back to Documentation" }}
+      />
+    </TablePageLayoutProvider>
   )
 }

@@ -59,6 +59,8 @@ import { useRouter } from "next/navigation"
 import { usePortfolios } from "@/hooks/use-portfolios"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "../_layout"
+
 export type ProjectHealthRow = ProjectHealth & {
   id: string
   project_name: string
@@ -333,6 +335,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Project Portfolios"
       description="Groups of related projects. Progress is counted from each project's tasks."
       icon={Layers}

@@ -70,6 +70,8 @@ import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("hr-employees-admin-employee-content")
 
 type EmployeeGender = "male" | "female" | "prefer_not_to_say" | "unspecified"
@@ -1013,6 +1015,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Employee Management"
       description="View and manage employee profiles, roles, and permissions."
       icon={Users}

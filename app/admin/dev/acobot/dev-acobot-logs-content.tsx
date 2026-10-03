@@ -13,6 +13,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Bot, Database, Download, Globe, MessageSquare, RefreshCw, Users } from "lucide-react"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type AcobotSource = "erp" | "website"
 
 type AcobotLogRow = {
@@ -286,6 +288,7 @@ export function DevAcobotLogsContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="ACOBot Conversations"
       description="Every question staff and website visitors asked ACOBot, its answer, and who asked it."
       backLink={{ href: "/admin/dev", label: "Back to DEV" }}

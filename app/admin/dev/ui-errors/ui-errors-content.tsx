@@ -8,6 +8,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export interface UiErrorRow {
   id: string
   created_at: string
@@ -96,6 +98,7 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="UI Error Monitor"
       description="Centralized frontend runtime errors captured from all pages during beta"
       icon={Bug}

@@ -40,6 +40,8 @@ import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { personName } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("hr-departments")
 
 const TABS: DataTableTab[] = [
@@ -502,6 +504,7 @@ export function DepartmentsPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Departments"
       description="Manage company departments and organizational structure."
       icon={Building}

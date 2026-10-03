@@ -14,6 +14,8 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { PurchaseOrderFormDialog } from "./_components/purchase-order-form-dialog"
 import { formatCurrency, formatDate } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface PurchaseOrder {
   id: string
   po_number: string
@@ -199,6 +201,7 @@ export default function PurchaseOrdersPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Purchase Orders"
       description="Manage purchase orders, supplier commitments, and delivery timing."
       icon={ShoppingCart}

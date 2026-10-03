@@ -29,6 +29,8 @@ import {
   UserX,
 } from "lucide-react"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export interface OnboardingRow {
   id: string
   employee_number: string | null
@@ -318,6 +320,7 @@ export function OnboardingContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Onboarding"
       description="Every staff profile, including not-yet-onboarded placeholders, and whether the person has ever signed in."
       icon={UserCheck}

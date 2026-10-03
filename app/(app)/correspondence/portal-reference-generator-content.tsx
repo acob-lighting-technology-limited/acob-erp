@@ -27,6 +27,8 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface DepartmentCodeOption {
   department_name: string
   department_code: string
@@ -369,6 +371,7 @@ export function PortalReferenceGeneratorContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Correspondence"
       description="Create and manage correspondence references."
       icon={FileCode2}

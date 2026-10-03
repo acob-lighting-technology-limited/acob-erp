@@ -13,6 +13,9 @@ import {
 import { PageWrapper, PageHeader, ModuleHubGrid } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default function PortalGeneralMeetingPage() {
   const reportCards = [
     {
@@ -90,30 +93,32 @@ export default function PortalGeneralMeetingPage() {
   ]
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="General Meeting"
-        description="Access the documents and trackers that support your weekly general meeting."
-        icon={FileBarChart}
-        backLink={{ href: "/reports", label: "Back to Reports" }}
-      />
-
-      <PageSection title="Available Trackers & Reports">
-        <ModuleHubGrid
-          cards={reportCards.map((c) => ({
-            title: c.title,
-            description: c.description,
-            href: c.href,
-            icon: c.icon,
-            tag: c.tag,
-            footer: c.subLabel,
-            color: c.color,
-            fill: c.fill,
-            hoverBorder: c.hoverBorder,
-            hoverText: c.hoverText,
-          }))}
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PageWrapper maxWidth="full" background="gradient">
+        <PageHeader
+          title="General Meeting"
+          description="Access the documents and trackers that support your weekly general meeting."
+          icon={FileBarChart}
+          backLink={{ href: "/reports", label: "Back to Reports" }}
         />
-      </PageSection>
-    </PageWrapper>
+
+        <PageSection title="Available Trackers & Reports">
+          <ModuleHubGrid
+            cards={reportCards.map((c) => ({
+              title: c.title,
+              description: c.description,
+              href: c.href,
+              icon: c.icon,
+              tag: c.tag,
+              footer: c.subLabel,
+              color: c.color,
+              fill: c.fill,
+              hoverBorder: c.hoverBorder,
+              hoverText: c.hoverText,
+            }))}
+          />
+        </PageSection>
+      </PageWrapper>
+    </TablePageLayoutProvider>
   )
 }

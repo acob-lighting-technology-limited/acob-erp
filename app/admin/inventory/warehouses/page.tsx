@@ -28,6 +28,8 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface WarehouseData {
   id: string
   name: string
@@ -256,6 +258,7 @@ export default function WarehousesPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Warehouses"
       description="Manage storage locations, operating status, and warehouse coverage."
       icon={WarehouseIcon}

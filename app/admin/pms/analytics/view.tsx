@@ -18,6 +18,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { personName } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type ReviewRow = {
   id: string
   user_id: string | null
@@ -306,6 +308,7 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="PMS Analytics"
       description="Performance distribution, review outcomes, and department benchmarking in one unified analytics table."
       icon={BarChart3}

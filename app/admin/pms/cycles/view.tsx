@@ -34,6 +34,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type CycleStatus = "planned" | "active" | "closed" | "locked"
 
 type ReviewCycle = {
@@ -320,6 +322,7 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Review Cycles"
       description="Create and manage performance review cycles. Only one cycle can be active at a time."
       icon={RefreshCw}

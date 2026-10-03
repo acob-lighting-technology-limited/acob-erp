@@ -53,6 +53,8 @@ import { RiskHeatMap } from "./risk-heat-map"
 import { RiskImportDialog } from "./risk-import-dialog"
 import { TimelineText, describeTimeline } from "./risk-timeline"
 
+import { layout as tablePageLayout } from "../_layout"
+
 interface RiskRegisterViewProps {
   departments: Array<{ name: string; code: string | null }>
   staff: StaffOption[]
@@ -305,6 +307,7 @@ export function RiskRegisterView({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Risk Register"
       description={
         lockedDepartment

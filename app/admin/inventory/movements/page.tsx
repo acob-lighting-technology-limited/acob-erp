@@ -11,6 +11,8 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { formatDate } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface StockMovement {
   id: string
   product_id: string
@@ -224,6 +226,7 @@ export default function MovementsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Stock Movements"
       description="Review stock inflows, outflows, adjustments, and transfer activity."
       icon={Boxes}

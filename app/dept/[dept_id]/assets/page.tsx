@@ -11,6 +11,9 @@ import {
   type UserProfile,
 } from "@/app/admin/assets/admin-assets-content"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 type AssetAssignmentRow = {
   asset_id: string
   assigned_to?: string | null
@@ -116,13 +119,15 @@ export default async function DeptAssetsPage({ params }: DeptAssetsPageProps) {
   })
 
   return (
-    <AdminAssetsContent
-      initialAssets={assets}
-      initialEmployees={employees}
-      initialDepartments={[deptName]}
-      userProfile={userProfile}
-      initialError={null}
-      lockedDepartment={scope.deptName}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminAssetsContent
+        initialAssets={assets}
+        initialEmployees={employees}
+        initialDepartments={[deptName]}
+        userProfile={userProfile}
+        initialError={null}
+        lockedDepartment={scope.deptName}
+      />
+    </TablePageLayoutProvider>
   )
 }

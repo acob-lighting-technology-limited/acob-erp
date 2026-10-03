@@ -8,6 +8,9 @@ import { AdminDocumentationContent } from "@/app/admin/documentation/admin-docum
 import type { UserProfile, employeeMember } from "@/app/admin/documentation/admin-documentation-content"
 import type { UserRole } from "@/types/database"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }
@@ -40,22 +43,24 @@ export default async function DeptDepartmentDocumentsPage({ params }: Props) {
   const departmentPath = `/${departmentToLibraryKey(deptName)}`
 
   return (
-    <AdminDocumentationContent
-      initialDocumentation={[]}
-      initialemployee={(employeeData || []) as employeeMember[]}
-      userProfile={userProfile}
-      departmentDocs={{
-        initialPath: departmentPath,
-        rootLabel: deptName,
-        enabled: true,
-        lockToInitialPath: true,
-        accessMode: "admin",
-        lockedDepartment: deptName,
-      }}
-      defaultTab="department-documents"
-      hideTabList={true}
-      backLinkHref={`/dept/${dept_id}/documentation`}
-      backLinkLabel="Back to Documentation"
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminDocumentationContent
+        initialDocumentation={[]}
+        initialemployee={(employeeData || []) as employeeMember[]}
+        userProfile={userProfile}
+        departmentDocs={{
+          initialPath: departmentPath,
+          rootLabel: deptName,
+          enabled: true,
+          lockToInitialPath: true,
+          accessMode: "admin",
+          lockedDepartment: deptName,
+        }}
+        defaultTab="department-documents"
+        hideTabList={true}
+        backLinkHref={`/dept/${dept_id}/documentation`}
+        backLinkLabel="Back to Documentation"
+      />
+    </TablePageLayoutProvider>
   )
 }

@@ -39,6 +39,8 @@ import { cn, formatName, formatFullName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export type { Task, TaskUserProfile } from "@/types/task"
 
 const log = logger("tasks-management-tasks-content")
@@ -471,6 +473,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Tasks"
       description="Manage your operational tasks, track deadlines, and submit completed work for review."
       icon={ClipboardList}

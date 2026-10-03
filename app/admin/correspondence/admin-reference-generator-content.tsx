@@ -39,6 +39,8 @@ import {
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("reference-generator")
 
 interface AdminReferenceGeneratorContentProps {
@@ -460,6 +462,7 @@ export function AdminReferenceGeneratorContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Correspondence"
       description="Manage correspondence references and tracking."
       icon={ListFilter}

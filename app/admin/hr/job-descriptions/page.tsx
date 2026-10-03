@@ -14,6 +14,8 @@ import { Briefcase, User, CheckCircle, XCircle, Eye, Building2, UserCircle2 } fr
 import type { UserRole } from "@/types/database"
 import { JobDescriptionDialog } from "./_components/job-description-dialog"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface Profile {
   id: string
   first_name: string
@@ -179,6 +181,7 @@ export default function AdminJobDescriptionsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Job Descriptions"
       description="Centralized registry for employee JD documentation and updates."
       icon={Briefcase}

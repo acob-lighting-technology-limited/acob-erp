@@ -24,6 +24,8 @@ import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { TicketAttachmentsPanel } from "@/components/help-desk/ticket-attachments-panel"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type ErrorPayload = {
   error?: string
   message?: string
@@ -558,6 +560,7 @@ export function HelpDeskContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Help Desk"
       description="Submit and track support/procurement tickets."
       icon={Headset}

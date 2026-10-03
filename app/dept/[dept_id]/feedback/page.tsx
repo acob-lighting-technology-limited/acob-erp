@@ -6,6 +6,9 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { AdminFeedbackContent } from "@/app/admin/feedback/admin-feedback-content"
 import type { FeedbackRecord } from "@/components/feedback/types"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }
@@ -65,5 +68,9 @@ export default async function DeptFeedbackPage({ params }: Props) {
     closed: feedbackWithProfiles.filter((f) => f.status === "closed").length,
   }
 
-  return <AdminFeedbackContent initialFeedback={feedbackWithProfiles} initialStats={stats} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminFeedbackContent initialFeedback={feedbackWithProfiles} initialStats={stats} />
+    </TablePageLayoutProvider>
+  )
 }

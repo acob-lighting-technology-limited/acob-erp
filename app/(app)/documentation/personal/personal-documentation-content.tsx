@@ -22,6 +22,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatDateTime } from "@/lib/format"
 import { draftToneClass } from "@/lib/status-tones"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("personal-documentation-content")
 
 interface Documentation {
@@ -348,6 +350,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Personal Documentation"
       description="Create and manage your work documentation."
       icon={FileText}

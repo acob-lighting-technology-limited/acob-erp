@@ -2,6 +2,9 @@ import type { Metadata } from "next"
 import { MdDeskEngagements } from "@/components/md-desk/md-desk-engagements"
 import { requireMdDeskMember } from "@/lib/md-desk/gate"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export const metadata: Metadata = {
   title: "MD's Calendar | ACOB Lighting Technology Limited",
 }
@@ -10,5 +13,9 @@ export const dynamic = "force-dynamic"
 
 export default async function AdminMdDeskCalendarPage() {
   await requireMdDeskMember("/admin")
-  return <MdDeskEngagements section="calendar" basePath="/admin/md-desk" />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <MdDeskEngagements section="calendar" basePath="/admin/md-desk" />
+    </TablePageLayoutProvider>
+  )
 }

@@ -35,6 +35,8 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type CompetencyCategory = "behaviour" | "leadership" | "core"
 
 type Competency = {
@@ -395,6 +397,7 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Competency Frameworks"
       description="Manage the scoring competencies used across performance reviews."
       icon={BookOpen}

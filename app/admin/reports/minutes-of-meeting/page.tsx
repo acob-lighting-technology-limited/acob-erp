@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { canOverrideReportsWeekLock, resolveAdminScope } from "@/lib/admin/rbac"
 import { MeetingDocumentTypeTable } from "@/components/reports/meeting-document-type-table"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default async function AdminMinutesOfMeetingPage() {
   const supabase = await createClient()
 
@@ -21,13 +24,15 @@ export default async function AdminMinutesOfMeetingPage() {
   const scope = await resolveAdminScope(supabase, user.id)
 
   return (
-    <MeetingDocumentTypeTable
-      documentType="minutes"
-      title="Minutes of Meeting"
-      description="Upload and manage Minutes of Meeting PDFs by week."
-      backHref="/admin/reports/general-meeting"
-      backLabel="Back to General Meeting"
-      canOverrideWeekLock={scope ? canOverrideReportsWeekLock(scope) : false}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <MeetingDocumentTypeTable
+        documentType="minutes"
+        title="Minutes of Meeting"
+        description="Upload and manage Minutes of Meeting PDFs by week."
+        backHref="/admin/reports/general-meeting"
+        backLabel="Back to General Meeting"
+        canOverrideWeekLock={scope ? canOverrideReportsWeekLock(scope) : false}
+      />
+    </TablePageLayoutProvider>
   )
 }

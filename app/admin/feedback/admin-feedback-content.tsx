@@ -19,6 +19,8 @@ import { cn, formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface AdminFeedbackContentProps {
   initialFeedback: FeedbackRecord[]
   initialStats: {
@@ -261,6 +263,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="User Feedback"
       description="Centralized portal for managing employee concerns, suggestions and system praise."
       icon={MessageSquare}

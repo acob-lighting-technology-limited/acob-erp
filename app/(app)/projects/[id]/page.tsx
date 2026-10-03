@@ -3,6 +3,9 @@ import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { ProjectDetail } from "@/components/projects/project-detail"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export const metadata: Metadata = {
   title: "Project | Matrix",
   description: "A project's progress, plans and charts.",
@@ -18,5 +21,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
 
-  return <ProjectDetail projectId={id} isAdmin={false} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <ProjectDetail projectId={id} isAdmin={false} />
+    </TablePageLayoutProvider>
+  )
 }

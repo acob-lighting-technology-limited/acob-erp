@@ -32,6 +32,8 @@ import type { HelpDeskTicket, EmployeeOption, LeadDirectoryMember } from "@/lib/
 import { resolveCurrentStage, resolveApproverName } from "@/lib/help-desk/ticket-display"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "../_layout"
+
 interface AdminHelpDeskContentProps {
   initialTickets: HelpDeskTicket[]
   employees: EmployeeOption[]
@@ -413,6 +415,7 @@ export function AdminHelpDeskContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Help Desk Workflow"
       description="Manage ticket routing, department approvals, and technical escalations."
       icon={Headset}

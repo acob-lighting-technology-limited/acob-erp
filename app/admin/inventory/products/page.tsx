@@ -15,6 +15,8 @@ import type { BadgeProps } from "@/components/ui/badge"
 import { ProductFormDialog } from "./_components/product-form-dialog"
 import { formatCurrency } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface Product {
   id: string
   sku: string
@@ -219,6 +221,7 @@ export default function ProductsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Products"
       description="Manage the product catalog, pricing, and stock posture across inventory."
       icon={Package}

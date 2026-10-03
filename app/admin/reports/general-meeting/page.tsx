@@ -14,6 +14,9 @@ import { PageWrapper, PageHeader, ModuleHubGrid } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { WeekSetupCard } from "./_components/week-setup-card"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default function AdminGeneralMeetingReportsPage() {
   const reportCards = [
     {
@@ -97,32 +100,34 @@ export default function AdminGeneralMeetingReportsPage() {
   ]
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="General Meeting"
-        description="Manage the documents and trackers that support your weekly general meeting workflow."
-        icon={Users}
-        backLink={{ href: "/admin/reports", label: "Back to Reports" }}
-      />
-
-      <PageSection title="General Meeting" className="space-y-4">
-        <WeekSetupCard />
-
-        <ModuleHubGrid
-          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-          cards={reportCards.map((c) => ({
-            title: c.title,
-            description: c.description,
-            href: c.href,
-            icon: c.icon,
-            footer: c.subLabel,
-            color: c.color,
-            fill: c.fill,
-            hoverBorder: c.hoverBorder,
-            hoverText: c.hoverText,
-          }))}
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PageWrapper maxWidth="full" background="gradient">
+        <PageHeader
+          title="General Meeting"
+          description="Manage the documents and trackers that support your weekly general meeting workflow."
+          icon={Users}
+          backLink={{ href: "/admin/reports", label: "Back to Reports" }}
         />
-      </PageSection>
-    </PageWrapper>
+
+        <PageSection title="General Meeting" className="space-y-4">
+          <WeekSetupCard />
+
+          <ModuleHubGrid
+            className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            cards={reportCards.map((c) => ({
+              title: c.title,
+              description: c.description,
+              href: c.href,
+              icon: c.icon,
+              footer: c.subLabel,
+              color: c.color,
+              fill: c.fill,
+              hoverBorder: c.hoverBorder,
+              hoverText: c.hoverText,
+            }))}
+          />
+        </PageSection>
+      </PageWrapper>
+    </TablePageLayoutProvider>
   )
 }

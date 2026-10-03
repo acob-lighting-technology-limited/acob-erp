@@ -47,6 +47,8 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("dashboard-attendance-attendance-content")
 
 interface AttendanceContentProps {
@@ -561,6 +563,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
   return (
     <>
       <DataTablePage
+        layout={tablePageLayout}
         title="Attendance"
         description="Track your work hours and attendance records."
         icon={Clock}

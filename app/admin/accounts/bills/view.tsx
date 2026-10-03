@@ -14,6 +14,8 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { BillFormDialog } from "./_components/bill-form-dialog"
 import { formatCurrency, formatDate } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export interface Bill {
   id: string
   bill_number: string
@@ -225,6 +227,7 @@ export function BillsPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Bills"
       description="Track supplier bills, payment progress, and upcoming due dates."
       icon={Receipt}

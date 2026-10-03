@@ -6,6 +6,9 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { AdminHelpDeskContent } from "@/app/admin/help-desk/management/admin-help-desk-content"
 import { loadHelpDeskConsole } from "@/app/admin/help-desk/_lib/load-help-desk"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface DeptHelpDeskPageProps {
   params: Promise<{ dept_id: string }>
 }
@@ -23,20 +26,22 @@ export default async function DeptHelpDeskPage({ params }: DeptHelpDeskPageProps
   ])
 
   return (
-    <AdminHelpDeskContent
-      initialTickets={data.tickets}
-      employees={data.employees}
-      leadDirectory={data.leadDirectory}
-      viewer={{
-        id: authData.user.id,
-        role: scope.role,
-        department: scope.deptName,
-        is_department_lead: true,
-        lead_departments: [scope.deptName],
-        managed_departments: [scope.deptName],
-      }}
-      lockedDepartment={scope.deptName}
-      backLinkHref={`/dept/${dept_id}`}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminHelpDeskContent
+        initialTickets={data.tickets}
+        employees={data.employees}
+        leadDirectory={data.leadDirectory}
+        viewer={{
+          id: authData.user.id,
+          role: scope.role,
+          department: scope.deptName,
+          is_department_lead: true,
+          lead_departments: [scope.deptName],
+          managed_departments: [scope.deptName],
+        }}
+        lockedDepartment={scope.deptName}
+        backLinkHref={`/dept/${dept_id}`}
+      />
+    </TablePageLayoutProvider>
   )
 }

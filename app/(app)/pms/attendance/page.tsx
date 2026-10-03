@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/server"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { formatScore } from "@/lib/format"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 function formatClockTime(value: string | null | undefined): string {
   if (!value || value === "-") return "-"
   const parts = value.split(":")
@@ -125,32 +128,34 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
   const avgScore = sumTracked > 0 ? Math.round((sumPresent / sumTracked) * 100) : null
 
   return (
-    <PmsTablePage
-      title="PMS Attendance"
-      description="Track your attendance score and working hours by quarter. Expand any quarter row to inspect the daily clock-in punch logs."
-      backHref="/pms"
-      backLabel="Back to PMS"
-      icon="attendance"
-      cycles={cycles}
-      summaryCards={[
-        { label: "Score", value: formatScore(avgScore), tooltip: "Attendance Score" },
-        { label: "Present Days", value: sumPresent },
-        { label: "Tracked Days", value: sumTracked },
-      ]}
-      tableTitle="Attendance by Quarter"
-      tableDescription="Attendance scores by quarter. Expand any quarter to review daily clock-in details."
-      rows={rows}
-      columns={[
-        { key: "quarter", label: "Quarter" },
-        { key: "score", label: "Score" },
-        { key: "present_tracked", label: "Present / Evaluated" },
-        { key: "total_work_hours", label: "Total Work Hours" },
-        { key: "total_miss_hours", label: "Total Miss Hours" },
-        { key: "lateness", label: "Lateness" },
-      ]}
-      searchPlaceholder="Search quarter or score..."
-      hideFirstColumnFilter
-      hideSecondaryFilter
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PmsTablePage
+        title="PMS Attendance"
+        description="Track your attendance score and working hours by quarter. Expand any quarter row to inspect the daily clock-in punch logs."
+        backHref="/pms"
+        backLabel="Back to PMS"
+        icon="attendance"
+        cycles={cycles}
+        summaryCards={[
+          { label: "Score", value: formatScore(avgScore), tooltip: "Attendance Score" },
+          { label: "Present Days", value: sumPresent },
+          { label: "Tracked Days", value: sumTracked },
+        ]}
+        tableTitle="Attendance by Quarter"
+        tableDescription="Attendance scores by quarter. Expand any quarter to review daily clock-in details."
+        rows={rows}
+        columns={[
+          { key: "quarter", label: "Quarter" },
+          { key: "score", label: "Score" },
+          { key: "present_tracked", label: "Present / Evaluated" },
+          { key: "total_work_hours", label: "Total Work Hours" },
+          { key: "total_miss_hours", label: "Total Miss Hours" },
+          { key: "lateness", label: "Lateness" },
+        ]}
+        searchPlaceholder="Search quarter or score..."
+        hideFirstColumnFilter
+        hideSecondaryFilter
+      />
+    </TablePageLayoutProvider>
   )
 }

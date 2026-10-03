@@ -39,6 +39,8 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export interface LeaveItem {
   id: string
   user_id: string
@@ -607,6 +609,7 @@ export function LeaveApprovePage({
       />
 
       <DataTablePage
+        layout={tablePageLayout}
         title="Leave Approvals & Scheduling"
         description="Review leave applications, manage approval workflows, and view organizational leave calendar."
         icon={CalendarCheck2}

@@ -6,6 +6,9 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { AdminEmployeeContent, type Employee, type UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import type { UserRole } from "@/types/database"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }
@@ -32,5 +35,9 @@ export default async function DeptEmployeesPage({ params }: Props) {
     .in("department", expandedDepts)
     .order("last_name", { ascending: true })
 
-  return <AdminEmployeeContent initialEmployees={(employeeData || []) as Employee[]} userProfile={userProfile} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminEmployeeContent initialEmployees={(employeeData || []) as Employee[]} userProfile={userProfile} />
+    </TablePageLayoutProvider>
+  )
 }

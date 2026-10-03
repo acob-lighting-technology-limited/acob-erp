@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import { useTablePageLayout } from "./layout-context"
 import { logger } from "@/lib/logger"
 import type { DataTablePageProps } from "./types"
 
@@ -20,6 +21,18 @@ const log = logger("components-ui-data-table-page")
  *   3. Stats cards  — optional, key metrics at a glance
  *   4. Children     — <DataTable> (includes search, filters, toolbar, table, pagination)
  */
+/** Dev-only: once per page and field, say where a route's `_layout.ts` no longer matches the page. */
+const reportedDrift = new Set<string>()
+function warnLayoutDrift(page: string, field: string, declared: unknown, actual: unknown) {
+  if (declared === undefined || declared === actual) return
+  const key = `${page}:${field}`
+  if (reportedDrift.has(key)) return
+  reportedDrift.add(key)
+  log.warn(
+    `[DataTablePage "${page}"] _layout.ts ${field} is ${String(declared)} but the page has ${String(actual)} — update _layout.ts so the loading skeleton matches`
+  )
+}
+
 export function DataTablePage({
   layout,
   export: exportConfig,
@@ -41,22 +54,15 @@ export function DataTablePage({
   actionsPlacement = "inline-always",
   children,
 }: DataTablePageProps) {
-  if (process.env.NODE_ENV !== "production" && layout) {
-    if (layout.tabs !== undefined && layout.tabs !== (tabs?.length ?? 0)) {
-      log.warn(
-        `[DataTablePage "${title}"] layout.tabs (${layout.tabs}) does not match actual tabs count (${tabs?.length ?? 0})`
-      )
-    }
-    if (layout.statBadges !== undefined && layout.statBadges !== (statBadges?.length ?? 0)) {
-      log.warn(
-        `[DataTablePage "${title}"] layout.statBadges (${layout.statBadges}) does not match actual statBadges count (${statBadges?.length ?? 0})`
-      )
-    }
-    if (layout.showBackLink !== undefined && layout.showBackLink !== Boolean(backLink)) {
-      log.warn(
-        `[DataTablePage "${title}"] layout.showBackLink (${layout.showBackLink}) does not match actual backLink presence (${Boolean(backLink)})`
-      )
-    }
+  const contextLayout = useTablePageLayout()
+  const pageLayout = layout ?? contextLayout
+  if (process.env.NODE_ENV !== "production" && pageLayout) {
+    const pageName = typeof title === "string" ? title : "untitled"
+    warnLayoutDrift(pageName, "tabs", pageLayout.tabs, tabs?.length ?? 0)
+    warnLayoutDrift(pageName, "statBadges", pageLayout.statBadges, statBadges?.length ?? 0)
+    warnLayoutDrift(pageName, "showBackLink", pageLayout.showBackLink, Boolean(backLink))
+    warnLayoutDrift(pageName, "spacing", pageLayout.spacing, spacing ?? "standard")
+    warnLayoutDrift(pageName, "inlineActions", pageLayout.inlineActions, actionsPlacement === "inline-always")
   }
 
   const [exportSlot, setExportSlot] = useState<HTMLDivElement | null>(null)

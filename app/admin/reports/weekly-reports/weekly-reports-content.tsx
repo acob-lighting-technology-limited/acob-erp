@@ -34,6 +34,8 @@ import { apiFetch } from "@/lib/api-client"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
   trackingData: TrackerStatus[]
@@ -335,6 +337,7 @@ export function WeeklyReportsContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Weekly Reports"
       description="Review and export departmental reports."
       icon={FileBarChart}

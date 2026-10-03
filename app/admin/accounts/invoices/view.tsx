@@ -14,6 +14,8 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
 import { formatCurrency, formatDate } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export interface Invoice {
   id: string
   invoice_number: string
@@ -236,6 +238,7 @@ export function InvoicesPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Invoices"
       description="Create and manage customer invoices, collections, and overdue balances."
       icon={FileText}

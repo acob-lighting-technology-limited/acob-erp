@@ -31,6 +31,8 @@ import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departme
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
 import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface UserProfile {
   id: string
   department: string | null
@@ -448,6 +450,7 @@ export default function WeeklyReportsPortal() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Weekly Reports"
       description="Review and export departmental reports."
       icon={FileBarChart}

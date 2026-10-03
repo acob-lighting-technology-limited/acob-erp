@@ -31,6 +31,8 @@ import { useHrProfiles } from "@/hooks/use-hr-profiles"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { personName } from "@/lib/format"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type Profile = {
   id: string
   first_name: string | null
@@ -463,6 +465,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Development Plans"
       description="Create and track employee development plans linked to performance reviews."
       icon={BookOpen}

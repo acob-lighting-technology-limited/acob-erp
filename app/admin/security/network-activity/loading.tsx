@@ -1,5 +1,6 @@
 import { TablePageSkeleton } from "@/components/skeletons"
+import { layout } from "./_layout"
 
-export default function AdminSecurityNetworkActivityLoading() {
-  return <TablePageSkeleton filters={2} columns={3} rows={8} statBadges={3} />
+export default function Loading() {
+  return <TablePageSkeleton {...layout} />
 }
