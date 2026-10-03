@@ -16,6 +16,7 @@ import { apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { personName } from "@/lib/format"
 
 type Profile = {
   id: string
@@ -49,11 +50,6 @@ type Cycle = {
   end_date?: string | null
 }
 
-function formatName(profile: Profile | null | undefined) {
-  if (!profile) return "Unknown"
-  return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown"
-}
-
 function formatMetric(value: number | null | undefined) {
   return typeof value === "number" ? `${value}%` : "-"
 }
@@ -63,7 +59,7 @@ function FeedbackCard({ row, onView }: { row: PeerFeedbackRow; onView: (row: Pee
     <div className="space-y-3 rounded-xl border p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-semibold">{formatName(row.subject)}</p>
+          <p className="font-semibold">{personName(row.subject)}</p>
           <p className="text-muted-foreground text-xs">{row.subject?.department || "No department"}</p>
         </div>
         <Badge variant={row.score >= 70 ? "default" : "secondary"}>{row.score}%</Badge>
@@ -71,7 +67,7 @@ function FeedbackCard({ row, onView }: { row: PeerFeedbackRow; onView: (row: Pee
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
           <p className="text-muted-foreground text-xs">Reviewer</p>
-          <p>{formatName(row.reviewer)}</p>
+          <p>{personName(row.reviewer)}</p>
         </div>
         <div>
           <p className="text-muted-foreground text-xs">Status</p>
@@ -128,7 +124,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
   const reviewerOptions = useMemo(() => {
     const reviewers = new Map<string, string>()
     for (const row of feedback) {
-      const name = formatName(row.reviewer)
+      const name = personName(row.reviewer)
       if (row.reviewer_user_id && name !== "Unknown") {
         reviewers.set(row.reviewer_user_id, name)
       }
@@ -148,8 +144,8 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
   const exportSource = processedFeedback.length ? processedFeedback : feedback
   const exportRows = exportSource.map((row, index) => ({
     "S/N": index + 1,
-    Subject: formatName(row.subject),
-    Reviewer: formatName(row.reviewer),
+    Subject: personName(row.subject),
+    Reviewer: personName(row.reviewer),
     Department: row.subject?.department || "-",
     Cycle: cycleNameMap.get(row.review_cycle_id) || "-",
     Score: row.score,
@@ -168,8 +164,8 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         key: "subject",
         label: "Subject",
         sortable: true,
-        accessor: (row) => formatName(row.subject),
-        render: (row) => <span className="font-medium">{formatName(row.subject)}</span>,
+        accessor: (row) => personName(row.subject),
+        render: (row) => <span className="font-medium">{personName(row.subject)}</span>,
         resizable: true,
         initialWidth: 190,
       },
@@ -184,7 +180,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         key: "reviewer",
         label: "Reviewer",
         sortable: true,
-        accessor: (row) => formatName(row.reviewer),
+        accessor: (row) => personName(row.reviewer),
         resizable: true,
         initialWidth: 190,
         hideOnMobile: true,
@@ -322,8 +318,8 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         searchPlaceholder="Search subject, reviewer, department, or comments…"
         searchFn={(row, query) => {
           return [
-            formatName(row.subject),
-            formatName(row.reviewer),
+            personName(row.subject),
+            personName(row.reviewer),
             row.subject?.department || "",
             row.comments || "",
             cycleNameMap.get(row.review_cycle_id) || "",
@@ -367,7 +363,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          title: (row) => `${formatName(row.subject)} (by ${formatName(row.reviewer)})`,
+          title: (row) => `${personName(row.subject)} (by ${personName(row.reviewer)})`,
           subtitle: (row) =>
             `${row.subject?.department || "No dept"} · ${cycleNameMap.get(row.review_cycle_id) || "No cycle"} · Score: ${row.score}%`,
           trailing: (row) => (
@@ -389,7 +385,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
           <DialogHeader>
             <DialogTitle>Peer Feedback Details</DialogTitle>
             <DialogDescription>
-              {selectedRow ? `${formatName(selectedRow.subject)} reviewed by ${formatName(selectedRow.reviewer)}` : ""}
+              {selectedRow ? `${personName(selectedRow.subject)} reviewed by ${personName(selectedRow.reviewer)}` : ""}
             </DialogDescription>
           </DialogHeader>
           {selectedRow ? (

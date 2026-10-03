@@ -5,10 +5,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { getCurrentUserPmsData } from "./_lib"
 import { CycleSelector } from "./_components/cycle-selector"
-
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
-}
+import { formatScore } from "@/lib/format"
 
 export default async function PmsPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
@@ -20,7 +17,7 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       description: "See your scored work, KPI score, and the company goals your tasks serve.",
       href: "/pms/kpi",
       icon: Target,
-      score: formatPercent(score.kpi_score),
+      score: formatScore(score.kpi_score),
       scoreSub: "Weighted task score",
       color: "bg-blue-500/10 text-info-foreground border-blue-500/20",
       fill: "bg-blue-500",
@@ -32,7 +29,7 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       description: "Watch your attendance score and recent clocking activity.",
       href: "/pms/attendance",
       icon: Clock3,
-      score: formatPercent(score.attendance_score),
+      score: formatScore(score.attendance_score),
       scoreSub: `${attendance.presentDays}/${attendance.trackedDays || 0} days positive`,
       color: "bg-amber-500/10 text-warning-foreground border-amber-500/20",
       fill: "bg-amber-500",
@@ -44,7 +41,7 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       description: "View your CBT scores by quarter from PMS.",
       href: "/pms/cbt",
       icon: Brain,
-      score: formatPercent(score.cbt_score),
+      score: formatScore(score.cbt_score),
       scoreSub: "Learning score in PMS",
       color: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
       fill: "bg-violet-500",
@@ -56,7 +53,7 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
       description: "View behaviour scoring from current review and feedback signals.",
       href: "/pms/behaviour",
       icon: ShieldCheck,
-      score: formatPercent(score.behaviour_score),
+      score: formatScore(score.behaviour_score),
       scoreSub: "Manager & peer feedback",
       color: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
       fill: "bg-purple-500",
@@ -94,35 +91,35 @@ export default async function PmsPage({ searchParams }: { searchParams: Promise<
         <StatCard
           variant="compact"
           title="Overall PMS"
-          value={formatPercent(score.final_score)}
+          value={formatScore(score.final_score)}
           icon={Award}
           description="Live overall score"
         />
         <StatCard
           variant="compact"
           title="KPI"
-          value={formatPercent(score.kpi_score)}
+          value={formatScore(score.kpi_score)}
           icon={Target}
           description="Weighted task score"
         />
         <StatCard
           variant="compact"
           title="Attendance"
-          value={formatPercent(score.attendance_score)}
+          value={formatScore(score.attendance_score)}
           icon={Clock3}
           description={`${attendance.presentDays}/${attendance.trackedDays || 0} recent days positive`}
         />
         <StatCard
           variant="compact"
           title="CBT"
-          value={formatPercent(score.cbt_score)}
+          value={formatScore(score.cbt_score)}
           icon={Brain}
           description="Learning score in PMS"
         />
         <StatCard
           variant="compact"
           title="Behaviour"
-          value={formatPercent(score.behaviour_score)}
+          value={formatScore(score.behaviour_score)}
           icon={ShieldCheck}
           description="Manager and peer feedback blend"
         />

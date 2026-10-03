@@ -5,10 +5,7 @@ import { computeAttendanceDay } from "@/lib/hr/attendance-ssot"
 import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"
 import { createClient } from "@/lib/supabase/server"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
-
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
-}
+import { formatScore } from "@/lib/format"
 
 function formatClockTime(value: string | null | undefined): string {
   if (!value || value === "-") return "-"
@@ -111,7 +108,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
 
     return {
       quarter: formatCycleLabel(cycle.name),
-      score: formatPercent(quarterScore),
+      score: formatScore(quarterScore),
       present_tracked: `${presentCount} / ${totalDays} days`,
       total_work_hours: totalDays > 0 ? `${totalWorkHours.toFixed(1)} hrs` : "-",
       total_miss_hours: totalDays > 0 ? `${totalMissedHours.toFixed(1)} hrs` : "-",
@@ -136,7 +133,7 @@ export default async function PmsAttendancePage({ searchParams }: { searchParams
       icon="attendance"
       cycles={cycles}
       summaryCards={[
-        { label: "Score", value: formatPercent(avgScore), tooltip: "Attendance Score" },
+        { label: "Score", value: formatScore(avgScore), tooltip: "Attendance Score" },
         { label: "Present Days", value: sumPresent },
         { label: "Tracked Days", value: sumTracked },
       ]}

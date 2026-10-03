@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { personName } from "@/lib/format"
 
 type ReviewRow = {
   id: string
@@ -62,11 +63,6 @@ type AnalyticsRow = {
   final: number | null
   tier: string
   status: string
-}
-
-function formatName(user: ReviewRow["user"]) {
-  if (!user) return "Unknown"
-  return `${user.first_name || ""} ${user.last_name || ""}`.trim() || "Unknown"
 }
 
 function scoreToTier(score: number | null): {
@@ -136,7 +132,7 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
     () =>
       reviews.map((review) => ({
         id: review.id,
-        employee: formatName(review.user),
+        employee: personName(review.user),
         department: review.user?.department || "-",
         cycle: review.cycle?.name || "-",
         reviewType: review.cycle?.review_type || "-",

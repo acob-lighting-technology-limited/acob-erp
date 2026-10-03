@@ -38,6 +38,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { personName } from "@/lib/format"
 
 const log = logger("hr-office-locations")
 
@@ -84,10 +85,6 @@ async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
   const res = await apiFetch("/api/admin/hr/office-locations", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load office locations")
   return res.json()
-}
-
-function employeeName(employee: LocationEmployee) {
-  return [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Unknown"
 }
 
 function LocationCard({
@@ -560,7 +557,7 @@ export function OfficeLocationsPage({
                     <tbody>
                       {members.map((member) => (
                         <tr key={member.id} className="border-t">
-                          <td className="px-3 py-2 font-medium">{employeeName(member)}</td>
+                          <td className="px-3 py-2 font-medium">{personName(member)}</td>
                           <td className="text-muted-foreground px-3 py-2">
                             <div className="flex items-center gap-2">
                               <Mail className="h-3 w-3" />

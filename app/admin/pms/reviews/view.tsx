@@ -21,6 +21,7 @@ import { CalibrationView } from "./_components/calibration-view"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { personName } from "@/lib/format"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,10 +90,6 @@ function isSubmittedReview(r: ReviewRow) {
 
 function isCompletedReview(r: ReviewRow) {
   return String(r.status ?? "").toLowerCase() === "completed"
-}
-
-function employeeName(r: ReviewRow) {
-  return `${r.user?.first_name ?? ""} ${r.user?.last_name ?? ""}`.trim() || "Employee"
 }
 
 function StatusBadge({ status }: { status: string | null }) {
@@ -176,7 +173,7 @@ function ReviewExpandedDetail({ row }: { row: ReviewRow }) {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Name</span>
-            <span className="font-medium">{employeeName(row)}</span>
+            <span className="font-medium">{personName(row.user, "Employee")}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Department</span>
@@ -208,7 +205,7 @@ function ReviewCard({ row, onEdit }: { row: ReviewRow; onEdit: (r: ReviewRow) =>
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="leading-tight font-semibold">{employeeName(row)}</p>
+            <p className="leading-tight font-semibold">{personName(row.user, "Employee")}</p>
             <p className="text-muted-foreground mt-0.5 text-xs">{row.user?.department ?? "—"}</p>
           </div>
           <StatusBadge status={row.status} />
@@ -448,7 +445,7 @@ export function AdminPmsReviewsPage({
     if (tab === "individual")
       return canonicalReviews.map((r, i) => ({
         "S/N": i + 1,
-        Employee: employeeName(r),
+        Employee: personName(r.user, "Employee"),
         Department: r.user?.department ?? "-",
         Quarter: r.cycle?.name ?? "-",
         "Review Type": r.cycle?.review_type ?? "-",
@@ -511,8 +508,8 @@ export function AdminPmsReviewsPage({
         sortable: true,
         resizable: true,
         initialWidth: 180,
-        accessor: (r) => employeeName(r),
-        render: (r) => <span className="font-medium">{employeeName(r)}</span>,
+        accessor: (r) => personName(r.user, "Employee"),
+        render: (r) => <span className="font-medium">{personName(r.user, "Employee")}</span>,
       },
       {
         key: "department",
@@ -855,7 +852,7 @@ export function AdminPmsReviewsPage({
           getRowId={(r) => r.id}
           searchPlaceholder="Search employee, department, quarter…"
           searchFn={(row, q) => {
-            const name = employeeName(row).toLowerCase()
+            const name = personName(row.user, "Employee").toLowerCase()
             const dept = String(row.user?.department ?? "").toLowerCase()
             const cycle = String(row.cycle?.name ?? "").toLowerCase()
             const type = String(row.cycle?.review_type ?? "").toLowerCase()
@@ -887,7 +884,7 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (r) => employeeName(r),
+            title: (r) => personName(r.user, "Employee"),
             subtitle: (r) =>
               `${r.user?.department ?? "No dept"} · ${r.cycle?.name ?? "No cycle"} · ${r.final_score !== null ? `${r.final_score?.toFixed(1)}%` : "No score"}`,
             trailing: (r) => <StatusBadge status={r.status} />,

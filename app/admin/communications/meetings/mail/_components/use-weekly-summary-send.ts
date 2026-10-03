@@ -5,6 +5,7 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { capitalize } from "@/lib/format"
 
 const log = logger("reports-mail-weekly-summary-send")
 
@@ -54,10 +55,6 @@ interface UseSendParams {
   selectedPreparedByDepartment: string | null
   currentUser?: { id?: string; department?: string | null; full_name?: string | null }
   fetchSchedules: () => void
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 function readFilenameFromDisposition(disposition: string | null, fallback: string) {

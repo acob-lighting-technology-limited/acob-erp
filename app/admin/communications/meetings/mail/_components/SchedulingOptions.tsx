@@ -8,12 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Clock, Send, Repeat, Trash2 } from "lucide-react"
 import { toLocalISODate, formatWATDateTime } from "@/lib/utils/date"
+import { capitalize } from "@/lib/format"
 
 type SendTiming = "now" | "scheduled" | "recurring"
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Schedule = Record<string, any>

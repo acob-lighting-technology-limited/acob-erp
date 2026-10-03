@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Send, Clock, Users, FileText, ClipboardList, Loader2, AlertCircle, Repeat } from "lucide-react"
+import { capitalize } from "@/lib/format"
 
 type ContentChoice =
   | "weekly_report"
@@ -17,10 +18,6 @@ type SendTiming = "now" | "scheduled" | "recurring"
 interface DocRef {
   file_name: string
   display_name: string
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 interface SummarySidebarCardProps {

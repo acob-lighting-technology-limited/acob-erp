@@ -28,7 +28,7 @@ import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { useHrProfiles } from "@/hooks/use-hr-profiles"
-import { formatDate } from "@/lib/format"
+import { formatDate, personName } from "@/lib/format"
 
 type Profile = {
   id: string
@@ -53,11 +53,6 @@ type PeerFeedbackRow = {
   created_at: string
   subject?: Profile | null
   reviewer?: Profile | null
-}
-
-function formatName(profile: Profile | null | undefined) {
-  if (!profile) return "Unknown"
-  return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown"
 }
 
 export default function PeerFeedbackPage() {
@@ -169,8 +164,8 @@ export default function PeerFeedbackPage() {
         key: "subject",
         label: "Colleague",
         sortable: true,
-        accessor: (f) => formatName(f.subject),
-        render: (f) => <span className="font-medium">{formatName(f.subject)}</span>,
+        accessor: (f) => personName(f.subject),
+        render: (f) => <span className="font-medium">{personName(f.subject)}</span>,
       },
       {
         key: "score",
@@ -273,7 +268,7 @@ export default function PeerFeedbackPage() {
           filters={cycleFilters}
           getRowId={(f) => f.id}
           searchPlaceholder="Search colleague name..."
-          searchFn={(f, query) => formatName(f.subject).toLowerCase().includes(query.toLowerCase())}
+          searchFn={(f, query) => personName(f.subject).toLowerCase().includes(query.toLowerCase())}
           isLoading={isLoading}
           onRetry={() => void loadData()}
           emptyTitle="No Feedback Given Yet"
@@ -284,11 +279,11 @@ export default function PeerFeedbackPage() {
           contactsView
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (f) => formatName(f.subject),
+            title: (f) => personName(f.subject),
             subtitle: (f) => [f.subject?.department, formatDate(f.created_at)].filter(Boolean).join(" · "),
             trailing: (f) => <Badge variant="secondary">{f.score}%</Badge>,
             detail: {
-              title: (f) => formatName(f.subject),
+              title: (f) => personName(f.subject),
               fields: (f) => [
                 { label: "Overall score", value: `${f.score}%` },
                 { label: "Comments", value: f.comments || "No comments left." },
@@ -299,7 +294,7 @@ export default function PeerFeedbackPage() {
           cardRenderer={(f) => (
             <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-semibold">{formatName(f.subject)}</span>
+                <span className="text-sm font-semibold">{personName(f.subject)}</span>
                 <Badge variant="secondary">{f.score}%</Badge>
               </div>
               {f.comments && <p className="text-muted-foreground line-clamp-2 text-xs">{f.comments}</p>}
@@ -320,7 +315,7 @@ export default function PeerFeedbackPage() {
                 </div>
                 <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
                   <span>
-                    Submitted to {formatName(f.subject)} ({f.subject?.department || "—"})
+                    Submitted to {personName(f.subject)} ({f.subject?.department || "—"})
                   </span>
                   <span>{formatDate(f.created_at)}</span>
                 </div>
@@ -445,7 +440,7 @@ export default function PeerFeedbackPage() {
                 <SelectContent>
                   {colleagues.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {formatName(c)} {c.department ? `(${c.department})` : ""}
+                      {personName(c)} {c.department ? `(${c.department})` : ""}
                       {alreadySubmittedKeys.has(`${c.id}:${selectedCycle}`) ? " ✓" : ""}
                     </SelectItem>
                   ))}
