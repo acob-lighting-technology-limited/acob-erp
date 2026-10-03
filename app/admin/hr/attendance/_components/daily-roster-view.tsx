@@ -449,6 +449,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       label: "Date",
       options: [],
       mode: "custom",
+      pinned: true,
       filterFn: () => true,
       // One control the same height, border and width as the dropdowns beside it,
       // so it sits in a single filter cell instead of spilling into the next.

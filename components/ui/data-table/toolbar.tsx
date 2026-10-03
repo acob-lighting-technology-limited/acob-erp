@@ -53,6 +53,39 @@ export function DataTableToolbar<TData>({ state }: { state: ReturnType<typeof us
     showViewToggle,
     showToolbar,
   } = state
+  const pinnedFilters = filters.filter((filter) => filter.pinned)
+  const sheetFilters = filters.filter((filter) => !filter.pinned)
+  const sheetFilterCount = activeFilterPills.filter((pill) => sheetFilters.some((f) => f.key === pill.key)).length
+  const renderFilterControl = (filter: (typeof filters)[number]) =>
+    filter.render ? (
+      filter.render(filterValues[filter.key] ?? [], (vals) => handleFilterChange(filter.key, vals))
+    ) : filter.multi === false ? (
+      <Select
+        value={filterValues[filter.key]?.[0] ?? "all"}
+        onValueChange={(val) => handleFilterChange(filter.key, val === "all" ? [] : [val])}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder={filter.placeholder ?? filter.label} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">{filter.placeholder ?? `All ${filter.label}`}</SelectItem>
+          {filter.options.map((opt: { value: string; label: string }) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    ) : (
+      <SearchableMultiSelect
+        label={filter.label}
+        icon={filter.icon}
+        values={filterValues[filter.key] ?? []}
+        options={filter.options}
+        onChange={(vals) => handleFilterChange(filter.key, vals)}
+        placeholder={filter.placeholder ?? `All ${filter.label}`}
+      />
+    )
   const toolbar = showToolbar ? (
     <div
       ref={toolbarRef}
@@ -89,14 +122,14 @@ export function DataTableToolbar<TData>({ state }: { state: ReturnType<typeof us
 
         <div className="flex shrink-0 items-center gap-2">
           {/* Mobile filters: one button + sheet, instead of a stack of selects */}
-          {filters.length > 0 && (
+          {sheetFilters.length > 0 && (
             <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="relative h-9 w-9 md:hidden" aria-label="Filters">
                   <FiltersIcon className="h-4 w-4" />
-                  {activeFilterPills.length > 0 && (
+                  {sheetFilterCount > 0 && (
                     <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold">
-                      {activeFilterPills.length}
+                      {sheetFilterCount}
                     </span>
                   )}
                 </Button>
@@ -107,38 +140,10 @@ export function DataTableToolbar<TData>({ state }: { state: ReturnType<typeof us
                     <SheetTitle>Filters</SheetTitle>
                   </SheetHeader>
                   <div className="space-y-3 pb-2">
-                    {filters.map((filter) => (
+                    {sheetFilters.map((filter) => (
                       <div key={filter.key} className="space-y-1.5">
                         <p className="text-muted-foreground text-xs font-medium">{filter.label}</p>
-                        {filter.render ? (
-                          filter.render(filterValues[filter.key] ?? [], (vals) => handleFilterChange(filter.key, vals))
-                        ) : filter.multi === false ? (
-                          <Select
-                            value={filterValues[filter.key]?.[0] ?? "all"}
-                            onValueChange={(val) => handleFilterChange(filter.key, val === "all" ? [] : [val])}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder={filter.placeholder ?? filter.label} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">{filter.placeholder ?? `All ${filter.label}`}</SelectItem>
-                              {filter.options.map((opt: { value: string; label: string }) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <SearchableMultiSelect
-                            label={filter.label}
-                            icon={filter.icon}
-                            values={filterValues[filter.key] ?? []}
-                            options={filter.options}
-                            onChange={(vals) => handleFilterChange(filter.key, vals)}
-                            placeholder={filter.placeholder ?? `All ${filter.label}`}
-                          />
-                        )}
+                        {renderFilterControl(filter)}
                       </div>
                     ))}
                   </div>
@@ -208,6 +213,15 @@ export function DataTableToolbar<TData>({ state }: { state: ReturnType<typeof us
           )}
         </div>
       </div>
+
+      {/* Pinned filters stay on screen on phones (the desktop row shows them anyway). */}
+      {pinnedFilters.length > 0 && (
+        <div className="space-y-2 md:hidden">
+          {pinnedFilters.map((filter) => (
+            <div key={filter.key}>{renderFilterControl(filter)}</div>
+          ))}
+        </div>
+      )}
 
       {/* Row 2: filter dropdowns (desktop) with the view switcher pinned right.
           On mobile the filters live in the sheet from row 1, so this row carries
