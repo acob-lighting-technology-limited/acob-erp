@@ -38,6 +38,7 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  cbtSnapshot: () => ["cbt-snapshot"],
   cbtCandidateEmails: () => ["cbt-candidate-emails"],
   cbtQuestions: (variant: string) => ["cbt-questions", variant],
   metricAddSeed: (metric: string, userId: string, cycleId: string) => ["metric-add-seed", metric, userId, cycleId],
