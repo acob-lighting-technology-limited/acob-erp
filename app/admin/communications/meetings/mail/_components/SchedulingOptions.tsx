@@ -12,7 +12,6 @@ import { capitalize } from "@/lib/format"
 
 type SendTiming = "now" | "scheduled" | "recurring"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Schedule = Record<string, any>
 
 interface SchedulingOptionsProps {

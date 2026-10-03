@@ -249,7 +249,7 @@ export function DocumentationContent({
         hideOnMobile: true,
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     []
   )
 

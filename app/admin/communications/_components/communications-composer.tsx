@@ -163,9 +163,9 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [recurringTime, setRecurringTime] = useState("18:00")
 
   const [isSending, setIsSending] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const [sendResult, setSendResult] = useState<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const [activeSchedules, setActiveSchedules] = useState<any[]>([])
   const meetingWeekOptions = useMemo(() => Array.from({ length: 53 }, (_, index) => index + 1), [])
   const meetingYearOptions = useMemo(
@@ -652,7 +652,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     if (sendTiming === "scheduled" || sendTiming === "recurring") {
       const toastId = toast.loading("Saving schedule...")
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const schedulePayload: any = {
           schedule_type: sendTiming === "scheduled" ? "one_time" : "recurring",
           reminder_type: reminderType,
@@ -733,7 +732,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminReminderSchedules(mode) })
       } catch (err: unknown) {
         log.error({ err: String(err) }, "Schedule error")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         toast.error((err as any).message || "Failed to save schedule", { id: toastId })
       }
       return
@@ -754,7 +753,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const payload: any = {
         type: reminderType,
         recipients: resolvedRecipients,
@@ -822,9 +820,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         return
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const successCount = data.results?.filter((r: any) => r.success).length || 0
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const failCount = data.results?.filter((r: any) => !r.success).length || 0
 
       if (failCount === 0) {
@@ -849,7 +846,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       })
     } catch (err: unknown) {
       log.error({ err: String(err) }, "Meeting reminder error")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       toast.error((err as any).message || "Failed to send", { id: toastId })
     } finally {
       setIsSending(false)

@@ -106,7 +106,6 @@ export async function fetchLeaveData(currentUserId: string) {
     warnings.push(`calendar: ${calendarPayload.error || calendarRes?.statusText || "network error"}`)
 
   if (warnings.length > 0) {
-    // eslint-disable-next-line no-console
     log.warn(`[leave-data] Partial fetch warnings: ${warnings.join(" | ")}`)
   }
 

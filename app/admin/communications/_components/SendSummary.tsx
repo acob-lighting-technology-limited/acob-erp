@@ -31,7 +31,7 @@ interface SendSummaryProps {
   recurringTime: string
   isSending: boolean
   onSend: () => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   sendResult: any
 }
 
@@ -257,7 +257,7 @@ export function SendSummary({
           </CardHeader>
           <CardContent>
             <div className="max-h-[300px] space-y-1 overflow-y-auto">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {}
               {sendResult.results.map((r: any, i: number) => (
                 <div
                   key={i}
