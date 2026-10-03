@@ -5,7 +5,7 @@ import { formatWATDate } from "@/lib/utils/date"
 import { useParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -130,46 +130,46 @@ export default function InvoiceDetailPage() {
   if (!invoice) return null
 
   return (
-    <AdminTablePage
-      title={invoice.invoice_number}
-      description={`Created on ${formatDate(invoice.created_at)}`}
-      icon={FileText}
-      backLinkHref="/admin/accounts/invoices"
-      backLinkLabel="Back to Invoices"
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={statusColors[invoice.status]} className="capitalize">
-            {invoice.status}
-          </Badge>
-          {invoice.status === "draft" && (
-            <>
-              <Button variant="outline" onClick={() => setIsEditOpen(true)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title={invoice.invoice_number}
+        description={`Created on ${formatDate(invoice.created_at)}`}
+        icon={FileText}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={statusColors[invoice.status]} className="capitalize">
+              {invoice.status}
+            </Badge>
+            {invoice.status === "draft" && (
+              <>
+                <Button variant="outline" onClick={() => setIsEditOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button onClick={markAsSent}>
+                  <Send className="mr-2 h-4 w-4" />
+                  Mark as Sent
+                </Button>
+              </>
+            )}
+            {invoice.status === "sent" && (
+              <Button onClick={markAsPaid} variant="default">
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Mark as Paid
               </Button>
-              <Button onClick={markAsSent}>
-                <Send className="mr-2 h-4 w-4" />
-                Mark as Sent
-              </Button>
-            </>
-          )}
-          {invoice.status === "sent" && (
-            <Button onClick={markAsPaid} variant="default">
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Mark as Paid
+            )}
+            <Button variant="outline">
+              <Printer className="mr-2 h-4 w-4" />
+              Print
             </Button>
-          )}
-          <Button variant="outline">
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Download PDF
-          </Button>
-        </div>
-      }
-    >
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Download PDF
+            </Button>
+          </div>
+        }
+        backLink={{ href: "/admin/accounts/invoices", label: "Back to Invoices" }}
+      />
       <InvoiceFormDialog
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
@@ -311,6 +311,6 @@ export default function InvoiceDetailPage() {
           )}
         </CardContent>
       </Card>
-    </AdminTablePage>
+    </PageWrapper>
   )
 }
