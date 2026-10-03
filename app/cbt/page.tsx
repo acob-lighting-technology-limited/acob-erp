@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type CandidateOption = {
   company_email: string | null
@@ -87,9 +89,18 @@ const EMPTY_FORM = {
 }
 
 export default function CbtPage() {
-  const [candidateOptions, setCandidateOptions] = useState<CandidateOption[]>([])
-  const [cycles, setCycles] = useState<ReviewCycleOption[]>([])
-  const [loadingOptions, setLoadingOptions] = useState(true)
+  const { data: options, isLoading: loadingOptions } = useQuery({
+    queryKey: QUERY_KEYS.cbtSessionOptions(),
+    queryFn: async () =>
+      (
+        await apiJson<{
+          data?: { candidates?: CandidateOption[]; cycles?: ReviewCycleOption[]; default_cycle_id?: string | null }
+        }>("/api/hr/performance/cbt/session", { cache: "no-store" })
+      ).data ?? {},
+    meta: { errorMessage: "Failed to load CBT candidates" },
+  })
+  const candidateOptions = useMemo(() => options?.candidates ?? [], [options])
+  const cycles = useMemo(() => options?.cycles ?? [], [options])
   const [starting, setStarting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [session, setSession] = useState<SessionData | null>(null)
@@ -100,7 +111,10 @@ export default function CbtPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({})
   const [verifyMode, setVerifyMode] = useState<VerifyMode>("password")
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [formState, setForm] = useState(EMPTY_FORM)
+  // Preselect the current cycle so the common case is one tap, while still
+  // allowing an earlier cycle to be chosen before starting.
+  const form = { ...formState, review_cycle_id: formState.review_cycle_id || options?.default_cycle_id || "" }
 
   // ?verify=identity deep-links straight to the date-of-birth form, which is
   // what the retired /cbt/identity route now redirects to. Read from the URL
@@ -149,32 +163,6 @@ export default function CbtPage() {
   const selectedCycleName = useMemo(() => {
     return cycles.find((c) => c.id === form.review_cycle_id)?.name || "Selected Cycle"
   }, [cycles, form.review_cycle_id])
-
-  useEffect(() => {
-    const loadOptions = async () => {
-      setLoadingOptions(true)
-      try {
-        const response = await apiFetch("/api/hr/performance/cbt/session", { cache: "no-store" })
-        const payload = await response.json()
-        if (!response.ok) throw new Error(payload.error || "Failed to load CBT candidates")
-        setCandidateOptions(payload.data?.candidates || [])
-        const loadedCycles: ReviewCycleOption[] = payload.data?.cycles || []
-        setCycles(loadedCycles)
-        // Preselect the current cycle so the common case is one tap, while
-        // still allowing an earlier cycle to be chosen before starting.
-        const defaultCycleId: string | null = payload.data?.default_cycle_id ?? null
-        if (defaultCycleId) {
-          setForm((current) => (current.review_cycle_id ? current : { ...current, review_cycle_id: defaultCycleId }))
-        }
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to load CBT candidates")
-      } finally {
-        setLoadingOptions(false)
-      }
-    }
-
-    void loadOptions()
-  }, [])
 
   const selectedQuestion = session?.questions[currentIndex] || null
 
