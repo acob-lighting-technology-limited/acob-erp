@@ -15,6 +15,7 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 
 type ReviewRow = {
   id: string
@@ -120,23 +121,15 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRows, setProcessedRows] = useState<AnalyticsRow[]>([])
   const {
-    data,
+    data: reviews = [],
     isLoading,
     error: queryError,
     refetch: loadData,
   } = useQuery({
     queryKey: QUERY_KEYS.pmsAnalytics(),
-    queryFn: async () => {
-      const [reviewsData, cyclesData] = await Promise.all([
-        apiJson<{ data?: ReviewRow[] }>("/api/hr/performance/reviews?limit=200"),
-        // Cycles only label the rows; a failure here must not hide the reviews.
-        apiJson<{ data?: Cycle[] }>("/api/hr/performance/cycles").catch(() => ({ data: [] as Cycle[] })),
-      ])
-      return { reviews: reviewsData.data ?? [], cycles: cyclesData.data ?? [] }
-    },
+    queryFn: async () => (await apiJson<{ data?: ReviewRow[] }>("/api/hr/performance/reviews?limit=200")).data ?? [],
   })
-  const reviews = useMemo(() => data?.reviews ?? [], [data])
-  const cycles = useMemo(() => data?.cycles ?? [], [data])
+  const { cycles } = usePerformanceCycles<Cycle>()
   const error = queryError?.message ?? null
 
   const rows = useMemo<AnalyticsRow[]>(

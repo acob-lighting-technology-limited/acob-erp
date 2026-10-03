@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Download, MessageSquare, UserRoundSearch, Users } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
@@ -12,6 +12,10 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { exportPmsRowsToExcel } from "@/lib/pms/export"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
+import { apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 
 type Profile = {
   id: string
@@ -83,41 +87,27 @@ function FeedbackCard({ row, onView }: { row: PeerFeedbackRow; onView: (row: Pee
 }
 
 export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string } = {}) {
-  const [feedback, setFeedback] = useState<PeerFeedbackRow[]>([])
-  const [cycles, setCycles] = useState<Cycle[]>([])
+  const {
+    data: feedback = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminPeerFeedback(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: PeerFeedbackRow[] }>(
+        "/api/hr/performance/peer-feedback?subject_user_id=all_admin",
+        { cache: "no-store" }
+      )
+      return payload.data ?? []
+    },
+  })
+  const error = queryError?.message ?? null
+  const { cycles } = usePerformanceCycles<Cycle>()
   // Rows currently visible in the table (after search + filters + sort).
   const [processedFeedback, setProcessedFeedback] = useState<PeerFeedbackRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+
   const [selectedRow, setSelectedRow] = useState<PeerFeedbackRow | null>(null)
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [feedbackRes, cyclesRes] = await Promise.all([
-        fetch("/api/hr/performance/peer-feedback?subject_user_id=all_admin"),
-        fetch("/api/hr/performance/cycles"),
-      ])
-      const [feedbackData, cyclesData] = await Promise.all([
-        feedbackRes.json().catch(() => ({})),
-        cyclesRes.json().catch(() => ({})),
-      ])
-      if (!feedbackRes.ok) {
-        throw new Error(feedbackData?.error || "Failed to load feedback")
-      }
-      setFeedback((feedbackData?.data || []) as PeerFeedbackRow[])
-      setCycles((cyclesData?.data || []) as Cycle[])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load feedback")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
 
   const cycleNameMap = useMemo(() => new Map(cycles.map((cycle) => [cycle.id, cycle.name])), [cycles])
 
@@ -344,7 +334,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         }}
         isLoading={isLoading}
         error={error}
-        onRetry={() => void loadData()}
+        onRetry={() => void refetch()}
         rowActions={rowActions}
         expandable={{
           render: (row) => (
