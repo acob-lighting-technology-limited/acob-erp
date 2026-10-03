@@ -55,6 +55,7 @@ import {
   Star,
   Eye,
   Pencil,
+  MessageCircle,
 } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
@@ -63,6 +64,7 @@ import { LunchMenuBuilderDialog } from "./_components/lunch-menu-builder-dialog"
 import { LunchDeadlineDialog } from "./_components/lunch-deadline-dialog"
 import { LunchVoteOverrideDialog } from "./_components/lunch-vote-override-dialog"
 import { LunchMenuViewersDialog } from "./_components/lunch-menu-viewers-dialog"
+import { LunchShareDialog } from "./_components/lunch-share-dialog"
 import {
   DEFAULT_LUNCH_SETTINGS,
   groupHeading,
@@ -74,7 +76,6 @@ import {
   type LunchMenuViewRecord,
 } from "@/lib/hr/lunch-voting"
 import { formatWATDate, formatWATTime } from "@/lib/utils/date"
-import { buildLunchWhatsAppMessage } from "@/lib/hr/lunch-share"
 
 export interface LunchEmployee {
   id: string
@@ -287,6 +288,7 @@ export function LunchRegisterPage({
   const [openMenuBuilder, setOpenMenuBuilder] = useState(false)
   const [editingMenu, setEditingMenu] = useState<AdminLunchMenu | null>(null)
   const [deadlineMenu, setDeadlineMenu] = useState<AdminLunchMenu | null>(null)
+  const [shareMenu, setShareMenu] = useState<AdminLunchMenu | null>(null)
   const [deletingMenu, setDeletingMenu] = useState<AdminLunchMenu | null>(null)
   const [archivingMenu, setArchivingMenu] = useState<AdminLunchMenu | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -382,7 +384,6 @@ export function LunchRegisterPage({
     }
 
     void loadMonthlyData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth, activeTab])
 
   // Fetch leaderboard data when cycle or parameters change
@@ -417,14 +418,15 @@ export function LunchRegisterPage({
   }, [activeTab, leaderboardPeriodMode, leaderboardMonth, leaderboardYear])
 
   // Load published/draft menus with their live vote tallies
-  const loadMenus = useCallback(async () => {
+  const loadMenus = useCallback(async (): Promise<AdminLunchMenu[]> => {
     setFetchingMenus(true)
     setMenusError(null)
     try {
       const res = await fetch("/api/admin/hr/lunch/menus")
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load menus")
-      setMenus((data.menus || []) as AdminLunchMenu[])
+      const loaded = (data.menus || []) as AdminLunchMenu[]
+      setMenus(loaded)
       if (data.settings) {
         setSettings(data.settings)
         setSettingsForm({
@@ -434,8 +436,10 @@ export function LunchRegisterPage({
           voting_deadline: data.settings.voting_deadline || DEFAULT_LUNCH_SETTINGS.voting_deadline,
         })
       }
+      return loaded
     } catch (err) {
       setMenusError(err instanceof Error ? err.message : "Failed to load menus")
+      return []
     } finally {
       setFetchingMenus(false)
     }
@@ -484,7 +488,8 @@ export function LunchRegisterPage({
             ? "Voting closed."
             : "Menu moved back to draft."
       )
-      void loadMenus()
+      const loaded = await loadMenus()
+      if (status === "published") offerWhatsAppShare(loaded.find((m) => m.id === menu.id))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update menu")
     }
@@ -513,20 +518,17 @@ export function LunchRegisterPage({
     }
   }
 
-  // The dated link previews the day's dishes in WhatsApp — see lib/hr/lunch-share.ts.
-  async function copyWhatsAppMessage(menu: AdminLunchMenu) {
-    const message = buildLunchWhatsAppMessage({
-      date: menu.date,
-      today: todayDate,
-      deadline: menu.resolvedDeadline,
-      origin: window.location.origin,
-    })
-    try {
-      await navigator.clipboard.writeText(message)
-      toast.success("WhatsApp message copied.")
-    } catch {
-      toast.error("Couldn't copy to the clipboard.")
-    }
+  // Publishing is followed straight away by posting to the staff WhatsApp
+  // group, so the post is offered right then — but only while staff can still
+  // vote; a menu published past its deadline has nothing to ask for.
+  function offerWhatsAppShare(menu: AdminLunchMenu | undefined) {
+    if (menu?.votingOpen) setShareMenu(menu)
+  }
+
+  // Any published day can be shared — a closed one gets a caption that doesn't
+  // ask for votes. Drafts and cancelled days have no public share page.
+  function canShareMenu(menu: AdminLunchMenu) {
+    return menu.status !== "draft" && !menu.archived_at
   }
 
   async function deleteMenu(menu: AdminLunchMenu) {
@@ -987,6 +989,25 @@ export function LunchRegisterPage({
           </Tooltip>
         )
       },
+    },
+    {
+      // Kept out of the ⋯ menu so posting to the staff group is one tap.
+      key: "share",
+      label: "Share",
+      render: (row) =>
+        canShareMenu(row) ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 px-2 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700"
+            onClick={() => setShareMenu(row)}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Share
+          </Button>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        ),
     },
   ]
 
@@ -1644,9 +1665,27 @@ export function LunchRegisterPage({
                   </div>
                   <div className="flex items-center justify-between border-t pt-2 text-[10px]">
                     <span className="text-muted-foreground">{row.votes.length} votes cast</span>
-                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setEditingMenu(row)}>
-                      Edit
-                    </Button>
+                    <div className="flex items-center gap-1.5">
+                      {canShareMenu(row) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1 text-[10px] text-emerald-600"
+                          onClick={() => setShareMenu(row)}
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                          Share
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px]"
+                        onClick={() => setEditingMenu(row)}
+                      >
+                        Edit
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )
@@ -1669,12 +1708,6 @@ export function LunchRegisterPage({
                 label: "Change deadline",
                 hidden: (row) => row.date < todayDate,
                 onClick: (row) => setDeadlineMenu(row),
-              },
-              {
-                // Only a published, open poll is worth posting to the group.
-                label: "Copy WhatsApp message",
-                hidden: (row) => !row.votingOpen,
-                onClick: (row) => void copyWhatsAppMessage(row),
               },
               {
                 label: "Change someone's answer",
@@ -2389,7 +2422,17 @@ export function LunchRegisterPage({
         defaultDate={selectedDate}
         todayDate={todayDate}
         defaultDeadline={settings.voting_deadline || DEFAULT_LUNCH_SETTINGS.voting_deadline}
-        onSaved={() => void loadMenus()}
+        onSaved={async ({ date, published }) => {
+          const loaded = await loadMenus()
+          if (published) offerWhatsAppShare(loaded.find((m) => m.date === date && !m.archived_at))
+        }}
+      />
+
+      <LunchShareDialog
+        open={shareMenu !== null}
+        onOpenChange={(open) => !open && setShareMenu(null)}
+        menu={shareMenu}
+        todayDate={todayDate}
       />
 
       <ExportOptionsDialog
