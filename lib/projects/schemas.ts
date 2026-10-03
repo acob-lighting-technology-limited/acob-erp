@@ -41,3 +41,21 @@ export function parseCapacity(value: number | string | null | undefined): number
   const n = Number(value)
   return Number.isFinite(n) ? n : null
 }
+
+export const PORTFOLIO_STATUSES = ["active", "on_hold", "closed"] as const
+
+/** A portfolio's editable fields — the portfolio form, POST /api/portfolios and PATCH /api/portfolios/[id]. */
+export const PortfolioFieldsSchema = z.object({
+  name: z.string().trim().min(1, "Portfolio name is required"),
+  code: z.string().trim().max(32, "Use 32 characters or fewer").optional().nullable(),
+  description: z.string().trim().max(5000, "Use 5,000 characters or fewer").optional().nullable(),
+  status: z.enum(PORTFOLIO_STATUSES),
+})
+
+export type PortfolioFields = z.infer<typeof PortfolioFieldsSchema>
+
+export const CreatePortfolioSchema = PortfolioFieldsSchema.extend({
+  status: PortfolioFieldsSchema.shape.status.default("active"),
+})
+
+export const UpdatePortfolioSchema = PortfolioFieldsSchema.partial()
