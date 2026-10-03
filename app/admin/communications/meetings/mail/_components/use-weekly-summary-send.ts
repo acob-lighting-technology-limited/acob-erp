@@ -182,7 +182,7 @@ export function useWeeklySummarySend({
   // Sorted array of selected weeks for iteration
   const weekNumbers = Array.from(selectedWeeks).sort((a, b) => a - b)
   const [isSending, setIsSending] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const [sendResult, setSendResult] = useState<any>(null)
 
   const logMailAudit = useCallback(
@@ -274,7 +274,7 @@ export function useWeeklySummarySend({
       }
 
       // ── Build payload ───────────────────────────────────────────────────────
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const payload: any = {
         recipients: resolvedRecipients,
         // Pass all selected weeks; backend will include one report per week
@@ -324,9 +324,9 @@ export function useWeeklySummarySend({
       if (!res.ok) throw new Error(result.error || "Failed to send weekly report")
 
       setSendResult(result)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const successCount = result.results?.filter((r: any) => r.success).length || 0
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const failCount = result.results?.filter((r: any) => !r.success).length || 0
 
       if (failCount === 0) {

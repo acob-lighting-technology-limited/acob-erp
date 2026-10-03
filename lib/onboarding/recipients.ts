@@ -9,7 +9,6 @@ import { DEPT_ADMIN_HR, DEPT_CORPORATE_SERVICES, DEPT_ITC, normalizeDepartmentNa
 // Inboxes come from departments.email; the env-configurable ORG_* addresses are
 // only a fallback for a department whose email has not been filled in.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type OnboardingClient = SupabaseClient<any, any, any>
 
 interface LeadProfileRow {

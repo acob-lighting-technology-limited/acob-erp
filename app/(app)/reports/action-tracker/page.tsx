@@ -242,7 +242,6 @@ export default function ActionTrackerPortal() {
     return toActionItems(
       processedDepartmentRows.length ? processedDepartmentRows.flatMap((row) => row.tasks) : weeklyTasks
     )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, directives, processedDirectives, weeklyTasks, processedDepartmentRows])
 
   const tasksQueryKey = QUERY_KEYS.actionTrackerTasks({ week, year, deptFilter })
