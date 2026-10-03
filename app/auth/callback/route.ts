@@ -8,10 +8,10 @@ const log = logger("auth-callback")
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get("code")
-  const next = searchParams.get("next") || "/home"
+  const next = searchParams.get("next") || "/profile"
 
   // Validate and sanitize 'next' to prevent open redirects
-  let safeNext = "/home"
+  let safeNext = "/profile"
   if (
     next &&
     typeof next === "string" &&
