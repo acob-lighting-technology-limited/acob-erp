@@ -21,10 +21,8 @@ import {
   ShieldCheck,
   Ticket,
   TrendingUp,
-  User,
   Users,
   Wrench,
-  FolderKanban,
   Layers,
 } from "lucide-react"
 
@@ -49,13 +47,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
-import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
+import { useDepartmentCode } from "@/hooks/use-department-code"
 
 interface SidebarProps {
   user?: {
@@ -237,7 +235,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [departmentCode, setDepartmentCode] = useState<string | null>(null)
+  const departmentCode = useDepartmentCode(profile?.department)
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
@@ -311,35 +309,6 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
   )
-
-  useEffect(() => {
-    let cancelled = false
-    const departmentName = profile?.department ? normalizeDepartmentName(profile.department) : ""
-    if (!departmentName) {
-      setDepartmentCode(null)
-      return
-    }
-
-    async function loadDepartmentCode() {
-      try {
-        const response = await fetch("/api/departments", { cache: "no-store" })
-        if (!response.ok) return
-        const payload = (await response.json().catch(() => null)) as {
-          data?: Array<{ name?: string | null; department_code?: string | null }>
-        } | null
-        const rows = payload?.data || []
-        const match = rows.find((row) => normalizeDepartmentName(String(row.name || "")) === departmentName)
-        if (!cancelled) setDepartmentCode(match?.department_code || null)
-      } catch {
-        if (!cancelled) setDepartmentCode(null)
-      }
-    }
-
-    void loadDepartmentCode()
-    return () => {
-      cancelled = true
-    }
-  }, [profile?.department])
 
   const accountName =
     profile?.first_name && profile?.last_name

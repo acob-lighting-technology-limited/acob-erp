@@ -69,9 +69,9 @@ export const QUERY_KEYS = {
   ticket: (id: string) => ["ticket", id],
 
   // Admin
+  departmentRows: () => ["department-rows"],
   hrProfilesAll: () => ["hr-profiles-all"],
   departments: () => ["departments"],
-  departmentRows: () => ["departments", "rows"],
   officeLocations: () => ["office-locations"],
   staffAvatars: () => ["staff-avatars"],
   staffCard: (id: string) => ["staff-card", id],
@@ -245,6 +245,7 @@ export const QUERY_KEYS = {
     filters ? ["admin-security-network-activity", filters] : ["admin-security-network-activity"],
 
   // Dev / maintenance
+  devUserAuditLogs: (userId: string) => ["dev-user-audit-logs", userId],
   leaveFlowTestFormData: () => ["leave-flow-test-form-data"],
   devTestsFormData: () => ["dev-tests-form-data"],
   maintenanceState: () => ["maintenance-state"],

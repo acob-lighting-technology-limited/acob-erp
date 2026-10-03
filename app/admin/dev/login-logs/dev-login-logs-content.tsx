@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDate, formatWATDateTime, formatWATRelative } from "@/lib/utils/date"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { apiJson } from "@/lib/api-client"
 
 type DevLoginLogRow = {
   id: string
@@ -142,20 +143,12 @@ function UserStatsView({
   allLogs: DevLoginLogRow[]
 }) {
   const userLogs = useMemo(() => allLogs.filter((log) => log.email === email), [email, allLogs])
-  const [auditLogs, setAuditLogs] = useState<any[]>([])
-  const [loadingAudit, setLoadingAudit] = useState(false)
-
-  useEffect(() => {
-    if (!userId) return
-    setLoadingAudit(true)
-    fetch(`/api/admin/dev/login-logs?type=audit&user_id=${userId}`)
-      .then((res) => res.json())
-      .then((payload) => {
-        setAuditLogs(payload.data || [])
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoadingAudit(false))
-  }, [userId])
+  const { data: auditLogs = [], isLoading: loadingAudit } = useQuery({
+    queryKey: QUERY_KEYS.devUserAuditLogs(userId ?? ""),
+    queryFn: async () =>
+      (await apiJson<{ data?: any[] }>(`/api/admin/dev/login-logs?type=audit&user_id=${userId}`)).data ?? [],
+    enabled: Boolean(userId),
+  })
 
   const userStats = useMemo(() => {
     const total = userLogs.length
