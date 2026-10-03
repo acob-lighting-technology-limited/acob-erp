@@ -7,4 +7,7 @@ export const layout: TablePageLayout = {
   showStats: true,
   statCards: 5,
   actions: 2,
+  showBackLink: true,
+  spacing: "tight",
+  tabs: 2,
 }

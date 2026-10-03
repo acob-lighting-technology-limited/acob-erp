@@ -9,4 +9,5 @@ export const layout: TablePageLayout = {
   statCards: 4,
   actions: 2,
   list: "responsive",
+  showBackLink: true,
 }

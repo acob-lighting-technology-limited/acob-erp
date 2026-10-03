@@ -5,4 +5,6 @@ export const layout: TablePageLayout = {
   columns: 5,
   rows: 8,
   showStats: true,
+  tabs: 2,
+  showBackLink: true,
 }

@@ -8,4 +8,6 @@ export const layout: TablePageLayout = {
   showStats: true,
   statCards: 4,
   actions: 0,
+  showBackLink: true,
+  spacing: "tight",
 }

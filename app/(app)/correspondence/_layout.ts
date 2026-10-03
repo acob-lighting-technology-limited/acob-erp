@@ -10,4 +10,5 @@ export const layout: TablePageLayout = {
   actions: 1,
   list: "responsive",
   groups: 1,
+  showBackLink: true,
 }

@@ -8,4 +8,5 @@ export const layout: TablePageLayout = {
   showStats: true,
   statCards: 4,
   actions: 2,
+  showBackLink: true,
 }

@@ -24,7 +24,7 @@ const log = logger("components-ui-data-table-page")
 /** Dev-only: once per page and field, say where a route's `_layout.ts` no longer matches the page. */
 const reportedDrift = new Set<string>()
 function warnLayoutDrift(page: string, field: string, declared: unknown, actual: unknown) {
-  if (declared === undefined || declared === actual) return
+  if (declared === actual) return
   const key = `${page}:${field}`
   if (reportedDrift.has(key)) return
   reportedDrift.add(key)
@@ -58,11 +58,13 @@ export function DataTablePage({
   const pageLayout = layout ?? contextLayout
   if (process.env.NODE_ENV !== "production" && pageLayout) {
     const pageName = typeof title === "string" ? title : "untitled"
-    warnLayoutDrift(pageName, "tabs", pageLayout.tabs, tabs?.length ?? 0)
-    warnLayoutDrift(pageName, "statBadges", pageLayout.statBadges, statBadges?.length ?? 0)
-    warnLayoutDrift(pageName, "showBackLink", pageLayout.showBackLink, Boolean(backLink))
-    warnLayoutDrift(pageName, "spacing", pageLayout.spacing, spacing ?? "standard")
-    warnLayoutDrift(pageName, "inlineActions", pageLayout.inlineActions, actionsPlacement === "inline-always")
+    // A field left out of _layout.ts renders at TablePageSkeleton's default, so
+    // compare against that default rather than skipping the field.
+    warnLayoutDrift(pageName, "tabs", pageLayout.tabs ?? 0, tabs?.length ?? 0)
+    warnLayoutDrift(pageName, "statBadges", pageLayout.statBadges ?? 0, statBadges?.length ?? 0)
+    warnLayoutDrift(pageName, "showBackLink", pageLayout.showBackLink ?? false, Boolean(backLink))
+    warnLayoutDrift(pageName, "spacing", pageLayout.spacing ?? "standard", spacing ?? "standard")
+    warnLayoutDrift(pageName, "inlineActions", pageLayout.inlineActions ?? true, actionsPlacement === "inline-always")
   }
 
   const [exportSlot, setExportSlot] = useState<HTMLDivElement | null>(null)

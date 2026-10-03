@@ -6,4 +6,5 @@ export const layout: TablePageLayout = {
   rows: 8,
   showStats: true,
   statCards: 4,
+  showBackLink: true,
 }

@@ -3,4 +3,6 @@ import type { TablePageLayout } from "@/components/ui/data-table/types"
 export const layout: TablePageLayout = {
   showStats: true,
   statCards: 5,
+  showBackLink: true,
+  spacing: "tight",
 }
