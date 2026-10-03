@@ -1,10 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
-import { CircleDollarSign, Download, Eye, FileClock, FileText, Pencil, Plus, Send, Wallet } from "lucide-react"
+import { CircleDollarSign, Eye, FileClock, FileText, Pencil, Plus, Wallet } from "lucide-react"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +12,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
-import { formatCurrency } from "@/lib/format"
+import { formatCurrency, formatDate } from "@/lib/format"
 
 export interface Invoice {
   id: string
@@ -45,10 +44,6 @@ async function fetchInvoicesList(): Promise<Invoice[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load invoices")
   const json = await res.json()
   return (json.data || []) as Invoice[]
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getDueWindow(invoice: Invoice) {

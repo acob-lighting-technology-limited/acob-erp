@@ -1,6 +1,5 @@
 "use client"
 
-import { formatWATDate } from "@/lib/utils/date"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,6 +7,7 @@ import { Eye, User, Building2, Briefcase, Calendar } from "lucide-react"
 import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { formatName } from "@/lib/utils"
 import type { UserRole } from "@/types/database"
+import { formatDate } from "@/lib/format"
 
 interface Profile {
   id: string
@@ -27,11 +27,6 @@ function getCompletionColor(hasDescription: boolean): string {
   return hasDescription
     ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
     : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never"
-  return formatWATDate(dateString, { month: "short", day: "numeric", year: "numeric" })
 }
 
 interface JobDescriptionCardViewProps {
@@ -79,7 +74,7 @@ export function JobDescriptionCardView({ profiles, onView }: JobDescriptionCardV
 
             <div className="text-muted-foreground flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4" />
-              <span>Updated: {formatDate(profile.job_description_updated_at)}</span>
+              <span>Updated: {formatDate(profile.job_description_updated_at, "Never")}</span>
             </div>
 
             <Button

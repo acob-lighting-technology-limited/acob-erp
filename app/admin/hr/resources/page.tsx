@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { formatWATDateTime } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle, Box } from "lucide-react"
@@ -22,12 +21,7 @@ import { BookingReviewDialog } from "./_components/booking-review-dialog"
 import { ResourceDialog } from "./_components/resource-dialog"
 import type { FleetAttachment, FleetBooking, FleetResource } from "./_components/fleet-types"
 import { apiFetch } from "@/lib/api-client"
-
-function formatDateTime(value: string) {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-  return formatWATDateTime(parsed)
-}
+import { formatDateTime } from "@/lib/format"
 
 async function fetchFleetResources(): Promise<FleetResource[]> {
   const response = await apiFetch("/api/admin/hr/fleet/resources")

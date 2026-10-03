@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery } from "@tanstack/react-query"
 import { CalendarDays, Package, PackageCheck, ReceiptText, ShoppingBag } from "lucide-react"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -10,6 +9,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { formatDate } from "@/lib/format"
 
 interface Receipt {
   id: string
@@ -26,10 +26,6 @@ async function fetchReceipts(): Promise<Receipt[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load receipts")
   const json = await res.json()
   return (json.data || []) as Receipt[]
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getItemBand(totalItems: number) {
