@@ -1,6 +1,6 @@
 "use client"
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react"
+import { forwardRef, useImperativeHandle, useMemo, useState, useEffect } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,9 @@ import { getAttendanceMonthOptions, monthBounds, toLocalYearMonth } from "@/lib/
 import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
 import { logger } from "@/lib/logger"
 import { CHANGE_LOG_CATEGORY_LABELS, type ChangeLogCategory, type ChangeLogRow } from "@/lib/hr/attendance-change-log"
+import { apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("admin-attendance-change-log-view")
 
@@ -142,32 +145,24 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
   const [month, setMonth] = useState(toLocalYearMonth())
   const { start: from, end: monthEnd } = monthBounds(month)
   const to = monthEnd > today ? today : monthEnd
-  const [rows, setRows] = useState<ChangeLogRow[]>([])
   const [processedRows, setProcessedRows] = useState<ChangeLogRow[]>([])
-  const [truncated, setTruncated] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  const load = useCallback(async () => {
-    if (!from || !to || from > to) return
-    setLoading(true)
-    try {
+  const { data, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.attendanceChangeLog(from, to),
+    enabled: Boolean(from && to && from <= to),
+    queryFn: async () => {
       const params = new URLSearchParams({ from, to })
-      const res = await fetch(`/api/admin/hr/attendance/change-log?${params.toString()}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load change log")
-      setRows((payload?.data as ChangeLogRow[]) ?? [])
-      setTruncated(Boolean(payload?.truncated))
-    } catch (err) {
-      log.error({ err: String(err) }, "Failed to load change log")
-      toast.error("Failed to load change log")
-    } finally {
-      setLoading(false)
-    }
-  }, [from, to])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ data?: ChangeLogRow[]; truncated?: boolean }>(
+        `/api/admin/hr/attendance/change-log?${params.toString()}`,
+        { cache: "no-store" }
+      )
+      return { rows: payload.data ?? [], truncated: Boolean(payload.truncated) }
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load change log" },
+  })
+  const rows = useMemo(() => data?.rows ?? [], [data])
+  const truncated = data?.truncated ?? false
 
   useEffect(() => {
     onVisibleCountChange?.(processedRows.length)
