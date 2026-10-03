@@ -12,6 +12,7 @@ import { NewRequisitionDialog } from "@/app/(app)/accounts/requisitions/_compone
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRequisitions } from "@/hooks/use-requisitions"
+import { formatCurrency } from "@/lib/format"
 
 function StageBadge({ requisition }: { requisition: Requisition }) {
   if (requisition.status === "approved") {
@@ -113,7 +114,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
       accessor: (r) => Number(r.amount) || 0,
       render: (r) => (
         <span className="font-mono text-xs font-semibold">
-          ₦{(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+          {formatCurrency(Number(r.amount) || 0, { whole: true })}
         </span>
       ),
       initialWidth: 130,
@@ -227,7 +228,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
           <StatCard
             variant="compact"
             title="Total Amount (₦)"
-            value={`₦${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`}
+            value={`${formatCurrency(totalAmount, { whole: true })}`}
             icon={FileCheck2}
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
@@ -276,7 +277,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
         mobileRow={{
           title: (r) => r.purpose,
           subtitle: (r) =>
-            `${r.requisition_number} · ${r.project_name || r.department} · ₦${(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}`,
+            `${r.requisition_number} · ${r.project_name || r.department} · ${formatCurrency(Number(r.amount) || 0, { whole: true })}`,
           trailing: (r) => <StageBadge requisition={r} />,
           onSelect: (r) => router.push(`/accounts/requisitions/${r.id}`),
         }}
@@ -285,7 +286,7 @@ export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequis
             <div className="flex items-center justify-between gap-2">
               <span className="text-muted-foreground font-mono text-xs font-bold">{r.requisition_number}</span>
               <span className="text-success-foreground font-mono text-xs font-bold">
-                ₦{(Number(r.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                {formatCurrency(Number(r.amount) || 0, { whole: true })}
               </span>
             </div>
             <div>

@@ -52,6 +52,7 @@ import { StatusBadge, labelSource } from "./_components/status-badge"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatNumber } from "@/lib/format"
 
 const log = logger("hr-attendance-reports")
 
@@ -957,8 +958,8 @@ export function AttendanceReportsPage({
     const totalMissedHours = reports.reduce((a, r) => a + (r.total_missed_hours ?? 0), 0)
     return {
       employees: reports.length,
-      totalHours: `${(Math.round(totalHours * 10) / 10).toLocaleString()} hrs`,
-      totalMissedHours: `${(Math.round(totalMissedHours * 10) / 10).toLocaleString()} hrs`,
+      totalHours: `${formatNumber(Math.round(totalHours * 10) / 10)} hrs`,
+      totalMissedHours: `${formatNumber(Math.round(totalMissedHours * 10) / 10)} hrs`,
     }
   }, [reports])
 

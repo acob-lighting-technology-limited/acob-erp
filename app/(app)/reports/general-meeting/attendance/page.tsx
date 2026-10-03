@@ -26,6 +26,7 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatTime } from "@/lib/format"
 
 interface SessionData {
   session: {
@@ -71,7 +72,7 @@ function formatClockTime(val: string | null | undefined): string {
   }
   const d = new Date(val)
   if (!Number.isNaN(d.getTime())) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    return formatTime(d)
   }
   return val
 }

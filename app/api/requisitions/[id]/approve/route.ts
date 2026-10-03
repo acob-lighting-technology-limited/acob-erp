@@ -12,6 +12,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { createNotification } from "@/lib/notifications/create"
+import { formatCurrency } from "@/lib/format"
 
 const log = logger("api-requisitions-approve")
 
@@ -181,8 +182,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           p_category: "approvals",
           p_title: "Requisition Fully Approved",
           p_message: req.is_emergency
-            ? `Your emergency requisition ${req.requisition_number} (₦${req.amount.toLocaleString()}) has been approved by Executive Management via the expedited route.`
-            : `Your requisition ${req.requisition_number} (₦${req.amount.toLocaleString()}) has been fully approved by Executive Management.`,
+            ? `Your emergency requisition ${req.requisition_number} (${formatCurrency(req.amount, { whole: true })}) has been approved by Executive Management via the expedited route.`
+            : `Your requisition ${req.requisition_number} (${formatCurrency(req.amount, { whole: true })}) has been fully approved by Executive Management.`,
           p_priority: "high",
           p_link_url: `/accounts/requisitions/${req.id}`,
           p_actor_id: user.id,

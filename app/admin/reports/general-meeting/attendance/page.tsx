@@ -33,6 +33,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
+import { formatTime as formatClockTime } from "@/lib/format"
 
 function formatTime(value: string | null): string {
   if (!value) return "—"
@@ -50,7 +51,7 @@ function formatTime(value: string | null): string {
 
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+  return formatClockTime(date)
 }
 
 function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {

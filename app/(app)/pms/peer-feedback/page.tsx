@@ -28,6 +28,7 @@ import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { useHrProfiles } from "@/hooks/use-hr-profiles"
+import { formatDate } from "@/lib/format"
 
 type Profile = {
   id: string
@@ -183,9 +184,7 @@ export default function PeerFeedbackPage() {
         label: "Submitted",
         sortable: true,
         accessor: (f) => f.created_at,
-        render: (f) => (
-          <span className="text-muted-foreground text-xs">{new Date(f.created_at).toLocaleDateString()}</span>
-        ),
+        render: (f) => <span className="text-muted-foreground text-xs">{formatDate(f.created_at)}</span>,
         hideOnMobile: true,
       },
     ],
@@ -225,9 +224,7 @@ export default function PeerFeedbackPage() {
         label: "Received",
         sortable: true,
         accessor: (f) => f.created_at,
-        render: (f) => (
-          <span className="text-muted-foreground text-xs">{new Date(f.created_at).toLocaleDateString()}</span>
-        ),
+        render: (f) => <span className="text-muted-foreground text-xs">{formatDate(f.created_at)}</span>,
         hideOnMobile: true,
       },
     ],
@@ -288,15 +285,14 @@ export default function PeerFeedbackPage() {
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
             title: (f) => formatName(f.subject),
-            subtitle: (f) =>
-              [f.subject?.department, new Date(f.created_at).toLocaleDateString()].filter(Boolean).join(" · "),
+            subtitle: (f) => [f.subject?.department, formatDate(f.created_at)].filter(Boolean).join(" · "),
             trailing: (f) => <Badge variant="secondary">{f.score}%</Badge>,
             detail: {
               title: (f) => formatName(f.subject),
               fields: (f) => [
                 { label: "Overall score", value: `${f.score}%` },
                 { label: "Comments", value: f.comments || "No comments left." },
-                { label: "Submitted", value: new Date(f.created_at).toLocaleDateString() },
+                { label: "Submitted", value: formatDate(f.created_at) },
               ],
             },
           }}
@@ -309,7 +305,7 @@ export default function PeerFeedbackPage() {
               {f.comments && <p className="text-muted-foreground line-clamp-2 text-xs">{f.comments}</p>}
               <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
                 <span>Submitted</span>
-                <span>{new Date(f.created_at).toLocaleDateString()}</span>
+                <span>{formatDate(f.created_at)}</span>
               </div>
             </div>
           )}
@@ -326,7 +322,7 @@ export default function PeerFeedbackPage() {
                   <span>
                     Submitted to {formatName(f.subject)} ({f.subject?.department || "—"})
                   </span>
-                  <span>{new Date(f.created_at).toLocaleDateString()}</span>
+                  <span>{formatDate(f.created_at)}</span>
                 </div>
               </div>
             ),
@@ -352,7 +348,7 @@ export default function PeerFeedbackPage() {
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
             title: () => "Anonymous Peer",
-            subtitle: (f) => `Received ${new Date(f.created_at).toLocaleDateString()}`,
+            subtitle: (f) => `Received ${formatDate(f.created_at)}`,
             trailing: (f) => <Badge variant="secondary">{f.score}%</Badge>,
             detail: {
               title: () => "Anonymous Peer",
@@ -363,7 +359,7 @@ export default function PeerFeedbackPage() {
                 { label: "Communication", value: f.communication !== null ? `${f.communication}%` : null },
                 { label: "Professionalism", value: f.professionalism !== null ? `${f.professionalism}%` : null },
                 { label: "Comments", value: f.comments || null },
-                { label: "Received", value: new Date(f.created_at).toLocaleDateString() },
+                { label: "Received", value: formatDate(f.created_at) },
               ],
             },
           }}
@@ -389,7 +385,7 @@ export default function PeerFeedbackPage() {
               </div>
               <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
                 <span>Received</span>
-                <span>{new Date(f.created_at).toLocaleDateString()}</span>
+                <span>{formatDate(f.created_at)}</span>
               </div>
             </div>
           )}

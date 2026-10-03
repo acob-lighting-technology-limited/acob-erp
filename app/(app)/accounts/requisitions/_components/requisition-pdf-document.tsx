@@ -6,6 +6,7 @@ import type { Requisition } from "@/lib/requisitions/types"
 import { getStageLabel, isStageBypassed } from "@/lib/requisitions/workflow"
 import { CheckCircle2, Clock, XCircle, FileText, Download, Printer, Siren, MinusCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { formatCurrency } from "@/lib/format"
 
 interface RequisitionPdfDocumentProps {
   requisition: Requisition
@@ -276,9 +277,7 @@ export function RequisitionPdfDocument({
             </div>
             <div>
               <span className="block text-xs text-slate-600 uppercase">AMOUNT (₦):</span>
-              <span className="text-sm font-bold text-emerald-700">
-                ₦{Number(requisition.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </span>
+              <span className="text-sm font-bold text-emerald-700">{formatCurrency(Number(requisition.amount))}</span>
             </div>
           </div>
 

@@ -13,6 +13,7 @@ import { isRequisitionApprover, resolveRequisitionActor } from "@/lib/requisitio
 import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { createNotification } from "@/lib/notifications/create"
+import { formatCurrency } from "@/lib/format"
 
 const log = logger("api-requisitions")
 
@@ -212,8 +213,8 @@ export async function POST(request: NextRequest) {
       if (adminHrProfiles && adminHrProfiles.length > 0) {
         const title = isEmergency ? "EMERGENCY Requisition — Immediate Approval Needed" : "New Requisition for Review"
         const message = isEmergency
-          ? `Emergency requisition ${newReq.requisition_number} (₦${payload.amount.toLocaleString()}) bypassed review, authorization and verification and is awaiting MD / Executive approval.`
-          : `Requisition ${newReq.requisition_number} (₦${payload.amount.toLocaleString()}) submitted for ${getStageLabel(initialStage).replace(/^Pending /, "")}.`
+          ? `Emergency requisition ${newReq.requisition_number} (${formatCurrency(payload.amount, { whole: true })}) bypassed review, authorization and verification and is awaiting MD / Executive approval.`
+          : `Requisition ${newReq.requisition_number} (${formatCurrency(payload.amount, { whole: true })}) submitted for ${getStageLabel(initialStage).replace(/^Pending /, "")}.`
 
         for (const target of adminHrProfiles) {
           await createNotification({

@@ -20,6 +20,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useRequisitions } from "@/hooks/use-requisitions"
 import { useMyProfile } from "@/hooks/use-my-profile"
+import { formatCurrency } from "@/lib/format"
 
 const TABS: DataTableTab[] = [
   { key: "my", label: "My Requisitions" },
@@ -55,7 +56,7 @@ function StageBadge({ requisition }: { requisition: Requisition }) {
 }
 
 function formatNaira(amount: number | string | null | undefined, decimals = 2) {
-  return `₦${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: decimals })}`
+  return formatCurrency(Number(amount || 0), { whole: decimals === 0 })
 }
 
 export default function RequisitionListPage() {

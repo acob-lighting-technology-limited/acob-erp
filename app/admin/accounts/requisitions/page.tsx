@@ -22,6 +22,7 @@ import { useFundingCategories, useRequisitions } from "@/hooks/use-requisitions"
 import { useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
+import { formatCurrency } from "@/lib/format"
 
 const TABS: DataTableTab[] = [
   { key: "requisitions", label: "Requisitions", icon: FileCheck2 },
@@ -167,7 +168,7 @@ export default function AdminRequisitionsPage() {
       accessor: (r) => r.amount,
       render: (r) => (
         <span className="text-success-foreground font-mono text-xs font-semibold">
-          ₦{Number(r.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {formatCurrency(Number(r.amount))}
         </span>
       ),
       initialWidth: 140,
@@ -372,7 +373,7 @@ export default function AdminRequisitionsPage() {
           <StatCard
             variant="compact"
             title="Total Amount (₦)"
-            value={`₦${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0 })}`}
+            value={`${formatCurrency(totalAmount, { whole: true })}`}
             icon={FileCheck2}
             iconBgColor="bg-purple-500/10"
             iconColor="text-purple-500"
@@ -433,7 +434,7 @@ export default function AdminRequisitionsPage() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (r) => `${r.requisition_number} · ₦${Number(r.amount).toLocaleString()}`,
+            title: (r) => `${r.requisition_number} · ${formatCurrency(Number(r.amount), { whole: true })}`,
             subtitle: (r) => `${r.project_name} · ${r.requester?.full_name || "Staff"} · ${r.department}`,
             trailing: (r) => (
               <Badge
@@ -459,7 +460,7 @@ export default function AdminRequisitionsPage() {
               </div>
               <div className="flex items-center justify-between border-t pt-2">
                 <span className="text-muted-foreground">{r.requester?.full_name || r.department}</span>
-                <span className="font-semibold">₦{Number(r.amount).toLocaleString()}</span>
+                <span className="font-semibold">{formatCurrency(Number(r.amount), { whole: true })}</span>
               </div>
             </div>
           )}
