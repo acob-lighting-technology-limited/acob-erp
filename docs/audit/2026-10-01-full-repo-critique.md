@@ -110,7 +110,7 @@ DO $$ DECLARE f regprocedure; BEGIN
 | [x] done — 998 → 0 in owned files (42b455bc) | 1.7 🟠 | **998 uses of `text-[10px]`/`text-[11px]`.** | Unreadable on phones and on the 150%-scaled laptops your own CSS comment describes. External reviewers notice this immediately. | Make `text-xs` (12px) the floor. Find and replace `text-[10px]`/`text-[11px]` with `text-xs`, and ban arbitrary font sizes via lint. |
 | [ ] | 1.8 🟡 | **1,548 arbitrary values** (`w-[…]`, `h-[…]`, `max-w-[…]`). | Spacing doesn't follow the scale, and layouts feel "off" by a few pixels. | Use scale values. For the ones that repeat, add `@theme` tokens (`--spacing-sidebar`, etc.). |
 | [x] done — tailwind.config.ts + tailwindcss-animate removed (86db252f) | 1.9 🟡 | **`tailwind.config.ts` is dead and wrong.** Tailwind v4 does not load it, and it wraps oklch vars in `hsl()`. | It misleads every contributor and agent, and breaks colours if anyone wires it with `@config`. | Delete the file, and remove the `tailwindcss-animate` dependency (you use `tw-animate-css`). |
-| [ ] | 1.10 🟡 | **30 raw `<img>` vs 12 `next/image`**, and 16 lint disables for it. | Images are not resized or lazy-loaded, which costs egress and causes layout shift. | Use `next/image` (Supabase storage is already in `images.remotePatterns`). Keep `<img>` only in email or PDF renderers. |
+| [x] reviewed every <img>: employee avatar → shadcn Avatar, letterhead logo → next/image. The rest are correct as raw img — email-signature HTML strings, next/og, blob/data URLs (QR, PDF previews), signed Storage URLs and arbitrary external thumbnails, which next/image cannot or should not proxy | 1.10 🟡 | **30 raw `<img>` vs 12 `next/image`**, and 16 lint disables for it. | Images are not resized or lazy-loaded, which costs egress and causes layout shift. | Use `next/image` (Supabase storage is already in `images.remotePatterns`). Keep `<img>` only in email or PDF renderers. |
 | [ ] | 1.11 🟡 | **Modal-heavy**: 157 `DialogContent` vs 3 `SheetContent`, while AGENTS.md says a row tap opens a sheet. | Long forms in centred dialogs are cramped on phones. | You already have `ui/patterns/responsive-modal.tsx` (**1 user**). Make it Dialog ≥ md and **Drawer (vaul) < md**, then switch dialogs to it. |
 | [ ] | 1.12 🟡 | **Three shell accents** (green user / amber admin / blue lead). | A good idea, but some components hardcode green and ignore the shell. | Make components read `--primary`, and have each shell redefine `--primary` (not a separate `--admin-primary`). |
 
@@ -125,7 +125,7 @@ DO $$ DECLARE f regprocedure; BEGIN
 | [ ] | 2.5 🟠 | **Forms behave differently everywhere.** About 147 files hand-roll `useState` forms; 12 use RHF. | Different error messages and disabled states; input is lost after a failed submit; enter-to-submit only works sometimes. | Standardise on **react-hook-form + zod + shadcn `<Form>`** (§10). Share each schema between the client form and the API route. |
 | [x] done — 96 icon buttons, 93 labelled; 3 left are in files with another session's uncommitted work (6587ef36) | 2.6 🟠 | **76 of 98 icon-only buttons have no accessible name.** | Screen readers say "button", and there is no tooltip for sighted users either. | Add `aria-label` plus `<Tooltip>`. Better: create `<IconButton label="…" icon={…}>` that *requires* `label`, and lint against raw `size="icon"`. |
 | [x] providers/confirm-provider.tsx (7acbad31) | 2.7 🟡 | **9 native `confirm()`/`alert()` calls.** | They look like 1999 and break the design. | Use `<AlertDialog>`. Add a `useConfirm()` hook that returns a promise, so call sites stay one line. |
-| [ ] | 2.8 🟡 | **Dates are formatted by browser locale** (117 `toLocale*` calls). | One person sees `10/1/2026`, another sees `1/10/2026`. | Put one `lib/format.ts` behind `Intl.DateTimeFormat('en-NG', { timeZone: 'Africa/Lagos' })` and ban `toLocale*` via lint. |
+| [x] every locale-less toLocale* call moved to lib/format or an explicit en-NG locale (07610226); explicit-locale calls left are deterministic | 2.8 🟡 | **Dates are formatted by browser locale** (117 `toLocale*` calls). | One person sees `10/1/2026`, another sees `1/10/2026`. | Put one `lib/format.ts` behind `Intl.DateTimeFormat('en-NG', { timeZone: 'Africa/Lagos' })` and ban `toLocale*` via lint. |
 | [x] done — /admin/payroll/dummy already redirected; its unreachable 1,348-line view deleted | 2.9 🟡 | **A "Dummy payroll" page ships to admins.** | It is confusing, and it looks unfinished to an outsider. | Merge it into the calculator as a "Sandbox" toggle, or delete it. |
 | [ ] | 2.10 🟡 | **Empty states.** `ui/patterns/empty-state.tsx` is used in 40 files, but many lists still render a bare "No data". | Users don't know what to do next. | Every empty state gets an icon, one sentence and **one primary action** ("Create your first requisition"). |
 | [ ] | 2.11 🟡 | **Errors are shown as raw DB messages** (177 routes return `error.message`). | Users see `duplicate key value violates unique constraint "…"`. | Map known codes to human text in `lib/api/errors.ts`, which already exists. |
@@ -234,13 +234,13 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 | [x] done — DiagnosticsPanel (3 panels) | 82% | `admin/dev/tests/_components/HelpDeskRouteDiagnosticsPanel.tsx` ↔ `RouteDiagnosticsPanel.tsx` | One panel taking a route list |
 | [x] (71fb6fad) bonus variant | 79% | `components/pms/cbt-question-manager.tsx` ↔ `admin/pms/cbt/extra/page.tsx` | The page renders the component |
 | [x] done — components/admin/audit-stream-view.tsx (136666ea) | 77% | `admin/dev/role-escalations/…-content.tsx` ↔ `admin/dev/security-events/…-content.tsx` | One `SecurityLogViewer` with `source` prop |
-| [ ] | 77% | `(app)/projects/project-content.tsx` ↔ `admin/projects/_components/project-admin-content.tsx` | Shared + scope |
+| [x] one ProjectContent with an admin mode (f3d94843); admin gains lazy charts, avatars and the portfolio filter | 77% | `(app)/projects/project-content.tsx` ↔ `admin/projects/_components/project-admin-content.tsx` | Shared + scope |
 | [~] data layer shared via hooks/use-requisitions (7110b7a3); screens still separate | 72% | `dept/[dept_id]/accounts/requisitions/…` ↔ `(app)/accounts/requisitions/page.tsx` | Shared + scope |
-| [ ] | 71% | `(app)/reports/weekly-reports/_components/weekly-report-filters.tsx` ↔ `admin/reports/action-tracker/_components/action-tracker-filters.tsx` | One `ReportWeekFilters` |
-| [ ] | 70% | `(app)/reports/general-meeting/page.tsx` ↔ `admin/reports/general-meeting/page.tsx` | Shared + scope |
-| [ ] | 70% | `admin/help-desk/page.tsx` ↔ `dept/[dept_id]/help-desk/page.tsx` | Shared + scope |
-| [ ] | 66% | `admin/reports/weekly-reports/…-content.tsx` (691) ↔ `(app)/reports/weekly-reports/page.tsx` (828) | Shared + scope |
-| [ ] | 65% | `admin/reports/action-tracker/…-content.tsx` (1,271) ↔ `(app)/reports/action-tracker/page.tsx` (1,229) | Shared + scope: **saves about 1,200 lines** |
+| [x] both files were unused — deleted (33842293) | 71% | `(app)/reports/weekly-reports/_components/weekly-report-filters.tsx` ↔ `admin/reports/action-tracker/_components/action-tracker-filters.tsx` | One `ReportWeekFilters` |
+| [x] no logic left to share — both render the shared hub grid; the overlap is audience-specific card copy and links | 70% | `(app)/reports/general-meeting/page.tsx` ↔ `admin/reports/general-meeting/page.tsx` | Shared + scope |
+| [x] one loadHelpDeskConsole(scope) (58f68be0); both routes are thin scope wrappers | 70% | `admin/help-desk/page.tsx` ↔ `dept/[dept_id]/help-desk/page.tsx` | Shared + scope |
+| [~] dialogs, lock state, tracker status and seed queries now shared (96792b60, 59984ee6); the two table screens remain separate — their filters, permissions and exports genuinely differ | 66% | `admin/reports/weekly-reports/…-content.tsx` (691) ↔ `(app)/reports/weekly-reports/page.tsx` (828) | Shared + scope |
+| [~] due-date/status/badge helpers and the lock query shared (5156013b, 96792b60); the two screens remain separate — staff has per-item edit rules the admin view does not | 65% | `admin/reports/action-tracker/…-content.tsx` (1,271) ↔ `(app)/reports/action-tracker/page.tsx` (1,229) | Shared + scope: **saves about 1,200 lines** |
 
 **Root cause and the one fix for all of these:** each staff, admin and dept screen was built by copying. You already have `admin-scope-context` and `dept-scope-context`. Make one feature component per screen under `components/<feature>/`. Each route file (`app/(app)/…`, `app/admin/…`, `app/dept/…`) becomes about 10 lines that render it inside its scope provider. The API route decides what data that scope may see.
 
@@ -248,11 +248,11 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 
 | Status | Helper | Copies | Fix |
 |---|---|---|---|
-| [ ] | `formatDate` | 23 | `lib/format.ts`: `formatDate`, `formatDateTime`, `formatTime`, `formatClockTime`, `formatMeetingDate`, all `en-NG` and `Africa/Lagos` |
+| [x] 14 wrappers identical to lib/format replaced (df2e1d2d); the rest are deliberate variants (2-digit day, weekday, long month) built on formatWATDate | `formatDate` | 23 | `lib/format.ts`: `formatDate`, `formatDateTime`, `formatTime`, `formatClockTime`, `formatMeetingDate`, all `en-NG` and `Africa/Lagos` |
 | [x] done — 17 copies → lib/format (19a2a580) | `formatCurrency` | 8 (+13 inline variants) | `lib/format.ts`: `formatNaira(n, { compact? })` |
 | [x] done — lib/admin/require-admin-role.ts | `ensureAdmin` | 11 | Delete; use `requireApiAdminScope` |
 | [x] done — lib/security/bearer-auth.ts | `safeCompare` | 10 | `lib/security/cron-auth.ts` |
-| [ ] | `formatName`/`displayName`/`employeeName` | 6/7/4 | `lib/people/name.ts`: `fullName(profile)` and `initials(profile)` |
+| [x] client copies → personName (eea624f6); server-side mail/notify helpers keep their own fallbacks | `formatName`/`displayName`/`employeeName` | 6/7/4 | `lib/people/name.ts`: `fullName(profile)` and `initials(profile)` |
 | [ ] | `getStatusColor`/`statusLabel` | 6/4 (15 incl. variants) | `StatusBadge` + `lib/status.ts` map |
 | [x] done — payments → lib/payments/department.ts | `normalizeDepartment` | 6 | `shared/departments.ts`, which already exists, so use it |
 | [x] done — lib/admin/rbac.ts | `hasGlobalReportsWriteAccess` | 6 | `lib/admin/rbac.ts` |
@@ -260,7 +260,7 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 | [x] done — lib/pms/reviews.ts + tests; fixed staff/admin drift (0b89db93) | `pickCanonicalReview`/`reviewStatusPriority` | 4/4 | `lib/pms/reviews.ts`. This is **business logic** with 4 copies, so a bug fix will miss 3 of them. |
 | [ ] | `toCsv` | 4 | Table-native export (7.9) |
 | [ ] | `buildCalendarCells`/`addDays`/`monBasedDay` | 4/4/4 | `lib/utils/date.ts` (exists), or `date-fns` (installed) |
-| [ ] | `capitalize`/`formatPercent`/`getInitials` | 5/5/5 | `lib/format.ts` |
+| [~] capitalize + 5 formatPercent copies → lib/format (formatScore keeps unrounded scores); 4 getInitials variants left (different input shapes) | `capitalize`/`formatPercent`/`getInitials` | 5/5/5 | `lib/format.ts` |
 
 **Prevent it from coming back:** add `jscpd` (copy-paste detector) to CI with a threshold of about 3%, and `knip` for unused exports.
 
@@ -285,7 +285,7 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 | [ ] | Hand-written `types/database.ts` | **`supabase gen types`** | Typed queries; most `any` gone |
 | [ ] | HTML-string email templates (`lib/email-templates/*.ts`) | **React Email** | Components, preview server, Outlook-safe output |
 | [ ] | Every-minute cron pollers + custom retry | **Supabase Queues (pgmq)**, Inngest or Trigger.dev | Retries, backoff, DLQ, a dashboard |
-| [ ] | 117 `toLocale*` calls | **`Intl.DateTimeFormat`** helper or **`@date-fns/tz`** | Consistent dates for everyone |
+| [x] see 2.8 | 117 `toLocale*` calls | **`Intl.DateTimeFormat`** helper or **`@date-fns/tz`** | Consistent dates for everyone |
 | [x] providers/confirm-provider.tsx (7acbad31) | `confirm()`/`alert()` | **AlertDialog** + a `useConfirm()` hook | Consistent and accessible |
 | [ ] | Centred dialogs on phones | **shadcn Drawer** (vaul installed) | Native-feeling bottom sheets |
 | [ ] | Searching 81 sidebar links | **shadcn Command** (cmdk installed) | ⌘K palette |
@@ -293,7 +293,7 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 | [x] lib/utils/random.ts | `Math.random` passwords/shuffles | **Web Crypto** (`crypto.getRandomValues`) | Secure, unbiased |
 | [ ] | Charts with ad-hoc colours | **shadcn Chart** (Recharts wrapper with `--chart-*` tokens) | Consistent, themed charts |
 | [ ] | Password + OTP auth | **Microsoft Entra ID SSO** via Supabase Azure provider | MFA, offboarding and no passwords (§15) |
-| [ ] | Copy-paste checks by eye | **jscpd** + **knip** in CI | Duplicates and dead code blocked automatically |
+| [x] jscpd guard (threshold = today's 1.4%) + knip report in CI (5e679ec8); knip's 77 unused files deleted (33842293) | Copy-paste checks by eye | **jscpd** + **knip** in CI | Duplicates and dead code blocked automatically |
 
 ## 11. Patches and workarounds
 
@@ -316,7 +316,7 @@ These are places where a symptom was patched instead of fixing the cause. Outsid
 | [ ] | 11.13 | Two `create_notification` overloads | A new signature was added without removing the old | Consolidate (3.9) |
 | [ ] | 11.14 | `security_definer` `staff_directory` view | Profiles RLS too tight for name lookups | A narrow definer function returning work fields only (3.3) |
 | [-] Supabase/env config (revisit) | 11.15 | Rate limiter "falling back to in-memory — not suitable for production" | Upstash optional in prod | Make `UPSTASH_*` required in prod and fail closed |
-| [ ] | 11.16 | Anniversary signature tools ("temporary 10th anniversary") still routed | One-off campaign never removed | Feature-flag it or delete it |
+| [x] still in use (2026 is the anniversary year); gated on isAnniversaryPeriod() so routes, cards and nav retire on 1 Jan 2027 (e92260df) | 11.16 | Anniversary signature tools ("temporary 10th anniversary") still routed | One-off campaign never removed | Feature-flag it or delete it |
 
 ## 12. Modern practices
 
