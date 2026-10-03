@@ -621,7 +621,15 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
           title: (r) => r.user_name,
-          subtitle: (r) => `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)}`,
+          subtitle: (r) => r.department,
+          metrics: (r) => {
+            const missed = getHourBreakdown(r, policy).missed
+            return [
+              { label: "In", value: formatTime(r.clock_in) },
+              { label: "Out", value: formatTime(r.clock_out) },
+              { label: "Lost", value: missed != null && missed > 0 ? `${missed.toFixed(2)}h` : "-" },
+            ]
+          },
           trailing: (r) => (
             <StatusBadge
               status={r.status}

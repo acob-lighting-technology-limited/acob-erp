@@ -428,10 +428,19 @@ export function AdminAttendanceRecordsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (r) => `${r.user_name} · ${formatDate(r.date)}`,
-            subtitle: (r) =>
-              `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)} · ${r.total_hours?.toFixed(1) ?? 0}h`,
+            title: (r) => r.user_name,
+            subtitle: (r) => r.department,
+            metrics: (r) => [
+              { label: "In", value: formatTime(r.clock_in) },
+              { label: "Out", value: formatTime(r.clock_out) },
+              { label: "Hours", value: r.total_hours != null ? `${r.total_hours.toFixed(2)}h` : "-" },
+            ],
             trailing: (r) => <StatusBadge status={r.status} record={r} />,
+            // One section per day, so the date is read once instead of on every row.
+            sections: {
+              by: (r) => formatWATDate(r.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+              summary: (dayRows) => `${dayRows.length} ${dayRows.length === 1 ? "record" : "records"}`,
+            },
             detail: {
               title: (r) => r.user_name,
               subtitle: (r) =>

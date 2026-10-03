@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { DataTable } from "@/components/ui/data-table"
+import { DataTable, DateTile } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -230,8 +230,12 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: (r) => <DateTile date={r.appeal_date} />,
           title: (r) => `${r.user_name} · ${r.department}`,
-          subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
+          subtitle: (r) =>
+            `${ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status} → ${
+              ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status
+            }`,
           trailing: (r) => statusBadge(r.status),
           onSelect: (r) => {
             if (r.status === "pending") setReviewAppeal(r)

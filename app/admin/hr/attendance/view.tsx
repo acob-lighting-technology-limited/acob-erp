@@ -1241,8 +1241,12 @@ export function AttendanceReportsPage({
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
             title: (r) => r.user_name,
-            subtitle: (r) =>
-              `${r.department} · ${r.present_days} present · ${r.late_days} late · ${r.absent_days} absent`,
+            subtitle: (r) => r.department,
+            metrics: (r) => [
+              { label: "Present", value: r.present_days },
+              { label: "Late", value: r.late_days },
+              { label: "Absent", value: r.absent_days },
+            ],
             trailing: (r) =>
               r.attendance_exempt ? (
                 <Badge variant="outline" className="text-xs">
