@@ -4,6 +4,7 @@
  */
 export const QUERY_KEYS = {
   // HR
+  myLunchHistory: (yearMonth: string) => ["my-lunch-history", yearMonth],
   grantableLeaveTypes: (userId: string) => ["grantable-leave-types", userId],
   adminLeaveEmployees: () => ["admin-leave-employees"],
   myLunchReview: (menuId: string) => ["my-lunch-review", menuId],
@@ -16,6 +17,8 @@ export const QUERY_KEYS = {
 
   // Attendance
   attendanceDeviceStatus: () => ["attendance-device-status"],
+  myAttendanceAppeals: () => ["my-attendance-appeals"],
+  myAttendanceRecent: () => ["my-attendance-recent"],
   dailyRoster: (date: string, department: string | null) => ["daily-roster", date, department],
   attendanceLeaderboard: (filters: Record<string, unknown>) => ["attendance-leaderboard", filters],
   attendanceRecords: (filters: Record<string, unknown>) => ["attendance-records", filters],
