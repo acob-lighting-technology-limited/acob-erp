@@ -607,13 +607,13 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         />
       </StatGrid>
 
-      {phase && (
-        <p className="text-muted-foreground mb-2 text-xs">
-          {phase === "arrivals"
-            ? `Newest clock-ins first, until ${closingLabel} closing. Not in yet are at the bottom.`
-            : `Newest clock-outs first (closing was ${closingLabel}). Still in are at the bottom.`}
-        </p>
-      )}
+      <p className="text-muted-foreground mb-2 text-xs">
+        {phase === "arrivals"
+          ? `Newest clock-ins first, until ${closingLabel} closing. Not in yet are at the bottom.`
+          : phase === "departures"
+            ? `Newest clock-outs first (closing was ${closingLabel}). Still in are at the bottom.`
+            : "Newest clock-outs first. No clock-out are at the bottom."}
+      </p>
 
       <DataTable<AttendanceRecord>
         data={orderedRecords}

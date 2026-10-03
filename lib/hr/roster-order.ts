@@ -8,8 +8,9 @@ import { toLocalISODate } from "@/lib/utils/date"
  * who has clocked in (many staff are on site, out of sight), and after closing
  * to see who has clocked out. So for the current working day the newest punch
  * of the current phase goes first - arrivals until closing time, departures
- * after it - and people with no such punch yet sink to the bottom. Past days
- * stay alphabetical: "who arrived last" only means something live.
+ * after it - and people with no such punch yet sink to the bottom. A past day
+ * keeps the departures order it ended on (newest clock-out first) rather than
+ * resetting to alphabetical — HR reads yesterday the way they left it.
  *
  * Closing time is the day's own (an early closure, else the policy's end time),
  * so the switch follows the actual close rather than a fixed 5pm. The working
@@ -48,10 +49,9 @@ export function rosterPhase(params: { rosterDate: string; now: Date; closeTime: 
 
 type RosterRow = { clock_in: string | null; clock_out: string | null; user_name?: string | null }
 
-/** Rows in the phase's default order; a past day (phase null) is alphabetical. */
+/** Rows in the phase's default order; a past day (phase null) uses the departures order. */
 export function orderRoster<T extends RosterRow>(rows: T[], phase: RosterPhase | null): T[] {
   const byName = (a: T, b: T) => String(a.user_name ?? "").localeCompare(String(b.user_name ?? ""))
-  if (!phase) return [...rows].sort(byName)
   const punch = (row: T) => (phase === "arrivals" ? row.clock_in : row.clock_out) || ""
   return [...rows].sort((a, b) => {
     const pa = punch(a)
