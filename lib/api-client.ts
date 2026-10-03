@@ -69,7 +69,24 @@ export async function apiJson<T = unknown>(input: RequestInfo | URL, init: Reque
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
     const message = typeof payload?.error === "string" ? payload.error : `Request failed (${response.status})`
-    throw new Error(message)
+    const fields = payload?.details?.fields
+    throw new ApiError(message, response.status, fields && typeof fields === "object" ? fields : {})
   }
   return payload as T
+}
+
+/**
+ * A non-2xx response from `apiJson`. `fields` holds the per-field messages a
+ * route's zod validation returned (`validationError` in lib/api/errors), keyed
+ * by field path, so a form can show each one under its own input.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly fields: Record<string, string> = {}
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
 }
