@@ -4,6 +4,7 @@
  */
 export const QUERY_KEYS = {
   // HR
+  myLunchReview: (menuId: string) => ["my-lunch-review", menuId],
   leaveRequests: (filters?: Record<string, unknown>) => (filters ? ["leave-requests", filters] : ["leave-requests"]),
   leaveBalance: (userId?: string) => ["leave-balance", userId],
   leaveTypes: () => ["leave-types"],
@@ -13,6 +14,7 @@ export const QUERY_KEYS = {
 
   // Attendance
   attendanceDeviceStatus: () => ["attendance-device-status"],
+  attendanceReportConfig: () => ["attendance-report-config"],
   employeeCycleAttendance: (userId: string, start: string, end: string) => [
     "employee-cycle-attendance",
     userId,
@@ -22,6 +24,12 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  strategicGoals: (scope: string, department?: string | null, year?: number | null) => [
+    "strategic-goals",
+    scope,
+    department ?? null,
+    year ?? null,
+  ],
   goals: (userId?: string) => ["goals", userId],
   reviews: (userId?: string) => ["reviews", userId],
 
@@ -30,6 +38,7 @@ export const QUERY_KEYS = {
   fleetBookings: (filters?: Record<string, unknown>) => (filters ? ["fleet-bookings", filters] : ["fleet-bookings"]),
 
   // Help desk
+  ticketAttachments: (ticketId: string) => ["ticket-attachments", ticketId],
   tickets: (filters?: Record<string, unknown>) => (filters ? ["tickets", filters] : ["tickets"]),
   ticket: (id: string) => ["ticket", id],
 
@@ -209,4 +218,15 @@ export const QUERY_KEYS = {
 
   // Requisitions
   requisition: (id: string) => ["requisition", id],
+
+  // Payroll
+  payrollPeriods: () => ["payroll-periods"],
+
+  // Documents
+  onedrivePreview: (path: string, accessMode: string, department?: string) => [
+    "onedrive-preview",
+    path,
+    accessMode,
+    department ?? null,
+  ],
 } as const

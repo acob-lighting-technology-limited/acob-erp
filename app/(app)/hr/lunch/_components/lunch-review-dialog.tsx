@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Star } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -14,9 +14,11 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface LunchReviewDialogProps {
   open: boolean
@@ -32,37 +34,42 @@ interface LunchReviewDialogProps {
  * believe the anonymity.
  */
 export function LunchReviewDialog({ open, onOpenChange, menuId, date, onSaved }: LunchReviewDialogProps) {
-  const [rating, setRating] = useState(0)
+  const queryClient = useQueryClient()
   const [hovered, setHovered] = useState(0)
-  const [comment, setComment] = useState("")
-  const [hasExistingReview, setHasExistingReview] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!open || !menuId) return
-    setLoading(true)
-    setRating(0)
-    setComment("")
-    setHasExistingReview(false)
-    void (async () => {
-      try {
-        const res = await apiFetch(`/api/hr/lunch/reviews?menu_id=${encodeURIComponent(menuId)}`)
-        const payload = await res.json()
-        const existing = (payload?.data || [])[0]
-        if (existing) {
-          setRating(Number(existing.rating) || 0)
-          setComment(existing.comment || "")
-          setHasExistingReview(true)
-        }
-      } catch {
-        // A missing prior review is the normal case — start blank.
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [open, menuId])
+  // The caller's own review for this menu, if they left one.
+  const { data: existing = null, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.myLunchReview(menuId ?? ""),
+    enabled: open && Boolean(menuId),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: { rating: number | string; comment: string | null }[] }>(
+        `/api/hr/lunch/reviews?menu_id=${encodeURIComponent(menuId!)}`
+      )
+      const review = payload.data?.[0]
+      return review ? { rating: Number(review.rating) || 0, comment: review.comment || "" } : null
+    },
+  })
+  const hasExistingReview = existing !== null
+
+  // Unsaved edits for the current menu; otherwise show the stored review (or a blank one).
+  const [draft, setDraft] = useState<{ menuId: string; rating: number; comment: string } | null>(null)
+  const current = draft && draft.menuId === menuId ? draft : (existing ?? { rating: 0, comment: "" })
+  const { rating, comment } = current
+  const setRating = (value: number) => menuId && setDraft({ menuId, rating: value, comment })
+  const setComment = (value: string) => menuId && setDraft({ menuId, rating, comment: value })
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setDraft(null)
+    onOpenChange(next)
+  }
+
+  const finish = () => {
+    if (menuId) void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.myLunchReview(menuId) })
+    handleOpenChange(false)
+    onSaved?.()
+  }
 
   async function handleSubmit() {
     if (!menuId) return
@@ -82,8 +89,7 @@ export function LunchReviewDialog({ open, onOpenChange, menuId, date, onSaved }:
       if (!res.ok) throw new Error(payload?.error || "Failed to save your review")
 
       toast.success(hasExistingReview ? "Review updated" : "Thanks — your feedback was sent anonymously")
-      onOpenChange(false)
-      onSaved?.()
+      finish()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save your review")
     } finally {
@@ -102,8 +108,7 @@ export function LunchReviewDialog({ open, onOpenChange, menuId, date, onSaved }:
       if (!res.ok) throw new Error(payload?.error || "Failed to delete your review")
 
       toast.success("Review deleted")
-      onOpenChange(false)
-      onSaved?.()
+      finish()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete your review")
     } finally {
@@ -112,7 +117,7 @@ export function LunchReviewDialog({ open, onOpenChange, menuId, date, onSaved }:
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{hasExistingReview ? "Edit your review" : "Review this meal"}</DialogTitle>
@@ -177,7 +182,7 @@ export function LunchReviewDialog({ open, onOpenChange, menuId, date, onSaved }:
             <div />
           )}
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || deleting}>
+            <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving || deleting}>
               Cancel
             </Button>
             <Button onClick={handleSubmit} loading={saving} disabled={loading || deleting}>
