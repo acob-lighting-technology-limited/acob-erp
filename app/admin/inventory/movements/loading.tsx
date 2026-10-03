@@ -1,5 +1,6 @@
 import { TablePageSkeleton } from "@/components/skeletons"
+import { layout } from "./_layout"
 
 export default function Loading() {
-  return <TablePageSkeleton filters={1} columns={6} rows={8} showStats={true} statCards={4} />
+  return <TablePageSkeleton {...layout} />
 }
