@@ -1,7 +1,5 @@
 "use client"
 
-/* eslint-disable @next/next/no-img-element -- signed URLs, not optimizable by next/image */
-
 import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Cake, Loader2, PartyPopper, Search, X } from "lucide-react"

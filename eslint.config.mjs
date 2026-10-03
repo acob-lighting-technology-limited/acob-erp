@@ -4,7 +4,8 @@ import nextVitals from "eslint-config-next/core-web-vitals"
 export default defineConfig([
   {
     linterOptions: {
-      reportUnusedDisableDirectives: "off",
+      // A disable comment that suppresses nothing hides nothing — fail on it.
+      reportUnusedDisableDirectives: "error",
     },
   },
   ...nextVitals,
