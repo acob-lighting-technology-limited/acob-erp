@@ -11,6 +11,7 @@ import type { AttendanceRecord } from "./page"
 import { apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { buildCalendarCells, formatMonthLabel, navigateMonth } from "@/lib/utils/calendar-grid"
 
 type DayStatus =
   | "present"
@@ -33,37 +34,6 @@ interface UnifiedDay {
 }
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-function monBasedDay(jsDay: number) {
-  return jsDay === 0 ? 6 : jsDay - 1
-}
-
-function formatMonthLabel(yearMonth: string) {
-  const [year, month] = yearMonth.split("-").map(Number)
-  return new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-}
-
-function navigateMonth(yearMonth: string, delta: number): string {
-  const [year, month] = yearMonth.split("-").map(Number)
-  const d = new Date(year, month - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-}
-
-function buildCalendarCells(yearMonth: string): (string | null)[] {
-  const [year, month] = yearMonth.split("-").map(Number)
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const firstDayOfWeek = new Date(year, month - 1, 1).getDay()
-  const offset = monBasedDay(firstDayOfWeek)
-  const cells: (string | null)[] = [
-    ...Array(offset).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => {
-      const d = i + 1
-      return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-    }),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
-  return cells
-}
 
 function formatTime(t: string | null | undefined) {
   if (!t) return ""
