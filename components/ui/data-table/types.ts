@@ -348,9 +348,29 @@ export interface DataTableProps<TData> {
   emptyAction?: React.ReactNode
 }
 
+// ─── TablePageLayout (Skeleton & Page Config Sharing) ─────────────────────────
+
+export type TablePageLayout = {
+  tabs?: number
+  statCards?: number
+  statBadges?: number
+  filters?: number
+  columns?: number
+  rows?: number
+  actions?: number
+  showBackLink?: boolean
+  showStats?: boolean
+  spacing?: "standard" | "tight"
+  inlineActions?: boolean
+  list?: "table" | "contacts" | "responsive"
+  groups?: number
+}
+
 // ─── DataTablePage Props ─────────────────────────────────────────────────────
 
 export interface DataTablePageProps {
+  /** Optional layout metadata shared with the route's loading.tsx skeleton */
+  layout?: TablePageLayout
   /** Default export configuration for tables inside this page. */
   export?: TableExportOptions | false
   title: string

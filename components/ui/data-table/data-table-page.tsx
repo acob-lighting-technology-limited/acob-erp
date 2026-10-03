@@ -6,7 +6,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import { logger } from "@/lib/logger"
 import type { DataTablePageProps } from "./types"
+
+const log = logger("components-ui-data-table-page")
 
 /**
  * Standard full-page layout wrapper for ALL table pages in this app.
@@ -18,6 +21,7 @@ import type { DataTablePageProps } from "./types"
  *   4. Children     — <DataTable> (includes search, filters, toolbar, table, pagination)
  */
 export function DataTablePage({
+  layout,
   export: exportConfig,
   title,
   description,
@@ -37,6 +41,24 @@ export function DataTablePage({
   actionsPlacement = "inline-always",
   children,
 }: DataTablePageProps) {
+  if (process.env.NODE_ENV !== "production" && layout) {
+    if (layout.tabs !== undefined && layout.tabs !== (tabs?.length ?? 0)) {
+      log.warn(
+        `[DataTablePage "${title}"] layout.tabs (${layout.tabs}) does not match actual tabs count (${tabs?.length ?? 0})`
+      )
+    }
+    if (layout.statBadges !== undefined && layout.statBadges !== (statBadges?.length ?? 0)) {
+      log.warn(
+        `[DataTablePage "${title}"] layout.statBadges (${layout.statBadges}) does not match actual statBadges count (${statBadges?.length ?? 0})`
+      )
+    }
+    if (layout.showBackLink !== undefined && layout.showBackLink !== Boolean(backLink)) {
+      log.warn(
+        `[DataTablePage "${title}"] layout.showBackLink (${layout.showBackLink}) does not match actual backLink presence (${Boolean(backLink)})`
+      )
+    }
+  }
+
   const [exportSlot, setExportSlot] = useState<HTMLDivElement | null>(null)
   const exportContext = useMemo(() => ({ config: exportConfig, slot: exportSlot }), [exportConfig, exportSlot])
   return (

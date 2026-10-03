@@ -6,40 +6,9 @@ function SkeletonLine({ className }: { className: string }) {
   return <div className={`bg-muted animate-pulse rounded-md ${className}`} />
 }
 
-export type TablePageSkeletonProps = {
-  filters?: number
-  columns?: number
-  rows?: number
-  showStats?: boolean
-  statCards?: number
-  /** Number of tab items to render (omit = no tabs row) */
-  tabs?: number
-  /** Number of action buttons to render on the right of the header */
-  actions?: number
-  /** Whether to show the back-link row above the title */
-  showBackLink?: boolean
-  /**
-   * Number of compact metric pills under the header. Only for pages that still
-   * pass `statBadges` to DataTablePage — mirror it here or the page visibly
-   * reflows on mount.
-   */
-  statBadges?: number
-  /** `tight` matches DataTablePage's `spacing="tight"` (space-y-3). */
-  spacing?: "standard" | "tight"
-  /** Matches `actionsPlacement="inline-always"`: actions beside the title at every width. */
-  inlineActions?: boolean
-  /**
-   * Which rendering the page opens in.
-   * - `table`      the data table
-   * - `contacts`   the row list at every width (a page whose `defaultViewMode`
-   *                is a plain "contacts")
-   * - `responsive` the row list below `md` and the table from `md` up, mirroring
-   *                `defaultViewMode={{ mobile: "contacts", desktop: "list" }}`
-   */
-  list?: "table" | "contacts" | "responsive"
-  /** Section headings in the contacts list (ignored for `list="table"`). */
-  groups?: number
-}
+import type { TablePageLayout } from "@/components/ui/data-table/types"
+
+export type TablePageSkeletonProps = TablePageLayout
 
 /**
  * TablePageSkeleton — mirrors the exact layout of DataTablePage + DataTable so
