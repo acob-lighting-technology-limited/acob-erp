@@ -73,20 +73,24 @@ export function ControlledDocFormDialog({
   const [publish, setPublish] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    if (!open) return
-    setTitle(doc?.title ?? "")
-    setDescription(doc?.description ?? "")
-    setCategory(doc?.category ?? "")
-    setOwnerDepartment(doc?.owner_department ?? (manageableDepartments?.length === 1 ? manageableDepartments[0] : ""))
-    setIsCompanyWide(doc ? doc.is_company_wide : manageableDepartments === null)
-    setDepartments(doc?.departments ?? (manageableDepartments?.length === 1 ? [manageableDepartments[0]] : []))
-    setNextReviewDate(doc?.next_review_date ?? "")
-    setEffectiveDate(toLocalISODate(new Date()))
-    setChangeSummary("")
-    setFile(null)
-    setPublish(false)
-  }, [open, doc, manageableDepartments])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setTitle(doc?.title ?? "")
+      setDescription(doc?.description ?? "")
+      setCategory(doc?.category ?? "")
+      setOwnerDepartment(doc?.owner_department ?? (manageableDepartments?.length === 1 ? manageableDepartments[0] : ""))
+      setIsCompanyWide(doc ? doc.is_company_wide : manageableDepartments === null)
+      setDepartments(doc?.departments ?? (manageableDepartments?.length === 1 ? [manageableDepartments[0]] : []))
+      setNextReviewDate(doc?.next_review_date ?? "")
+      setEffectiveDate(toLocalISODate(new Date()))
+      setChangeSummary("")
+      setFile(null)
+      setPublish(false)
+    }
+  }
 
   function validate(): string | null {
     if (!title.trim()) return "Title is required"

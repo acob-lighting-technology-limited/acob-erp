@@ -46,10 +46,14 @@ export function SupplierFormDialog({ open, onOpenChange, queryClient, supplier =
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<SupplierFormValues>(defaultValues)
 
-  useEffect(() => {
-    if (!open) return
-    setFormData(supplier ? { ...supplier } : defaultValues)
-  }, [open, supplier])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setFormData(supplier ? { ...supplier } : defaultValues)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

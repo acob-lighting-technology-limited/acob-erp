@@ -38,12 +38,16 @@ export function FundingCategoryDialog({
   const [description, setDescription] = useState("")
   const [sortOrder, setSortOrder] = useState("100")
 
-  useEffect(() => {
-    if (!open) return
-    setName(category?.name || "")
-    setDescription(category?.description || "")
-    setSortOrder(String(category?.sort_order ?? 100))
-  }, [open, category])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setName(category?.name || "")
+      setDescription(category?.description || "")
+      setSortOrder(String(category?.sort_order ?? 100))
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
