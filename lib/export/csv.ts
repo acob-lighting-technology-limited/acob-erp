@@ -8,9 +8,12 @@ export function toCsv(rows: readonly (readonly CsvValue[])[]): string {
       .map((row) =>
         row
           .map((value) => {
-            let cell = value == null ? "" : String(value)
+            if (value == null) return ""
+            let cell = String(value)
+            // Skip injection guard for true numbers and string representations of plain numbers
+            const isPlainNumber = typeof value === "number" || /^\s*[-+]?\d+(\.\d+)?\s*$/.test(cell)
             // Whitespace can hide a formula from a naïve first-character check.
-            if (/^\s*[=+\-@]/.test(cell)) cell = "'" + cell
+            if (!isPlainNumber && /^\s*[=+\-@]/.test(cell)) cell = "'" + cell
             return /[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell
           })
           .join(",")
