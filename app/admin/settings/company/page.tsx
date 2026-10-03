@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,19 +42,19 @@ export default function CompanySettingsPage() {
   }
 
   return (
-    <AdminTablePage
-      title="Company Settings"
-      description="Manage your organization details"
-      icon={Building2}
-      backLinkHref="/admin/settings"
-      backLinkLabel="Back to Settings"
-      actions={
-        <Button onClick={handleSubmit} disabled={saving}>
-          <Save className="mr-2 h-4 w-4" />
-          Save Changes
-        </Button>
-      }
-    >
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Company Settings"
+        description="Manage your organization details"
+        icon={Building2}
+        actions={
+          <Button onClick={handleSubmit} disabled={saving}>
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+          </Button>
+        }
+        backLink={{ href: "/admin/settings", label: "Back to Settings" }}
+      />
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
@@ -165,6 +165,6 @@ export default function CompanySettingsPage() {
           </CardContent>
         </Card>
       </form>
-    </AdminTablePage>
+    </PageWrapper>
   )
 }
