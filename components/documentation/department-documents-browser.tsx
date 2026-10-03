@@ -70,7 +70,9 @@ import { toast } from "sonner"
 import JSZip from "jszip"
 import { saveAs } from "file-saver"
 import { toLocalISODate, formatWATDateTime } from "@/lib/utils/date"
-import { apiFetch, readCsrfCookie, readDeptContext } from "@/lib/api-client"
+import { apiFetch, apiJson, readCsrfCookie, readDeptContext } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface DepartmentDocumentsBrowserProps {
   initialPath?: string
@@ -221,6 +223,8 @@ async function collectEntryUploadData(
   return { files, folders }
 }
 
+const NO_FILES: FileItem[] = []
+
 export function DepartmentDocumentsBrowser({
   initialPath = "/",
   rootLabel = "Department Libraries",
@@ -249,10 +253,26 @@ export function DepartmentDocumentsBrowser({
 
   const pathFromUrl = clampPath(searchParams.get("path") || initialPath)
   const [currentPath, setCurrentPath] = useState(pathFromUrl)
-  const [files, setFiles] = useState<FileItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+
+  // The search that was submitted for a folder; navigating elsewhere clears it.
+  const [submittedSearch, setSubmittedSearch] = useState({ path: currentPath, query: "" })
+  const activeSearch = submittedSearch.path === currentPath ? submittedSearch.query : ""
+
+  const filesQuery = useQuery({
+    queryKey: QUERY_KEYS.onedriveFiles({ path: currentPath, accessMode, lockedDepartment, search: activeSearch }),
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      params.set("path", currentPath)
+      params.set("accessMode", accessMode)
+      if (lockedDepartment) params.set("department", lockedDepartment)
+      if (activeSearch) params.set("search", activeSearch)
+      return (await apiJson<{ data?: FileItem[] }>(`/api/onedrive?${params.toString()}`)).data ?? []
+    },
+  })
+  const files = filesQuery.data ?? NO_FILES
+  const loading = filesQuery.isFetching
+  const error = filesQuery.error?.message ?? null
   const rawView = searchParams.get("view")
   const initialView: "table" | "card" | "list" =
     rawView === "list" || rawView === "card" || rawView === "table" ? rawView : rawView === "grid" ? "card" : "table"
@@ -338,39 +358,18 @@ export function DepartmentDocumentsBrowser({
     folderInputRef.current?.setAttribute("directory", "")
   }, [])
 
+  /** Load `path` with an optional search; re-requesting the current view refetches it. */
   const fetchFiles = useCallback(
     async (path: string, search?: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const params = new URLSearchParams()
-        params.set("path", path)
-        params.set("accessMode", accessMode)
-        if (lockedDepartment) params.set("department", lockedDepartment)
-        if (search) params.set("search", search)
-
-        const response = await apiFetch(`/api/onedrive?${params.toString()}`)
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to load files")
-        }
-
-        setFiles(data.data)
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load files")
-        setFiles([])
-      } finally {
-        setLoading(false)
+      const query = search ?? ""
+      if (path === currentPath && query === activeSearch) {
+        await filesQuery.refetch()
+      } else {
+        setSubmittedSearch({ path, query })
       }
     },
-    [accessMode, lockedDepartment]
+    [currentPath, activeSearch, filesQuery]
   )
-
-  useEffect(() => {
-    fetchFiles(currentPath)
-  }, [currentPath, fetchFiles])
 
   useEffect(() => {
     setSelectedPaths((prev) => {
