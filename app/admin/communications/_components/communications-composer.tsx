@@ -24,8 +24,10 @@ import { SchedulingOptions } from "./SchedulingOptions"
 import { SendSummary } from "./SendSummary"
 import { getCurrentOfficeWeek, getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { DEPT_ADMIN_HR } from "@/shared/departments"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
+import { toLocalISODate } from "@/lib/utils/date"
 
 const log = logger("communications-composer")
 
@@ -105,10 +107,33 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [agendaText, setAgendaText] = useState(DEFAULT_AGENDA.join("\n"))
   // On Sunday (last day of office week), default to next week since the user
   // is preparing for the upcoming meeting — avoids a visible flash from W13→W14.
-  const [activeMeetingWeek, setActiveMeetingWeek] = useState(() =>
-    new Date().getDay() === 0 ? nextOfficeWeek : currentOfficeWeek
-  )
-  const [hasManualMeetingWeekOverride, setHasManualMeetingWeekOverride] = useState(false)
+  // A week picked by hand; until then the meeting week follows the lock state.
+  const [manualMeetingWeek, setManualMeetingWeek] = useState<{ week: number; year: number } | null>(null)
+  // Advance to next week once this week's report is locked, or its meeting date
+  // has passed (e.g. the meeting was Mon/Tue and today is later in the week — the
+  // user is preparing next week's reminder, not re-sending one already held).
+  const currentLockQuery = useAdminWeeklyReportLockState(currentOfficeWeekWeek, currentOfficeWeekYear, {
+    enabled: mode !== "communications" && !manualMeetingWeek,
+  })
+  const autoMeetingWeek = useMemo(() => {
+    const current = { week: currentOfficeWeekWeek, year: currentOfficeWeekYear }
+    const next = { week: nextOfficeWeekWeek, year: nextOfficeWeekYear }
+    const lock = currentLockQuery.data
+    // On Sunday (last day of office week) default to next week while the lock
+    // state resolves — avoids a visible flash from W13 to W14.
+    if (!lock) return currentLockQuery.isError ? current : new Date().getDay() === 0 ? next : current
+    let shouldAdvance = lock.isLocked
+    if (!shouldAdvance && lock.meetingDate) shouldAdvance = toLocalISODate() > lock.meetingDate
+    return shouldAdvance ? next : current
+  }, [
+    currentLockQuery.data,
+    currentLockQuery.isError,
+    currentOfficeWeekWeek,
+    currentOfficeWeekYear,
+    nextOfficeWeekWeek,
+    nextOfficeWeekYear,
+  ])
+  const activeMeetingWeek = manualMeetingWeek ?? autoMeetingWeek
   const [savingMeetingDraft, setSavingMeetingDraft] = useState(false)
 
   // Knowledge sharing fields
@@ -249,55 +274,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   }, [employees])
 
   // ── Effects ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (mode === "communications") return
-    if (hasManualMeetingWeekOverride) return
-
-    let cancelled = false
-    const resolveActiveMeetingWeek = async () => {
-      try {
-        const res = await apiFetch(
-          `/api/admin/reports/weekly-lock-state?week=${currentOfficeWeekWeek}&year=${currentOfficeWeekYear}`,
-          { cache: "no-store" }
-        )
-        if (!res.ok) throw new Error("Failed to resolve meeting lock state")
-        const currentLock = (await res.json()) as { isLocked: boolean; meetingDate: string }
-        if (cancelled) return
-
-        // Advance to next week if:
-        // 1. The current week's report is already locked, OR
-        // 2. The current week's meeting date has already passed (e.g. meeting was
-        //    Mon/Tue and today is later in the week — the user wants to prepare
-        //    next week's reminder, not re-send for a meeting that already happened).
-        let shouldAdvance = currentLock.isLocked
-        if (!shouldAdvance && currentLock.meetingDate) {
-          const today = new Date()
-          const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
-          shouldAdvance = todayIso > currentLock.meetingDate
-        }
-
-        setActiveMeetingWeek(
-          shouldAdvance
-            ? { week: nextOfficeWeekWeek, year: nextOfficeWeekYear }
-            : { week: currentOfficeWeekWeek, year: currentOfficeWeekYear }
-        )
-      } catch {
-        if (!cancelled) setActiveMeetingWeek({ week: currentOfficeWeekWeek, year: currentOfficeWeekYear })
-      }
-    }
-
-    void resolveActiveMeetingWeek()
-    return () => {
-      cancelled = true
-    }
-  }, [
-    currentOfficeWeekWeek,
-    currentOfficeWeekYear,
-    hasManualMeetingWeekOverride,
-    mode,
-    nextOfficeWeekWeek,
-    nextOfficeWeekYear,
-  ])
 
   useEffect(() => {
     if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
@@ -368,66 +344,70 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     }
   }, [meetingDraftStorageKey, reminderType])
 
-  useEffect(() => {
-    if (reminderType !== "meeting") return
-    if (!meetingDate) return
-
+  // Pre-fill the knowledge-sharing department and presenter from the KSS roster
+  // for the meeting's week. The fields stay editable in the knowledge-sharing form.
+  const rosterWeek = useMemo(() => {
     const [year, month, day] = meetingDate.split("-").map((part) => Number(part))
-    if (!year || !month || !day) return
-    const officeWeek = getOfficeWeekFromDate(new Date(year, month - 1, day))
-
-    let cancelled = false
-    const autoFillFromRoster = async () => {
-      try {
-        const res = await apiFetch(`/api/reports/kss-roster?week=${officeWeek.week}&year=${officeWeek.year}`)
-        const payload = await res.json()
-        if (!res.ok) return
-
-        const roster = Array.isArray(payload?.data) ? payload.data : []
-        const picked = roster.find((entry: { is_active?: boolean }) => entry?.is_active !== false) ?? roster[0]
-        if (cancelled) return
-        if (!picked) {
-          // No roster entry: the rotation still knows which department presents.
-          setKnowledgePresenterId("none")
-          setKnowledgePresenterName("")
-          const rotationRes = await apiFetch(
-            `/api/admin/communications/kss-rotation?week=${officeWeek.week}&year=${officeWeek.year}`
-          )
-          const rotation = await rotationRes.json().catch(() => null)
-          const department = rotationRes.ok ? rotation?.data?.department : null
-          if (cancelled) return
-          setKnowledgeDepartment(typeof department === "string" && department.trim() ? department : "none")
-          return
-        }
-
-        if (typeof picked.department === "string" && picked.department.trim()) {
-          setKnowledgeDepartment(picked.department)
-        } else {
-          setKnowledgeDepartment("none")
-        }
-
-        const presenterId = typeof picked.presenter_id === "string" ? picked.presenter_id : null
-        if (presenterId && employees.some((emp) => emp.id === presenterId)) {
-          setKnowledgePresenterId(presenterId)
-          setKnowledgePresenterName("")
-        } else {
-          setKnowledgePresenterId("none")
-          setKnowledgePresenterName(
-            typeof picked.presenter_name === "string" && picked.presenter_name.trim()
-              ? picked.presenter_name.trim()
-              : ""
-          )
-        }
-      } catch {
-        // Fail silently; form still works with manual selection.
+    return year && month && day ? getOfficeWeekFromDate(new Date(year, month - 1, day)) : null
+  }, [meetingDate])
+  const rosterQuery = useQuery({
+    queryKey: QUERY_KEYS.kssRoster(rosterWeek?.week ?? 0, rosterWeek?.year ?? 0),
+    queryFn: async () =>
+      (
+        await apiJson<{
+          data?: Array<{ is_active?: boolean; department?: unknown; presenter_id?: unknown; presenter_name?: unknown }>
+        }>(`/api/reports/kss-roster?week=${rosterWeek!.week}&year=${rosterWeek!.year}`)
+      ).data ?? [],
+    enabled: reminderType === "meeting" && Boolean(rosterWeek),
+  })
+  const rosterPicked =
+    (rosterQuery.data ?? []).find((entry) => entry?.is_active !== false) ?? (rosterQuery.data ?? [])[0]
+  // No roster entry for the week: the KSS rotation still knows which department presents.
+  const rotationQuery = useQuery({
+    queryKey: ["admin-kss-rotation-week", rosterWeek?.week ?? 0, rosterWeek?.year ?? 0],
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: { department?: unknown } | null }>(
+          `/api/admin/communications/kss-rotation?week=${rosterWeek!.week}&year=${rosterWeek!.year}`
+        )
+      ).data?.department ?? null,
+    enabled: reminderType === "meeting" && Boolean(rosterWeek) && rosterQuery.isSuccess && !rosterPicked,
+  })
+  // Apply each roster result once (React's "adjust state when an input changes"
+  // pattern — no effect, no extra render pass).
+  const rotationReady = Boolean(rosterPicked) || rotationQuery.isFetched
+  const rosterApplyKey =
+    reminderType === "meeting" && rosterQuery.data && rotationReady
+      ? `${meetingDate}:${rosterQuery.dataUpdatedAt}:${rotationQuery.dataUpdatedAt}:${employees.length}`
+      : null
+  const [appliedRosterKey, setAppliedRosterKey] = useState<string | null>(null)
+  if (rosterApplyKey && rosterApplyKey !== appliedRosterKey) {
+    setAppliedRosterKey(rosterApplyKey)
+    if (!rosterPicked) {
+      const rotationDepartment = rotationQuery.data
+      setKnowledgeDepartment(
+        typeof rotationDepartment === "string" && rotationDepartment.trim() ? rotationDepartment : "none"
+      )
+      setKnowledgePresenterId("none")
+      setKnowledgePresenterName("")
+    } else {
+      const presenterId = typeof rosterPicked.presenter_id === "string" ? rosterPicked.presenter_id : null
+      setKnowledgeDepartment(
+        typeof rosterPicked.department === "string" && rosterPicked.department.trim() ? rosterPicked.department : "none"
+      )
+      if (presenterId && employees.some((emp) => emp.id === presenterId)) {
+        setKnowledgePresenterId(presenterId)
+        setKnowledgePresenterName("")
+      } else {
+        setKnowledgePresenterId("none")
+        setKnowledgePresenterName(
+          typeof rosterPicked.presenter_name === "string" && rosterPicked.presenter_name.trim()
+            ? rosterPicked.presenter_name.trim()
+            : ""
+        )
       }
     }
-
-    autoFillFromRoster()
-    return () => {
-      cancelled = true
-    }
-  }, [employees, meetingDate, reminderType])
+  }
 
   // ── Query: active schedules ───────────────────────────────────────────────
   const { data: schedulesData } = useQuery({
@@ -934,20 +914,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   meetingYear={activeMeetingWeek.year}
                   weekOptions={meetingWeekOptions}
                   yearOptions={meetingYearOptions}
-                  setMeetingWeek={(value) => {
-                    setHasManualMeetingWeekOverride(true)
-                    setActiveMeetingWeek((prev) => ({
-                      ...prev,
-                      week: value,
-                    }))
-                  }}
-                  setMeetingYear={(value) => {
-                    setHasManualMeetingWeekOverride(true)
-                    setActiveMeetingWeek((prev) => ({
-                      ...prev,
-                      year: value,
-                    }))
-                  }}
+                  setMeetingWeek={(value) => setManualMeetingWeek({ ...activeMeetingWeek, week: value })}
+                  setMeetingYear={(value) => setManualMeetingWeek({ ...activeMeetingWeek, year: value })}
                   meetingDate={meetingDate}
                   meetingTime={meetingTime}
                   teamsLink={teamsLink}

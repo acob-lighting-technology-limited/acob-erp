@@ -96,6 +96,7 @@ export const QUERY_KEYS = {
   search: (q: string) => ["search", q],
 
   // Weekly reports
+  kssRoster: (week: number, year: number) => ["kss-roster", week, year],
   meetingAttendanceSession: (week: number, year: number) => ["meeting-attendance-session", week, year],
   weeklyReportSeed: (department: string, week: number, year: number) => ["weekly-report-seed", department, week, year],
   weeklyReportLockState: (week: number, year: number) => ["weekly-report-lock", week, year],

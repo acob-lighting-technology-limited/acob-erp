@@ -20,12 +20,13 @@ export function useWeeklyReportLockState(week: number, year: number, { enabled =
 }
 
 /** Admin screens: the same lock state via the admin route (adds override/unlock info). */
-export function useAdminWeeklyReportLockState(week: number, year: number) {
+export function useAdminWeeklyReportLockState(week: number, year: number, { enabled = true } = {}) {
   return useQuery({
     queryKey: QUERY_KEYS.adminWeeklyReportLockState(week, year),
     queryFn: () =>
       apiJson<WeeklyReportLockState>(`/api/admin/reports/weekly-lock-state?week=${week}&year=${year}`, {
         cache: "no-store",
       }),
+    enabled,
   })
 }
