@@ -4,12 +4,13 @@ import { use, useState } from "react"
 import { toast } from "sonner"
 import type { Requisition } from "@/lib/requisitions/types"
 import { RequisitionPdfDocument } from "../_components/requisition-pdf-document"
-import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
+import { ArrowLeft, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { PageLoader } from "@/components/ui/query-states"
 
 export default function RequisitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -72,14 +73,7 @@ export default function RequisitionDetailPage({ params }: { params: Promise<{ id
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-        <p className="text-muted-foreground text-sm">Loading ACOB Requisition Form...</p>
-      </div>
-    )
-  }
+  if (isLoading) return <PageLoader />
 
   if (error || !requisition) {
     return (

@@ -16,6 +16,7 @@ import { WeeklyReportTextFields } from "@/components/reports/weekly-report-text-
 import { useMyProfile } from "@/hooks/use-my-profile"
 import { useWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 import { seedTexts, useWeeklyReportSeed } from "@/hooks/use-weekly-report-seed"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface WeeklyReportDialogProps {
   isOpen: boolean
@@ -122,8 +123,14 @@ function WeeklyReportForm({ onClose, onSuccess, initialData }: Omit<WeeklyReport
       </DialogHeader>
 
       {loading ? (
-        <div className="flex h-[300px] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
+        // The three report fields, in their final positions, while the week loads.
+        <div className="grid gap-6 py-4" aria-busy>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid gap-6 py-4">
