@@ -142,7 +142,7 @@ export default function NotificationSettingsPage() {
     [modules]
   )
 
-  if (loading) return <PageLoader />
+  if (loading) return <PageLoader variant="form" />
   if (isError) return <QueryError message="Could not load notification settings." onRetry={refetch} />
 
   return (
