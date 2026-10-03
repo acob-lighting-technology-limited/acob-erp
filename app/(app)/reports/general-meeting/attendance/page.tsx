@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
@@ -22,8 +22,10 @@ import {
   UserCheck,
 } from "lucide-react"
 import { toast } from "sonner"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface SessionData {
   session: {
@@ -84,66 +86,46 @@ function CheckInContent() {
 
   const [week] = useState(initialWeek)
   const [year] = useState(initialYear)
+  // A QR scan arrives with ?code= prefilled; the user still confirms with the button.
   const [code, setCode] = useState(initialCode)
   const [submitting, setSubmitting] = useState(false)
-  const [sessionLoading, setSessionLoading] = useState(true)
-  const [sessionData, setSessionData] = useState<SessionData | null>(null)
-  const [userStatus, setUserStatus] = useState<{
-    hasOfficeClockIn: boolean
-    officeClockIn: string | null
-    officeClockInSource: string | null
-    alreadyCheckedIn: boolean
-    meetingClockIn: string | null
-  } | null>(null)
-  const [successResult, setSuccessResult] = useState<{
-    officeClockIn: string | null
-    meetingClockIn: string
-  } | null>(null)
-  const [biometricError, setBiometricError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const sessionKey = QUERY_KEYS.meetingAttendanceSession(week, year)
 
-  // Fetch session & current user's biometric entrance punch status
-  useEffect(() => {
-    let mounted = true
-    const loadSession = async () => {
-      try {
-        setSessionLoading(true)
-        const res = await apiFetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
-        const data = await res.json()
-        if (mounted) {
-          if (data.session || data.holidayInfo) {
-            setSessionData({
-              session: data.session || null,
-              holidayInfo: data.holidayInfo || null,
-            })
-          }
-          if (data.userStatus) {
-            setUserStatus(data.userStatus)
-            if (data.userStatus.alreadyCheckedIn && data.userStatus.meetingClockIn) {
-              setSuccessResult({
-                officeClockIn: data.userStatus.officeClockIn,
-                meetingClockIn: data.userStatus.meetingClockIn,
-              })
-            }
-          }
-        }
-      } catch {
-        // Fail quietly on network hiccup
-      } finally {
-        if (mounted) setSessionLoading(false)
+  // Session & the current user's biometric entrance punch status.
+  const { data: sessionPayload, isLoading: sessionLoading } = useQuery({
+    queryKey: sessionKey,
+    queryFn: async () => {
+      const data = await apiJson<{
+        session?: SessionData["session"] | null
+        holidayInfo?: SessionData["holidayInfo"] | null
+        userStatus?: UserStatus | null
+      }>(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
+      return {
+        sessionData:
+          data.session || data.holidayInfo
+            ? ({ session: data.session || null, holidayInfo: data.holidayInfo || null } as SessionData)
+            : null,
+        userStatus: data.userStatus ?? null,
       }
-    }
-    loadSession()
-    return () => {
-      mounted = false
-    }
-  }, [week, year])
+    },
+  })
+  const sessionData = sessionPayload?.sessionData ?? null
+  const userStatus = sessionPayload?.userStatus ?? null
 
-  // Auto-submit if code is prefilled via QR scan (length 6)
-  useEffect(() => {
-    if (initialCode && initialCode.length === 6 && !successResult && !submitting) {
-      setCode(initialCode)
-    }
-  }, [initialCode, successResult, submitting])
+  // A check-in made on this visit, or one already on record (until dismissed).
+  const [localResult, setLocalResult] = useState<CheckInResult | null>(null)
+  const [recordedDismissed, setRecordedDismissed] = useState(false)
+  const successResult: CheckInResult | null =
+    localResult ??
+    (!recordedDismissed && userStatus?.alreadyCheckedIn && userStatus.meetingClockIn
+      ? { officeClockIn: userStatus.officeClockIn, meetingClockIn: userStatus.meetingClockIn }
+      : null)
+  const setSuccessResult = (next: CheckInResult | null) => {
+    setLocalResult(next)
+    if (next === null) setRecordedDismissed(true)
+  }
+  const [biometricError, setBiometricError] = useState<string | null>(null)
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -191,7 +173,9 @@ function CheckInContent() {
         officeClockIn: data.record.office_clock_in,
         meetingClockIn: data.record.meeting_clock_in,
       })
-      setUserStatus((prev) => (prev ? { ...prev, alreadyCheckedIn: true } : null))
+      queryClient.setQueryData<typeof sessionPayload>(sessionKey, (prev) =>
+        prev?.userStatus ? { ...prev, userStatus: { ...prev.userStatus, alreadyCheckedIn: true } } : prev
+      )
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error checking in")
     } finally {
@@ -494,6 +478,16 @@ function CheckInContent() {
     </div>
   )
 }
+
+type UserStatus = {
+  hasOfficeClockIn: boolean
+  officeClockIn: string | null
+  officeClockInSource: string | null
+  alreadyCheckedIn: boolean
+  meetingClockIn: string | null
+}
+
+type CheckInResult = { officeClockIn: string | null; meetingClockIn: string }
 
 export default function MeetingCheckInPage() {
   return (

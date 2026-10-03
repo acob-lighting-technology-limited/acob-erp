@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { BookOpen, Pencil, Plus, ToggleLeft, ToggleRight, Trash2 } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type CompetencyCategory = "behaviour" | "leadership" | "core"
 
@@ -116,9 +118,6 @@ function CompetencyCard({
 }
 
 export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string } = {}) {
-  const [competencies, setCompetencies] = useState<Competency[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -131,28 +130,23 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
   const [category, setCategory] = useState<CompetencyCategory>("behaviour")
   const [sortOrder, setSortOrder] = useState("0")
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await apiFetch("/api/hr/performance/competencies")
-      const data = (await res.json().catch(() => ({}))) as { data?: Competency[]; error?: string }
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load competencies")
-      }
-      setCompetencies(data.data || [])
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load competencies"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  const {
+    data: competencies = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.competencies(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: Competency[] }>("/api/hr/performance/competencies", { cache: "no-store" })
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load competencies" },
+  })
+  const error = queryError?.message ?? null
+  const load = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   function resetForm() {
     setKey("")

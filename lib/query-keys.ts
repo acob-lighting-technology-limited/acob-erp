@@ -15,6 +15,7 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  attendanceLeaderboard: (filters: Record<string, unknown>) => ["attendance-leaderboard", filters],
   attendanceRecords: (filters: Record<string, unknown>) => ["attendance-records", filters],
   employeeAttendanceDays: (userId: string, yearMonth: string, exempt: boolean) => [
     "employee-attendance-days",
@@ -36,6 +37,7 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  competencies: () => ["competencies"],
   myPeerFeedback: () => ["my-peer-feedback"],
   adminPeerFeedback: () => ["admin-peer-feedback"],
   myDevelopmentPlans: () => ["my-development-plans"],
@@ -76,6 +78,7 @@ export const QUERY_KEYS = {
   search: (q: string) => ["search", q],
 
   // Weekly reports
+  meetingAttendanceSession: (week: number, year: number) => ["meeting-attendance-session", week, year],
   weeklyReportSeed: (department: string, week: number, year: number) => ["weekly-report-seed", department, week, year],
   weeklyReportLockState: (week: number, year: number) => ["weekly-report-lock", week, year],
   weeklyReports: (filters?: Record<string, unknown>) => (filters ? ["weekly-reports", filters] : ["weekly-reports"]),
