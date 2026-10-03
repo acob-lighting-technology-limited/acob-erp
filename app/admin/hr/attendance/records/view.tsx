@@ -19,6 +19,8 @@ import {
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Clock, Calendar, Pencil, AlertCircle, Download, Building, FileText } from "lucide-react"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
+import { ClockTimes, NameWithDept } from "../_components/clock-times"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { toast } from "sonner"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
@@ -58,6 +60,7 @@ export function AdminAttendanceRecordsPage({
   backLinkHref,
   lockedDepartment,
 }: { backLinkHref?: string; lockedDepartment?: string } = {}) {
+  const deptCode = useDepartmentCodes()
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRecords, setProcessedRecords] = useState<AttendanceRecord[]>([])
   const [filters, setFilters] = useState(() => ({
@@ -428,9 +431,13 @@ export function AdminAttendanceRecordsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (r) => `${r.user_name} · ${formatDate(r.date)}`,
-            subtitle: (r) =>
-              `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)} · ${r.total_hours?.toFixed(1) ?? 0}h`,
+            title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
+            subtitle: (r) => (
+              <>
+                <ClockTimes clockIn={r.clock_in} clockOut={r.clock_out} />
+                {` · ${r.total_hours?.toFixed(1) ?? 0}h · ${formatDate(r.date)}`}
+              </>
+            ),
             trailing: (r) => <StatusBadge status={r.status} record={r} />,
             detail: {
               title: (r) => r.user_name,

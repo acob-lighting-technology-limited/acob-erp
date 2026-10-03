@@ -11,15 +11,33 @@ type DepartmentRow = { name?: string | null; department_code?: string | null }
  * Short code ("ACC", "HR") for a department name, from /api/departments.
  * Shared by both sidebars; null until loaded or when the name has no code.
  */
-export function useDepartmentCode(department: string | null | undefined): string | null {
-  const name = department ? normalizeDepartmentName(department) : ""
-  const { data } = useQuery({
+function useDepartmentRows(enabled = true) {
+  return useQuery({
     queryKey: QUERY_KEYS.departmentRows(),
     queryFn: async () =>
       (await apiJson<{ data?: DepartmentRow[] }>("/api/departments", { cache: "no-store" })).data ?? [],
-    enabled: Boolean(name),
+    enabled,
     staleTime: 10 * 60 * 1000,
-  })
+  }).data
+}
+
+export function useDepartmentCode(department: string | null | undefined): string | null {
+  const name = department ? normalizeDepartmentName(department) : ""
+  const data = useDepartmentRows(Boolean(name))
   if (!name) return null
   return data?.find((row) => normalizeDepartmentName(String(row.name || "")) === name)?.department_code || null
+}
+
+/**
+ * Lookup for lists that show many departments: name → short code, falling back
+ * to the name itself while loading or when a department has no code.
+ */
+export function useDepartmentCodes(): (department: string | null | undefined) => string {
+  const data = useDepartmentRows()
+  const codes = new Map(
+    (data ?? [])
+      .filter((row) => row.department_code)
+      .map((row) => [normalizeDepartmentName(String(row.name || "")), String(row.department_code)])
+  )
+  return (department) => (department ? (codes.get(normalizeDepartmentName(department)) ?? department) : "")
 }

@@ -38,6 +38,8 @@ import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { isEarlyDeparture, getManualStatusEditOptions } from "@/lib/hr/attendance-status"
 import { StatusBadge, formatTime, labelSource } from "./status-badge"
+import { ClockTimes, NameWithDept } from "./clock-times"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { orderRoster, rosterPhase } from "@/lib/hr/roster-order"
 import { useQuery } from "@tanstack/react-query"
@@ -152,6 +154,7 @@ function formatClock12(hhmm: string): string {
 }
 
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
+  const deptCode = useDepartmentCodes()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [editForm, setEditForm] = useState({ status: "", manual_comment: "" })
@@ -620,8 +623,8 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          title: (r) => r.user_name,
-          subtitle: (r) => `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)}`,
+          title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
+          subtitle: (r) => <ClockTimes clockIn={r.clock_in} clockOut={r.clock_out} />,
           trailing: (r) => (
             <StatusBadge
               status={r.status}
