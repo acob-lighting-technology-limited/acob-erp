@@ -15,6 +15,7 @@ import type { LeaveItem } from "../view"
 import { getStageBadge, resolvePersonName } from "../view"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { buildCalendarCells } from "@/lib/utils/calendar-grid"
 
 export interface CalendarStats {
   total_days: number
@@ -89,26 +90,6 @@ function getYearOptions(): number[] {
     years.push(y)
   }
   return years
-}
-
-function monBasedDay(jsDay: number) {
-  return jsDay === 0 ? 6 : jsDay - 1
-}
-
-function buildCalendarCells(yearMonth: string): (string | null)[] {
-  const [year, month] = yearMonth.split("-").map(Number)
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const firstDayOfWeek = new Date(year, month - 1, 1).getDay()
-  const offset = monBasedDay(firstDayOfWeek)
-  const cells: (string | null)[] = [
-    ...Array(offset).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => {
-      const d = i + 1
-      return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-    }),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
-  return cells
 }
 
 /** Color palette definition for different leave types */
