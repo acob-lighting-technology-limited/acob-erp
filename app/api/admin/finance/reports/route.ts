@@ -36,10 +36,7 @@ export async function GET() {
     .select("id, title, amount, category, created_at, status, currency, department:departments(name)")
     .order("created_at", { ascending: false })
 
-  if (error) {
-    if (error.code === "42P01") return NextResponse.json({ data: [] })
-    return serverError(log, error)
-  }
+  if (error) return serverError(log, error)
 
   const normalizedDepts = depts?.map((d) => normalizeDepartmentName(d))
 

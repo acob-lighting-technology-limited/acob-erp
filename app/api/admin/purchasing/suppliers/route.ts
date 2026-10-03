@@ -36,10 +36,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await db.from("suppliers").select("*").order("name")
-  if (error) {
-    if (error.code === "42P01") return NextResponse.json({ data: [] })
-    return serverError(log, error)
-  }
+  if (error) return serverError(log, error)
   return NextResponse.json({ data: data ?? [] })
 }
 

@@ -6,13 +6,6 @@ import { logger } from "@/lib/logger"
 const log = logger("help-desk-categories")
 export const dynamic = "force-dynamic"
 
-type ErrorWithCode = {
-  code?: string
-  message?: string
-  details?: string
-  hint?: string
-}
-
 type ProfileDepartmentRow = {
   department: string | null
 }
@@ -31,8 +24,6 @@ type HelpDeskCategoryRow = {
   support_mode: string | null
   is_active: boolean
 }
-
-type LegacyHelpDeskCategoryRow = Omit<HelpDeskCategoryRow, "support_mode" | "is_active">
 
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
@@ -69,45 +60,16 @@ export async function GET() {
       ])
 
     if (profilesError) throw profilesError
-    if (departmentsError && (departmentsError as ErrorWithCode).code !== "42703") throw departmentsError
+    if (departmentsError) throw departmentsError
 
-    let data: HelpDeskCategoryRow[] = []
     const { data: categoryRows, error: categoriesError } = await dataClient
       .from("help_desk_categories")
       .select("id, service_department, request_type, code, name, description, support_mode, is_active")
       .eq("is_active", true)
       .order("service_department")
       .order("name")
-
-    if (!categoriesError) {
-      data = (categoryRows as HelpDeskCategoryRow[] | null) || []
-    } else {
-      const errCode = (categoriesError as ErrorWithCode)?.code
-
-      if (errCode === "42P01") {
-        data = []
-      } else if (errCode === "42703") {
-        const { data: legacyRows, error: legacyError } = await dataClient
-          .from("help_desk_categories")
-          .select("id, service_department, request_type, code, name, description")
-          .order("service_department")
-          .order("name")
-
-        if (legacyError) {
-          const legacyCode = (legacyError as ErrorWithCode)?.code
-          if (legacyCode !== "42P01") throw legacyError
-          data = []
-        } else {
-          data = ((legacyRows as LegacyHelpDeskCategoryRow[] | null) || []).map((row) => ({
-            ...row,
-            support_mode: null,
-            is_active: true,
-          }))
-        }
-      } else {
-        throw categoriesError
-      }
-    }
+    if (categoriesError) throw categoriesError
+    const data = (categoryRows as HelpDeskCategoryRow[] | null) || []
 
     const departments = Array.from(
       new Set(

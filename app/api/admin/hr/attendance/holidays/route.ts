@@ -81,18 +81,9 @@ export async function POST(request: NextRequest) {
   const rows = dates.map((holiday_date) => ({ holiday_date, location, name, created_by: auth.userId }))
 
   // Ignore days already marked as holidays so re-adding an overlapping range is safe.
-  let { error: insertError } = await dataClient
+  const { error: insertError } = await dataClient
     .from("holiday_calendar")
     .upsert(rows, { onConflict: "holiday_date,location", ignoreDuplicates: true })
-  // Back-compat for environments missing the created_by column.
-  if (insertError && insertError.code === "42703") {
-    const fallbackRows = dates.map((holiday_date) => ({ holiday_date, location, name }))
-    insertError = (
-      await dataClient
-        .from("holiday_calendar")
-        .upsert(fallbackRows, { onConflict: "holiday_date,location", ignoreDuplicates: true })
-    ).error
-  }
   if (insertError) return serverError(log, insertError, "Failed to add holiday")
 
   // Leave booked before this holiday existed was priced without it. Hand the

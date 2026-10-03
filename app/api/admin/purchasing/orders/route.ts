@@ -39,10 +39,7 @@ export async function GET() {
     .select("*, supplier:suppliers(name)")
     .order("created_at", { ascending: false })
 
-  if (error) {
-    if (error.code === "42P01") return NextResponse.json({ data: [] })
-    return serverError(log, error)
-  }
+  if (error) return serverError(log, error)
 
   const orders = (data ?? []).map((o) => {
     const row = o as Record<string, unknown> & { supplier?: SupplierJoin }

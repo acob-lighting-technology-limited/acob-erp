@@ -29,11 +29,6 @@ export async function GET() {
 
   const { data, error } = await db.from("roles").select("*").order("name")
   if (error) {
-    // Table absent (fresh env) — signal the client to use its built-in defaults.
-    if (error.code === "42P01" || error.message?.includes("relation")) {
-      return NextResponse.json({ data: null, fallback: true })
-    }
-    log.error({ err: error.message }, "failed to load roles")
     return serverError(log, error)
   }
 
