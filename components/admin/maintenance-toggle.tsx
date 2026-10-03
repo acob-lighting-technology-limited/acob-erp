@@ -1,41 +1,34 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("admin-maintenance-toggle")
 
+type MaintenanceState = { can_toggle?: boolean; data?: { enabled?: boolean } }
+
 export function MaintenanceToggle() {
-  const [enabled, setEnabled] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [updating, setUpdating] = useState(false)
-  const [canToggle, setCanToggle] = useState(false)
 
-  async function fetchState() {
-    try {
-      const response = await apiFetch("/api/dev/maintenance", { cache: "no-store" })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload.error || "Failed to load maintenance settings")
-
-      setCanToggle(Boolean(payload.can_toggle))
-      setEnabled(Boolean(payload.data?.enabled))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load maintenance settings"
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Declared before the effect that calls it (a function declaration used
-  // ahead of its definition is hoisted, but the React Compiler rejects it).
-  useEffect(() => {
-    fetchState()
-  }, [])
+  const { data, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.maintenanceState(),
+    queryFn: () => apiJson<MaintenanceState>("/api/dev/maintenance", { cache: "no-store" }),
+    meta: { errorMessage: "Failed to load maintenance settings" },
+  })
+  const canToggle = Boolean(data?.can_toggle)
+  const enabled = Boolean(data?.data?.enabled)
+  const setEnabled = (next: boolean) =>
+    queryClient.setQueryData<MaintenanceState>(QUERY_KEYS.maintenanceState(), (prev) => ({
+      ...prev,
+      data: { ...prev?.data, enabled: next },
+    }))
 
   async function handleToggle(checked: boolean) {
     // Prevent overlapping requests
