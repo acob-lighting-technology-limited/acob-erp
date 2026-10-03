@@ -31,6 +31,7 @@ import type { CreatePaymentFormData } from "./create-payment-dialog"
 import { logger } from "@/lib/logger"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
+import { statusToneClass } from "@/lib/status-tones"
 
 const log = logger("payments-table")
 
@@ -244,13 +245,7 @@ export function PaymentsTable({
   const formatCurrency = (amount: number, currency: string) =>
     new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
 
-  const getStatusColor = (status: string) => {
-    if (status === "paid") return "bg-success-muted text-success-foreground"
-    if (status === "due") return "bg-warning-muted text-warning-foreground"
-    if (status === "overdue") return "bg-danger-muted text-danger-foreground"
-    if (status === "cancelled") return "bg-neutral-muted text-neutral-foreground"
-    return ""
-  }
+  const getStatusColor = (status: string) => statusToneClass(status)
 
   const processedPayments = useMemo<ProcessedPayment[]>(() => {
     return payments.map((payment) => {

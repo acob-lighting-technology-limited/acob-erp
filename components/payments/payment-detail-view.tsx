@@ -49,6 +49,7 @@ import type {
   PaymentDocument,
   PaymentEditFormData,
 } from "@/components/payments/payment-types"
+import { statusToneClass } from "@/lib/status-tones"
 
 interface PaymentPageData {
   payment: Payment | null
@@ -361,20 +362,7 @@ export function PaymentDetailView({ paymentId, basePath, scope }: PaymentDetailV
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-success-muted text-success-foreground"
-      case "due":
-        return "bg-warning-muted text-warning-foreground"
-      case "overdue":
-        return "bg-danger-muted text-danger-foreground"
-      case "cancelled":
-        return "bg-neutral-muted text-neutral-foreground"
-      default:
-        return ""
-    }
-  }
+  const getStatusColor = (status: string) => statusToneClass(status)
 
   const formatCurrency = (amount: number, currency: string = "NGN") => {
     return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)

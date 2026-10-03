@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { UserPlus, History, ArrowUpDown, AlertCircle, CheckCircle2, Calendar, FileText } from "lucide-react"
 import type { Asset } from "@/app/admin/assets/admin-assets-content"
 import { formatDateTime } from "@/lib/format"
+import { ASSET_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
 interface AssetActivity {
   id: string
@@ -30,23 +31,6 @@ interface AssetHistoryDialogProps {
   onOpenChange: (open: boolean) => void
   selectedAsset: Asset | null
   assetHistory: AssetActivity[]
-}
-
-function getStatusColor(status: string) {
-  switch (status) {
-    case "assigned":
-      return "bg-success-muted text-success-foreground"
-    case "available":
-      return "bg-info-muted text-info-foreground"
-    case "maintenance":
-      return "bg-warning-muted text-warning-foreground"
-    case "retired":
-      return "bg-neutral-muted text-neutral-foreground"
-    case "archived":
-      return "bg-danger-muted text-danger-foreground"
-    default:
-      return "bg-neutral-muted text-neutral-foreground"
-  }
 }
 
 export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetHistory }: AssetHistoryDialogProps) {
@@ -125,7 +109,9 @@ export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetH
                         {activity.details.old_status}
                       </Badge>
                       <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                      <Badge className={getStatusColor(activity.details.status || "")}>{activity.details.status}</Badge>
+                      <Badge className={statusToneClass(activity.details.status || "", ASSET_STATUS_TONES)}>
+                        {activity.details.status}
+                      </Badge>
                     </div>
                   )}
                 </div>

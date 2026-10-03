@@ -21,23 +21,7 @@ import type {
   EmployeeAuditLog,
   EmployeeFeedback,
 } from "./employee-detail-types"
-
-function getStatusColor(status: string) {
-  switch (status?.toLowerCase()) {
-    case "completed":
-    case "resolved":
-      return "bg-success-muted text-success-foreground"
-    case "in_progress":
-      return "bg-info-muted text-info-foreground"
-    case "pending":
-    case "open":
-      return "bg-warning-muted text-warning-foreground"
-    case "assigned":
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-    default:
-      return "bg-neutral-muted text-neutral-foreground"
-  }
-}
+import { statusToneClass } from "@/lib/status-tones"
 
 function getPriorityColor(priority: string) {
   switch (priority?.toLowerCase()) {
@@ -147,7 +131,7 @@ export function EmployeeDetailTabs({
                     <TableRow key={task.id}>
                       <TableCell className="font-medium">{task.title}</TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(task.status)}>{task.status}</Badge>
+                        <Badge className={statusToneClass(task.status)}>{task.status}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge className={getPriorityColor(task.priority)}>{task.priority}</Badge>
@@ -201,7 +185,7 @@ export function EmployeeDetailTabs({
                       <TableCell>{device.device_model || "N/A"}</TableCell>
                       <TableCell>{device.serial_number || "N/A"}</TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(device.status)}>{device.status}</Badge>
+                        <Badge className={statusToneClass(device.status)}>{device.status}</Badge>
                       </TableCell>
                       <TableCell>{formatWATDate(device.assigned_at)}</TableCell>
                       <TableCell>
@@ -251,7 +235,7 @@ export function EmployeeDetailTabs({
                       <TableCell>{asset.asset_model || "N/A"}</TableCell>
                       <TableCell>{asset.serial_number || "N/A"}</TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(asset.status)}>{asset.status}</Badge>
+                        <Badge className={statusToneClass(asset.status)}>{asset.status}</Badge>
                       </TableCell>
                       <TableCell>{formatWATDate(asset.assigned_at)}</TableCell>
                       <TableCell>
@@ -343,7 +327,7 @@ export function EmployeeDetailTabs({
                         <Badge variant="outline">{item.feedback_type}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
+                        <Badge className={statusToneClass(item.status)}>{item.status}</Badge>
                       </TableCell>
                       <TableCell>{formatWATDate(item.created_at)}</TableCell>
                       <TableCell>

@@ -93,3 +93,32 @@ export function statusLabel(status: string | null | undefined): string {
     .trim()
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
+
+// Full class strings (not built at runtime) so Tailwind generates them.
+const TONE_CLASSES: Record<StatusTone, string> = {
+  success: "bg-success-muted text-success-foreground",
+  warning: "bg-warning-muted text-warning-foreground",
+  info: "bg-info-muted text-info-foreground",
+  danger: "bg-danger-muted text-danger-foreground",
+  neutral: "bg-neutral-muted text-neutral-foreground",
+}
+
+/** Pill classes for a status, for places that style their own element instead of using StatusBadge. */
+export function statusToneClass(status: string | null | undefined, overrides?: Record<string, StatusTone>): string {
+  return TONE_CLASSES[statusTone(status, overrides)]
+}
+
+/** Assets: "assigned" is the healthy state, "available" just informational, "archived" a removal. */
+export const ASSET_STATUS_TONES: Record<string, StatusTone> = {
+  assigned: "success",
+  available: "info",
+  archived: "danger",
+}
+
+/** Feedback: a fresh "open" item is good news for the submitter. */
+export const FEEDBACK_STATUS_TONES: Record<string, StatusTone> = { open: "success" }
+
+/** Documentation: drafts need attention, published is done. */
+export function draftToneClass(isDraft: boolean): string {
+  return TONE_CLASSES[isDraft ? "warning" : "success"]
+}

@@ -26,9 +26,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import type { Feedback } from "./page"
 import type { SystemSatisfactionSurvey } from "@/types/survey"
-import { logger } from "@/lib/logger"
-
-const log = logger("feedback-feedback-content")
+import { FEEDBACK_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
 interface FeedbackContentProps {
   initialFeedback: Feedback[]
@@ -54,13 +52,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
     return "bg-neutral-muted text-neutral-foreground"
   }
 
-  const getStatusColor = (status: string) => {
-    if (status === "open") return "bg-success-muted text-success-foreground"
-    if (status === "in_progress") return "bg-info-muted text-info-foreground"
-    if (status === "resolved") return "bg-violet-100 text-violet-800"
-    if (status === "closed") return "bg-neutral-muted text-neutral-foreground"
-    return "bg-neutral-muted text-neutral-foreground"
-  }
+  const getStatusColor = (status: string) => statusToneClass(status, FEEDBACK_STATUS_TONES)
 
   const handleFeedbackSubmitted = (newFeedback: Feedback) => {
     setUserFeedback((current) => [newFeedback, ...current])

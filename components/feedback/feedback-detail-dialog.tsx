@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatName } from "@/lib/utils"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import type { FeedbackRecord } from "@/components/feedback/types"
+import { FEEDBACK_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
 function getTypeColor(type: string): string {
   switch (type) {
@@ -19,21 +20,6 @@ function getTypeColor(type: string): string {
       return "bg-info-muted text-info-foreground"
     case "required_item":
       return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-    default:
-      return "bg-neutral-muted text-neutral-foreground"
-  }
-}
-
-function getStatusColor(status: string): string {
-  switch (status) {
-    case "open":
-      return "bg-success-muted text-success-foreground"
-    case "in_progress":
-      return "bg-info-muted text-info-foreground"
-    case "resolved":
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-    case "closed":
-      return "bg-neutral-muted text-neutral-foreground"
     default:
       return "bg-neutral-muted text-neutral-foreground"
   }
@@ -121,7 +107,7 @@ export function FeedbackDetailDialog({
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Current Status</Label>
                 <div>
-                  <Badge className={getStatusColor(feedback.status)}>{feedback.status}</Badge>
+                  <Badge className={statusToneClass(feedback.status, FEEDBACK_STATUS_TONES)}>{feedback.status}</Badge>
                 </div>
               </div>
             </div>

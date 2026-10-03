@@ -15,6 +15,7 @@ import { AdminDocViewDialog } from "@/components/documentation/admin-doc-view-di
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { AdminDocumentation, UserProfile, employeeMember } from "@/components/documentation/admin-doc-types"
 import { formatDate } from "@/lib/format"
+import { draftToneClass } from "@/lib/status-tones"
 
 // Re-export types for consumers of this module
 export type { UserProfile, employeeMember }
@@ -38,8 +39,7 @@ interface AdminDocumentationContentProps {
   backLinkLabel?: string
 }
 
-const getStatusColor = (isDraft: boolean) =>
-  isDraft ? "bg-warning-muted text-warning-foreground" : "bg-success-muted text-success-foreground"
+const getStatusColor = draftToneClass
 
 export function AdminDocumentationContent({
   initialDocumentation,

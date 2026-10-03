@@ -61,6 +61,7 @@ import {
 } from "@/lib/assets/asset-export"
 import { toLocalDateTimeInput, toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { ASSET_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
 const log = logger("assets-admin-assets-content")
 
@@ -1181,22 +1182,7 @@ export function AdminAssetsContent({
       .reduce((sum, asset) => sum + (asset.unresolved_issues_count || 0), 0),
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "assigned":
-        return "bg-success-muted text-success-foreground"
-      case "available":
-        return "bg-info-muted text-info-foreground"
-      case "maintenance":
-        return "bg-warning-muted text-warning-foreground"
-      case "retired":
-        return "bg-neutral-muted text-neutral-foreground"
-      case "archived":
-        return "bg-danger-muted text-danger-foreground"
-      default:
-        return "bg-neutral-muted text-neutral-foreground"
-    }
-  }
+  const getStatusColor = (status: string) => statusToneClass(status, ASSET_STATUS_TONES)
 
   const assetTypeOptions = assetTypes.map((type) => ({ value: type.code, label: type.label }))
   const departmentOptions = departments.map((department) => ({ value: department, label: department }))

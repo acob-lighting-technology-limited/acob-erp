@@ -20,6 +20,7 @@ import { apiFetch } from "@/lib/api-client"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatDateTime } from "@/lib/format"
+import { draftToneClass } from "@/lib/status-tones"
 
 const log = logger("personal-documentation-content")
 
@@ -45,9 +46,7 @@ interface PersonalDocumentationContentProps {
   userId: string
 }
 
-function getStatusColor(isDraft: boolean) {
-  return isDraft ? "bg-warning-muted text-warning-foreground" : "bg-success-muted text-success-foreground"
-}
+const getStatusColor = draftToneClass
 
 export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDocumentationContentProps) {
   const [docs, setDocs] = useState<Documentation[]>(initialDocs)
