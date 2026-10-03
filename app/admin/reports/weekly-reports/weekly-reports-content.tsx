@@ -31,6 +31,7 @@ import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { downloadWeeklyReportDocx, downloadWeeklyReportPdf } from "@/lib/reports/export-download"
 import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -47,12 +48,6 @@ async function fetchAdminWeeklyReports(weekFilter: number, yearFilter: number): 
     reports: sortReportsByDepartment((json.reports || []) as WeeklyReport[]),
     trackingData: (json.trackingData || []) as TrackerStatus[],
   }
-}
-
-async function fetchAdminWeeklyReportLockState(week: number, year: number) {
-  const res = await apiFetch(`/api/admin/reports/weekly-lock-state?week=${week}&year=${year}`, { cache: "no-store" })
-  if (!res.ok) throw new Error("Failed to resolve lock state")
-  return res.json()
 }
 
 interface TrackerStatus {
@@ -154,10 +149,7 @@ export function WeeklyReportsContent({
   const reports = useMemo(() => reportsData?.reports ?? [], [reportsData?.reports])
   const trackingData = useMemo(() => reportsData?.trackingData ?? [], [reportsData?.trackingData])
 
-  const { data: lockState } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter),
-    queryFn: () => fetchAdminWeeklyReportLockState(weekFilter, yearFilter),
-  })
+  const { data: lockState } = useAdminWeeklyReportLockState(weekFilter, yearFilter)
 
   const isFilteredWeekLocked = lockState?.isLocked ?? false
   const canMutateFilteredWeek = lockState?.canMutate ?? !isFilteredWeekLocked

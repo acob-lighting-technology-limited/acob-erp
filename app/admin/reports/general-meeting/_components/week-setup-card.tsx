@@ -17,6 +17,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { apiFetch } from "@/lib/api-client"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 
 type EmployeeOption = {
   id: string
@@ -101,16 +102,7 @@ export function WeekSetupCard() {
     [employees, kssDepartmentInput, kssPresenterIdInput]
   )
 
-  const { data: lockState } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekNumber, yearNumber),
-    queryFn: async () => {
-      const res = await apiFetch(`/api/admin/reports/weekly-lock-state?week=${weekNumber}&year=${yearNumber}`, {
-        cache: "no-store",
-      })
-      if (!res.ok) throw new Error("Failed to resolve lock state")
-      return res.json()
-    },
-  })
+  const { data: lockState } = useAdminWeeklyReportLockState(weekNumber, yearNumber)
   const computedDeadlineLabel = useMemo(() => {
     if (!lockState?.meetingDate) return null
     const [year, month, day] = lockState.meetingDate.split("-").map(Number)

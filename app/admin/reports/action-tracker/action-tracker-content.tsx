@@ -37,6 +37,7 @@ import { apiFetch } from "@/lib/api-client"
 import { DirectiveFormDialog, type EditableDirective } from "@/components/admin/action-tracker/directive-form-dialog"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 
 const log = logger("reports-action-tracker-action-tracker-co")
 
@@ -225,16 +226,7 @@ export function ActionTrackerContent({
     queryFn: () => fetchAdminActionTrackerTasks(weekFilter, yearFilter, deptFilter, scopedDepartments),
   })
 
-  const { data: lockState } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter),
-    queryFn: async () => {
-      const res = await apiFetch(`/api/admin/reports/weekly-lock-state?week=${weekFilter}&year=${yearFilter}`, {
-        cache: "no-store",
-      })
-      if (!res.ok) throw new Error("Failed to resolve lock state")
-      return res.json()
-    },
-  })
+  const { data: lockState } = useAdminWeeklyReportLockState(weekFilter, yearFilter)
 
   const tasksQueryKey = QUERY_KEYS.adminActionTrackerTasks({ weekFilter, yearFilter, deptFilter, scopedDepartments })
 
