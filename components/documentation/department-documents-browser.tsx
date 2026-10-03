@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import { ListToolbar, useDebouncedListSearch } from "@/components/ui/patterns/list-toolbar"
+import type { DataTableFilter } from "@/components/ui/data-table/types"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
@@ -223,6 +225,44 @@ async function collectEntryUploadData(
   return { files, folders }
 }
 
+const DOCUMENT_FILTERS: DataTableFilter[] = [
+  {
+    key: "type",
+    label: "Type",
+    multi: false,
+    placeholder: "All Types",
+    options: [
+      { value: "all", label: "All Types" },
+      { value: "folder", label: "Folders" },
+      { value: "files", label: "Files Only" },
+      { value: "document", label: "Docs & PDFs" },
+      { value: "spreadsheet", label: "Spreadsheets" },
+      { value: "presentation", label: "Presentations" },
+      { value: "media", label: "Media / Images" },
+    ],
+  },
+  {
+    key: "sort",
+    label: "Sort",
+    multi: false,
+    placeholder: "Sort by",
+    options: [
+      { value: "name-asc", label: "Name (A–Z)" },
+      { value: "name-desc", label: "Name (Z–A)" },
+      { value: "date-desc", label: "Newest first" },
+      { value: "date-asc", label: "Oldest first" },
+      { value: "size-desc", label: "Largest size" },
+      { value: "size-asc", label: "Smallest size" },
+    ],
+  },
+]
+
+const DOCUMENT_VIEW_OPTIONS = [
+  { key: "list" as const, label: "List", Icon: List, hint: "Compact list view" },
+  { key: "card" as const, label: "Cards", Icon: LayoutGrid, hint: "Card grid" },
+  { key: "table" as const, label: "Table", Icon: TableProperties, hint: "Data table" },
+]
+
 const NO_FILES: FileItem[] = []
 
 export function DepartmentDocumentsBrowser({
@@ -253,11 +293,9 @@ export function DepartmentDocumentsBrowser({
 
   const pathFromUrl = clampPath(searchParams.get("path") || initialPath)
   const [currentPath, setCurrentPath] = useState(pathFromUrl)
-  const [searchQuery, setSearchQuery] = useState("")
-
-  // The search that was submitted for a folder; navigating elsewhere clears it.
-  const [submittedSearch, setSubmittedSearch] = useState({ path: currentPath, query: "" })
-  const activeSearch = submittedSearch.path === currentPath ? submittedSearch.query : ""
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "")
+  const debouncedSearchQuery = useDebouncedListSearch(searchQuery, 250)
+  const activeSearch = debouncedSearchQuery.trim().length >= 2 ? debouncedSearchQuery.trim() : ""
 
   const filesQuery = useQuery({
     queryKey: QUERY_KEYS.onedriveFiles({ path: currentPath, accessMode, lockedDepartment, search: activeSearch }),
@@ -277,8 +315,8 @@ export function DepartmentDocumentsBrowser({
   const initialView: "table" | "card" | "list" =
     rawView === "list" || rawView === "card" || rawView === "table" ? rawView : rawView === "grid" ? "card" : "table"
   const [viewMode, setViewMode] = useState<"table" | "card" | "list">(initialView)
-  const [typeFilter, setTypeFilter] = useState<string>("all")
-  const [sortOrder, setSortOrder] = useState<string>("name-asc")
+  const [typeFilter, setTypeFilter] = useState<string>(searchParams.get("type") ?? "all")
+  const [sortOrder, setSortOrder] = useState<string>(searchParams.get("sort") ?? "name-asc")
 
   const processedFiles = useMemo(() => {
     let list = files
@@ -358,19 +396,6 @@ export function DepartmentDocumentsBrowser({
     folderInputRef.current?.setAttribute("directory", "")
   }, [])
 
-  /** Load `path` with an optional search; re-requesting the current view refetches it. */
-  const fetchFiles = useCallback(
-    async (path: string, search?: string) => {
-      const query = search ?? ""
-      if (path === currentPath && query === activeSearch) {
-        await filesQuery.refetch()
-      } else {
-        setSubmittedSearch({ path, query })
-      }
-    },
-    [currentPath, activeSearch, filesQuery]
-  )
-
   useEffect(() => {
     setSelectedPaths((prev) => {
       const valid = new Set(files.map((file) => file.path))
@@ -385,8 +410,16 @@ export function DepartmentDocumentsBrowser({
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.set("path", currentPath)
+    if (activeSearch) params.set("q", activeSearch)
+    else params.delete("q")
+    if (typeFilter !== "all") params.set("type", typeFilter)
+    else params.delete("type")
+    if (sortOrder !== "name-asc") params.set("sort", sortOrder)
+    else params.delete("sort")
+    if (viewMode !== "table") params.set("view", viewMode)
+    else params.delete("view")
     router.replace(`?${params.toString()}`, { scroll: false })
-  }, [currentPath, router, searchParams])
+  }, [activeSearch, currentPath, router, searchParams, sortOrder, typeFilter, viewMode])
 
   const navigateToFolder = (path: string) => {
     setCurrentPath(clampPath(path))
@@ -550,13 +583,8 @@ export function DepartmentDocumentsBrowser({
     await downloadSelection(selectedItems)
   }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    fetchFiles(currentPath, searchQuery.trim() || undefined)
-  }
-
-  const handleRefresh = () => {
-    fetchFiles(currentPath, searchQuery.trim() || undefined)
+  const handleRefresh = async () => {
+    await filesQuery.refetch()
   }
 
   const resetFileInputs = () => {
@@ -659,7 +687,7 @@ export function DepartmentDocumentsBrowser({
       toast.success("Folder created")
       setNewFolderOpen(false)
       setNewFolderName("")
-      await fetchFiles(currentPath, searchQuery.trim() || undefined)
+      await filesQuery.refetch()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to create folder")
     } finally {
@@ -734,7 +762,7 @@ export function DepartmentDocumentsBrowser({
             : "Folder structure created"
         )
 
-        await fetchFiles(currentPath, searchQuery.trim() || undefined)
+        await filesQuery.refetch()
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : "Some uploads failed")
       } finally {
@@ -742,7 +770,7 @@ export function DepartmentDocumentsBrowser({
         resetFileInputs()
       }
     },
-    [canAddContent, createFolderRequest, currentPath, fetchFiles, searchQuery, uploadWithProgress]
+    [canAddContent, createFolderRequest, filesQuery, uploadWithProgress]
   )
 
   const handleFilesSelected = async (selectedFiles: FileList | null) => {
@@ -836,7 +864,7 @@ export function DepartmentDocumentsBrowser({
       setRenameOpen(false)
       setRenameTarget(null)
       setRenameValue("")
-      await fetchFiles(currentPath, searchQuery.trim() || undefined)
+      await filesQuery.refetch()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to rename item")
     } finally {
@@ -865,7 +893,7 @@ export function DepartmentDocumentsBrowser({
 
       toast.success(`${deleteTarget.isFolder ? "Folder" : "File"} deleted`)
       setDeleteTarget(null)
-      await fetchFiles(currentPath, searchQuery.trim() || undefined)
+      await filesQuery.refetch()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to delete item")
     } finally {
@@ -922,7 +950,7 @@ export function DepartmentDocumentsBrowser({
               setTypeFilter("all")
               setSortOrder("name-asc")
               setSearchQuery("")
-              fetchFiles(currentPath, undefined)
+              void filesQuery.refetch()
             }}
           >
             Reset filters
@@ -1477,121 +1505,44 @@ export function DepartmentDocumentsBrowser({
         }}
       >
         <CardHeader className="space-y-3 p-4 pb-3">
-          {/* Row 1: Search bar (full width on mobile, fills space on desktop) + Refresh */}
-          <div className="flex items-center gap-2">
-            <form onSubmit={handleSearch} className="relative min-w-0 flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                placeholder="Search files by name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 pr-9 pl-10"
-                aria-label="Search files"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("")
-                    fetchFiles(currentPath, undefined)
-                  }}
-                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-                  aria-label="Clear search"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </form>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Refresh"
-              onClick={handleRefresh}
-              disabled={loading || isMutating}
-              className="h-9 w-9 shrink-0"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
-
-          {/* Row 2: Filter dropdowns on the left, View switcher pinned on the right */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9 w-32.5 sm:w-37.5">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="folder">Folders</SelectItem>
-                  <SelectItem value="files">Files Only</SelectItem>
-                  <SelectItem value="document">Docs & PDFs</SelectItem>
-                  <SelectItem value="spreadsheet">Spreadsheets</SelectItem>
-                  <SelectItem value="presentation">Presentations</SelectItem>
-                  <SelectItem value="media">Media / Images</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={sortOrder} onValueChange={setSortOrder}>
-                <SelectTrigger className="h-9 w-32.5 sm:w-37.5">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name-asc">Name (A–Z)</SelectItem>
-                  <SelectItem value="name-desc">Name (Z–A)</SelectItem>
-                  <SelectItem value="date-desc">Newest first</SelectItem>
-                  <SelectItem value="date-asc">Oldest first</SelectItem>
-                  <SelectItem value="size-desc">Largest size</SelectItem>
-                  <SelectItem value="size-asc">Smallest size</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {(typeFilter !== "all" || searchQuery || sortOrder !== "name-asc") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground h-9 text-xs"
-                  onClick={() => {
-                    setTypeFilter("all")
-                    setSortOrder("name-asc")
-                    setSearchQuery("")
-                    fetchFiles(currentPath, undefined)
-                  }}
-                >
-                  Clear all
-                </Button>
-              )}
-            </div>
-
-            {/* Segmented view switcher pinned to the right */}
-            <div
-              className="border-input ml-auto inline-flex h-9 items-center rounded-lg border bg-transparent p-1"
-              role="group"
-              aria-label="View mode"
-            >
-              {[
-                { key: "list" as const, label: "List", Icon: List, hint: "Compact list view" },
-                { key: "card" as const, label: "Cards", Icon: LayoutGrid, hint: "Card grid" },
-                { key: "table" as const, label: "Table", Icon: TableProperties, hint: "Data table" },
-              ].map(({ key, label, Icon, hint }) => (
-                <button
-                  key={key}
-                  type="button"
-                  title={hint}
-                  onClick={() => setViewMode(key)}
-                  className={cn(
-                    "inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
-                    viewMode === key
-                      ? "bg-muted text-foreground font-semibold shadow-xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <ListToolbar
+            search={{
+              value: searchQuery,
+              onChange: setSearchQuery,
+              placeholder: "Search files by name...",
+              "aria-label": "Search files",
+              debounceMs: 250,
+              minLength: 2,
+            }}
+            filters={DOCUMENT_FILTERS}
+            filterValues={{
+              type: typeFilter !== "all" ? [typeFilter] : [],
+              sort: sortOrder !== "name-asc" ? [sortOrder] : [],
+            }}
+            onFilterChange={(key, values) => {
+              if (key === "type") setTypeFilter(values[0] ?? "all")
+              if (key === "sort") setSortOrder(values[0] ?? "name-asc")
+            }}
+            view={{
+              value: viewMode,
+              onChange: setViewMode,
+              options: DOCUMENT_VIEW_OPTIONS,
+            }}
+            actions={
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Refresh"
+                onClick={handleRefresh}
+                disabled={loading || isMutating}
+                className="h-9 w-9 shrink-0"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            }
+            resultCount={processedFiles.length}
+            resultLabel="items"
+          />
 
           {/* Row 3: Active count summary */}
           <div className="text-muted-foreground flex items-center justify-between pt-0.5 text-xs font-medium">

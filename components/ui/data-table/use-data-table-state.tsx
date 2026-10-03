@@ -19,7 +19,8 @@ import { useMobileList } from "./use-mobile-list"
 import type { DataTableProps, PaginationConfig, SortConfig } from "./types"
 import { getDetailConfig } from "./detail-config"
 import { logger } from "@/lib/logger"
-import { useDebounce, useColumnResize } from "./legacy-primitives"
+import { useColumnResize } from "./legacy-primitives"
+import { useUrlListState } from "./use-url-list-state"
 const log = logger("components-ui-data-table-data-table")
 const AUTO_PAGINATE_AFTER = 200
 const AUTO_PAGINATION: PaginationConfig = { pageSize: 50 }
@@ -96,66 +97,34 @@ export function useDataTableState<TData>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // stable on mount
   const { colWidths, startResize } = useColumnResize(initialColWidths)
-  // ─── Router (URL sync) ─────────────────────────────────────────────────────
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  // ─── Search state ──────────────────────────────────────────────────────────
-  const initialSearch = urlSync ? (searchParams.get("q") ?? "") : ""
-  const [searchInput, setSearchInput] = useState(initialSearch)
-  const searchQuery = useDebounce(searchInput, 300)
-  // ─── Filter state ──────────────────────────────────────────────────────────
-  const initialFilters = useMemo(() => {
-    const init: Record<string, string[]> = {}
-    for (const f of filters) {
-      // URL values (when synced) take precedence over configured defaults.
-      if (urlSync) {
-        const val = searchParams.getAll(f.key)
-        if (val.length > 0) {
-          init[f.key] = val
-          continue
-        }
-      }
-      if (f.defaultValues && f.defaultValues.length > 0) init[f.key] = f.defaultValues
-    }
-    return init
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // only on mount
-  const [internalFilterValues, setInternalFilterValues] = useState<Record<string, string[]>>(initialFilters)
-  const isFilterControlled = controlledFilterValues !== undefined
-  const filterValues = controlledFilterValues ?? internalFilterValues
-  // Every mutation runs through here so controlled and uncontrolled modes cannot
-  // drift: the parent always hears about the change, and internal state is only
-  // written when the parent isn't the owner.
-  const commitFilters = useCallback(
-    (updater: (prev: Record<string, string[]>) => Record<string, string[]>) => {
-      // Closes over this render's values rather than a ref: these only run from
-      // event handlers, which always see the committed render's state.
-      const next = updater(filterValues)
-      if (!isFilterControlled) setInternalFilterValues(next)
-      onFilterValuesChange?.(next)
-    },
-    [filterValues, isFilterControlled, onFilterValuesChange]
-  )
+
+  // ─── URL Sync & List State (Search, Filters, View Mode) ───────────────────
+  const {
+    searchInput,
+    setSearchInput,
+    searchQuery,
+    filterValues,
+    commitFilters,
+    handleFilterChange,
+    removeFilterPill,
+    clearAllFilters,
+    manualViewMode,
+    setManualViewMode,
+  } = useUrlListState<"list" | "card" | "contacts">({
+    urlSync,
+    debounceDelay: 300,
+    filters,
+    filterValues: controlledFilterValues,
+    onFilterValuesChange,
+    validViews: ["list", "card", "contacts"],
+  })
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [detailRow, setDetailRow] = useState<TData | null>(null)
   const detailConfig = useMemo(() => getDetailConfig(mobileRow, columns), [mobileRow, columns])
+
   // ─── View mode (user-controlled; never auto-switch) ──────────────────────
-  // Declared above the URL sync because it is part of it: a shared link that
-  // restores the sender's search and filters but drops the view they were
-  // looking at arrives showing something they never saw.
-  const [manualViewMode, setManualViewMode] = useState<"list" | "card" | "contacts" | null>(() => {
-    if (!urlSync) return null
-    const fromUrl = searchParams.get("view")
-    return fromUrl === "list" || fromUrl === "card" || fromUrl === "contacts" ? fromUrl : null
-  })
-  /** "Contacts" is only real when the page supplied the list anatomy it renders. */
   const contactsAvailable = contactsView && Boolean(mobileRow)
-  // A page may open in a different mode per width. Resolved from the live
-  // breakpoint rather than baked in, but only ever as the *default*: once
-  // `manualViewMode` is set the reader's choice survives every resize.
-  // `useIsMobile` reports false until its effect runs, so the first paint is the
-  // desktop default and a phone settles on its own a frame later.
   const isMobile = useIsMobile()
   const resolvedDefaultViewMode =
     defaultViewMode && typeof defaultViewMode === "object"
@@ -165,41 +134,15 @@ export function useDataTableState<TData>({
       : defaultViewMode
   const requestedViewMode = manualViewMode ?? resolvedDefaultViewMode ?? "list"
   const viewMode = requestedViewMode === "contacts" && !contactsAvailable ? "list" : requestedViewMode
-  /**
-   * The one pair CSS can settle without JS: row list below `md`, table from `md`
-   * up. Rendering both and letting media queries choose means the correct shape
-   * is present in the very first paint — `useIsMobile` only reports after the
-   * first effect, so resolving this in JS alone flashes the desktop table on a
-   * phone. Only while the reader has made no choice of their own; the moment
-   * they touch the toggle a single mode takes over.
-   */
+
   const responsivePair =
     !manualViewMode &&
     contactsAvailable &&
-    // A grouped list renders whole while the table paginates, so the two halves
-    // of the pair would disagree about the pager. An A–Z book wants to be the
-    // list at every width anyway — that is what a plain "contacts" default is for.
     !mobileRow?.groupBy &&
     defaultViewMode &&
     typeof defaultViewMode === "object" &&
     defaultViewMode.mobile === "contacts" &&
     defaultViewMode.desktop === "list"
-  // ─── Sync state → URL ──────────────────────────────────────────────────────
-  const isFirstRender = useRef(true)
-  useEffect(() => {
-    if (!urlSync) return
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
-    }
-    const params = new URLSearchParams()
-    if (searchQuery) params.set("q", searchQuery)
-    for (const [key, vals] of Object.entries(filterValues)) {
-      for (const v of vals) params.append(key, v)
-    }
-    if (manualViewMode) params.set("view", manualViewMode)
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchQuery, filterValues, manualViewMode, urlSync, pathname, router])
   // ─── Trigger external search callback ──────────────────────────────────────
   useEffect(() => {
     if (onSearchChange) onSearchChange(searchQuery)
@@ -421,22 +364,6 @@ export function useDataTableState<TData>({
       setSelectedRows(new Set(paginatedData.map(getRowId)))
     }
   }, [paginatedData, selectedRows.size, getRowId])
-  const handleFilterChange = useCallback(
-    (key: string, values: string[]) => {
-      commitFilters((prev) => ({ ...prev, [key]: values }))
-    },
-    [commitFilters]
-  )
-  const removeFilterPill = useCallback(
-    (key: string, value: string) => {
-      commitFilters((prev) => ({ ...prev, [key]: (prev[key] ?? []).filter((v) => v !== value) }))
-    },
-    [commitFilters]
-  )
-  const clearAllFilters = useCallback(() => {
-    setSearchInput("")
-    commitFilters(() => ({}))
-  }, [commitFilters])
   const handlePageChange = useCallback(
     (newPage: number) => {
       if (isServerPagination && onPageChange) onPageChange(newPage)
