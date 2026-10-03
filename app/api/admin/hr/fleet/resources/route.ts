@@ -95,12 +95,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      const status = String(error.message || "")
-        .toLowerCase()
-        .includes("unique")
-        ? 409
-        : 500
-      return NextResponse.json({ error: error.message || "Failed to create resource" }, { status })
+      if (error.code === "23505") {
+        return NextResponse.json({ error: "A resource with this name already exists." }, { status: 409 })
+      }
+      return serverError(log, error, "Failed to create resource")
     }
 
     await writeAuditLog(
