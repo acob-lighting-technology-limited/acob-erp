@@ -77,3 +77,49 @@ export function matchNavPages(pages: NavPage[], query: string, limit = 6): NavPa
   const inTrail = pages.filter((p) => !p.label.toLowerCase().includes(q) && p.trail.toLowerCase().includes(q))
   return [...starts, ...contains, ...inTrail].slice(0, limit)
 }
+
+// ── Pinned and recently visited pages (per browser) ──────────────────────────
+// Kept in localStorage: a per-viewer convenience that is fine to lose.
+
+const PINNED_KEY = "nav:pinned"
+const RECENT_KEY = "nav:recent"
+const RECENT_LIMIT = 6
+
+function readList(key: string): string[] {
+  try {
+    const raw = window.localStorage.getItem(key)
+    const parsed = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : []
+  } catch {
+    return []
+  }
+}
+
+function writeList(key: string, value: string[]) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // Private mode or blocked storage: the feature just does not persist.
+  }
+}
+
+export function readPinnedHrefs(): string[] {
+  return readList(PINNED_KEY)
+}
+
+export function togglePinnedHref(href: string): string[] {
+  const pinned = readList(PINNED_KEY)
+  const next = pinned.includes(href) ? pinned.filter((h) => h !== href) : [href, ...pinned]
+  writeList(PINNED_KEY, next)
+  return next
+}
+
+export function readRecentHrefs(): string[] {
+  return readList(RECENT_KEY)
+}
+
+/** Remember a visit to a page that appears in the nav (most recent first). */
+export function recordRecentHref(href: string) {
+  const recent = readList(RECENT_KEY).filter((h) => h !== href)
+  writeList(RECENT_KEY, [href, ...recent].slice(0, RECENT_LIMIT))
+}

@@ -19,6 +19,7 @@ import {
   Building2,
   MapPin,
   X,
+  Star,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -26,7 +27,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
-import { matchNavPages, useNavPages } from "@/lib/nav/page-index"
+import {
+  matchNavPages,
+  readPinnedHrefs,
+  readRecentHrefs,
+  recordRecentHref,
+  togglePinnedHref,
+  useNavPages,
+  type NavPage,
+} from "@/lib/nav/page-index"
 
 type SearchType =
   | "profile"
@@ -99,6 +108,9 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
+  // Pinned/recent are read when the dialog opens (localStorage is per browser).
+  const [pinnedHrefs, setPinnedHrefs] = useState<string[]>([])
+  const [recentHrefs, setRecentHrefs] = useState<string[]>([])
   const router = useRouter()
   const pathname = usePathname()
   // When searching from inside the dept console (/dept/[id]/…), pass the dept
@@ -114,6 +126,8 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault()
+        setPinnedHrefs(readPinnedHrefs())
+        setRecentHrefs(readRecentHrefs())
         setOpen(true)
       }
       if (e.key === "Escape") {
@@ -144,6 +158,53 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
   const navPages = useNavPages()
   const pageMatches = useMemo(() => matchNavPages(navPages, query), [navPages, query])
 
+  // Remember visits to nav pages, for the "Recent" list.
+  useEffect(() => {
+    if (pathname && navPages.some((page) => page.href === pathname)) recordRecentHref(pathname)
+  }, [pathname, navPages])
+
+  const openSearch = () => {
+    setPinnedHrefs(readPinnedHrefs())
+    setRecentHrefs(readRecentHrefs())
+    setOpen(true)
+  }
+  const pageByHref = useMemo(() => new Map(navPages.map((page) => [page.href, page])), [navPages])
+  const pinnedPages = pinnedHrefs.map((href) => pageByHref.get(href)).filter((p): p is NavPage => Boolean(p))
+  const recentPages = recentHrefs
+    .filter((href) => !pinnedHrefs.includes(href))
+    .map((href) => pageByHref.get(href))
+    .filter((p): p is NavPage => Boolean(p))
+
+  const renderPageRow = (page: NavPage) => {
+    const Icon = page.icon ?? FileText
+    const pinned = pinnedHrefs.includes(page.href)
+    return (
+      <div
+        key={page.href}
+        className="group hover:bg-primary/5 flex items-center gap-1 rounded-md pr-1 transition-colors"
+      >
+        <button
+          onClick={() => goTo(page.href)}
+          className="flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left text-sm"
+        >
+          <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 shrink-0" />
+          <span className="min-w-0 flex-1 truncate font-medium">{page.label}</span>
+          <span className="text-muted-foreground truncate text-xs">{page.trail}</span>
+        </button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          aria-label={pinned ? `Unpin ${page.label}` : `Pin ${page.label}`}
+          aria-pressed={pinned}
+          onClick={() => setPinnedHrefs(togglePinnedHref(page.href))}
+        >
+          <Star className={cn("h-3.5 w-3.5", pinned ? "fill-current text-amber-500" : "text-muted-foreground")} />
+        </Button>
+      </div>
+    )
+  }
+
   const goTo = (href: string) => {
     router.push(href)
     setOpen(false)
@@ -167,7 +228,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
           isScoped &&
             "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))] bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] text-[var(--navbar-admin-primary,var(--admin-primary))] hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))]/80 hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
         )}
-        onClick={() => setOpen(true)}
+        onClick={openSearch}
       >
         <Search
           className={cn(
@@ -231,22 +292,9 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
             )}
 
             {pageMatches.length > 0 && (
-              <div className="mb-3 space-y-1">
+              <div className="mb-3 space-y-0.5">
                 <p className="text-muted-foreground px-1 text-xs font-medium">Pages</p>
-                {pageMatches.map((page) => {
-                  const Icon = page.icon ?? FileText
-                  return (
-                    <button
-                      key={page.href}
-                      onClick={() => goTo(page.href)}
-                      className="group hover:bg-primary/5 flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm transition-colors"
-                    >
-                      <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 shrink-0" />
-                      <span className="min-w-0 flex-1 truncate font-medium">{page.label}</span>
-                      <span className="text-muted-foreground truncate text-xs">{page.trail}</span>
-                    </button>
-                  )
-                })}
+                {pageMatches.map(renderPageRow)}
               </div>
             )}
 
@@ -256,8 +304,27 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
               </div>
             )}
 
-            {!loading && !query && (
-              <div className="text-muted-foreground py-8 text-center text-sm">Start typing to search...</div>
+            {!query && (pinnedPages.length > 0 || recentPages.length > 0) && (
+              <div className="space-y-3">
+                {pinnedPages.length > 0 && (
+                  <div className="space-y-0.5">
+                    <p className="text-muted-foreground px-1 text-xs font-medium">Pinned</p>
+                    {pinnedPages.map(renderPageRow)}
+                  </div>
+                )}
+                {recentPages.length > 0 && (
+                  <div className="space-y-0.5">
+                    <p className="text-muted-foreground px-1 text-xs font-medium">Recent</p>
+                    {recentPages.map(renderPageRow)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!loading && !query && pinnedPages.length === 0 && recentPages.length === 0 && (
+              <div className="text-muted-foreground py-8 text-center text-sm">
+                Start typing to search. Star a page to pin it here.
+              </div>
             )}
 
             {!loading && results.length > 0 && (
