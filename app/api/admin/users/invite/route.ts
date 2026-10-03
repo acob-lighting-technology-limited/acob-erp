@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import {
   ASSIGNABLE_ROLES,
   canAssignRole,
@@ -10,6 +9,8 @@ import {
 } from "@/lib/role-management"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
+import { InviteUserSchema } from "@/lib/users/schemas"
+import { validationError } from "@/lib/api/errors"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 
 const log = logger("admin-users-invite")
@@ -25,14 +26,6 @@ type ProfileInvitePayload = {
   last_name?: string
   department?: string
 }
-
-const InviteUserSchema = z.object({
-  email: z.string().trim().min(1, "Email is required"),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
-  role: z.enum(ASSIGNABLE_ROLES).optional(),
-  department: z.string().optional(),
-})
 
 export async function PATCH(request: Request) {
   const rl = await rateLimit(`invite:${getClientId(request)}`, { limit: 10, windowSec: 600 })
@@ -69,9 +62,7 @@ export async function PATCH(request: Request) {
     // 2. Parse body
     const body = await request.json()
     const parsed = InviteUserSchema.safeParse(body)
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
-    }
+    if (!parsed.success) return validationError(parsed.error.issues)
 
     const { email: rawEmail, first_name, last_name, role, department } = parsed.data
     const email = rawEmail.trim()
