@@ -104,13 +104,8 @@ async function fetchDashboardAuditLogs(department: string, userId: string | null
   return (payload?.data || []) as any[]
 }
 
-const CHART_COLORS = [
-  "var(--primary)",
-  "oklch(0.65 0.15 250)",
-  "oklch(0.7 0.12 85)",
-  "oklch(0.6 0.18 300)",
-  "oklch(0.65 0.15 142)",
-]
+// Theme chart tokens (globals.css), so the series follow light/dark mode.
+const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
 
 // Custom tooltips matching shadcn styling
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -1077,7 +1072,7 @@ export function DevLoginLogsContent() {
                     <XAxis dataKey="hour" tickLine={false} axisLine={false} className="text-xs" />
                     <YAxis tickLine={false} axisLine={false} className="text-xs" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" fill="oklch(0.65 0.15 250)" radius={[4, 4, 0, 0]} name="Logins" />
+                    <Bar dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} name="Logins" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1146,7 +1141,7 @@ export function DevLoginLogsContent() {
                       className="font-mono text-xs"
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" fill="oklch(0.7 0.12 85)" radius={[0, 4, 4, 0]} name="Logins" />
+                    <Bar dataKey="count" fill="var(--chart-4)" radius={[0, 4, 4, 0]} name="Logins" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
