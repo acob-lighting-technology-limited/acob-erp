@@ -15,6 +15,14 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  employeeAttendanceDays: (userId: string, yearMonth: string, exempt: boolean) => [
+    "employee-attendance-days",
+    userId,
+    yearMonth,
+    exempt,
+  ],
+  attendanceExceptions: (filters: Record<string, unknown>) => ["attendance-exceptions", filters],
+  attendanceChangeLog: (from: string, to: string) => ["attendance-change-log", from, to],
   myAttendanceDays: (yearMonth: string) => ["my-attendance-days", yearMonth],
   attendanceAppeals: (filters: Record<string, unknown>) => ["attendance-appeals", filters],
   attendanceReportConfig: () => ["attendance-report-config"],

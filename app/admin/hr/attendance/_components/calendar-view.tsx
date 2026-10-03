@@ -1,12 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -21,12 +20,13 @@ import { toLocalISODate, toLocalYearMonth, isLate } from "@/lib/hr/attendance-ut
 import {
   ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
-  MANUAL_ATTENDANCE_STATUS_OPTIONS,
   isEarlyDeparture,
   getManualStatusEditOptions,
 } from "@/lib/hr/attendance-status"
 import { formatTime } from "./status-badge"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type DayStatus =
   | "present"
@@ -130,8 +130,6 @@ export const CELL_BG: Record<string, string> = {
 export function CalendarView({ employees }: CalendarViewProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>(employees[0]?.user_id ?? "")
   const [calendarMonth, setCalendarMonth] = useState(toLocalYearMonth())
-  const [days, setDays] = useState<UnifiedDay[] | null>(null)
-  const [loading, setLoading] = useState(false)
 
   const [editTarget, setEditTarget] = useState<{ date: string; record: DayRecord | null } | null>(null)
   const [editForm, setEditForm] = useState({
@@ -142,31 +140,33 @@ export function CalendarView({ employees }: CalendarViewProps) {
 
   const selectedEmployee = employees.find((e) => e.user_id === selectedUserId)
 
-  const load = useCallback(async () => {
-    if (!selectedUserId) return
-    setLoading(true)
-    setDays(null)
-    try {
+  const {
+    data: days = null,
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.employeeAttendanceDays(
+      selectedUserId,
+      calendarMonth,
+      Boolean(selectedEmployee?.attendance_exempt)
+    ),
+    enabled: Boolean(selectedUserId),
+    queryFn: async () => {
       const qs = new URLSearchParams({
         user_id: selectedUserId,
         year_month: calendarMonth,
         exempt_hint: selectedEmployee?.attendance_exempt ? "1" : "0",
       })
-      const res = await apiFetch(`/api/admin/hr/attendance/employee-days?${qs}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || "Failed to load")
-      setDays(payload?.data ?? [])
-    } catch {
-      toast.error("Failed to load calendar data")
-      setDays([])
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedUserId, calendarMonth, selectedEmployee?.attendance_exempt])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ data?: UnifiedDay[] }>(`/api/admin/hr/attendance/employee-days?${qs}`, {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load calendar data" },
+  })
+  const load = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   function openEdit(day: UnifiedDay) {
     if (day.status === "on_leave") return

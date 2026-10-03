@@ -1,13 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -22,13 +21,11 @@ import { Clock, AlertTriangle, XCircle, FileText, Pencil, Building, MessageSquar
 import { toast } from "sonner"
 import { toLocalISODate, monthBounds, toLocalYearMonth, isLate } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
-import {
-  MANUAL_ATTENDANCE_STATUS_OPTIONS,
-  isEarlyDeparture,
-  getManualStatusEditOptions,
-} from "@/lib/hr/attendance-status"
+import { isEarlyDeparture, getManualStatusEditOptions } from "@/lib/hr/attendance-status"
 import { formatTime, labelSource, StatusBadge } from "./status-badge"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface AttendanceRecord {
   id: string
@@ -76,33 +73,31 @@ export function ExceptionsView({ departments, lockedDepartment }: ExceptionsView
   const { start: defaultStart } = monthBounds(toLocalYearMonth())
   const [startDate, setStartDate] = useState(defaultStart)
   const [endDate, setEndDate] = useState(toLocalISODate())
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [loading, setLoading] = useState(false)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [editForm, setEditForm] = useState({ status: "", manual_comment: "" })
   const [saving, setSaving] = useState(false)
 
-  const load = useCallback(async () => {
-    if (!startDate || !endDate) return
-    setLoading(true)
-    try {
+  const {
+    data: records = [],
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.attendanceExceptions({ startDate, endDate, lockedDepartment }),
+    enabled: Boolean(startDate && endDate),
+    queryFn: async () => {
       const params = new URLSearchParams({ start_date: startDate, end_date: endDate })
       if (lockedDepartment) params.set("department", lockedDepartment)
-      const res = await apiFetch(`/api/admin/hr/attendance/records?${params}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || "Failed to load")
-      const all: AttendanceRecord[] = payload.records || []
-      setRecords(all.filter(isException))
-    } catch {
-      toast.error("Failed to load exceptions")
-    } finally {
-      setLoading(false)
-    }
-  }, [startDate, endDate, lockedDepartment])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ records?: AttendanceRecord[] }>(`/api/admin/hr/attendance/records?${params}`, {
+        cache: "no-store",
+      })
+      return (payload.records ?? []).filter(isException)
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load exceptions" },
+  })
+  const load = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   function openEdit(record: AttendanceRecord) {
     const clockIn = record.clock_in ?? null
