@@ -40,3 +40,14 @@ jobs:
       # excluded: they need a running app and a signed-in session.
       - name: Unit tests
         run: npm test
+
+      # Copy-paste guard (audit §10). The threshold is today's level (1.4%
+      # duplicated lines); lower it as the 9a duplicates are merged.
+      - name: Duplicate code
+        run: npm run dup:check
+
+      # Unused files, exports and dependencies. Reported, not yet blocking:
+      # the backlog is cleared first, then `continue-on-error` comes off.
+      - name: Dead code
+        run: npm run deadcode
+        continue-on-error: true

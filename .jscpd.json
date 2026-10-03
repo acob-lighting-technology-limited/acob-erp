@@ -1,0 +1,10 @@
+{
+  "path": ["app", "components", "lib", "hooks", "providers"],
+  "format": ["typescript", "tsx"],
+  "minLines": 15,
+  "minTokens": 120,
+  "threshold": 1.5,
+  "ignore": ["**/__tests__/**", "**/*.test.ts", "**/*.d.ts"],
+  "reporters": ["consoleFull"],
+  "gitignore": true
+}
