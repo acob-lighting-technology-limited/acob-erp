@@ -32,6 +32,10 @@ const KNOWN_DB_ERRORS: Record<string, { status: number; code: ApiErrorCode; mess
   "23514": { status: 400, code: ApiErrorCode.VALIDATION_ERROR, message: "A value is not allowed." },
   "23502": { status: 400, code: ApiErrorCode.MISSING_REQUIRED_FIELD, message: "A required value is missing." },
   "42501": { status: 403, code: ApiErrorCode.FORBIDDEN, message: "You do not have permission to do this." },
+  "22P02": { status: 400, code: ApiErrorCode.VALIDATION_ERROR, message: "A value is in the wrong format." },
+  "22001": { status: 400, code: ApiErrorCode.VALIDATION_ERROR, message: "A value is too long." },
+  "22007": { status: 400, code: ApiErrorCode.VALIDATION_ERROR, message: "A date or time is not valid." },
+  "57014": { status: 503, code: ApiErrorCode.INTERNAL_ERROR, message: "That took too long. Please try again." },
   PGRST116: { status: 404, code: ApiErrorCode.NOT_FOUND, message: "Record not found." },
 }
 
