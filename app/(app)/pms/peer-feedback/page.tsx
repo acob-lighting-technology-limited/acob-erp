@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { CheckCircle2, Loader2, MessageSquare, Send, Users } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useCycleFilters, type CycleFilterCycle } from "@/components/pms/use-cycle-filters"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 
 type Profile = {
   id: string
@@ -55,11 +59,26 @@ function formatName(profile: Profile | null | undefined) {
 }
 
 export default function PeerFeedbackPage() {
-  const [colleagues, setColleagues] = useState<Profile[]>([])
-  const [cycles, setCycles] = useState<Cycle[]>([])
-  const [myFeedback, setMyFeedback] = useState<PeerFeedbackRow[]>([])
-  const [receivedFeedback, setReceivedFeedback] = useState<PeerFeedbackRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { cycles } = usePerformanceCycles<Cycle>()
+  const {
+    data,
+    isLoading,
+    refetch: loadData,
+  } = useQuery({
+    queryKey: QUERY_KEYS.myPeerFeedback(),
+    queryFn: async () => {
+      const [profiles, given, received] = await Promise.all([
+        apiJson<{ data?: Profile[] }>("/api/hr/profiles?all=true"),
+        apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback?as_reviewer=true"),
+        apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback"),
+      ])
+      return { colleagues: profiles.data ?? [], myFeedback: given.data ?? [], receivedFeedback: received.data ?? [] }
+    },
+    meta: { errorMessage: "Failed to load data" },
+  })
+  const colleagues = useMemo(() => data?.colleagues ?? [], [data])
+  const myFeedback = useMemo(() => data?.myFeedback ?? [], [data])
+  const receivedFeedback = useMemo(() => data?.receivedFeedback ?? [], [data])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<"received" | "given">("received")
@@ -73,36 +92,6 @@ export default function PeerFeedbackPage() {
   const [teamwork, setTeamwork] = useState("")
   const [professionalism, setProfessionalism] = useState("")
   const [comments, setComments] = useState("")
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const [profilesRes, cyclesRes, myFeedbackRes, receivedRes] = await Promise.all([
-        apiFetch("/api/hr/profiles?all=true"),
-        apiFetch("/api/hr/performance/cycles"),
-        apiFetch("/api/hr/performance/peer-feedback?as_reviewer=true"),
-        apiFetch("/api/hr/performance/peer-feedback"),
-      ])
-      const [profilesData, cyclesData, myFeedbackData, receivedData] = await Promise.all([
-        profilesRes.json().catch(() => ({})),
-        cyclesRes.json().catch(() => ({})),
-        myFeedbackRes.json().catch(() => ({})),
-        receivedRes.json().catch(() => ({})),
-      ])
-      setColleagues((profilesData?.data || []) as Profile[])
-      setCycles((cyclesData?.data || []) as Cycle[])
-      setMyFeedback((myFeedbackData?.data || []) as PeerFeedbackRow[])
-      setReceivedFeedback((receivedData?.data || []) as PeerFeedbackRow[])
-    } catch {
-      toast.error("Failed to load data")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
 
   const alreadySubmittedKeys = useMemo(
     () => new Set(myFeedback.map((f) => `${f.subject_user_id}:${f.review_cycle_id}`)),

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,10 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CheckCircle, XCircle, Loader2, PlayCircle, FlaskConical, SkipForward, Route } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { logger } from "@/lib/logger"
-import { apiFetch } from "@/lib/api-client"
-
-const log = logger("leave-flow-test")
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type StepResult = {
   step: string
@@ -57,8 +56,17 @@ const FIX_HINTS: Record<string, string> = {
 }
 
 export function LeaveFlowTestContent() {
-  const [employees, setEmployees] = useState<{ value: string; label: string }[]>([])
-  const [leaveTypes, setLeaveTypes] = useState<{ value: string; label: string }[]>([])
+  const { data: formData } = useQuery({
+    queryKey: QUERY_KEYS.leaveFlowTestFormData(),
+    queryFn: () =>
+      apiJson<{ employees?: { value: string; label: string }[]; leaveTypes?: { value: string; label: string }[] }>(
+        "/api/admin/hr/leave/test/form-data",
+        { cache: "no-store" }
+      ),
+    meta: { errorMessage: "Failed to load form data" },
+  })
+  const employees = formData?.employees ?? []
+  const leaveTypes = formData?.leaveTypes ?? []
   const [requesterId, setRequesterId] = useState("")
   const [relieverId, setRelieverId] = useState("")
   const [leaveTypeId, setLeaveTypeId] = useState("")
@@ -68,18 +76,6 @@ export function LeaveFlowTestContent() {
 
   const [diagnosticsRunning, setDiagnosticsRunning] = useState(false)
   const [diagnosticsResult, setDiagnosticsResult] = useState<DiagnosticsResult | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      const res = await apiFetch("/api/admin/hr/leave/test/form-data", { cache: "no-store" })
-      if (!res.ok) throw new Error("Failed to load form data")
-      const json = await res.json()
-      setEmployees(json.employees || [])
-      setLeaveTypes(json.leaveTypes || [])
-    }
-
-    load().catch((err) => log.error({ err: String(err) }, "load failed"))
-  }, [])
 
   async function runTest() {
     if (!requesterId || !relieverId || !leaveTypeId) {

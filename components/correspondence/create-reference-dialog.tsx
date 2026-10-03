@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/dialog"
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { Lock, Plus } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface DepartmentCodeOption {
   department_name: string
@@ -81,18 +84,39 @@ export function CreateReferenceDialog({
   const set = (patch: Partial<CreateReferenceForm>) => onFormChange({ ...form, ...patch })
   const isInternal = (form.letter_type || "external") === "internal"
 
-  const [categories, setCategories] = useState<CategoryOption[]>([])
-  const [requesters, setRequesters] = useState<RequesterOption[]>([])
-  const [requestersLoading, setRequestersLoading] = useState(false)
+  const { data: categories = [] } = useQuery({
+    queryKey: QUERY_KEYS.correspondenceCategories(),
+    queryFn: async () => (await apiJson<{ data?: CategoryOption[] }>("/api/correspondence/categories")).data ?? [],
+    staleTime: 5 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    fetch("/api/correspondence/categories")
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.data) setCategories(json.data as CategoryOption[])
-      })
-      .catch(() => {})
-  }, [])
+  // Requesters in the chosen department; the current user is always selectable
+  // (and is the default — the submit falls back to them).
+  const currentUserOption = { id: currentUserId, full_name: currentUserName || "Current user" }
+  const {
+    data: departmentRequesters,
+    isLoading: requestersLoading,
+    isError: requestersFailed,
+  } = useQuery({
+    queryKey: QUERY_KEYS.correspondenceRequesters(form.department_name),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: RequesterOption[] }>(
+          `/api/correspondence/requesters?department_name=${encodeURIComponent(form.department_name)}`
+        )
+      ).data ?? [],
+    enabled: Boolean(form.department_name) && !isEditMode,
+  })
+  const requesters: RequesterOption[] =
+    !form.department_name || isEditMode
+      ? []
+      : requestersFailed
+        ? [currentUserOption]
+        : departmentRequesters
+          ? departmentRequesters.some((row) => row.id === currentUserId)
+            ? departmentRequesters
+            : [currentUserOption, ...departmentRequesters]
+          : []
 
   const options = departmentCodes.map((dept) => ({
     ...dept,
@@ -135,36 +159,6 @@ export function CreateReferenceDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInternal, mdDepartment?.department_name, mdDepartment?.department_code])
-
-  useEffect(() => {
-    if (!form.department_name || isEditMode) {
-      setRequesters([])
-      return
-    }
-
-    setRequestersLoading(true)
-    fetch(`/api/correspondence/requesters?department_name=${encodeURIComponent(form.department_name)}`)
-      .then((r) => r.json())
-      .then((json) => {
-        const list = (json.data || []) as RequesterOption[]
-        const hasCurrentUser = list.some((row) => row.id === currentUserId)
-        const merged = hasCurrentUser
-          ? list
-          : [{ id: currentUserId, full_name: currentUserName || "Current user" }, ...list]
-        setRequesters(merged)
-        if (!form.requester_id) {
-          set({ requester_id: currentUserId })
-        }
-      })
-      .catch(() => {
-        setRequesters([{ id: currentUserId, full_name: currentUserName || "Current user" }])
-        if (!form.requester_id) {
-          set({ requester_id: currentUserId })
-        }
-      })
-      .finally(() => setRequestersLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.department_name, isEditMode, currentUserId, currentUserName])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

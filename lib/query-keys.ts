@@ -27,6 +27,10 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  myPeerFeedback: () => ["my-peer-feedback"],
+  adminPeerFeedback: () => ["admin-peer-feedback"],
+  myDevelopmentPlans: () => ["my-development-plans"],
+  performanceCycles: () => ["performance-cycles"],
   pmsAnalytics: () => ["pms-analytics"],
   cbtAttemptDetail: (profileId: string, cycleId: string) => ["cbt-attempt-detail", profileId, cycleId],
   cbtAttempts: () => ["cbt-attempts"],
@@ -50,6 +54,7 @@ export const QUERY_KEYS = {
   ticket: (id: string) => ["ticket", id],
 
   // Admin
+  hrProfilesAll: () => ["hr-profiles-all"],
   myProfile: () => ["my-profile"],
   departments: () => ["departments"],
   officeLocations: () => ["office-locations"],
@@ -221,6 +226,7 @@ export const QUERY_KEYS = {
     filters ? ["admin-security-network-activity", filters] : ["admin-security-network-activity"],
 
   // Dev / maintenance
+  leaveFlowTestFormData: () => ["leave-flow-test-form-data"],
   devTestsFormData: () => ["dev-tests-form-data"],
   maintenanceState: () => ["maintenance-state"],
 
@@ -239,4 +245,8 @@ export const QUERY_KEYS = {
     accessMode,
     department ?? null,
   ],
+
+  // Correspondence
+  correspondenceRequesters: (department: string) => ["correspondence-requesters", department],
+  correspondenceCategories: () => ["correspondence-categories"],
 } as const

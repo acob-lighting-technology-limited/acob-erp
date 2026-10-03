@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { BookOpen, CheckCircle2, Clock } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
@@ -10,8 +10,11 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { useCycleFilters, type CycleFilterCycle } from "@/components/pms/use-cycle-filters"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 
 type PlanAction = {
   id: string
@@ -72,34 +75,26 @@ function planProgress(plan: DevelopmentPlan) {
 }
 
 export default function DevelopmentPlansPage() {
-  const [plans, setPlans] = useState<DevelopmentPlan[]>([])
-  const [cycles, setCycles] = useState<CycleFilterCycle[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadPlans = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [plansRes, cyclesRes] = await Promise.all([
-        apiFetch("/api/hr/performance/development-plans"),
-        apiFetch("/api/hr/performance/cycles"),
-      ])
-      const data = (await plansRes.json().catch(() => ({}))) as { data?: DevelopmentPlan[]; error?: string }
-      const cyclesData = (await cyclesRes.json().catch(() => ({}))) as { data?: CycleFilterCycle[] }
-      if (!plansRes.ok) throw new Error(data.error || "Failed to load plans")
-      setPlans(data.data || [])
-      setCycles(cyclesData.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadPlans()
-  }, [loadPlans])
+  const queryClient = useQueryClient()
+  const { cycles } = usePerformanceCycles<CycleFilterCycle>()
+  const {
+    data: plans = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.myDevelopmentPlans(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: DevelopmentPlan[] }>("/api/hr/performance/development-plans", {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+  })
+  const error = queryError?.message ?? null
+  const loadPlans = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const { filters: cycleFilters } = useCycleFilters<DevelopmentPlan>({
     cycles,
@@ -120,7 +115,7 @@ export default function DevelopmentPlansPage() {
         throw new Error(data.error || "Failed to update")
       }
       toast.success("Action marked complete")
-      setPlans((current) =>
+      queryClient.setQueryData<DevelopmentPlan[]>(QUERY_KEYS.myDevelopmentPlans(), (current = []) =>
         current.map((plan) =>
           plan.id === planId
             ? {
