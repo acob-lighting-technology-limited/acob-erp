@@ -184,7 +184,7 @@ export default function AdminFleetPage() {
         label: "Reason",
         accessor: (r) => r.reason,
         hideOnMobile: true,
-        render: (r) => <span className="max-w-[200px] truncate text-xs">{r.reason}</span>,
+        render: (r) => <span className="max-w-50 truncate text-xs">{r.reason}</span>,
       },
       {
         key: "status",
@@ -275,7 +275,7 @@ export default function AdminFleetPage() {
         render: (r) => (
           <div>
             <p className="font-medium">{r.name}</p>
-            {r.description && <p className="text-muted-foreground max-w-[300px] truncate text-xs">{r.description}</p>}
+            {r.description && <p className="text-muted-foreground max-w-75 truncate text-xs">{r.description}</p>}
           </div>
         ),
       },

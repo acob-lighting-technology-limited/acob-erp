@@ -130,7 +130,7 @@ export function RecipientSelector({
                 Clear
               </Button>
             </div>
-            <div className="max-h-[320px] space-y-1 overflow-y-auto rounded-lg border p-2">
+            <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border p-2">
               {filteredEmployees.map((emp) => (
                 <label
                   key={emp.id}
@@ -227,7 +227,7 @@ export function RecipientSelector({
                 <p className="text-sm font-medium text-orange-600">
                   {missedRecipients.length} missed recipient{missedRecipients.length !== 1 ? "s" : ""} found:
                 </p>
-                <div className="max-h-[200px] overflow-y-auto rounded-lg border bg-orange-50 p-3 dark:bg-orange-950/20">
+                <div className="max-h-50 overflow-y-auto rounded-lg border bg-orange-50 p-3 dark:bg-orange-950/20">
                   {missedRecipients.map((email) => (
                     <div key={email} className="py-0.5 font-mono text-xs text-orange-800 dark:text-orange-300">
                       {email}

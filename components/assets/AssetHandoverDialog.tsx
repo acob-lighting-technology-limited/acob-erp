@@ -185,7 +185,7 @@ export function AssetHandoverDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[650px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-162.5">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="text-success-foreground rounded-lg bg-emerald-500/10 p-2">

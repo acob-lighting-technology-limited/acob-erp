@@ -386,7 +386,7 @@ export function WeekSetupCard() {
             )}
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7 xl:items-end">
-              <div className="w-full max-w-[160px]">
+              <div className="w-full max-w-40">
                 <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
                 <Select value={String(weekNumber)} onValueChange={(value) => setWeekNumber(Number(value))}>
                   <SelectTrigger>
@@ -401,7 +401,7 @@ export function WeekSetupCard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-full max-w-[140px]">
+              <div className="w-full max-w-35">
                 <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
                 <Select value={String(yearNumber)} onValueChange={(value) => setYearNumber(Number(value))}>
                   <SelectTrigger>
@@ -416,7 +416,7 @@ export function WeekSetupCard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-full max-w-[220px]">
+              <div className="w-full max-w-55">
                 <Label className="mb-1.5 block text-xs font-semibold">Actual Meeting Date</Label>
                 <Input
                   type="date"
@@ -425,7 +425,7 @@ export function WeekSetupCard() {
                   disabled={isWeekSetupLocked}
                 />
               </div>
-              <div className="w-full max-w-[160px]">
+              <div className="w-full max-w-40">
                 <Label className="mb-1.5 block text-xs font-semibold">Meeting Time</Label>
                 <Input
                   type="time"
@@ -434,7 +434,7 @@ export function WeekSetupCard() {
                   disabled={isWeekSetupLocked}
                 />
               </div>
-              <div className="w-full max-w-[180px]">
+              <div className="w-full max-w-45">
                 <Label className="mb-1.5 block text-xs font-semibold">Grace Hours After Meeting</Label>
                 <Input
                   type="number"
@@ -445,7 +445,7 @@ export function WeekSetupCard() {
                   disabled={isWeekSetupLocked}
                 />
               </div>
-              <div className="w-full max-w-[180px]">
+              <div className="w-full max-w-45">
                 <Label className="mb-1.5 block text-xs font-semibold">Presenter Type</Label>
                 <Select
                   value={kssPresenterType}
@@ -469,7 +469,7 @@ export function WeekSetupCard() {
                 </Select>
               </div>
               {kssPresenterType === "employee" && (
-                <div className="w-full max-w-[240px]">
+                <div className="w-full max-w-60">
                   <Label className="mb-1.5 block text-xs font-semibold">KSS Department</Label>
                   <Select
                     value={kssDepartmentInput}

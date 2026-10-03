@@ -121,7 +121,7 @@ export function FeedbackDetailDialog({
 
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Description</Label>
-              <div className="bg-muted/50 min-h-[100px] rounded-lg border p-4">
+              <div className="bg-muted/50 min-h-25 rounded-lg border p-4">
                 <p className="whitespace-pre-wrap">{feedback.description || "No description provided."}</p>
               </div>
             </div>

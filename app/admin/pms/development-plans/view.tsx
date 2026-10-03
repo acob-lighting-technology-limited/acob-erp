@@ -356,7 +356,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         label: "Plan",
         sortable: true,
         accessor: (plan) => plan.title,
-        render: (plan) => <span className="block max-w-[220px] truncate">{plan.title}</span>,
+        render: (plan) => <span className="block max-w-55 truncate">{plan.title}</span>,
         resizable: true,
         initialWidth: 220,
       },

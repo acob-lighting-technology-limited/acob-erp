@@ -573,7 +573,7 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
         </div>
 
         {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
-        <aside className="space-y-6 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
+        <aside className="space-y-6 lg:sticky lg:top-30 lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
           <SummarySidebarCard
             selectedWeeks={selectedWeeks}
             yearNumber={yearNumber}

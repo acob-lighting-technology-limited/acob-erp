@@ -752,7 +752,7 @@ export function KssRosterTable({
                     aria-label={`Download ${doc.file_name}`}
                   >
                     <FileText className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                    <span className="max-w-[150px] truncate font-medium">{doc.file_name}</span>
+                    <span className="max-w-37.5 truncate font-medium">{doc.file_name}</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top">{`Download ${doc.file_name}`}</TooltipContent>

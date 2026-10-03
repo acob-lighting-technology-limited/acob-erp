@@ -158,11 +158,11 @@ export function EmployeeCalendarView() {
         </div>
         {!loading && monthWorkedHours !== null && (
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-card text-card-foreground min-w-[80px] rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-[90px] sm:px-3 sm:py-1.5">
+            <div className="bg-card text-card-foreground min-w-20 rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-22.5 sm:px-3 sm:py-1.5">
               <p className="text-muted-foreground mb-0.5 text-xs leading-none sm:mb-1 sm:text-xs">Work Hours</p>
               <p className="text-xs leading-none font-semibold text-emerald-600 sm:text-sm">{monthWorkedHours} hrs</p>
             </div>
-            <div className="bg-card text-card-foreground min-w-[80px] rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-[90px] sm:px-3 sm:py-1.5">
+            <div className="bg-card text-card-foreground min-w-20 rounded-lg border px-2 py-1 text-center shadow-xs sm:min-w-22.5 sm:px-3 sm:py-1.5">
               <p className="text-muted-foreground mb-0.5 text-xs leading-none sm:mb-1 sm:text-xs">Missed Hours</p>
               <p className="text-xs leading-none font-semibold text-amber-600 sm:text-sm">{monthMissedHours} hrs</p>
             </div>

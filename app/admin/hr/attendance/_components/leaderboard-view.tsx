@@ -418,7 +418,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as "month" | "quarter" | "all")}>
-            <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Cycle">
+            <SelectTrigger className="h-9 w-full sm:w-32.5" aria-label="Cycle">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -430,7 +430,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
 
           {periodMode === "month" && (
             <Select value={yearMonth} onValueChange={setYearMonth}>
-              <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Month">
+              <SelectTrigger className="h-9 w-full sm:w-45" aria-label="Month">
                 <SelectValue placeholder="Select Month" />
               </SelectTrigger>
               <SelectContent>
@@ -446,7 +446,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {periodMode === "quarter" && (
             <>
               <Select value={quarter} onValueChange={(v) => setQuarter(v as Quarter)}>
-                <SelectTrigger className="h-9 w-full sm:w-[90px]" aria-label="Quarter">
+                <SelectTrigger className="h-9 w-full sm:w-22.5" aria-label="Quarter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -457,7 +457,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                 </SelectContent>
               </Select>
               <Select value={String(quarterYear)} onValueChange={(v) => setQuarterYear(Number(v) || quarterYear)}>
-                <SelectTrigger className="h-9 w-full sm:w-[100px]" aria-label="Year">
+                <SelectTrigger className="h-9 w-full sm:w-25" aria-label="Year">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -474,7 +474,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {!lockedDepartment && (
             <div className={cn(periodMode === "month" && "col-span-2 sm:col-span-1")}>
               <Select value={department} onValueChange={setDepartment}>
-                <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Department">
+                <SelectTrigger className="h-9 w-full sm:w-45" aria-label="Department">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>

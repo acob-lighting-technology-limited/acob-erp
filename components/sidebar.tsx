@@ -385,7 +385,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                   {hasChildren ? (
                     <div
                       className={cn(
-                        "flex min-h-[36px] items-center rounded-md text-sm font-medium transition-colors duration-150",
+                        "flex min-h-9 items-center rounded-md text-sm font-medium transition-colors duration-150",
                         highlighted ? activeCls : inactiveCls
                       )}
                     >
@@ -419,7 +419,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           className={cn(
                             "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
                             isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
-                            "min-h-[36px] text-sm font-medium",
+                            "min-h-9 text-sm font-medium",
                             highlighted ? activeCls : inactiveCls
                           )}
                         >
@@ -471,7 +471,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                             {hasSubChildren ? (
                               <div
                                 className={cn(
-                                  "flex min-h-[32px] items-center rounded-md text-sm font-medium transition-colors duration-150",
+                                  "flex min-h-8 items-center rounded-md text-sm font-medium transition-colors duration-150",
                                   childHighlighted ? activeCls : inactiveCls
                                 )}
                               >
@@ -500,7 +500,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                                 href={child.href}
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={cn(
-                                  "flex min-h-[32px] items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
+                                  "flex min-h-8 items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
                                   isChildActive ? activeCls : inactiveCls
                                 )}
                               >
@@ -519,7 +519,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                                       href={grandchild.href}
                                       onClick={() => setIsMobileMenuOpen(false)}
                                       className={cn(
-                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        "flex min-h-7 items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
                                         isGcActive ? activeCls : inactiveCls
                                       )}
                                     >
@@ -550,7 +550,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                   <Button
                     variant="outline"
                     className={cn(
-                      "text-muted-foreground hover:text-foreground min-h-[52px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
+                      "text-muted-foreground hover:text-foreground min-h-13 w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
                       "justify-center px-2.5"
                     )}
                   >
@@ -572,7 +572,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="text-muted-foreground hover:text-foreground min-h-[52px] w-full justify-between px-3 text-sm transition-[padding,gap] duration-300 ease-in-out"
+                className="text-muted-foreground hover:text-foreground min-h-13 w-full justify-between px-3 text-sm transition-[padding,gap] duration-300 ease-in-out"
               >
                 <div className="flex items-center gap-2.5">
                   <StaffAvatar

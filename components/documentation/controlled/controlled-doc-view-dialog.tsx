@@ -99,7 +99,7 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[640px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-160">
         {isLoading || !doc ? (
           <>
             <DialogHeader>

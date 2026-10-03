@@ -22,7 +22,7 @@ export function StatCardSkeleton() {
               <Skeleton className="h-4 w-10 sm:h-5 sm:w-12" />
             </div>
           </div>
-          <Skeleton className="h-[26px] w-[26px] shrink-0 sm:h-8 sm:w-8 sm:rounded-lg" />
+          <Skeleton className="h-6.5 w-6.5 shrink-0 sm:h-8 sm:w-8 sm:rounded-lg" />
         </div>
       </CardContent>
     </Card>

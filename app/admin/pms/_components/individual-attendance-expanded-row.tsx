@@ -103,7 +103,7 @@ export function IndividualAttendanceExpandedRow({
     <div className="space-y-2">
       <div className="text-muted-foreground text-xs font-semibold">Daily Attendance logs for {cycle?.name}</div>
       <div className="bg-card overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[600px] text-sm">
+        <table className="w-full min-w-150 text-sm">
           <thead className="bg-muted/50 text-muted-foreground font-medium">
             <tr>
               <th className="px-4 py-2 text-left">Date</th>

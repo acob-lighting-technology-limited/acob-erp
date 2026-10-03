@@ -90,7 +90,7 @@ export function EventCard({ event, onSelect, onEdit }: EventCardProps) {
       </CardContent>
 
       <CardFooter className="border-border/40 mt-auto flex items-center justify-between border-t p-4 pt-2.5">
-        <span className="text-muted-foreground max-w-[140px] truncate text-xs">
+        <span className="text-muted-foreground max-w-35 truncate text-xs">
           {event.organizer_name ? `By ${event.organizer_name}` : "ACOB Calendar"}
         </span>
         <div className="flex items-center gap-1.5">

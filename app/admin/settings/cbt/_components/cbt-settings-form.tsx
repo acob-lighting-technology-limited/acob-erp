@@ -309,7 +309,7 @@ export function CbtSettingsForm({ initialSettings, profiles }: CbtSettingsFormPr
       </Card>
 
       <div className="flex justify-end">
-        <Button type="submit" loading={saving} disabled={saving} className="min-w-[160px]">
+        <Button type="submit" loading={saving} disabled={saving} className="min-w-40">
           <Save className="mr-2 h-4 w-4" />
           Save CBT Settings
         </Button>

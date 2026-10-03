@@ -137,7 +137,7 @@ export function ManageGrossSalaryDialog() {
           <DollarSign className="mr-1.5 h-4 w-4" /> Manage Gross Salary
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[640px]">
+      <DialogContent className="sm:max-w-160">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-emerald-500" />
@@ -163,7 +163,7 @@ export function ManageGrossSalaryDialog() {
             </div>
           </div>
 
-          <div className="border-border/60 max-h-[360px] overflow-x-auto overflow-y-auto rounded-md border">
+          <div className="border-border/60 max-h-90 overflow-x-auto overflow-y-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 text-xs">

@@ -452,7 +452,7 @@ export function LeaveDetailDialog({
                       </div>
                     </div>
                   ) : (
-                    <div className="before:bg-muted-foreground/20 relative space-y-6 pl-6 before:absolute before:top-2 before:bottom-2 before:left-2.5 before:w-[2px]">
+                    <div className="before:bg-muted-foreground/20 relative space-y-6 pl-6 before:absolute before:top-2 before:bottom-2 before:left-2.5 before:w-0.5">
                       {stageOrder.map((stageKey, idx) => {
                         const item = stageAuditMap.get(stageKey)
                         const stageActorName =

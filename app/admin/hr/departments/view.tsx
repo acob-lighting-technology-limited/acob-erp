@@ -415,7 +415,7 @@ export function DepartmentsPage({
       accessor: (department) => department.description || "",
       hideOnMobile: true,
       render: (department) => (
-        <span className="text-muted-foreground block max-w-[260px] truncate text-sm">
+        <span className="text-muted-foreground block max-w-65 truncate text-sm">
           {department.description || "No description added"}
         </span>
       ),
@@ -700,7 +700,7 @@ export function DepartmentsPage({
               <p className="text-muted-foreground text-sm">No employees in this department.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
+                <table className="w-full min-w-160 text-sm">
                   <thead className="bg-muted/30">
                     <tr>
                       <th className="w-12 px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">S/N</th>

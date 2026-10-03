@@ -65,7 +65,7 @@ interface PersonalRecentActivityFeedProps {
 
 export function PersonalRecentActivityFeed({ activity, className }: PersonalRecentActivityFeedProps) {
   return (
-    <Card className={cn("flex h-[480px] flex-col", className)}>
+    <Card className={cn("flex h-120 flex-col", className)}>
       <CardHeader className="shrink-0 px-4 py-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm">

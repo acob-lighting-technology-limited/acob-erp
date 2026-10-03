@@ -70,7 +70,7 @@ export function AcknowledgementProgress({ progress }: { progress: ControlledDocR
   const percent = progress.total > 0 ? Math.round((progress.acknowledged / progress.total) * 100) : 0
   const complete = progress.total > 0 && progress.acknowledged >= progress.total
   return (
-    <div className="flex min-w-[120px] flex-col gap-1">
+    <div className="flex min-w-30 flex-col gap-1">
       <div className="flex items-center gap-1.5 text-xs">
         {complete ? (
           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />

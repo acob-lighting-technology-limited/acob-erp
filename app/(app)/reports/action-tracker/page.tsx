@@ -501,7 +501,7 @@ export default function ActionTrackerPortal() {
         sortable: true,
         accessor: (row) => row.title,
         render: (row) => (
-          <div className="min-w-[240px]">
+          <div className="min-w-60">
             <p className="font-medium">{row.title}</p>
             {row.description ? <p className="text-muted-foreground text-xs">{row.description}</p> : null}
           </div>
@@ -558,7 +558,7 @@ export default function ActionTrackerPortal() {
                 void handleStatusChange(row.id, newStatus)
               }}
             >
-              <SelectTrigger className="h-8 w-[150px] text-xs font-semibold uppercase">
+              <SelectTrigger className="h-8 w-37.5 text-xs font-semibold uppercase">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -835,7 +835,7 @@ export default function ActionTrackerPortal() {
                                   void handleStatusChange(task.id, newStatus)
                                 }}
                               >
-                                <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase">
+                                <SelectTrigger className="h-8 w-40 text-xs font-semibold uppercase">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -850,7 +850,7 @@ export default function ActionTrackerPortal() {
                                 <TooltipTrigger asChild>
                                   <span className="inline-block cursor-not-allowed">
                                     <Select value={task.status} disabled>
-                                      <SelectTrigger className="h-8 w-[160px] text-xs font-semibold uppercase opacity-70">
+                                      <SelectTrigger className="h-8 w-40 text-xs font-semibold uppercase opacity-70">
                                         <SelectValue />
                                       </SelectTrigger>
                                     </Select>

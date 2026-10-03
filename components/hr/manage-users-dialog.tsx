@@ -838,7 +838,7 @@ export function ManageUsersDialog({
             <TabsContent value="applications" className="mt-0 flex min-h-0 flex-1 overflow-hidden">
               <div className="flex min-h-0 flex-1">
                 {/* Queue sidebar */}
-                <aside className="border-border bg-muted/10 flex w-[280px] shrink-0 flex-col border-r">
+                <aside className="border-border bg-muted/10 flex w-70 shrink-0 flex-col border-r">
                   <div className="border-border bg-background border-b p-5">
                     <h3 className="font-bold">Queue</h3>
                     <p className="text-muted-foreground text-xs">Verification Needed</p>
@@ -1196,7 +1196,7 @@ export function ManageUsersDialog({
             <TabsContent value="exit" className="mt-0 flex min-h-0 flex-1 overflow-hidden">
               <div className="flex min-h-0 flex-1">
                 {/* Left: employee list */}
-                <div className="border-border flex w-[300px] shrink-0 flex-col border-r">
+                <div className="border-border flex w-75 shrink-0 flex-col border-r">
                   <div className="border-border space-y-3 border-b p-4">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold">Active Employees</p>
@@ -1357,7 +1357,7 @@ export function ManageUsersDialog({
                           variant="destructive"
                           disabled={isExiting || !allExitValid}
                           onClick={() => setExitConfirmOpen(true)}
-                          className="min-w-[160px]"
+                          className="min-w-40"
                         >
                           {isExiting ? (
                             <>

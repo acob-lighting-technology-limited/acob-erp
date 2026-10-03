@@ -133,7 +133,7 @@ export function DevAcobotLogsContent() {
           accessor: (row) => row.question,
           resizable: true,
           initialWidth: 360,
-          render: (row) => <p className="max-w-[420px] text-sm">{truncate(row.question, 160)}</p>,
+          render: (row) => <p className="max-w-105 text-sm">{truncate(row.question, 160)}</p>,
         },
         {
           key: "ip_address",
@@ -171,7 +171,7 @@ export function DevAcobotLogsContent() {
           accessor: (row) => row.question,
           resizable: true,
           initialWidth: 320,
-          render: (row) => <p className="max-w-[360px] text-sm">{truncate(row.question, 140)}</p>,
+          render: (row) => <p className="max-w-90 text-sm">{truncate(row.question, 140)}</p>,
         }
       )
     }

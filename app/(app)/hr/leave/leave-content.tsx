@@ -482,7 +482,7 @@ export function LeaveContent({
         accessor: (r) => r.current_stage_code || r.approval_stage || "-",
         render: (r) => (
           <span
-            className="text-muted-foreground block max-w-[140px] truncate text-xs"
+            className="text-muted-foreground block max-w-35 truncate text-xs"
             title={approvalStageLabel(r.current_stage_code || r.approval_stage)}
           >
             {approvalStageLabel(r.current_stage_code || r.approval_stage)}
@@ -496,7 +496,7 @@ export function LeaveContent({
         accessor: (r) => resolvePersonName(r.reliever) || "-",
         render: (r) => (
           <span
-            className="text-muted-foreground block max-w-[140px] truncate text-xs"
+            className="text-muted-foreground block max-w-35 truncate text-xs"
             title={resolvePersonName(r.reliever) || "-"}
           >
             {resolvePersonName(r.reliever) || "-"}

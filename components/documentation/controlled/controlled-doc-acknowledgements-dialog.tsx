@@ -62,7 +62,7 @@ export function ControlledDocAcknowledgementsDialog({ doc, onOpenChange }: Contr
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="max-h-[90vh] sm:max-w-[560px]">
+      <DialogContent className="max-h-[90vh] sm:max-w-140">
         <DialogHeader>
           <DialogTitle>Acknowledgements</DialogTitle>
           <DialogDescription>

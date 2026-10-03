@@ -227,7 +227,7 @@ export default function CbtDetailsLogPage() {
                     <span className="text-muted-foreground block font-medium">Verified Last Name</span>
                     <span className="text-foreground font-semibold">{row.cbt_details.last_name || "-"}</span>
                   </div>
-                  <div className="bg-border hidden h-6 w-[1px] sm:block" />
+                  <div className="bg-border hidden h-6 w-px sm:block" />
                   <div>
                     <span className="text-muted-foreground block font-medium">Entered DOB</span>
                     <span className="text-foreground font-semibold">

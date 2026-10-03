@@ -54,7 +54,7 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
         label: "Route",
         sortable: true,
         accessor: (r) => r.route,
-        render: (r) => <span className="max-w-[220px] truncate font-mono text-xs">{r.route || "-"}</span>,
+        render: (r) => <span className="max-w-55 truncate font-mono text-xs">{r.route || "-"}</span>,
       },
       {
         key: "user",
@@ -70,7 +70,7 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
         initialWidth: 500,
         accessor: (r) => r.message,
         hideOnMobile: true,
-        render: (r) => <span className="max-w-[520px] truncate text-xs">{r.message}</span>,
+        render: (r) => <span className="max-w-130 truncate text-xs">{r.message}</span>,
       },
     ],
     []

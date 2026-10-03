@@ -59,7 +59,7 @@ export function SendSummary({
   sendResult,
 }: SendSummaryProps) {
   return (
-    <aside className="space-y-6 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
+    <aside className="space-y-6 lg:sticky lg:top-30 lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
       <Card className="border-orange-200 dark:border-orange-900">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Summary</CardTitle>
@@ -163,7 +163,7 @@ export function SendSummary({
               <span className="text-muted-foreground text-sm">email(s)</span>
             </div>
             {resolvedRecipients.length > 0 && (
-              <div className="mt-2 max-h-[160px] space-y-0.5 overflow-y-auto rounded-md border p-2 text-xs">
+              <div className="mt-2 max-h-40 space-y-0.5 overflow-y-auto rounded-md border p-2 text-xs">
                 {resolvedRecipients.map((email) => (
                   <div key={email} className="truncate">
                     {email}
@@ -256,7 +256,7 @@ export function SendSummary({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-[300px] space-y-1 overflow-y-auto">
+            <div className="max-h-75 space-y-1 overflow-y-auto">
               {}
               {sendResult.results.map((r: any, i: number) => (
                 <div

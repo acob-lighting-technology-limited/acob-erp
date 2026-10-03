@@ -345,7 +345,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
 
         <DropdownMenuContent
           align="end"
-          className="w-[calc(100vw-2rem)] border-2 p-0 shadow-xl sm:w-[460px]"
+          className="w-[calc(100vw-2rem)] border-2 p-0 shadow-xl sm:w-115"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {/* Header */}
@@ -423,7 +423,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
             </TabsList>
 
             <TabsContent value={activeTab} className="mt-0">
-              <ScrollArea className="h-[430px]">
+              <ScrollArea className="h-107.5">
                 {filteredNotifications.length > 0 ? (
                   <div className="divide-y">
                     {filteredNotifications.map((notification) => {

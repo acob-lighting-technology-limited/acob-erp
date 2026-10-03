@@ -797,7 +797,7 @@ export function PmsMetricTabsPage({
               <div className="space-y-2">
                 <div className="text-muted-foreground text-xs">Underlying people records</div>
                 <div className="overflow-x-auto rounded-md border">
-                  <table className="w-full min-w-[680px] text-sm">
+                  <table className="w-full min-w-170 text-sm">
                     <thead className="bg-muted/60 text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2 text-left">Employee</th>

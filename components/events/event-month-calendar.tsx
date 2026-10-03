@@ -113,7 +113,7 @@ export function EventMonthCalendar({
       </div>
 
       <div className="overflow-x-auto">
-        <div className="min-w-[640px]">
+        <div className="min-w-160">
           <div className="bg-muted/80 grid grid-cols-7 border-b text-xs font-medium">
             {WEEKDAYS.map((d) => (
               <div key={d} className="text-muted-foreground px-2 py-2 text-center">
@@ -129,7 +129,7 @@ export function EventMonthCalendar({
               return (
                 <div
                   key={day}
-                  className={cn("min-h-[104px] border-b p-1.5", i % 7 !== 6 && "border-r", !inMonth && "bg-muted/30")}
+                  className={cn("min-h-26 border-b p-1.5", i % 7 !== 6 && "border-r", !inMonth && "bg-muted/30")}
                 >
                   <div className="mb-1 flex justify-end">
                     <span

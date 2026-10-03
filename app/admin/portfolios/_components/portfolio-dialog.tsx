@@ -82,7 +82,7 @@ export function PortfolioDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-120">
         <DialogHeader>
           <DialogTitle>{portfolio ? "Edit Portfolio" : "Add Portfolio"}</DialogTitle>
           <DialogDescription>
@@ -119,7 +119,7 @@ export function PortfolioDialog({
               id="portfolio-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[70px] text-sm"
+              className="min-h-17.5 text-sm"
             />
           </div>
 

@@ -48,7 +48,7 @@ export function SchedulingOptions({
         <button
           type="button"
           onClick={() => setSendTiming("now")}
-          className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
+          className={`flex min-w-37.5 flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "now"
               ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
@@ -65,7 +65,7 @@ export function SchedulingOptions({
         <button
           type="button"
           onClick={() => setSendTiming("scheduled")}
-          className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
+          className={`flex min-w-37.5 flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "scheduled"
               ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
@@ -82,7 +82,7 @@ export function SchedulingOptions({
         <button
           type="button"
           onClick={() => setSendTiming("recurring")}
-          className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
+          className={`flex min-w-37.5 flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "recurring"
               ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
@@ -108,7 +108,7 @@ export function SchedulingOptions({
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
               min={toLocalISODate()}
-              className="w-[180px]"
+              className="w-45"
             />
           </div>
           <div className="space-y-2">
@@ -118,7 +118,7 @@ export function SchedulingOptions({
               type="time"
               value={scheduledTime}
               onChange={(e) => setScheduledTime(e.target.value)}
-              className="w-[140px]"
+              className="w-35"
             />
           </div>
         </div>
@@ -130,7 +130,7 @@ export function SchedulingOptions({
             <div className="space-y-2">
               <Label htmlFor="recurring-day">Day of Week</Label>
               <Select value={recurringDay} onValueChange={setRecurringDay}>
-                <SelectTrigger id="recurring-day" className="w-[160px]">
+                <SelectTrigger id="recurring-day" className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -149,7 +149,7 @@ export function SchedulingOptions({
                 type="time"
                 value={recurringTime}
                 onChange={(e) => setRecurringTime(e.target.value)}
-                className="w-[140px]"
+                className="w-35"
               />
             </div>
           </div>

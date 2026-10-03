@@ -898,7 +898,7 @@ export function AdminTasksContent({
               {r.kpi_measure && <div className="text-muted-foreground line-clamp-1 text-xs">🎯 {r.kpi_measure}</div>}
               <div className="flex items-center justify-between border-t pt-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="max-w-[120px] truncate font-medium">{workflowOwnerLabel(r)}</span>
+                  <span className="max-w-30 truncate font-medium">{workflowOwnerLabel(r)}</span>
                 </div>
                 <AdminTaskStatusBadge status={r.status} className="text-xs" />
               </div>

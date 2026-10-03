@@ -1151,7 +1151,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Address</span>
-                    <span className="max-w-[150px] truncate">{r.residential_address || "—"}</span>
+                    <span className="max-w-37.5 truncate">{r.residential_address || "—"}</span>
                   </div>
                 </div>
               </div>
@@ -1301,7 +1301,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   </Tooltip>
                 </div>
                 {r.additional_email && (
-                  <div className="ml-[22px]">
+                  <div className="ml-5.5">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button

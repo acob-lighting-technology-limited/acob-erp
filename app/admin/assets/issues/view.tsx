@@ -222,7 +222,7 @@ export function AssetIssuesPage({
       accessor: (issue) => issue.description,
       render: (issue) => (
         <span
-          className={`block max-w-[320px] truncate text-sm ${issue.resolved ? "text-muted-foreground line-through" : ""}`}
+          className={`block max-w-80 truncate text-sm ${issue.resolved ? "text-muted-foreground line-through" : ""}`}
         >
           {issue.description}
         </span>

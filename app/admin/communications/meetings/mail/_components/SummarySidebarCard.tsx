@@ -154,7 +154,7 @@ export function SummarySidebarCard({
             <span className="text-muted-foreground text-sm">email(s)</span>
           </div>
           {resolvedRecipients.length > 0 && (
-            <div className="mt-2 max-h-[160px] space-y-0.5 overflow-y-auto rounded-md border p-2 text-xs">
+            <div className="mt-2 max-h-40 space-y-0.5 overflow-y-auto rounded-md border p-2 text-xs">
               {resolvedRecipients.map((email) => (
                 <div key={email} className="truncate">
                   {email}

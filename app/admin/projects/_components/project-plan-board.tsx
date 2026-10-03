@@ -702,7 +702,7 @@ export function ProjectPlanBoard({
       )}
 
       <Dialog open={isAddPlanOpen} onOpenChange={setIsAddPlanOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-120">
           <form
             onSubmit={(e) => {
               e.preventDefault()

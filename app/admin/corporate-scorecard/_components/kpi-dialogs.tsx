@@ -171,7 +171,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
         onOpenChange(next)
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[620px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-155">
         <DialogHeader>
           <DialogTitle>Add Corporate KPI</DialogTitle>
           <DialogDescription>
@@ -243,7 +243,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
               placeholder="e.g. Number of solicited portfolio projects awarded (Mini Grids)"
               value={measure}
               onChange={(e) => setMeasure(e.target.value)}
-              className="min-h-[64px] resize-none"
+              className="min-h-16 resize-none"
             />
           </div>
 
@@ -518,7 +518,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
   return (
     <Dialog open={row !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[680px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-170">
         <DialogHeader>
           <DialogTitle>Edit Corporate KPI #{row?.source_sn}</DialogTitle>
           <DialogDescription>
@@ -581,11 +581,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">KPI Measure Name *</Label>
-            <Textarea
-              value={measure}
-              onChange={(e) => setMeasure(e.target.value)}
-              className="min-h-[64px] resize-none"
-            />
+            <Textarea value={measure} onChange={(e) => setMeasure(e.target.value)} className="min-h-16 resize-none" />
           </div>
 
           <div className="space-y-1.5">
@@ -765,7 +761,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
             {unassignedDepartments.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-2">
                 <Select value={newDept} onValueChange={setNewDept}>
-                  <SelectTrigger className="h-8 min-w-[180px] flex-1 text-xs">
+                  <SelectTrigger className="h-8 min-w-45 flex-1 text-xs">
                     <SelectValue placeholder="Select department to add..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -849,7 +845,7 @@ export function ArchiveKpiDialog({ row, onOpenChange, onChanged }: ArchiveKpiDia
 
   return (
     <Dialog open={row !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent className="sm:max-w-105">
         <DialogHeader>
           <DialogTitle>Archive Corporate KPI</DialogTitle>
           <DialogDescription>

@@ -16,7 +16,7 @@ export function PlanYearSelect({ year, years, onChange }: PlanYearSelectProps) {
   if (!year || !years || years.length < 2) return null
   return (
     <Select value={String(year)} onValueChange={(value) => onChange(Number(value))}>
-      <SelectTrigger className="h-8 w-[110px]" aria-label="Plan year">
+      <SelectTrigger className="h-8 w-27.5" aria-label="Plan year">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

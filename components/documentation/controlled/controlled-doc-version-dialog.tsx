@@ -77,7 +77,7 @@ export function ControlledDocVersionDialog({ doc, onOpenChange, onSaved }: Contr
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && !isSaving && close()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>Upload Version {nextVersion}</DialogTitle>
           <DialogDescription>

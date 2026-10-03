@@ -654,7 +654,7 @@ export function PdfTools() {
                     <iframe
                       src={singlePdfPreviewUrl}
                       title={`Preview of ${singlePdfFile?.name || "selected PDF"}`}
-                      className="h-[420px] w-full rounded-md border"
+                      className="h-105 w-full rounded-md border"
                     />
                     <p className="text-muted-foreground text-xs">
                       Scroll to find the pages you want, then enter their numbers below.
@@ -900,7 +900,7 @@ export function PdfTools() {
                     <iframe
                       src={singlePdfPreviewUrl}
                       title={`Preview of ${singlePdfFile?.name || "selected PDF"}`}
-                      className="h-[420px] w-full rounded-md border"
+                      className="h-105 w-full rounded-md border"
                     />
                   </div>
                 )}

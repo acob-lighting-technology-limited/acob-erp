@@ -99,7 +99,7 @@ export function WeeklySummaryForm({
             <div className="space-y-1.5">
               <Label htmlFor="year-select">Year</Label>
               <Select value={String(yearNumber)} onValueChange={(v) => setYearNumber(Number(v))}>
-                <SelectTrigger id="year-select" className="w-[120px]">
+                <SelectTrigger id="year-select" className="w-30">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

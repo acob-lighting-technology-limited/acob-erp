@@ -803,7 +803,7 @@ export function DevLoginLogsContent() {
             <div className="flex flex-col gap-1.5">
               <span className="text-muted-foreground text-xs font-medium">Filter By</span>
               <Select value={filterMode} onValueChange={(val: any) => setFilterMode(val)}>
-                <SelectTrigger className="w-[140px] text-sm">
+                <SelectTrigger className="w-35 text-sm">
                   <SelectValue placeholder="Select filter" />
                 </SelectTrigger>
                 <SelectContent>
@@ -821,7 +821,7 @@ export function DevLoginLogsContent() {
               <div className="animate-in fade-in slide-in-from-left-1 flex flex-col gap-1.5 duration-200">
                 <span className="text-muted-foreground text-xs font-medium">Time Range</span>
                 <Select value={timeRange} onValueChange={setTimeRange}>
-                  <SelectTrigger className="w-[150px] text-sm">
+                  <SelectTrigger className="w-37.5 text-sm">
                     <SelectValue placeholder="Select range" />
                   </SelectTrigger>
                   <SelectContent>
@@ -845,7 +845,7 @@ export function DevLoginLogsContent() {
                     type="date"
                     value={selectedDateRange.from}
                     onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, from: e.target.value }))}
-                    className="h-9 w-[160px] text-sm"
+                    className="h-9 w-40 text-sm"
                   />
                 </div>
                 <div className="animate-in fade-in slide-in-from-left-1 flex flex-col gap-1.5 duration-200">
@@ -854,7 +854,7 @@ export function DevLoginLogsContent() {
                     type="date"
                     value={selectedDateRange.to}
                     onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, to: e.target.value }))}
-                    className="h-9 w-[160px] text-sm"
+                    className="h-9 w-40 text-sm"
                   />
                 </div>
               </>
@@ -864,7 +864,7 @@ export function DevLoginLogsContent() {
               <div className="animate-in fade-in slide-in-from-left-1 flex flex-col gap-1.5 duration-200">
                 <span className="text-muted-foreground text-xs font-medium">Select Month</span>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-[180px] text-sm">
+                  <SelectTrigger className="w-45 text-sm">
                     <SelectValue placeholder="Choose month" />
                   </SelectTrigger>
                   <SelectContent>
@@ -883,7 +883,7 @@ export function DevLoginLogsContent() {
               <div className="animate-in fade-in slide-in-from-left-1 flex flex-col gap-1.5 duration-200">
                 <span className="text-muted-foreground text-xs font-medium">Quarterly Cycle</span>
                 <Select value={selectedCycle} onValueChange={setSelectedCycle}>
-                  <SelectTrigger className="w-[180px] text-sm">
+                  <SelectTrigger className="w-45 text-sm">
                     <SelectValue placeholder="Choose cycle" />
                   </SelectTrigger>
                   <SelectContent>
@@ -902,7 +902,7 @@ export function DevLoginLogsContent() {
               <div className="animate-in fade-in slide-in-from-left-1 flex flex-col gap-1.5 duration-200">
                 <span className="text-muted-foreground text-xs font-medium">Bi-annual Cycle</span>
                 <Select value={selectedBiannual} onValueChange={setSelectedBiannual}>
-                  <SelectTrigger className="w-[200px] text-sm">
+                  <SelectTrigger className="w-50 text-sm">
                     <SelectValue placeholder="Choose half-year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -921,7 +921,7 @@ export function DevLoginLogsContent() {
               <div className="animate-in fade-in slide-in-from-left-1 flex flex-col gap-1.5 duration-200">
                 <span className="text-muted-foreground text-xs font-medium">Annual Cycle</span>
                 <Select value={selectedAnnual} onValueChange={setSelectedAnnual}>
-                  <SelectTrigger className="w-[140px] text-sm">
+                  <SelectTrigger className="w-35 text-sm">
                     <SelectValue placeholder="Choose year" />
                   </SelectTrigger>
                   <SelectContent>
@@ -945,7 +945,7 @@ export function DevLoginLogsContent() {
                   setSelectedUser("all")
                 }}
               >
-                <SelectTrigger className="w-[180px] text-sm">
+                <SelectTrigger className="w-45 text-sm">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
@@ -967,7 +967,7 @@ export function DevLoginLogsContent() {
                 placeholder="All Users"
                 options={[{ value: "all", label: "All Users" }, ...individualOptions]}
                 searchPlaceholder="Search person..."
-                className="w-[260px]"
+                className="w-65"
               />
             </div>
           </div>

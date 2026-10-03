@@ -687,7 +687,7 @@ function ManageDepartmentsDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-120">
         <DialogHeader>
           <DialogTitle>Manage Departments</DialogTitle>
           <DialogDescription>{row?.measure}</DialogDescription>

@@ -545,7 +545,7 @@ export function OfficeLocationsPage({
               <div className="space-y-3">
                 <p className="text-sm font-medium">{members.length} assigned employees</p>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
+                  <table className="w-full min-w-160 text-sm">
                     <thead className="bg-muted/30">
                       <tr>
                         <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Employee</th>

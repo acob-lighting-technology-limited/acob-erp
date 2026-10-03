@@ -243,7 +243,7 @@ export function FinanceReportsPage({
       backLink={{ href: backLinkHref ?? "/admin/accounts", label: "Back to Accounts" }}
       actions={
         <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-45">
             <Calendar className="mr-2 h-4 w-4" />
             <SelectValue />
           </SelectTrigger>

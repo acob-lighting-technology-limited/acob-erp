@@ -214,7 +214,7 @@ export function ProjectDialogs({
     <>
       {/* ADD PROJECT DIALOG */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-125">
           <DialogHeader>
             <DialogTitle>Add Project Profile</DialogTitle>
             <DialogDescription>Create a new ongoing project deployment record.</DialogDescription>
@@ -365,7 +365,7 @@ export function ProjectDialogs({
 
       {/* EDIT PROJECT DIALOG */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-125">
           <DialogHeader>
             <DialogTitle>Edit Project Profile</DialogTitle>
             <DialogDescription>Modify fields and overall status of the deployment profile.</DialogDescription>

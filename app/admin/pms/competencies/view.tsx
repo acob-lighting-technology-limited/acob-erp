@@ -339,9 +339,7 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
         label: "Description",
         accessor: (competency) => competency.description || "",
         render: (competency) => (
-          <span className="text-muted-foreground block max-w-[260px] truncate text-sm">
-            {competency.description || "-"}
-          </span>
+          <span className="text-muted-foreground block max-w-65 truncate text-sm">{competency.description || "-"}</span>
         ),
         hideOnMobile: true,
         resizable: true,

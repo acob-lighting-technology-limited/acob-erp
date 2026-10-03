@@ -24,7 +24,7 @@ export function SendResultPanel({ results }: SendResultPanelProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="max-h-[300px] space-y-1 overflow-y-auto">
+        <div className="max-h-75 space-y-1 overflow-y-auto">
           {results.map((r, i) => (
             <div
               key={i}

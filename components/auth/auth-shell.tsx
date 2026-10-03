@@ -57,7 +57,7 @@ export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, cla
 
       <div
         aria-hidden="true"
-        className="bg-primary/15 pointer-events-none absolute top-1/2 left-1/2 h-[560px] w-[760px] -translate-x-[65%] -translate-y-1/2 rounded-full blur-[120px]"
+        className="bg-primary/15 pointer-events-none absolute top-1/2 left-1/2 h-140 w-190 -translate-x-[65%] -translate-y-1/2 rounded-full blur-[120px]"
       />
 
       {/* Faint backdrop on small screens, where there is no brand panel to hold it */}
@@ -78,7 +78,7 @@ export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, cla
 
             {/* Reserved for the matrix wireframe; see SHOW_MATRIX. */}
             {SHOW_MATRIX && mounted && (
-              <div aria-hidden="true" className="pointer-events-none h-[320px]">
+              <div aria-hidden="true" className="pointer-events-none h-80">
                 <WireframeForms variant="matrix" mode={mode} speed={1} size={1} />
               </div>
             )}

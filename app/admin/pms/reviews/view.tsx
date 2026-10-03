@@ -647,7 +647,7 @@ export function AdminPmsReviewsPage({
         render: (r) => {
           const pct = r.reviews > 0 ? Math.round((r.submitted / r.reviews) * 100) : 0
           return (
-            <div className="min-w-[80px] space-y-1">
+            <div className="min-w-20 space-y-1">
               <div className="flex justify-between text-xs">
                 <span>{r.submitted}</span>
                 <span className="text-muted-foreground">{pct}%</span>

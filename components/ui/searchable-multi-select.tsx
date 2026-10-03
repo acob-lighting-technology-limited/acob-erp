@@ -98,7 +98,7 @@ export function SearchableMultiSelect({
   }, [portal, open])
 
   const contentClassName =
-    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 flex max-h-[360px] w-[var(--radix-popover-trigger-width)] min-w-[14rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-md border shadow-md"
+    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 flex max-h-90 w-[var(--radix-popover-trigger-width)] min-w-[14rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-md border shadow-md"
 
   const renderContent = () => (
     <>
@@ -130,7 +130,7 @@ export function SearchableMultiSelect({
         {selectedOptions.length > 0 && (
           // Capped and independently scrollable
           <div
-            className="mt-2 flex max-h-[72px] flex-wrap gap-1 overflow-y-auto"
+            className="mt-2 flex max-h-18 flex-wrap gap-1 overflow-y-auto"
             onMouseDown={(e) => e.stopPropagation()}
             onWheel={(e) => e.stopPropagation()}
           >
@@ -141,7 +141,7 @@ export function SearchableMultiSelect({
                 className="hover:bg-destructive/20 hover:text-destructive cursor-pointer text-xs transition-colors"
                 onClick={(e) => removeValue(option.value, e)}
               >
-                <span className="max-w-[180px] truncate">{option.label}</span>
+                <span className="max-w-45 truncate">{option.label}</span>
                 <X className="ml-1 h-3 w-3 shrink-0" />
               </Badge>
             ))}
@@ -149,7 +149,7 @@ export function SearchableMultiSelect({
         )}
       </div>
       <div
-        className="max-h-[220px] min-h-0 flex-1 overflow-y-auto p-1"
+        className="max-h-55 min-h-0 flex-1 overflow-y-auto p-1"
         onMouseDown={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
       >

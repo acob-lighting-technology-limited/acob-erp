@@ -56,7 +56,7 @@ import type { ChartsProject } from "@/components/projects/project-charts"
 // rather than on page load. ssr:false because recharts measures the DOM.
 const ProjectCharts = dynamic(() => import("@/components/projects/project-charts").then((m) => m.ProjectCharts), {
   ssr: false,
-  loading: () => <div className="bg-muted/40 h-[320px] w-full animate-pulse rounded-lg" />,
+  loading: () => <div className="bg-muted/40 h-80 w-full animate-pulse rounded-lg" />,
 })
 import { toLocalISODate } from "@/lib/utils/date"
 import { projectHref } from "@/lib/projects/links"

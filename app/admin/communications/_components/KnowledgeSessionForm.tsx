@@ -29,7 +29,7 @@ export function KnowledgeSessionForm({
           type="date"
           value={sessionDate}
           onChange={(e) => setSessionDate(e.target.value)}
-          className="w-[180px]"
+          className="w-45"
         />
       </div>
       <div className="space-y-2">
@@ -39,7 +39,7 @@ export function KnowledgeSessionForm({
           type="time"
           value={sessionTime}
           onChange={(e) => setSessionTime(e.target.value)}
-          className="w-[140px]"
+          className="w-35"
         />
       </div>
       <div className="space-y-2">
@@ -49,7 +49,7 @@ export function KnowledgeSessionForm({
           value={duration}
           onChange={(e) => setDuration(e.target.value)}
           placeholder="e.g. 30 minutes"
-          className="w-[160px]"
+          className="w-40"
         />
       </div>
     </div>

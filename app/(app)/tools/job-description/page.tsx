@@ -220,7 +220,7 @@ export default function JobDescriptionPage() {
                     value={jobDescription}
                     onChange={(e) => setJobDescription(e.target.value)}
                     placeholder="Enter your job description here...&#10;&#10;Example:&#10;• Manage daily operations of the department&#10;• Coordinate with team members on project deliverables&#10;• Review and approve departmental reports&#10;• Ensure compliance with company policies"
-                    className="min-h-[400px] text-base"
+                    className="min-h-100 text-base"
                   />
                   <p className="text-muted-foreground text-sm">
                     Tip: Use bullet points or paragraphs to clearly outline your responsibilities

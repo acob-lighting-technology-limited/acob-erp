@@ -373,7 +373,7 @@ export function TaskReviewDecisionDialog({
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Enter notes or explanation for audit log..."
-                  className="min-h-[70px] text-xs"
+                  className="min-h-17.5 text-xs"
                 />
               </div>
 

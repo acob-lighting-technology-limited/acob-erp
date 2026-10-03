@@ -98,7 +98,7 @@ export function CalibrationView({ reviews }: CalibrationViewProps) {
               </span>
             </div>
             <div className="overflow-x-auto">
-              <Table className="min-w-[700px]">
+              <Table className="min-w-175">
                 <TableHeader className="bg-muted/80">
                   <TableRow>
                     <TableHead className="w-12">Rank</TableHead>

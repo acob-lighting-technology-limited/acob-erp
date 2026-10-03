@@ -762,7 +762,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
             </div>
           )}
 
-          <div className="max-h-[420px] space-y-3 overflow-y-auto">
+          <div className="max-h-105 space-y-3 overflow-y-auto">
             {historyLoading ? (
               <p className="text-muted-foreground text-sm">Loading…</p>
             ) : historyItems.length === 0 ? (

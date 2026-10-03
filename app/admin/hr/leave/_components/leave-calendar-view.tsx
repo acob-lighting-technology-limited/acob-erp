@@ -446,7 +446,7 @@ export function LeaveCalendarView({
                 return (
                   <div
                     key={`skeleton-${idx}`}
-                    className={`flex min-h-[64px] flex-col justify-between p-1.5 sm:min-h-[74px] ${
+                    className={`flex min-h-16 flex-col justify-between p-1.5 sm:min-h-18.5 ${
                       isLastInRow ? "" : "border-border/60 border-r"
                     }`}
                   >
@@ -468,7 +468,7 @@ export function LeaveCalendarView({
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className={`bg-muted/10 min-h-[64px] p-1 sm:min-h-[74px] ${
+                      className={`bg-muted/10 min-h-16 p-1 sm:min-h-18.5 ${
                         isLastInRow ? "" : "border-border/60 border-r"
                       }`}
                     />
@@ -485,7 +485,7 @@ export function LeaveCalendarView({
                 return (
                   <div
                     key={date}
-                    className={`relative flex min-h-[64px] flex-col p-1 transition-colors sm:min-h-[74px] ${
+                    className={`relative flex min-h-16 flex-col p-1 transition-colors sm:min-h-18.5 ${
                       isLastInRow ? "" : "border-border/60 border-r"
                     } ${isWeekend ? "bg-muted/15" : "bg-card"} ${
                       isToday ? "ring-primary bg-primary/5 ring-2 ring-inset" : ""
@@ -507,7 +507,7 @@ export function LeaveCalendarView({
 
                       {holiday && (
                         <span
-                          className="py-0.2 text-warning-foreground max-w-[80px] truncate rounded-xs bg-amber-500/15 px-1 text-[8px] font-semibold"
+                          className="py-0.2 text-warning-foreground max-w-20 truncate rounded-xs bg-amber-500/15 px-1 text-[8px] font-semibold"
                           title={holiday.name}
                         >
                           {holiday.name}

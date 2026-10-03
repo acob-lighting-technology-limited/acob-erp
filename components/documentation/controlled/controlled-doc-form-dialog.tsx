@@ -160,7 +160,7 @@ export function ControlledDocFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isSaving && onOpenChange(next)}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-140">
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${meta.label} Details` : `Add ${meta.label}`}</DialogTitle>
           <DialogDescription>

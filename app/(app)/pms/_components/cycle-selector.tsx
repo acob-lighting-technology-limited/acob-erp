@@ -105,7 +105,7 @@ export function CycleSelector({ cycles, activeCycleId, showLabel = false }: Cycl
     <div className="flex w-full items-center gap-2">
       {showLabel && <span className="text-muted-foreground hidden text-xs font-medium sm:inline">Review Cycle:</span>}
       <Select value={cadence} onValueChange={handleCadence} disabled={isPending}>
-        <SelectTrigger className="border-border bg-card hover:bg-accent/50 h-9 w-[130px] shrink-0 text-xs shadow-xs transition-colors">
+        <SelectTrigger className="border-border bg-card hover:bg-accent/50 h-9 w-32.5 shrink-0 text-xs shadow-xs transition-colors">
           <SelectValue placeholder="Review Type" />
         </SelectTrigger>
         <SelectContent align="start">
@@ -117,7 +117,7 @@ export function CycleSelector({ cycles, activeCycleId, showLabel = false }: Cycl
         </SelectContent>
       </Select>
       <Select value={selectedValue} onValueChange={handleSelect} disabled={isPending}>
-        <SelectTrigger className="border-border bg-card hover:bg-accent/50 h-9 w-full text-xs shadow-xs transition-colors sm:w-[220px]">
+        <SelectTrigger className="border-border bg-card hover:bg-accent/50 h-9 w-full text-xs shadow-xs transition-colors sm:w-55">
           <SelectValue
             placeholder={visibleCycles.length === 0 ? `No ${periodLabel.toLowerCase()}s` : `Select ${periodLabel}`}
           />

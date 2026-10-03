@@ -58,7 +58,7 @@ export function AssetMailRoutingPanel() {
               Officially Returned, Asset Status Alert
             </div>
             <div className="overflow-x-auto rounded-md border">
-              <table className="w-full min-w-[980px] border-collapse text-sm">
+              <table className="w-full min-w-245 border-collapse text-sm">
                 <thead className="bg-muted/40">
                   <tr>
                     <th className="border px-3 py-2 text-left">Employee</th>

@@ -197,7 +197,7 @@ export function ChallengesView({
         sortable: true,
         accessor: (row) => row.title,
         render: (row) => (
-          <div className="min-w-[260px] space-y-1">
+          <div className="min-w-65 space-y-1">
             <p className="text-foreground text-sm font-medium">{row.title}</p>
             {row.resolution_note && (
               <p className="text-muted-foreground bg-muted/30 border-border/40 rounded border p-1.5 text-xs">

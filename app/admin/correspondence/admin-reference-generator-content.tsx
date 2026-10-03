@@ -365,10 +365,7 @@ export function AdminReferenceGeneratorContent({
       hideOnMobile: true,
       accessor: (r) => r.department_name || r.assigned_department_name || "-",
       render: (r) => (
-        <span
-          className="block max-w-[180px] truncate"
-          title={r.department_name || r.assigned_department_name || undefined}
-        >
+        <span className="block max-w-45 truncate" title={r.department_name || r.assigned_department_name || undefined}>
           {r.department_name || r.assigned_department_name || "-"}
         </span>
       ),

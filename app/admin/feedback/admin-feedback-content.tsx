@@ -207,7 +207,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         initialWidth: 250,
         accessor: (r) => r.title || "",
         render: (r) => (
-          <div className="flex max-w-[280px] flex-col">
+          <div className="flex max-w-70 flex-col">
             <span className="truncate font-medium">{r.title}</span>
             <Badge variant="outline" className="mt-1 w-fit text-xs font-normal uppercase">
               {r.feedback_type}

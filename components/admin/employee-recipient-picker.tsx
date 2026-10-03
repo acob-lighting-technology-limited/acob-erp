@@ -104,7 +104,7 @@ export function EmployeeRecipientPicker({
           className="pl-9"
         />
       </div>
-      <div className="max-h-[240px] space-y-1 overflow-y-auto rounded-lg border p-2">
+      <div className="max-h-60 space-y-1 overflow-y-auto rounded-lg border p-2">
         {loading ? (
           <div className="text-muted-foreground py-6 text-center text-sm">Loading employees…</div>
         ) : filtered.length === 0 ? (

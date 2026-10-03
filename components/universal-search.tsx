@@ -284,7 +284,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
             </div>
           </div>
 
-          <div className="max-h-[400px] overflow-y-auto px-6 pb-6">
+          <div className="max-h-100 overflow-y-auto px-6 pb-6">
             {loading && (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />

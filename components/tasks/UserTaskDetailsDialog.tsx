@@ -256,7 +256,7 @@ export function UserTaskDetailsDialog({
                     value={commentDraft}
                     onChange={(event) => setCommentDraft(event.target.value)}
                     placeholder="Post an activity note or progress update…"
-                    className="min-h-[72px] text-sm"
+                    className="min-h-18 text-sm"
                     aria-label="Add an activity"
                   />
                   <div className="flex justify-end">

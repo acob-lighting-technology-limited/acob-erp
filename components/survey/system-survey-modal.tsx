@@ -328,7 +328,7 @@ export function SystemSurveyModal({ isOpen, onClose, onSnooze, existingSurvey, o
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="min-w-[132px]">
+            <Button type="submit" disabled={isSubmitting} className="min-w-33">
               {isSubmitting ? (
                 <>
                   <Loader2 className="animate-spin" />

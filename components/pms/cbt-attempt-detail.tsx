@@ -111,14 +111,14 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
             <span className="text-muted-foreground block text-xs">Score</span>
             <span className="text-foreground text-lg font-bold">{attempt.score}%</span>
           </div>
-          <div className="bg-border h-8 w-[1px]" />
+          <div className="bg-border h-8 w-px" />
           <div className="text-right">
             <span className="text-muted-foreground block text-xs">Correct</span>
             <span className="text-foreground text-lg font-semibold">
               {attempt.correct_answers} / {attempt.total_questions}
             </span>
           </div>
-          <div className="bg-border h-8 w-[1px]" />
+          <div className="bg-border h-8 w-px" />
           <div className="text-right">
             <span className="text-muted-foreground block text-xs">Tab Switches</span>
             {(() => {
@@ -178,7 +178,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                 <div key={question.id} className="bg-card space-y-3 rounded-xl border p-4 shadow-sm">
                   {/* Question Prompt */}
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-muted-foreground bg-muted flex h-6 min-w-[24px] items-center justify-center rounded-full px-1 text-xs font-semibold">
+                    <span className="text-muted-foreground bg-muted flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-semibold">
                       {idx + 1}
                     </span>
                     <p className="text-foreground flex-1 text-sm leading-relaxed font-medium">{question.prompt}</p>
@@ -221,7 +221,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
 
                       return (
                         <div key={letter} className={getOptionStyle(letter)}>
-                          <span className="min-w-[16px] font-bold uppercase">{letter}.</span>
+                          <span className="min-w-4 font-bold uppercase">{letter}.</span>
                           <span className="flex-1">{optionText}</span>
                         </div>
                       )

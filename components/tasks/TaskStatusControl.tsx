@@ -219,7 +219,7 @@ export function TaskStatusControl({
       </Select>
 
       <Dialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <DialogContent className="sm:max-w-[440px]">
+        <DialogContent className="sm:max-w-110">
           <DialogHeader>
             <DialogTitle>
               {pending?.requires === "rating"
@@ -285,7 +285,7 @@ export function TaskStatusControl({
                       ? "Reason for reopening / pardon note..."
                       : "Why is this happening?"
               }
-              className="min-h-[70px] text-xs"
+              className="min-h-17.5 text-xs"
             />
           </div>
 

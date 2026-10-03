@@ -134,7 +134,7 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
                       type="time"
                       value={time}
                       onChange={(e) => updateSendTime(index, e.target.value)}
-                      className="w-[140px]"
+                      className="w-35"
                     />
                     <Button
                       type="button"

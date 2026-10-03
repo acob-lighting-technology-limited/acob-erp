@@ -173,7 +173,7 @@ export function AdminAuditLogsContent({
         resizable: true,
         initialWidth: 320,
         accessor: (r) => getAuditLogSummary(r),
-        render: (r) => <span className="line-clamp-2 block max-w-[320px] text-sm">{getAuditLogSummary(r)}</span>,
+        render: (r) => <span className="line-clamp-2 block max-w-80 text-sm">{getAuditLogSummary(r)}</span>,
       },
       {
         key: "target",
@@ -181,7 +181,7 @@ export function AdminAuditLogsContent({
         resizable: true,
         initialWidth: 190,
         accessor: (r) => getTargetDescription(r),
-        render: (r) => <span className="block max-w-[190px] truncate text-sm">{getTargetDescription(r)}</span>,
+        render: (r) => <span className="block max-w-47.5 truncate text-sm">{getTargetDescription(r)}</span>,
       },
       {
         key: "department",
@@ -190,7 +190,7 @@ export function AdminAuditLogsContent({
         resizable: true,
         initialWidth: 170,
         accessor: (r) => getDepartmentLocation(r),
-        render: (r) => <span className="block max-w-[170px] truncate text-sm">{getDepartmentLocation(r)}</span>,
+        render: (r) => <span className="block max-w-42.5 truncate text-sm">{getDepartmentLocation(r)}</span>,
       },
     ],
     []

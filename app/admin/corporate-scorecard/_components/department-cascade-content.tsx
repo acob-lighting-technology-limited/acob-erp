@@ -633,7 +633,7 @@ function EditTargetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-120">
         <DialogHeader>
           <DialogTitle>Confirm This Department&apos;s Target</DialogTitle>
           <DialogDescription>{row?.measure}</DialogDescription>
@@ -672,7 +672,7 @@ function EditTargetDialog({
             value={departmentTarget}
             onChange={(e) => setDepartmentTarget(e.target.value)}
             placeholder="This department's commitment toward the corporate target..."
-            className="min-h-[60px] text-xs"
+            className="min-h-15 text-xs"
           />
         </div>
 
@@ -682,7 +682,7 @@ function EditTargetDialog({
             value={proposedAction}
             onChange={(e) => setProposedAction(e.target.value)}
             placeholder="What & how this department will achieve it..."
-            className="min-h-[60px] text-xs"
+            className="min-h-15 text-xs"
           />
         </div>
 
@@ -808,7 +808,7 @@ function RecordActualDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-120">
         <DialogHeader>
           <DialogTitle>Record / Override Actual</DialogTitle>
           <DialogDescription>
@@ -890,7 +890,7 @@ function RecordActualDialog({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Context or reason for this adjustment..."
-            className="min-h-[60px] text-xs"
+            className="min-h-15 text-xs"
           />
         </div>
 

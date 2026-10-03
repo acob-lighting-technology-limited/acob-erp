@@ -1011,19 +1011,19 @@ export function DepartmentDocumentsBrowser({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[44px]">
+          <TableHead className="w-11">
             <Checkbox
               checked={processedFiles.length > 0 && processedFiles.every((f) => selectedPaths.has(f.path))}
               onCheckedChange={(value) => toggleSelectAll(Boolean(value))}
               aria-label="Select all items"
             />
           </TableHead>
-          <TableHead className="w-[320px]">Name</TableHead>
-          <TableHead className="w-[100px]">Type</TableHead>
-          <TableHead className="w-[100px]">Size</TableHead>
-          <TableHead className="w-[120px]">Modified</TableHead>
-          <TableHead className="w-[220px]">Activity</TableHead>
-          <TableHead className="w-[80px] text-right">Actions</TableHead>
+          <TableHead className="w-80">Name</TableHead>
+          <TableHead className="w-25">Type</TableHead>
+          <TableHead className="w-25">Size</TableHead>
+          <TableHead className="w-30">Modified</TableHead>
+          <TableHead className="w-55">Activity</TableHead>
+          <TableHead className="w-20 text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -1043,7 +1043,7 @@ export function DepartmentDocumentsBrowser({
               <TableCell>
                 <div className="flex items-center gap-3">
                   <FileIcon category={file.isFolder ? "folder" : category} size={20} />
-                  <span className="max-w-[260px] truncate font-medium">{file.name}</span>
+                  <span className="max-w-65 truncate font-medium">{file.name}</span>
                 </div>
               </TableCell>
               <TableCell>
@@ -1300,7 +1300,7 @@ export function DepartmentDocumentsBrowser({
                   {file.lastModifiedBy && (
                     <>
                       <span>•</span>
-                      <span className="max-w-[140px] truncate">by {file.lastModifiedBy}</span>
+                      <span className="max-w-35 truncate">by {file.lastModifiedBy}</span>
                     </>
                   )}
                 </div>
@@ -1518,7 +1518,7 @@ export function DepartmentDocumentsBrowser({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="h-9 w-[130px] sm:w-[150px]">
+                <SelectTrigger className="h-9 w-32.5 sm:w-37.5">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1533,7 +1533,7 @@ export function DepartmentDocumentsBrowser({
               </Select>
 
               <Select value={sortOrder} onValueChange={setSortOrder}>
-                <SelectTrigger className="h-9 w-[130px] sm:w-[150px]">
+                <SelectTrigger className="h-9 w-32.5 sm:w-37.5">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>

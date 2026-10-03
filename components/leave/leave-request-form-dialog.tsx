@@ -237,7 +237,7 @@ export function LeaveRequestFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[95vw] max-w-[560px] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[95vw] max-w-140 overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5" />

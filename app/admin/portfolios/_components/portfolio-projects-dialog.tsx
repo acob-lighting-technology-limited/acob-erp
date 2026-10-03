@@ -130,7 +130,7 @@ export function PortfolioProjectsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-[600px]">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-150">
         <DialogHeader>
           <DialogTitle>Manage Projects</DialogTitle>
           <DialogDescription>

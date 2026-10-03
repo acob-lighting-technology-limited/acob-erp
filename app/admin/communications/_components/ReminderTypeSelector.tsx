@@ -42,7 +42,7 @@ export function ReminderTypeSelector({ reminderType, setReminderType }: Reminder
               key={opt.value}
               type="button"
               onClick={() => setReminderType(opt.value)}
-              className={`flex min-w-[240px] flex-1 items-start gap-3 rounded-lg border-2 p-4 text-left transition-all ${
+              className={`flex min-w-60 flex-1 items-start gap-3 rounded-lg border-2 p-4 text-left transition-all ${
                 reminderType === opt.value
                   ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
                   : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"

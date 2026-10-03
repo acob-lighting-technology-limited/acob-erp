@@ -141,7 +141,7 @@ export function DocFormDialog({
               value={formData.content}
               onChange={(e) => onFormChange({ ...formData, content: e.target.value })}
               placeholder="Write your documentation here..."
-              className="min-h-[300px] text-base"
+              className="min-h-75 text-base"
             />
           </div>
 

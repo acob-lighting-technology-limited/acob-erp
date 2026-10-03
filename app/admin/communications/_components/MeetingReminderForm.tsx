@@ -75,7 +75,7 @@ export function MeetingReminderForm({
         <div className="space-y-2">
           <Label htmlFor="meeting-week">Week</Label>
           <Select value={String(meetingWeek)} onValueChange={(value) => setMeetingWeek(Number(value))}>
-            <SelectTrigger id="meeting-week" className="w-[140px]">
+            <SelectTrigger id="meeting-week" className="w-35">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -90,7 +90,7 @@ export function MeetingReminderForm({
         <div className="space-y-2">
           <Label htmlFor="meeting-year">Year</Label>
           <Select value={String(meetingYear)} onValueChange={(value) => setMeetingYear(Number(value))}>
-            <SelectTrigger id="meeting-year" className="w-[140px]">
+            <SelectTrigger id="meeting-year" className="w-35">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -104,7 +104,7 @@ export function MeetingReminderForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="meet-date">Meeting Date</Label>
-          <Input id="meet-date" type="date" value={meetingDate} className="w-[180px]" disabled readOnly />
+          <Input id="meet-date" type="date" value={meetingDate} className="w-45" disabled readOnly />
           <p className="text-muted-foreground text-xs">
             The date updates automatically from the selected week&apos;s Admin Reports setup. This value is read-only
             here.
@@ -115,7 +115,7 @@ export function MeetingReminderForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="meet-time">Meeting Time</Label>
-          <Input id="meet-time" type="time" value={meetingTime} className="w-[140px]" disabled readOnly />
+          <Input id="meet-time" type="time" value={meetingTime} className="w-35" disabled readOnly />
           <p className="text-muted-foreground text-xs">
             Managed from Admin Reports week setup. This value is read-only here.
           </p>
@@ -156,7 +156,7 @@ export function MeetingReminderForm({
           <div className="space-y-2">
             <Label htmlFor="ks-department">Department</Label>
             <Select value={knowledgeDepartment} disabled>
-              <SelectTrigger id="ks-department" className="w-[220px]">
+              <SelectTrigger id="ks-department" className="w-55">
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
@@ -172,7 +172,7 @@ export function MeetingReminderForm({
           <div className="space-y-2">
             <Label htmlFor="ks-presenter">Presenter</Label>
             <Select value={presenterSelectValue} disabled>
-              <SelectTrigger id="ks-presenter" className="w-[260px]">
+              <SelectTrigger id="ks-presenter" className="w-65">
                 <SelectValue placeholder="Select presenter" />
               </SelectTrigger>
               <SelectContent>
@@ -196,7 +196,7 @@ export function MeetingReminderForm({
       <div className="space-y-2">
         <Label htmlFor="meeting-prepared-by">Prepared by</Label>
         <Select value={meetingPreparedById} onValueChange={setMeetingPreparedById}>
-          <SelectTrigger id="meeting-prepared-by" className="w-[320px]">
+          <SelectTrigger id="meeting-prepared-by" className="w-80">
             <SelectValue placeholder="Select person" />
           </SelectTrigger>
           <SelectContent>

@@ -316,7 +316,7 @@ export default function AdminMeetingAttendancePage() {
         key: "actions",
         label: "Actions",
         render: (r) => (
-          <div className="flex min-w-[170px] items-center gap-1.5">
+          <div className="flex min-w-42.5 items-center gap-1.5">
             <Button
               size="sm"
               variant="ghost"

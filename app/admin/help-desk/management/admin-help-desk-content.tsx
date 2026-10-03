@@ -315,7 +315,7 @@ export function AdminHelpDeskContent({
         initialWidth: 300,
         accessor: (r) => r.title,
         render: (r) => (
-          <div className="flex max-w-[300px] flex-col">
+          <div className="flex max-w-75 flex-col">
             <span className="truncate font-medium">{r.title}</span>
             <span className="text-muted-foreground text-xs tracking-widest uppercase">{r.request_type}</span>
           </div>
@@ -383,7 +383,7 @@ export function AdminHelpDeskContent({
                 value={assignmentMap[r.id] || ""}
                 onValueChange={(val) => setAssignmentMap((prev) => ({ ...prev, [r.id]: val }))}
               >
-                <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectTrigger className="h-8 w-40 text-xs">
                   <SelectValue placeholder="Staff..." />
                 </SelectTrigger>
                 <SelectContent>
