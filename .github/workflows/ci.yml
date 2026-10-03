@@ -51,3 +51,9 @@ jobs:
       - name: Dead code
         run: npm run deadcode
         continue-on-error: true
+
+      # Known vulnerabilities in production dependencies. Reported, not blocking:
+      # some advisories have no upstream fix yet; Dependabot raises the bumps.
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
