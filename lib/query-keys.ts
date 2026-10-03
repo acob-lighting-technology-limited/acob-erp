@@ -38,6 +38,8 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  metricAddSeed: (metric: string, userId: string, cycleId: string) => ["metric-add-seed", metric, userId, cycleId],
+  metricSnapshot: (metric: string, cycleId: string) => ["metric-snapshot", metric, cycleId],
   adminDevelopmentPlans: () => ["admin-development-plans"],
   performanceReviews: (filters: Record<string, unknown>) => ["performance-reviews", filters],
   performanceReviewSeed: (userId: string, cycleId: string) => ["performance-review-seed", userId, cycleId],
