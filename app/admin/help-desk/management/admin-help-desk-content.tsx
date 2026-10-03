@@ -28,8 +28,8 @@ import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-de
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
-import type { HelpDeskTicket, EmployeeOption, LeadDirectoryMember } from "@/components/help-desk/ticket-queue-table"
-import { resolveCurrentStage, resolveApproverName } from "@/components/help-desk/ticket-queue-table"
+import type { HelpDeskTicket, EmployeeOption, LeadDirectoryMember } from "@/lib/help-desk/ticket-display"
+import { resolveCurrentStage, resolveApproverName } from "@/lib/help-desk/ticket-display"
 import { apiFetch } from "@/lib/api-client"
 
 interface AdminHelpDeskContentProps {
