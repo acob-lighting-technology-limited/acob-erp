@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { canAccessAdminSection, isAdminLikeRole } from "@/lib/admin/rbac"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
-import { apiError, ApiErrorCode } from "@/lib/api/errors"
+import { apiError, ApiErrorCode, validationError } from "@/lib/api/errors"
+import { CreateFundingCategorySchema, UpdateFundingCategorySchema } from "@/lib/requisitions/schemas"
 
 const log = logger("api-requisition-funding-categories")
 
@@ -21,26 +21,6 @@ type FundingCategoryRow = {
 }
 
 const SELECT_COLUMNS = "id, code, name, description, is_active, sort_order"
-
-const CreateSchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters"),
-  code: z
-    .string()
-    .trim()
-    .min(2, "Code must be at least 2 characters")
-    .regex(/^[a-z0-9_-]+$/, "Code may only contain lowercase letters, numbers, hyphens and underscores")
-    .optional(),
-  description: z.string().trim().optional(),
-  sort_order: z.number().int().min(0).max(9999).optional(),
-})
-
-const UpdateSchema = z.object({
-  id: z.string().uuid("A valid category id is required"),
-  name: z.string().trim().min(2, "Name must be at least 2 characters").optional(),
-  description: z.string().trim().optional(),
-  is_active: z.boolean().optional(),
-  sort_order: z.number().int().min(0).max(9999).optional(),
-})
 
 function slugifyCode(name: string): string {
   return name
@@ -105,9 +85,9 @@ export async function POST(request: NextRequest) {
     if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
     if (!(await canManageFundingCategories())) return apiError("Forbidden", ApiErrorCode.FORBIDDEN, 403)
 
-    const parsed = CreateSchema.safeParse(await request.json())
+    const parsed = CreateFundingCategorySchema.safeParse(await request.json())
     if (!parsed.success) {
-      return apiError(parsed.error.issues[0]?.message || "Validation error", ApiErrorCode.VALIDATION_ERROR, 400)
+      return validationError(parsed.error.issues)
     }
 
     const code = parsed.data.code || slugifyCode(parsed.data.name)
@@ -164,9 +144,9 @@ export async function PATCH(request: NextRequest) {
     if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
     if (!(await canManageFundingCategories())) return apiError("Forbidden", ApiErrorCode.FORBIDDEN, 403)
 
-    const parsed = UpdateSchema.safeParse(await request.json())
+    const parsed = UpdateFundingCategorySchema.safeParse(await request.json())
     if (!parsed.success) {
-      return apiError(parsed.error.issues[0]?.message || "Validation error", ApiErrorCode.VALIDATION_ERROR, 400)
+      return validationError(parsed.error.issues)
     }
 
     const { id, ...changes } = parsed.data
