@@ -40,7 +40,9 @@
   /* Brand: ACOB green. `primary` is the brand; `secondary` and `accent` are
      deliberately *neutral/subtle* surfaces (shadcn semantics): secondary buttons
      and hover states must not compete with the primary action. */
-  --background: oklch(0.955 0.003 75); /* warm light grey — cards float above this */
+  /* Light surfaces are neutral (chroma 0). They used a warm 75° hue, which read
+     as cream/milk next to the pure-white cards. */
+  --background: oklch(0.965 0 0); /* light grey — white cards float above this */
   --foreground: oklch(0.25 0 0);
   --card: oklch(1 0 0); /* pure white cards */
   --card-foreground: oklch(0.25 0 0);
@@ -48,23 +50,23 @@
   --popover-foreground: oklch(0.25 0 0);
   --primary: oklch(0.45 0.2 142);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.94 0.004 75);
+  --secondary: oklch(0.945 0 0);
   --secondary-foreground: oklch(0.25 0 0);
-  --muted: oklch(0.93 0.003 75); /* slightly darker than background */
+  --muted: oklch(0.94 0 0); /* slightly darker than background */
   /* Secondary text. Was 0.25 (identical to --foreground), which flattened every
      label/description to heading weight. 0.48 keeps >= 4.5:1 on card and page. */
-  --muted-foreground: oklch(0.48 0.008 75);
+  --muted-foreground: oklch(0.48 0 0);
   /* Hover/highlight surface for ghost & outline buttons and menu/select items. */
   --accent: oklch(0.95 0.035 142);
   --accent-foreground: oklch(0.3 0.09 142);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.875 0.002 75); /* slightly more visible borders */
+  --border: oklch(0.88 0 0); /* slightly more visible borders */
   /* Matches --border, as it already does in dark mode. At 0.975 this sat between
      the white card (1.0) and the page (0.955), so every control drawing
      `border-input` — Input, SelectTrigger, SearchableMultiSelect, outline Buttons
      — had a border too faint to read in light mode. */
-  --input: oklch(0.875 0.002 75);
+  --input: oklch(0.88 0 0);
   --ring: oklch(0.45 0.2 142);
   /* Five distinct hues so multi-series charts stay readable (was 3x green). */
   --chart-1: oklch(0.52 0.16 142); /* green — brand */
@@ -89,17 +91,17 @@
   --danger: oklch(0.577 0.22 27);
   --danger-foreground: oklch(0.43 0.17 27);
   --danger-muted: oklch(0.95 0.035 25);
-  --neutral: oklch(0.6 0.01 75);
-  --neutral-foreground: oklch(0.38 0.01 75);
-  --neutral-muted: oklch(0.94 0.004 75);
+  --neutral: oklch(0.6 0 0);
+  --neutral-foreground: oklch(0.38 0 0);
+  --neutral-muted: oklch(0.945 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.972 0.003 75);
+  --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.45 0.2 142);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.955 0.003 75);
+  --sidebar-accent: oklch(0.955 0 0);
   --sidebar-accent-foreground: oklch(0.45 0.2 142);
-  --sidebar-border: oklch(0.9 0.002 75);
+  --sidebar-border: oklch(0.9 0 0);
   --sidebar-ring: oklch(0.45 0.2 142);
 
   /* ===== DESIGN SYSTEM TOKENS ===== */
@@ -136,10 +138,10 @@
   --admin-badge-bg: oklch(0.96 0.05 75);
   --admin-badge-border: oklch(0.86 0.08 75);
   --admin-accent-soft: oklch(0.95 0.03 75);
-  --admin-sidebar-bg: oklch(0.99 0.005 75);
-  --admin-sidebar-border: oklch(0.9 0.01 70);
-  --admin-content-bg: linear-gradient(to bottom, oklch(0.985 0.007 75), oklch(0.975 0.004 70));
-  --admin-ribbon-bg: oklch(0.985 0.01 75 / 0.92);
+  --admin-sidebar-bg: oklch(1 0 0);
+  --admin-sidebar-border: oklch(0.9 0 0);
+  --admin-content-bg: var(--background);
+  --admin-ribbon-bg: oklch(1 0 0 / 0.92);
 }
 
 .dark {
@@ -203,7 +205,7 @@
   --admin-accent-soft: oklch(0.3 0.02 72);
   --admin-sidebar-bg: oklch(0.18 0.004 72);
   --admin-sidebar-border: oklch(0.28 0.006 72);
-  --admin-content-bg: linear-gradient(to bottom, oklch(0.16 0.004 72), oklch(0.145 0.002 70));
+  --admin-content-bg: var(--background);
   --admin-ribbon-bg: oklch(0.19 0.004 72 / 0.88);
 }
 
