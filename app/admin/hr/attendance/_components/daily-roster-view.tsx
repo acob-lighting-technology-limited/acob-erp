@@ -42,6 +42,8 @@ import {
   getManualStatusEditOptions,
 } from "@/lib/hr/attendance-status"
 import { StatusBadge, formatTime, labelSource } from "./status-badge"
+import { ClockTimes, NameWithDept } from "./clock-times"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 import { apiFetch } from "@/lib/api-client"
 import { orderRoster, rosterPhase } from "@/lib/hr/roster-order"
 
@@ -154,6 +156,7 @@ function formatClock12(hhmm: string): string {
 }
 
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
+  const deptCode = useDepartmentCodes()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -626,8 +629,8 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          title: (r) => r.user_name,
-          subtitle: (r) => `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)}`,
+          title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
+          subtitle: (r) => <ClockTimes clockIn={r.clock_in} clockOut={r.clock_out} />,
           trailing: (r) => (
             <StatusBadge
               status={r.status}
