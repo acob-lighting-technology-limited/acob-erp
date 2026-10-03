@@ -38,6 +38,8 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  adminDevelopmentPlans: () => ["admin-development-plans"],
+  performanceReviews: (filters: Record<string, unknown>) => ["performance-reviews", filters],
   performanceReviewSeed: (userId: string, cycleId: string) => ["performance-review-seed", userId, cycleId],
   competencies: () => ["competencies"],
   myPeerFeedback: () => ["my-peer-feedback"],

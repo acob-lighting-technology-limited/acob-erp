@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { pickCanonicalReview } from "@/lib/pms/reviews"
-import { useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { Download, FileText, Plus, Users, BarChart3, CheckCircle2, RefreshCw, Clock, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,8 @@ import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
 import { CalibrationView } from "./_components/calibration-view"
 import { toLocalISODate } from "@/lib/utils/date"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -281,55 +283,42 @@ export function AdminPmsReviewsPage({
   const [tab, setTab] = useState<TabMode>("individual")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [reviews, setReviews] = useState<ReviewRow[]>([])
   // Rows currently visible in the department/cycle tables (after search + filters + sort).
   // The individual tab is server-paginated (search/filters there aren't wired to refetch yet
   // — a separate pre-existing issue — so its export intentionally mirrors canonicalReviews).
   const [processedDeptRows, setProcessedDeptRows] = useState<DeptRow[]>([])
   const [processedCycleRows, setProcessedCycleRows] = useState<CycleRow[]>([])
-  const [totalReviews, setTotalReviews] = useState(0)
   const [serverPage, setServerPage] = useState(0)
-  const hasLoadedRef = useRef(false)
 
   // ─── Data ─────────────────────────────────────────────────────────────────
 
-  const loadReviews = useCallback(async (pageIndex = 0) => {
-    if (hasLoadedRef.current) {
-      setIsRefreshing(true)
-    } else {
-      setIsInitialLoading(true)
-    }
-    setError(null)
-    try {
-      const params = new URLSearchParams({
-        limit: String(PAGE_SIZE),
-        offset: String(pageIndex * PAGE_SIZE),
-      })
-      const res = await fetch(`/api/hr/performance/reviews?${params}`, { cache: "no-store" })
-      const payload = (await res.json().catch(() => null)) as {
-        data?: ReviewRow[]
-        error?: string
-        meta?: { total?: number }
-      } | null
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load reviews")
-      setReviews(payload?.data ?? [])
-      setTotalReviews(payload?.meta?.total ?? payload?.data?.length ?? 0)
-      setServerPage(pageIndex)
-      hasLoadedRef.current = true
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load reviews")
-    } finally {
-      setIsInitialLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadReviews()
-  }, [loadReviews])
+  const {
+    data: reviewsPage,
+    isPending: isInitialLoading,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.performanceReviews({ page: serverPage }),
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(serverPage * PAGE_SIZE) })
+      const payload = await apiJson<{ data?: ReviewRow[]; meta?: { total?: number } }>(
+        `/api/hr/performance/reviews?${params}`,
+        { cache: "no-store" }
+      )
+      return { rows: payload.data ?? [], total: payload.meta?.total ?? payload.data?.length ?? 0 }
+    },
+    placeholderData: keepPreviousData,
+  })
+  const reviews = useMemo(() => reviewsPage?.rows ?? [], [reviewsPage])
+  const totalReviews = reviewsPage?.total ?? 0
+  const isRefreshing = isFetching && !isInitialLoading
+  const error = queryError?.message ?? null
+  /** Load a page (default: the first). Re-requesting the current page refetches it. */
+  const loadReviews = (pageIndex = 0) => {
+    if (pageIndex === serverPage) void refetch()
+    else setServerPage(pageIndex)
+  }
 
   // ─── Derived: canonical reviews (one per employee per cycle) ─────────────
 

@@ -27,6 +27,7 @@ import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { useHrProfiles } from "@/hooks/use-hr-profiles"
 
 type Profile = {
   id: string
@@ -67,16 +68,15 @@ export default function PeerFeedbackPage() {
   } = useQuery({
     queryKey: QUERY_KEYS.myPeerFeedback(),
     queryFn: async () => {
-      const [profiles, given, received] = await Promise.all([
-        apiJson<{ data?: Profile[] }>("/api/hr/profiles?all=true"),
+      const [given, received] = await Promise.all([
         apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback?as_reviewer=true"),
         apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback"),
       ])
-      return { colleagues: profiles.data ?? [], myFeedback: given.data ?? [], receivedFeedback: received.data ?? [] }
+      return { myFeedback: given.data ?? [], receivedFeedback: received.data ?? [] }
     },
     meta: { errorMessage: "Failed to load data" },
   })
-  const colleagues = useMemo(() => data?.colleagues ?? [], [data])
+  const { profiles: colleagues } = useHrProfiles<Profile>()
   const myFeedback = useMemo(() => data?.myFeedback ?? [], [data])
   const receivedFeedback = useMemo(() => data?.receivedFeedback ?? [], [data])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
