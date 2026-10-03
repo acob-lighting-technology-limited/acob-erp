@@ -82,7 +82,7 @@ export default function JobDescriptionPage() {
     }
   }, [profileData])
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <PageLoader variant="form" />
 
   const lastUpdated = profileData?.job_description_updated_at ?? null
   const profile = profileData
