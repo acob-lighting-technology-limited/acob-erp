@@ -25,6 +25,7 @@ export const QUERY_KEYS = {
     start,
     end,
   ],
+  myProfile: () => ["my-profile"],
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
@@ -64,6 +65,8 @@ export const QUERY_KEYS = {
   search: (q: string) => ["search", q],
 
   // Weekly reports
+  weeklyReportSeed: (department: string, week: number, year: number) => ["weekly-report-seed", department, week, year],
+  weeklyReportLockState: (week: number, year: number) => ["weekly-report-lock", week, year],
   weeklyReports: (filters?: Record<string, unknown>) => (filters ? ["weekly-reports", filters] : ["weekly-reports"]),
   adminWeeklyReports: (filters?: Record<string, unknown>) =>
     filters ? ["admin-weekly-reports", filters] : ["admin-weekly-reports"],
