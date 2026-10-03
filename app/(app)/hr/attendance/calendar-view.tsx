@@ -1,14 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { toast } from "sonner"
 import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
-import { computeAttendanceDay, attendanceRateFrom } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay } from "@/lib/hr/attendance-ssot"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { AttendanceRecord } from "./page"
+import { apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type DayStatus =
   | "present"
@@ -113,28 +115,16 @@ function shortStatusLabel(status: string, fullLabel: string): string {
 
 export function EmployeeCalendarView() {
   const [calendarMonth, setCalendarMonth] = useState(toLocalYearMonth())
-  const [days, setDays] = useState<UnifiedDay[] | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setDays(null)
-    try {
-      const res = await fetch(`/api/hr/attendance/my-days?year_month=${calendarMonth}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || "Failed to load")
-      setDays(payload?.data ?? [])
-    } catch {
-      toast.error("Failed to load calendar data")
-      setDays([])
-    } finally {
-      setLoading(false)
-    }
-  }, [calendarMonth])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  const { data: days = null, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.myAttendanceDays(calendarMonth),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: UnifiedDay[] }>(`/api/hr/attendance/my-days?year_month=${calendarMonth}`, {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load calendar data" },
+  })
 
   const today = toLocalISODate()
   const currentYearMonth = toLocalYearMonth()

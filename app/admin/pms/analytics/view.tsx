@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { BarChart3, Download, TrendingDown, TrendingUp, Users } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -12,6 +12,9 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { exportPmsRowsToExcel } from "@/lib/pms/export"
 import { toLocalISODate } from "@/lib/utils/date"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type ReviewRow = {
   id: string
@@ -114,40 +117,27 @@ function AnalyticsCard({ row }: { row: AnalyticsRow }) {
 }
 
 export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {}) {
-  const [reviews, setReviews] = useState<ReviewRow[]>([])
-  const [cycles, setCycles] = useState<Cycle[]>([])
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRows, setProcessedRows] = useState<AnalyticsRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [reviewsRes, cyclesRes] = await Promise.all([
-        fetch("/api/hr/performance/reviews?limit=200"),
-        fetch("/api/hr/performance/cycles"),
-      ])
+  const {
+    data,
+    isLoading,
+    error: queryError,
+    refetch: loadData,
+  } = useQuery({
+    queryKey: QUERY_KEYS.pmsAnalytics(),
+    queryFn: async () => {
       const [reviewsData, cyclesData] = await Promise.all([
-        reviewsRes.json().catch(() => ({})),
-        cyclesRes.json().catch(() => ({})),
+        apiJson<{ data?: ReviewRow[] }>("/api/hr/performance/reviews?limit=200"),
+        // Cycles only label the rows; a failure here must not hide the reviews.
+        apiJson<{ data?: Cycle[] }>("/api/hr/performance/cycles").catch(() => ({ data: [] as Cycle[] })),
       ])
-      if (!reviewsRes.ok) {
-        throw new Error(reviewsData?.error || "Failed to load reviews")
-      }
-      setReviews(reviewsData?.data || [])
-      setCycles(cyclesData?.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load analytics")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
+      return { reviews: reviewsData.data ?? [], cycles: cyclesData.data ?? [] }
+    },
+  })
+  const reviews = useMemo(() => data?.reviews ?? [], [data])
+  const cycles = useMemo(() => data?.cycles ?? [], [data])
+  const error = queryError?.message ?? null
 
   const rows = useMemo<AnalyticsRow[]>(
     () =>
