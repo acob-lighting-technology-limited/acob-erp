@@ -38,6 +38,7 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  cbtSessionOptions: () => ["cbt-session-options"],
   cbtSnapshot: () => ["cbt-snapshot"],
   cbtCandidateEmails: () => ["cbt-candidate-emails"],
   cbtQuestions: (variant: string) => ["cbt-questions", variant],
