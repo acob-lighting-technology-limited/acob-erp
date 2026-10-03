@@ -14,6 +14,7 @@ import {
 } from "@/lib/hr/attendance-status"
 import type { Task, Asset, LeaveItem, LunchLogItem, WorkDayAttendanceItem } from "@/app/(app)/profile/page"
 import { getTaskUrgency, sortTasksByUrgency } from "./work-items"
+import { formatCurrency } from "@/lib/format"
 
 const MAX_TASKS = 6
 const MAX_LEAVE_ITEMS = 5
@@ -422,9 +423,7 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
           <p className="text-muted-foreground font-medium">{currentMonthName} deductions</p>
           <p className="text-muted-foreground text-[10px]">Your share, after the company meal subsidy</p>
         </div>
-        <span className="font-mono font-semibold tabular-nums">
-          ₦{totalDeduction.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-        </span>
+        <span className="font-mono font-semibold tabular-nums">{formatCurrency(totalDeduction)}</span>
       </div>
       {recentLogs.length > 0 ? (
         <ul className="flex-1 divide-y overflow-y-auto">
@@ -434,10 +433,12 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
                 <p className="text-foreground font-semibold">
                   {formatWATDate(log.date, { weekday: "short", month: "short", day: "numeric" })}
                 </p>
-                <p className="text-muted-foreground text-[10px]">Meal price: ₦{Number(log.cost).toLocaleString()}</p>
+                <p className="text-muted-foreground text-xs">
+                  Meal price: {formatCurrency(Number(log.cost), { whole: true })}
+                </p>
               </div>
               <span className="font-mono font-medium tabular-nums">
-                ₦{Number(log.employee_deduction).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {formatCurrency(Number(log.employee_deduction))}
               </span>
             </li>
           ))}

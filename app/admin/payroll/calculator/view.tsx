@@ -43,6 +43,7 @@ import {
   ChevronUp,
 } from "lucide-react"
 import { toast } from "sonner"
+import { formatCurrency, formatNumber } from "@/lib/format"
 
 interface CalculatorPageProps {
   initialData: {
@@ -161,7 +162,9 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
     setCommInputState(formatWithCommas(comm))
     setGrossInputState(formatWithCommas(base + comm))
     setApprovedStatus("pending")
-    toast.info(`Loaded base salary & ₦${comm.toLocaleString()} allowance for ${emp ? emp.full_name : "Default"}`)
+    toast.info(
+      `Loaded base salary & ${formatCurrency(comm, { whole: true })} allowance for ${emp ? emp.full_name : "Default"}`
+    )
   }
 
   // Handle Gross Salary typing with live comma formatting
@@ -337,8 +340,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
   const taxDelta = currentBreakdown.monthlyTax - baselineBreakdown.monthlyTax
   const deductionDelta = currentBreakdown.totalDeductions - baselineBreakdown.totalDeductions
 
-  const money = (num: number) =>
-    `₦${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const money = (num: number) => `${formatCurrency(num)}`
 
   const handleApprove = () => {
     setApprovedStatus("approved")
@@ -456,7 +458,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     {employees.map((emp) => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.full_name} ({emp.department}){emp.is_department_lead ? " [Dept Lead]" : ""} — Base: ₦
-                        {emp.basic_salary.toLocaleString()}
+                        {formatNumber(emp.basic_salary)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -474,7 +476,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                   Monthly Gross Salary (Target)
                 </Label>
                 <Badge variant="secondary" className="font-mono text-xs">
-                  Base ₦{baseVal.toLocaleString()} + ₦{(commVal / 1000).toFixed(0)}k Comm.
+                  Base {formatCurrency(baseVal, { whole: true })} + ₦{(commVal / 1000).toFixed(0)}k Comm.
                 </Badge>
               </div>
 

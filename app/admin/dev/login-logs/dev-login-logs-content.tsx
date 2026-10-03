@@ -30,6 +30,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { apiJson } from "@/lib/api-client"
+import { formatNumber } from "@/lib/format"
 
 type DevLoginLogRow = {
   id: string
@@ -981,7 +982,7 @@ export function DevLoginLogsContent() {
           <p className="text-muted-foreground text-xs">
             {meta.days ? `Showing sign-ins from the last ${meta.days} days.` : "Showing all recorded sign-ins."}
             {meta.truncated
-              ? ` Capped at ${meta.limit.toLocaleString()} rows — older events in this window are not shown, and the counts above cover only what is loaded.`
+              ? ` Capped at ${formatNumber(meta.limit)} rows — older events in this window are not shown, and the counts above cover only what is loaded.`
               : ""}
           </p>
         ) : null}

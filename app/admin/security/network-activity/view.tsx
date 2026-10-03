@@ -7,6 +7,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { Archive, CalendarDays, Download, ExternalLink, HardDrive, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatNumber } from "@/lib/format"
 
 interface ArchivedDay {
   date: string
@@ -99,7 +100,7 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
       label: "Batches",
       sortable: true,
       accessor: (r) => r.files,
-      render: (r) => r.files.toLocaleString(),
+      render: (r) => formatNumber(r.files),
     },
     {
       key: "bytes",

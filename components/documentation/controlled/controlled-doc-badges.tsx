@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
   CONTROLLED_DOC_STATUS_LABELS,
+  formatDocDate,
   getReviewState,
   type ControlledDocRow,
   type ControlledDocStatus,
@@ -26,11 +27,7 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
   const state = getReviewState(date)
   if (state === "none" || !date) return <span className="text-muted-foreground text-xs">—</span>
 
-  const label = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
+  const label = formatDocDate(date)
 
   if (state === "ok") return <span className="text-xs">{label}</span>
 

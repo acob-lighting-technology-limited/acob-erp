@@ -10,6 +10,7 @@ import { ShieldAlert, AlertCircle, FileText, CalendarRange, Download, RefreshCw 
 import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { formatCurrency } from "@/lib/format"
 
 export type AuditLogRow = {
   id: string
@@ -165,7 +166,7 @@ function getDetailedChanges(row: EnrichedBypassLog) {
   if (entityType.includes("requisition")) {
     const amount = newVals.amount || oldVals.amount
     if (amount) {
-      details.push({ label: "Amount", value: `₦${Number(amount).toLocaleString()}` })
+      details.push({ label: "Amount", value: `${formatCurrency(Number(amount), { whole: true })}` })
     }
     const dept = newVals.department_name || oldVals.department_name || row.department
     if (dept) {

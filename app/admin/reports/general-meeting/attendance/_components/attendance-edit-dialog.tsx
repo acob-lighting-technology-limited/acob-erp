@@ -18,6 +18,7 @@ import { toast } from "sonner"
 import { CheckCircle2, Loader2, Trash2, UserCheck } from "lucide-react"
 import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
+import { formatTime as formatClockTime } from "@/lib/format"
 
 interface Props {
   open: boolean
@@ -42,7 +43,7 @@ function formatTime(value: string | null | undefined): string {
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+  return formatClockTime(date)
 }
 
 export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onSuccess }: Props) {

@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EmployeeRecipientPicker, type DirectoryEmployee } from "@/components/admin/employee-recipient-picker"
+import { formatDate } from "@/lib/format"
 
 export type MeetingSource = {
   id: string
@@ -185,7 +186,7 @@ export function MeetingSourceDialog({ open, onOpenChange, editing, onSaved }: Pr
                   {meetings.map((m) => (
                     <SelectItem key={m.joinUrl} value={m.joinUrl}>
                       {m.subject}
-                      {m.lastSeen ? ` — ${new Date(m.lastSeen).toLocaleDateString()}` : ""}
+                      {m.lastSeen ? ` — ${formatDate(m.lastSeen)}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
