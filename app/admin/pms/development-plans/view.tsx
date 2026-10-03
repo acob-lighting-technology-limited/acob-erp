@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { BookOpen, Eye, Pencil, Plus, Target, TrendingUp, Users } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { useHrProfiles } from "@/hooks/use-hr-profiles"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 
 type Profile = {
   id: string
@@ -155,11 +159,8 @@ function PlanCard({
 }
 
 export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: string } = {}) {
-  const [plans, setPlans] = useState<DevelopmentPlan[]>([])
-  const [employees, setEmployees] = useState<Profile[]>([])
-  const [cycles, setCycles] = useState<Cycle[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { profiles: employees } = useHrProfiles<Profile>()
+  const { cycles } = usePerformanceCycles<Cycle>()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [viewingPlan, setViewingPlan] = useState<DevelopmentPlan | null>(null)
@@ -177,38 +178,26 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
   const [progressPct, setProgressPct] = useState("0")
   const [actionLines, setActionLines] = useState("")
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [plansRes, profilesRes, cyclesRes] = await Promise.all([
-        apiFetch("/api/hr/performance/development-plans?user_id=all_admin"),
-        apiFetch("/api/hr/profiles?all=true"),
-        apiFetch("/api/hr/performance/cycles"),
-      ])
-      const [plansData, profilesData, cyclesData] = await Promise.all([
-        plansRes.json().catch(() => ({})),
-        profilesRes.json().catch(() => ({})),
-        cyclesRes.json().catch(() => ({})),
-      ])
-      if (!plansRes.ok) {
-        throw new Error(plansData?.error || "Failed to load development plans")
-      }
-      setPlans(plansData?.data || [])
-      setEmployees(profilesData?.data || [])
-      setCycles(cyclesData?.data || [])
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load development plans"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
+  const {
+    data: plans = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminDevelopmentPlans(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: DevelopmentPlan[] }>(
+        "/api/hr/performance/development-plans?user_id=all_admin",
+        { cache: "no-store" }
+      )
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load development plans" },
+  })
+  const error = queryError?.message ?? null
+  const loadData = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const cycleNameMap = useMemo(() => new Map(cycles.map((cycle) => [cycle.id, cycle.name])), [cycles])
 

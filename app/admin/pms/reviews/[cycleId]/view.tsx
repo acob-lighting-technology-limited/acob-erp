@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { pickCanonicalReview } from "@/lib/pms/reviews"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Download, FileText, Plus, Users, CheckCircle2, Clock, BarChart3 } from "lucide-react"
 import { toast } from "sonner"
@@ -16,7 +16,8 @@ import { CreateReviewDialog } from "@/app/admin/hr/performance/_components/creat
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
 import { toLocalISODate } from "@/lib/utils/date"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,39 +116,33 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
     | "department"
     | "cycle"
 
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [reviews, setReviews] = useState<ReviewRow[]>([])
   // Rows currently visible in each mode's table (after search + filters + sort).
   const [processedIndividualRows, setProcessedIndividualRows] = useState<ReviewRow[]>([])
   const [processedDeptRows, setProcessedDeptRows] = useState<DeptSummaryRow[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTarget, setEditingTarget] = useState<ReviewRow | null>(null)
   const [isExportOpen, setIsExportOpen] = useState(false)
-  const hasLoadedRef = useRef(false)
 
-  const loadReviews = useCallback(async () => {
-    if (!hasLoadedRef.current) setIsInitialLoading(true)
-    setError(null)
-    try {
-      const res = await apiFetch(`/api/hr/performance/reviews?cycle_id=${encodeURIComponent(cycleId)}`, {
-        cache: "no-store",
-      })
-      const payload = (await res.json().catch(() => null)) as { data?: ReviewRow[]; error?: string } | null
-      if (!res.ok) throw new Error(payload?.error || "Failed to load quarter reviews")
-      setReviews(payload?.data || [])
-      hasLoadedRef.current = true
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load quarter reviews")
-    } finally {
-      setIsInitialLoading(false)
-    }
-  }, [cycleId])
-
-  useEffect(() => {
-    if (!cycleId) return
-    void loadReviews()
-  }, [cycleId, loadReviews])
+  const {
+    data: reviews = [],
+    isPending,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.performanceReviews({ cycleId }),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: ReviewRow[] }>(`/api/hr/performance/reviews?cycle_id=${encodeURIComponent(cycleId)}`, {
+          cache: "no-store",
+        })
+      ).data ?? [],
+    enabled: Boolean(cycleId),
+  })
+  const isInitialLoading = isPending && Boolean(cycleId)
+  const error = queryError?.message ?? null
+  const loadReviews = async () => {
+    await refetch()
+  }
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
