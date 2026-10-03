@@ -126,6 +126,8 @@ export function HRAdminDashboard({
         />
       </StatGrid>
 
+      {scope.isAdminLike && scope.scopeMode !== "lead" && <DataHealthCard />}
+
       {/* Admin Actions */}
       <Section title="HR Management">
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -504,7 +506,6 @@ export function HRAdminDashboard({
           </CardContent>
         </Card>
       </Section>
-      {scope.isAdminLike && scope.scopeMode !== "lead" && <DataHealthCard />}
     </PageWrapper>
   )
 }

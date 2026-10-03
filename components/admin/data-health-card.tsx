@@ -6,6 +6,7 @@ import { AlertTriangle, Building2, CheckCircle2, UserX } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { QueryError } from "@/components/ui/query-states"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatDate } from "@/lib/format"
@@ -59,13 +60,24 @@ function Group({
  * uses. Each name links to the employee record to fix it.
  */
 export function DataHealthCard() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: QUERY_KEYS.adminDataHealth(),
     queryFn: () => apiJson<DataHealth>("/api/admin/hr/data-health", { cache: "no-store" }),
     staleTime: 5 * 60 * 1000,
   })
 
-  if (isError) return null
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Data health</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <QueryError message="Could not load the data-health check." onRetry={() => void refetch()} />
+        </CardContent>
+      </Card>
+    )
+  }
 
   const issues = data ? data.missingDepartment.length + data.departmentsWithoutLead.length + data.inactive.length : 0
 
