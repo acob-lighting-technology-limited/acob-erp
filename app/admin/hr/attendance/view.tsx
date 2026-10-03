@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -30,14 +30,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { BarChart3, Download, FileText, Users, Clock, AlertCircle, Pencil, Info, Settings2, Mail } from "lucide-react"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import {
-  ATTENDANCE_TRACKING_START,
   getAttendanceMonthOptions,
-  getWorkdaysInMonth,
   monthBounds,
   quarterBounds,
   toLocalISODate,
@@ -45,16 +42,16 @@ import {
 } from "@/lib/hr/attendance-utils"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import {
-  ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
-  MANUAL_ATTENDANCE_STATUS_OPTIONS,
   getManualStatusEditOptions,
   isPermissionAttendanceStatus,
 } from "@/lib/hr/attendance-status"
-import { computeAttendanceDay, netDayHoursFor, COVERED_STATUSES } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { StatusBadge, labelSource } from "./_components/status-badge"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("hr-attendance-reports")
 
@@ -343,8 +340,43 @@ interface EmployeeExpandProps {
   onRecordChanged?: (userId: string) => void
 }
 
+function toCalendarDays(rows: NonNullable<UnifiedDayPayload["data"]>): CalendarDay[] {
+  return rows.map((row) => ({
+    date: row.date,
+    dayName: formatDayShort(row.date),
+    record: row.record,
+    isOnLeave: row.status === "on_leave",
+    status: row.status as DayStatus,
+    manualBy: row.manual_by ?? row.record?.editor_first_name ?? null,
+    earlyClosureTime: (row as any).early_closure_time ?? null,
+    lateResumptionTime: (row as any).late_resumption_time ?? null,
+  }))
+}
+
+type AttendanceReportData = { reports: AttendanceReport[]; departments: string[]; policy: AttendancePolicy }
+
+const NO_REPORTS: AttendanceReport[] = []
+const NO_DEPARTMENTS: string[] = []
+const NO_HOLIDAYS: Array<{ holiday_date: string; name?: string | null }> = []
+
 export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged }: EmployeeExpandProps) {
-  const [days, setDays] = useState<CalendarDay[] | null>(null)
+  const daysQuery = useQuery({
+    queryKey: QUERY_KEYS.employeeAttendanceDays(report.user_id, yearMonth, Boolean(report.attendance_exempt)),
+    queryFn: async () => {
+      const qs = new URLSearchParams({
+        user_id: report.user_id,
+        year_month: yearMonth,
+        exempt_hint: report.attendance_exempt ? "1" : "0",
+      })
+      const payload = await apiJson<UnifiedDayPayload>(`/api/admin/hr/attendance/employee-days?${qs.toString()}`, {
+        cache: "no-store",
+      })
+      return payload?.data ?? []
+    },
+    select: toCalendarDays,
+  })
+  const days: CalendarDay[] | null = daysQuery.isError ? [] : (daysQuery.data ?? null)
+  const loadDays = () => void daysQuery.refetch()
   const [editTarget, setEditTarget] = useState<{ date: string; record: DayRecord | null } | null>(null)
   const [editForm, setEditForm] = useState({
     status: "",
@@ -357,40 +389,6 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
   const [historyItems, setHistoryItems] = useState<TimelineEvent[]>([])
   const [historyContext, setHistoryContext] = useState<TimelineContext | null>(null)
   const [historyTarget, setHistoryTarget] = useState<{ date: string } | null>(null)
-
-  function loadDays() {
-    void (async () => {
-      try {
-        const qs = new URLSearchParams({
-          user_id: report.user_id,
-          year_month: yearMonth,
-          exempt_hint: report.attendance_exempt ? "1" : "0",
-        })
-        const res = await apiFetch(`/api/admin/hr/attendance/employee-days?${qs.toString()}`, { cache: "no-store" })
-        const payload = res.ok ? ((await res.json()) as UnifiedDayPayload) : null
-        const calDays: CalendarDay[] = (payload?.data || []).map((row) => ({
-          date: row.date,
-          dayName: formatDayShort(row.date),
-          record: row.record,
-          isOnLeave: row.status === "on_leave",
-          status: row.status as DayStatus,
-          manualBy: row.manual_by ?? row.record?.editor_first_name ?? null,
-          earlyClosureTime: (row as any).early_closure_time ?? null,
-          lateResumptionTime: (row as any).late_resumption_time ?? null,
-        }))
-
-        setDays(calDays)
-      } catch (err) {
-        log.error("Failed to load employee day records", err)
-        setDays([])
-      }
-    })()
-  }
-
-  useEffect(() => {
-    loadDays()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report.user_id, yearMonth])
 
   function openEdit(date: string, record: DayRecord | null) {
     const { initialStatus } = getManualStatusEditOptions(record)
@@ -442,7 +440,6 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
       if (!res.ok) throw new Error(payload?.error ?? "Failed to save")
       toast.success(editTarget.record ? "Record updated" : "Record created")
       setEditTarget(null)
-      setDays(null)
       loadDays()
       onRecordChanged?.(report.user_id)
     } catch (err) {
@@ -463,7 +460,6 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
       if (!res.ok) throw new Error(payload?.error ?? "Failed to revert record")
       toast.success("Manual override removed — reverted to auto-derived attendance")
       setEditTarget(null)
-      setDays(null)
       loadDays()
       onRecordChanged?.(report.user_id)
     } catch (err) {
@@ -836,14 +832,8 @@ export function AttendanceReportsPage({
   const [activeTab, setActiveTab] = useState<AttendanceTab>(
     ATTENDANCE_TABS.some((t) => t.key === requestedTab) ? (requestedTab as AttendanceTab) : "daily"
   )
-  const [loading, setLoading] = useState(false)
-  const [reports, setReports] = useState<AttendanceReport[]>([])
   // Rows currently visible in the table (after search + filters + sort).
   const [processedReports, setProcessedReports] = useState<AttendanceReport[]>([])
-  const [departments, setDepartments] = useState<string[]>([])
-  // Served by the reports API so day breakdowns here charge the same hours the
-  // server did. Defaults only apply until the first response lands.
-  const [policy, setPolicy] = useState<AttendancePolicy>(DEFAULT_ATTENDANCE_POLICY)
   const [yearMonth, setYearMonth] = useState(currentYearMonth)
   const [periodMode, setPeriodMode] = useState<"month" | "quarter">("month")
   const [quarter, setQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">("Q1")
@@ -858,10 +848,66 @@ export function AttendanceReportsPage({
   const changeLogRef = useRef<ChangeLogViewHandle>(null)
   const [changeLogCount, setChangeLogCount] = useState(0)
   const isChangeLogTab = activeTab === "change-log"
-  const [holidays, setHolidays] = useState<Array<{ holiday_date: string; name?: string | null }>>([])
   // Unified Attendance Manager dialog
   const [managerOpen, setManagerOpen] = useState(false)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
+
+  const queryClient = useQueryClient()
+  const reportsKey = QUERY_KEYS.attendanceReports({ periodMode, yearMonth, quarter, quarterYear, reportDepartment })
+  const reportQuery = useQuery({
+    queryKey: reportsKey,
+    queryFn: async (): Promise<AttendanceReportData> => {
+      const { start, end } = periodMode === "month" ? monthBounds(yearMonth) : quarterBounds(quarterYear, quarter)
+      const params = new URLSearchParams({ start_date: start, end_date: end, department: reportDepartment })
+      const payload = await apiJson<{ data?: AttendanceReport[]; departments?: string[]; policy?: AttendancePolicy }>(
+        `/api/hr/attendance/reports?${params.toString()}`,
+        { cache: "no-store" }
+      )
+      const activePeriodLabel = periodMode === "month" ? yearMonth : `${quarter} ${quarterYear}`
+      const activeCycleLabel = periodMode === "month" ? "Monthly" : "Quarterly"
+      return {
+        reports: (payload.data ?? []).map((row) => ({
+          ...row,
+          period_label: activePeriodLabel,
+          cycle_label: activeCycleLabel,
+        })),
+        departments: payload.departments ?? [],
+        // Served by the reports API so day breakdowns here charge the same hours the server did.
+        policy: payload.policy ? { ...DEFAULT_ATTENDANCE_POLICY, ...payload.policy } : DEFAULT_ATTENDANCE_POLICY,
+      }
+    },
+    placeholderData: keepPreviousData,
+  })
+  const loading = reportQuery.isFetching
+  const reports = reportQuery.data?.reports ?? NO_REPORTS
+  const loadedDepartments = reportQuery.data?.departments ?? NO_DEPARTMENTS
+  const departments = useMemo(
+    () => (lockedDepartment ? [lockedDepartment] : loadedDepartments),
+    [lockedDepartment, loadedDepartments]
+  )
+  const policy = reportQuery.data?.policy ?? DEFAULT_ATTENDANCE_POLICY
+  const generateReport = useCallback(() => void reportQuery.refetch(), [reportQuery])
+  const setReports = useCallback(
+    (update: (prev: AttendanceReport[]) => AttendanceReport[]) =>
+      queryClient.setQueryData<AttendanceReportData>(
+        QUERY_KEYS.attendanceReports({ periodMode, yearMonth, quarter, quarterYear, reportDepartment }),
+        (current) => (current ? { ...current, reports: update(current.reports) } : current)
+      ),
+    [queryClient, periodMode, yearMonth, quarter, quarterYear, reportDepartment]
+  )
+
+  const holidaysQuery = useQuery({
+    queryKey: QUERY_KEYS.attendanceHolidays(yearMonth),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: Array<{ holiday_date: string; name?: string | null }> }>(
+          `/api/admin/hr/attendance/holidays?month=${yearMonth}`,
+          { cache: "no-store" }
+        )
+      ).data ?? [],
+  })
+  const holidays = holidaysQuery.data ?? NO_HOLIDAYS
+  const loadHolidays = useCallback(() => void holidaysQuery.refetch(), [holidaysQuery])
 
   const refreshSingleEmployeeSummary = useCallback(
     async (userId: string) => {
@@ -899,56 +945,8 @@ export function AttendanceReportsPage({
         log.error("Failed to refresh single employee summary:", error)
       }
     },
-    [periodMode, quarter, quarterYear, reportDepartment, yearMonth]
+    [periodMode, quarter, quarterYear, reportDepartment, yearMonth, setReports]
   )
-
-  const generateReport = useCallback(async () => {
-    setLoading(true)
-    try {
-      const { start, end } = periodMode === "month" ? monthBounds(yearMonth) : quarterBounds(quarterYear, quarter)
-      const params = new URLSearchParams({ start_date: start, end_date: end, department: reportDepartment })
-      const response = await apiFetch(`/api/hr/attendance/reports?${params.toString()}`, { cache: "no-store" })
-      const payload = (await response.json().catch(() => null)) as {
-        data?: AttendanceReport[]
-        departments?: string[]
-        policy?: AttendancePolicy
-        error?: string
-      } | null
-      if (!response.ok) throw new Error(payload?.error ?? "Failed to load attendance report")
-      const activePeriodLabel = periodMode === "month" ? yearMonth : `${quarter} ${quarterYear}`
-      const activeCycleLabel = periodMode === "month" ? "Monthly" : "Quarterly"
-      setReports(
-        (payload?.data ?? []).map((row) => ({
-          ...row,
-          period_label: activePeriodLabel,
-          cycle_label: activeCycleLabel,
-        }))
-      )
-      setDepartments(lockedDepartment ? [lockedDepartment] : (payload?.departments ?? []))
-      if (payload?.policy) setPolicy({ ...DEFAULT_ATTENDANCE_POLICY, ...payload.policy })
-    } catch (error) {
-      log.error("Error generating report:", error)
-      setReports([])
-    } finally {
-      setLoading(false)
-    }
-  }, [yearMonth, reportDepartment, periodMode, quarter, quarterYear, lockedDepartment])
-
-  const loadHolidays = useCallback(async () => {
-    const response = await apiFetch(`/api/admin/hr/attendance/holidays?month=${yearMonth}`, { cache: "no-store" })
-    const payload = (await response.json().catch(() => null)) as {
-      data?: Array<{ holiday_date: string; name?: string | null }>
-    } | null
-    if (response.ok) setHolidays(payload?.data ?? [])
-  }, [yearMonth])
-
-  useEffect(() => {
-    void generateReport()
-  }, [generateReport])
-
-  useEffect(() => {
-    void loadHolidays()
-  }, [loadHolidays])
 
   const departmentOptions = useMemo(() => departments.map((d) => ({ value: d, label: d })), [departments])
 

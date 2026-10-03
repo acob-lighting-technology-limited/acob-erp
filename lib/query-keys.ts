@@ -17,6 +17,8 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  attendanceHolidays: (yearMonth: string) => ["attendance-holidays", yearMonth],
+  attendanceReports: (filters: Record<string, unknown>) => ["attendance-reports", filters],
   myAttendanceAppeals: () => ["my-attendance-appeals"],
   myAttendanceRecent: () => ["my-attendance-recent"],
   dailyRoster: (date: string, department: string | null) => ["daily-roster", date, department],
