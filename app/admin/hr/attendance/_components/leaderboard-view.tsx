@@ -1,13 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react"
+import { useMemo, useState, type ComponentType } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Timer, UserX, AlertCircle, Sunrise, Sunset, FileWarning, Building2 } from "lucide-react"
-import { toast } from "sonner"
-import { logger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
 import {
   ATTENDANCE_TRACKING_START,
@@ -19,8 +17,9 @@ import {
   toLocalYearMonth,
   type Quarter,
 } from "@/lib/hr/attendance-utils"
-
-const log = logger("hr-attendance-leaderboard")
+import { apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface LeaderboardReport {
   user_id: string
@@ -252,13 +251,16 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
   const [quarterYear, setQuarterYear] = useState(new Date().getFullYear())
   const [department, setDepartment] = useState(lockedDepartment || "all")
   const [viewScope, setViewScope] = useState<"individual" | "department" | "combined">("individual")
-  const [reports, setReports] = useState<LeaderboardReport[]>([])
-  const [departmentStats, setDepartmentStats] = useState<DepartmentStat[]>([])
-  const [loading, setLoading] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
+  const { data, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.attendanceLeaderboard({
+      periodMode,
+      yearMonth,
+      quarterYear,
+      quarter,
+      department: lockedDepartment || department,
+    }),
+    queryFn: async () => {
       const { start, end } =
         periodMode === "month"
           ? monthBounds(yearMonth)
@@ -270,28 +272,17 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
         end_date: end,
         department: lockedDepartment || department,
       })
-      const res = await fetch(`/api/hr/attendance/reports?${params.toString()}`, { cache: "no-store" })
-      const payload = (await res.json().catch(() => null)) as {
-        data?: LeaderboardReport[]
-        department_stats?: DepartmentStat[]
-        error?: string
-      } | null
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load leaderboard")
-      setReports(payload?.data ?? [])
-      setDepartmentStats(payload?.department_stats ?? [])
-    } catch (err) {
-      log.error("Failed to load attendance leaderboard", err)
-      toast.error("Failed to load leaderboard")
-      setReports([])
-      setDepartmentStats([])
-    } finally {
-      setLoading(false)
-    }
-  }, [periodMode, yearMonth, quarter, quarterYear, department, lockedDepartment])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ data?: LeaderboardReport[]; department_stats?: DepartmentStat[] }>(
+        `/api/hr/attendance/reports?${params.toString()}`,
+        { cache: "no-store" }
+      )
+      return { reports: payload.data ?? [], departmentStats: payload.department_stats ?? [] }
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load leaderboard" },
+  })
+  const reports = useMemo(() => data?.reports ?? [], [data])
+  const departmentStats = useMemo(() => data?.departmentStats ?? [], [data])
 
   const departmentOptions = useMemo(() => {
     const visible = lockedDepartment ? [lockedDepartment] : departments
