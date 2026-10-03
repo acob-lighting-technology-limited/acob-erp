@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -14,10 +14,9 @@ import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { EyeOff, ShieldCheck } from "lucide-react"
 import type { FeedbackRecord } from "@/components/feedback/types"
-import { apiFetch } from "@/lib/api-client"
-import { logger } from "@/lib/logger"
-
-const log = logger("feedback-form")
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 /** Sentinel for the default "general feedback to management" target. */
 const GENERAL_TARGET = "general"
@@ -59,30 +58,17 @@ export function FeedbackForm({ onFeedbackSubmitted, variant = "card" }: Feedback
   })
   const [isAnonymous, setIsAnonymous] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
-  const [leads, setLeads] = useState<EligibleLead[]>([])
   const [target, setTarget] = useState<string>(GENERAL_TARGET)
 
   const isLeadFeedback = target !== GENERAL_TARGET
 
   // Only the lead(s) of the user's own department are returned here — the server
   // resolves eligibility, so this list is also the authorization boundary.
-  useEffect(() => {
-    let cancelled = false
-    const loadLeads = async () => {
-      try {
-        const response = await apiFetch("/api/feedback/my-leads", { cache: "no-store" })
-        if (!response.ok) return
-        const payload = (await response.json().catch(() => null)) as { data?: EligibleLead[] } | null
-        if (!cancelled) setLeads(payload?.data || [])
-      } catch (error) {
-        log.error({ err: String(error) }, "Failed to load eligible leads")
-      }
-    }
-    void loadLeads()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { data: leads = [] } = useQuery({
+    queryKey: QUERY_KEYS.myFeedbackLeads(),
+    queryFn: async () =>
+      (await apiJson<{ data?: EligibleLead[] }>("/api/feedback/my-leads", { cache: "no-store" })).data ?? [],
+  })
 
   const onSubmit = form.handleSubmit(async (data) => {
     setIsLoading(true)

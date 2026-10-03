@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useMemo } from "react"
 import { Brain, FileClock, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -10,6 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CbtAttemptDetail } from "@/components/pms/cbt-attempt-detail"
 import { formatWATDateTime } from "@/lib/utils/date"
+import { apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type AttemptRow = {
   id: string
@@ -42,36 +44,26 @@ type AttemptRow = {
 }
 
 export default function CbtDetailsLogPage() {
-  const [data, setData] = useState<AttemptRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadAttempts = async (quiet = false) => {
-    if (quiet) {
-      setIsRefreshing(true)
-    } else {
-      setIsLoading(true)
-    }
-    setError(null)
-    try {
-      const response = await fetch("/api/admin/hr/performance/cbt/attempts", { cache: "no-store" })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Failed to load attempts logs")
-      setData(payload.data || [])
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to load attempts logs"
-      setError(msg)
-      toast.error(msg)
-    } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
-    }
+  const {
+    data: data = [],
+    isLoading,
+    isFetching: isRefreshing,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.cbtAttempts(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: AttemptRow[] }>("/api/admin/hr/performance/cbt/attempts", {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load attempts logs" },
+  })
+  const error = queryError?.message ?? null
+  const loadAttempts = async (..._args: unknown[]) => {
+    await refetch()
   }
-
-  useEffect(() => {
-    void loadAttempts()
-  }, [])
 
   const columns: DataTableColumn<AttemptRow>[] = useMemo(
     () => [

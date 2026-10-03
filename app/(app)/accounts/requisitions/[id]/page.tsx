@@ -1,6 +1,6 @@
 "use client"
 
-import React, { use, useState } from "react"
+import { use, useState } from "react"
 import { toast } from "sonner"
 import type { Requisition } from "@/lib/requisitions/types"
 import { RequisitionPdfDocument } from "../_components/requisition-pdf-document"

@@ -23,6 +23,8 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  cbtAttempts: () => ["cbt-attempts"],
+  cbtBonusScores: () => ["cbt-bonus-scores"],
   strategicGoals: (scope: string, department?: string | null, year?: number | null) => [
     "strategic-goals",
     scope,
@@ -184,6 +186,7 @@ export const QUERY_KEYS = {
   hrLeaveTypesActive: () => ["hr-leave-types-active"],
 
   // Components
+  myFeedbackLeads: () => ["my-feedback-leads"],
   feedbackViewer: () => ["feedback-viewer-filter"],
   paymentsTable: (filters?: Record<string, unknown>) => (filters ? ["payments-table", filters] : ["payments-table"]),
   notificationBell: () => ["notification-bell"],
