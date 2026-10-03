@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import {
   Clock,
@@ -36,13 +36,12 @@ import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { LeaveCalendarView } from "./_components/leave-calendar-view"
 import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
 export { resolveLeaveRouteStages }
 export type { RouteSnapshotStage }
-import { useMyProfile } from "@/hooks/use-my-profile"
 
 export interface LeaveItem {
   id: string
@@ -314,7 +313,13 @@ export function LeaveApprovePage({
   const overrideEvidenceRef = useRef(false)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [selectedLeaveDetail, setSelectedLeaveDetail] = useState<LeaveItem | null>(null)
-  const currentUserId = useMyProfile().data?.id ?? null
+  // Admin screens read identity through the scoped API, not the browser Supabase client.
+  const { data: currentUserId = null } = useQuery({
+    queryKey: QUERY_KEYS.adminCurrentUser(),
+    queryFn: async () =>
+      (await apiJson<{ userId?: string }>("/api/admin/current-user", { cache: "no-store" })).userId ?? null,
+    staleTime: 10 * 60 * 1000,
+  })
   const [addLeaveOpen, setAddLeaveOpen] = useState(false)
   // Adding leave here creates it already approved, skipping the workflow, so it is
   // Admin & HR only - the server refuses leads too (requireAttendanceAdmin).

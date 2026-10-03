@@ -30,7 +30,6 @@ import { StatusBadge, labelSource } from "../_components/status-badge"
 import { ClockTimes, NameWithDept } from "../_components/clock-times"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
 
-const log = logger("admin-attendance-records")
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
