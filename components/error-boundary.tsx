@@ -3,6 +3,9 @@
 import React from "react"
 import { reportClientError } from "@/lib/telemetry/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { logger } from "@/lib/logger"
+
+const log = logger("components-error-boundary")
 
 type ErrorBoundaryProps = {
   children: React.ReactNode

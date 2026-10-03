@@ -4,6 +4,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { ProjectAdminContent } from "./_components/project-admin-content"
 import type { Metadata } from "next"
+import { logger } from "@/lib/logger"
+
+const log = logger("app-admin-projects")
 
 export const metadata: Metadata = {
   title: "Manage Projects | Matrix",
@@ -39,7 +42,7 @@ async function getAdminProjectsData() {
     .order("first_name", { ascending: true })
 
   if (profilesError) {
-    console.error("Error loading profiles for project manager assignment:", profilesError)
+    log.error("Error loading profiles for project manager assignment:", profilesError)
   }
 
   // The task form assigns work, so it needs the same employee shape the

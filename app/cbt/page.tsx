@@ -13,6 +13,9 @@ import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { logger } from "@/lib/logger"
+
+const log = logger("app-cbt")
 
 type CandidateOption = {
   company_email: string | null
@@ -189,7 +192,7 @@ export default function CbtPage() {
         setTabSwitchCount(Number(savedTabSwitches))
       }
     } catch (e) {
-      console.error("Failed to load saved CBT state:", e)
+      log.error("Failed to load saved CBT state:", e)
     }
   }, [session])
 
@@ -239,7 +242,7 @@ export default function CbtPage() {
         })
       )
     } catch (e) {
-      console.error("Failed to save CBT state:", e)
+      log.error("Failed to save CBT state:", e)
     }
   }, [session, currentIndex, answers, testStarted])
 

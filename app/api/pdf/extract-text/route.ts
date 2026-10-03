@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       await parser.destroy()
     }
   } catch (error: any) {
-    console.error("Error extracting text from PDF:", error)
+    log.error("Error extracting text from PDF:", error)
     return serverError(log, error, "Failed to extract text from PDF")
   }
 }

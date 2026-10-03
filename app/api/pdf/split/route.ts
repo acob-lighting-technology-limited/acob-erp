@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error splitting PDF:", error)
+    log.error("Error splitting PDF:", error)
     return serverError(log, error, "Failed to split PDF")
   }
 }

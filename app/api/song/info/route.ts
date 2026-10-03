@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
             trackCount = playlistInfo.entries.length
           }
         } catch (err) {
-          console.log("Could not extract playlist tracks:", err)
+          log.info("Could not extract playlist tracks:", err)
         }
       }
     }
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
       tracks: tracks.length > 0 ? tracks : undefined,
     })
   } catch (error: any) {
-    console.error("Error fetching song info:", error)
+    log.error("Error fetching song info:", error)
 
     const errorMessage = error.message || error.stderr || ""
     if (errorMessage.includes("[DRM]") || errorMessage.includes("DRM protection")) {

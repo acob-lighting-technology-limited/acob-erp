@@ -78,6 +78,9 @@ import { toast } from "sonner"
 import { Copy } from "lucide-react"
 import { ColumnHelp } from "./column-help"
 import type { DataTableDetailConfig, DataTableProps, SortConfig } from "./types"
+import { logger } from "@/lib/logger"
+
+const log = logger("components-ui-data-table-data-table")
 
 // ─── Debounce hook ───────────────────────────────────────────────────────────
 
@@ -612,7 +615,7 @@ export function DataTable<TData>({
       if (process.env.NODE_ENV !== "production" && !accessor) {
         const resolvesOnRow = result.some((row) => (row as Record<string, unknown> | null)?.[filter.key] !== undefined)
         if (!resolvesOnRow) {
-          console.warn(
+          log.warn(
             `[DataTable] Filter "${filter.key}" matches no column accessor and no row property, ` +
               `so selecting it will not filter anything. Add a column with this key and an ` +
               `accessor, or give the filter a filterFn.`

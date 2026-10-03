@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
           files.push(path.join(batchDir, downloadedFile))
         }
       } catch (error: any) {
-        console.error(`Error downloading ${url}:`, error)
+        log.error(`Error downloading ${url}:`, error)
       }
     }
 
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
           await require("fs").promises.rmdir(batchDir)
         }
       } catch (err) {
-        console.error("Error cleaning up batch files:", err)
+        log.error("Error cleaning up batch files:", err)
       }
     }, 1000)
 
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error in batch download:", error)
+    log.error("Error in batch download:", error)
 
     try {
       if (existsSync(batchDir)) {
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         await require("fs").promises.rmdir(batchDir)
       }
     } catch (err) {
-      console.error("Error cleaning up on error:", err)
+      log.error("Error cleaning up on error:", err)
     }
 
     return serverError(log, error, "Batch download failed")

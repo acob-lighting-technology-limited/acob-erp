@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error adding watermark to PDF:", error)
+    log.error("Error adding watermark to PDF:", error)
     return serverError(log, error, "Failed to add watermark to PDF")
   }
 }

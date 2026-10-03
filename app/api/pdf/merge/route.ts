@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < count; i++) {
       const file = formData.get(`file${i}`) as File
       if (!file || file.type !== "application/pdf") {
-        console.warn(`Skipping file ${i}: not a valid PDF`)
+        log.warn(`Skipping file ${i}: not a valid PDF`)
         continue
       }
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
         processedCount++
       } catch (error: any) {
-        console.error(`Error processing file ${i} (${file.name}):`, error)
+        log.error(`Error processing file ${i} (${file.name}):`, error)
       }
     }
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error merging PDFs:", error)
+    log.error("Error merging PDFs:", error)
     return serverError(log, error, "Failed to merge PDFs")
   }
 }

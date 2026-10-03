@@ -4,6 +4,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { ProjectContent } from "./project-content"
 import type { Metadata } from "next"
+import { logger } from "@/lib/logger"
+
+const log = logger("app-app-projects")
 
 export const metadata: Metadata = {
   title: "Projects & Deployments | Matrix",
@@ -37,7 +40,7 @@ export default async function ProjectsPage() {
     .order("first_name", { ascending: true })
 
   if (profilesError) {
-    console.error("Error loading profiles for project manager assignment:", profilesError)
+    log.error("Error loading profiles for project manager assignment:", profilesError)
   }
 
   const assignableEmployees = (profiles || []).map((p) => ({

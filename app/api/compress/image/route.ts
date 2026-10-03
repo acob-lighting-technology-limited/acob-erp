@@ -134,7 +134,7 @@ export async function POST(request: Request) {
       },
     })
   } catch (error: any) {
-    console.error("Error compressing image:", error)
+    log.error("Error compressing image:", error)
 
     return serverError(log, error, "Image compression failed")
   }

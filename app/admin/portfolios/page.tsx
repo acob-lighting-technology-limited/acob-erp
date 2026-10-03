@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { PortfoliosContent } from "./_components/portfolios-content"
+import { logger } from "@/lib/logger"
+
+const log = logger("app-admin-portfolios")
 
 export const metadata: Metadata = {
   title: "Project Portfolios | Matrix",
@@ -33,7 +36,7 @@ export default async function AdminPortfoliosPage() {
     .order("first_name", { ascending: true })
 
   if (profilesError) {
-    console.error("Error loading profiles for project manager assignment:", profilesError)
+    log.error("Error loading profiles for project manager assignment:", profilesError)
   }
 
   const managerOptions = (profiles || []).map((profile) => ({
