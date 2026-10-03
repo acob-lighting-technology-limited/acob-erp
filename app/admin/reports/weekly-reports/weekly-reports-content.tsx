@@ -32,6 +32,7 @@ import { downloadWeeklyReportDocx, downloadWeeklyReportPdf } from "@/lib/reports
 import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
+import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -68,26 +69,6 @@ interface WeeklyReportsContentProps {
     lead_departments?: string[]
     admin_routes?: string[] | null
   }
-}
-
-function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
-  const normalizedDepartment = normalizeDepartmentName(department)
-  const deptActions = trackingData.filter(
-    (action) => normalizeDepartmentName(action.department) === normalizedDepartment
-  )
-  if (deptActions.length === 0) {
-    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
-  }
-  if (deptActions.every((action) => action.status === "completed")) {
-    return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
-  }
-  if (deptActions.some((action) => action.status === "in_progress" || action.status === "completed")) {
-    return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
-  }
-  if (deptActions.some((action) => action.status === "not_started")) {
-    return { label: "Not Started", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" }
-  }
-  return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
 }
 
 export function WeeklyReportsContent({
@@ -206,11 +187,11 @@ export function WeeklyReportsContent({
   const stats = useMemo(() => {
     const total = reports.length
     const withTrackerStarted = reports.filter((report) => {
-      const status = getActionTrackerStatus(report.department, trackingData)
+      const status = getDepartmentTrackerStatus(report.department, trackingData)
       return status.label === "Started" || status.label === "Finished"
     }).length
     const finished = reports.filter(
-      (report) => getActionTrackerStatus(report.department, trackingData).label === "Finished"
+      (report) => getDepartmentTrackerStatus(report.department, trackingData).label === "Finished"
     ).length
     const locked = isFilteredWeekLocked ? reports.length : 0
 
@@ -299,9 +280,9 @@ export function WeeklyReportsContent({
       {
         key: "tracker_status",
         label: "Action Tracker",
-        accessor: (report) => getActionTrackerStatus(report.department, trackingData).label,
+        accessor: (report) => getDepartmentTrackerStatus(report.department, trackingData).label,
         render: (report) => {
-          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
           return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
         },
       },
@@ -556,7 +537,7 @@ export function WeeklyReportsContent({
             return `${submitterName} (W${report.week_number}) · ${report.year}`
           },
           trailing: (report) => {
-            const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+            const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
             return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
           },
           onSelect: (report) => {
@@ -567,7 +548,7 @@ export function WeeklyReportsContent({
         cardRenderer={(report) => {
           const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
           const submitterName = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
-          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
 
           return (
             <div className="space-y-3 rounded-xl border p-4">

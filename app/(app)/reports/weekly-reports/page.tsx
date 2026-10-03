@@ -31,6 +31,7 @@ import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departme
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
+import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
 
 interface UserProfile {
   id: string
@@ -168,26 +169,6 @@ async function fetchWeeklyReports(
   }
 }
 
-function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
-  const normalizedDepartment = normalizeDepartmentName(department)
-  const deptActions = trackingData.filter(
-    (action) => normalizeDepartmentName(action.department) === normalizedDepartment
-  )
-  if (deptActions.length === 0) {
-    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
-  }
-  if (deptActions.every((action) => action.status === "completed")) {
-    return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
-  }
-  if (deptActions.some((action) => action.status === "in_progress" || action.status === "completed")) {
-    return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
-  }
-  if (deptActions.some((action) => action.status === "not_started")) {
-    return { label: "Not Started", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" }
-  }
-  return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
-}
-
 export default function WeeklyReportsPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()
   // The week people are reporting on, which from Friday is the next one — that
@@ -322,11 +303,11 @@ export default function WeeklyReportsPortal() {
   const stats = useMemo(() => {
     const total = reports.length
     const withTrackerStarted = reports.filter((report) => {
-      const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+      const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
       return trackerStatus.label === "Started" || trackerStatus.label === "Finished"
     }).length
     const finished = reports.filter(
-      (report) => getActionTrackerStatus(report.department, trackingData).label === "Finished"
+      (report) => getDepartmentTrackerStatus(report.department, trackingData).label === "Finished"
     ).length
     const locked = lockState?.isLocked ? reports.length : 0
     return { total, withTrackerStarted, finished, locked }
@@ -420,9 +401,9 @@ export default function WeeklyReportsPortal() {
         key: "tracker_status",
         label: "Action Tracker",
         sortable: true,
-        accessor: (report) => getActionTrackerStatus(report.department, trackingData).label,
+        accessor: (report) => getDepartmentTrackerStatus(report.department, trackingData).label,
         render: (report) => {
-          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
           return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
         },
       },
@@ -702,7 +683,7 @@ export default function WeeklyReportsPortal() {
             return `${submitterName} (W${report.week_number}) · ${report.year}`
           },
           trailing: (report) => {
-            const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+            const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
             return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
           },
           detail: {
@@ -710,7 +691,7 @@ export default function WeeklyReportsPortal() {
             fields: (report) => {
               const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
               const submitterName = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
-              const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+              const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
               return [
                 { label: "Week", value: `W${report.week_number}, ${report.year}` },
                 { label: "Meeting Date", value: meetingDate },
@@ -724,7 +705,7 @@ export default function WeeklyReportsPortal() {
         cardRenderer={(report) => {
           const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
           const submitterName = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
-          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
 
           return (
             <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">

@@ -1,4 +1,5 @@
 import { getOfficeWeekMonday } from "@/lib/meeting-week"
+import { normalizeDepartmentName } from "@/shared/departments"
 import { formatWATDateTime } from "@/lib/utils/date"
 
 /** The fields of an action item these helpers read. */
@@ -30,7 +31,7 @@ export function getDueDateClassName(task: TrackedItem) {
 }
 
 /** One status for a department's whole list of items. */
-export function getDeptSummaryStatus(tasks: TrackedItem[]): DepartmentSummaryStatus {
+export function getDeptSummaryStatus(tasks: Array<{ status: string }>): DepartmentSummaryStatus {
   if (tasks.length === 0) return "Pending"
   if (tasks.every((task) => task.status === "completed")) return "Finished"
   if (tasks.some((task) => task.status === "in_progress" || task.status === "completed")) return "Started"
@@ -50,4 +51,12 @@ export function getSummaryBadgeClass(status: DepartmentSummaryStatus) {
   if (status === "Started") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
   if (status === "Not Started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
   return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
+}
+
+/** A department's action-tracker status for the week, with its badge colour (weekly-report tables). */
+export function getDepartmentTrackerStatus(department: string, items: Array<{ department: string; status: string }>) {
+  const normalized = normalizeDepartmentName(department)
+  const deptItems = items.filter((item) => normalizeDepartmentName(item.department) === normalized)
+  const label = getDeptSummaryStatus(deptItems)
+  return { label, color: getSummaryBadgeClass(label) }
 }
