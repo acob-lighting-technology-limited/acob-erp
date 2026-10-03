@@ -2,7 +2,7 @@
 
 ## Phase 1 — table-native export
 
-- Commit: `731a51e7 feat: add table-native exports`.
+- Implementation commit: `5ed763f2 feat: add table-native exports`.
 - Added opt-in `DataTable`/`DataTablePage` export configuration. It exports visible accessor columns and every filtered, sorted client-side row to CSV, XLSX or PDF.
 - Added a common CSV writer with RFC 4180 quoting, a UTF-8 BOM, formula-injection protection and unit coverage.
 - Moved the existing employee and asset XLSX/PDF writers to the shared table-export path. Existing column-selection and report headings remain in place.
