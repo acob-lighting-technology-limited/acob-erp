@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   DEFAULT_PROJECT_PRIORITY,
   PROJECT_PRIORITIES,
@@ -24,6 +24,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import type { Project } from "./project-admin-content"
 import { apiFetch } from "@/lib/api-client"
+import { usePortfolios } from "@/hooks/use-portfolios"
 
 const PRIORITY_OPTIONS = PROJECT_PRIORITIES.map((value) => ({ value, label: PROJECT_PRIORITY_LABELS[value] }))
 
@@ -77,7 +78,8 @@ export function ProjectDialogs({
   const [status, setStatus] = useState<"planning" | "active" | "on_hold" | "completed" | "cancelled">("planning")
   const [portfolioId, setPortfolioId] = useState("")
   const [priority, setPriority] = useState<ProjectPriority>(DEFAULT_PROJECT_PRIORITY)
-  const [portfolios, setPortfolios] = useState<Array<{ id: string; name: string; code: string | null }>>([])
+  const { data: portfoliosData } = usePortfolios({ enabled: isAddOpen || isEditOpen })
+  const portfolios = portfoliosData?.data ?? []
 
   const portfolioOptions = [
     { value: "", label: "No portfolio" },
@@ -93,21 +95,6 @@ export function ProjectDialogs({
 
   // A project may sit outside every portfolio, so a failed load must not block
   // the form — it just leaves the selector empty.
-  useEffect(() => {
-    if (!isAddOpen && !isEditOpen) return
-    apiFetch("/api/portfolios", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((payload) =>
-        setPortfolios(
-          (payload.data ?? []).map((portfolio: { id: string; name: string; code: string | null }) => ({
-            id: portfolio.id,
-            name: portfolio.name,
-            code: portfolio.code,
-          }))
-        )
-      )
-      .catch(() => setPortfolios([]))
-  }, [isAddOpen, isEditOpen])
 
   // Sync form states with selected project for editing
   useEffect(() => {

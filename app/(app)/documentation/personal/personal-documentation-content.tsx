@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { FileText, Plus, Eye, Edit2, Trash2 } from "lucide-react"
@@ -18,6 +18,8 @@ import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
 import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("personal-documentation-content")
 
@@ -72,9 +74,48 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
   // "general" = documents anyone published to the whole company.
   // "mine" = documents you authored.
   const [activeTab, setActiveTab] = useState<string>("general")
-  const [generalDocs, setGeneralDocs] = useState<Documentation[]>([])
-  const [isLoadingGeneral, setIsLoadingGeneral] = useState(false)
   const supabase = createClient()
+  const queryClient = useQueryClient()
+
+  const { data: generalDocs = [], isLoading: isLoadingGeneral } = useQuery({
+    queryKey: QUERY_KEYS.generalDocumentation(),
+    enabled: activeTab === "general",
+    queryFn: async (): Promise<Documentation[]> => {
+      // Author names come from staff_directory rather than an embedded
+      // profiles(...) join: the embed runs under profiles RLS, which limits a
+      // plain employee to their own row and left every other author unnamed.
+      const { data, error } = await supabase
+        .from("user_documentation")
+        .select("*")
+        .eq("visibility", "general")
+        .eq("is_draft", false)
+        .order("updated_at", { ascending: false })
+
+      if (error) throw error
+
+      const rows = data || []
+      const authorIds = Array.from(new Set(rows.map((row) => row.user_id).filter((id): id is string => Boolean(id))))
+
+      const authorNameById = new Map<string, string>()
+      if (authorIds.length > 0) {
+        const { data: authors, error: authorsError } = await supabase
+          .from("staff_directory")
+          .select("id, first_name, last_name")
+          .in("id", authorIds)
+        if (authorsError) throw authorsError
+        for (const author of authors || []) {
+          const name = `${author.first_name ?? ""} ${author.last_name ?? ""}`.trim()
+          if (name) authorNameById.set(String(author.id), name)
+        }
+      }
+
+      return rows.map((row: Record<string, unknown>) => ({
+        ...(row as unknown as Documentation),
+        author_name: (row.user_id ? authorNameById.get(String(row.user_id)) : null) ?? null,
+      }))
+    },
+    meta: { errorMessage: "Failed to load general documentation" },
+  })
 
   const isGeneralTab = activeTab === "general"
 
@@ -216,55 +257,6 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
     }
   }
 
-  const loadGeneralDocumentation = useCallback(async () => {
-    setIsLoadingGeneral(true)
-    try {
-      // Author names come from staff_directory rather than an embedded
-      // profiles(...) join: the embed runs under profiles RLS, which limits a
-      // plain employee to their own row and left every other author unnamed.
-      const { data, error } = await supabase
-        .from("user_documentation")
-        .select("*")
-        .eq("visibility", "general")
-        .eq("is_draft", false)
-        .order("updated_at", { ascending: false })
-
-      if (error) throw error
-
-      const rows = data || []
-      const authorIds = Array.from(new Set(rows.map((row) => row.user_id).filter((id): id is string => Boolean(id))))
-
-      const authorNameById = new Map<string, string>()
-      if (authorIds.length > 0) {
-        const { data: authors, error: authorsError } = await supabase
-          .from("staff_directory")
-          .select("id, first_name, last_name")
-          .in("id", authorIds)
-        if (authorsError) throw authorsError
-        for (const author of authors || []) {
-          const name = `${author.first_name ?? ""} ${author.last_name ?? ""}`.trim()
-          if (name) authorNameById.set(String(author.id), name)
-        }
-      }
-
-      setGeneralDocs(
-        rows.map((row: Record<string, unknown>) => ({
-          ...(row as unknown as Documentation),
-          author_name: (row.user_id ? authorNameById.get(String(row.user_id)) : null) ?? null,
-        }))
-      )
-    } catch (error) {
-      log.error("Error loading general documentation:", error)
-      toast.error("Failed to load general documentation")
-    } finally {
-      setIsLoadingGeneral(false)
-    }
-  }, [supabase])
-
-  useEffect(() => {
-    if (activeTab === "general") void loadGeneralDocumentation()
-  }, [activeTab, loadGeneralDocumentation])
-
   function openCreateDialog() {
     setSelectedDoc(null)
     setFormData({
@@ -328,6 +320,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
       toast.success(selectedDoc ? "Documentation updated" : "Documentation created")
       setIsDialogOpen(false)
       await loadDocumentation()
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.generalDocumentation() })
     } catch (error) {
       log.error("Error saving documentation:", error)
       toast.error("Failed to save documentation")
@@ -351,6 +344,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
       setIsDeleteDialogOpen(false)
       setSelectedDoc(null)
       await loadDocumentation()
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.generalDocumentation() })
     } catch (error) {
       log.error("Error deleting documentation:", error)
       toast.error("Failed to delete documentation")
