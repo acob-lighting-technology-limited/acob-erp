@@ -73,10 +73,14 @@ export function ProductFormDialog({ open, onOpenChange, queryClient, product = n
     queryFn: fetchProductCategories,
   })
 
-  useEffect(() => {
-    if (!open) return
-    setFormData(product ? { ...product } : defaultFormData)
-  }, [open, product])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setFormData(product ? { ...product } : defaultFormData)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

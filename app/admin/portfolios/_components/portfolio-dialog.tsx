@@ -39,13 +39,17 @@ export function PortfolioDialog({
   const [status, setStatus] = useState<"active" | "on_hold" | "closed">("active")
   const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    if (!open) return
-    setName(portfolio?.name ?? "")
-    setCode(portfolio?.code ?? "")
-    setDescription(portfolio?.description ?? "")
-    setStatus(portfolio?.status ?? "active")
-  }, [open, portfolio])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setName(portfolio?.name ?? "")
+      setCode(portfolio?.code ?? "")
+      setDescription(portfolio?.description ?? "")
+      setStatus(portfolio?.status ?? "active")
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()

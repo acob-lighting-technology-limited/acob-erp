@@ -50,17 +50,21 @@ export function MeetingSourceDialog({ open, onOpenChange, editing, onSaved }: Pr
   const [emailEnabled, setEmailEnabled] = useState(true)
   const [isActive, setIsActive] = useState(true)
 
-  useEffect(() => {
-    if (!open) return
-    setOrganizerEmail(editing?.organizer_email || "")
-    setOrganizerToLoad("")
-    setJoinWebUrl(editing?.join_web_url || "")
-    setLabel(editing?.label || "")
-    setSelectedEmployeeIds([])
-    setExternalEmails(editing?.recipients || [])
-    setEmailEnabled(editing?.email_enabled ?? true)
-    setIsActive(editing?.is_active ?? true)
-  }, [open, editing])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setOrganizerEmail(editing?.organizer_email || "")
+      setOrganizerToLoad("")
+      setJoinWebUrl(editing?.join_web_url || "")
+      setLabel(editing?.label || "")
+      setSelectedEmployeeIds([])
+      setExternalEmails(editing?.recipients || [])
+      setEmailEnabled(editing?.email_enabled ?? true)
+      setIsActive(editing?.is_active ?? true)
+    }
+  }
 
   const handleEmployeesLoaded = (loaded: DirectoryEmployee[]) => {
     setEmployees(loaded)
@@ -91,7 +95,9 @@ export function MeetingSourceDialog({ open, onOpenChange, editing, onSaved }: Pr
     queryKey: ["meeting-artifact-calendar", organizerToLoad],
     enabled: Boolean(organizerToLoad),
     queryFn: async (): Promise<CalendarMeeting[]> => {
-      const res = await fetch(`/api/reports/meeting-artifacts/calendar?organizer=${encodeURIComponent(organizerToLoad)}`)
+      const res = await fetch(
+        `/api/reports/meeting-artifacts/calendar?organizer=${encodeURIComponent(organizerToLoad)}`
+      )
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to load meetings")
       return payload.data || []

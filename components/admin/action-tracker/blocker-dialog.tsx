@@ -69,11 +69,15 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
 
   const targetId = target?.id || ""
 
-  useEffect(() => {
-    if (!isOpen) return
-    setNote(target?.blocker_note || "")
-    setPendingFiles([])
-  }, [isOpen, target?.blocker_note])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (isOpen !== syncedOpen) {
+    setSyncedOpen(isOpen)
+    if (isOpen) {
+      setNote(target?.blocker_note || "")
+      setPendingFiles([])
+    }
+  }
 
   const {
     data: evidence = [],
