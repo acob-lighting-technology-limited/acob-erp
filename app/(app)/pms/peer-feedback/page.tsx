@@ -272,6 +272,11 @@ export default function PeerFeedbackPage() {
           isLoading={isLoading}
           onRetry={() => void loadData()}
           emptyTitle="No Feedback Given Yet"
+          emptyAction={
+            <Button size="sm" onClick={() => setIsDialogOpen(true)}>
+              Give feedback
+            </Button>
+          }
           emptyDescription={'No peer feedback submitted yet. Use the "Give Feedback" button to start.'}
           emptyIcon={Send}
           viewToggle

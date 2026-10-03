@@ -317,6 +317,7 @@ export function DataTable<TData>({
   emptyIcon: EmptyIcon = Inbox,
   emptyTitle = "No results found",
   emptyDescription = "Try adjusting your search or filters.",
+  emptyAction,
 }: DataTableProps<TData>) {
   const expandAtStart = expandableColumnPosition !== "end"
   // ─── Column resize ─────────────────────────────────────────────────────────
@@ -1253,6 +1254,7 @@ export function DataTable<TData>({
                     emptyDescription={emptyDescription}
                     hasActiveFilters={hasActiveFilters}
                     onClearFilters={clearAllFilters}
+                    emptyAction={emptyAction}
                   />
                 </TableCell>
               </TableRow>
@@ -1730,6 +1732,7 @@ export function DataTable<TData>({
               emptyDescription={emptyDescription}
               hasActiveFilters={hasActiveFilters}
               onClearFilters={clearAllFilters}
+              emptyAction={emptyAction}
             />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1821,6 +1824,7 @@ export function DataTable<TData>({
                     emptyDescription={emptyDescription}
                     hasActiveFilters={hasActiveFilters}
                     onClearFilters={clearAllFilters}
+                    emptyAction={emptyAction}
                   />
                 ) : (
                   mobileList
@@ -1838,6 +1842,7 @@ export function DataTable<TData>({
                   emptyDescription={emptyDescription}
                   hasActiveFilters={hasActiveFilters}
                   onClearFilters={clearAllFilters}
+                  emptyAction={emptyAction}
                 />
               ) : (
                 mobileList
@@ -1855,6 +1860,7 @@ export function DataTable<TData>({
                     emptyDescription={emptyDescription}
                     hasActiveFilters={hasActiveFilters}
                     onClearFilters={clearAllFilters}
+                    emptyAction={emptyAction}
                   />
                 ) : (
                   mobileList
@@ -1918,12 +1924,14 @@ function TableEmptyState({
   emptyDescription,
   hasActiveFilters,
   onClearFilters,
+  emptyAction,
 }: {
   EmptyIcon: React.ElementType<{ className?: string }>
   emptyTitle: string
   emptyDescription: string
   hasActiveFilters: boolean
   onClearFilters: () => void
+  emptyAction?: React.ReactNode
 }) {
   return (
     <EmptyState
@@ -1937,7 +1945,9 @@ function TableEmptyState({
             <X className="h-3.5 w-3.5" />
             Clear filters
           </Button>
-        ) : null
+        ) : (
+          (emptyAction ?? null)
+        )
       }
     />
   )
