@@ -68,6 +68,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 const log = logger("hr-employees-admin-employee-content")
 
@@ -165,19 +166,10 @@ function getInitials(name: string): string {
 function EmployeeAvatar({ employee, size = "md" }: { employee: Employee; size?: keyof typeof AVATAR_SIZES }) {
   const fullName = `${employee.first_name || ""} ${employee.last_name || ""}`.trim() || employee.company_email || "User"
   return (
-    <span
-      className={cn(
-        "bg-primary/10 text-primary flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold",
-        AVATAR_SIZES[size]
-      )}
-    >
-      {employee.avatar_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={employee.avatar_url} alt={fullName} className="h-full w-full object-cover" />
-      ) : (
-        getInitials(fullName)
-      )}
-    </span>
+    <Avatar className={cn("shrink-0", AVATAR_SIZES[size])}>
+      {employee.avatar_url ? <AvatarImage src={employee.avatar_url} alt={fullName} className="object-cover" /> : null}
+      <AvatarFallback className="bg-primary/10 text-primary font-bold">{getInitials(fullName)}</AvatarFallback>
+    </Avatar>
   )
 }
 

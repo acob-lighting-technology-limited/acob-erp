@@ -9,6 +9,7 @@ import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { formatName } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/patterns"
 import type { UserRole } from "@/types/database"
+import Image from "next/image"
 
 interface Profile {
   id: string
@@ -81,8 +82,15 @@ export function JobDescriptionDialog({ profile, isOpen, onOpenChange }: JobDescr
         <div className="hidden print:mb-8 print:block print:border-b print:pb-4">
           <div className="flex items-start justify-between">
             <div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/acob-logo.webp" alt="ACOB Lighting" className="h-16 w-auto" />
+              {/* Eager: the letterhead is print-only, so a lazy image would never load before printing. */}
+              <Image
+                src="/acob-logo.webp"
+                alt="ACOB Lighting"
+                width={200}
+                height={64}
+                loading="eager"
+                className="h-16 w-auto"
+              />
             </div>
             <div className="text-right text-sm">
               {profile?.first_name && profile?.last_name && (
