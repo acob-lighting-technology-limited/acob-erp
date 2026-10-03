@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useAdminScope } from "@/components/admin-scope-context"
+import { DataHealthCard } from "@/components/admin/data-health-card"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -503,6 +504,7 @@ export function HRAdminDashboard({
           </CardContent>
         </Card>
       </Section>
+      {scope.isAdminLike && scope.scopeMode !== "lead" && <DataHealthCard />}
     </PageWrapper>
   )
 }
