@@ -16,6 +16,7 @@ export const QUERY_KEYS = {
 
   // Attendance
   attendanceDeviceStatus: () => ["attendance-device-status"],
+  myAttendanceDays: (yearMonth: string) => ["my-attendance-days", yearMonth],
   attendanceAppeals: (filters: Record<string, unknown>) => ["attendance-appeals", filters],
   attendanceReportConfig: () => ["attendance-report-config"],
   employeeCycleAttendance: (userId: string, start: string, end: string) => [
@@ -27,6 +28,7 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  pmsAnalytics: () => ["pms-analytics"],
   cbtAttemptDetail: (profileId: string, cycleId: string) => ["cbt-attempt-detail", profileId, cycleId],
   cbtAttempts: () => ["cbt-attempts"],
   cbtBonusScores: () => ["cbt-bonus-scores"],
