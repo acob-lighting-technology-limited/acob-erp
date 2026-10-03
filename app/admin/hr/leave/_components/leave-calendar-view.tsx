@@ -1,19 +1,20 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CalendarDays, Clock, RotateCcw } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { apiFetch } from "@/lib/api-client"
+import { apiJson } from "@/lib/api-client"
 import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
 import type { LeaveItem } from "../view"
-import { STAGE_LABELS, getStageBadge, resolvePersonName } from "../view"
+import { getStageBadge, resolvePersonName } from "../view"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 export interface CalendarStats {
   total_days: number
@@ -199,6 +200,24 @@ function resolveLeaveTypeColor(typeName?: string | null): LeaveTypeColorDef {
   return LEAVE_TYPE_COLORS.default
 }
 
+type CalendarData = {
+  leaves: LeaveItem[]
+  holidays: HolidayItem[]
+  departments: string[]
+  employees: EmployeeFilterOption[]
+  leave_types: LeaveTypeOption[]
+  stats: CalendarStats
+}
+
+const EMPTY_CALENDAR: CalendarData = {
+  leaves: [],
+  holidays: [],
+  departments: [],
+  employees: [],
+  leave_types: [],
+  stats: { total_days: 0, active_leaves: 0, approved_count: 0, pending_count: 0 },
+}
+
 export function LeaveCalendarView({
   apiBasePath = "/api/admin/hr/leave",
   lockedDepartment,
@@ -211,23 +230,6 @@ export function LeaveCalendarView({
   const [selectedUserId, setSelectedUserId] = useState<string>("all")
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
-
-  const [loading, setLoading] = useState(false)
-  const [calendarData, setCalendarData] = useState<{
-    leaves: LeaveItem[]
-    holidays: HolidayItem[]
-    departments: string[]
-    employees: EmployeeFilterOption[]
-    leave_types: LeaveTypeOption[]
-    stats: { total_days: number; active_leaves: number; approved_count: number; pending_count: number }
-  }>({
-    leaves: [],
-    holidays: [],
-    departments: [],
-    employees: [],
-    leave_types: [],
-    stats: { total_days: 0, active_leaves: 0, approved_count: 0, pending_count: 0 },
-  })
 
   // Day expansion modal for crowded days
   const [expandedDay, setExpandedDay] = useState<{
@@ -245,50 +247,44 @@ export function LeaveCalendarView({
 
   const yearOptions = useMemo(() => getYearOptions(), [])
 
-  const loadCalendar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        year_month: calendarMonth,
-      })
+  const { data: calendarData = EMPTY_CALENDAR, isFetching: loading } = useQuery({
+    queryKey: QUERY_KEYS.leaveCalendar({
+      apiBasePath,
+      calendarMonth,
+      activeDept,
+      selectedUserId,
+      selectedLeaveTypeId,
+      selectedStatus,
+    }),
+    queryFn: async (): Promise<CalendarData> => {
+      const params = new URLSearchParams({ year_month: calendarMonth })
       if (activeDept) params.set("department", activeDept)
       if (selectedUserId && selectedUserId !== "all") params.set("user_id", selectedUserId)
       if (selectedLeaveTypeId && selectedLeaveTypeId !== "all") params.set("leave_type_id", selectedLeaveTypeId)
       if (selectedStatus && selectedStatus !== "all") params.set("status", selectedStatus)
-
       const endpoint = apiBasePath.includes("/dept/")
         ? `${apiBasePath}/calendar?${params.toString()}`
         : `/api/admin/hr/leave/calendar?${params.toString()}`
-
-      const res = await apiFetch(endpoint, { cache: "no-store" })
-      const json = (await res.json().catch(() => null)) as CalendarApiResponse | null
-
-      if (!res.ok) {
-        throw new Error((json as unknown as { error?: string })?.error || "Failed to load calendar")
+      const json = await apiJson<CalendarApiResponse>(endpoint, { cache: "no-store" })
+      const data = json?.data
+      if (!data) return EMPTY_CALENDAR
+      return {
+        leaves: Array.isArray(data.leaves) ? data.leaves : [],
+        holidays: Array.isArray(data.holidays) ? data.holidays : [],
+        departments: Array.isArray(data.departments) ? data.departments : [],
+        employees: Array.isArray(data.employees) ? data.employees : [],
+        leave_types: Array.isArray(data.leave_types) ? data.leave_types : [],
+        stats: data.stats || EMPTY_CALENDAR.stats,
       }
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load leave calendar" },
+  })
 
-      if (json?.data) {
-        const stats = json.data.stats || { total_days: 0, active_leaves: 0, approved_count: 0, pending_count: 0 }
-        setCalendarData({
-          leaves: Array.isArray(json.data.leaves) ? json.data.leaves : [],
-          holidays: Array.isArray(json.data.holidays) ? json.data.holidays : [],
-          departments: Array.isArray(json.data.departments) ? json.data.departments : [],
-          employees: Array.isArray(json.data.employees) ? json.data.employees : [],
-          leave_types: Array.isArray(json.data.leave_types) ? json.data.leave_types : [],
-          stats,
-        })
-        onStatsChange?.(stats)
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load leave calendar")
-    } finally {
-      setLoading(false)
-    }
-  }, [apiBasePath, calendarMonth, activeDept, selectedUserId, selectedLeaveTypeId, selectedStatus, onStatsChange])
-
+  // The parent page shows these totals in its own stat cards.
   useEffect(() => {
-    void loadCalendar()
-  }, [loadCalendar])
+    onStatsChange?.(calendarData.stats)
+  }, [calendarData.stats, onStatsChange])
 
   const today = toLocalISODate()
   const cells = useMemo(() => buildCalendarCells(calendarMonth), [calendarMonth])

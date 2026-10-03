@@ -4,6 +4,7 @@
  */
 export const QUERY_KEYS = {
   // HR
+  leaveCalendar: (filters: Record<string, unknown>) => ["leave-calendar", filters],
   myLunchHistory: (yearMonth: string) => ["my-lunch-history", yearMonth],
   grantableLeaveTypes: (userId: string) => ["grantable-leave-types", userId],
   adminLeaveEmployees: () => ["admin-leave-employees"],
