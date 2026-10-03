@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Trash2 } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,11 +15,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect } from "@/components/ui/searchable-select"
-import { apiFetch } from "@/lib/api-client"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { apiJson } from "@/lib/api-client"
+import { applyServerErrors } from "@/lib/forms/server-errors"
+import { PortfolioFieldsSchema, type PortfolioFields } from "@/lib/projects/schemas"
 import type { Portfolio } from "./portfolios-content"
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "on_hold", label: "On Hold" },
+  { value: "closed", label: "Closed" },
+]
 
 export function PortfolioDialog({
   open,
@@ -33,53 +43,6 @@ export function PortfolioDialog({
   /** Shown only when editing; hands off to the delete confirmation. */
   onDelete?: (portfolio: Portfolio) => void
 }) {
-  const [name, setName] = useState("")
-  const [code, setCode] = useState("")
-  const [description, setDescription] = useState("")
-  const [status, setStatus] = useState<"active" | "on_hold" | "closed">("active")
-  const [isSaving, setIsSaving] = useState(false)
-
-  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
-  const [syncedOpen, setSyncedOpen] = useState(false)
-  if (open !== syncedOpen) {
-    setSyncedOpen(open)
-    if (open) {
-      setName(portfolio?.name ?? "")
-      setCode(portfolio?.code ?? "")
-      setDescription(portfolio?.description ?? "")
-      setStatus(portfolio?.status ?? "active")
-    }
-  }
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault()
-    if (!name.trim()) {
-      toast.error("Portfolio name is required")
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      const res = await apiFetch(portfolio ? `/api/portfolios/${portfolio.id}` : "/api/portfolios", {
-        method: portfolio ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          code: code.trim() || null,
-          description: description.trim() || null,
-          status,
-        }),
-      })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to save portfolio")
-      onSuccess()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save portfolio")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
@@ -89,79 +52,146 @@ export function PortfolioDialog({
             A portfolio groups related projects under one programme, client, or funding arrangement.
           </DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label htmlFor="portfolio-name" className="text-xs font-semibold">
-              Portfolio Name *
-            </Label>
-            <Input
-              id="portfolio-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Minimum Subsidy Tender"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="portfolio-code" className="text-xs font-semibold">
-              Short Code
-            </Label>
-            <Input id="portfolio-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="MST" />
-            <p className="text-muted-foreground text-[11px]">
-              Shown on project rows where the full name would not fit.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="portfolio-description" className="text-xs font-semibold">
-              Description
-            </Label>
-            <Textarea
-              id="portfolio-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="min-h-[70px] text-sm"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold">Status</Label>
-            <SearchableSelect
-              value={status}
-              onValueChange={(value) => setStatus(value as "active" | "on_hold" | "closed")}
-              options={[
-                { value: "active", label: "Active" },
-                { value: "on_hold", label: "On Hold" },
-                { value: "closed", label: "Closed" },
-              ]}
-              placeholder="Select status"
-              searchPlaceholder="Search status..."
-            />
-          </div>
-
-          <DialogFooter className="gap-2">
-            {portfolio && onDelete && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-destructive hover:text-destructive sm:mr-auto"
-                onClick={() => onDelete(portfolio)}
-                disabled={isSaving}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            )}
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? "Saving..." : portfolio ? "Save Changes" : "Create Portfolio"}
-            </Button>
-          </DialogFooter>
-        </form>
+        {/* Content unmounts when the dialog closes, so each opening starts from `portfolio`. */}
+        <PortfolioForm
+          portfolio={portfolio}
+          onSuccess={onSuccess}
+          onDelete={onDelete}
+          onCancel={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
+  )
+}
+
+function PortfolioForm({
+  portfolio,
+  onSuccess,
+  onDelete,
+  onCancel,
+}: {
+  portfolio: Portfolio | null
+  onSuccess: () => void
+  onDelete?: (portfolio: Portfolio) => void
+  onCancel: () => void
+}) {
+  const form = useForm<PortfolioFields>({
+    resolver: zodResolver(PortfolioFieldsSchema),
+    defaultValues: {
+      name: portfolio?.name ?? "",
+      code: portfolio?.code ?? "",
+      description: portfolio?.description ?? "",
+      status: portfolio?.status ?? "active",
+    },
+  })
+
+  const save = useMutation({
+    mutationFn: (values: PortfolioFields) =>
+      apiJson(portfolio ? `/api/portfolios/${portfolio.id}` : "/api/portfolios", {
+        method: portfolio ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          code: values.code || null,
+          description: values.description || null,
+          status: values.status,
+        }),
+      }),
+    onSuccess,
+    onError: (error) => {
+      const message = applyServerErrors(error, form.setError, Object.keys(form.getValues()))
+      if (message) toast.error(message)
+    },
+  })
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((values) => save.mutate(values))} className="space-y-4 py-2">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-semibold">Portfolio Name *</FormLabel>
+              <FormControl>
+                <Input placeholder="Minimum Subsidy Tender" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="code"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-semibold">Short Code</FormLabel>
+              <FormControl>
+                <Input placeholder="MST" {...field} value={field.value ?? ""} />
+              </FormControl>
+              <FormDescription className="text-xs">
+                Shown on project rows where the full name would not fit.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-semibold">Description</FormLabel>
+              <FormControl>
+                <Textarea className="min-h-17.5 text-sm" {...field} value={field.value ?? ""} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-semibold">Status</FormLabel>
+              <SearchableSelect
+                value={field.value}
+                onValueChange={(value) => field.onChange(value as PortfolioFields["status"])}
+                options={STATUS_OPTIONS}
+                placeholder="Select status"
+                searchPlaceholder="Search status..."
+              />
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <DialogFooter className="gap-2">
+          {portfolio && onDelete && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-destructive hover:text-destructive sm:mr-auto"
+              onClick={() => onDelete(portfolio)}
+              disabled={save.isPending}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          )}
+          <Button type="button" variant="outline" onClick={onCancel} disabled={save.isPending}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={save.isPending}>
+            {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {portfolio ? "Save Changes" : "Create Portfolio"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
   )
 }
