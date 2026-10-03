@@ -15,6 +15,7 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  dailyRoster: (date: string, department: string | null) => ["daily-roster", date, department],
   attendanceLeaderboard: (filters: Record<string, unknown>) => ["attendance-leaderboard", filters],
   attendanceRecords: (filters: Record<string, unknown>) => ["attendance-records", filters],
   employeeAttendanceDays: (userId: string, yearMonth: string, exempt: boolean) => [
@@ -37,6 +38,7 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  performanceReviewSeed: (userId: string, cycleId: string) => ["performance-review-seed", userId, cycleId],
   competencies: () => ["competencies"],
   myPeerFeedback: () => ["my-peer-feedback"],
   adminPeerFeedback: () => ["admin-peer-feedback"],

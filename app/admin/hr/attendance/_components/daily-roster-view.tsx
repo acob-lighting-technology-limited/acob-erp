@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
@@ -34,16 +34,14 @@ import {
 import { toast } from "sonner"
 import { toLocalISODate, isLate } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
-import { computeAttendanceDay, netDayHoursFor, COVERED_STATUSES } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
-import {
-  MANUAL_ATTENDANCE_STATUS_OPTIONS,
-  isEarlyDeparture,
-  getManualStatusEditOptions,
-} from "@/lib/hr/attendance-status"
+import { isEarlyDeparture, getManualStatusEditOptions } from "@/lib/hr/attendance-status"
 import { StatusBadge, formatTime, labelSource } from "./status-badge"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { orderRoster, rosterPhase } from "@/lib/hr/roster-order"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 function parseTimeToMinutes(value: string | null | undefined): number | null {
   if (!value) return null
@@ -155,16 +153,9 @@ function formatClock12(hhmm: string): string {
 
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [loading, setLoading] = useState(false)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [editForm, setEditForm] = useState({ status: "", manual_comment: "" })
   const [saving, setSaving] = useState(false)
-  // Served by the records API so day breakdowns here charge the same hours the
-  // server did. Defaults only apply until the first response lands.
-  const [policy, setPolicy] = useState<AttendancePolicy>(DEFAULT_ATTENDANCE_POLICY)
-  // The day's closing time (early closure or policy end), from the records API.
-  const [closeTime, setCloseTime] = useState<string | null>(null)
   // Ticks each minute so an open page switches from arrivals to departures at closing.
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -172,44 +163,47 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
     return () => window.clearInterval(timer)
   }, [])
 
-  const load = useCallback(
-    async (options?: { silent?: boolean }) => {
-      if (!options?.silent) setLoading(true)
-      try {
-        const params = new URLSearchParams({ start_date: rosterDate, end_date: rosterDate, include_all: "1" })
-        if (lockedDepartment) params.set("department", lockedDepartment)
-        const res = await apiFetch(`/api/admin/hr/attendance/records?${params}`, { cache: "no-store" })
-        const payload = await res.json().catch(() => null)
-        if (!res.ok) throw new Error(payload?.error || "Failed to load roster")
-        setRecords(payload.records || [])
-        if (payload?.policy) setPolicy({ ...DEFAULT_ATTENDANCE_POLICY, ...payload.policy })
-        setCloseTime(typeof payload?.close_time === "string" ? payload.close_time : null)
-      } catch {
-        if (!options?.silent) toast.error("Failed to load daily roster")
-      } finally {
-        if (!options?.silent) setLoading(false)
+  const {
+    data: roster,
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.dailyRoster(rosterDate, lockedDepartment ?? null),
+    queryFn: async () => {
+      const params = new URLSearchParams({ start_date: rosterDate, end_date: rosterDate, include_all: "1" })
+      if (lockedDepartment) params.set("department", lockedDepartment)
+      const payload = await apiJson<{
+        records?: AttendanceRecord[]
+        policy?: Partial<AttendancePolicy>
+        close_time?: unknown
+      }>(`/api/admin/hr/attendance/records?${params}`, { cache: "no-store" })
+      return {
+        records: payload.records ?? [],
+        // Served by the records API so day breakdowns here charge the same hours the server did.
+        policy: { ...DEFAULT_ATTENDANCE_POLICY, ...payload.policy } as AttendancePolicy,
+        // The day's closing time (early closure or policy end).
+        closeTime: typeof payload.close_time === "string" ? payload.close_time : null,
       }
     },
-    [rosterDate, lockedDepartment]
-  )
-
-  useEffect(() => {
-    void load()
-  }, [load])
+    // A live check should not need a Refresh button: reload quietly every two
+    // minutes while today's roster is open. Past days do not change.
+    refetchInterval: (query) => {
+      const data = query.state.data
+      const close = data?.closeTime ?? data?.policy.endTime ?? DEFAULT_ATTENDANCE_POLICY.endTime
+      return rosterPhase({ rosterDate, now: new Date(), closeTime: close }) !== null ? AUTO_REFRESH_MS : false
+    },
+    meta: { errorMessage: "Failed to load daily roster" },
+  })
+  const records = useMemo(() => roster?.records ?? [], [roster])
+  const policy = roster?.policy ?? DEFAULT_ATTENDANCE_POLICY
+  const closeTime = roster?.closeTime ?? null
+  const load = () => void refetch()
 
   // Default order only - clicking a column header still sorts by that column.
   const phase = rosterPhase({ rosterDate, now, closeTime: closeTime ?? policy.endTime })
   const orderedRecords = useMemo(() => orderRoster(records, phase), [records, phase])
   const closingLabel = formatClock12((closeTime ?? policy.endTime).slice(0, 5))
-
-  // A live check should not need a Refresh button: reload quietly every two
-  // minutes while today's roster is open. Past days do not change.
   const isLive = phase !== null
-  useEffect(() => {
-    if (!isLive) return
-    const timer = window.setInterval(() => void load({ silent: true }), AUTO_REFRESH_MS)
-    return () => window.clearInterval(timer)
-  }, [isLive, load])
 
   function openEdit(record: AttendanceRecord) {
     const clockIn = record.clock_in ?? null
