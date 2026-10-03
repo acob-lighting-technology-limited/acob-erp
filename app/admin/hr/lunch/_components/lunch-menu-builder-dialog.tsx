@@ -42,7 +42,8 @@ interface LunchMenuBuilderDialogProps {
   defaultDate: string
   /** Today in WAT, so the derived heading preview matches the staff page. */
   todayDate: string
-  onSaved: () => void
+  /** `published` is true when this save published the menu — the page then offers the WhatsApp post. */
+  onSaved: (result: { date: string; published: boolean }) => void
 }
 
 function blankGroup(): DraftGroup {
@@ -161,7 +162,7 @@ export function LunchMenuBuilderDialog({
 
       toast.success(publish ? "Menu published — staff can vote now." : "Menu saved as draft.")
       onOpenChange(false)
-      onSaved()
+      onSaved({ date, published: publish })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save menu")
     } finally {
