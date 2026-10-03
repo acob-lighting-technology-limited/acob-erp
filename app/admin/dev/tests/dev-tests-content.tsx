@@ -1,36 +1,32 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FlaskConical, Route, Ticket, ClipboardList, Package, Activity } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
-import { logger } from "@/lib/logger"
 import { LeaveTab } from "./_components/LeaveTab"
 import { HelpDeskTab } from "./_components/HelpDeskTab"
 import { TaskTab } from "./_components/TaskTab"
 import { AssetMailRoutingPanel } from "./_components/AssetMailRoutingPanel"
 import { RouteHealthPanel } from "./_components/RouteHealthPanel"
-
-const log = logger("dev-tests")
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 // ── Root Content Component ────────────────────────────────────────────────────
 export function DevTestsContent() {
-  const [employees, setEmployees] = useState<{ value: string; label: string }[]>([])
-  const [leaveTypes, setLeaveTypes] = useState<{ value: string; label: string }[]>([])
-  const [departments, setDepartments] = useState<string[]>([])
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/admin/dev/tests/form-data", { cache: "no-store" })
-    if (!res.ok) throw new Error("Failed to load form data")
-    const json = await res.json()
-    setEmployees(json.employees || [])
-    setLeaveTypes(json.leaveTypes || [])
-    setDepartments(json.departments || [])
-  }, [])
-
-  useEffect(() => {
-    load().catch((err) => log.error({ err: String(err) }, "load failed"))
-  }, [load])
+  const { data } = useQuery({
+    queryKey: QUERY_KEYS.devTestsFormData(),
+    queryFn: () =>
+      apiJson<{
+        employees?: { value: string; label: string }[]
+        leaveTypes?: { value: string; label: string }[]
+        departments?: string[]
+      }>("/api/admin/dev/tests/form-data", { cache: "no-store" }),
+    meta: { errorMessage: "Failed to load form data" },
+  })
+  const employees = data?.employees ?? []
+  const leaveTypes = data?.leaveTypes ?? []
+  const departments = data?.departments ?? []
 
   return (
     <PageWrapper maxWidth="full" background="gradient">

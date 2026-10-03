@@ -1,43 +1,30 @@
 "use client"
 
-import React, { useEffect, useState, useCallback, use } from "react"
+import React, { use, useState } from "react"
 import { toast } from "sonner"
 import type { Requisition } from "@/lib/requisitions/types"
 import { RequisitionPdfDocument } from "../_components/requisition-pdf-document"
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 export default function RequisitionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [requisition, setRequisition] = useState<Requisition | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
 
-  const fetchDetail = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/requisitions/${id}`)
-      const json = await res.json()
-
-      if (!res.ok) {
-        throw new Error(json.error || json.message || "Failed to load requisition")
-      }
-
-      setRequisition(json.data)
-    } catch (err: any) {
-      setError(err.message || "Error fetching requisition")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [id])
-
-  useEffect(() => {
-    fetchDetail()
-  }, [fetchDetail])
+  const {
+    data: requisition = null,
+    isLoading,
+    error: queryError,
+    refetch: fetchDetail,
+  } = useQuery({
+    queryKey: QUERY_KEYS.requisition(id),
+    queryFn: async () => (await apiJson<{ data: Requisition }>(`/api/requisitions/${id}`)).data,
+  })
+  const error = queryError?.message ?? null
 
   const handleApprove = async (comments?: string) => {
     if (!requisition) return

@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Search, X } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { fetchDirectoryRows } from "@/lib/directory/client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 export interface DirectoryEmployee {
   id: string
@@ -36,6 +39,18 @@ interface EmployeeRecipientPickerProps {
   emptyHint?: string
 }
 
+function toRecipients(rows: DirectoryRow[]): DirectoryEmployee[] {
+  return rows
+    .filter((r) => r.employment_status !== "exited")
+    .map((r) => ({
+      id: r.id,
+      name: r.full_name?.trim() || [r.first_name, r.last_name].filter(Boolean).join(" ") || "Unknown",
+      email: r.company_email || r.additional_email || null,
+      department: r.department,
+    }))
+    .filter((e) => e.email)
+}
+
 export function EmployeeRecipientPicker({
   selectedIds,
   onChange,
@@ -43,37 +58,22 @@ export function EmployeeRecipientPicker({
   onEmployeesLoaded,
   emptyHint = "No recipients selected yet.",
 }: EmployeeRecipientPickerProps) {
-  const [employees, setEmployees] = useState<DirectoryEmployee[]>([])
-  const [loading, setLoading] = useState(true)
+  const {
+    data: employees = [],
+    isLoading: loading,
+    isSuccess: loaded,
+  } = useQuery({
+    queryKey: QUERY_KEYS.directory(),
+    queryFn: () => fetchDirectoryRows<DirectoryRow>(),
+    select: toRecipients,
+  })
   const [query, setQuery] = useState("")
 
+  // Tell the caller once the directory is available (it reconciles legacy emails against it).
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const res = await fetch("/api/directory", { cache: "no-store" })
-        const payload = (await res.json().catch(() => null)) as { data?: DirectoryRow[] } | null
-        if (cancelled) return
-        const rows = (payload?.data ?? [])
-          .filter((r) => r.employment_status !== "exited")
-          .map((r) => ({
-            id: r.id,
-            name: r.full_name?.trim() || [r.first_name, r.last_name].filter(Boolean).join(" ") || "Unknown",
-            email: r.company_email || r.additional_email || null,
-            department: r.department,
-          }))
-          .filter((e) => e.email)
-        setEmployees(rows)
-        onEmployeesLoaded?.(rows)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (loaded) onEmployeesLoaded?.(employees)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per load, not on every parent render
+  }, [loaded])
 
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
 

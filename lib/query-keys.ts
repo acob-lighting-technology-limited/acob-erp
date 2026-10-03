@@ -12,6 +12,12 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  employeeCycleAttendance: (userId: string, start: string, end: string) => [
+    "employee-cycle-attendance",
+    userId,
+    start,
+    end,
+  ],
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
@@ -194,5 +200,9 @@ export const QUERY_KEYS = {
     filters ? ["admin-security-network-activity", filters] : ["admin-security-network-activity"],
 
   // Dev / maintenance
+  devTestsFormData: () => ["dev-tests-form-data"],
   maintenanceState: () => ["maintenance-state"],
+
+  // Requisitions
+  requisition: (id: string) => ["requisition", id],
 } as const

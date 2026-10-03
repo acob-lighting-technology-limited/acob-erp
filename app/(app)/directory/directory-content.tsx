@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { fetchDirectoryRows } from "@/lib/directory/client"
 
 type DirectoryRow = {
   id: string
@@ -138,12 +139,7 @@ function displayName(row: DirectoryRow): string {
   return first || row.company_email || "Unknown"
 }
 
-async function fetchDirectory(): Promise<DirectoryRow[]> {
-  const res = await fetch("/api/directory", { method: "GET", credentials: "include", cache: "no-store" })
-  const payload = await res.json()
-  if (!res.ok) throw new Error(payload?.error || `Failed to load directory (${res.status})`)
-  return (payload?.data || []) as DirectoryRow[]
-}
+const fetchDirectory = () => fetchDirectoryRows<DirectoryRow>()
 
 export function DirectoryContent() {
   const queryClient = useQueryClient()

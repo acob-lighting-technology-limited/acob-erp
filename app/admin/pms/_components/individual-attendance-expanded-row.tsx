@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { StatusBadge, formatTime, labelSource } from "@/app/admin/hr/attendance/_components/status-badge"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type AttendanceDay = {
   date: string
@@ -49,62 +51,36 @@ export function IndividualAttendanceExpandedRow({
   cycleId: string
   cycles: { id: string; name: string; start_date: string | null; end_date: string | null }[]
 }) {
-  const [days, setDays] = useState<AttendanceDay[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
   const cycle = cycles.find((c) => c.id === cycleId)
   const startDate = cycle?.start_date
   const endDate = cycle?.end_date
 
-  useEffect(() => {
-    if (!userId || !startDate || !endDate) return
-
-    let active = true
-    setIsLoading(true)
-    setError(null)
-
-    const months = getMonthsInRange(startDate, endDate)
-
-    void (async () => {
-      try {
-        const promises = months.map(async (month) => {
-          const res = await fetch(
+  const {
+    data: days = [],
+    isLoading,
+    error: queryError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.employeeCycleAttendance(userId, startDate ?? "", endDate ?? ""),
+    enabled: Boolean(userId && startDate && endDate),
+    queryFn: async () => {
+      const months = getMonthsInRange(startDate!, endDate!)
+      const results = await Promise.all(
+        months.map(async (month) => {
+          const payload = await apiJson<{ data?: AttendanceDay[] }>(
             `/api/admin/hr/attendance/employee-days?user_id=${encodeURIComponent(userId)}&year_month=${encodeURIComponent(month)}`,
             { cache: "no-store" }
           )
-          if (!res.ok) {
-            throw new Error(`Failed to fetch attendance for ${month}`)
-          }
-          const payload = await res.json()
-          return (payload?.data || []) as AttendanceDay[]
+          return payload.data || []
         })
-
-        const results = await Promise.all(promises)
-        if (!active) return
-
-        // Merge all arrays, filter within cycle range, and sort descending
-        const merged = results
-          .flat()
-          .filter((d) => d.date >= startDate && d.date <= endDate)
-          .sort((a, b) => b.date.localeCompare(a.date))
-
-        setDays(merged)
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load logs")
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false)
-        }
-      }
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [userId, startDate, endDate])
+      )
+      // Merge all months, keep the cycle range, newest first.
+      return results
+        .flat()
+        .filter((d) => d.date >= startDate! && d.date <= endDate!)
+        .sort((a, b) => b.date.localeCompare(a.date))
+    },
+  })
+  const error = queryError?.message ?? null
 
   if (isLoading) {
     return (
