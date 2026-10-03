@@ -271,6 +271,7 @@ export const QUERY_KEYS = {
   payrollPeriods: () => ["payroll-periods"],
 
   // Documents
+  onedriveFiles: (filters: Record<string, unknown>) => ["onedrive-files", filters],
   generalDocumentation: () => ["general-documentation"],
   onedrivePreview: (path: string, accessMode: string, department?: string) => [
     "onedrive-preview",
