@@ -4,6 +4,8 @@
  */
 export const QUERY_KEYS = {
   // HR
+  grantableLeaveTypes: (userId: string) => ["grantable-leave-types", userId],
+  adminLeaveEmployees: () => ["admin-leave-employees"],
   myLunchReview: (menuId: string) => ["my-lunch-review", menuId],
   leaveRequests: (filters?: Record<string, unknown>) => (filters ? ["leave-requests", filters] : ["leave-requests"]),
   leaveBalance: (userId?: string) => ["leave-balance", userId],
@@ -14,6 +16,7 @@ export const QUERY_KEYS = {
 
   // Attendance
   attendanceDeviceStatus: () => ["attendance-device-status"],
+  attendanceAppeals: (filters: Record<string, unknown>) => ["attendance-appeals", filters],
   attendanceReportConfig: () => ["attendance-report-config"],
   employeeCycleAttendance: (userId: string, start: string, end: string) => [
     "employee-cycle-attendance",
@@ -24,6 +27,7 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  cbtAttemptDetail: (profileId: string, cycleId: string) => ["cbt-attempt-detail", profileId, cycleId],
   cbtAttempts: () => ["cbt-attempts"],
   cbtBonusScores: () => ["cbt-bonus-scores"],
   strategicGoals: (scope: string, department?: string | null, year?: number | null) => [

@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { logger } from "@/lib/logger"
 import { CheckCircle2, XCircle, AlertCircle, Loader2, Info } from "lucide-react"
 
-const log = logger("cbt-attempt-detail")
 import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface CbtAttemptDetailProps {
   profileId: string
@@ -36,64 +36,36 @@ type Attempt = {
 }
 
 export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailProps) {
-  const [attempt, setAttempt] = useState<Attempt | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [isGated, setIsGated] = useState(false)
-  const [gatedReason, setGatedReason] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadDetail() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const params = new URLSearchParams({ profile_id: profileId, review_cycle_id: reviewCycleId })
-        const res = await fetch(`/api/admin/hr/performance/cbt/attempts/detail?${params}`, { cache: "no-store" })
-        const payload = await res.json().catch(() => null)
-        if (!res.ok) throw new Error(payload?.error || "Failed to load CBT details")
-
-        const { attempt: attemptData, questions: rawQuestions, gated, gated_reason } = payload?.data ?? {}
-
-        if (!attemptData) {
-          if (isMounted) {
-            setAttempt(null)
-            setIsLoading(false)
-          }
-          return
-        }
-
-        const typedAttempt = attemptData as Attempt
-        const orderedQuestions = (typedAttempt.question_ids || [])
-          .map((qId: string) => (rawQuestions as Question[]).find((q) => q.id === qId))
-          .filter((q): q is Question => !!q)
-
-        if (isMounted) {
-          setAttempt(typedAttempt)
-          setQuestions(orderedQuestions)
-          setIsGated(Boolean(gated))
-          setGatedReason(typeof gated_reason === "string" ? gated_reason : null)
-        }
-      } catch (err) {
-        log.error({ err: String(err) }, "Failed to load CBT attempt details")
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : "Failed to load CBT details")
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
+  const {
+    data,
+    isLoading,
+    error: queryError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.cbtAttemptDetail(profileId, reviewCycleId),
+    queryFn: async () => {
+      const params = new URLSearchParams({ profile_id: profileId, review_cycle_id: reviewCycleId })
+      const payload = await apiJson<{
+        data?: { attempt?: Attempt | null; questions?: Question[]; gated?: boolean; gated_reason?: unknown }
+      }>(`/api/admin/hr/performance/cbt/attempts/detail?${params}`, { cache: "no-store" })
+      const { attempt: typedAttempt, questions: rawQuestions = [], gated, gated_reason } = payload.data ?? {}
+      if (!typedAttempt) return { attempt: null, questions: [], isGated: false, gatedReason: null }
+      // Show questions in the order the candidate saw them.
+      const questions = (typedAttempt.question_ids || [])
+        .map((qId: string) => rawQuestions.find((q) => q.id === qId))
+        .filter((q): q is Question => !!q)
+      return {
+        attempt: typedAttempt,
+        questions,
+        isGated: Boolean(gated),
+        gatedReason: typeof gated_reason === "string" ? gated_reason : null,
       }
-    }
-
-    void loadDetail()
-
-    return () => {
-      isMounted = false
-    }
-  }, [profileId, reviewCycleId])
+    },
+  })
+  const attempt = data?.attempt ?? null
+  const questions = data?.questions ?? []
+  const isGated = data?.isGated ?? false
+  const gatedReason = data?.gatedReason ?? null
+  const error = queryError?.message ?? null
 
   if (isLoading) {
     return (
