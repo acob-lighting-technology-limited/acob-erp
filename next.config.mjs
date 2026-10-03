@@ -73,6 +73,12 @@ const securityHeaders = [
 ]
 
 const nextConfig = {
+  // React Compiler in opt-in mode (audit 6.4): only components marked with a
+  // "use memo" directive are compiled. Mark a component once it passes the
+  // React-19 hook rules, verify it, then drop its manual useMemo/useCallback.
+  // Switch to the default "infer" mode once most of the app is opted in.
+  reactCompiler: { compilationMode: "annotation" },
+
   transpilePackages: ["xlsx", "jspdf", "jspdf-autotable", "docx", "file-saver"],
 
   images: {
