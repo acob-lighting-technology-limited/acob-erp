@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
-import { ProjectContent } from "./project-content"
+import { ProjectContent } from "@/components/projects/project-list-content"
 import type { Metadata } from "next"
 import { logger } from "@/lib/logger"
 

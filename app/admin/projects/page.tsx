@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { resolveAdminScope } from "@/lib/admin/rbac"
-import { ProjectAdminContent } from "./_components/project-admin-content"
+import { ProjectContent } from "@/components/projects/project-list-content"
 import type { Metadata } from "next"
 import { logger } from "@/lib/logger"
 
@@ -85,5 +85,5 @@ export default async function AdminProjectsPage() {
     userProfile: { id: string; role: string; department: string | null }
   }
 
-  return <ProjectAdminContent profiles={result.profiles} currentUser={result.userProfile} />
+  return <ProjectContent admin profiles={result.profiles} />
 }

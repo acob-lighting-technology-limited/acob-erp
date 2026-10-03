@@ -5,22 +5,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableDetailField, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { QUERY_KEYS } from "@/lib/query-keys"
 import {
   FolderGit2,
   FolderKanban,
-  Plus,
   RefreshCw,
   Calendar,
   MapPin,
   Wrench,
-  ShieldCheck,
   Briefcase,
-  Pencil,
   Activity,
   Layers,
   AlertTriangle,
@@ -28,10 +26,9 @@ import {
   LayoutDashboard,
   BarChart3,
   ArrowRight,
+  Pencil,
+  Plus,
 } from "lucide-react"
-import { toast } from "sonner"
-import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
-import { ProjectDialogs } from "./project-dialogs"
 import {
   PROJECT_HEALTH_LABELS,
   PROJECT_METRIC_HELP,
@@ -46,11 +43,21 @@ import {
   ProjectStatusBadge,
   ProjectSummary,
   WorkDoneCell,
+  WorkDoneText,
   formatCapacity,
   plansText,
 } from "@/components/projects/project-summary"
 import { ProjectsOverview, type OverviewProject } from "@/components/projects/projects-overview"
-import { ProjectCharts, type ChartsProject } from "@/components/projects/project-charts"
+import dynamic from "next/dynamic"
+import type { ChartsProject } from "@/components/projects/project-charts"
+
+// recharts is one of the heaviest things in the bundle and the charts sit
+// below the fold behind a toggle, so it is fetched when they are first shown
+// rather than on page load. ssr:false because recharts measures the DOM.
+const ProjectCharts = dynamic(() => import("@/components/projects/project-charts").then((m) => m.ProjectCharts), {
+  ssr: false,
+  loading: () => <div className="bg-muted/40 h-[320px] w-full animate-pulse rounded-lg" />,
+})
 import { toLocalISODate } from "@/lib/utils/date"
 import { projectHref } from "@/lib/projects/links"
 import Link from "next/link"
@@ -61,9 +68,12 @@ import {
   normalizePriority,
   priorityRank,
 } from "@/lib/projects/priority"
+import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
+import { PROJECTS_QUERY_KEY } from "@/lib/projects/records"
+import { ProjectDialogs } from "@/app/admin/projects/_components/project-dialogs"
 
-// Define core project structure
-export interface Project {
+// Define user-facing project type (includes tasks count payload)
+export interface ProjectRow {
   id: string
   project_name: string
   location: string
@@ -76,7 +86,7 @@ export interface Project {
   status: "planning" | "active" | "on_hold" | "completed" | "cancelled"
   created_at: string
   updated_at: string
-  portfolio_id: string | null
+  portfolio_id?: string | null
   priority?: string | null
   project_manager?: {
     id: string
@@ -90,47 +100,55 @@ export interface Project {
   plans?: { id: string }[] | null
 }
 
-interface ProjectAdminContentProps {
-  profiles: employee[]
-  currentUser: { id: string; role: string; department: string | null }
+/** The admin editor dialogs work on the same row shape. */
+export type Project = ProjectRow
+
+export interface ProjectContentProps {
+  profiles?: employee[]
+  /** Admin console: links to admin project pages, adds create/edit, and lists every project. */
+  admin?: boolean
+  currentUser?: {
+    id: string
+    role: string
+    is_department_lead: boolean
+    department: string | null
+    canManage?: boolean
+  }
 }
 
-function managerName(project: Project) {
-  return (
-    project.project_manager?.full_name ||
-    [project.project_manager?.first_name, project.project_manager?.last_name].filter(Boolean).join(" ") ||
-    "Unassigned"
-  )
-}
-
-async function fetchProjects(): Promise<Project[]> {
+async function fetchUserProjects(): Promise<ProjectRow[]> {
   const res = await fetch("/api/projects", { cache: "no-store" })
   const payload = await res.json()
   if (!res.ok) {
     throw new Error(payload?.error || `Failed to load projects (${res.status})`)
   }
-  return (payload?.data || []) as Project[]
+  return (payload?.data || []) as ProjectRow[]
 }
 
-export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminContentProps) {
+export function ProjectContent({ profiles = [], admin = false }: ProjectContentProps = {}) {
   const queryClient = useQueryClient()
-  const [activeProject, setActiveProject] = useState<Project | null>(null)
+  const [activeProject, setActiveProject] = useState<ProjectRow | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const openEdit = (project: ProjectRow) => {
+    setActiveProject(project)
+    setIsEditOpen(true)
+  }
+  const staffAvatars = useStaffAvatars()
 
-  // React Query fetch for project list
+  // Fetch project list
   const {
     data: rows = [],
     isLoading,
     error,
     refetch,
   } = useQuery({
-    queryKey: ["projects"],
-    queryFn: fetchProjects,
+    queryKey: PROJECTS_QUERY_KEY,
+    queryFn: fetchUserProjects,
   })
 
-  // Health is derived from the project's own tasks on every render — nothing
-  // about progress is stored, so these figures cannot drift from the tasks.
+  // Progress comes from the same helper the admin project and portfolio pages
+  // use, so a project reads the same whichever page you open it on.
   const healthById = useMemo(() => {
     const today = toLocalISODate()
     return new Map(
@@ -222,7 +240,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
   }, [rows])
 
   // Table columns definition
-  const columns = useMemo<DataTableColumn<Project>[]>(
+  const columns = useMemo<DataTableColumn<ProjectRow>[]>(
     () => [
       {
         key: "project_name",
@@ -232,7 +250,7 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         render: (r) => (
           <div className="space-y-1">
             <Link
-              href={projectHref(r.id, true)}
+              href={projectHref(r.id, admin)}
               onClick={(e) => e.stopPropagation()}
               className="text-foreground hover:text-primary font-semibold hover:underline"
             >
@@ -261,8 +279,22 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         accessor: (r) => r.project_manager?.full_name || "",
         render: (r) => (
           <div className="flex items-center gap-1.5 text-sm">
-            <Briefcase className="text-muted-foreground h-3.5 w-3.5" />
-            <span>{managerName(r)}</span>
+            {r.project_manager ? (
+              <StaffAvatar
+                name={
+                  r.project_manager.full_name || [r.project_manager.first_name, r.project_manager.last_name].join(" ")
+                }
+                src={staffAvatars[r.project_manager.id]}
+                size="xs"
+              />
+            ) : (
+              <Briefcase className="text-muted-foreground h-3.5 w-3.5" />
+            )}
+            <span>
+              {r.project_manager?.full_name ||
+                [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
+                "Unassigned"}
+            </span>
           </div>
         ),
       },
@@ -314,11 +346,24 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         render: (r) => <ProjectStatusBadge status={r.status} />,
       },
     ],
-    [healthById]
+    [healthById, staffAvatars, admin]
   )
 
+  // Portfolio option list for filtering
+  const portfolioOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const r of rows) {
+      if (r.portfolio) {
+        map.set(r.portfolio.id, r.portfolio.code ? `${r.portfolio.code} — ${r.portfolio.name}` : r.portfolio.name)
+      }
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label }))
+  }, [rows])
+
   // Filters definition
-  const filters = useMemo<DataTableFilter<Project>[]>(
+  const filters = useMemo<DataTableFilter<ProjectRow>[]>(
     () => [
       {
         key: "status",
@@ -342,55 +387,76 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
         key: "technology_type",
         label: "Technology",
         options: techOptions,
-        // The technology column moved into the expanded view, so match on the row.
         mode: "custom",
         filterFn: (row, selected) => selected.includes(row.technology_type || ""),
       },
       {
         key: "health",
         label: "Progress",
-        options: (["on_track", "at_risk", "behind_schedule", "completed"] as const).map((value) => ({
-          value,
-          label: PROJECT_HEALTH_LABELS[value],
-        })),
+        options: [
+          { value: "on_track", label: PROJECT_HEALTH_LABELS.on_track },
+          { value: "at_risk", label: PROJECT_HEALTH_LABELS.at_risk },
+          { value: "behind_schedule", label: PROJECT_HEALTH_LABELS.behind_schedule },
+          { value: "completed", label: PROJECT_HEALTH_LABELS.completed },
+        ],
         mode: "custom",
         filterFn: (row, selected) => selected.includes(healthById.get(row.id)?.status ?? "on_track"),
       },
+      ...(portfolioOptions.length > 0
+        ? [
+            {
+              key: "portfolio",
+              label: "Portfolio",
+              options: portfolioOptions,
+              mode: "custom" as const,
+              filterFn: (row: ProjectRow, selected: string[]) =>
+                selected.length === 0 || (row.portfolio?.id ? selected.includes(row.portfolio.id) : false),
+            },
+          ]
+        : []),
     ],
-    [techOptions, healthById]
+    [techOptions, portfolioOptions, healthById]
   )
 
   return (
     <DataTablePage
-      title="Projects Management"
-      description="Overview and detailed task status tracking for all company ongoing installations."
-      backLink={{ href: "/admin", label: "Back to Admin" }}
+      title={admin ? "Projects Management" : "Projects & Deployments"}
+      description={
+        admin
+          ? "Overview and detailed task status tracking for all company ongoing installations."
+          : "View ongoing mini-grid electrification and solar installations progress and task milestones."
+      }
+      backLink={admin ? { href: "/admin", label: "Back to Admin" } : undefined}
+      spacing="tight"
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => router.replace(tab === "projects" ? pathname : `${pathname}?tab=${tab}`, { scroll: false })}
+      actionsPlacement="inline-always"
       actions={
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ["projects"] })}
+            onClick={() => queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })}
             disabled={isLoading}
           >
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button size="sm" onClick={() => setIsAddOpen(true)}>
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Project</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          {admin && (
+            <Button size="sm" onClick={() => setIsAddOpen(true)}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Project</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
         </div>
       }
       stats={
         <StatGrid>
           <StatCard
             variant="compact"
-            title="Projects"
+            title={admin ? "Projects" : "My projects"}
             value={stats.total}
             icon={FolderKanban}
             iconBgColor="bg-blue-500/10"
@@ -420,14 +486,14 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
       {activeTab === "charts" ? (
         <ProjectCharts projects={chartProjects} filterBy="project" />
       ) : activeTab === "overview" ? (
-        <ProjectsOverview projects={overviewItems} hrefFor={(p) => projectHref(p.id, true)} />
+        <ProjectsOverview projects={overviewItems} hrefFor={(p) => projectHref(p.id, admin)} />
       ) : (
-        <DataTable<Project>
+        <DataTable<ProjectRow>
           data={rowsByPriority}
           columns={columns}
           filters={filters}
           getRowId={(r) => r.id}
-          searchPlaceholder="Search project name, location..."
+          searchPlaceholder="Search project title or site location..."
           searchFn={(row, query) => {
             const q = query.toLowerCase()
             return (
@@ -440,16 +506,16 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
           error={error instanceof Error ? error.message : null}
           onRetry={refetch}
           viewToggle
-          contactsView
           stickyToolbar
+          contactsView
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
             title: (r) => r.project_name,
-            subtitle: (r) => `${r.location} · ${formatCapacity(r.capacity_w)} · ${r.technology_type || "General"}`,
+            subtitle: (r) => [r.location, r.technology_type].filter(Boolean).join(" · ") || r.location,
             trailing: (r) => <ProjectStatusBadge status={r.status} />,
             detail: {
               title: (r) => r.project_name,
-              subtitle: (r) => r.location,
+              subtitle: (r) => <span className="text-muted-foreground text-xs">{r.location}</span>,
               badges: (r) => {
                 const health = healthById.get(r.id)
                 return (
@@ -464,14 +530,21 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
                 const health = healthById.get(r.id)
                 const fields: DataTableDetailField[] = [
                   { icon: MapPin, label: "Location", value: r.location },
-                  { icon: Briefcase, label: "Project manager", value: managerName(r) },
-                  { icon: Layers, label: "Portfolio", value: r.portfolio?.name ?? "Unassigned", copyable: false },
+                  {
+                    icon: Briefcase,
+                    label: "Project manager",
+                    value:
+                      r.project_manager?.full_name ||
+                      [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
+                      "Unassigned",
+                  },
                   { icon: Wrench, label: "Technology", value: r.technology_type },
                   {
                     icon: FolderGit2,
                     label: "Capacity",
                     value: r.capacity_w === null ? null : formatCapacity(r.capacity_w),
                   },
+                  { icon: Layers, label: "Portfolio", value: r.portfolio?.name, copyable: false },
                   {
                     icon: Calendar,
                     label: "Dates",
@@ -495,66 +568,67 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
                 ]
                 return fields.filter((field) => field.value)
               },
-              actions: (r) => [
-                {
-                  label: "Open project",
-                  icon: ArrowRight,
-                  onClick: () => router.push(projectHref(r.id, true)),
-                },
-                {
-                  label: "Edit Project",
-                  icon: Pencil,
-                  onClick: () => {
-                    setActiveProject(r)
-                    setIsEditOpen(true)
-                  },
-                },
-              ],
+              actions: admin
+                ? (r) => [
+                    { label: "Open project", icon: ArrowRight, onClick: () => router.push(projectHref(r.id, true)) },
+                    { label: "Edit Project", icon: Pencil, onClick: () => openEdit(r) },
+                  ]
+                : undefined,
             },
           }}
-          cardRenderer={(r) => (
-            <div className="bg-card space-y-3 rounded-xl border p-4 text-xs transition-shadow hover:shadow-md">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{r.project_name}</p>
-                  <p className="text-muted-foreground text-xs">{r.location}</p>
+          rowActions={
+            admin
+              ? [
+                  { label: "Open project", icon: ArrowRight, onClick: (r) => router.push(projectHref(r.id, true)) },
+                  { label: "Edit Project Details", icon: Pencil, onClick: openEdit },
+                ]
+              : undefined
+          }
+          cardRenderer={(r) => {
+            const health = healthById.get(r.id)
+            return (
+              <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="line-clamp-2 text-sm font-semibold">{r.project_name}</h4>
+                  <ProjectStatusBadge status={r.status} />
                 </div>
-                <ProjectStatusBadge status={r.status} />
+                <div className="grid grid-cols-2 gap-1.5 text-xs">
+                  <div>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Location</p>
+                    <p className="font-medium">{r.location || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Technology</p>
+                    <p className="font-medium">{r.technology_type || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Capacity</p>
+                    <p className="font-medium">{formatCapacity(r.capacity_w)}</p>
+                  </div>
+                </div>
+                {health && (
+                  <p className="text-muted-foreground text-xs">
+                    <WorkDoneText health={health} />
+                  </p>
+                )}
+                <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
+                  <span>
+                    {r.project_manager?.full_name ||
+                      [r.project_manager?.first_name, r.project_manager?.last_name].filter(Boolean).join(" ") ||
+                      "Unassigned"}
+                  </span>
+                  {health && <HealthBadge status={health.status} />}
+                </div>
               </div>
-              <div className="text-muted-foreground flex items-center justify-between text-xs">
-                <span>{formatCapacity(r.capacity_w)}</span>
-                <span>{r.technology_type || "General"}</span>
-              </div>
-              {r.portfolio && (
-                <Badge variant="secondary" className="text-xs">
-                  {r.portfolio.code || r.portfolio.name}
-                </Badge>
-              )}
-            </div>
-          )}
-          rowActions={[
-            {
-              label: "Open project",
-              icon: ArrowRight,
-              onClick: (r) => router.push(projectHref(r.id, true)),
-            },
-            {
-              label: "Edit Project Details",
-              icon: Pencil,
-              onClick: (r) => {
-                setActiveProject(r)
-                setIsEditOpen(true)
-              },
-            },
-          ]}
-          forceRowActionsDropdown
+            )
+          }}
           expandable={{
             render: (r) => (
               <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
                 <ProjectSummary project={r} health={healthById.get(r.id)} />
                 <div className="flex justify-end">
                   <Button asChild size="sm" variant="outline">
-                    <Link href={projectHref(r.id, true)}>
+                    <Link href={projectHref(r.id, admin)}>
                       Open project and plans
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
@@ -563,24 +637,28 @@ export function ProjectAdminContent({ profiles, currentUser }: ProjectAdminConte
               </div>
             ),
           }}
-          emptyTitle="No Projects Found"
-          emptyDescription="Create a new project deployment profile to start tracking tasks."
+          emptyTitle={admin ? "No Projects Found" : "No Projects Assigned"}
+          emptyDescription={
+            admin
+              ? "Create a new project deployment profile to start tracking tasks."
+              : "You will see projects here once you are assigned as a manager or member."
+          }
           emptyIcon={FolderKanban}
           urlSync
         />
       )}
 
-      <ProjectDialogs
-        profiles={profiles}
-        isAddOpen={isAddOpen}
-        setIsAddOpen={setIsAddOpen}
-        isEditOpen={isEditOpen}
-        setIsEditOpen={setIsEditOpen}
-        selectedProject={activeProject}
-        onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["projects"] })
-        }}
-      />
+      {admin && (
+        <ProjectDialogs
+          profiles={profiles}
+          isAddOpen={isAddOpen}
+          setIsAddOpen={setIsAddOpen}
+          isEditOpen={isEditOpen}
+          setIsEditOpen={setIsEditOpen}
+          selectedProject={activeProject}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })}
+        />
+      )}
     </DataTablePage>
   )
 }

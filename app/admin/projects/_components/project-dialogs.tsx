@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
-import type { Project } from "./project-admin-content"
+import type { Project } from "@/components/projects/project-list-content"
 import { apiFetch } from "@/lib/api-client"
 import { usePortfolios } from "@/hooks/use-portfolios"
 

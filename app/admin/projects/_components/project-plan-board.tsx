@@ -61,7 +61,7 @@ import { countWork } from "@/lib/projects/health"
 import { TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task } from "@/types/task"
-import type { Project } from "./project-admin-content"
+import type { Project } from "@/components/projects/project-list-content"
 
 type Plan = {
   id: string
