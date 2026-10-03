@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useParams } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { useQueryClient } from "@tanstack/react-query"
@@ -16,7 +15,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { EmptyState } from "@/components/ui/patterns"
 import { PageLoader } from "@/components/ui/query-states"
 import { SupplierFormDialog } from "../_components/supplier-form-dialog"
-import { formatCurrency } from "@/lib/format"
+import { formatCurrency, formatDate } from "@/lib/format"
 
 interface Supplier {
   id: string
@@ -48,10 +47,6 @@ async function fetchSupplierDetail(id: string): Promise<SupplierPageData> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Supplier not found")
   const json = await res.json()
   return json.data as SupplierPageData
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 export default function SupplierDetailPage() {

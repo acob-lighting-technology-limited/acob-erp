@@ -10,6 +10,7 @@ import { formatName } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/patterns"
 import type { UserRole } from "@/types/database"
 import Image from "next/image"
+import { formatDate } from "@/lib/format"
 
 interface Profile {
   id: string
@@ -23,11 +24,6 @@ interface Profile {
   job_description: string | null
   job_description_updated_at: string | null
   created_at: string
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never"
-  return formatWATDate(dateString, { month: "short", day: "numeric", year: "numeric" })
 }
 
 interface JobDescriptionDialogProps {
@@ -73,7 +69,9 @@ export function JobDescriptionDialog({ profile, isOpen, onOpenChange }: JobDescr
               <Badge className={getRoleBadgeColor(profile?.role || "employee")}>
                 {getRoleDisplayName(profile?.role || "employee")}
               </Badge>
-              <span className="text-sm">Last updated: {formatDate(profile?.job_description_updated_at || null)}</span>
+              <span className="text-sm">
+                Last updated: {formatDate(profile?.job_description_updated_at || null, "Never")}
+              </span>
             </div>
           </DialogDescription>
         </DialogHeader>

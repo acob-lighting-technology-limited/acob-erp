@@ -32,7 +32,7 @@ import {
 } from "lucide-react"
 import type { HelpDeskTicketDetailResponse } from "@/components/help-desk/help-desk-types"
 import type { HelpDeskStatus } from "@/lib/help-desk/server"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatDateTime } from "@/lib/format"
 
 const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
   new: ["assigned", "department_queue", "cancelled"],
@@ -53,11 +53,6 @@ const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
 
 function formatLabel(value: string | null | undefined) {
   return String(value || "unknown").replaceAll("_", " ")
-}
-
-function formatDateTime(dateString: string | null | undefined) {
-  if (!dateString) return "—"
-  return formatWATDateTime(dateString)
 }
 
 interface UserHelpDeskTicketDetailsDialogProps {

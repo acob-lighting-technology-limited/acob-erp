@@ -5,7 +5,7 @@ import { ArrowRight, ScrollText } from "lucide-react"
 import { EmptyState } from "@/components/ui/patterns"
 import type { RecentActivityItem } from "./dashboard-types"
 import { cn } from "@/lib/utils"
-import { formatWATRelative } from "@/lib/utils/date"
+import { formatRelative } from "@/lib/format"
 
 const activityRouteMap: Record<string, string> = {
   task: "/admin/tasks",
@@ -31,10 +31,6 @@ const activityRouteMap: Record<string, string> = {
 
 function resolveActivityRoute(moduleKey: string): string {
   return activityRouteMap[moduleKey] || "/admin/audit-logs"
-}
-
-function formatDate(dateString: string): string {
-  return formatWATRelative(dateString)
 }
 
 interface RecentActivityFeedProps {
@@ -80,7 +76,7 @@ export function RecentActivityFeed({ activity, showViewAll = true, className }: 
                         {item.moduleLabel}
                       </Badge>
                       <span className="text-muted-foreground text-xs" suppressHydrationWarning>
-                        {formatDate(item.createdAt)}
+                        {formatRelative(item.createdAt)}
                       </span>
                     </div>
                   </div>

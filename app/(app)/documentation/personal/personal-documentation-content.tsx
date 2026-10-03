@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { FileText, Plus, Eye, Edit2, Trash2 } from "lucide-react"
-import { formatWATDateTime } from "@/lib/utils/date"
 import { Badge } from "@/components/ui/badge"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import { Button } from "@/components/ui/button"
@@ -20,6 +19,7 @@ import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatDateTime } from "@/lib/format"
 
 const log = logger("personal-documentation-content")
 
@@ -43,10 +43,6 @@ interface Documentation {
 interface PersonalDocumentationContentProps {
   initialDocs: Documentation[]
   userId: string
-}
-
-function formatDate(dateString: string) {
-  return formatWATDateTime(dateString)
 }
 
 function getStatusColor(isDraft: boolean) {
@@ -179,7 +175,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
         label: "Updated",
         sortable: true,
         accessor: (row) => row.updated_at,
-        render: (row) => <span className="text-muted-foreground text-xs">{formatDate(row.updated_at)}</span>,
+        render: (row) => <span className="text-muted-foreground text-xs">{formatDateTime(row.updated_at)}</span>,
         hideOnMobile: true,
       },
     ],
@@ -461,7 +457,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
               { label: "Status", value: doc.is_draft ? "Draft" : "Published" },
               { label: "Visibility", value: doc.visibility === "general" ? "General" : "Private" },
               { label: "Author", value: doc.author_name || null },
-              { label: "Updated", value: formatDate(doc.updated_at) },
+              { label: "Updated", value: formatDateTime(doc.updated_at) },
             ],
             actions: (doc) => [
               {
@@ -500,7 +496,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
         onOpenChange={setIsViewDialogOpen}
         doc={selectedDoc}
         getStatusColor={getStatusColor}
-        formatDate={formatDate}
+        formatDate={(value: string) => formatDateTime(value)}
       />
 
       <DocFormDialog

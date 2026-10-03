@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle, CircleDollarSign, Eye, FileClock, Plus, Receipt, Wallet } from "lucide-react"
@@ -13,7 +12,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { BillFormDialog } from "./_components/bill-form-dialog"
-import { formatCurrency } from "@/lib/format"
+import { formatCurrency, formatDate } from "@/lib/format"
 
 export interface Bill {
   id: string
@@ -44,10 +43,6 @@ async function fetchBillsList(): Promise<Bill[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load bills")
   const json = await res.json()
   return (json.data || []) as Bill[]
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getDateBand(bill: Bill) {
