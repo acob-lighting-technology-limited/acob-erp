@@ -145,14 +145,6 @@ interface DailyRosterViewProps {
 /** How often today's roster reloads itself. */
 const AUTO_REFRESH_MS = 2 * 60 * 1000
 
-/** "17:00" -> "5:00 PM". */
-function formatClock12(hhmm: string): string {
-  const [h, m] = hhmm.split(":").map(Number)
-  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm
-  const suffix = h >= 12 ? "PM" : "AM"
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`
-}
-
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
   const deptCode = useDepartmentCodes()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
@@ -205,7 +197,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   // Default order only - clicking a column header still sorts by that column.
   const phase = rosterPhase({ rosterDate, now, closeTime: closeTime ?? policy.endTime })
   const orderedRecords = useMemo(() => orderRoster(records, phase), [records, phase])
-  const closingLabel = formatClock12((closeTime ?? policy.endTime).slice(0, 5))
   const isLive = phase !== null
 
   function openEdit(record: AttendanceRecord) {
@@ -601,14 +592,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
           iconColor="text-cyan-500"
         />
       </StatGrid>
-
-      <p className="text-muted-foreground mb-2 text-xs">
-        {phase === "arrivals"
-          ? `Newest clock-ins first, until ${closingLabel} closing. Not in yet are at the bottom.`
-          : phase === "departures"
-            ? `Newest clock-outs first (closing was ${closingLabel}). Still in are at the bottom.`
-            : "Newest clock-outs first. No clock-out are at the bottom."}
-      </p>
 
       <DataTable<AttendanceRecord>
         data={orderedRecords}
