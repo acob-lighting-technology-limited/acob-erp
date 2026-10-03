@@ -42,6 +42,7 @@ export const QUERY_KEYS = {
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  departmentKpis: (department: string) => ["department-kpis", department],
   cbtSessionOptions: () => ["cbt-session-options"],
   cbtSnapshot: () => ["cbt-snapshot"],
   cbtCandidateEmails: () => ["cbt-candidate-emails"],
