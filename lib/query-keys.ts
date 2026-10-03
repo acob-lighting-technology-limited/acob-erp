@@ -247,6 +247,7 @@ export const QUERY_KEYS = {
   payrollPeriods: () => ["payroll-periods"],
 
   // Documents
+  generalDocumentation: () => ["general-documentation"],
   onedrivePreview: (path: string, accessMode: string, department?: string) => [
     "onedrive-preview",
     path,
@@ -257,4 +258,7 @@ export const QUERY_KEYS = {
   // Correspondence
   correspondenceRequesters: (department: string) => ["correspondence-requesters", department],
   correspondenceCategories: () => ["correspondence-categories"],
+
+  // Projects
+  portfolios: () => ["portfolios"],
 } as const
