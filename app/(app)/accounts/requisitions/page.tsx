@@ -89,10 +89,7 @@ export default function RequisitionListPage() {
       accessor: (r) => r.requisition_number,
       render: (r) => (
         <div className="flex flex-col gap-0.5">
-          <Link
-            href={`/accounts/requisitions/${r.id}`}
-            className="font-mono font-bold text-emerald-700 hover:underline dark:text-emerald-400"
-          >
+          <Link href={`/accounts/requisitions/${r.id}`} className="text-primary font-mono font-bold hover:underline">
             {r.requisition_number}
           </Link>
           {r.is_emergency && (

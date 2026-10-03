@@ -445,7 +445,7 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
               />
               <div className="pointer-events-none flex flex-col items-center justify-center gap-1.5">
                 {isUploading ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  <Loader2 className="text-primary h-6 w-6 animate-spin" />
                 ) : (
                   <Upload className="text-muted-foreground h-6 w-6" />
                 )}

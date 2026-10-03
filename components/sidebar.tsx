@@ -426,7 +426,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           <span className="relative inline-flex items-center">
                             <item.icon className="h-4 w-4 shrink-0" />
                             {isCollapsed && item.badge != null && item.badge > 0 && (
-                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-emerald-500 ring-2">
+                              <span className="ring-background bg-primary absolute -top-1 -right-1 flex h-2 w-2 rounded-full ring-2">
                                 <span className="sr-only">{item.badge} unviewed</span>
                               </span>
                             )}

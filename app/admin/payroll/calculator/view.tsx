@@ -1424,7 +1424,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               <Button variant="outline" size="sm" onClick={() => setApprovalDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={handleApprove}>
+              <Button size="sm" onClick={handleApprove}>
                 Confirm & Approve
               </Button>
             </DialogFooter>
