@@ -16,21 +16,22 @@ export default defineConfig([
       "react-hooks/purity": "error",
       "react-hooks/error-boundaries": "error",
       "react-hooks/static-components": "error",
+      // Data loading moved to TanStack Query (audit 6.2). The sites left are mostly
+      // "reset the form when a dialog opens"; they are being fixed by mounting the
+      // form only while open. Off until zero, because lint:strict fails on warnings.
+      "react-hooks/set-state-in-effect": "off",
       // Off, with reasons:
       // - incompatible-library flags library APIs (react-hook-form `watch`, etc.)
       //   that the React Compiler cannot optimise; nothing to fix on our side.
       // - preserve-manual-memoization only matters once the React Compiler is on.
-      // - set-state-in-effect: ~155 fetch-in-effect sites remain; they are being
-      //   moved to TanStack Query (audit 6.2). Turn on when that reaches zero.
       "react-hooks/incompatible-library": "off",
       "react-hooks/preserve-manual-memoization": "off",
-      "react-hooks/set-state-in-effect": "off",
       "react/no-unescaped-entities": "warn",
       "import/no-anonymous-default-export": "off",
       "@next/next/no-img-element": "warn",
       "prefer-const": "error",
       "no-restricted-syntax": [
-        "warn",
+        "error",
         {
           selector:
             "CallExpression[callee.name='useEffect'] > ArrowFunctionExpression > BlockStatement > ExpressionStatement > CallExpression[callee.object.name='fetch']",

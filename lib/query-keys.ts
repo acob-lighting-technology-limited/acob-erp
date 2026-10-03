@@ -88,6 +88,7 @@ export const QUERY_KEYS = {
   ticket: (id: string) => ["ticket", id],
 
   // Admin
+  adminCurrentUser: () => ["admin-current-user"],
   departmentRows: () => ["department-rows"],
   hrProfilesAll: () => ["hr-profiles-all"],
   myProfile: () => ["my-profile"],
