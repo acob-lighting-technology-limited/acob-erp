@@ -215,6 +215,7 @@ export const QUERY_KEYS = {
   hrLeaveTypesActive: () => ["hr-leave-types-active"],
 
   // Components
+  adminSurveys: () => ["admin-surveys"],
   myFeedbackLeads: () => ["my-feedback-leads"],
   feedbackViewer: () => ["feedback-viewer-filter"],
   paymentsTable: (filters?: Record<string, unknown>) => (filters ? ["payments-table", filters] : ["payments-table"]),
@@ -262,6 +263,8 @@ export const QUERY_KEYS = {
   ],
 
   // Correspondence
+  correspondenceCounts: (department: string | null) => ["correspondence-counts", department],
+  correspondenceRecords: (filters: Record<string, unknown>) => ["correspondence-records", filters],
   correspondenceRequesters: (department: string) => ["correspondence-requesters", department],
   correspondenceCategories: () => ["correspondence-categories"],
 
