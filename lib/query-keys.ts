@@ -192,4 +192,7 @@ export const QUERY_KEYS = {
   adminSecurityEmployees: () => ["admin-security-employees"],
   adminSecurityNetworkActivity: (filters?: Record<string, unknown>) =>
     filters ? ["admin-security-network-activity", filters] : ["admin-security-network-activity"],
+
+  // Dev / maintenance
+  maintenanceState: () => ["maintenance-state"],
 } as const

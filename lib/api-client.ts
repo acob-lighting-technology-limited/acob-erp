@@ -57,3 +57,19 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
 
   return fetch(input, { ...init, headers })
 }
+
+/**
+ * apiFetch + JSON parse + throw on a non-2xx status, using the route's
+ * `{ error }` body as the message. The standard queryFn for React Query:
+ *
+ *   useQuery({ queryKey: ["maintenance"], queryFn: () => apiJson<State>("/api/dev/maintenance") })
+ */
+export async function apiJson<T = unknown>(input: RequestInfo | URL, init: RequestInit = {}): Promise<T> {
+  const response = await apiFetch(input, init)
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const message = typeof payload?.error === "string" ? payload.error : `Request failed (${response.status})`
+    throw new Error(message)
+  }
+  return payload as T
+}
