@@ -1,5 +1,7 @@
 "use client"
 
+import { toCsv } from "@/lib/export/csv"
+
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDateTime, formatWATRelative, toLocalISODate } from "@/lib/utils/date"
@@ -79,7 +81,7 @@ async function fetchOnboarding(): Promise<OnboardingPayload> {
   }
 }
 
-function toCsv(rows: OnboardingRow[]) {
+function buildOnboardingCsv(rows: OnboardingRow[]) {
   const headers = [
     "employee_number",
     "name",
@@ -112,9 +114,7 @@ function toCsv(rows: OnboardingRow[]) {
     row.email_confirmed ? "yes" : "no",
     row.account_created_at || row.profile_created_at,
   ])
-  return [headers, ...body]
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    .join("\n")
+  return toCsv([headers, ...body])
 }
 
 export function OnboardingContent() {
@@ -306,7 +306,7 @@ export function OnboardingContent() {
   )
 
   const exportCsv = () => {
-    const csv = toCsv(scopedRows)
+    const csv = buildOnboardingCsv(scopedRows)
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")

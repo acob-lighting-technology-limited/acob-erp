@@ -1,5 +1,7 @@
 "use client"
 
+import { toCsv } from "@/lib/export/csv"
+
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDate, formatWATDateTime, formatWATRelative } from "@/lib/utils/date"
@@ -45,7 +47,7 @@ type DevLoginLogRow = {
   login_at: string
 }
 
-function toCsv(rows: DevLoginLogRow[]) {
+function buildLoginLogsCsv(rows: DevLoginLogRow[]) {
   const headers = ["time", "email", "name", "role", "department", "ip", "auth_method", "user_agent"]
   const body = rows.map((row) => [
     row.login_at,
@@ -57,10 +59,7 @@ function toCsv(rows: DevLoginLogRow[]) {
     row.auth_method || "",
     row.user_agent || "",
   ])
-  const escaped = [headers, ...body].map((line) =>
-    line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-  )
-  return escaped.join("\n")
+  return toCsv([headers, ...body])
 }
 
 type DevLoginLogsMeta = {
@@ -717,7 +716,7 @@ export function DevLoginLogsContent() {
   )
 
   const exportCsv = () => {
-    const csv = toCsv(filteredRows)
+    const csv = buildLoginLogsCsv(filteredRows)
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")

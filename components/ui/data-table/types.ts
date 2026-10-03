@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
+import type { TableExportOptions } from "@/lib/export/table-export"
 
 /** The three renderings a `DataTable` can show. */
 export type DataTableViewMode = "list" | "card" | "contacts"
@@ -168,6 +169,8 @@ export interface BulkAction<TData> {
 // ─── Main DataTable Props ────────────────────────────────────────────────────
 
 export interface DataTableProps<TData> {
+  /** Opt-in export of visible accessor columns and all filtered, sorted rows. */
+  export?: TableExportOptions | false
   // ── Core ─────────────────────────────────────────────────────────────────
   data: TData[]
   columns: DataTableColumn<TData>[]
@@ -348,6 +351,8 @@ export interface DataTableProps<TData> {
 // ─── DataTablePage Props ─────────────────────────────────────────────────────
 
 export interface DataTablePageProps {
+  /** Default export configuration for tables inside this page. */
+  export?: TableExportOptions | false
   title: string
   description?: string
   icon?: LucideIcon

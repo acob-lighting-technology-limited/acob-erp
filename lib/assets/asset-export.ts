@@ -1,3 +1,4 @@
+import { exportTable, getRecordExportColumns } from "@/lib/export/table-export"
 import { toast } from "sonner"
 import { formatName } from "@/lib/utils"
 import { ASSET_TYPE_MAP } from "@/lib/asset-types"
@@ -166,24 +167,13 @@ export function buildAssetExportRows(
 /** Excel export — call with pre-built rows */
 export async function exportAssetsToExcel(rows: AssetExportRow[], filename?: string): Promise<void> {
   try {
-    const XLSX = await import("@e965/xlsx")
-    const { default: saveAs } = await import("file-saver")
-
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Assets")
-
-    const maxWidth = 50
-    const cols = Object.keys(rows[0] || {}).map((key) => ({
-      wch: Math.min(Math.max(key.length, ...rows.map((row) => String(row[key] ?? "").length)), maxWidth),
-    }))
-    ws["!cols"] = cols
-
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-    const data = new Blob([excelBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    })
-    saveAs(data, filename ?? `assets-export-${toLocalISODate()}.xlsx`)
+    await exportTable(
+      rows,
+      getRecordExportColumns(rows),
+      { filename: filename ?? `assets-export-${toLocalISODate()}` },
+      "xlsx",
+      { sheetName: "Assets", maxColumnWidth: 50 }
+    )
     toast.success("Assets exported to Excel successfully")
   } catch (error: unknown) {
     log.error("Error exporting to Excel:", error)
@@ -202,30 +192,25 @@ export async function exportAssetsToPDF(
   extraMeta?: { total: number }
 ): Promise<void> {
   try {
-    const jsPDF = (await import("jspdf")).default
-    const autoTable = (await import("jspdf-autotable")).default
-
-    const doc = new jsPDF({ orientation: "landscape" })
-
-    doc.setFontSize(16)
-    doc.text("Assets Report", 14, 15)
-    doc.setFontSize(10)
-    doc.text(`Generated on: ${formatWATDate(new Date())}`, 14, 22)
-    doc.text(`Total Assets: ${extraMeta?.total ?? rows.length}`, 14, 28)
-
-    const headers = Object.keys(rows[0] || {})
-    const body = rows.map((row) => headers.map((h) => String(row[h] ?? "")))
-
-    autoTable(doc, {
-      head: [headers],
-      body,
-      startY: 35,
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [34, 139, 34], textColor: 255 },
-      alternateRowStyles: { fillColor: [245, 247, 250] },
-    })
-
-    doc.save(filename ?? `assets-export-${toLocalISODate()}.pdf`)
+    await exportTable(
+      rows,
+      getRecordExportColumns(rows),
+      { filename: filename ?? `assets-export-${toLocalISODate()}`, title: "Assets Report" },
+      "pdf",
+      {
+        pdf: {
+          orientation: "landscape",
+          headingLines: [
+            `Generated on: ${formatWATDate(new Date())}`,
+            `Total Assets: ${extraMeta?.total ?? rows.length}`,
+          ],
+          startY: 35,
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [34, 139, 34], textColor: 255 },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+        },
+      }
+    )
     toast.success("Assets exported to PDF successfully")
   } catch (error: unknown) {
     log.error("Error exporting to PDF:", error)

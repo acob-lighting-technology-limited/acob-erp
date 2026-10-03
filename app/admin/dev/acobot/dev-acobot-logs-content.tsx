@@ -1,5 +1,7 @@
 "use client"
 
+import { toCsv } from "@/lib/export/csv"
+
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
@@ -40,7 +42,7 @@ function truncate(value: string | null, max: number): string {
   return value.length > max ? `${value.slice(0, max).trimEnd()}…` : value
 }
 
-function toCsv(rows: AcobotLogRow[]) {
+function buildAcobotCsv(rows: AcobotLogRow[]) {
   const headers = ["time", "source", "person", "email", "department", "question", "answer", "had_context", "model"]
   const body = rows.map((row) => [
     row.created_at,
@@ -53,9 +55,7 @@ function toCsv(rows: AcobotLogRow[]) {
     row.had_context ? "yes" : "no",
     row.model || "",
   ])
-  return [headers, ...body]
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    .join("\n")
+  return toCsv([headers, ...body])
 }
 
 async function fetchAcobotLogs(source: AcobotSource): Promise<AcobotLogRow[]> {
@@ -220,7 +220,7 @@ export function DevAcobotLogsContent() {
   }, [dateOptions, departmentOptions, isWebsite])
 
   const exportCsv = () => {
-    const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8;" })
+    const blob = new Blob([buildAcobotCsv(rows)], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url

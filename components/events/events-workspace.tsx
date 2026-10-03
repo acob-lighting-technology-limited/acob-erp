@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { downloadCsv } from "@/lib/export/table-export"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -297,31 +298,6 @@ export function EventsWorkspace({
     },
   ]
 
-  const handleExportCsv = () => {
-    if (rows.length === 0) return
-    const headers = ["Title", "Type", "Status", "Start", "End", "Location", "Audience", "Organizer"]
-    const lines = rows.map((e) => [
-      `"${(e.title || "").replace(/"/g, '""')}"`,
-      `"${e.type}"`,
-      `"${e.status}"`,
-      `"${e.start_at}"`,
-      `"${e.end_at}"`,
-      `"${locationLabel(e).replace(/"/g, '""')}"`,
-      `"${e.visibility}"`,
-      `"${(e.organizer_name || "").replace(/"/g, '""')}"`,
-    ])
-    const csvContent = [headers.join(","), ...lines.map((l) => l.join(","))].join("\n")
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.setAttribute("href", url)
-    link.setAttribute("download", `company-events-${toLocalISODate()}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }
-
   const statCards =
     variant === "manage" ? (
       <StatGrid>
@@ -404,6 +380,7 @@ export function EventsWorkspace({
 
   return (
     <DataTablePage
+      export={tab === "calendar" ? false : { filename: `company-events-${toLocalISODate()}`, formats: ["csv"] }}
       title={title}
       description={description}
       icon={icon}
@@ -414,10 +391,30 @@ export function EventsWorkspace({
       stats={statCards}
       actions={
         <div className="flex items-center gap-2">
-          {rows.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleExportCsv}>
-              <Download className="mr-1.5 h-4 w-4" aria-hidden />
-              Export
+          {tab === "calendar" && rows.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                downloadCsv(
+                  [
+                    ["Title", "Type", "Status", "Start", "End", "Location", "Audience", "Organizer"],
+                    ...rows.map((event) => [
+                      event.title,
+                      event.type,
+                      event.status,
+                      event.start_at,
+                      event.end_at,
+                      locationLabel(event),
+                      event.visibility,
+                      event.organizer_name,
+                    ]),
+                  ],
+                  `company-events-${toLocalISODate()}.csv`
+                )
+              }
+            >
+              <Download className="mr-1.5 h-4 w-4" aria-hidden /> Export
             </Button>
           )}
           {canCreate && (

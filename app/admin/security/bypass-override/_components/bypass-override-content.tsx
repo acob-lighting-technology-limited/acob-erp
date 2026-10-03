@@ -1,5 +1,7 @@
 "use client"
 
+import { toCsv } from "@/lib/export/csv"
+
 import { useMemo } from "react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -223,7 +225,7 @@ function getRequestedBy(row: EnrichedBypassLog): string {
   return "System / N/A"
 }
 
-function toCsv(rows: EnrichedBypassLog[]) {
+function buildBypassCsv(rows: EnrichedBypassLog[]) {
   const headers = [
     "Time",
     "Performed By",
@@ -256,10 +258,7 @@ function toCsv(rows: EnrichedBypassLog[]) {
       ip,
     ]
   })
-  const escaped = [headers, ...body].map((line) =>
-    line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-  )
-  return escaped.join("\n")
+  return toCsv([headers, ...body])
 }
 
 export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog[]; error: string | null }) {
@@ -423,7 +422,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
   )
 
   const exportCsv = () => {
-    const csv = toCsv(rows)
+    const csv = buildBypassCsv(rows)
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
