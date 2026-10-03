@@ -17,7 +17,8 @@ interface DataHealth {
   activeStaff: number
   missingDepartment: Person[]
   departmentsWithoutLead: Array<{ id: string; name: string }>
-  inactive: Array<Person & { lastSignInAt: string | null }>
+  /** null when the auth user list could not be read. */
+  inactive: Array<Person & { lastSignInAt: string | null }> | null
   inactiveDays: number
 }
 
@@ -79,7 +80,9 @@ export function DataHealthCard() {
     )
   }
 
-  const issues = data ? data.missingDepartment.length + data.departmentsWithoutLead.length + data.inactive.length : 0
+  const issues = data
+    ? data.missingDepartment.length + data.departmentsWithoutLead.length + (data.inactive?.length ?? 0)
+    : 0
 
   return (
     <Card>
@@ -139,26 +142,38 @@ export function DataHealthCard() {
               ))}
             </Group>
 
-            <Group
-              icon={UserX}
-              title={`No sign-in for ${data.inactiveDays} days`}
-              hint="Usually a missed invite or a leaver still marked active."
-              count={data.inactive.length}
-            >
-              {data.inactive.slice(0, PREVIEW).map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-2">
-                  <Link href={`/admin/hr/employees/${p.id}`} className="truncate hover:underline">
-                    {p.name}
-                  </Link>
-                  <span className="text-muted-foreground shrink-0 text-xs">
-                    {p.lastSignInAt ? formatDate(p.lastSignInAt) : "never"}
-                  </span>
-                </li>
-              ))}
-              {data.inactive.length > PREVIEW ? (
-                <li className="text-muted-foreground text-xs">+{data.inactive.length - PREVIEW} more</li>
-              ) : null}
-            </Group>
+            {data.inactive === null ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <UserX className="text-muted-foreground h-4 w-4" aria-hidden />
+                  <p className="text-sm font-medium">{`No sign-in for ${data.inactiveDays} days`}</p>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Sign-in dates are unavailable: some login accounts are malformed, so the user list cannot be read.
+                </p>
+              </div>
+            ) : (
+              <Group
+                icon={UserX}
+                title={`No sign-in for ${data.inactiveDays} days`}
+                hint="Usually a missed invite or a leaver still marked active."
+                count={data.inactive.length}
+              >
+                {data.inactive.slice(0, PREVIEW).map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2">
+                    <Link href={`/admin/hr/employees/${p.id}`} className="truncate hover:underline">
+                      {p.name}
+                    </Link>
+                    <span className="text-muted-foreground shrink-0 text-xs">
+                      {p.lastSignInAt ? formatDate(p.lastSignInAt) : "never"}
+                    </span>
+                  </li>
+                ))}
+                {data.inactive.length > PREVIEW ? (
+                  <li className="text-muted-foreground text-xs">+{data.inactive.length - PREVIEW} more</li>
+                ) : null}
+              </Group>
+            )}
           </div>
         )}
       </CardContent>
