@@ -22,6 +22,7 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { personName } from "@/lib/format"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,17 +93,9 @@ function isCompletedReview(r: ReviewRow) {
   return String(r.status ?? "").toLowerCase() === "completed"
 }
 
-function StatusBadge({ status }: { status: string | null }) {
-  const s = String(status ?? "").toLowerCase()
-  if (s === "completed")
-    return (
-      <Badge variant="default" className="bg-emerald-600">
-        Completed
-      </Badge>
-    )
-  if (s === "submitted") return <Badge variant="secondary">Submitted</Badge>
-  if (s === "draft") return <Badge variant="outline">Draft</Badge>
-  return <span className="text-muted-foreground text-sm">—</span>
+/** A review's status on the shared badge; no status yet shows a dash. */
+function ReviewStatus({ status }: { status: string | null }) {
+  return status ? <StatusBadge status={status} /> : <span className="text-muted-foreground text-sm">—</span>
 }
 
 function ScoreBar({ label, value }: { label: string; value: number | null }) {
@@ -155,7 +148,7 @@ function ReviewExpandedDetail({ row }: { row: ReviewRow }) {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Status</span>
-            <StatusBadge status={row.status} />
+            <ReviewStatus status={row.status} />
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Cycle</span>
@@ -208,7 +201,7 @@ function ReviewCard({ row, onEdit }: { row: ReviewRow; onEdit: (r: ReviewRow) =>
             <p className="leading-tight font-semibold">{personName(row.user, "Employee")}</p>
             <p className="text-muted-foreground mt-0.5 text-xs">{row.user?.department ?? "—"}</p>
           </div>
-          <StatusBadge status={row.status} />
+          <ReviewStatus status={row.status} />
         </div>
 
         {/* Quarter chip */}
@@ -570,7 +563,7 @@ export function AdminPmsReviewsPage({
         label: "Status",
         // accessor is required so the "Status" filter can match against it
         accessor: (r) => String(r.status ?? "").toLowerCase(),
-        render: (r) => <StatusBadge status={r.status} />,
+        render: (r) => <ReviewStatus status={r.status} />,
       },
     ],
     []
@@ -887,7 +880,7 @@ export function AdminPmsReviewsPage({
             title: (r) => personName(r.user, "Employee"),
             subtitle: (r) =>
               `${r.user?.department ?? "No dept"} · ${r.cycle?.name ?? "No cycle"} · ${r.final_score !== null ? `${r.final_score?.toFixed(1)}%` : "No score"}`,
-            trailing: (r) => <StatusBadge status={r.status} />,
+            trailing: (r) => <ReviewStatus status={r.status} />,
             onSelect: (r) => {
               if (r.review_cycle_id) goToIndividualCycle(r.review_cycle_id)
             },
