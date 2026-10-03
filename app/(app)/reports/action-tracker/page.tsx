@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 import {
   CheckCircle2,
@@ -42,6 +42,14 @@ import { canUpdateActionProgress } from "@/lib/reports/action-tracker-permission
 import { apiFetch } from "@/lib/api-client"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  formatDueDate,
+  getDeptSummaryStatus,
+  getDueDateClassName,
+  getItemStatusBadgeClass,
+  getSummaryBadgeClass,
+  type DepartmentSummaryStatus,
+} from "@/lib/reports/action-tracker-display"
 
 const log = logger("dashboard-reports-action-tracker")
 
@@ -65,7 +73,7 @@ interface DepartmentActionRow {
   notStartedPoints: number
   inProgressPoints: number
   pendingPoints: number
-  summaryStatus: "Finished" | "Started" | "Not Started" | "Pending"
+  summaryStatus: DepartmentSummaryStatus
 }
 
 interface ExportScope {
@@ -74,52 +82,7 @@ interface ExportScope {
   items: ActionItem[]
 }
 
-function resolveDueDate(task: ActionTask) {
-  if (task.due_date) {
-    const explicitDueDate = new Date(task.due_date)
-    if (!Number.isNaN(explicitDueDate.getTime())) return explicitDueDate
-  }
-  const sunday = getOfficeWeekMonday(task.week_number, task.year)
-  sunday.setDate(sunday.getDate() + 6)
-  sunday.setHours(23, 59, 0, 0)
-  return sunday
-}
-
-function formatDueDate(task: ActionTask) {
-  return formatWATDateTime(resolveDueDate(task), { day: "2-digit", month: "short", year: "numeric" })
-}
-
-function getDueDateClassName(task: ActionTask) {
-  const status = task.status.toLowerCase()
-  if (status === "completed") return "font-medium text-green-600 dark:text-green-400"
-  const dueDate = resolveDueDate(task)
-  if (dueDate.getTime() < Date.now()) return "font-semibold text-red-600 dark:text-red-400"
-  return "font-semibold text-yellow-600 dark:text-yellow-400"
-}
-
-function getDeptSummaryStatus(tasks: ActionTask[]): DepartmentActionRow["summaryStatus"] {
-  if (tasks.length === 0) return "Pending"
-  if (tasks.every((task) => task.status === "completed")) return "Finished"
-  if (tasks.some((task) => task.status === "in_progress" || task.status === "completed")) return "Started"
-  if (tasks.some((task) => task.status === "not_started")) return "Not Started"
-  return "Pending"
-}
-
 type TrackerTab = "weekly" | "directives"
-
-function getItemStatusBadgeClass(status: string) {
-  if (status === "completed") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "in_progress") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "not_started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
-}
-
-function getSummaryBadgeClass(status: DepartmentActionRow["summaryStatus"]) {
-  if (status === "Finished") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "Started") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "Not Started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
-}
 
 export default function ActionTrackerPortal() {
   const currentOfficeWeek = getCurrentOfficeWeek()

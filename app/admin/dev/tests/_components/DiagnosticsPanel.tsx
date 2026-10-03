@@ -99,12 +99,7 @@ export function DiagnosticsPanel<Row extends DiagnosticRowBase>({
             {loading ? "Checking…" : "Check All Routes"}
           </Button>
           {result && (
-            <span
-              className={cn(
-                "text-sm font-medium",
-                result.broken_count === 0 ? "text-success-foreground" : "text-danger-foreground"
-              )}
-            >
+            <span className={cn("text-sm font-medium", result.broken_count === 0 ? "text-green-600" : "text-red-500")}>
               {result.broken_count === 0
                 ? `✓ All ${result.total} ${unit}(s) OK`
                 : `✗ ${result.broken_count} / ${result.total} broken`}
@@ -134,14 +129,16 @@ export function DiagnosticsPanel<Row extends DiagnosticRowBase>({
                           key={i}
                           className={cn(
                             "rounded-md border px-3 py-2 text-xs",
-                            row.resolved ? "border-success/25 bg-success-muted" : "border-danger/25 bg-danger-muted"
+                            row.resolved
+                              ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
+                              : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
                           )}
                         >
                           <div className="flex items-start gap-2">
                             {row.resolved ? (
-                              <CheckCircle className="text-success-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
+                              <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600" />
                             ) : (
-                              <XCircle className="text-danger-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
+                              <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
                             )}
                             <div className="min-w-0 flex-1">
                               <span className="font-mono font-medium">{rowLabel(row)}</span>
@@ -153,9 +150,9 @@ export function DiagnosticsPanel<Row extends DiagnosticRowBase>({
                                 ) : null
                               ) : (
                                 <div className="mt-1 space-y-1">
-                                  <p className="text-danger-foreground">{row.fail_reason}</p>
+                                  <p className="text-red-500">{row.fail_reason}</p>
                                   {hint && (
-                                    <p className="text-warning-foreground">
+                                    <p className="text-yellow-600 dark:text-yellow-400">
                                       <strong>Fix:</strong> {hint}
                                     </p>
                                   )}
