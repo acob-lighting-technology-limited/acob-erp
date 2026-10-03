@@ -9,6 +9,7 @@ import { PlanYearSelect } from "./plan-year-select"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatScore } from "@/lib/format"
 
 type GoalScope = "mine" | "department" | "all"
 
@@ -38,10 +39,6 @@ const SCOPE_COPY: Record<GoalScope, { description: string; tableDescription: str
     tableDescription:
       "Goals are the strategic objectives of the corporate scorecard. A goal with no tasks has no work against it anywhere in the company.",
   },
-}
-
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
 }
 
 /** Text the shared status badge already colours: on target / needs attention / at risk. */
@@ -95,7 +92,7 @@ export function StrategicGoalsView({
         pillar: goal.strategic_priority,
         kpis: goal.kpi_count,
         tasks: `${goal.task_completed} / ${goal.task_total}`,
-        progress: formatPercent(scope === "mine" ? goal.task_score : goal.attainment_pct),
+        progress: formatScore(scope === "mine" ? goal.task_score : goal.attainment_pct),
         status: goalStatus(goal, scope),
       })),
     [goals, scope]

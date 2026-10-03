@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getCbtSettings, canAccessCbt } from "@/lib/cbt-config"
 import { CycleSelector } from "@/app/(app)/pms/_components/cycle-selector"
+import { formatScore } from "@/lib/format"
 
 const adminPmsLinks = [
   {
@@ -100,10 +101,6 @@ const adminPmsLinks = [
   },
 ]
 
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
-}
-
 export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; cycleId?: string } = {}) {
   const base = basePath ?? "/admin"
   const supabase = await createClient()
@@ -132,28 +129,28 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
         <StatCard
           variant="compact"
           title="Avg PMS"
-          value={formatPercent(summary.overallPms)}
+          value={formatScore(summary.overallPms)}
           icon={Award}
           description="Average individual PMS"
         />
         <StatCard
           variant="compact"
           title="Avg KPI"
-          value={formatPercent(summary.overallKpi)}
+          value={formatScore(summary.overallKpi)}
           icon={Target}
           description="Average individual KPI"
         />
         <StatCard
           variant="compact"
           title="Avg CBT"
-          value={formatPercent(summary.cbt)}
+          value={formatScore(summary.cbt)}
           icon={Brain}
           description="Average learning capability score"
         />
         <StatCard
           variant="compact"
           title="Avg Attendance"
-          value={formatPercent(summary.attendance)}
+          value={formatScore(summary.attendance)}
           icon={Clock3}
           description="Attendance compliance"
         />

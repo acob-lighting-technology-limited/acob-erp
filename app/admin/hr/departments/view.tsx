@@ -38,6 +38,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { logger } from "@/lib/logger"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { personName } from "@/lib/format"
 
 const log = logger("hr-departments")
 
@@ -107,10 +108,6 @@ async function fetchDepartmentsData(): Promise<DepartmentsData> {
   const res = await apiFetch("/api/admin/hr/departments", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load departments")
   return res.json()
-}
-
-function employeeName(employee: DepartmentEmployee) {
-  return [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Unknown"
 }
 
 function DepartmentCard({
@@ -717,7 +714,7 @@ export function DepartmentsPage({
                     {members.map((member, index) => (
                       <tr key={member.id} className="border-t">
                         <td className="text-muted-foreground w-12 px-3 py-2 font-mono text-xs">{index + 1}</td>
-                        <td className="px-3 py-2 font-medium">{employeeName(member)}</td>
+                        <td className="px-3 py-2 font-medium">{personName(member)}</td>
                         <td className="text-muted-foreground px-3 py-2">
                           <div className="flex items-center gap-2">
                             <Mail className="h-3 w-3" />

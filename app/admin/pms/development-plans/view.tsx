@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useHrProfiles } from "@/hooks/use-hr-profiles"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { personName } from "@/lib/format"
 
 type Profile = {
   id: string
@@ -94,10 +95,6 @@ const PRIORITY_VARIANTS: Record<string, "default" | "secondary" | "outline" | "d
   low: "secondary",
 }
 
-function formatName(profile: Profile | null | undefined) {
-  return `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Unknown"
-}
-
 function formatDate(date: string | null | undefined) {
   if (!date) return "-"
   return formatWATDate(date, { day: "2-digit", month: "short", year: "numeric" })
@@ -123,7 +120,7 @@ function PlanCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">{plan.title}</p>
-          <p className="text-muted-foreground text-xs">{formatName(plan.user)}</p>
+          <p className="text-muted-foreground text-xs">{personName(plan.user)}</p>
         </div>
         <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="capitalize">
           {plan.status.replace("_", " ")}
@@ -342,8 +339,8 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         key: "employee",
         label: "Employee",
         sortable: true,
-        accessor: (plan) => formatName(plan.user),
-        render: (plan) => <span className="font-medium">{formatName(plan.user)}</span>,
+        accessor: (plan) => personName(plan.user),
+        render: (plan) => <span className="font-medium">{personName(plan.user)}</span>,
         resizable: true,
         initialWidth: 180,
       },
@@ -522,7 +519,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         searchPlaceholder="Search employee, department, plan title, or focus area…"
         searchFn={(plan, query) =>
           [
-            formatName(plan.user),
+            personName(plan.user),
             plan.user?.department || "",
             plan.title,
             plan.description || "",
@@ -542,7 +539,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
             <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="text-muted-foreground text-xs">Employee</p>
-                <p className="mt-1 font-medium">{formatName(plan.user)}</p>
+                <p className="mt-1 font-medium">{personName(plan.user)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Quarter</p>
@@ -564,7 +561,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          title: (plan) => `${formatName(plan.user)} · ${plan.title}`,
+          title: (plan) => `${personName(plan.user)} · ${plan.title}`,
           subtitle: (plan) =>
             `${plan.user?.department || "No dept"} · ${FOCUS_LABELS[plan.focus_area] || plan.focus_area} · Progress: ${plan.progress_pct}%`,
           trailing: (plan) => (
@@ -607,7 +604,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
                   <SelectContent>
                     {employees.map((employee) => (
                       <SelectItem key={employee.id} value={employee.id}>
-                        {formatName(employee)} {employee.department ? `(${employee.department})` : ""}
+                        {personName(employee)} {employee.department ? `(${employee.department})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -781,7 +778,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
           <DialogHeader>
             <DialogTitle>{viewingPlan?.title || "Plan Details"}</DialogTitle>
             <DialogDescription>
-              {viewingPlan ? `${formatName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
+              {viewingPlan ? `${personName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
             </DialogDescription>
           </DialogHeader>
           {viewingPlan ? (

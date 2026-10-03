@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { personName } from "@/lib/format"
 
 type TabKey = "individual" | "department" | "cycle"
 
@@ -97,10 +98,6 @@ const TABS: DataTableTab[] = [
   { key: "department", label: "Department" },
   { key: "cycle", label: "Cadence" },
 ]
-
-function employeeName(user: CbtUser | undefined) {
-  return [user?.first_name, user?.last_name].filter(Boolean).join(" ") || "Employee"
-}
 
 function scoreLabel(score: number | null) {
   return typeof score === "number" ? `${score}%` : "-"
@@ -275,7 +272,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             id: `${user.id}-${cycle.id}`,
             user_id: user.id,
             review_cycle_id: cycle.id,
-            employee: employeeName(user),
+            employee: personName(user, "Employee"),
             department: user.department || "-",
             cycle: cycle.name,
             cbt_score: score ? score.cbt_score : null,
@@ -291,7 +288,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           id: `${user.id}-none`,
           user_id: user.id,
           review_cycle_id: "",
-          employee: employeeName(user),
+          employee: personName(user, "Employee"),
           department: user.department || "-",
           cycle: "-",
           cbt_score: null,

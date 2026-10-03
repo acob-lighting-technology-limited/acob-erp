@@ -93,6 +93,11 @@ export function formatPercent(
   return `${pct.toFixed(options.decimals ?? 0)}%`
 }
 
+/** A score that is already a percentage, shown as stored: 87.5 → "87.5%"; missing → "-". */
+export function formatScore(value: number | null | undefined, fallback = "-"): string {
+  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : fallback
+}
+
 /** Display name from a profile-like object: "Ada Obi", falling back to email, then "Unknown". */
 export function personName(
   person:
@@ -133,6 +138,11 @@ export function initials(
     return letters.toUpperCase()
   }
   return "?"
+}
+
+/** "weekly" → "Weekly" — first letter only, the rest untouched. */
+export function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 /** "in_progress" → "In progress" */
