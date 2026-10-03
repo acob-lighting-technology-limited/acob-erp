@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-// Root page redirects to profile (middleware handles this, but fallback here)
+// Root page redirects to My Day (the proxy handles this; this is the fallback)
 export default function RootPage() {
-  redirect("/profile")
+  redirect("/home")
 }

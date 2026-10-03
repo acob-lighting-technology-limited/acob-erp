@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const tokenHash = searchParams.get("token_hash")
   const rawType = searchParams.get("type")
-  const rawNext = searchParams.get("next") || "/profile"
+  const rawNext = searchParams.get("next") || "/home"
 
   // Validate type parameter
   const ALLOWED_TYPES = new Set(["invite", "recovery", "email", "signup", "magiclink"])
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     : "signup"
 
   // Validate and sanitize 'next' to prevent open redirects
-  let safeNext = "/profile"
+  let safeNext = "/home"
   if (
     rawNext &&
     rawNext.startsWith("/") &&
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
 
   // For recovery, redirect to reset-password page (or custom next if provided)
   if (type === "recovery") {
-    const recoveryDest = safeNext !== "/profile" ? safeNext : "/auth/reset-password"
+    const recoveryDest = safeNext !== "/home" ? safeNext : "/auth/reset-password"
     return NextResponse.redirect(new URL(recoveryDest, request.url))
   }
 

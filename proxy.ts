@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
 
     // Normal root redirect
     const url = request.nextUrl.clone()
-    url.pathname = "/profile"
+    url.pathname = "/home"
     return NextResponse.redirect(url)
   }
 

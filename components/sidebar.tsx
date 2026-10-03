@@ -24,6 +24,7 @@ import {
   Users,
   Wrench,
   Layers,
+  Sun,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -109,6 +110,7 @@ const navigationSections: NavSectionDef[] = [
     key: "overview",
     label: "Overview",
     items: [
+      { name: "My Day", href: "/home", icon: Sun },
       { name: "Dashboard", href: "/profile", icon: LayoutDashboard },
       { name: "Directory", href: "/directory", icon: BookUser },
       // "Calendar" here, "Events" on the admin sidebar — same EventsWorkspace

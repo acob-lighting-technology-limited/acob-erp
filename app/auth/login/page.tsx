@@ -357,7 +357,7 @@ export default function LoginPage() {
 }
 
 function getSafeNextPath(next: string | null): string {
-  if (!next) return "/profile"
+  if (!next) return "/home"
 
   if (
     next.startsWith("/") &&
@@ -369,5 +369,5 @@ function getSafeNextPath(next: string | null): string {
     return next
   }
 
-  return "/profile"
+  return "/home"
 }
