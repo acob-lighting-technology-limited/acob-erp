@@ -18,6 +18,8 @@ export const QUERY_KEYS = {
 
   // Attendance
   attendanceDeviceStatus: () => ["attendance-device-status"],
+  attendanceHolidays: (yearMonth: string) => ["attendance-holidays", yearMonth],
+  attendanceReports: (filters: Record<string, unknown>) => ["attendance-reports", filters],
   myAttendanceAppeals: () => ["my-attendance-appeals"],
   myAttendanceRecent: () => ["my-attendance-recent"],
   dailyRoster: (date: string, department: string | null) => ["daily-roster", date, department],
