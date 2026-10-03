@@ -5,6 +5,14 @@ export function isChristmasPeriod(date = new Date()): boolean {
   return year === 2026 && month === 12
 }
 
+/**
+ * ACOB's 10th-anniversary year. The anniversary signature tools and nav links
+ * exist only while this is true, so they retire themselves on 1 January 2027.
+ */
+export function isAnniversaryPeriod(date = new Date()): boolean {
+  return date.getFullYear() === 2026
+}
+
 export function isTemporary2026LogoPeriod(date = new Date()): boolean {
   return date.getFullYear() === 2026 && !isChristmasPeriod(date)
 }

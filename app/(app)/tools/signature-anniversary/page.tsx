@@ -4,8 +4,10 @@ import { SignatureCreator } from "@/components/signature-creator"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { FileSignature } from "lucide-react"
+import { isAnniversaryPeriod } from "@/lib/seasonal-branding"
 
 export default async function AnniversarySignaturePage(props: { searchParams: Promise<{ userId?: string }> }) {
+  if (!isAnniversaryPeriod()) redirect("/tools/signature")
   const searchParams = await props.searchParams
   const supabase = await createClient()
 

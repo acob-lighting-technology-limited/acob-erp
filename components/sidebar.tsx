@@ -54,6 +54,7 @@ import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
 import { useDepartmentCode } from "@/hooks/use-department-code"
+import { isAnniversaryPeriod } from "@/lib/seasonal-branding"
 
 interface SidebarProps {
   user?: {
@@ -205,7 +206,7 @@ const navigationSections: NavSectionDef[] = [
         icon: Wrench,
         children: [
           { name: "Signature", href: "/tools/signature" },
-          { name: "Signature Anniversary", href: "/tools/signature-anniversary" },
+          ...(isAnniversaryPeriod() ? [{ name: "Signature Anniversary", href: "/tools/signature-anniversary" }] : []),
           { name: "My Job Description", href: "/tools/job-description" },
           { name: "Watermark", href: "/tools/watermark" },
           { name: "Media & PDF Suite", href: "/tools/media" },

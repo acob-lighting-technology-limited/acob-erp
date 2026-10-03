@@ -2,8 +2,9 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Wrench, ArrowRight, FileSignature, Droplet, Video } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
+import { isAnniversaryPeriod } from "@/lib/seasonal-branding"
 
-const tools = [
+const allTools = [
   {
     name: "Email Signature",
     description: "Generate professional employee email signatures",
@@ -37,6 +38,9 @@ const tools = [
     bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
   },
 ]
+
+// The anniversary edition is only offered during the anniversary year.
+const tools = allTools.filter((tool) => !tool.href.includes("signature-anniversary") || isAnniversaryPeriod())
 
 export default function AdminToolsPage() {
   return (

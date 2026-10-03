@@ -2,8 +2,9 @@
 
 import { FileSignature, Droplet, Wrench, Briefcase, Video } from "lucide-react"
 import { PageHeader, PageWrapper, ModuleHubGrid } from "@/components/layout"
+import { isAnniversaryPeriod } from "@/lib/seasonal-branding"
 
-const tools = [
+const allTools = [
   {
     name: "Email Signature",
     description: "Generate a professional email signature with your ACOB contact details",
@@ -65,6 +66,9 @@ const tools = [
     hoverText: "group-hover:text-indigo-500",
   },
 ]
+
+// The anniversary edition is only offered during the anniversary year.
+const tools = allTools.filter((tool) => !tool.href.includes("signature-anniversary") || isAnniversaryPeriod())
 
 export default function ToolsPage() {
   return (
