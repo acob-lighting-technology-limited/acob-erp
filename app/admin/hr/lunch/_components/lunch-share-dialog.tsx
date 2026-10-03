@@ -17,7 +17,7 @@ import { buildLunchWhatsAppMessage } from "@/lib/hr/lunch-share"
 interface LunchShareDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  menu: { date: string; resolvedDeadline: string } | null
+  menu: { date: string; resolvedDeadline: string; votingOpen: boolean } | null
   todayDate: string
 }
 
@@ -36,6 +36,7 @@ export function LunchShareDialog({ open, onOpenChange, menu, todayDate }: LunchS
             date: menu.date,
             today: todayDate,
             deadline: menu.resolvedDeadline,
+            votingOpen: menu.votingOpen,
             origin: window.location.origin,
           })
         : "",

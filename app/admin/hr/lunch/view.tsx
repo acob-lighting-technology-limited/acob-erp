@@ -525,6 +525,12 @@ export function LunchRegisterPage({
     if (menu?.votingOpen) setShareMenu(menu)
   }
 
+  // Any published day can be shared — a closed one gets a caption that doesn't
+  // ask for votes. Drafts and cancelled days have no public share page.
+  function canShareMenu(menu: AdminLunchMenu) {
+    return menu.status !== "draft" && !menu.archived_at
+  }
+
   async function deleteMenu(menu: AdminLunchMenu) {
     setDeleting(true)
     try {
@@ -986,11 +992,10 @@ export function LunchRegisterPage({
     },
     {
       // Kept out of the ⋯ menu so posting to the staff group is one tap.
-      // Only an open poll is worth posting.
       key: "share",
       label: "Share",
       render: (row) =>
-        row.votingOpen ? (
+        canShareMenu(row) ? (
           <Button
             size="sm"
             variant="ghost"
@@ -1661,7 +1666,7 @@ export function LunchRegisterPage({
                   <div className="flex items-center justify-between border-t pt-2 text-[10px]">
                     <span className="text-muted-foreground">{row.votes.length} votes cast</span>
                     <div className="flex items-center gap-1.5">
-                      {row.votingOpen && (
+                      {canShareMenu(row) && (
                         <Button
                           size="sm"
                           variant="outline"
