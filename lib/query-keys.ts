@@ -15,6 +15,7 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  attendanceRecords: (filters: Record<string, unknown>) => ["attendance-records", filters],
   employeeAttendanceDays: (userId: string, yearMonth: string, exempt: boolean) => [
     "employee-attendance-days",
     userId,

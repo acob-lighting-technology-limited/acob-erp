@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle, Box } from "lucide-react"
 
@@ -50,10 +49,8 @@ const TABS: DataTableTab[] = [
 ]
 
 export default function AdminFleetPage() {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState("bookings")
-  const [accessChecked, setAccessChecked] = useState(false)
 
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false)
   const [resourceName, setResourceName] = useState("")
@@ -65,25 +62,6 @@ export default function AdminFleetPage() {
   const [attachments, setAttachments] = useState<FleetAttachment[]>([])
   const [reviewing, setReviewing] = useState(false)
   const [adminNote, setAdminNote] = useState("")
-
-  useEffect(() => {
-    let isMounted = true
-    async function verifyAccess() {
-      try {
-        const response = await apiFetch("/api/admin/hr/fleet/bookings?status=pending", { cache: "no-store" })
-        if (!response.ok && (response.status === 401 || response.status === 403)) {
-          router.replace("/admin/hr")
-          return
-        }
-      } finally {
-        if (isMounted) setAccessChecked(true)
-      }
-    }
-    void verifyAccess()
-    return () => {
-      isMounted = false
-    }
-  }, [router])
 
   const { data: resources = [], isLoading: loadingResources } = useQuery({
     queryKey: QUERY_KEYS.adminFleetResources(),
@@ -347,19 +325,6 @@ export default function AdminFleetPage() {
   )
 
   // ─── Render ──────────────────────────────────────────────────────────────
-  if (!accessChecked) {
-    return (
-      <DataTablePage
-        title="Resource Booking Admin"
-        description="Manage bookable resources and review booking applications"
-        icon={CalendarCheck2}
-        backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
-      >
-        <div className="text-muted-foreground rounded-md border p-6 text-sm">Loading access policy...</div>
-      </DataTablePage>
-    )
-  }
-
   const pendingCount = bookings.filter((b) => b.status === "pending").length
   const approvedCount = bookings.filter((b) => b.status === "approved").length
   const rejectedCount = bookings.filter((b) => b.status === "rejected").length
