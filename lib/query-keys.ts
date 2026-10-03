@@ -16,6 +16,7 @@ export const QUERY_KEYS = {
 
   // Attendance
   attendanceDeviceStatus: () => ["attendance-device-status"],
+  attendanceRecords: (filters: Record<string, unknown>) => ["attendance-records", filters],
   employeeAttendanceDays: (userId: string, yearMonth: string, exempt: boolean) => [
     "employee-attendance-days",
     userId,
