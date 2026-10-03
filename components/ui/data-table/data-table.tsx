@@ -77,7 +77,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Copy } from "lucide-react"
 import { ColumnHelp } from "./column-help"
-import type { DataTableDetailConfig, DataTableProps, SortConfig } from "./types"
+import type { DataTableDetailConfig, DataTableProps, PaginationConfig, SortConfig } from "./types"
 import { logger } from "@/lib/logger"
 
 const log = logger("components-ui-data-table-data-table")
@@ -264,6 +264,9 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const AUTO_PAGINATE_AFTER = 200
+const AUTO_PAGINATION: PaginationConfig = { pageSize: 50 }
+
 export function DataTable<TData>({
   data,
   columns,
@@ -279,7 +282,7 @@ export function DataTable<TData>({
   // Sorting
   sortFn,
   // Pagination
-  pagination,
+  pagination: paginationProp,
   totalRows,
   currentPage = 0,
   onPageChange,
@@ -319,6 +322,10 @@ export function DataTable<TData>({
   emptyDescription = "Try adjusting your search or filters.",
   emptyAction,
 }: DataTableProps<TData>) {
+  // A table with no pagination renders every row. Past AUTO_PAGINATE_AFTER rows
+  // that is thousands of DOM nodes on a phone, so page it at 50 unless the
+  // caller chose otherwise (audit 7.3).
+  const pagination = paginationProp ?? (data.length > AUTO_PAGINATE_AFTER ? AUTO_PAGINATION : undefined)
   const expandAtStart = expandableColumnPosition !== "end"
   // ─── Column resize ─────────────────────────────────────────────────────────
   const initialColWidths = useMemo(() => {
