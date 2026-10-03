@@ -2,7 +2,7 @@
 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { sanitizeReportText } from "@/lib/export-utils"
+import { sanitizeReportText } from "@/lib/export/shared"
 import {
   REPORT_TEXT_FIELDS,
   replaceSelectedText,

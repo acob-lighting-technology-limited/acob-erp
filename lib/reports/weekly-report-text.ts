@@ -1,4 +1,4 @@
-import { sanitizeReportText } from "@/lib/export-utils"
+import { sanitizeReportText } from "@/lib/export/shared"
 
 export const REPORT_TEXT_FIELDS = ["work_done", "tasks_new_week", "challenges"] as const
 export type ReportTextField = (typeof REPORT_TEXT_FIELDS)[number]
