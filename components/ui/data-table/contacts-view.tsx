@@ -21,10 +21,11 @@ export function DataTableContactsView<TData>({ state }: { state: ReturnType<type
         <div key={group.heading ?? groupIdx}>
           {group.heading && (
             <div
-              className="bg-muted text-muted-foreground sticky z-[5] border-b px-3 py-1 text-xs font-bold"
+              className="bg-muted text-muted-foreground sticky z-[5] flex items-center justify-between gap-3 border-b px-3 py-1.5 text-xs"
               style={{ top: "var(--dt-sticky-offset, 0px)" }}
             >
-              {group.heading}
+              <span className="font-bold">{group.heading}</span>
+              {group.summary != null && <span className="font-medium tabular-nums">{group.summary}</span>}
             </div>
           )}
           <div className="divide-y">
@@ -61,8 +62,24 @@ export function DataTableContactsView<TData>({ state }: { state: ReturnType<type
                       {mobileRow.subtitle && (
                         <span className="text-muted-foreground block truncate text-xs">{mobileRow.subtitle(row)}</span>
                       )}
+                      {mobileRow.metrics && (
+                        <span className="mt-1 flex gap-x-3">
+                          {mobileRow.metrics(row).map((metric) => (
+                            <span key={metric.label} className="flex w-16 min-w-0 flex-col">
+                              <span className="text-muted-foreground text-xs leading-tight">{metric.label}</span>
+                              <span className="truncate text-xs leading-tight font-semibold tabular-nums">
+                                {metric.value}
+                              </span>
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </span>
-                    {mobileRow.trailing && <span className="shrink-0 text-right">{mobileRow.trailing(row)}</span>}
+                    {mobileRow.trailing && (
+                      <span className="flex shrink-0 flex-col items-end gap-1 text-right">
+                        {mobileRow.trailing(row)}
+                      </span>
+                    )}
                     <ChevronRight className="text-muted-foreground/50 h-4 w-4 shrink-0" />
                   </button>
                   {expandable && isExpanded && canExpand && (

@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import { DataTable, DataTablePage, DateTile } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { EmployeeCalendarView } from "./calendar-view"
 import { AppealDialog } from "./_components/appeal-dialog"
@@ -152,6 +152,15 @@ function formatClockTime(value: string | null | undefined): string {
     return `${parts[0]}:${parts[1]}`
   }
   return value
+}
+
+/** Monday of the ISO week holding a `YYYY-MM-DD` date, as `YYYY-MM-DD`. */
+function weekStartISO(date: string): string {
+  const [year, month, day] = date.slice(0, 10).split("-").map(Number)
+  const value = new Date(Date.UTC(year, month - 1, day))
+  value.setUTCDate(value.getUTCDate() - ((value.getUTCDay() + 6) % 7))
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())}`
 }
 
 function getClockOutLabel(row: Pick<AttendanceRow, "clock_in" | "clock_out" | "date">): string {
@@ -684,19 +693,39 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
             emptyIcon={Clock}
             skeletonRows={6}
             mobileRow={{
-              leading: () => null,
-              title: (row) => (
-                <span className="text-foreground font-medium">
-                  {formatWATDate(row.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
-                </span>
+              // Timesheet-app anatomy: date tile, the day, clock times in aligned
+              // slots, and the figure that matters — hours lost — on the right.
+              leading: (row) => <DateTile date={row.date} />,
+              title: (row) => row.dayLabel,
+              metrics: (row) => [
+                { label: "In", value: formatClockTime(row.clock_in) },
+                {
+                  label: "Out",
+                  value: row.clock_out
+                    ? formatClockTime(row.clock_out)
+                    : row.clock_in && row.date === toLocalISODate()
+                      ? "Now"
+                      : "-",
+                },
+                { label: "Worked", value: row.workHours != null ? `${row.workHours.toFixed(2)}h` : "-" },
+              ],
+              trailing: (row) => (
+                <>
+                  {(row.missedHoursValue ?? 0) > 0 ? (
+                    <span className="text-danger-foreground text-xs font-semibold tabular-nums">
+                      {row.missedHoursValue!.toFixed(2)}h lost
+                    </span>
+                  ) : null}
+                  <StatusBadge status={row.normalizedStatus} />
+                </>
               ),
-              // Three clauses truncate on a phone before the third is readable.
-              // Clock times plus the number that actually matters — hours lost.
-              subtitle: (row) =>
-                `${formatClockTime(row.clock_in)} – ${getClockOutLabel(row)}${
-                  (row.missedHoursValue ?? 0) > 0 ? ` · ${row.missedHoursValue!.toFixed(2)} hrs missed` : ""
-                }`,
-              trailing: (row) => <StatusBadge status={row.normalizedStatus} />,
+              sections: {
+                by: (row) => `Week of ${formatWATDate(weekStartISO(row.date), { day: "numeric", month: "short" })}`,
+                summary: (weekRows) => {
+                  const lost = weekRows.reduce((sum, r) => sum + (r.missedHoursValue ?? 0), 0)
+                  return lost > 0 ? `${lost.toFixed(2)}h lost` : "No hours lost"
+                },
+              },
               detail: {
                 title: (row) =>
                   formatWATDate(row.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
