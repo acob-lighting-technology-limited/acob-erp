@@ -668,6 +668,11 @@ export function FleetContent() {
           ),
         }}
         emptyTitle="No bookings"
+        emptyAction={
+          <Button size="sm" onClick={() => setOpen(true)}>
+            Book a resource
+          </Button>
+        }
         emptyDescription="Applications you submit, and those you can see, appear here."
         emptyIcon={Car}
         skeletonRows={6}

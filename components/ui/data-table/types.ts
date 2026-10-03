@@ -341,6 +341,8 @@ export interface DataTableProps<TData> {
   emptyIcon?: LucideIcon
   emptyTitle?: string
   emptyDescription?: string
+  /** The one next step when the list is empty and unfiltered, e.g. "Create your first requisition". */
+  emptyAction?: React.ReactNode
 }
 
 // ─── DataTablePage Props ─────────────────────────────────────────────────────

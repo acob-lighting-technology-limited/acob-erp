@@ -638,6 +638,13 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
             ),
           }}
           emptyTitle={admin ? "No Projects Found" : "No Projects Assigned"}
+          emptyAction={
+            admin ? (
+              <Button size="sm" onClick={() => setIsAddOpen(true)}>
+                Add the first project
+              </Button>
+            ) : undefined
+          }
           emptyDescription={
             admin
               ? "Create a new project deployment profile to start tracking tasks."

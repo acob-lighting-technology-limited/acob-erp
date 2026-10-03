@@ -1089,6 +1089,13 @@ export function LeaveContent({
           ),
         }}
         emptyTitle={isReviewTab ? "Nothing waiting on you" : "No leave requests"}
+        emptyAction={
+          isReviewTab ? undefined : (
+            <Button size="sm" onClick={openCreateDialog}>
+              Request leave
+            </Button>
+          )
+        }
         emptyDescription={
           isReviewTab
             ? "Requests reach you here when you are the reliever, the department lead, or the next approver in the route."

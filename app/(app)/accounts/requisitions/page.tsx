@@ -295,6 +295,13 @@ export default function RequisitionListPage() {
           onSelect: (r) => router.push(`/accounts/requisitions/${r.id}`),
         }}
         emptyTitle="No requisitions"
+        emptyAction={
+          activeTab === "my" ? (
+            <Button size="sm" onClick={() => setIsCreateOpen(true)}>
+              Create your first requisition
+            </Button>
+          ) : undefined
+        }
         emptyDescription="Requisitions you raise or need to approve will appear here."
         emptyIcon={FileCheck2}
         skeletonRows={6}
