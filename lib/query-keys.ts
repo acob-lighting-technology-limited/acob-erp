@@ -48,6 +48,7 @@ export const QUERY_KEYS = {
   ticket: (id: string) => ["ticket", id],
 
   // Admin
+  myProfile: () => ["my-profile"],
   departments: () => ["departments"],
   officeLocations: () => ["office-locations"],
   staffAvatars: () => ["staff-avatars"],
@@ -220,6 +221,8 @@ export const QUERY_KEYS = {
   maintenanceState: () => ["maintenance-state"],
 
   // Requisitions
+  requisitionFundingCategories: (includeInactive: boolean) => ["requisition-funding-categories", includeInactive],
+  requisitions: (filters?: Record<string, unknown>) => (filters ? ["requisitions", filters] : ["requisitions"]),
   requisition: (id: string) => ["requisition", id],
 
   // Payroll

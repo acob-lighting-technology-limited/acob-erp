@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   DataTablePage,
   DataTable,
@@ -18,6 +18,10 @@ import { getStageLabel } from "@/lib/requisitions/workflow"
 import { apiFetch } from "@/lib/api-client"
 import { FundingCategoryDialog } from "./_components/funding-category-dialog"
 import Link from "next/link"
+import { useFundingCategories, useRequisitions } from "@/hooks/use-requisitions"
+import { useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { toast } from "sonner"
 
 const TABS: DataTableTab[] = [
   { key: "requisitions", label: "Requisitions", icon: FileCheck2 },
@@ -27,61 +31,25 @@ const TABS: DataTableTab[] = [
 export default function AdminRequisitionsPage() {
   const [tab, setTab] = useState<string>("requisitions")
 
-  const [rows, setRows] = useState<Requisition[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
+  const requisitionsQuery = useRequisitions()
+  const rows = requisitionsQuery.data ?? []
+  const isLoading = requisitionsQuery.isLoading
+  const error = requisitionsQuery.error?.message ?? null
+  const fetchRequisitions = () => void requisitionsQuery.refetch()
 
-  const [fundingCategories, setFundingCategories] = useState<RequisitionFundingCategory[]>([])
-  const [isLoadingFunding, setIsLoadingFunding] = useState<boolean>(true)
-  const [fundingError, setFundingError] = useState<string | null>(null)
+  const fundingQuery = useFundingCategories({ includeInactive: true })
+  const fundingCategories = fundingQuery.data ?? []
+  const isLoadingFunding = fundingQuery.isLoading
+  const fundingError = fundingQuery.error?.message ?? null
+  const queryClient = useQueryClient()
+  // Refresh both the admin list and the form's active-only list.
+  const fetchFundingCategories = () =>
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.requisitionFundingCategories(true).slice(0, 1) })
 
   const [isFundingDialogOpen, setIsFundingDialogOpen] = useState<boolean>(false)
   const [editingCategory, setEditingCategory] = useState<RequisitionFundingCategory | null>(null)
   const [isSavingCategory, setIsSavingCategory] = useState<boolean>(false)
   const [saveCategoryError, setSaveCategoryError] = useState<string | null>(null)
-
-  const fetchRequisitions = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/requisitions")
-      const json = await res.json()
-
-      if (!res.ok) {
-        throw new Error(json.error || json.message || "Failed to load requisitions")
-      }
-
-      setRows(json.data || [])
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch requisitions")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  const fetchFundingCategories = useCallback(async () => {
-    setIsLoadingFunding(true)
-    setFundingError(null)
-    try {
-      const res = await apiFetch("/api/requisitions/funding-categories?include_inactive=true")
-      const json = await res.json()
-
-      if (!res.ok) {
-        throw new Error(json.error || json.message || "Failed to load funding categories")
-      }
-
-      setFundingCategories(json.data || [])
-    } catch (err: any) {
-      setFundingError(err.message || "Failed to fetch funding categories")
-    } finally {
-      setIsLoadingFunding(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchRequisitions()
-    fetchFundingCategories()
-  }, [fetchRequisitions, fetchFundingCategories])
 
   const totalCount = rows.length
   const pendingCount = rows.filter((r) => r.status === "pending").length
@@ -125,7 +93,6 @@ export default function AdminRequisitionsPage() {
   }
 
   const toggleCategoryActive = async (category: RequisitionFundingCategory) => {
-    setFundingError(null)
     try {
       const res = await apiFetch("/api/requisitions/funding-categories", {
         method: "PATCH",
@@ -136,7 +103,7 @@ export default function AdminRequisitionsPage() {
       if (!res.ok) throw new Error(json.error || json.message || "Failed to update funding category")
       await fetchFundingCategories()
     } catch (err: any) {
-      setFundingError(err.message || "Failed to update funding category")
+      toast.error(err.message || "Failed to update funding category")
     }
   }
 

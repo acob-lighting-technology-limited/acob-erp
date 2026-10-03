@@ -16,11 +16,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
-import type { BeneficiaryDetail, RequisitionAttachment, RequisitionFundingCategory } from "@/lib/requisitions/types"
+import type { BeneficiaryDetail, RequisitionAttachment } from "@/lib/requisitions/types"
 import { EMERGENCY_JUSTIFICATION_MIN_LENGTH } from "@/lib/requisitions/workflow"
 import { Plus, Trash2, Upload, FileText, Loader2, AlertCircle, Siren } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { apiFetch } from "@/lib/api-client"
+import { useFundingCategories } from "@/hooks/use-requisitions"
 
 /** A beneficiary row plus a client-only key, so removing a row never shifts another row's inputs. */
 type BeneficiaryRow = BeneficiaryDetail & { key: string }
@@ -57,25 +58,12 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const [fundingCategories, setFundingCategories] = useState<RequisitionFundingCategory[]>([])
+  const fundingQuery = useFundingCategories({ enabled: open })
+  const fundingCategories = fundingQuery.data ?? []
+  const fundingLoadError = fundingQuery.error?.message ?? null
   const [fundingCategoryId, setFundingCategoryId] = useState<string>("")
   const [isEmergency, setIsEmergency] = useState(false)
   const [emergencyJustification, setEmergencyJustification] = useState("")
-
-  const loadFundingCategories = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/requisitions/funding-categories")
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "Failed to load funding categories")
-      setFundingCategories(json.data || [])
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to load funding categories")
-    }
-  }, [])
-
-  useEffect(() => {
-    if (open) loadFundingCategories()
-  }, [open, loadFundingCategories])
 
   // Update amount in words when numeric amount changes
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,10 +228,10 @@ export function NewRequisitionDialog({ open, onOpenChange, userDepartment, onSuc
           </DialogDescription>
         </DialogHeader>
 
-        {errorMsg && (
+        {(errorMsg ?? fundingLoadError) && (
           <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-600">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{errorMsg}</span>
+            <span>{errorMsg ?? fundingLoadError}</span>
           </div>
         )}
 

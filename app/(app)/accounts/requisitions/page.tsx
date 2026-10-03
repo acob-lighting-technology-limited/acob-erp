@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import {
   DataTablePage,
   DataTable,
@@ -15,11 +15,11 @@ import { Plus, FileCheck2, Clock, CheckCircle2, AlertCircle, RefreshCw, Siren, W
 import type { Requisition } from "@/lib/requisitions/types"
 import { getStageLabel } from "@/lib/requisitions/workflow"
 import { NewRequisitionDialog } from "./_components/new-requisition-dialog"
-import { createClient } from "@/lib/supabase/client"
-import { apiFetch } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useRequisitions } from "@/hooks/use-requisitions"
+import { useMyProfile } from "@/hooks/use-my-profile"
 
 const TABS: DataTableTab[] = [
   { key: "my", label: "My Requisitions" },
@@ -61,55 +61,18 @@ function formatNaira(amount: number | string | null | undefined, decimals = 2) {
 export default function RequisitionListPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<string>("my")
-  const [rows, setRows] = useState<Requisition[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false)
   // A requisition is always raised for the requester's own department, so the
   // dialog shows it read-only rather than asking them to type it.
-  const [userDepartment, setUserDepartment] = useState<string | null>(null)
+  const userDepartment = useMyProfile().data?.department ?? null
 
-  useEffect(() => {
-    const supabase = createClient()
-    void (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from("profiles").select("department").eq("id", user.id).single()
-      setUserDepartment(data?.department ?? null)
-    })()
-  }, [])
-
-  const fetchRequisitions = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      let url = "/api/requisitions"
-      if (activeTab === "my") {
-        url += "?user_only=true"
-      } else if (activeTab === "approvals") {
-        url += "?status=pending"
-      }
-
-      const res = await apiFetch(url)
-      const json = await res.json()
-
-      if (!res.ok) {
-        throw new Error(json.error || json.message || "Failed to load requisitions")
-      }
-
-      setRows(json.data || [])
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to fetch requisitions")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [activeTab])
-
-  useEffect(() => {
-    fetchRequisitions()
-  }, [fetchRequisitions])
+  const requisitionsQuery = useRequisitions(
+    activeTab === "my" ? { userOnly: true } : activeTab === "approvals" ? { status: "pending" } : {}
+  )
+  const rows = requisitionsQuery.data ?? []
+  const isLoading = requisitionsQuery.isLoading
+  const error = requisitionsQuery.error?.message ?? null
+  const fetchRequisitions = () => void requisitionsQuery.refetch()
 
   // Stats computation
   const totalCount = rows.length

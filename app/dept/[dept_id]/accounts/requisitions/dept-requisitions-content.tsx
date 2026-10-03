@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -11,6 +11,7 @@ import { getStageLabel } from "@/lib/requisitions/workflow"
 import { NewRequisitionDialog } from "@/app/(app)/accounts/requisitions/_components/new-requisition-dialog"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useRequisitions } from "@/hooks/use-requisitions"
 
 function StageBadge({ requisition }: { requisition: Requisition }) {
   if (requisition.status === "approved") {
@@ -42,37 +43,18 @@ interface DeptRequisitionsContentProps {
 
 export function DeptRequisitionsContent({ deptId, deptName, userId }: DeptRequisitionsContentProps) {
   const router = useRouter()
-  const [rows, setRows] = useState<Requisition[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false)
 
-  const fetchRequisitions = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/requisitions")
-      const json = await res.json()
-
-      if (!res.ok) {
-        throw new Error(json.error || json.message || "Failed to load requisitions")
-      }
-
-      // Lock to this department console's department
-      const allRows: Requisition[] = json.data || []
-      const scopedRows = allRows.filter((r) => r.department?.toLowerCase() === deptName.toLowerCase())
-
-      setRows(scopedRows)
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch department requisitions")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [deptName])
-
-  useEffect(() => {
-    fetchRequisitions()
-  }, [fetchRequisitions])
+  // Lock to this department console's department.
+  const scopeToDept = useCallback(
+    (all: Requisition[]) => all.filter((r) => r.department?.toLowerCase() === deptName.toLowerCase()),
+    [deptName]
+  )
+  const requisitionsQuery = useRequisitions({}, scopeToDept)
+  const rows = requisitionsQuery.data ?? []
+  const isLoading = requisitionsQuery.isLoading
+  const error = requisitionsQuery.error?.message ?? null
+  const fetchRequisitions = () => void requisitionsQuery.refetch()
 
   const totalCount = rows.length
   const pendingCount = rows.filter((r) => r.status === "pending").length
