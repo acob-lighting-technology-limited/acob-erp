@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -30,12 +30,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn, formatName } from "@/lib/utils"
 import { logger } from "@/lib/logger"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import {
   exportCorrespondenceToExcel,
   exportCorrespondenceToPDF,
   exportCorrespondenceToWord,
 } from "@/lib/correspondence/correspondence-export"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("reference-generator")
 
@@ -57,16 +59,12 @@ export function AdminReferenceGeneratorContent({
   const { departments: dynamicDepartments } = useDepartments()
   const availableDepartments = dynamicDepartments.length > 0 ? dynamicDepartments : getCanonicalDepartmentOrder()
 
-  const [records, setRecords] = useState<CorrespondenceRecord[]>(initialRecords)
   const [loadingRecordId, setLoadingRecordId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"all" | "external" | "internal">("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(initialRecords.length)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
-  const [tabCounts, setTabCounts] = useState({ all: initialRecords.length, external: 0, internal: 0 })
-  const [globalCounts, setGlobalCounts] = useState({ total: 0, underReview: 0, approved: 0, rejected: 0 })
   const [departmentFilter, setDepartmentFilter] = useState("")
   // This table is server-paginated, so the DataTable cannot filter rows itself —
   // every active filter has to be forwarded to the API or it does nothing.
@@ -100,59 +98,42 @@ export function AdminReferenceGeneratorContent({
     decision: "approved" | "rejected" | "returned_for_correction"
   } | null>(null)
 
-  useEffect(() => {
-    async function fetchTabCounts() {
-      try {
-        const [all, external, internal] = await Promise.all([
-          apiFetch(recordsUrl(new URLSearchParams({ page: "1", limit: "1" })), { cache: "no-store" }).then((r) =>
-            r.json()
-          ),
-          apiFetch(recordsUrl(new URLSearchParams({ page: "1", limit: "1", letter_type: "external" })), {
-            cache: "no-store",
-          }).then((r) => r.json()),
-          apiFetch(recordsUrl(new URLSearchParams({ page: "1", limit: "1", letter_type: "internal" })), {
-            cache: "no-store",
-          }).then((r) => r.json()),
-        ])
-        setTabCounts({
-          all: Number(all.total || 0),
-          external: Number(external.total || 0),
-          internal: Number(internal.total || 0),
-        })
-      } catch (err) {
-        log.error("Failed to fetch tab counts", err)
-      }
-    }
+  const queryClient = useQueryClient()
+  const countsDepartment = lockedDepartment || departmentFilter || null
 
-    async function fetchGlobalCounts() {
-      try {
-        const [all, underReview, approved, rejected] = await Promise.all([
-          apiFetch(recordsUrl(new URLSearchParams({ page: "1", limit: "1" })), { cache: "no-store" }).then((r) =>
-            r.json()
-          ),
-          apiFetch(recordsUrl(new URLSearchParams({ page: "1", limit: "1", status: "under_review" })), {
-            cache: "no-store",
-          }).then((r) => r.json()),
-          apiFetch(recordsUrl(new URLSearchParams({ page: "1", limit: "1", status: "approved" })), {
-            cache: "no-store",
-          }).then((r) => r.json()),
-          apiFetch(recordsUrl(new URLSearchParams({ page: "1", limit: "1", status: "rejected" })), {
-            cache: "no-store",
-          }).then((r) => r.json()),
-        ])
-        setGlobalCounts({
-          total: Number(all.total || 0),
-          underReview: Number(underReview.total || 0),
-          approved: Number(approved.total || 0),
-          rejected: Number(rejected.total || 0),
-        })
-      } catch (err) {
-        log.error("Failed to fetch global counts", err)
+  // Header counts: one cached query of `limit=1` probes (only `total` is read).
+  const { data: counts } = useQuery({
+    queryKey: QUERY_KEYS.correspondenceCounts(countsDepartment),
+    queryFn: async () => {
+      const totalFor = async (extra: Record<string, string>) => {
+        const json = await apiJson<{ total?: number }>(
+          recordsUrl(new URLSearchParams({ page: "1", limit: "1", ...extra })),
+          { cache: "no-store" }
+        )
+        return Number(json.total || 0)
       }
-    }
-    void fetchTabCounts()
-    void fetchGlobalCounts()
-  }, [recordsUrl])
+      const [all, external, internal, underReview, approved, rejected] = await Promise.all([
+        totalFor({}),
+        totalFor({ letter_type: "external" }),
+        totalFor({ letter_type: "internal" }),
+        totalFor({ status: "under_review" }),
+        totalFor({ status: "approved" }),
+        totalFor({ status: "rejected" }),
+      ])
+      return { all, external, internal, underReview, approved, rejected }
+    },
+  })
+  const tabCounts = {
+    all: counts?.all ?? initialRecords.length,
+    external: counts?.external ?? 0,
+    internal: counts?.internal ?? 0,
+  }
+  const globalCounts = {
+    total: counts?.all ?? 0,
+    underReview: counts?.underReview ?? 0,
+    approved: counts?.approved ?? 0,
+    rejected: counts?.rejected ?? 0,
+  }
 
   const stats = useMemo(() => {
     return {
@@ -161,7 +142,7 @@ export function AdminReferenceGeneratorContent({
       approved: globalCounts.approved,
       rejected: globalCounts.rejected,
     }
-  }, [globalCounts])
+  }, [globalCounts.total, globalCounts.underReview, globalCounts.approved, globalCounts.rejected])
   const statusLabel = (status: string) => (status === "under_review" ? "Sent for review" : formatName(status))
   const statusBadgeClass = (status: string) => {
     if (status === "approved") return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
@@ -174,7 +155,7 @@ export function AdminReferenceGeneratorContent({
   }
 
   const handleExport = async (format: "excel" | "pdf" | "word") => {
-    setIsLoading(true)
+    setIsExporting(true)
     const exportToast = toast.loading(`Exporting correspondence to ${format}...`)
     try {
       const params = new URLSearchParams({
@@ -206,35 +187,41 @@ export function AdminReferenceGeneratorContent({
       log.error("Failed to export correspondence records", err)
       toast.error("Export failed", { id: exportToast })
     } finally {
-      setIsLoading(false)
+      setIsExporting(false)
     }
   }
 
-  useEffect(() => {
-    async function loadRecords() {
-      setIsLoading(true)
-      try {
-        const params = new URLSearchParams({
-          page: String(page),
-          limit: "50",
-        })
-        if (activeTab !== "all") params.set("letter_type", activeTab)
-        if (searchQuery.trim()) params.set("search", searchQuery.trim())
-        applyServerFilters(params)
-
-        const res = await apiFetch(recordsUrl(params), { cache: "no-store" })
-        const json = await res.json()
-        setRecords(json.data || [])
-        setTotal(Number(json.total || 0))
-      } catch (err) {
-        log.error("Failed to load records", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    void loadRecords()
-  }, [page, searchQuery, activeTab, recordsUrl, applyServerFilters])
+  const recordsKey = QUERY_KEYS.correspondenceRecords({
+    page,
+    activeTab,
+    search: searchQuery.trim(),
+    department: countsDepartment,
+    statusFilter,
+    yearFilter,
+  })
+  const { data: recordsPage, isFetching: isLoadingRecords } = useQuery({
+    queryKey: recordsKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), limit: "50" })
+      if (activeTab !== "all") params.set("letter_type", activeTab)
+      if (searchQuery.trim()) params.set("search", searchQuery.trim())
+      applyServerFilters(params)
+      const json = await apiJson<{ data?: CorrespondenceRecord[]; total?: number }>(recordsUrl(params), {
+        cache: "no-store",
+      })
+      return { records: json.data ?? [], total: Number(json.total || 0) }
+    },
+    placeholderData: keepPreviousData,
+    initialData:
+      page === 1 && activeTab === "all" && !searchQuery.trim() && !statusFilter && !yearFilter && !departmentFilter
+        ? { records: initialRecords, total: initialRecords.length }
+        : undefined,
+    // The server render is a first paint only; refetch the real page on mount.
+    initialDataUpdatedAt: 0,
+  })
+  const records = recordsPage?.records ?? []
+  const total = recordsPage?.total ?? 0
+  const isLoading = isLoadingRecords || isExporting
 
   async function decide(recordId: string, decision: "approved" | "rejected" | "returned_for_correction") {
     setDecisionPrompt({ recordId, decision })
@@ -244,7 +231,6 @@ export function AdminReferenceGeneratorContent({
     if (!decisionPrompt) return
 
     const { recordId, decision } = decisionPrompt
-    const prevRecord = records.find((r) => r.id === recordId)
     setLoadingRecordId(recordId)
     try {
       const res = await apiFetch(`/api/correspondence/records/${recordId}/approvals`, {
@@ -265,16 +251,17 @@ export function AdminReferenceGeneratorContent({
       const updatedRecord = body.data?.record as CorrespondenceRecord | undefined
       const newStatus = (updatedRecord?.status ?? decision) as CorrespondenceStatus
       toast.success(`Record ${newStatus.replaceAll("_", " ")}`)
-      setRecords((current) =>
-        current.map((record) => (record.id === recordId ? { ...record, ...updatedRecord, status: newStatus } : record))
+      queryClient.setQueryData<typeof recordsPage>(recordsKey, (current) =>
+        current
+          ? {
+              ...current,
+              records: current.records.map((record) =>
+                record.id === recordId ? { ...record, ...updatedRecord, status: newStatus } : record
+              ),
+            }
+          : current
       )
-      setGlobalCounts((prev) => {
-        const next = { ...prev }
-        if (prevRecord?.status === "under_review") next.underReview = Math.max(0, prev.underReview - 1)
-        if (newStatus === "approved") next.approved = prev.approved + 1
-        if (newStatus === "rejected") next.rejected = prev.rejected + 1
-        return next
-      })
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.correspondenceCounts(countsDepartment) })
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to apply decision"))
     } finally {

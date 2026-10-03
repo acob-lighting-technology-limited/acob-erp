@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
   AlertTriangle,
@@ -23,7 +23,9 @@ import type { CorrespondenceRecord } from "@/types/correspondence"
 import { CreateReferenceDialog, type CreateReferenceForm } from "@/components/correspondence/create-reference-dialog"
 import { cn, formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface DepartmentCodeOption {
   department_name: string
@@ -68,7 +70,24 @@ export function PortalReferenceGeneratorContent({
     ? currentViewerDepartment
     : ""
 
-  const [records, setRecords] = useState<CorrespondenceRecord[]>(initialRecords)
+  const queryClient = useQueryClient()
+  const myRecordsKey = QUERY_KEYS.correspondenceRecords({ scope: "mine" })
+  // No page/limit: the API returns the full scoped set when neither is passed.
+  // `limit=100` silently capped the list and made every stat card understate.
+  const { data: records = initialRecords } = useQuery({
+    queryKey: myRecordsKey,
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: CorrespondenceRecord[] }>("/api/correspondence/records?scope=mine", {
+          cache: "no-store",
+        })
+      ).data ?? [],
+    initialData: initialRecords,
+    // The server render is a first paint only; refetch the full set on mount.
+    initialDataUpdatedAt: 0,
+  })
+  const setRecords = (update: (current: CorrespondenceRecord[]) => CorrespondenceRecord[]) =>
+    queryClient.setQueryData<CorrespondenceRecord[]>(myRecordsKey, (current = []) => update(current))
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -105,25 +124,6 @@ export function PortalReferenceGeneratorContent({
     }),
     [records]
   )
-
-  useEffect(() => {
-    let active = true
-
-    async function loadRecords() {
-      // No page/limit: the API returns the full scoped set when neither is passed.
-      // `limit=100` silently capped the list and made every stat card understate.
-      const response = await apiFetch("/api/correspondence/records?scope=mine", { cache: "no-store" })
-      const payload = await response.json()
-      if (!response.ok || !active) return
-      setRecords(payload.data || [])
-    }
-
-    void loadRecords()
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   async function createRecord(event: React.FormEvent) {
     event.preventDefault()
