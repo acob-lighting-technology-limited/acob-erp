@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { serverError } from "@/lib/api/errors"
+import { serverError, validationError } from "@/lib/api/errors"
+import { SupplierSchema } from "@/lib/purchasing/schemas"
 import { logger } from "@/lib/logger"
 
 const log = logger("api/admin/purchasing/suppliers/id")
 
 export const dynamic = "force-dynamic"
-
-const SupplierSchema = z.object({
-  name: z.string().trim().min(1),
-  code: z.string().trim().min(1),
-  email: z.string().trim().optional().nullable(),
-  phone: z.string().trim().optional().nullable(),
-  address: z.string().trim().optional().nullable(),
-  contact_person: z.string().trim().optional().nullable(),
-  is_active: z.boolean(),
-})
 
 // Supplier detail + last 10 purchase orders.
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -53,9 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { id } = await params
   const parsed = SupplierSchema.safeParse(await request.json().catch(() => null))
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 })
-  }
+  if (!parsed.success) return validationError(parsed.error.issues)
   const db = getServiceRoleClientOrFallback(supabase)
   const { name, code, email, phone, address, contact_person, is_active } = parsed.data
   const { error } = await db
