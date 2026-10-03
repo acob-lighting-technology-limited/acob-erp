@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
-import type { EmployeeOption, HelpDeskTicket, LeadDirectoryMember } from "@/components/help-desk/ticket-queue-table"
+import type { EmployeeOption, HelpDeskTicket, LeadDirectoryMember } from "@/lib/help-desk/ticket-display"
 
 type HelpDeskTicketRow = HelpDeskTicket & {
   requester_id: string
