@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
           }
         }
       } catch (gsError: any) {
-        console.error("Ghostscript compression error:", gsError)
+        log.error("Ghostscript compression error:", gsError)
         useGhostscript = false
       }
     }
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
         if (tempFile && existsSync(tempFile)) await unlink(tempFile)
         if (outputFile && existsSync(outputFile)) await unlink(outputFile)
       } catch (err) {
-        console.error("Error cleaning up temp files:", err)
+        log.error("Error cleaning up temp files:", err)
       }
     }, 1000)
 
@@ -229,13 +229,13 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error compressing PDF:", error)
+    log.error("Error compressing PDF:", error)
 
     try {
       if (tempFile && existsSync(tempFile)) await unlink(tempFile)
       if (outputFile && existsSync(outputFile)) await unlink(outputFile)
     } catch (cleanupErr) {
-      console.error("Error during cleanup:", cleanupErr)
+      log.error("Error during cleanup:", cleanupErr)
     }
 
     return serverError(log, error, "Failed to compress PDF")

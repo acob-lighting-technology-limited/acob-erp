@@ -561,7 +561,7 @@ export async function GET(request: NextRequest) {
       // Don't fail silently: an unselectable column here used to blank the leave
       // type on every row in the UI with no trace of why.
       if (leaveTypeError) {
-        console.error("[hr/leave/requests] leave_types lookup failed:", leaveTypeError.message)
+        log.error("[hr/leave/requests] leave_types lookup failed:", leaveTypeError.message)
       }
       leaveTypeRows = data || []
     }

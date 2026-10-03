@@ -194,6 +194,6 @@ async function notifyHROfSubmission(
       html,
     })
   } catch (err) {
-    console.error("Failed to notify HR of onboarding submission:", err)
+    log.error("Failed to notify HR of onboarding submission:", err)
   }
 }

@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error compressing video:", error)
+    log.error("Error compressing video:", error)
 
     if (tempFile && existsSync(tempFile)) {
       try {

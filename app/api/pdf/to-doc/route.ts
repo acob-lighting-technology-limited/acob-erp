@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
               if (outputFile && existsSync(outputFile)) await unlink(outputFile)
               if (existsSync(docOutputFile)) await unlink(docOutputFile)
             } catch (err) {
-              console.error("Error cleaning up temp files:", err)
+              log.error("Error cleaning up temp files:", err)
             }
           }, 1000)
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
           })
         }
       } catch (e) {
-        console.log("LibreOffice not available, returning DOCX format instead")
+        log.info("LibreOffice not available, returning DOCX format instead")
       }
     }
 
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         if (tempFile && existsSync(tempFile)) await unlink(tempFile)
         if (outputFile && existsSync(outputFile)) await unlink(outputFile)
       } catch (err) {
-        console.error("Error cleaning up temp files:", err)
+        log.error("Error cleaning up temp files:", err)
       }
     }, 1000)
 
@@ -149,13 +149,13 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error converting PDF to DOC:", error)
+    log.error("Error converting PDF to DOC:", error)
 
     try {
       if (tempFile && existsSync(tempFile)) await unlink(tempFile)
       if (outputFile && existsSync(outputFile)) await unlink(outputFile)
     } catch (cleanupErr) {
-      console.error("Error during cleanup:", cleanupErr)
+      log.error("Error during cleanup:", cleanupErr)
     }
 
     return serverError(log, error, "Failed to convert PDF to DOC/DOCX")

@@ -30,6 +30,8 @@ export default defineConfig([
       "import/no-anonymous-default-export": "off",
       "@next/next/no-img-element": "warn",
       "prefer-const": "error",
+      // Use lib/logger (structured, namespaced) — raw console output is lost in prod.
+      "no-console": "error",
       "no-restricted-syntax": [
         "error",
         {
@@ -73,6 +75,21 @@ export default defineConfig([
         },
       ],
     },
+  },
+  {
+    // The logger itself writes to the console; tests and the next-themes warning
+    // filter (theme-provider) legitimately touch it too.
+    files: [
+      "lib/logger.ts",
+      "**/__tests__/**",
+      "components/theme-provider.tsx",
+      "e2e/**",
+      "*.config.*",
+      // Deno edge functions and the standalone document service log to stdout by design.
+      "supabase/functions/**",
+      "services/**",
+    ],
+    rules: { "no-console": "off" },
   },
   globalIgnores(["scripts/**"]),
 ])

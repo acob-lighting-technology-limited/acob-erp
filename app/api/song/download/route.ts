@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      console.log("Could not fetch song title, using provided/default")
+      log.info("Could not fetch song title, using provided/default")
     }
 
     const sanitizedTitle = songTitle
@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
       throw execError
     }
 
-    console.log("Download stdout:", stdout)
+    log.info("Download stdout:", stdout)
     if (stderr) {
       if (stderr.includes("[DRM]") || stderr.includes("DRM protection")) {
         const urlObj = new URL(url)
@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      console.log("Download stderr:", stderr)
+      log.info("Download stderr:", stderr)
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500))
@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
           await unlink(tempFile)
         }
       } catch (err) {
-        console.error("Error cleaning up temp file:", err)
+        log.error("Error cleaning up temp file:", err)
       }
     }, 1000)
 
@@ -310,13 +310,13 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error downloading song:", error)
+    log.error("Error downloading song:", error)
 
     if (tempFile && existsSync(tempFile)) {
       try {
         await unlink(tempFile)
       } catch (err) {
-        console.error("Error cleaning up temp file:", err)
+        log.error("Error cleaning up temp file:", err)
       }
     }
 

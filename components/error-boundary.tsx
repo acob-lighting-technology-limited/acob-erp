@@ -2,6 +2,9 @@
 
 import React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { logger } from "@/lib/logger"
+
+const log = logger("components-error-boundary")
 
 type ErrorBoundaryProps = {
   children: React.ReactNode
@@ -27,7 +30,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("ErrorBoundary caught an error", error, errorInfo)
+    log.error({ err: String(error), componentStack: errorInfo.componentStack }, "ErrorBoundary caught an error")
   }
 
   private resetError = () => {

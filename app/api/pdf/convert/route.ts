@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           },
         })
       } catch (serviceError) {
-        console.error("Document service convert failed; falling back:", serviceError)
+        log.error("Document service convert failed; falling back:", serviceError)
       }
     }
 
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
           await rmdir(outputDir)
         }
       } catch (err) {
-        console.error("Error cleaning up temp files:", err)
+        log.error("Error cleaning up temp files:", err)
       }
     }, 5000)
 
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error converting PDF to images:", error)
+    log.error("Error converting PDF to images:", error)
 
     try {
       if (tempFile && existsSync(tempFile)) {
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
         } catch {}
       }
     } catch (cleanupErr) {
-      console.error("Error during cleanup:", cleanupErr)
+      log.error("Error during cleanup:", cleanupErr)
     }
 
     return serverError(log, error, "Failed to convert PDF to images.")
