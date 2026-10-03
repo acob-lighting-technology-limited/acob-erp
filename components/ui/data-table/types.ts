@@ -286,23 +286,6 @@ export interface DataTableProps<TData> {
     subtitle?: (row: TData) => ReactNode
     /** Right-hand slot, fixed width so it aligns across rows. */
     trailing?: (row: TData) => ReactNode
-    /**
-     * Labelled values under the title, each in a fixed-width slot so they line
-     * up down the list like table columns ("In 08:02 · Out 17:10"). Use it on
-     * records pages instead of packing figures into `subtitle`; keep it to 2–3
-     * values — everything else belongs in the detail sheet.
-     */
-    metrics?: (row: TData) => Array<{ label: string; value: ReactNode }>
-    /**
-     * Section headers for a records list (a week, a month), in the order the
-     * rows arrive — unlike `groupBy`, which files an address book A–Z and
-     * renders every row. `summary` fills the right side of the header and gets
-     * every row in that section, not just the current page.
-     */
-    sections?: {
-      by: (row: TData) => string
-      summary?: (rows: TData[]) => ReactNode
-    }
     /** Tapping the row. Ignored when `detail` is set (the sheet opens instead). */
     onSelect?: (row: TData) => void
 

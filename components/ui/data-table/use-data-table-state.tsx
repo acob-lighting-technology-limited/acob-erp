@@ -440,7 +440,6 @@ export function useDataTableState<TData>({
   const { snByRowId, mobileGroups } = useMobileList({
     mobileRow,
     listSource,
-    allRows: sortedData,
     listRendersEverything,
     isServerPagination,
     activePage,

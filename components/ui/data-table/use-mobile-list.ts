@@ -1,10 +1,9 @@
 "use client"
-import { useMemo, type ReactNode } from "react"
+import { useMemo } from "react"
 import type { DataTableProps } from "./types"
 export function useMobileList<TData>({
   mobileRow,
   listSource,
-  allRows,
   listRendersEverything,
   isServerPagination,
   activePage,
@@ -13,8 +12,6 @@ export function useMobileList<TData>({
 }: {
   mobileRow: DataTableProps<TData>["mobileRow"]
   listSource: TData[]
-  /** Every row after filter and sort — section summaries cover the whole section, not one page. */
-  allRows: TData[]
   listRendersEverything: boolean
   isServerPagination: boolean
   activePage: number
@@ -31,33 +28,7 @@ export function useMobileList<TData>({
   }, [listSource, listRendersEverything, isServerPagination, activePage, pageSize, getRowId])
   const mobileGroups = useMemo(() => {
     if (!mobileRow) return []
-    const sections = mobileRow.sections
-    if (sections) {
-      // Records sections keep data order (newest week first when sorted by date).
-      const page = new Map<string, TData[]>()
-      for (const row of listSource) {
-        const heading = sections.by(row)
-        if (!page.has(heading)) page.set(heading, [])
-        page.get(heading)!.push(row)
-      }
-      const summaries = new Map<string, ReactNode>()
-      if (sections.summary) {
-        const all = new Map<string, TData[]>()
-        for (const row of allRows) {
-          const heading = sections.by(row)
-          if (!page.has(heading)) continue
-          if (!all.has(heading)) all.set(heading, [])
-          all.get(heading)!.push(row)
-        }
-        for (const [heading, rows] of all) summaries.set(heading, sections.summary(rows))
-      }
-      return Array.from(page.entries()).map(([heading, rows]) => ({
-        heading: heading as string | null,
-        summary: summaries.get(heading) ?? null,
-        rows,
-      }))
-    }
-    if (!mobileRow.groupBy) return [{ heading: null as string | null, summary: null as ReactNode, rows: listSource }]
+    if (!mobileRow.groupBy) return [{ heading: null as string | null, rows: listSource }]
     const map = new Map<string, TData[]>()
     for (const row of listSource) {
       const heading = mobileRow.groupBy(row)
@@ -74,7 +45,7 @@ export function useMobileList<TData>({
         if (isSymbol(a) !== isSymbol(b)) return isSymbol(a) ? 1 : -1
         return a.localeCompare(b, undefined, { numeric: true })
       })
-      .map(([heading, rows]) => ({ heading: heading as string | null, summary: null as ReactNode, rows }))
-  }, [mobileRow, listSource, allRows])
+      .map(([heading, rows]) => ({ heading, rows }))
+  }, [mobileRow, listSource])
   return { snByRowId, mobileGroups }
 }

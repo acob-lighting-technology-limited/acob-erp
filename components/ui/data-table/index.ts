@@ -1,7 +1,6 @@
 export { DataTable } from "./data-table"
 export { DataTablePage } from "./data-table-page"
 export { ColumnHelp } from "./column-help"
-export { DateTile } from "./date-tile"
 export type {
   DataTableProps,
   DataTableColumn,
