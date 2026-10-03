@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("admin-hr-leave-add")
 
@@ -100,41 +102,43 @@ export function AddLeaveDialog({
   onOpenChange: (open: boolean) => void
   onAdded: () => void
 }) {
-  const [employees, setEmployees] = useState<EmployeeOption[]>([])
-  const [userId, setUserId] = useState("")
-  const [types, setTypes] = useState<LeaveTypeOption[]>([])
-  const [loadingTypes, setLoadingTypes] = useState(false)
-  const [leaveTypeId, setLeaveTypeId] = useState("")
+  const [userId, setUserIdState] = useState("")
+  const [leaveTypeChoice, setLeaveTypeId] = useState("")
   const [startDate, setStartDate] = useState(toLocalISODate())
   const [endDate, setEndDate] = useState(toLocalISODate())
   const [reason, setReason] = useState("")
   const [saving, setSaving] = useState(false)
 
-  // Reset to a clean form each time the dialog is opened.
-  useEffect(() => {
-    if (!open) return
-    setUserId("")
-    setTypes([])
-    setLeaveTypeId("")
-    setStartDate(toLocalISODate())
-    setEndDate(toLocalISODate())
-    setReason("")
-    void fetchEmployees().then(setEmployees)
-  }, [open])
+  const { data: employees = [] } = useQuery({
+    queryKey: QUERY_KEYS.adminLeaveEmployees(),
+    queryFn: fetchEmployees,
+    enabled: open,
+  })
 
-  useEffect(() => {
-    if (!userId) {
-      setTypes([])
+  const { data: types = [], isLoading: loadingTypes } = useQuery({
+    queryKey: QUERY_KEYS.grantableLeaveTypes(userId),
+    queryFn: () => fetchLeaveTypeOptions(userId),
+    enabled: Boolean(userId),
+  })
+  // Default to the first grantable type until the admin picks one.
+  const leaveTypeId = types.some((t) => t.id === leaveTypeChoice) ? leaveTypeChoice : (types[0]?.id ?? "")
+
+  const setUserId = (value: string) => {
+    setUserIdState(value)
+    setLeaveTypeId("")
+  }
+
+  // Start from a clean form every time the dialog closes.
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
+      setUserIdState("")
       setLeaveTypeId("")
-      return
+      setStartDate(toLocalISODate())
+      setEndDate(toLocalISODate())
+      setReason("")
     }
-    setLoadingTypes(true)
-    void fetchLeaveTypeOptions(userId).then((opts) => {
-      setTypes(opts)
-      setLeaveTypeId(opts[0]?.id ?? "")
-      setLoadingTypes(false)
-    })
-  }, [userId])
+    onOpenChange(next)
+  }
 
   const employeeOptions = useMemo(
     () =>
@@ -175,7 +179,7 @@ export function AddLeaveDialog({
         return
       }
       toast.success(`Leave recorded (${payload?.days_count ?? previewDays ?? ""} day(s))`)
-      onOpenChange(false)
+      handleOpenChange(false)
       onAdded()
     } catch (err) {
       log.error({ err: String(err) }, "Manual leave save failed")
@@ -186,7 +190,7 @@ export function AddLeaveDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add Leave</DialogTitle>
@@ -280,7 +284,7 @@ export function AddLeaveDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
           <Button type="button" onClick={() => void save()} disabled={saving || !userId || !leaveTypeId}>
