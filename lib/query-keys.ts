@@ -17,6 +17,12 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  manualLeaveTypeOptions: (userId: string) => ["manual-leave-type-options", userId],
+  attendanceManager: (resource: string, filters?: Record<string, unknown>) => [
+    "attendance-manager",
+    resource,
+    filters ?? null,
+  ],
   attendanceHolidays: (yearMonth: string) => ["attendance-holidays", yearMonth],
   attendanceReports: (filters: Record<string, unknown>) => ["attendance-reports", filters],
   myAttendanceAppeals: () => ["my-attendance-appeals"],
