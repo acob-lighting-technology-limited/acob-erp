@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
-import { cn } from "@/lib/utils"
 import {
   Clock,
   Download,
   FileQuestion,
   UserCheck,
-  MapPin,
   AlertCircle,
   Calendar,
   MessageSquare,
@@ -37,7 +35,7 @@ import {
 import type { AttendanceRecord } from "./page"
 import { logger } from "@/lib/logger"
 import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
-import { computeAttendanceDay, attendanceRateFrom, NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay, NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
 import {
   ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
@@ -45,7 +43,9 @@ import {
   normalizeStoredAttendanceStatus,
 } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("dashboard-attendance-attendance-content")
 
@@ -175,13 +175,43 @@ const ATTENDANCE_TABS: DataTableTab[] = [
   { key: "calendar", label: "Calendar" },
 ]
 
+const EMPTY_APPEALS: AppealRecord[] = []
+
 export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: AttendanceContentProps) {
   const [activeTab, setActiveTab] = useState<"log" | "calendar">("log")
-  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(initialTodayRecord)
-  const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>(initialRecentRecords)
-  const [unifiedDays, setUnifiedDays] = useState<UnifiedDay[] | null>(null)
+  // Current month + the two before it, so the log and filter show history.
+  const daysQuery = useQuery({
+    queryKey: QUERY_KEYS.myAttendanceRecent(),
+    queryFn: async () => {
+      const ym = toLocalYearMonth()
+      const months = [getPrevMonth(ym, 2), getPrevMonth(ym, 1), ym]
+      const results = await Promise.all(
+        months.map((m) =>
+          apiJson<{ data?: UnifiedDay[] }>(`/api/hr/attendance/my-days?year_month=${m}`, { cache: "no-store" })
+            .then((d) => d.data ?? [])
+            .catch(() => [] as UnifiedDay[])
+        )
+      )
+      return results.flat()
+    },
+  })
+  const unifiedDays = daysQuery.data ?? null
+  // Server-rendered records cover the first paint until the days arrive.
+  const todayRecord = unifiedDays
+    ? (unifiedDays.find((row) => row.date === toLocalISODate())?.record ?? null)
+    : initialTodayRecord
+  const recentRecords = useMemo(
+    () =>
+      unifiedDays ? (unifiedDays.map((row) => row.record).filter(Boolean) as AttendanceRecord[]) : initialRecentRecords,
+    [unifiedDays, initialRecentRecords]
+  )
   const [filteredRows, setFilteredRows] = useState<AttendanceRow[]>([])
-  const [appeals, setAppeals] = useState<AppealRecord[]>([])
+  const appealsQuery = useQuery({
+    queryKey: QUERY_KEYS.myAttendanceAppeals(),
+    queryFn: async () =>
+      (await apiJson<{ data?: AppealRecord[] }>("/api/hr/attendance/appeals", { cache: "no-store" })).data ?? [],
+  })
+  const appeals = appealsQuery.data ?? EMPTY_APPEALS
   const [appealDialogRow, setAppealDialogRow] = useState<AttendanceRow | null>(null)
   const [editAppeal, setEditAppeal] = useState<AppealRecord | null>(null)
   const [cancelAppealId, setCancelAppealId] = useState<string | null>(null)
@@ -203,41 +233,8 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
     return count
   }, [unifiedDays])
 
-  const fetchAttendanceData = useCallback(async () => {
-    try {
-      const ym = toLocalYearMonth()
-      const today = toLocalISODate()
-      // Fetch current month + 2 previous months so the log and filter show history
-      const months = [getPrevMonth(ym, 2), getPrevMonth(ym, 1), ym]
-      const results = await Promise.all(
-        months.map((m) =>
-          apiFetch(`/api/hr/attendance/my-days?year_month=${m}`, { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => (d?.data as UnifiedDay[]) ?? [])
-            .catch(() => [] as UnifiedDay[])
-        )
-      )
-      const allDays = results.flat()
-      setUnifiedDays(allDays)
-      const todayRec = allDays.find((row) => row.date === today)?.record ?? null
-      setTodayRecord(todayRec)
-      setRecentRecords(allDays.map((row) => row.record).filter(Boolean) as AttendanceRecord[])
-    } catch (error) {
-      log.error("Error fetching attendance:", error)
-    }
-  }, [])
-
-  const fetchAppeals = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/hr/attendance/appeals", { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (res.ok) {
-        setAppeals((payload?.data as AppealRecord[]) ?? [])
-      }
-    } catch (err) {
-      log.error("Error fetching appeals:", err)
-    }
-  }, [])
+  const fetchAttendanceData = useCallback(() => void daysQuery.refetch(), [daysQuery])
+  const fetchAppeals = useCallback(() => void appealsQuery.refetch(), [appealsQuery])
 
   const handleCancelAppeal = useCallback(
     async (appealId: string) => {
@@ -257,11 +254,6 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
     },
     [fetchAppeals, fetchAttendanceData]
   )
-
-  useEffect(() => {
-    void fetchAttendanceData()
-    void fetchAppeals()
-  }, [fetchAttendanceData, fetchAppeals])
 
   const rows = useMemo<AttendanceRow[]>(() => {
     if (unifiedDays === null) return []
