@@ -13,6 +13,8 @@
     "format:check": "prettier --check .",
     "commit": "cz",
     "type-check": "tsc --noEmit",
+    "dup:check": "npx --yes jscpd@4",
+    "deadcode": "npx --yes knip@5",
     "test": "npm run test:audit && npm run test:admin-scope && npm run test:meeting-week && npm run test:attendance && npm run test:task-scoring && npm run test:project-health && npm run test:scorecard && npm run test:risk-register",
     "test:audit": "tsx --test lib/audit/__tests__/*.test.ts",
     "test:admin-scope": "tsx --test lib/admin/__tests__/*.test.ts",
