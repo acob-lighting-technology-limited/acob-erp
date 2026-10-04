@@ -476,6 +476,7 @@ const adminNavigation: NavItem[] = [
         children: [
           { name: "Report Mail-out", href: "/admin/communications/meetings/mail" },
           { name: "Reminders", href: "/admin/communications/meetings/reminders" },
+          { name: "Knowledge Sharing", href: "/admin/communications/meetings/kss" },
         ],
       },
     ],

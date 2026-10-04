@@ -19,7 +19,6 @@ interface SendSummaryProps {
   broadcastDepartment: string
   broadcastSubject: string
   broadcastAttachmentCount: number
-  selectedMeetingPreparedByName: string | null
   selectedBroadcastPreparedByName: string | null
   selectedPresenterName: string | null
   knowledgeDepartment: string
@@ -44,7 +43,6 @@ export function SendSummary({
   broadcastDepartment,
   broadcastSubject,
   broadcastAttachmentCount,
-  selectedMeetingPreparedByName,
   selectedBroadcastPreparedByName,
   selectedPresenterName,
   knowledgeDepartment,
@@ -105,14 +103,6 @@ export function SendSummary({
                     {reminderType === "meeting" ? meetingTime : sessionTime}
                   </Badge>
                 </div>
-                {reminderType === "meeting" && (
-                  <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground shrink-0">Prepared by</span>
-                    <Badge variant="outline" className="max-w-[68%] truncate">
-                      {selectedMeetingPreparedByName || "Not set"}
-                    </Badge>
-                  </div>
-                )}
               </>
             ) : (
               <>
