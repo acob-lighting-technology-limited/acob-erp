@@ -1,50 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
-import { z } from "zod"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
-import {
-  EMERGENCY_BYPASSED_STAGES,
-  EMERGENCY_JUSTIFICATION_MIN_LENGTH,
-  getInitialStage,
-  getStageLabel,
-} from "@/lib/requisitions/workflow"
+import { EMERGENCY_BYPASSED_STAGES, getInitialStage, getStageLabel } from "@/lib/requisitions/workflow"
 import { isRequisitionApprover, resolveRequisitionActor } from "@/lib/requisitions/authorization"
 import { logger } from "@/lib/logger"
-import { apiError, ApiErrorCode } from "@/lib/api/errors"
+import { apiError, ApiErrorCode, validationError } from "@/lib/api/errors"
+import { CreateRequisitionSchema } from "@/lib/requisitions/schemas"
 import { createNotification } from "@/lib/notifications/create"
 import { formatCurrency } from "@/lib/format"
 
 const log = logger("api-requisitions")
-
-const BeneficiarySchema = z.object({
-  account_name: z.string().trim().min(1, "Account name is required"),
-  account_number: z.string().trim().min(1, "Account number is required"),
-  bank_name: z.string().trim().min(1, "Bank name is required"),
-  amount: z.union([z.number(), z.string()]).optional(),
-})
-
-const AttachmentSchema = z.object({
-  file_name: z.string().trim().min(1, "File name is required"),
-  file_url: z.string().trim().min(1, "File URL is required"),
-  file_type: z.string().optional(),
-  file_size: z.number().optional(),
-})
-
-const CreateRequisitionSchema = z.object({
-  department: z.string().trim().min(1, "Department is required"),
-  project_name: z.string().trim().min(1, "Project name is required"),
-  amount: z.number().positive("Amount must be greater than zero"),
-  amount_in_words: z.string().optional(),
-  purpose: z.string().trim().min(3, "Purpose must be at least 3 characters"),
-  beneficiary_details: z.array(BeneficiarySchema).min(1, "At least one beneficiary is required"),
-  // Supporting documents are optional — not every requisition has a receipt or
-  // invoice available at the time it is raised.
-  attachments: z.array(AttachmentSchema).optional().default([]),
-  funding_category_id: z.string().uuid("Select the project funding category"),
-  is_emergency: z.boolean().optional(),
-  emergency_justification: z.string().trim().optional(),
-})
 
 function getAdminClient() {
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -129,14 +95,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const parsed = CreateRequisitionSchema.safeParse(body)
 
-    if (!parsed.success) {
-      return apiError(
-        parsed.error.issues[0]?.message || "Validation error",
-        ApiErrorCode.VALIDATION_ERROR,
-        400,
-        parsed.error.issues
-      )
-    }
+    if (!parsed.success) return validationError(parsed.error.issues)
 
     const payload = parsed.data
     const computedAmountInWords = payload.amount_in_words?.trim() || numberToNairaWords(payload.amount)
@@ -145,14 +104,6 @@ export async function POST(request: NextRequest) {
 
     const isEmergency = payload.is_emergency === true
     const emergencyJustification = payload.emergency_justification?.trim() || ""
-
-    if (isEmergency && emergencyJustification.length < EMERGENCY_JUSTIFICATION_MIN_LENGTH) {
-      return apiError(
-        `An emergency requisition needs a written justification of at least ${EMERGENCY_JUSTIFICATION_MIN_LENGTH} characters.`,
-        ApiErrorCode.VALIDATION_ERROR,
-        400
-      )
-    }
 
     // Resolve the funding category and snapshot its label onto the requisition so
     // the printed form stays accurate if the category is renamed later.
