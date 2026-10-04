@@ -171,11 +171,9 @@ const nextConfig = {
         destination: "/hr/leave/:path*",
         permanent: true,
       },
-      {
-        source: "/lunch",
-        destination: "/hr/lunch",
-        permanent: true,
-      },
+      // No /lunch → /hr/lunch redirect: /lunch is a public page (app/lunch/page.tsx)
+      // so WhatsApp can preview the open menu. Signed-in visitors are sent on to
+      // /hr/lunch by the middleware.
       {
         source: "/resources",
         destination: "/hr/resources",

@@ -2,9 +2,10 @@ import "server-only"
 import { cache } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { loadMenuForDate } from "@/lib/hr/lunch-menu-server"
-import { isVotingOpen, loadLunchSettings, resolveVotingDeadline } from "@/lib/hr/lunch-voting"
+import { loadMenuForDate, loadMenusInRange } from "@/lib/hr/lunch-menu-server"
+import { isVotingOpen, loadLunchSettings, resolveVotingDeadline, LUNCH_LOOKAHEAD_DAYS } from "@/lib/hr/lunch-voting"
 import { isLunchShareDate } from "@/lib/hr/lunch-share"
+import { toLocalISODate } from "@/lib/utils/date"
 
 export interface LunchSharePreview {
   date: string
@@ -50,4 +51,21 @@ export const loadLunchSharePreview = cache(async (date: string): Promise<LunchSh
     deadline: resolveVotingDeadline(menu, settings).toISOString(),
     votingOpen: isVotingOpen(menu, settings),
   }
+})
+
+/**
+ * The day the bare /lunch link previews: the soonest menu staff can still vote
+ * on, or null when none is open.
+ */
+export const loadCurrentLunchShareDate = cache(async (): Promise<string | null> => {
+  const client = getServiceRoleClientOrFallback(await createClient())
+  const today = toLocalISODate()
+  const until = new Date(`${today}T12:00:00+01:00`)
+  until.setUTCDate(until.getUTCDate() + LUNCH_LOOKAHEAD_DAYS)
+
+  const [menus, settings] = await Promise.all([
+    loadMenusInRange(client, today, toLocalISODate(until)),
+    loadLunchSettings(client),
+  ])
+  return menus.find((menu) => isVotingOpen(menu, settings))?.date ?? null
 })

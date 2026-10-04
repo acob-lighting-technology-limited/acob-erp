@@ -8,7 +8,7 @@ import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "
 import { resolveCookieMaxAge } from "@/lib/supabase/cookie-policy"
 import { getCbtSettings, canAccessCbt, resolveCbtAccessScope } from "@/lib/cbt-config"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { LUNCH_SHARE_PATH_PATTERN } from "@/lib/hr/lunch-share"
+import { LUNCH_SHARE_PATH_PATTERN, lunchShareRedirectPath } from "@/lib/hr/lunch-share"
 
 type CookieSetOptions = Parameters<NextResponse["cookies"]["set"]>[2]
 
@@ -327,7 +327,7 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !pathname.startsWith("/auth") &&
     !pathname.startsWith("/launch") &&
-    // Dated lunch share links — WhatsApp's preview crawler has no session.
+    // Lunch share links — WhatsApp's preview crawler has no session.
     !LUNCH_SHARE_PATH_PATTERN.test(pathname) &&
     !pathname.startsWith("/employee/new") &&
     !pathname.startsWith("/api/public") &&
@@ -339,6 +339,14 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/auth/login"
     url.searchParams.set("next", intendedPath || "/profile")
     return NextResponse.redirect(url)
+  }
+
+  // A signed-in person opening a WhatsApp lunch link goes straight to that
+  // day's poll. Done here rather than in the page so they never see the share
+  // page, which exists for the preview crawler (it never has a session).
+  const lunchPollTarget = user ? lunchShareRedirectPath(pathname) : null
+  if (lunchPollTarget) {
+    return NextResponse.redirect(new URL(lunchPollTarget, request.url))
   }
 
   // Check employment status for authenticated users (Normal flow if maintenance is OFF).
