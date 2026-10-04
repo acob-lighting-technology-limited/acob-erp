@@ -2,21 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
-import { z } from "zod"
 import { logger } from "@/lib/logger"
-import { serverError } from "@/lib/api/errors"
+import { serverError, validationError } from "@/lib/api/errors"
+import { AttendancePolicySchema } from "@/lib/hr/attendance-policy-schema"
 
 const log = logger("admin-settings-attendance")
-
-const PolicySchema = z.object({
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Start time must be in HH:MM format"),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, "End time must be in HH:MM format"),
-  lateCutoff: z.string().regex(/^\d{2}:\d{2}$/, "Grace cutoff must be in HH:MM format"),
-  incompletePenalty: z.number().nonnegative("Incomplete penalty must be a positive number"),
-  lunchMinutes: z.number().int().min(0).max(240, "Lunch break must be between 0 and 240 minutes"),
-  lunchQualifyingHours: z.number().min(0).max(24, "Qualifying day length must be between 0 and 24 hours"),
-  emailNotificationsEnabled: z.boolean().optional(),
-})
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,10 +24,8 @@ export async function POST(request: NextRequest) {
     if (!routeAccess.ok) return routeAccess.response
 
     const body = await request.json()
-    const parsed = PolicySchema.safeParse(body)
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
-    }
+    const parsed = AttendancePolicySchema.safeParse(body)
+    if (!parsed.success) return validationError(parsed.error.issues)
 
     const {
       startTime,
