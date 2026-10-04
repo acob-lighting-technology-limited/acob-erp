@@ -44,6 +44,7 @@ import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
+import { resolveLeaveRouteStages } from "@/lib/hr/leave-stages"
 
 interface LeaveContentProps {
   currentUserId: string
@@ -355,7 +356,7 @@ export function LeaveContent({
       }
     }
 
-    const stageOrder = ["reliever", "department_lead", "admin_hr_lead", "hcs", "md"]
+    const stageOrder = resolveLeaveRouteStages(row)
     const stageName: Record<string, string> = {
       reliever: "Reliever",
       department_lead: "Department Lead",

@@ -38,6 +38,10 @@ import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
+import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
+
+export { resolveLeaveRouteStages }
+export type { RouteSnapshotStage }
 
 export interface LeaveItem {
   id: string
@@ -56,6 +60,8 @@ export interface LeaveItem {
   current_approver_user_id?: string
   reliever_id?: string | null
   supervisor_id?: string | null
+  requester_route_kind?: string | null
+  route_snapshot?: RouteSnapshotStage[] | null
   created_at: string
   admin_manual?: boolean | null
   approved_at?: string | null
@@ -765,7 +771,7 @@ export function LeaveApprovePage({
                   }
                 }
 
-                const stageOrder = ["reliever", "department_lead", "admin_hr_lead", "hcs", "md"]
+                const stageOrder = resolveLeaveRouteStages(r)
                 const stageName: Record<string, string> = {
                   reliever: "Reliever",
                   department_lead: "Department Lead",

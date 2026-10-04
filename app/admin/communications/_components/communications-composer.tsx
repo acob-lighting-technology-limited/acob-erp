@@ -18,12 +18,10 @@ import {
 } from "./composer-utils"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { MeetingReminderForm } from "./MeetingReminderForm"
-import { KnowledgeSessionForm } from "./KnowledgeSessionForm"
 import { BroadcastForm } from "./BroadcastForm"
 import { RecipientSelector } from "./RecipientSelector"
 import { SchedulingOptions } from "./SchedulingOptions"
 import { SendSummary } from "./SendSummary"
-import { ReminderTypeSelector } from "./ReminderTypeSelector"
 import { getCurrentOfficeWeek, getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 import { apiFetch } from "@/lib/api-client"
@@ -120,7 +118,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
   const [knowledgePresenterId, setKnowledgePresenterId] = useState("none")
   const [knowledgePresenterName, setKnowledgePresenterName] = useState("")
-  const [meetingPreparedById, setMeetingPreparedById] = useState("none")
 
   // Broadcast fields
   const [broadcastSubject, setBroadcastSubject] = useState("")
@@ -151,8 +148,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const queryClient = useQueryClient()
   const currentUserDept = (currentUser?.department || "").trim()
   const currentUserName = (currentUser?.full_name || "").trim()
-  const isCurrentUserAdminHr =
-    currentUserDept.toLowerCase().includes("admin") && currentUserDept.toLowerCase().includes("hr")
 
   const { data: canonicalMeetingSetup } = useQuery({
     queryKey: ["canonical-meeting-date", activeMeetingWeek.week, activeMeetingWeek.year],
@@ -227,22 +222,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       department: knowledgeDepartment !== "none" ? knowledgeDepartment : null,
     }
   }, [knowledgeDepartment, knowledgePresenterName, selectedPresenter])
-
-  const meetingPreparedByOptions = useMemo(
-    () =>
-      employees
-        .filter((e) => {
-          const dept = (e.department || "").toLowerCase()
-          return dept.includes("admin") && dept.includes("hr")
-        })
-        .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")),
-    [employees]
-  )
-
-  const selectedMeetingPreparedBy = useMemo(
-    () => (meetingPreparedById === "none" ? null : employees.find((e) => e.id === meetingPreparedById) || null),
-    [employees, meetingPreparedById]
-  )
 
   const broadcastPreparedByOptions = useMemo(
     () =>
@@ -323,20 +302,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   useEffect(() => {
     if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
   }, [mode, reminderType])
-
-  useEffect(() => {
-    if (meetingPreparedByOptions.length > 0 && !meetingPreparedByOptions.some((p) => p.id === meetingPreparedById)) {
-      const rafiatPreferred = meetingPreparedByOptions.find((p) => (p.full_name || "").toLowerCase().includes("rafiat"))
-      const preferred =
-        rafiatPreferred?.id ||
-        (isCurrentUserAdminHr &&
-        currentUserName &&
-        meetingPreparedByOptions.some((p) => p.full_name === currentUserName)
-          ? meetingPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
-          : meetingPreparedByOptions[0].id)
-      setMeetingPreparedById(preferred || meetingPreparedByOptions[0].id)
-    }
-  }, [currentUserName, isCurrentUserAdminHr, meetingPreparedById, meetingPreparedByOptions])
 
   useEffect(() => {
     if (broadcastPreparedByOptions.length === 0) return
@@ -420,10 +385,18 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
         const roster = Array.isArray(payload?.data) ? payload.data : []
         const picked = roster.find((entry: { is_active?: boolean }) => entry?.is_active !== false) ?? roster[0]
-        if (!picked || cancelled) {
-          setKnowledgeDepartment("none")
+        if (cancelled) return
+        if (!picked) {
+          // No roster entry: the rotation still knows which department presents.
           setKnowledgePresenterId("none")
           setKnowledgePresenterName("")
+          const rotationRes = await apiFetch(
+            `/api/admin/communications/kss-rotation?week=${officeWeek.week}&year=${officeWeek.year}`
+          )
+          const rotation = await rotationRes.json().catch(() => null)
+          const department = rotationRes.ok ? rotation?.data?.department : null
+          if (cancelled) return
+          setKnowledgeDepartment(typeof department === "string" && department.trim() ? department : "none")
           return
         }
 
@@ -652,10 +625,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       }
     }
 
-    if (reminderType === "meeting" && !selectedMeetingPreparedBy?.full_name) {
-      toast.error("Prepared by is required")
-      return
-    }
     if (reminderType === "meeting") {
       const agendaItems = parseAgendaItems(agendaText)
       if (agendaItems.length === 0) {
@@ -707,12 +676,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             knowledgeSharingDepartment:
               reminderType === "meeting" && knowledgeDepartment !== "none" ? knowledgeDepartment : undefined,
             knowledgeSharingPresenter: reminderType === "meeting" ? selectedKnowledgePresenter || undefined : undefined,
-            meetingPreparedByName:
-              reminderType === "meeting" ? selectedMeetingPreparedBy?.full_name || "ACOB Team" : undefined,
-            meetingPreparedByDesignation:
-              reminderType === "meeting" ? selectedMeetingPreparedBy?.designation || null : undefined,
-            meetingPreparedByDepartment:
-              reminderType === "meeting" ? selectedMeetingPreparedBy?.department || DEPT_ADMIN_HR : undefined,
             sessionDate: reminderType === "knowledge_sharing" ? sessionDate : undefined,
             sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
             duration: reminderType === "knowledge_sharing" ? duration : undefined,
@@ -809,9 +772,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         payload.agenda = parseAgendaItems(agendaText)
         if (knowledgeDepartment !== "none") payload.knowledgeSharingDepartment = knowledgeDepartment
         if (selectedKnowledgePresenter) payload.knowledgeSharingPresenter = selectedKnowledgePresenter
-        payload.meetingPreparedByName = selectedMeetingPreparedBy?.full_name || "ACOB Team"
-        payload.meetingPreparedByDesignation = selectedMeetingPreparedBy?.designation || null
-        payload.meetingPreparedByDepartment = selectedMeetingPreparedBy?.department || DEPT_ADMIN_HR
       } else if (reminderType === "knowledge_sharing") {
         payload.sessionDate = formatDateNice(sessionDate)
         payload.sessionTime = sessionTime
@@ -878,7 +838,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           failure_count: failCount,
           recipient_count: resolvedRecipients.length,
           subject: label,
-          prepared_by: selectedMeetingPreparedBy?.full_name || null,
           attachment_count: 0,
         },
       })
@@ -941,7 +900,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         description={
           mode === "communications"
             ? "Send branded department-level broadcast emails to selected recipients."
-            : "Send meeting reminders and knowledge-sharing alerts to selected recipients."
+            : "Send the general meeting reminder to selected recipients."
         }
         icon={Megaphone}
         backLink={{
@@ -953,11 +912,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Reminder Type selector (meetings mode only) */}
-          {mode !== "communications" && (
-            <ReminderTypeSelector reminderType={reminderType} setReminderType={setReminderType} />
-          )}
-
           {/* Details Card */}
           <Card>
             <CardHeader className="pb-3">
@@ -1005,20 +959,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   knowledgeDepartment={knowledgeDepartment}
                   knowledgePresenterId={knowledgePresenterId}
                   knowledgePresenterName={knowledgePresenterName}
-                  meetingPreparedById={meetingPreparedById}
-                  setMeetingPreparedById={setMeetingPreparedById}
                   departmentOptions={departmentOptions}
                   presenterOptions={presenterOptions}
-                  meetingPreparedByOptions={meetingPreparedByOptions}
-                />
-              ) : reminderType === "knowledge_sharing" ? (
-                <KnowledgeSessionForm
-                  sessionDate={sessionDate}
-                  setSessionDate={setSessionDate}
-                  sessionTime={sessionTime}
-                  setSessionTime={setSessionTime}
-                  duration={duration}
-                  setDuration={setDuration}
                 />
               ) : (
                 <BroadcastForm
@@ -1109,7 +1051,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           sessionTime={sessionTime}
           broadcastDepartment={broadcastDepartment}
           broadcastSubject={broadcastSubject}
-          selectedMeetingPreparedByName={selectedMeetingPreparedBy?.full_name ?? null}
           selectedBroadcastPreparedByName={selectedBroadcastPreparedBy?.full_name ?? null}
           selectedPresenterName={selectedKnowledgePresenter?.full_name ?? null}
           knowledgeDepartment={knowledgeDepartment}

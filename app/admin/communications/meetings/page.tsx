@@ -2,7 +2,7 @@
 
 import { PageWrapper, PageHeader } from "@/components/layout"
 import { IconFill } from "@/components/ui/icon-fill"
-import { Mail, Megaphone, ChevronRight, CalendarDays } from "lucide-react"
+import { BookOpen, Mail, Megaphone, ChevronRight, CalendarDays } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 
@@ -20,7 +20,7 @@ export default function CommunicationsMeetingsPage() {
     },
     {
       title: "Reminders",
-      description: "Send meeting and knowledge-sharing reminders with scheduling controls.",
+      description: "Send the general meeting reminder with scheduling controls.",
       href: "/admin/communications/meetings/reminders",
       icon: Megaphone,
       color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
@@ -28,13 +28,23 @@ export default function CommunicationsMeetingsPage() {
       hoverBorder: "hover:border-orange-500/60 dark:hover:border-orange-400/60",
       hoverText: "group-hover:text-orange-500",
     },
+    {
+      title: "Knowledge Sharing",
+      description: "Presenting department rotation and the heads-up email to the next department.",
+      href: "/admin/communications/meetings/kss",
+      icon: BookOpen,
+      color: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20",
+      fill: "bg-green-500",
+      hoverBorder: "hover:border-green-500/60 dark:hover:border-green-400/60",
+      hoverText: "group-hover:text-green-500",
+    },
   ]
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Communications: General Meeting"
-        description="General meeting communication workflows (reports and reminders)."
+        description="General meeting communication workflows (reports, reminders and knowledge sharing)."
         icon={CalendarDays}
         backLink={{ href: "/admin/communications", label: "Back to Communications" }}
       />

@@ -5,6 +5,7 @@ import { getLeaveEntitlements } from "@/lib/hr/leave-entitlement"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { LeaveContent } from "./leave-content"
 import { toLocalISODate } from "@/lib/utils/date"
+import type { RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
 export interface LeaveApprovalAudit {
   id: string
@@ -48,6 +49,7 @@ export interface LeaveRequest {
   current_stage_order?: number
   current_approver_user_id?: string
   requester_route_kind?: string
+  route_snapshot?: RouteSnapshotStage[] | null
   leave_request_segments?: { start_date: string; end_date: string; days_count: number; segment_order: number }[]
   lead_reconfirm_required?: boolean
   reliever_revision?: number

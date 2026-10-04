@@ -6,6 +6,7 @@ import * as PopoverPrimitive from "@radix-ui/react-popover"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface SearchableMultiSelectProps {
   label?: string
@@ -156,9 +157,8 @@ export function SearchableMultiSelect({
         {filteredOptions.length > 0 ? (
           filteredOptions.map((option) => {
             const isSelected = values.includes(option.value)
-            return (
+            const itemElement = (
               <div
-                key={option.value}
                 onClick={() => toggleValue(option.value)}
                 className={cn(
                   "group relative flex w-full cursor-pointer items-center rounded-sm py-1.5 pr-8 pl-8 text-xs transition-colors outline-none select-none",
@@ -179,6 +179,25 @@ export function SearchableMultiSelect({
                   <span className="truncate whitespace-nowrap">{option.label}</span>
                 </div>
               </div>
+            )
+
+            if (!option.label) {
+              return <React.Fragment key={option.value}>{itemElement}</React.Fragment>
+            }
+
+            return (
+              <Tooltip key={option.value} delayDuration={200} disableHoverableContent>
+                <TooltipTrigger asChild>{itemElement}</TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  align="center"
+                  sideOffset={8}
+                  collisionPadding={10}
+                  className="z-[70] max-w-sm break-words sm:max-w-md"
+                >
+                  {option.label}
+                </TooltipContent>
+              </Tooltip>
             )
           })
         ) : (
