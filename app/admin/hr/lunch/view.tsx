@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +64,8 @@ import { LunchDeadlineDialog } from "./_components/lunch-deadline-dialog"
 import { LunchVoteOverrideDialog } from "./_components/lunch-vote-override-dialog"
 import { LunchMenuViewersDialog } from "./_components/lunch-menu-viewers-dialog"
 import { LunchShareDialog } from "./_components/lunch-share-dialog"
+import { LunchExportDialog } from "./_components/lunch-export-dialog"
+import { getAttendanceMonthOptions } from "@/lib/hr/attendance-utils"
 import {
   DEFAULT_LUNCH_SETTINGS,
   groupHeading,
@@ -302,22 +303,9 @@ export function LunchRegisterPage({
 
   // Export states
   const [openExport, setOpenExport] = useState(false)
-  const [openCustomPeriodDialog, setOpenCustomPeriodDialog] = useState(false)
-  const [customStartDate, setCustomStartDate] = useState<string>(todayDate.substring(0, 8) + "01")
-  const [customEndDate, setCustomEndDate] = useState<string>(todayDate)
 
-  // Generate Month list options for Select filter dropdowns
-  const monthOptions = useMemo(() => {
-    const opts = []
-    const now = new Date()
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-      const lbl = d.toLocaleString("en-US", { month: "long", year: "numeric" })
-      opts.push({ value: val, label: lbl })
-    }
-    return opts
-  }, [])
+  // Generate Month list options for Select filter dropdowns and export picker
+  const monthOptions = useMemo(() => getAttendanceMonthOptions(), [])
 
   // Generate Year list options
   const yearOptions = ["2026", "2025"]
@@ -644,113 +632,6 @@ export function LunchRegisterPage({
   // Trigger open the export options picker
   function handleExportClick() {
     setOpenExport(true)
-  }
-
-  // Export Daily Roster
-  function exportDaily() {
-    const headers = [
-      "Employee Name",
-      "Staff Code",
-      "Department",
-      "Date",
-      "Cost",
-      "Company Subsidy",
-      "Employee Deduction",
-      "Status",
-    ]
-    const csvRows = [headers.join(",")]
-
-    const source = processedDailyRows.length ? processedDailyRows.map((r) => r.employee) : employees
-    source.forEach((emp) => {
-      const hasEaten = ateUserIds.includes(emp.id)
-      const row = [
-        `"${emp.full_name}"`,
-        `"${emp.employee_number}"`,
-        `"${emp.department || "General"}"`,
-        selectedDate,
-        hasEaten ? cost : 0,
-        hasEaten ? companySubsidy : 0,
-        hasEaten ? employeeSurcharge : 0,
-        hasEaten ? "Served" : "Skipped",
-      ]
-      csvRows.push(row.join(","))
-    })
-
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n")
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement("a")
-    link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `lunch_register_${selectedDate}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    toast.success("Daily report exported successfully!")
-  }
-
-  // Export Monthly Summary
-  function exportMonthly() {
-    const headers = ["Employee Name", "Staff Code", "Department", "Month", "Lunch Days Count", "Total Deduction"]
-    const csvRows = [headers.join(",")]
-
-    const source = processedSummaryData.length ? processedSummaryData : summaryData
-    source.forEach((row) => {
-      const r = [
-        `"${row.full_name}"`,
-        `"${row.employee_number}"`,
-        `"${row.department || "General"}"`,
-        selectedMonth,
-        row.lunch_count,
-        row.total_deduction,
-      ]
-      csvRows.push(r.join(","))
-    })
-
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n")
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement("a")
-    link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `lunch_summary_${selectedMonth}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    toast.success("Monthly report exported successfully!")
-  }
-
-  // Export Custom Period
-  async function exportCustom(start: string, end: string) {
-    try {
-      const res = await fetch(`/api/admin/hr/lunch?start_date=${start}&end_date=${end}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to load custom period data")
-
-      const headers = ["Employee Name", "Staff Code", "Department", "Period", "Lunch Days Count", "Total Deduction"]
-      const csvRows = [headers.join(",")]
-
-      const summary = data.summary || []
-      summary.forEach((row: any) => {
-        const r = [
-          `"${row.full_name}"`,
-          `"${row.employee_number}"`,
-          `"${row.department || "General"}"`,
-          `"${start} to ${end}"`,
-          row.lunch_count,
-          row.total_deduction,
-        ]
-        csvRows.push(r.join(","))
-      })
-
-      const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n")
-      const encodedUri = encodeURI(csvContent)
-      const link = document.createElement("a")
-      link.setAttribute("href", encodedUri)
-      link.setAttribute("download", `lunch_summary_${start}_to_${end}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      toast.success("Custom period report exported successfully!")
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to export report")
-    }
   }
 
   // Daily checklist columns
@@ -2435,72 +2316,7 @@ export function LunchRegisterPage({
         todayDate={todayDate}
       />
 
-      <ExportOptionsDialog
-        open={openExport}
-        onOpenChange={setOpenExport}
-        title="Export Lunch Report"
-        options={[
-          { id: "day", label: "Daily Roster (CSV)", icon: "excel" },
-          { id: "month", label: "Monthly Summary (CSV)", icon: "excel" },
-          { id: "custom", label: "Custom Period (CSV)", icon: "excel" },
-        ]}
-        onSelect={(id) => {
-          if (id === "day") exportDaily()
-          else if (id === "month") exportMonthly()
-          else if (id === "custom") setOpenCustomPeriodDialog(true)
-        }}
-      />
-
-      {/* Custom Period Range Selector Dialog */}
-      <Dialog open={openCustomPeriodDialog} onOpenChange={setOpenCustomPeriodDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Select Custom Period Range</DialogTitle>
-            <DialogDescription>
-              Select the start and end dates to export the summary of meals and surcharges.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4 text-sm">
-            <div className="space-y-2">
-              <Label htmlFor="custom-start">Start Date</Label>
-              <Input
-                id="custom-start"
-                type="date"
-                value={customStartDate}
-                max={todayDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="custom-end">End Date</Label>
-              <Input
-                id="custom-end"
-                type="date"
-                value={customEndDate}
-                max={todayDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenCustomPeriodDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                void exportCustom(customStartDate, customEndDate)
-                setOpenCustomPeriodDialog(false)
-              }}
-              disabled={!customStartDate || !customEndDate || customStartDate > customEndDate}
-            >
-              Export Period
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <LunchExportDialog open={openExport} onOpenChange={setOpenExport} monthOptions={monthOptions} />
       {activeTab === "reviews" && (
         <div className="space-y-4">
           <p className="text-muted-foreground text-xs">
