@@ -140,7 +140,11 @@ const nextConfig = {
       { source: "/tools/reference-generator", destination: "/correspondence", permanent: true },
       { source: "/admin/accounts/payments/departments", destination: "/admin/accounts/payments", permanent: true },
       { source: "/admin/payments/departments", destination: "/admin/accounts/payments", permanent: true },
-      { source: "/admin/corporate-scorecard/summary", destination: "/admin/corporate-services/scorecard?tab=summary", permanent: true },
+      {
+        source: "/admin/corporate-scorecard/summary",
+        destination: "/admin/corporate-services/scorecard?tab=summary",
+        permanent: true,
+      },
       { source: "/admin/hr/attendance/reports", destination: "/admin/hr/attendance", permanent: true },
       { source: "/admin/hr/employees/payroll", destination: "/admin/payroll", permanent: true },
       { source: "/admin/hr/payroll", destination: "/admin/payroll", permanent: true },
@@ -149,7 +153,11 @@ const nextConfig = {
       { source: "/admin/payroll/dummy", destination: "/admin/payroll/calculator", permanent: true },
       { source: "/admin/pms/cbt/question", destination: "/admin/pms/cbt", permanent: true },
       { source: "/admin/pms/goals", destination: "/admin/pms/kpi?tab=goals", permanent: true },
-      { source: "/admin/reports/meeting-documents", destination: "/admin/reports/general-meeting/kss", permanent: true },
+      {
+        source: "/admin/reports/meeting-documents",
+        destination: "/admin/reports/general-meeting/kss",
+        permanent: true,
+      },
       { source: "/admin/reports/mail", destination: "/admin/communications/meetings/mail", permanent: true },
       { source: "/admin/tools/reference-generator", destination: "/admin/correspondence", permanent: true },
       { source: "/dept/:dept_id/pms/goals", destination: "/dept/:dept_id/pms/kpi?tab=goals", permanent: true },
@@ -198,11 +206,9 @@ const nextConfig = {
         destination: "/hr/leave/:path*",
         permanent: true,
       },
-      {
-        source: "/lunch",
-        destination: "/hr/lunch",
-        permanent: true,
-      },
+      // No /lunch → /hr/lunch redirect: /lunch is a public page (app/lunch/page.tsx)
+      // so WhatsApp can preview the open menu. Signed-in visitors are sent on to
+      // /hr/lunch by the middleware.
       {
         source: "/resources",
         destination: "/hr/resources",

@@ -13,7 +13,11 @@
 
 import { toLocalISODate } from "@/lib/utils/date"
 
-export const LUNCH_SHARE_PATH_PATTERN = /^\/lunch\/\d{4}-\d{2}-\d{2}(\/|$)/
+/**
+ * Public lunch share paths: the bare /lunch link (previews whichever menu is
+ * open now) and the dated /lunch/YYYY-MM-DD links plus their preview images.
+ */
+export const LUNCH_SHARE_PATH_PATTERN = /^\/lunch(\/?$|\/\d{4}-\d{2}-\d{2}(\/|$))/
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -25,6 +29,23 @@ export function isLunchShareDate(value: string): boolean {
 
 export function lunchSharePath(date: string): string {
   return `/lunch/${date}`
+}
+
+/**
+ * Where a signed-in visitor to a share page belongs: the poll, opened on the
+ * link's day. Null for anything that isn't a share page (its preview image,
+ * say). The middleware redirects on this, so only the session-less preview
+ * crawler and staff who aren't signed in ever render a share page.
+ */
+export function lunchShareRedirectPath(pathname: string): string | null {
+  if (/^\/lunch\/?$/.test(pathname)) return "/hr/lunch"
+  const match = /^\/lunch\/(\d{4}-\d{2}-\d{2})\/?$/.exec(pathname)
+  return match && isLunchShareDate(match[1]) ? lunchPollPath(match[1]) : null
+}
+
+/** The staff poll opened on a given menu day. */
+export function lunchPollPath(date: string): string {
+  return `/hr/lunch?date=${date}`
 }
 
 function shiftISODate(date: string, days: number): string {

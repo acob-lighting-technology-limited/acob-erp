@@ -16,7 +16,8 @@ import { LunchContent, type LunchPollData } from "./lunch-content"
 export const dynamic = "force-dynamic"
 
 interface PageProps {
-  searchParams?: Promise<{ tab?: string }>
+  /** `date` opens the poll on that menu day — WhatsApp share links land here. */
+  searchParams?: Promise<{ tab?: string; date?: string }>
 }
 
 export default async function LunchPage({ searchParams }: PageProps) {
@@ -39,9 +40,11 @@ export default async function LunchPage({ searchParams }: PageProps) {
   const settings = await loadLunchSettings(dataClient)
   const menus = await loadMenusInRange(dataClient, shift(-LUNCH_LOOKBACK_DAYS), shift(LUNCH_LOOKAHEAD_DAYS))
 
-  // Land on today when it has a menu, otherwise the next published day —
-  // voting usually happens a day or more ahead of the meal.
-  const selected = menus.find((m) => m.date === today) || menus.find((m) => m.date > today) || menus.at(-1) || null
+  // A share link's day wins. Otherwise land on today when it has a menu, else
+  // the next published day — voting usually happens a day or more ahead.
+  const requested = resolvedSearchParams?.date ? menus.find((m) => m.date === resolvedSearchParams.date) : undefined
+  const selected =
+    requested || menus.find((m) => m.date === today) || menus.find((m) => m.date > today) || menus.at(-1) || null
 
   const votes = selected ? await loadVotesForMenu(dataClient, selected.id) : []
   const { cost, companySubsidy, employeeDeduction } = lunchCostBreakdown(settings)
