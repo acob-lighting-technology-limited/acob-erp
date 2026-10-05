@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { StaffCardDialog } from "@/components/ui/staff-card-dialog"
+import { StaffCardDialog, staffCardQueryOptions } from "@/components/ui/staff-card-dialog"
 import { cn } from "@/lib/utils"
 
 const STAFF_AVATAR_SIZES = {
@@ -59,6 +60,7 @@ export function StaffAvatar({
   profileId,
 }: StaffAvatarProps) {
   const [cardOpen, setCardOpen] = useState(false)
+  const queryClient = useQueryClient()
   const label = name?.trim() || "Staff member"
   const avatar = (
     <Avatar className={cn(STAFF_AVATAR_SIZES[size], className)}>
@@ -71,12 +73,17 @@ export function StaffAvatar({
 
   if (!profileId) return avatar
 
+  // Start loading the card on hover/touch/focus so it's usually ready by the click.
+  const prefetchCard = () => void queryClient.prefetchQuery(staffCardQueryOptions(profileId))
+
   return (
     <>
       <button
         type="button"
         aria-label={`View ${label}'s contact card`}
         // Avatars often sit in clickable table rows; the card shouldn't also open the row.
+        onPointerEnter={prefetchCard}
+        onFocus={prefetchCard}
         onClick={(event) => {
           event.stopPropagation()
           setCardOpen(true)

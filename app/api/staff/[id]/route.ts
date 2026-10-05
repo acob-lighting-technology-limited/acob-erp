@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { getAvatarSignedUrl } from "@/lib/profile-photos"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { logger } from "@/lib/logger"
@@ -21,12 +20,13 @@ type StaffCardRow = {
   department: string | null
   designation: string | null
   employment_status: string | null
-  avatar_path: string | null
 }
 
 /**
  * One colleague's contact card — what opens when a staff photo is clicked. Fields are a
  * subset of `/api/directory`, which already shows every employee these for everyone.
+ * No photo here: the clicked avatar already holds its signed URL, and re-signing it
+ * would add a storage round-trip to every open.
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const rl = await rateLimit(`staff-card:${getClientId(request)}`, { limit: 60, windowSec: 60 })
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { data, error } = await dataClient
     .from("profiles")
     .select(
-      "id, first_name, last_name, full_name, company_email, phone_number, department, designation, employment_status, avatar_path"
+      "id, first_name, last_name, full_name, company_email, phone_number, department, designation, employment_status"
     )
     .eq("id", id)
     .maybeSingle()
@@ -71,7 +71,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       phone: row.phone_number,
       department: row.department ? normalizeDepartmentName(row.department) : null,
       designation: row.designation,
-      avatar_url: await getAvatarSignedUrl(dataClient, row.avatar_path),
     },
   })
 }

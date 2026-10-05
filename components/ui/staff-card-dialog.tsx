@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { queryOptions, useQuery } from "@tanstack/react-query"
 import { Mail, Phone } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -15,7 +15,6 @@ interface StaffCard {
   phone: string | null
   department: string | null
   designation: string | null
-  avatar_url: string | null
 }
 
 async function fetchStaffCard(id: string): Promise<StaffCard> {
@@ -23,6 +22,16 @@ async function fetchStaffCard(id: string): Promise<StaffCard> {
   if (!response.ok) throw new Error("Failed to load staff member")
   const payload = (await response.json()) as { data: StaffCard }
   return payload.data
+}
+
+/** Shared by the dialog and the avatar's hover prefetch, so both hit the same cache entry. */
+export function staffCardQueryOptions(profileId: string) {
+  return queryOptions({
+    queryKey: QUERY_KEYS.staffCard(profileId),
+    queryFn: () => fetchStaffCard(profileId),
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  })
 }
 
 interface StaffCardDialogProps {
@@ -36,16 +45,10 @@ interface StaffCardDialogProps {
 
 /** A colleague's photo with their name, email and phone — opened by clicking a `StaffAvatar`. */
 export function StaffCardDialog({ profileId, open, onOpenChange, name, src }: StaffCardDialogProps) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: QUERY_KEYS.staffCard(profileId),
-    queryFn: () => fetchStaffCard(profileId),
-    enabled: open,
-    staleTime: 10 * 60 * 1000,
-    retry: 1,
-  })
+  const { data, isLoading, isError } = useQuery({ ...staffCardQueryOptions(profileId), enabled: open })
 
   const displayName = data?.name || name?.trim() || "Staff member"
-  const photo = data?.avatar_url ?? src ?? null
+  const photo = src ?? null
   const role = [data?.designation, data?.department].filter(Boolean).join(" · ")
 
   return (
