@@ -61,8 +61,12 @@ export function BirthdayClothesline() {
         <p className="birthday-error">{error}</p>
       ) : celebrants.length > 0 ? (
         <div className="bd4-lines" style={{ "--lines": lines.length } as CSSProperties}>
-          {lines.map((line) => (
-            <div key={line.start} className="bd4-line" style={{ "--count": line.items.length } as CSSProperties}>
+          {lines.map((line, lineIndex) => (
+            <div
+              key={line.start}
+              className="bd4-line"
+              style={{ "--count": line.items.length, "--li": lineIndex } as CSSProperties}
+            >
               <svg className="bd4-rope" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path d="M0 2 Q50 98 100 2" />
               </svg>
