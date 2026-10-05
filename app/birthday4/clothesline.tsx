@@ -16,7 +16,8 @@ import {
 import { useBirthdayCelebrants } from "../birthday/use-birthday-celebrants"
 import "./clothesline.css"
 
-const MAX_PER_LINE = 5
+// One rope wherever faces stay readable; a second rope only beyond this.
+const MAX_PER_LINE = 8
 
 /** Split celebrants into evenly-filled lines of at most MAX_PER_LINE, keeping each line's start index. */
 function toLines(celebrants: Celebrant[]): { start: number; items: Celebrant[] }[] {
@@ -48,6 +49,8 @@ export function BirthdayClothesline() {
     )
   }
 
+  const lines = toLines(celebrants)
+
   return (
     <section className="bd4">
       <header className="bd4-head">
@@ -58,8 +61,8 @@ export function BirthdayClothesline() {
       {error ? (
         <p className="birthday-error">{error}</p>
       ) : celebrants.length > 0 ? (
-        <div className="bd4-lines">
-          {toLines(celebrants).map((line) => (
+        <div className="bd4-lines" style={{ "--lines": lines.length } as CSSProperties}>
+          {lines.map((line) => (
             <div key={line.start} className="bd4-line" style={{ "--count": line.items.length } as CSSProperties}>
               <svg className="bd4-rope" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path d="M0 2 Q50 98 100 2" />

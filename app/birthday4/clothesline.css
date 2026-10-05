@@ -54,7 +54,8 @@
 
 .bd4-line {
   --sag: 70px;
-  --frame-w: min(13.5rem, calc((100vw - 6rem) / (var(--count) + 0.8)));
+  /* Capped by height too, so rope(s) + frames + footer fit one screen. */
+  --frame-w: min(13.5rem, calc((100vw - 6rem) / (var(--count) + 0.8)), calc(34vh / var(--lines, 1)));
 
   position: relative;
   height: calc(var(--sag) + var(--frame-w) * 1.62 + 2rem);
