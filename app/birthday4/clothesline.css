@@ -37,6 +37,7 @@
 }
 
 .bd4-range {
+  margin-top: 0.5rem;
   border: 1px solid rgb(47 162 87 / 0.6);
   border-radius: 999px;
   padding: 0.4rem 1rem;

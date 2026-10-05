@@ -55,7 +55,6 @@ export function BirthdayClothesline() {
     <section className="bd4">
       <header className="bd4-head">
         <img src="/images/acob-logo-dark.webp" alt="ACOB Lighting Logo" className="bd4-logo" />
-        <span className="bd4-range">{rangeLabel}</span>
       </header>
 
       {error ? (
@@ -112,6 +111,7 @@ export function BirthdayClothesline() {
         <p className="bd4-wish">
           The ACOB Family celebrates you — wishing you joy, grace, peace, and a beautiful year ahead.
         </p>
+        <span className="bd4-range">{rangeLabel}</span>
       </footer>
 
       <BirthdayBackButton onClick={state.reset} />
