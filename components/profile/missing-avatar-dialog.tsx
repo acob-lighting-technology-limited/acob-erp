@@ -18,6 +18,8 @@ import {
 // photo is uploaded. Kept on its own key so dismissing one doesn't hide the other.
 const DISMISS_KEY = "acob-avatar-dialog-dismissed-until"
 const DISMISS_MS = 24 * 60 * 60 * 1000
+// `?photo-prompt=1` forces the popup open, so it can be previewed by someone who has a photo.
+const PREVIEW_PARAM = "photo-prompt"
 
 interface MissingAvatarDialogProps {
   hasAvatar: boolean
@@ -26,9 +28,15 @@ interface MissingAvatarDialogProps {
 export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [isPreview, setIsPreview] = useState(false)
 
   // Decided once on mount, so client-side navigation doesn't re-open it.
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get(PREVIEW_PARAM) === "1") {
+      setIsPreview(true)
+      setOpen(true)
+      return
+    }
     // /profile already has the upload control front and centre.
     if (hasAvatar || window.location.pathname === "/profile") return
     try {
@@ -50,6 +58,7 @@ export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
 
   function dismiss() {
     setOpen(false)
+    if (isPreview) return
     try {
       window.localStorage.setItem(DISMISS_KEY, String(Date.now() + DISMISS_MS))
     } catch {
@@ -57,7 +66,7 @@ export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
     }
   }
 
-  if (hasAvatar || pathname === "/profile") {
+  if (!isPreview && (hasAvatar || pathname === "/profile")) {
     return null
   }
 
