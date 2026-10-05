@@ -1,4 +1,4 @@
-/* Style 4 — clothesline. Builds on birthday.css tokens and decor. */
+/* Clothesline spotlight (/birthday as cards, /birthday4 on ropes). Builds on birthday.css tokens and decor. */
 
 .birthday-page.bd-clothesline {
   height: auto;
@@ -324,6 +324,56 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ── Cards layout (.bd4--static, used by /birthday) ────────────────
+   No ropes, pegs or sway: the cards sit level in a centred row and rise in
+   one by one. Everything else is shared with the rope layout. */
+
+.bd4--static .bd4-lines {
+  flex: 1;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.bd4--static .bd4-rope,
+.bd4--static .bd4-peg {
+  display: none;
+}
+
+.bd4--static .bd4-line {
+  display: flex;
+  height: auto;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2rem;
+  padding: 0 2rem;
+}
+
+.bd4--static .bd4-pin {
+  position: relative;
+  top: auto !important;
+  left: auto !important;
+  translate: none;
+  animation: bd4-card-in 850ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.4s + var(--li, 0) * 250ms + var(--i, 0) * 110ms);
+}
+
+.bd4--static .bd4-frame {
+  margin-top: 0;
+}
+
+@keyframes bd4-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
   }
 }
 
