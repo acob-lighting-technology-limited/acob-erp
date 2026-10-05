@@ -29,6 +29,7 @@ export const QUERY_KEYS = {
   departments: () => ["departments"],
   officeLocations: () => ["office-locations"],
   staffAvatars: () => ["staff-avatars"],
+  staffCard: (id: string) => ["staff-card", id],
   profiles: (filters?: Record<string, unknown>) => (filters ? ["profiles", filters] : ["profiles"]),
   profile: (id: string) => ["profile", id],
   assets: (filters?: Record<string, unknown>) => (filters ? ["assets", filters] : ["assets"]),

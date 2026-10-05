@@ -288,6 +288,7 @@ export function EmployeeViewModal({
                 <StaffAvatar
                   name={`${formatName(viewEmployeeProfile.first_name)} ${formatName(viewEmployeeProfile.last_name)}`}
                   src={staffAvatars[viewEmployeeProfile.id]}
+                  profileId={viewEmployeeProfile.id}
                   size="md"
                   className="border"
                 />

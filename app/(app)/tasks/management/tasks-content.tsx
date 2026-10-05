@@ -370,6 +370,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             <StaffAvatar
               name={formatFullName(t.assigned_by_user.first_name, t.assigned_by_user.last_name)}
               src={t.assigned_by ? staffAvatars[t.assigned_by] : null}
+              profileId={t.assigned_by}
               size="xs"
             />
           )}

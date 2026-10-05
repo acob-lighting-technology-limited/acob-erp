@@ -116,6 +116,7 @@ export function ProjectTaskViewer({ projectId, projectName }: ProjectTaskViewerP
                             [task.assigned_user.first_name, task.assigned_user.last_name].join(" ")
                           }
                           src={staffAvatars[task.assigned_to]}
+                          profileId={task.assigned_to}
                           size="xs"
                         />
                       ) : (

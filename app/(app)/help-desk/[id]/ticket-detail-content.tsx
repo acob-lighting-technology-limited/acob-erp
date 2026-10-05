@@ -31,13 +31,23 @@ type Ticket = {
   csat_feedback?: string | null
 }
 
-function TicketPerson({ label, name, src }: { label: string; name: string | null; src: string | null | undefined }) {
+function TicketPerson({
+  label,
+  name,
+  src,
+  profileId,
+}: {
+  label: string
+  name: string | null
+  src: string | null | undefined
+  profileId: string | null | undefined
+}) {
   return (
     <div className="flex items-center gap-2">
       <span>{label}:</span>
       {name ? (
         <span className="flex items-center gap-1.5">
-          <StaffAvatar name={name} src={src} size="xs" />
+          <StaffAvatar name={name} src={src} profileId={profileId} size="xs" />
           {name}
         </span>
       ) : (
@@ -213,11 +223,13 @@ export function TicketDetailContent({
                 label="Requester"
                 name={ticket.requester_name || (ticket.requester_id === viewerId ? "You" : null)}
                 src={ticket.requester_id ? staffAvatars[ticket.requester_id] : null}
+                profileId={ticket.requester_id}
               />
               <TicketPerson
                 label="Assigned To"
                 name={ticket.assigned_to_name || (ticket.assigned_to === viewerId ? "You" : null)}
                 src={ticket.assigned_to ? staffAvatars[ticket.assigned_to] : null}
+                profileId={ticket.assigned_to}
               />
               <div>Department: {ticket.service_department || "-"}</div>
               <div>Category: {ticket.category || "-"}</div>

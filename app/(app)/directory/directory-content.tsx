@@ -113,8 +113,17 @@ function CopyValue({ value, className, muted }: { value: string | null; classNam
  * the initials standing in for it) belongs in the table cell and the card as
  * much as in the contacts row.
  */
-function DirectoryAvatar({ row, size = "md" }: { row: DirectoryRow; size?: StaffAvatarSize }) {
-  return <StaffAvatar name={displayName(row)} src={row.avatar_url} size={size} />
+function DirectoryAvatar({
+  row,
+  size = "md",
+  viewable = true,
+}: {
+  row: DirectoryRow
+  size?: StaffAvatarSize
+  /** False inside the mobile row, which is itself a button. */
+  viewable?: boolean
+}) {
+  return <StaffAvatar name={displayName(row)} src={row.avatar_url} size={size} profileId={viewable ? row.id : null} />
 }
 
 /**
@@ -464,7 +473,7 @@ export function DirectoryContent() {
             const letter = displayName(r).trim()[0]?.toUpperCase() || "#"
             return /[A-Z]/.test(letter) ? letter : "#"
           },
-          leading: (r) => <DirectoryAvatar row={r} />,
+          leading: (r) => <DirectoryAvatar row={r} viewable={false} />,
           title: (r) => displayName(r),
           subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
           trailing: (r) =>

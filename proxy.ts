@@ -62,5 +62,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // sw.js and manifest.webmanifest must bypass the auth redirect. Browsers
+  // refuse a service worker script served via redirect, and fetch the manifest
+  // without cookies — a redirect to /auth/login makes iOS save a plain bookmark
+  // instead of installing the app, and iOS only exposes push to installed apps.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 }

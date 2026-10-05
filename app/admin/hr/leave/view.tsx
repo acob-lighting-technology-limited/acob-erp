@@ -1013,6 +1013,7 @@ export function LeaveApprovePage({
                   <StaffAvatar
                     name={r.user?.full_name || "Employee"}
                     src={staffAvatars[r.user_id]}
+                    profileId={r.user_id}
                     size="xl"
                     className="text-xl"
                   />

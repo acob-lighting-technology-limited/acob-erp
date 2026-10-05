@@ -159,6 +159,7 @@ export function LeaveDetailDialog({
               <StaffAvatar
                 name={employeeName}
                 src={staffAvatars[leave.user_id]}
+                profileId={leave.user_id}
                 initials={getInitials(employeeName)}
                 className="h-10 w-10 border text-xs shadow-xs"
               />

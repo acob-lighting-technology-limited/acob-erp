@@ -240,7 +240,7 @@ export default function AdminMeetingAttendancePage() {
         accessor: (r) => r.full_name,
         render: (r) => (
           <div className="flex items-center gap-3 py-1">
-            <StaffAvatar name={r.full_name} src={r.avatar_url} size="md" />
+            <StaffAvatar name={r.full_name} src={r.avatar_url} profileId={r.id} size="md" />
             <div className="min-w-0">
               <div className="text-foreground truncate font-medium">{r.full_name}</div>
               <div className="text-muted-foreground truncate text-xs">{r.designation || r.department}</div>
@@ -541,7 +541,7 @@ export default function AdminMeetingAttendancePage() {
           detail: {
             title: (r) => r.full_name,
             subtitle: (r) => [r.designation, r.department].filter(Boolean).join(" · ") || "—",
-            avatar: (r) => <StaffAvatar name={r.full_name} src={r.avatar_url} size="xl" />,
+            avatar: (r) => <StaffAvatar name={r.full_name} src={r.avatar_url} profileId={r.id} size="xl" />,
             fields: (r) => [
               { icon: Building2, label: "Department", value: r.department },
               {
@@ -584,7 +584,7 @@ export default function AdminMeetingAttendancePage() {
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <StaffAvatar name={r.full_name} src={r.avatar_url} size="lg" />
+                <StaffAvatar name={r.full_name} src={r.avatar_url} profileId={r.id} size="lg" />
                 <div className="min-w-0">
                   <div className="truncate font-medium">{r.full_name}</div>
                   <div className="text-muted-foreground truncate text-xs">{r.designation || r.department}</div>
