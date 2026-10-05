@@ -1,0 +1,406 @@
+/* Clothesline spotlight (/birthday as cards, /birthday4 on ropes). Builds on birthday.css tokens and decor. */
+
+.birthday-page.bd-clothesline {
+  height: auto;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 100%, rgb(47 162 87 / 0.25), transparent 55%),
+    linear-gradient(180deg, #0a120c 0%, #040604 100%);
+}
+
+/* The ropes are the decoration here — bunting and tethered balloons would be
+   competing lines of string. */
+.bd-clothesline .birthday-decor__bunting,
+.bd-clothesline .birthday-balloons {
+  display: none;
+}
+
+.bd4 {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem 0 4rem;
+}
+
+.bd4-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 2.5rem;
+}
+
+.bd4-logo {
+  height: 34px;
+  width: auto;
+}
+
+.bd4-range {
+  margin-top: 0.5rem;
+  border: 1px solid rgb(47 162 87 / 0.6);
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  color: var(--bd-green-bright);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bd4-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.bd4-line {
+  --sag: 70px;
+  /* Capped by height too, so rope(s) + frames + footer fit one screen. */
+  --frame-w: min(13.5rem, calc((100vw - 6rem) / (var(--count) + 0.8)), calc(34vh / var(--lines, 1)));
+
+  position: relative;
+  height: calc(var(--sag) + var(--frame-w) * 1.62 + 2rem);
+}
+
+.bd4-rope {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--sag);
+  overflow: visible;
+}
+
+.bd4-rope path {
+  fill: none;
+  stroke: var(--bd-green-bright);
+  stroke-opacity: 0.75;
+  stroke-width: 2.5px;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 4px 4px rgb(0 0 0 / 0.5));
+}
+
+.bd4-pin {
+  position: absolute;
+  width: var(--frame-w);
+  margin: 0;
+  translate: -50% -6px;
+  transform-origin: 50% 0;
+  animation:
+    bd4-drop 900ms cubic-bezier(0.22, 1.3, 0.36, 1) both,
+    bd4-sway 5.5s ease-in-out infinite;
+  animation-delay: calc(0.95s + var(--li, 0) * 250ms + var(--i, 0) * 110ms), calc(var(--i, 0) * -0.9s);
+}
+
+.bd4-peg {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  z-index: 2;
+  width: 12px;
+  height: 30px;
+  translate: -50% 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--bd-gold-deep), var(--bd-gold), var(--bd-gold-deep));
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.5);
+}
+
+.bd4-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 14px;
+  border: 1px solid rgb(47 162 87 / 0.55);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.5rem 0.75rem;
+  background: linear-gradient(180deg, var(--bd-forest), #050806);
+  box-shadow: 0 30px 50px -24px rgb(0 0 0 / 0.95);
+}
+
+.bd4-pin--today .bd4-frame {
+  border-color: var(--bd-gold);
+  box-shadow:
+    0 30px 50px -24px rgb(0 0 0 / 0.95),
+    0 0 40px 4px rgb(232 189 79 / 0.35);
+}
+
+.bd4-photo {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 0.3rem;
+  background: var(--bd-forest);
+}
+
+.bd4-frame figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  text-align: center;
+}
+
+.bd4-name {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: clamp(0.95rem, 1.4vw, 1.25rem);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd4-date {
+  color: var(--bd-green-bright);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bd4-pin--today .bd4-date {
+  color: var(--bd-gold);
+}
+
+.bd4-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding: 0 2rem;
+  text-align: center;
+}
+
+.bd4-happy {
+  margin: 0;
+  color: var(--bd-gold);
+  font-family: var(--font-birthday-script), cursive;
+  font-size: clamp(3rem, 6vw, 5.5rem);
+  line-height: 1;
+}
+
+.bd4-names {
+  max-width: 60rem;
+  margin: 0;
+  color: var(--bd-cream);
+  font-family: var(--font-birthday-serif), Georgia, serif;
+  font-size: clamp(1.4rem, 2.6vw, 2.25rem);
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.bd4-wish {
+  max-width: 40rem;
+  margin: 0.25rem 0 0;
+  color: var(--bd-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+@keyframes bd4-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-40px) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Uses `rotate` so it composes with the drop-in `transform` above. */
+@keyframes bd4-sway {
+  0%,
+  100% {
+    rotate: -2deg;
+  }
+  50% {
+    rotate: 2deg;
+  }
+}
+
+/* ── Entrance ─────────────────────────────────────────────────────
+   ~3s, once: logo → each rope strings across → frames drop onto it with a
+   bounce and a single photo glint → "Happy Birthday" writes on → names,
+   wish and date range follow. Only the sway keeps going afterwards.
+   Reduced-motion users get the final frame (birthday.css). */
+
+.bd4-logo {
+  animation: bd4-fade-down 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.bd4-rope {
+  animation: bd4-string 900ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  animation-delay: calc(0.2s + var(--li, 0) * 250ms);
+}
+
+.bd4-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.32) 50%, transparent 65%);
+  translate: -130% 0;
+  pointer-events: none;
+  animation: bd4-glint 1.1s ease-in-out both;
+  animation-delay: calc(1.6s + var(--li, 0) * 250ms + var(--i, 0) * 110ms);
+}
+
+.bd4-happy {
+  animation: bd4-write 1.1s cubic-bezier(0.65, 0, 0.35, 1) 1.9s both;
+}
+
+.bd4-names {
+  animation: bd4-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) 2.5s both;
+}
+
+.bd4-wish {
+  animation: bd4-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) 2.7s both;
+}
+
+.bd4-range {
+  animation: bd4-pop 550ms cubic-bezier(0.34, 1.56, 0.64, 1) 2.95s both;
+}
+
+@keyframes bd4-fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Reveals the rope left-to-right, as if it's being strung across. */
+@keyframes bd4-string {
+  from {
+    clip-path: inset(-50% 100% -50% 0);
+  }
+  to {
+    clip-path: inset(-50% 0 -50% 0);
+  }
+}
+
+@keyframes bd4-glint {
+  from {
+    translate: -130% 0;
+  }
+  to {
+    translate: 130% 0;
+  }
+}
+
+@keyframes bd4-write {
+  from {
+    clip-path: inset(-30% 105% -30% -10%);
+  }
+  to {
+    clip-path: inset(-30% -10% -30% -10%);
+  }
+}
+
+@keyframes bd4-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bd4-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Cards layout (.bd4--static, used by /birthday) ────────────────
+   No ropes, pegs or sway: the cards sit level in a centred row and rise in
+   one by one. Everything else is shared with the rope layout. */
+
+.bd4--static .bd4-lines {
+  flex: 1;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.bd4--static .bd4-rope,
+.bd4--static .bd4-peg {
+  display: none;
+}
+
+.bd4--static .bd4-line {
+  display: flex;
+  height: auto;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2rem;
+  padding: 0 2rem;
+}
+
+.bd4--static .bd4-pin {
+  position: relative;
+  top: auto !important;
+  left: auto !important;
+  translate: none;
+  animation: bd4-card-in 850ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.4s + var(--li, 0) * 250ms + var(--i, 0) * 110ms);
+}
+
+.bd4--static .bd4-frame {
+  margin-top: 0;
+}
+
+@keyframes bd4-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* On phones the rope geometry gets too tight — fall back to a simple pegged grid. */
+@media (max-width: 720px) {
+  .bd4-head {
+    padding: 0 1rem;
+  }
+
+  .bd4-line {
+    display: flex;
+    height: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem 1rem;
+    padding: 1rem;
+  }
+
+  .bd4-rope {
+    display: none;
+  }
+
+  .bd4-pin {
+    position: relative;
+    top: auto !important;
+    left: auto !important;
+    width: calc(50% - 0.5rem);
+    translate: none;
+  }
+}

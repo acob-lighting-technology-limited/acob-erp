@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { birthdayScript, birthdaySerif } from "./fonts"
 import "./birthday.css"
 
 export const metadata: Metadata = {
@@ -11,5 +12,5 @@ export default function BirthdayLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return <div className="birthday-route">{children}</div>
+  return <div className={`birthday-route ${birthdayScript.variable} ${birthdaySerif.variable}`}>{children}</div>
 }
