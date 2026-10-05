@@ -30,6 +30,8 @@ import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { apiFetch } from "@/lib/api-client"
+import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 type DocumentType = "minutes"
 
@@ -125,6 +127,8 @@ export function MeetingDocumentTypeTable({
       return Array.isArray(data) && data[0] ? Boolean(data[0].is_locked) : false
     },
   })
+
+  const staffAvatars = useStaffAvatars()
 
   const uploadedByIds = useMemo(
     () => Array.from(new Set(rows.map((row) => row.uploaded_by).filter((value): value is string => Boolean(value)))),
@@ -343,7 +347,16 @@ export function MeetingDocumentTypeTable({
         label: "Submitted By",
         hideOnMobile: true,
         accessor: (row) => (row.uploaded_by ? uploadedByNameMap.get(row.uploaded_by) || "-" : "-"),
-        render: (row) => (row.uploaded_by ? uploadedByNameMap.get(row.uploaded_by) || "-" : "-"),
+        render: (row) =>
+          row.uploaded_by ? (
+            <StaffNameWithAvatar
+              name={uploadedByNameMap.get(row.uploaded_by) || "Unknown"}
+              profileId={row.uploaded_by}
+              src={staffAvatars[row.uploaded_by]}
+            />
+          ) : (
+            "-"
+          ),
       },
       {
         key: "created_at",
@@ -356,7 +369,7 @@ export function MeetingDocumentTypeTable({
         render: (row) => formatWATTimeDate(row.created_at),
       },
     ],
-    [uploadedByNameMap]
+    [staffAvatars, uploadedByNameMap]
   )
 
   const filters = useMemo<DataTableFilter<MeetingDocument>[]>(
@@ -675,7 +688,17 @@ export function MeetingDocumentTypeTable({
                 </div>
                 <div className="rounded-lg border p-4">
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">Submitted By</p>
-                  <p className="mt-2 text-sm">{submittedBy}</p>
+                  <p className="mt-2 text-sm">
+                    {row.uploaded_by && submittedBy !== "-" ? (
+                      <StaffNameWithAvatar
+                        name={submittedBy ?? "-"}
+                        profileId={row.uploaded_by}
+                        src={staffAvatars[row.uploaded_by]}
+                      />
+                    ) : (
+                      submittedBy
+                    )}
+                  </p>
                 </div>
               </div>
             )
@@ -719,7 +742,15 @@ export function MeetingDocumentTypeTable({
               <div className="grid gap-1 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Submitted By</span>
-                  <span>{submittedBy}</span>
+                  {row.uploaded_by && submittedBy !== "-" ? (
+                    <StaffNameWithAvatar
+                      name={submittedBy ?? "-"}
+                      profileId={row.uploaded_by}
+                      src={staffAvatars[row.uploaded_by]}
+                    />
+                  ) : (
+                    <span>{submittedBy}</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Submitted</span>

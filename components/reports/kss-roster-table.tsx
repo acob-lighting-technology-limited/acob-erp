@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { StaffAvatar, StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -797,7 +797,16 @@ export function KssRosterTable({
         label: "Submitted By",
         hideOnMobile: true,
         accessor: (row) => (row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"),
-        render: (row) => (row.created_by ? employeeNameById.get(row.created_by) || "Unknown" : "-"),
+        render: (row) =>
+          row.created_by ? (
+            <StaffNameWithAvatar
+              name={employeeNameById.get(row.created_by) || "Unknown"}
+              profileId={row.created_by}
+              src={staffAvatars[row.created_by]}
+            />
+          ) : (
+            "-"
+          ),
       },
       {
         key: "created_at",
@@ -1390,7 +1399,17 @@ export function KssRosterTable({
                   </div>
                   <div className="rounded-lg border p-4">
                     <p className="text-muted-foreground text-xs tracking-wide uppercase">Submitted By</p>
-                    <p className="mt-2 text-sm">{submittedBy}</p>
+                    <p className="mt-2 text-sm">
+                      {row.created_by ? (
+                        <StaffNameWithAvatar
+                          name={submittedBy}
+                          profileId={row.created_by}
+                          src={staffAvatars[row.created_by]}
+                        />
+                      ) : (
+                        submittedBy
+                      )}
+                    </p>
                   </div>
                   <div className="rounded-lg border p-4">
                     <p className="text-muted-foreground text-xs tracking-wide uppercase">Notes</p>

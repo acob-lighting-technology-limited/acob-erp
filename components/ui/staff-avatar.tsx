@@ -91,3 +91,21 @@ export function StaffAvatar({
     </>
   )
 }
+
+interface StaffNameWithAvatarProps {
+  name: string
+  profileId: string | null | undefined
+  /** From `useStaffAvatars()`; people without a photo show initials. */
+  src?: string | null
+  className?: string
+}
+
+/** A person's small photo followed by their name — for "Submitted by"-style table cells. */
+export function StaffNameWithAvatar({ name, profileId, src, className }: StaffNameWithAvatarProps) {
+  return (
+    <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
+      <StaffAvatar name={name} src={src} profileId={profileId} size="xs" />
+      <span className="truncate">{name}</span>
+    </span>
+  )
+}
