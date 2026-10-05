@@ -14,8 +14,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// Like the banner, cancelling only hides the popup for a day; it returns until a
-// photo is uploaded. Kept on its own key so dismissing one doesn't hide the other.
+// Shown on every staff page, including /profile (the dashboard). Like the banner,
+// cancelling only hides the popup for a day; it returns until a photo is uploaded.
+// Kept on its own key so dismissing one doesn't hide the other.
 const DISMISS_KEY = "acob-avatar-dialog-dismissed-until"
 const DISMISS_MS = 24 * 60 * 60 * 1000
 // `?photo-prompt=1` forces the popup open, so it can be previewed by someone who has a photo.
@@ -37,8 +38,7 @@ export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
       setOpen(true)
       return
     }
-    // /profile already has the upload control front and centre.
-    if (hasAvatar || window.location.pathname === "/profile") return
+    if (hasAvatar) return
     try {
       const until = Number(window.localStorage.getItem(DISMISS_KEY) || 0)
       setOpen(until <= Date.now())
@@ -66,8 +66,17 @@ export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
     }
   }
 
-  if (!isPreview && (hasAvatar || pathname === "/profile")) {
+  if (!isPreview && hasAvatar) {
     return null
+  }
+
+  // /profile (the dashboard) owns the upload input, so open the picker there directly
+  // instead of linking to the page the user is already on.
+  const isOnProfile = pathname === "/profile"
+
+  function handleUploadOnProfile() {
+    dismiss()
+    window.dispatchEvent(new Event("profile-avatar-pick-request"))
   }
 
   return (
@@ -87,9 +96,13 @@ export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
           <Button variant="outline" onClick={dismiss}>
             Cancel
           </Button>
-          <Button asChild onClick={dismiss}>
-            <Link href="/profile">Upload photo</Link>
-          </Button>
+          {isOnProfile ? (
+            <Button onClick={handleUploadOnProfile}>Upload photo</Button>
+          ) : (
+            <Button asChild onClick={dismiss}>
+              <Link href="/profile">Upload photo</Link>
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

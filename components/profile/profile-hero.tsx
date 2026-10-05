@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
@@ -177,6 +177,13 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
   const [isUploading, setIsUploading] = useState(false)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false)
+
+  // The upload-photo popup asks for the file picker from here, since /profile owns the input.
+  useEffect(() => {
+    const openPicker = () => fileInputRef.current?.click()
+    window.addEventListener("profile-avatar-pick-request", openPicker)
+    return () => window.removeEventListener("profile-avatar-pick-request", openPicker)
+  }, [])
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
