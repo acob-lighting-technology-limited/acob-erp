@@ -48,8 +48,24 @@ export interface OnboardingRow {
   profile_created_at: string
 }
 
-function OnboardingAvatar({ row, size = "md" }: { row: OnboardingRow; size?: StaffAvatarSize }) {
-  return <StaffAvatar name={row.full_name || row.email || "User"} src={row.avatar_url} size={size} />
+function OnboardingAvatar({
+  row,
+  size = "md",
+  viewable = true,
+}: {
+  row: OnboardingRow
+  size?: StaffAvatarSize
+  /** False inside the mobile row, which is itself a button. */
+  viewable?: boolean
+}) {
+  return (
+    <StaffAvatar
+      name={row.full_name || row.email || "User"}
+      src={row.avatar_url}
+      size={size}
+      profileId={viewable ? row.id : null}
+    />
+  )
 }
 
 interface OnboardingMeta {
@@ -443,7 +459,7 @@ export function OnboardingContent() {
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            leading: (row) => <OnboardingAvatar row={row} size="sm" />,
+            leading: (row) => <OnboardingAvatar row={row} size="sm" viewable={false} />,
             title: (row) => row.full_name,
             subtitle: (row) => [row.department, row.employee_number || row.email].filter(Boolean).join(" · ") || "—",
             trailing: (row) =>

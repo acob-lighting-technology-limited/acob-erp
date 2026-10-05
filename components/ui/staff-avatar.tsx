@@ -1,6 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { StaffCardDialog } from "@/components/ui/staff-card-dialog"
 import { cn } from "@/lib/utils"
 
 const STAFF_AVATAR_SIZES = {
@@ -34,6 +36,12 @@ interface StaffAvatarProps {
   size?: StaffAvatarSize
   className?: string
   fallbackClassName?: string
+  /**
+   * The person's profile id. When set, clicking the avatar opens their contact card
+   * (photo, name, email, phone). Leave it unset where the avatar sits inside another
+   * button (mobile list rows, account menus) — a button can't nest a button.
+   */
+  profileId?: string | null
 }
 
 /**
@@ -41,14 +49,45 @@ interface StaffAvatarProps {
  * `bg-primary/10` as the fallback. Built on Radix Avatar so an expired signed URL
  * (they last an hour) degrades to initials instead of a broken image.
  */
-export function StaffAvatar({ name, src, initials, size = "md", className, fallbackClassName }: StaffAvatarProps) {
+export function StaffAvatar({
+  name,
+  src,
+  initials,
+  size = "md",
+  className,
+  fallbackClassName,
+  profileId,
+}: StaffAvatarProps) {
+  const [cardOpen, setCardOpen] = useState(false)
   const label = name?.trim() || "Staff member"
-  return (
+  const avatar = (
     <Avatar className={cn(STAFF_AVATAR_SIZES[size], className)}>
       {src ? <AvatarImage src={src} alt={label} className="object-cover" /> : null}
       <AvatarFallback className={cn("bg-primary/10 text-primary font-bold", fallbackClassName)}>
         {initials || staffInitials(name)}
       </AvatarFallback>
     </Avatar>
+  )
+
+  if (!profileId) return avatar
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={`View ${label}'s contact card`}
+        // Avatars often sit in clickable table rows; the card shouldn't also open the row.
+        onClick={(event) => {
+          event.stopPropagation()
+          setCardOpen(true)
+        }}
+        className="focus-visible:ring-ring inline-flex shrink-0 cursor-pointer rounded-full transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
+      >
+        {avatar}
+      </button>
+      {cardOpen && (
+        <StaffCardDialog profileId={profileId} open={cardOpen} onOpenChange={setCardOpen} name={name} src={src} />
+      )}
+    </>
   )
 }

@@ -431,6 +431,7 @@ export function AdminTasksContent({
               <StaffAvatar
                 name={workflowOwnerLabel(r)}
                 src={r.assigned_to ? staffAvatars[r.assigned_to] : null}
+                profileId={r.assigned_to}
                 size="xs"
               />
             )}
@@ -770,6 +771,7 @@ export function AdminTasksContent({
                           <StaffAvatar
                             name={workflowOwnerLabel(r)}
                             src={r.assigned_to ? staffAvatars[r.assigned_to] : null}
+                            profileId={r.assigned_to}
                             size="xs"
                           />
                         )}
@@ -783,6 +785,7 @@ export function AdminTasksContent({
                           <StaffAvatar
                             name={formatFullName(r.assigned_by_user.first_name, r.assigned_by_user.last_name)}
                             src={r.assigned_by ? staffAvatars[r.assigned_by] : null}
+                            profileId={r.assigned_by}
                             size="xs"
                           />
                         )}

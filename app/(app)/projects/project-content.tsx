@@ -268,6 +268,7 @@ export function ProjectContent({ profiles = [] }: ProjectContentProps = {}) {
                   r.project_manager.full_name || [r.project_manager.first_name, r.project_manager.last_name].join(" ")
                 }
                 src={staffAvatars[r.project_manager.id]}
+                profileId={r.project_manager.id}
                 size="xs"
               />
             ) : (

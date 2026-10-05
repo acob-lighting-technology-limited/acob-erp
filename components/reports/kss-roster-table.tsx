@@ -712,7 +712,12 @@ export function KssRosterTable({
         render: (row) =>
           row.presenter_id ? (
             <span className="flex items-center gap-2">
-              <StaffAvatar name={getPresenterName(row)} src={staffAvatars[row.presenter_id]} size="xs" />
+              <StaffAvatar
+                name={getPresenterName(row)}
+                src={staffAvatars[row.presenter_id]}
+                profileId={row.presenter_id}
+                size="xs"
+              />
               {getPresenterName(row)}
             </span>
           ) : (
@@ -1455,7 +1460,12 @@ export function KssRosterTable({
                     <p className="font-medium">{row.department}</p>
                     <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
                       {row.presenter_id && (
-                        <StaffAvatar name={presenterName} src={staffAvatars[row.presenter_id]} size="xs" />
+                        <StaffAvatar
+                          name={presenterName}
+                          src={staffAvatars[row.presenter_id]}
+                          profileId={row.presenter_id}
+                          size="xs"
+                        />
                       )}
                       {presenterName}
                     </p>

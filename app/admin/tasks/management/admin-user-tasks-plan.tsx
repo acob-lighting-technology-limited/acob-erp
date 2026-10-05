@@ -348,7 +348,13 @@ export function AdminUserTasksPlan({
         accessor: (r) => r.name,
         render: (r) => (
           <div className="flex items-center gap-3">
-            <StaffAvatar name={r.name} src={staffAvatars[r.userId]} size="sm" className="text-xs" />
+            <StaffAvatar
+              name={r.name}
+              src={staffAvatars[r.userId]}
+              profileId={r.userId}
+              size="sm"
+              className="text-xs"
+            />
             <div className="min-w-0">
               <p className="truncate font-medium">{r.name}</p>
               <p className="text-muted-foreground truncate text-xs">{r.email}</p>

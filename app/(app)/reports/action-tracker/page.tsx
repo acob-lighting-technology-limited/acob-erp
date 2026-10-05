@@ -558,6 +558,7 @@ export default function ActionTrackerPortal() {
                   <StaffAvatar
                     name={person.name}
                     src={staffAvatars[person.id]}
+                    profileId={person.id}
                     size="xs"
                     className="h-4 w-4 text-[7px]"
                   />
