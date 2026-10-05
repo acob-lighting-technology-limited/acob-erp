@@ -8,8 +8,10 @@
     linear-gradient(180deg, #0a120c 0%, #040604 100%);
 }
 
-/* The ropes replace the bunting here — two lines of string would compete. */
-.bd-clothesline .birthday-decor__bunting {
+/* The ropes are the decoration here — bunting and tethered balloons would be
+   competing lines of string. */
+.bd-clothesline .birthday-decor__bunting,
+.bd-clothesline .birthday-balloons {
   display: none;
 }
 
