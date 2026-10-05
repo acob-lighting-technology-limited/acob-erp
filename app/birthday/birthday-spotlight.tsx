@@ -27,7 +27,7 @@ export function BirthdayShell({
   )
 }
 
-/** The original card-grid spotlight (/birthday, and /birthday3 with variant 3 styling). */
+/** The original card-grid spotlight — now only /birthday3 (Minimal Noir, variant 3). */
 export function BirthdaySpotlight({ variant }: { variant?: 3 }) {
   return (
     <BirthdayShell variant={variant}>

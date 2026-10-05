@@ -3,17 +3,11 @@
 /* eslint-disable @next/next/no-img-element -- static asset, not optimizable by next/image */
 
 import type { CSSProperties } from "react"
-import { BirthdayEmpty, CelebrantPhoto } from "../birthday/birthday-explorer"
+import { BirthdayEmpty, CelebrantPhoto } from "./birthday-explorer"
 import { cn } from "@/lib/utils"
-import { BirthdayBackButton, BirthdayPicker } from "../birthday/birthday-picker"
-import {
-  displayName,
-  formatMMDDLabel,
-  formatNamesList,
-  isBirthdayToday,
-  type Celebrant,
-} from "../birthday/birthday-utils"
-import { useBirthdayCelebrants } from "../birthday/use-birthday-celebrants"
+import { BirthdayBackButton, BirthdayPicker } from "./birthday-picker"
+import { displayName, formatMMDDLabel, formatNamesList, isBirthdayToday, type Celebrant } from "./birthday-utils"
+import { useBirthdayCelebrants } from "./use-birthday-celebrants"
 import "./clothesline.css"
 
 // One rope wherever faces stay readable; a second rope only beyond this.
@@ -36,8 +30,11 @@ function ropeDrop(t: number): number {
   return (2 + 192 * t * (1 - t)) / 100
 }
 
-/** Style 4 — clothesline: portraits pegged to swaying ropes strung across the screen. */
-export function BirthdayClothesline() {
+/**
+ * Clothesline spotlight. "rope" pegs the cards to swaying ropes strung across the
+ * screen (/birthday4); "cards" sets them level in a centred row (/birthday).
+ */
+export function BirthdayClothesline({ layout }: { layout: "rope" | "cards" }) {
   const state = useBirthdayCelebrants()
   const { celebrants, rangeLabel, isLoading, error } = state
 
@@ -52,7 +49,7 @@ export function BirthdayClothesline() {
   const lines = toLines(celebrants)
 
   return (
-    <section className="bd4">
+    <section className={cn("bd4", layout === "cards" && "bd4--static")}>
       <header className="bd4-head">
         <img src="/images/acob-logo-dark.webp" alt="ACOB Lighting Logo" className="bd4-logo" />
       </header>
