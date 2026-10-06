@@ -16,25 +16,20 @@ deterministic event IDs, checkpoints and pagination to avoid importing duplicate
 or skipping a full batch. Collection is delayed, and cannot recover logs already
 expired by Supabase's retention or usage limits.
 
-1. Deploy the application changes.
-2. Set `SUPABASE_LOGS_ACCESS_TOKEN` in the hosting environment to a management
-   token restricted to this project with `analytics_logs_read` permission. Never
-   prefix it with `NEXT_PUBLIC_`, commit it, or use the project's service-role key
-   as a management token. Existing `SUPABASE_SERVICE_ROLE_KEY` is needed for storage.
-3. Set a strong `CRON_SECRET` in the hosting environment.
-4. In GitHub Actions, add the same `CRON_SECRET` as a repository secret; set
-   repository variables `ERROR_MONITOR_APP_URL=https://matrix.acoblighting.com`
-   and `ERROR_MONITOR_ENABLED=true`. The workflow must be on the default branch
-   for scheduled runs. Run **Collect Supabase errors** manually to verify first.
-5. Check the workflow response and the monitor's last successful collection time.
-   Until the token and schedule are configured, platform logs are not collected.
+1. Deploy the application changes and the accompanying database migration.
+2. In Supabase Dashboard → Account → Access Tokens, create a **scoped** token
+   limited to this project with the read permission for Analytics Logs. Never use
+   a classic account token or the project's service-role key for this purpose.
+3. In Developer → Error Monitor, click **Connect Supabase logs**, paste the token
+   once, and click **Save securely**. The application sends it only to the server,
+   which stores it encrypted in Supabase Vault; it is never returned to a browser.
+4. Supabase `pg_cron` then invokes the existing Vault-backed application scheduler
+   every 15 minutes. Check **last succeeded** in Error Monitor after the first run.
 
-The included GitHub Actions workflow runs every 15 minutes when enabled. Actions
-can delay scheduled jobs; this is not a guaranteed delivery interval. An existing
-external scheduler can instead send `GET /api/cron/collect-errors` with
-`Authorization: Bearer <CRON_SECRET>`. It must use HTTPS. Do not enable two schedules.
-No Supabase subscription upgrade or new observability service is required; normal
-hosting, Actions and Supabase resource quotas still apply.
+No hosting variables, GitHub Actions secrets, Log Drains, or external scheduler are
+required. The existing `app_base_url` and `app_cron_secret` Vault secrets are reused
+by the repository-wide scheduler. Collection is delayed and cannot recover logs
+that have already expired under Supabase retention or usage limits.
 
 ## Alerts and retention
 

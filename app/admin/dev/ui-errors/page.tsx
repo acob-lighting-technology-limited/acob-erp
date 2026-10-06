@@ -24,6 +24,13 @@ type UiErrorUserRow = {
   company_email?: string | null
 }
 
+type ErrorMonitorStatusClient = {
+  rpc: (
+    fn: "get_error_monitor_collector_status",
+    args: Record<string, never>
+  ) => Promise<{ data: boolean | null; error: { message: string } | null }>
+}
+
 function readMetaString(metadata: Record<string, unknown> | null, key: string) {
   const value = metadata?.[key]
   return typeof value === "string" ? value : ""
@@ -33,6 +40,10 @@ export default async function DevUiErrorsPage() {
   const scope = await getRequestScope()
   if (!scope?.isAdminLike || !canAccessAdminSection(scope, "dev")) notFound()
   const supabase = await createClient()
+  const { data: collectorConfigured } = await (supabase as unknown as ErrorMonitorStatusClient).rpc(
+    "get_error_monitor_collector_status",
+    {}
+  )
   const dataClient = getServiceRoleClientOrFallback(supabase)
   const { data: alertSetting } = await dataClient
     .from("system_settings")
@@ -109,7 +120,7 @@ export default async function DevUiErrorsPage() {
       collectorLastSuccess={
         typeof collectorSetting?.value?.last_success === "string" ? collectorSetting.value.last_success : null
       }
-      platformConfigured={Boolean(process.env.SUPABASE_LOGS_ACCESS_TOKEN)}
+      platformConfigured={collectorConfigured === true}
     />
   )
 }

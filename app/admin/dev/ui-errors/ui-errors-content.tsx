@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api-client"
 import { toast } from "sonner"
 import { groupErrors } from "@/lib/telemetry/group"
@@ -52,6 +53,8 @@ export function UiErrorsContent({
   const router = useRouter()
   const groupedRows = useMemo(() => groupErrors(rows), [rows])
   const [busy, setBusy] = useState<string | null>(null)
+  const [showCollectorSetup, setShowCollectorSetup] = useState(false)
+  const [managementToken, setManagementToken] = useState("")
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") router.refresh()
@@ -89,6 +92,26 @@ export function UiErrorsContent({
       router.refresh()
     } catch {
       toast.error("Unable to update error alerts")
+    } finally {
+      setBusy(null)
+    }
+  }
+  const saveCollectorToken = async () => {
+    if (!managementToken.trim()) return
+    setBusy("collector")
+    try {
+      const res = await apiFetch("/api/admin/dev/errors/collector", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ managementToken: managementToken.trim() }),
+      })
+      if (!res.ok) throw new Error("Unable to save Supabase log token")
+      setManagementToken("")
+      setShowCollectorSetup(false)
+      toast.success("Supabase log collection is configured")
+      router.refresh()
+    } catch {
+      toast.error("Unable to save Supabase log token")
     } finally {
       setBusy(null)
     }
@@ -194,6 +217,14 @@ export function UiErrorsContent({
           >
             {alertsEnabled ? "Disable alerts" : "Notify me"}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy !== null}
+            onClick={() => setShowCollectorSetup((open) => !open)}
+          >
+            {platformConfigured ? "Update Supabase token" : "Connect Supabase logs"}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => router.refresh()}>
             Refresh
           </Button>
@@ -209,8 +240,8 @@ export function UiErrorsContent({
     >
       {!platformConfigured && (
         <p role="status" className="mb-4 rounded-md border p-3 text-sm">
-          Supabase platform collection needs a server management token and scheduled collector. App error capture is
-          independent of this connection.
+          Connect a scoped Supabase Management API token to collect platform errors. The token is encrypted in Supabase
+          Vault; application error capture already works independently.
         </p>
       )}
       {platformConfigured && (
@@ -219,6 +250,28 @@ export function UiErrorsContent({
             ? `Platform collection last succeeded: ${formatWATDateTime(collectorLastSuccess)}`
             : "Platform token configured; awaiting the first successful collection."}
         </p>
+      )}
+      {showCollectorSetup && (
+        <form
+          className="mb-4 flex flex-col gap-2 rounded-md border p-3 sm:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void saveCollectorToken()
+          }}
+        >
+          <Input
+            aria-label="Supabase Management API token"
+            autoComplete="off"
+            disabled={busy !== null}
+            onChange={(event) => setManagementToken(event.target.value)}
+            placeholder="Scoped Supabase Management API token"
+            type="password"
+            value={managementToken}
+          />
+          <Button disabled={busy !== null || !managementToken.trim()} type="submit">
+            Save securely
+          </Button>
+        </form>
       )}
       <DataTable<UiErrorRow>
         data={groupedRows}

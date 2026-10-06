@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto"
+import { createHash } from "node:crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { telemetryClient, persistFailure } from "@/lib/telemetry/server"
@@ -9,19 +9,38 @@ import { maintainErrorMonitor } from "@/lib/telemetry/maintenance"
 export const runtime = "nodejs"
 export const maxDuration = 60
 
+type RuntimeSecrets = { management_token: string | null; cron_secret: string | null }
+type RuntimeSecretsClient = {
+  rpc: (
+    fn: "get_error_monitor_runtime_secrets",
+    args: Record<string, never>
+  ) => Promise<{ data: RuntimeSecrets[] | null; error: { message: string } | null }>
+}
+
+async function getRuntimeSecrets() {
+  const client = telemetryClient() as unknown as RuntimeSecretsClient
+  const { data, error } = await client.rpc("get_error_monitor_runtime_secrets", {})
+  if (error) throw new Error("Unable to load Error Monitor runtime configuration")
+  return data?.[0] || { management_token: null, cron_secret: null }
+}
+
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET
-  const expected = Buffer.from(`Bearer ${secret || ""}`)
+  let runtime: RuntimeSecrets
+  try {
+    runtime = await getRuntimeSecrets()
+  } catch {
+    return NextResponse.json({ error: "Error Monitor is not configured" }, { status: 503 })
+  }
+  const expected = Buffer.from(`Bearer ${runtime.cron_secret || ""}`)
   const supplied = Buffer.from(request.headers.get("authorization") || "")
-  if (!secret || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+  if (!runtime.cron_secret || supplied.length !== expected.length || !expected.equals(supplied)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const token = process.env.SUPABASE_LOGS_ACCESS_TOKEN
   const rl = await rateLimit("platform-error-collector", { limit: 1, windowSec: 60 })
   if (!rl.allowed) return NextResponse.json({ error: "Collection already requested" }, { status: 429 })
   try {
     const client = telemetryClient()
-    if (!token) {
+    if (!runtime.management_token) {
       await maintainErrorMonitor()
       return NextResponse.json({ ok: true, platformConfigured: false, imported: 0 })
     }
@@ -47,7 +66,7 @@ export async function GET(request: NextRequest) {
     url.searchParams.set("iso_timestamp_start", window.start)
     url.searchParams.set("iso_timestamp_end", window.end)
     const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${runtime.management_token}` },
       cache: "no-store",
       signal: AbortSignal.timeout(20000),
     })
