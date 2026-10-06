@@ -5,7 +5,7 @@ import { redact, safeContext, safePath } from "../sanitize"
 import { logWindow, platformQuery } from "../platform"
 import { groupErrors } from "../group"
 
-test("grouping keeps affected users and resolution states separate and preserves event references", () => {
+test("grouping collapses one failure across users, keeps resolution states apart and preserves event references", () => {
   const row = {
     id: "one",
     source: "http.error",
@@ -20,10 +20,40 @@ test("grouping keeps affected users and resolution states separate and preserves
     { ...row, id: "three", user_name: "User B" },
     { ...row, id: "four", resolved: true },
   ])
-  assert.equal(grouped.length, 3)
+  assert.equal(grouped.length, 2)
   assert.equal(grouped[0].id, "one")
-  assert.equal(grouped[0].occurrences, 2)
-  assert.deepEqual(grouped[0].eventIds, ["one", "two"])
+  assert.equal(grouped[0].occurrences, 3)
+  assert.deepEqual(grouped[0].eventIds, ["one", "two", "three"])
+  assert.deepEqual(grouped[0].users, ["User A", "User B"])
+  assert.equal(grouped[1].occurrences, 1)
+})
+
+test("routine statuses are not reported, defects are", async () => {
+  const cases: [string, number, boolean][] = [
+    ["https://db.supabase.co/rest/v1/profiles", 406, false], // .single() with no row
+    ["https://db.supabase.co/rest/v1/profiles", 401, false], // expired session
+    ["https://db.supabase.co/rest/v1/votes", 409, false], // handled duplicate insert
+    ["https://db.supabase.co/auth/v1/token", 400, false], // wrong password / stale refresh
+    ["https://db.supabase.co/rest/v1/tasks", 400, true], // malformed query
+    ["https://db.supabase.co/rest/v1/tasks", 403, true], // RLS rejected a write
+    ["https://db.supabase.co/rest/v1/rpc/apply_leave", 500, true],
+    ["/api/tasks", 404, false],
+    ["/api/tasks", 429, false],
+    ["/api/tasks", 409, true],
+    ["/api/tasks", 422, true],
+    ["/api/tasks", 503, true],
+  ]
+  for (const [url, status, expected] of cases) {
+    const events: RequestFailure[] = []
+    const observed = monitoredFetch(
+      async () => new Response("x", { status }),
+      "https://app.test",
+      "https://db.supabase.co",
+      (event) => events.push(event)
+    )
+    await observed(url)
+    assert.equal(events.length, expected ? 1 : 0, `${url} ${status}`)
+  }
 })
 
 test("failed requests preserve the response stream, method and request reference", async () => {
@@ -133,6 +163,9 @@ test("collector windows overlap for late arrivals and remain within API retentio
   const future = logWindow("2027-01-01T12:00:00Z", now)
   assert.equal(future.start, future.end)
   assert.match(platformQuery({ timestamp: "2026-10-06T11:00:00", id: "event-1" }), /toString\(id\) > 'event-1'/)
+  // Only documented columns, and no gateway traffic the app already records.
+  assert.ok(!platformQuery().includes("severity_text"))
+  assert.match(platformQuery(), /source != 'edge_logs'/)
   assert.throws(() => platformQuery({ timestamp: "garbage", id: "event-1" }))
   assert.ok(platformQuery({ timestamp: "2026-10-06T11:00:00.123456", id: "event-1" }).includes(".123456"))
 })

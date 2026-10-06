@@ -1,12 +1,21 @@
 import { z } from "zod"
 
 // Select diagnostic fields rather than full request headers or structured SQL fields.
-export const PLATFORM_ERROR_QUERY = `select timestamp, id, source, severity_text, event_message,
+// Only columns documented for the unified `logs` table are used; severity lives
+// in log_attributes, not a top-level column. API gateway traffic (edge_logs) is
+// excluded because the app's own fetch monitor already records those failures,
+// so importing them would count every Supabase error twice. What remains is what
+// the app cannot see: database errors from triggers, cron and RPCs, and 5xx from
+// Edge Functions, Auth, Storage and Realtime. Unique violations (23505) are
+// excluded as they are usually handled duplicate inserts.
+export const PLATFORM_ERROR_QUERY = `select timestamp, id, source, event_message,
   log_attributes['request.path'] as path,
   log_attributes['response.status_code'] as status
 from logs
-where (upper(severity_text) in ('ERROR', 'FATAL', 'PANIC')
-  or toInt32OrZero(log_attributes['response.status_code']) >= 400)
+where source != 'edge_logs'
+  and ((upper(log_attributes['parsed.error_severity']) in ('ERROR', 'FATAL', 'PANIC')
+      and log_attributes['parsed.sql_state_code'] != '23505')
+    or toInt32OrZero(log_attributes['response.status_code']) >= 500)
 order by timestamp asc, id asc limit 500`
 
 export function platformQuery(page?: { timestamp: string; id: string }) {

@@ -120,6 +120,12 @@ export default async function DevUiErrorsPage() {
       collectorLastSuccess={
         typeof collectorSetting?.value?.last_success === "string" ? collectorSetting.value.last_success : null
       }
+      collectorLastError={
+        typeof collectorSetting?.value?.last_error_at === "string" &&
+        typeof collectorSetting.value.last_error === "string"
+          ? { at: collectorSetting.value.last_error_at, message: collectorSetting.value.last_error }
+          : null
+      }
       platformConfigured={collectorConfigured === true}
     />
   )

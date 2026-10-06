@@ -24,6 +24,27 @@ async function getRuntimeSecrets() {
   return data?.[0] || { management_token: null, cron_secret: null }
 }
 
+/** Keeps the checkpoint, so Error Monitor can show the failure next to "last succeeded". */
+async function recordCollectorFailure(message: string) {
+  try {
+    const client = telemetryClient()
+    const { data } = await client
+      .from("system_settings")
+      .select("value")
+      .eq("key", "error_monitor_collector")
+      .maybeSingle()
+    const now = new Date().toISOString()
+    await client.from("system_settings").upsert({
+      key: "error_monitor_collector",
+      value: { ...(data?.value ?? {}), last_error: message.slice(0, 300), last_error_at: now },
+      description: "Supabase error log collector checkpoint",
+      updated_at: now,
+    })
+  } catch {
+    // The failure itself is already recorded as an event.
+  }
+}
+
 export async function GET(request: NextRequest) {
   let runtime: RuntimeSecrets
   try {
@@ -142,6 +163,7 @@ export async function GET(request: NextRequest) {
           ? error.message
           : "Collection failed"
     await persistFailure({ source: "server.collector", route: "/api/cron/collect-errors", message })
+    await recordCollectorFailure(message)
     // App alerts and retention still run if platform access is unavailable.
     await maintainErrorMonitor().catch(() => undefined)
     return NextResponse.json({ error: "Platform log collection failed; inspect Error Monitor" }, { status: 502 })

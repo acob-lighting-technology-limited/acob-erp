@@ -26,6 +26,7 @@ export interface UiErrorRow {
   resolved: boolean
   eventIds?: string[]
   occurrences?: number
+  users?: string[]
 }
 
 interface UiErrorsContentProps {
@@ -40,6 +41,11 @@ interface UiErrorsContentProps {
   platformConfigured: boolean
   alertsEnabled: boolean
   collectorLastSuccess: string | null
+  collectorLastError: { at: string; message: string } | null
+}
+
+function describeUsers(r: UiErrorRow) {
+  return r.users && r.users.length > 1 ? `${r.users.length} users` : r.users?.[0] || r.user_name || "Anonymous"
 }
 
 export function UiErrorsContent({
@@ -49,6 +55,7 @@ export function UiErrorsContent({
   platformConfigured,
   alertsEnabled,
   collectorLastSuccess,
+  collectorLastError,
 }: UiErrorsContentProps) {
   const router = useRouter()
   const groupedRows = useMemo(() => groupErrors(rows), [rows])
@@ -155,9 +162,9 @@ export function UiErrorsContent({
       },
       {
         key: "user",
-        label: "User",
+        label: "Users",
         sortable: true,
-        accessor: (r) => r.user_name || "Anonymous",
+        accessor: (r) => describeUsers(r),
       },
       {
         key: "message",
@@ -244,6 +251,13 @@ export function UiErrorsContent({
           Vault; application error capture already works independently.
         </p>
       )}
+      {platformConfigured &&
+        collectorLastError &&
+        (!collectorLastSuccess || Date.parse(collectorLastError.at) > Date.parse(collectorLastSuccess)) && (
+          <p role="alert" className="border-destructive/50 text-destructive mb-4 rounded-md border p-3 text-sm">
+            Supabase log collection failed at {formatWATDateTime(collectorLastError.at)}: {collectorLastError.message}
+          </p>
+        )}
       {platformConfigured && (
         <p role="status" className="text-muted-foreground mb-4 text-sm">
           {collectorLastSuccess
@@ -282,7 +296,7 @@ export function UiErrorsContent({
           row.message.toLowerCase().includes(q) ||
           row.route.toLowerCase().includes(q) ||
           row.source.toLowerCase().includes(q) ||
-          row.user_name.toLowerCase().includes(q)
+          (row.users || [row.user_name]).some((user) => user.toLowerCase().includes(q))
         }
         filters={filters}
         error={error ? "Failed to load logs from backend storage" : null}
@@ -305,6 +319,9 @@ export function UiErrorsContent({
               <p>
                 {row.occurrences || 1} occurrence(s) in the latest 500 events. Details below are from the latest
                 occurrence.
+              </p>
+              <p>
+                <strong>Affected:</strong> {(row.users || [row.user_name || "Anonymous"]).join(", ")}
               </p>
               <pre className="max-h-24 overflow-auto text-xs break-all whitespace-pre-wrap">
                 {(row.eventIds || [row.id]).join("\n")}
@@ -351,7 +368,7 @@ export function UiErrorsContent({
               <Badge variant="outline">{r.source}</Badge>
             </div>
             <div className="text-muted-foreground flex justify-between border-t pt-2 text-[10px]">
-              <span>{r.user_name || "Anonymous"}</span>
+              <span>{describeUsers(r)}</span>
               <span>{formatWATDateTime(r.created_at)}</span>
             </div>
           </div>
