@@ -1,22 +1,38 @@
 "use client"
 
 import { apiFetch } from "@/lib/api-client"
+import { redact, safeContext, safePath } from "./sanitize"
 
 export interface ClientTelemetryPayload {
-  source: "window.error" | "unhandledrejection" | "react.error_boundary" | "react.global_error_boundary"
+  source:
+    | "window.error"
+    | "unhandledrejection"
+    | "react.error_boundary"
+    | "react.global_error_boundary"
+    | "http.error"
+    | "supabase.request"
+    | "action.error"
   message: string
   stack?: string | null
   route?: string
   context?: Record<string, unknown>
 }
 
+const seen = new Map<string, number>()
 export async function reportClientError(payload: ClientTelemetryPayload): Promise<void> {
   try {
+    const route = safePath(payload.route || (typeof window !== "undefined" ? window.location.pathname : "/"))
+    const fingerprint = `${payload.source}|${route}|${payload.message}`
+    const now = Date.now()
+    if (now - (seen.get(fingerprint) || 0) < 5000) return
+    seen.set(fingerprint, now)
+    if (seen.size > 200) seen.delete(seen.keys().next().value as string)
     const body = JSON.stringify({
       ...payload,
-      timestamp: new Date().toISOString(),
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
-      href: typeof window !== "undefined" ? window.location.href : undefined,
+      route,
+      message: redact(payload.message),
+      stack: redact(payload.stack || "", 5000),
+      context: safeContext(payload.context),
     })
 
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {

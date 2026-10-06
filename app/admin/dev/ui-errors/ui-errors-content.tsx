@@ -1,6 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { apiFetch } from "@/lib/api-client"
+import { toast } from "sonner"
+import { groupErrors } from "@/lib/telemetry/group"
 import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { Bug, AlertTriangle, ShieldAlert } from "lucide-react"
@@ -15,6 +20,11 @@ export interface UiErrorRow {
   source: string
   route: string
   user_name: string
+  stack: string
+  context: unknown
+  resolved: boolean
+  eventIds?: string[]
+  occurrences?: number
 }
 
 interface UiErrorsContentProps {
@@ -23,13 +33,77 @@ interface UiErrorsContentProps {
     total: number
     last24h: number
     boundaries: number
+    unresolved: number
   }
   error: unknown
+  platformConfigured: boolean
+  alertsEnabled: boolean
+  collectorLastSuccess: string | null
 }
 
-export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
+export function UiErrorsContent({
+  rows,
+  stats,
+  error,
+  platformConfigured,
+  alertsEnabled,
+  collectorLastSuccess,
+}: UiErrorsContentProps) {
+  const router = useRouter()
+  const groupedRows = useMemo(() => groupErrors(rows), [rows])
+  const [busy, setBusy] = useState<string | null>(null)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh()
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [router])
+  const resolve = async (row: UiErrorRow) => {
+    setBusy(row.id)
+    try {
+      const res = await apiFetch(`/api/admin/dev/errors/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolved: !row.resolved, ids: row.eventIds || [row.id] }),
+      })
+      if (!res.ok) throw new Error("Unable to update error status")
+      router.refresh()
+    } catch {
+      toast.error("Unable to update error status")
+    } finally {
+      setBusy(null)
+    }
+  }
+  const toggleAlerts = async () => {
+    setBusy("alerts")
+    try {
+      const res = await apiFetch("/api/admin/dev/errors/alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !alertsEnabled }),
+      })
+      if (!res.ok) throw new Error("Unable to update alerts")
+      toast.success(
+        alertsEnabled ? "Error alerts disabled" : "Error alerts enabled; delivery requires the scheduled collector"
+      )
+      router.refresh()
+    } catch {
+      toast.error("Unable to update error alerts")
+    } finally {
+      setBusy(null)
+    }
+  }
   const columns: DataTableColumn<UiErrorRow>[] = useMemo(
     () => [
+      { key: "occurrences", label: "Occurrences", sortable: true, accessor: (r) => r.occurrences || 1 },
+      {
+        key: "status",
+        label: "Status",
+        accessor: (r) => (r.resolved ? "resolved" : "open"),
+        render: (r) => (
+          <Badge variant={r.resolved ? "outline" : "destructive"}>{r.resolved ? "Resolved" : "Open"}</Badge>
+        ),
+      },
       {
         key: "time",
         label: "Time",
@@ -70,7 +144,7 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
         initialWidth: 500,
         accessor: (r) => r.message,
         hideOnMobile: true,
-        render: (r) => <span className="max-w-[520px] truncate text-xs">{r.message}</span>,
+        render: (r) => <span className="max-w-full truncate text-xs">{r.message}</span>,
       },
     ],
     []
@@ -81,6 +155,14 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
     const routes = Array.from(new Set(rows.map((r) => r.route).filter((x): x is string => !!x))).sort()
 
     return [
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "open", label: "Open" },
+          { value: "resolved", label: "Resolved" },
+        ],
+      },
       {
         key: "source",
         label: "Source",
@@ -96,20 +178,50 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
 
   return (
     <DataTablePage
-      title="UI Error Monitor"
-      description="Centralized frontend runtime errors captured from all pages during beta"
+      title="Error Monitor"
+      description="Latest 500 browser, failed request, server and Supabase errors. Refreshes every minute while visible."
       icon={Bug}
       backLink={{ href: "/admin/dev", label: "Back to DEV" }}
+      actions={
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy !== null}
+            onClick={() => {
+              void toggleAlerts()
+            }}
+          >
+            {alertsEnabled ? "Disable alerts" : "Notify me"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => router.refresh()}>
+            Refresh
+          </Button>
+        </div>
+      }
       stats={
         <StatGrid>
-          <StatCard variant="compact" title="Total Captured" value={stats.total} icon={Bug} />
+          <StatCard variant="compact" title="Open in Latest 500" value={stats.unresolved} icon={Bug} />
           <StatCard variant="compact" title="Last 24h" value={stats.last24h} icon={AlertTriangle} />
           <StatCard variant="compact" title="Boundary Catches" value={stats.boundaries} icon={ShieldAlert} />
         </StatGrid>
       }
     >
+      {!platformConfigured && (
+        <p role="status" className="mb-4 rounded-md border p-3 text-sm">
+          Supabase platform collection needs a server management token and scheduled collector. App error capture is
+          independent of this connection.
+        </p>
+      )}
+      {platformConfigured && (
+        <p role="status" className="text-muted-foreground mb-4 text-sm">
+          {collectorLastSuccess
+            ? `Platform collection last succeeded: ${formatWATDateTime(collectorLastSuccess)}`
+            : "Platform token configured; awaiting the first successful collection."}
+        </p>
+      )}
       <DataTable<UiErrorRow>
-        data={rows}
+        data={groupedRows}
         columns={columns}
         getRowId={(r) => r.id}
         searchPlaceholder="Search message, route, source, user..."
@@ -122,6 +234,47 @@ export function UiErrorsContent({ rows, stats, error }: UiErrorsContentProps) {
         filters={filters}
         error={error ? "Failed to load logs from backend storage" : null}
         pagination={{ pageSize: 50 }}
+        onRetry={() => router.refresh()}
+        rowActions={[
+          {
+            label: "Toggle resolved",
+            onClick: (row) => {
+              void resolve(row)
+            },
+          },
+        ]}
+        expandable={{
+          render: (row) => (
+            <div className="space-y-3 p-4 text-sm">
+              <p className="break-all">
+                <strong>Reference:</strong> {row.id}
+              </p>
+              <p>
+                {row.occurrences || 1} occurrence(s) in the latest 500 events. Details below are from the latest
+                occurrence.
+              </p>
+              <pre className="max-h-24 overflow-auto text-xs break-all whitespace-pre-wrap">
+                {(row.eventIds || [row.id]).join("\n")}
+              </pre>
+              <p className="break-words whitespace-pre-wrap">{row.message}</p>
+              <pre className="max-h-80 overflow-auto rounded border p-3 text-xs break-all whitespace-pre-wrap">
+                {row.stack || "No stack trace available"}
+              </pre>
+              <pre className="max-h-60 overflow-auto text-xs break-all whitespace-pre-wrap">
+                {JSON.stringify(row.context, null, 2)}
+              </pre>
+              <Button
+                size="sm"
+                disabled={busy !== null}
+                onClick={() => {
+                  void resolve(row)
+                }}
+              >
+                {row.resolved ? "Reopen" : "Mark resolved"}
+              </Button>
+            </div>
+          ),
+        }}
         viewToggle
         contactsView
         stickyToolbar

@@ -1,0 +1,29 @@
+name: Collect Supabase errors
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions: {}
+
+concurrency:
+  group: collect-supabase-errors
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    # Set this variable only after deploying and configuring the collector.
+    if: vars.ERROR_MONITOR_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Collect errors
+        env:
+          APP_URL: ${{ vars.ERROR_MONITOR_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$APP_URL" && test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "${APP_URL%/}/api/cron/collect-errors"

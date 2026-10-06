@@ -37,6 +37,12 @@ export function ShellErrorBoundary({
     /error loading dynamically imported module/i.test(error?.message || "")
 
   useEffect(() => {
+    void reportClientError({
+      source: "react.error_boundary",
+      message: error.message || "Unknown render error",
+      stack: error.stack ?? null,
+      context: { shell, digest: error.digest, isChunkError },
+    })
     if (isChunkError && typeof window !== "undefined") {
       try {
         const lastReload = sessionStorage.getItem("chunk_reload_boundary_ts")

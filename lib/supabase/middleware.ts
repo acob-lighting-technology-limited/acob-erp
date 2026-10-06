@@ -75,6 +75,8 @@ export async function updateSession(request: NextRequest) {
   // spoofing window on paths where scope injection is skipped or fails.
   request.headers.delete("x-admin-scope")
   request.headers.delete("x-dept-scope")
+  request.headers.delete("x-telemetry-user-id")
+  request.headers.set("x-pathname", request.nextUrl.pathname)
 
   let supabaseResponse = NextResponse.next({
     request,
@@ -122,6 +124,7 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  if (user) request.headers.set("x-telemetry-user-id", user.id)
 
   const pathname = request.nextUrl.pathname
   const intendedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`
@@ -332,6 +335,7 @@ export async function updateSession(request: NextRequest) {
     !pathname.startsWith("/employee/new") &&
     !pathname.startsWith("/api/public") &&
     !pathname.startsWith("/api/devices") &&
+    pathname !== "/api/telemetry/errors" &&
     !pathname.startsWith("/api/ingest/network-activity") &&
     !isCronRoute(pathname)
   ) {
