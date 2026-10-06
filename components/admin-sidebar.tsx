@@ -540,7 +540,7 @@ const adminNavigation: NavItem[] = [
       { name: "Role Escalations", href: "/admin/dev/role-escalations" },
       { name: "Security Events", href: "/admin/dev/security-events" },
       { name: "Impersonation", href: "/admin/dev/impersonation" },
-      { name: "UI Errors", href: "/admin/dev/ui-errors" },
+      { name: "Error Monitor", href: "/admin/dev/ui-errors" },
       { name: "Tests", href: "/admin/dev/tests" },
       { name: "ACOBot", href: "/admin/dev/acobot" },
     ],

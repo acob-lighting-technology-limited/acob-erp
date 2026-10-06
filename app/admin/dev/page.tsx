@@ -49,8 +49,8 @@ const sections = [
     subLabel: "Security audit trail",
   },
   {
-    title: "UI Error Monitor",
-    description: "Track runtime frontend errors captured globally across all pages.",
+    title: "Error Monitor",
+    description: "Investigate browser, server, failed action and Supabase errors.",
     href: "/admin/dev/ui-errors",
     icon: Bug,
     color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",

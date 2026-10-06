@@ -25,7 +25,19 @@ interface LogEntry {
 
 const IS_PROD = process.env.NODE_ENV === "production"
 
+let errorReporter: ((namespace: string, message: string, data: Record<string, unknown>) => void) | undefined
+export function setErrorReporter(reporter: NonNullable<typeof errorReporter>) {
+  errorReporter = reporter
+}
+
 function write(level: LogLevel, ns: string, data: Record<string, unknown>, msg: string) {
+  if (level === "error") {
+    try {
+      errorReporter?.(ns, msg, data)
+    } catch {
+      /* Preserve the original log. */
+    }
+  }
   const entry: LogEntry = { level, ns, msg, time: new Date().toISOString(), ...data }
 
   if (IS_PROD) {
