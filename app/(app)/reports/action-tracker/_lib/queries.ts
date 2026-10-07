@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 export interface ActionTask {
   id: string
@@ -41,9 +41,7 @@ export interface ActionTrackerTasksResult {
   tasks: ActionTask[]
 }
 
-export async function fetchActionTrackerMetadata(
-  supabase: ReturnType<typeof createClient>
-): Promise<ActionTrackerMetadata> {
+export async function fetchActionTrackerMetadata(supabase: SupabaseClient): Promise<ActionTrackerMetadata> {
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -67,7 +65,7 @@ export async function fetchActionTrackerMetadata(
 }
 
 export async function fetchActionTrackerTasks(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient,
   week: number,
   year: number,
   deptFilter: string
