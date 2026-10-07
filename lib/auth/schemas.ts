@@ -18,3 +18,16 @@ export const ChangePasswordFormSchema = ChangePasswordSchema.extend({
 })
 
 export type ChangePasswordFormValues = z.infer<typeof ChangePasswordFormSchema>
+
+/** Choosing a new password (reset link, invite link): a password and its confirmation. */
+export const NewPasswordFormSchema = z
+  .object({
+    password: z.string().min(6, "Password must be at least 6 characters long").max(200),
+    confirmPassword: z.string().min(1, "Confirm your password"),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  })
+
+export type NewPasswordFormValues = z.infer<typeof NewPasswordFormSchema>

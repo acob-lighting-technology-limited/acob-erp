@@ -20,11 +20,13 @@ type AuthFieldProps = {
   /** Rendered on the label row, e.g. a "Forgot password?" link. */
   action?: ReactNode
   hint?: string
+  /** Validation message shown under the input in place of the hint. */
+  error?: string
   id?: string
 } & Omit<React.ComponentProps<typeof Input>, "id" | "className">
 
 /** Labelled input with a leading icon. */
-export function AuthField({ label, icon: Icon, action, hint, id, ...inputProps }: AuthFieldProps) {
+export function AuthField({ label, icon: Icon, action, hint, error, id, ...inputProps }: AuthFieldProps) {
   const generatedId = useId()
   const fieldId = id ?? generatedId
 
@@ -40,11 +42,12 @@ export function AuthField({ label, icon: Icon, action, hint, id, ...inputProps }
         <Icon className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2" />
         <Input
           id={fieldId}
+          aria-invalid={error ? true : undefined}
           {...inputProps}
           className="border-input/80 bg-background/60 placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/30 h-12 rounded-xl pl-10.5 transition-colors"
         />
       </div>
-      {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
+      <AuthFieldMessage hint={hint} error={error} />
     </div>
   )
 }
@@ -53,7 +56,7 @@ type AuthPasswordFieldProps = Omit<AuthFieldProps, "type"> & { revealLabel?: str
 
 /** Password input with a leading icon and a show/hide toggle. */
 export function AuthPasswordField({ revealLabel = "password", ...props }: AuthPasswordFieldProps) {
-  const { label, icon: Icon, action, hint, id, ...inputProps } = props
+  const { label, icon: Icon, action, hint, error, id, ...inputProps } = props
   const generatedId = useId()
   const fieldId = id ?? generatedId
   const [visible, setVisible] = useState(false)
@@ -70,6 +73,7 @@ export function AuthPasswordField({ revealLabel = "password", ...props }: AuthPa
         <Icon className="text-muted-foreground pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2" />
         <Input
           id={fieldId}
+          aria-invalid={error ? true : undefined}
           {...inputProps}
           type={visible ? "text" : "password"}
           className="border-input/80 bg-background/60 placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/30 h-12 rounded-xl pr-11 pl-10.5 transition-colors"
@@ -85,9 +89,19 @@ export function AuthPasswordField({ revealLabel = "password", ...props }: AuthPa
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
-      {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
+      <AuthFieldMessage hint={hint} error={error} />
     </div>
   )
+}
+
+function AuthFieldMessage({ hint, error }: { hint?: string; error?: string }) {
+  if (error)
+    return (
+      <p role="alert" className="text-destructive text-xs">
+        {error}
+      </p>
+    )
+  return hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null
 }
 
 /** Inline status message — replaces the old full-width tinted alert boxes. */
