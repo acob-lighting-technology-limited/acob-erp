@@ -5,12 +5,17 @@ import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 export const dynamic = "force-dynamic"
 
 // Whether the weekly report / meeting reminder is locked for a given office
-// week. Shared across the reports/communications admin screens.
+// week. Shared across the reports/communications admin screens, including the
+// weekly-reports screen in the department console, so leads are allowed: the
+// RPC resolves canMutate for the caller, and without it a lead's screen fell
+// back to "unlocked" after the deadline.
 export async function GET(request: NextRequest) {
   const scopeResult = await requireApiAdminScope()
   if (!scopeResult.ok) return scopeResult.response
   const { scope, supabase } = scopeResult
-  if (!scope.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!scope.isAdminLike && !scope.isDepartmentLead) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   const week = Number(request.nextUrl.searchParams.get("week"))
   const year = Number(request.nextUrl.searchParams.get("year"))
