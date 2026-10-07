@@ -169,6 +169,8 @@ export function DepartmentsPage({
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
   const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Blocks a second submit while one is in flight (a double click created duplicates and re-ran the rename cascade).
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -239,7 +241,9 @@ export function DepartmentsPage({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    if (saving) return
 
+    setSaving(true)
     try {
       if (!canManageDepartments) {
         toast.error("You can view departments but cannot modify them")
@@ -312,6 +316,8 @@ export function DepartmentsPage({
       log.error("Error saving department:", err)
       const message = err instanceof Error ? err.message : "Failed to save department"
       toast.error(message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -628,7 +634,9 @@ export function DepartmentsPage({
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">{editingDepartment ? "Update" : "Create"}</Button>
+                  <Button type="submit" loading={saving}>
+                    {editingDepartment ? "Update" : "Create"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
