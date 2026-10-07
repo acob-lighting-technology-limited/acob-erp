@@ -65,11 +65,12 @@ export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDia
     setNow(new Date())
   }, [])
 
-  useEffect(() => {
-    if (!open) {
-      setSearchQuery("")
-    }
-  }, [open])
+  // Clear the search when the dialog closes — adjusted during render, not in an effect.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (!open) setSearchQuery("")
+  }
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin-hr-birthdays-all"],

@@ -46,6 +46,7 @@ import {
   ShieldAlert,
   Trash2,
 } from "lucide-react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type Employee = {
   id: string
@@ -306,14 +307,19 @@ export function KssRosterTable({
       ? isSelectedWeekLocked && Boolean(selectedWeekDoc)
       : isSelectedWeekLocked && Boolean(selectedWeekExistingRow) && Boolean(selectedWeekDoc)) && !hasGraceOverride
 
-  useEffect(() => {
-    if (!canUploadMissingForLockedWeek || !selectedWeekExistingRow || editingId) return
-    setDepartment(selectedWeekExistingRow.department || "none")
-    setPresenterType(selectedWeekExistingRow.presenter_id ? "employee" : "visitor")
-    setPresenterId(selectedWeekExistingRow.presenter_id || "none")
-    setVisitorPresenterName(selectedWeekExistingRow.presenter_name || "")
-    setNotes(selectedWeekExistingRow.notes || "")
-  }, [canUploadMissingForLockedWeek, selectedWeekExistingRow, editingId])
+  // Prefill from the locked week's existing row — adjusted during render, not in an effect.
+  const [prefilledFor, setPrefilledFor] = useState<readonly unknown[] | null>(null)
+  const prefilledForNext = [canUploadMissingForLockedWeek, selectedWeekExistingRow, editingId] as const
+  if (depsChanged(prefilledFor, prefilledForNext)) {
+    setPrefilledFor(prefilledForNext)
+    if (canUploadMissingForLockedWeek && selectedWeekExistingRow && !editingId) {
+      setDepartment(selectedWeekExistingRow.department || "none")
+      setPresenterType(selectedWeekExistingRow.presenter_id ? "employee" : "visitor")
+      setPresenterId(selectedWeekExistingRow.presenter_id || "none")
+      setVisitorPresenterName(selectedWeekExistingRow.presenter_name || "")
+      setNotes(selectedWeekExistingRow.notes || "")
+    }
+  }
 
   const rows = useMemo(
     () => roster.sort((a, b) => compareWeekYear(b.meeting_week, b.meeting_year, a.meeting_week, a.meeting_year)),

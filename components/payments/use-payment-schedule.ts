@@ -13,15 +13,19 @@ import {
   startOfDay,
 } from "date-fns"
 import type { Payment, ScheduleItem, PaymentDocument } from "./payment-types"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 export function usePaymentSchedule(payment: Payment | null) {
   const [schedule, setSchedule] = useState<ScheduleItem[]>([])
 
-  useEffect(() => {
+  // Rebuild when a recurring payment arrives or changes — adjusted during render, not in an effect.
+  const [builtFor, setBuiltFor] = useState<Payment | null | undefined>(undefined)
+  if (builtFor !== payment) {
+    setBuiltFor(payment)
     if (payment && payment.payment_type === "recurring" && payment.next_payment_due && payment.recurrence_period) {
       setSchedule(buildSchedule(payment))
     }
-  }, [payment])
+  }
 
   return schedule
 }

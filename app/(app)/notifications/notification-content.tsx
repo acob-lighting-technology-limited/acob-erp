@@ -127,9 +127,12 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   // Default to the work waiting on the viewer (audit 2.1).
   const [activeTab, setActiveTab] = useState("action")
 
-  useEffect(() => {
+  // A fresh server list replaces local edits — adjusted during render, not in an effect.
+  const [syncedInitial, setSyncedInitial] = useState(initialNotifications)
+  if (syncedInitial !== initialNotifications) {
+    setSyncedInitial(initialNotifications)
     setNotifications(initialNotifications)
-  }, [initialNotifications])
+  }
 
   useEffect(() => {
     const subscription = supabase

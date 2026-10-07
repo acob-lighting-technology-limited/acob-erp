@@ -19,6 +19,7 @@ import { PageLoader } from "@/components/ui/query-states"
 import Image from "next/image"
 
 import { logger } from "@/lib/logger"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("tools-job-description")
 
@@ -74,13 +75,13 @@ export default function JobDescriptionPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Sync local state when data loads
-  useEffect(() => {
-    if (profileData) {
-      setJobDescription(profileData.job_description)
-      setIsEditing(!profileData.job_description) // Auto-edit if empty
-    }
-  }, [profileData])
+  // Seed local state when data loads — adjusted during render, not in an effect.
+  const [seededFrom, setSeededFrom] = useState<typeof profileData>(undefined)
+  if (profileData && seededFrom !== profileData) {
+    setSeededFrom(profileData)
+    setJobDescription(profileData.job_description)
+    setIsEditing(!profileData.job_description) // Auto-edit if empty
+  }
 
   if (isLoading) return <PageLoader variant="form" />
 

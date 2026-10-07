@@ -36,6 +36,7 @@ import { useTheme } from "next-themes"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { cn, getInitials } from "@/lib/utils"
 import { getSeasonalLogoPaths, isTemporary2026LogoPeriod } from "@/lib/seasonal-branding"
+import { useMounted } from "@/hooks/use-mounted"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface NavbarProps {
@@ -56,7 +57,7 @@ interface NavbarProps {
 export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = false }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const mounted = useMounted()
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(
     avatarUrl || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
   )
@@ -78,10 +79,6 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
   const logoSrc = !mounted
     ? getSeasonalLogoPaths("light").navbar
     : getSeasonalLogoPaths(resolvedTheme === "dark" ? "dark" : "light").navbar
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     if (avatarUrl !== undefined) {

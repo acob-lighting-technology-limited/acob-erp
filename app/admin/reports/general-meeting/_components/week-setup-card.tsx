@@ -18,6 +18,7 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { apiFetch } from "@/lib/api-client"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type EmployeeOption = {
   id: string
@@ -128,22 +129,32 @@ export function WeekSetupCard() {
     return !lockState.canMutate
   }, [lockState])
 
-  useEffect(() => {
-    if (!lockState) return
-    setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekNumber, yearNumber))
-    setMeetingGraceHours(lockState.graceHours || 24)
-  }, [lockState, weekNumber, yearNumber])
+  // Seed date and grace hours from the week's lock state — adjusted during render, not in an effect.
+  const [seededLock, setSeededLock] = useState<readonly unknown[] | null>(null)
+  const seededLockNext = [lockState, weekNumber, yearNumber] as const
+  if (depsChanged(seededLock, seededLockNext)) {
+    setSeededLock(seededLockNext)
+    if (lockState) {
+      setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekNumber, yearNumber))
+      setMeetingGraceHours(lockState.graceHours || 24)
+    }
+  }
 
-  useEffect(() => {
-    if (!weekSetupData) return
-    setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
-    setKssDepartmentInput(weekSetupData.kssDepartment || "none")
-    setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
-    setKssPresenterNameInput(weekSetupData.kssPresenterName || "")
-    setKssPresenterType(
-      weekSetupData.kssPresenterId && weekSetupData.kssPresenterId !== "none" ? "employee" : "visitor"
-    )
-  }, [weekSetupData])
+  // Seed the KSS/time inputs from the week's setup — adjusted during render, not in an effect.
+  const [seededSetup, setSeededSetup] = useState<readonly unknown[] | null>(null)
+  const seededSetupNext = [weekSetupData] as const
+  if (depsChanged(seededSetup, seededSetupNext)) {
+    setSeededSetup(seededSetupNext)
+    if (weekSetupData) {
+      setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
+      setKssDepartmentInput(weekSetupData.kssDepartment || "none")
+      setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
+      setKssPresenterNameInput(weekSetupData.kssPresenterName || "")
+      setKssPresenterType(
+        weekSetupData.kssPresenterId && weekSetupData.kssPresenterId !== "none" ? "employee" : "visitor"
+      )
+    }
+  }
 
   const tuesdayIso = useMemo(() => {
     if (!weekSetupData?.mondayDateIso) return null

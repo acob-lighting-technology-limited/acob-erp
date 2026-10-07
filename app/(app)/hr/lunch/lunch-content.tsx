@@ -42,6 +42,7 @@ import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { layout as tablePageLayout } from "./_layout"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("lunch-content")
 
@@ -126,10 +127,13 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
   const [draft, setDraft] = useState<Record<string, string>>(() => myVote?.selections || {})
   const [draftEating, setDraftEating] = useState<boolean>(() => myVote?.is_eating ?? true)
 
-  useEffect(() => {
+  // A newly saved vote resets the draft — adjusted during render, not in an effect.
+  const [draftFor, setDraftFor] = useState(myVote)
+  if (draftFor !== myVote) {
+    setDraftFor(myVote)
     setDraft(myVote?.selections || {})
     setDraftEating(myVote?.is_eating ?? true)
-  }, [myVote])
+  }
 
   // Which option rows have their voter list expanded.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())

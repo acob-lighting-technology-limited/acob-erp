@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type PolicyRow = {
   notification_key: string
@@ -61,10 +62,12 @@ export function MailPolicySettings() {
     queryFn: fetchMailPolicies,
   })
 
-  // Sync local state when data loads
-  useEffect(() => {
-    if (data) setPolicies(data)
-  }, [data])
+  // Seed local state when data loads — adjusted during render, not in an effect.
+  const [seededFrom, setSeededFrom] = useState<typeof data>(undefined)
+  if (data && seededFrom !== data) {
+    setSeededFrom(data)
+    setPolicies(data)
+  }
 
   const { mutate: savePoliciesMutate, isPending: saving } = useMutation({
     mutationFn: async (body: { policies: PolicyRow[] }) => {

@@ -20,6 +20,7 @@ import { apiFetch } from "@/lib/api-client"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import { isLate } from "@/lib/hr/attendance-utils"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface AppealableRow {
   id: string
@@ -83,8 +84,18 @@ export function AppealDialog({
   const hasLateArrival = Boolean(row.clock_in && isLate(row.clock_in))
   const hasMissingClockOut = Boolean(!row.clock_out || row.normalizedStatus === "incomplete")
 
-  // Reset state when dialog opens or editing changes
-  useEffect(() => {
+  // Reset when the dialog opens or the appeal being edited changes — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [
+    editAppeal,
+    open,
+    row.normalizedStatus,
+    isAbsentDay,
+    hasLateArrival,
+    hasMissingClockOut,
+  ] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
     if (editAppeal) {
       setAbsentReason(editAppeal.appeal_reason)
       setLwpReason(editAppeal.appeal_reason)
@@ -105,7 +116,7 @@ export function AppealDialog({
       setCheckIwp(hasMissingClockOut)
       setCheckOos(false)
     }
-  }, [editAppeal, open, row.normalizedStatus, isAbsentDay, hasLateArrival, hasMissingClockOut])
+  }
 
   // Quota check
   const isPermissionRequested = isAbsentDay ? absentRequestedStatus === "absent_with_permission" : checkLwp || checkIwp
