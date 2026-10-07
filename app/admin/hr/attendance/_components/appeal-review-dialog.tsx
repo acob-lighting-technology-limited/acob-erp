@@ -46,10 +46,12 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   const [approvingLoad, setApprovingLoad] = useState(false)
   const [rejectingLoad, setRejectingLoad] = useState(false)
 
-  // Sync note when appeal changes
-  useEffect(() => {
+  // Clear the note when a different appeal is shown — adjusted during render, not in an effect.
+  const [notedAppeal, setNotedAppeal] = useState(appeal)
+  if (notedAppeal !== appeal) {
+    setNotedAppeal(appeal)
     setNote("")
-  }, [appeal])
+  }
 
   const currentNote = appeal ? note : ""
   const isLoading = approvingLoad || rejectingLoad

@@ -17,6 +17,8 @@ import type { QueryClient } from "@tanstack/react-query"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { formatCurrency } from "@/lib/format"
+import { depsChanged } from "@/lib/utils/deps-changed"
+import { addIsoDays } from "@/lib/hr/leave-days"
 
 const log = logger("finance-invoice-dialog")
 
@@ -78,9 +80,12 @@ export function InvoiceFormDialog({
   }))
   const [items, setItems] = useState<InvoiceItemFormValue[]>([createDefaultItem()])
 
-  useEffect(() => {
-    if (!open) return
-    if (invoice) {
+  // Seed the form each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [initialItems, invoice, open] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (open && invoice) {
       setFormData({
         customer_name: invoice.customer_name,
         customer_email: invoice.customer_email || "",
@@ -92,21 +97,20 @@ export function InvoiceFormDialog({
         terms: invoice.terms || "Payment is due within 30 days of invoice date.",
       })
       setItems(initialItems.length > 0 ? initialItems : [createDefaultItem()])
-      return
+    } else if (open) {
+      setFormData({
+        customer_name: "",
+        customer_email: "",
+        customer_address: "",
+        issue_date: toLocalISODate(),
+        due_date: addIsoDays(toLocalISODate(), 30),
+        currency: "NGN",
+        notes: "",
+        terms: "Payment is due within 30 days of invoice date.",
+      })
+      setItems([createDefaultItem()])
     }
-
-    setFormData({
-      customer_name: "",
-      customer_email: "",
-      customer_address: "",
-      issue_date: toLocalISODate(),
-      due_date: toLocalISODate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
-      currency: "NGN",
-      notes: "",
-      terms: "Payment is due within 30 days of invoice date.",
-    })
-    setItems([createDefaultItem()])
-  }, [initialItems, invoice, open])
+  }
 
   function addItem() {
     setItems([...items, createDefaultItem()])

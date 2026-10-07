@@ -126,9 +126,12 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
 
-  useEffect(() => {
+  // A fresh server list replaces local edits — adjusted during render, not in an effect.
+  const [syncedInitial, setSyncedInitial] = useState(initialNotifications)
+  if (syncedInitial !== initialNotifications) {
+    setSyncedInitial(initialNotifications)
     setNotifications(initialNotifications)
-  }, [initialNotifications])
+  }
 
   useEffect(() => {
     const subscription = supabase
