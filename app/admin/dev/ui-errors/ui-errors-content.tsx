@@ -7,9 +7,11 @@ import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api-client"
 import { toast } from "sonner"
 import { groupErrors } from "@/lib/telemetry/group"
+import { exportErrorsToCsv, exportErrorsToExcel, type ErrorExportRow } from "@/lib/telemetry/export"
+import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
-import { formatWATDateTime } from "@/lib/utils/date"
-import { Bug, AlertTriangle, ShieldAlert } from "lucide-react"
+import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
+import { Bug, AlertTriangle, ShieldAlert, Download } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
@@ -60,6 +62,28 @@ export function UiErrorsContent({
   const router = useRouter()
   const groupedRows = useMemo(() => groupErrors(rows), [rows])
   const [busy, setBusy] = useState<string | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  // What the table shows after search, filters and sort, so the export matches the screen.
+  const [processedRows, setProcessedRows] = useState<UiErrorRow[]>([])
+  const handleExport = (format: string) => {
+    const source = processedRows.length ? processedRows : groupedRows
+    const exportRows: ErrorExportRow[] = source.map((r) => ({
+      Status: r.resolved ? "Resolved" : "Open",
+      Occurrences: r.occurrences || 1,
+      Users: r.users?.length || 1,
+      Affected: (r.users || [r.user_name || "Anonymous"]).join(", "),
+      Source: r.source,
+      Route: r.route,
+      Message: r.message,
+      "Last Seen (WAT)": formatWATDateTime(r.created_at),
+      Reference: r.id,
+      Stack: r.stack,
+      Context: JSON.stringify(r.context ?? {}),
+    }))
+    const filename = `acob-error-monitor-${toLocalISODate(new Date())}`
+    if (format === "excel") void exportErrorsToExcel(exportRows, filename)
+    else exportErrorsToCsv(exportRows, filename)
+  }
   const [showCollectorSetup, setShowCollectorSetup] = useState(false)
   const [managementToken, setManagementToken] = useState("")
   useEffect(() => {
@@ -235,6 +259,10 @@ export function UiErrorsContent({
           <Button size="sm" variant="outline" onClick={() => router.refresh()}>
             Refresh
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setExportOpen(true)} disabled={groupedRows.length === 0}>
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
         </div>
       }
       stats={
@@ -287,8 +315,19 @@ export function UiErrorsContent({
           </Button>
         </form>
       )}
+      <ExportOptionsDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        title="Export Error Monitor"
+        options={[
+          { id: "excel", label: "Excel (.xlsx)", icon: "excel" },
+          { id: "csv", label: "CSV (.csv)", icon: "excel" },
+        ]}
+        onSelect={handleExport}
+      />
       <DataTable<UiErrorRow>
         data={groupedRows}
+        onProcessedDataChange={setProcessedRows}
         columns={columns}
         getRowId={(r) => r.id}
         searchPlaceholder="Search message, route, source, user..."

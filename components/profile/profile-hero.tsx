@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Pencil, Mail, Phone, Cake, Home, Camera, Trash2, Loader2 } from "lucide-react"
 import { formatName, cn } from "@/lib/utils"
-import { formatWATDate, formatBirthdayLabel, toLocalISODate, formatDDMMYYYY } from "@/lib/utils/date"
+import { formatWATDate, formatBirthdayLabel, toLocalISODate, toLocalTimeString, formatDDMMYYYY } from "@/lib/utils/date"
 import { isWeekend } from "@/lib/hr/attendance-utils"
 import { getRoleBadgeColor, getRoleDisplayName } from "@/lib/permissions"
 import { apiFetch } from "@/lib/api-client"
@@ -106,8 +106,10 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
   return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase()
 }
 
+// WAT, not the runtime clock: the server renders in UTC and the phone in WAT,
+// so local hours disagreed for an hour twice a day and broke hydration.
 function getGreeting(): string {
-  const hour = new Date().getHours()
+  const hour = Number(toLocalTimeString().slice(0, 2))
   if (hour < 12) return "Good morning"
   if (hour < 17) return "Good afternoon"
   return "Good evening"

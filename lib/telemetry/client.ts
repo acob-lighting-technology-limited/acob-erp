@@ -2,6 +2,7 @@
 
 import { apiFetch } from "@/lib/api-client"
 import { redact, safeContext, safePath } from "./sanitize"
+import { isClientNoise } from "./noise"
 
 export interface ClientTelemetryPayload {
   source:
@@ -21,6 +22,7 @@ export interface ClientTelemetryPayload {
 const seen = new Map<string, number>()
 export async function reportClientError(payload: ClientTelemetryPayload): Promise<void> {
   try {
+    if (isClientNoise(payload.message, payload.stack)) return
     const route = safePath(payload.route || (typeof window !== "undefined" ? window.location.pathname : "/"))
     const fingerprint = `${payload.source}|${route}|${payload.message}`
     const now = Date.now()

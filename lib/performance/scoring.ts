@@ -606,7 +606,10 @@ export async function computeIndividualPerformanceScore(
   // The RESOLVED cycle, not params.cycleId: on the default view (no cycle in
   // the URL) params.cycleId is undefined, so this filter used to be skipped
   // entirely and the newest review from ANY cycle overwrote the live scores.
-  const scopedCycleId = cycle?.id ?? params.cycleId ?? null
+  // "All cycles" resolves no cycle and must stay unfiltered: falling through to
+  // the literal "all" sent it as a uuid and both queries failed outright.
+  const isAllCycles = params.cycleId === "all" || params.cycleId === "__all__"
+  const scopedCycleId = cycle?.id ?? (isAllCycles ? null : params.cycleId) ?? null
   if (scopedCycleId) {
     latestReviewQuery = latestReviewQuery.eq("review_cycle_id", scopedCycleId)
   }
