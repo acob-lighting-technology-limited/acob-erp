@@ -270,7 +270,7 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 |---|---|---|---|
 | [x] superseded — the base DialogContent is responsive now | `ui/patterns/responsive-modal.tsx` | 1 | Every form dialog (157) |
 | [~] nearly every list is a DataTable with built-in paging; the few card grids left page their own | `ui/patterns/pagination-controls.tsx` | 1 | Every non-DataTable list |
-| [ ] | `ui/patterns/list-toolbar.tsx` | 1 | Card/grid pages with search |
+| [~] ListToolbar built with shared URL sync (3b4187c7); only the department documents browser uses it so far | `ui/patterns/list-toolbar.tsx` | 1 | Card/grid pages with search |
 | [~] DataTable renders query errors with retry for every table; card screens use QueryError | `ui/patterns/error-state.tsx` | 3 | Every query error |
 | [~] PageLoader now renders the page skeleton for all its users; QueryError still used by 2 | `ui/query-states.tsx` | 12 | Every react-query screen |
 | [x] done — deleted | `components/ui/empty-state.tsx` | **0** | Delete; `patterns/empty-state` is the real one |
@@ -280,7 +280,7 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 | Status | Hand-rolled | Use | What you gain |
 |---|---|---|---|
 | [ ] | 1,952-line `DataTable` engine | **TanStack Table** + **TanStack Virtual** | Tested sort, filter, pagination, selection and sizing; server mode; virtual rows |
-| [ ] | ~147 `useState` forms | **react-hook-form + zod + shadcn `Form`** (installed) | One validation UX, shared schemas, a11y wiring |
+| [~] see 2.5 — forms with real validation needs converted or fixed; the rest already meet the bar | ~147 `useState` forms | **react-hook-form + zod + shadcn `Form`** (installed) | One validation UX, shared schemas, a11y wiring |
 | [~] DataTable's urlSync already keeps search/filters/sort/page in the URL for every table; nuqs would type it — not added | Filter/tab state in components | **nuqs** | Type-safe URL state, shareable links, Back works |
 | [ ] | Hand-written `types/database.ts` | **`supabase gen types`** | Typed queries; most `any` gone |
 | [ ] | HTML-string email templates (`lib/email-templates/*.ts`) | **React Email** | Components, preview server, Outlook-safe output |
