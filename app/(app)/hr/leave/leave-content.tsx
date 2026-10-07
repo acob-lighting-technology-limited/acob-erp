@@ -118,6 +118,34 @@ type CombinedLeaveItem = Omit<LeaveRequest, "user"> & {
   } | null
 }
 
+/**
+ * What still stops a leave request from being submitted, in the order the form
+ * asks for it. The Submit button used to grey out with no reason given.
+ */
+function leaveRequestMissing({
+  formData,
+  totalDays,
+  availableDays,
+  requiresAttachment,
+}: {
+  formData: LeaveRequestFormData
+  totalDays: number
+  availableDays: number
+  requiresAttachment: boolean
+}): string[] {
+  const missing: string[] = []
+  if (!formData.leave_type_id) missing.push("Choose a leave type")
+  if (formData.segments.length === 0) missing.push("Pick your leave dates")
+  else if (totalDays <= 0) missing.push("Pick at least one working day")
+  else if (formData.leave_type_id && totalDays > availableDays)
+    missing.push(`This request is ${totalDays} day${totalDays === 1 ? "" : "s"}; you have ${availableDays} available`)
+  if (!formData.reason) missing.push("Give a reason")
+  if (!formData.reliever_identifier) missing.push("Choose a reliever")
+  if (!formData.handover_file && !formData.handover_checklist_url) missing.push("Attach your handover document")
+  if (requiresAttachment && !formData.attachment) missing.push("Attach the document this leave type requires")
+  return missing
+}
+
 export function LeaveContent({
   currentUserId,
   initialRequests,
@@ -647,6 +675,13 @@ export function LeaveContent({
       if (!response.ok) throw new Error(payload.error || "Failed to submit request")
 
       const createdOrUpdatedId = String(payload?.data?.id || editingRequestId || "")
+      if (!isEditing && createdOrUpdatedId) {
+        // The request now exists. If an upload below fails, a retry must update
+        // this request, not create a second one, and must not re-upload the handover.
+        setEditingRequestId(createdOrUpdatedId)
+        setFormData((prev) => ({ ...prev, handover_file: null, handover_checklist_url: handoverChecklistUrl || null }))
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
+      }
       let successMessage = String(payload?.message || "")
       if (attachment && createdOrUpdatedId) {
         const requiredDocumentsFromResponse = Array.isArray(payload?.data?.required_documents)
@@ -1211,16 +1246,12 @@ export function LeaveContent({
         approvalRouteStages={leaveRoutePreview?.stages || []}
         preview={segmentsPreview(formData.segments, holidaySet)}
         leaveCalendar={leaveCalendar}
-        canSubmit={
-          !!formData.leave_type_id &&
-          formData.segments.length > 0 &&
-          !!formData.reason &&
-          !!formData.reliever_identifier &&
-          (Boolean(formData.handover_file) || Boolean(formData.handover_checklist_url)) &&
-          segmentsTotalDays(formData.segments, holidaySet) > 0 &&
-          segmentsTotalDays(formData.segments, holidaySet) <= selectedAvailableDays &&
-          (!requiresAttachmentOnCreate || Boolean(formData.attachment))
-        }
+        missingRequirements={leaveRequestMissing({
+          formData,
+          totalDays: segmentsTotalDays(formData.segments, holidaySet),
+          availableDays: selectedAvailableDays,
+          requiresAttachment: requiresAttachmentOnCreate,
+        })}
         submitting={submitting}
         onSubmit={handleSubmitRequest}
       />
