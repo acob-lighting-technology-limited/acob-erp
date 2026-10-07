@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation } from "@tanstack/react-query"
 import {
   DEFAULT_PROJECT_PRIORITY,
   PROJECT_PRIORITIES,
   PROJECT_PRIORITY_LABELS,
   normalizePriority,
-  type ProjectPriority,
 } from "@/lib/projects/priority"
 import {
   Dialog,
@@ -18,12 +19,14 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { toast } from "sonner"
 import type { Project } from "@/components/projects/project-list-content"
-import { apiFetch } from "@/lib/api-client"
+import { apiJson } from "@/lib/api-client"
+import { applyServerErrors } from "@/lib/forms/server-errors"
+import { ProjectInputSchema, type ProjectInput } from "@/lib/projects/schemas"
 import { usePortfolios } from "@/hooks/use-portfolios"
 
 const PRIORITY_OPTIONS = PROJECT_PRIORITIES.map((value) => ({ value, label: PROJECT_PRIORITY_LABELS[value] }))
@@ -36,14 +39,16 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ]
 
+type Profile = {
+  id: string
+  first_name: string
+  last_name: string
+  full_name?: string | null
+  department: string
+}
+
 interface ProjectDialogsProps {
-  profiles: Array<{
-    id: string
-    first_name: string
-    last_name: string
-    full_name?: string | null
-    department: string
-  }>
+  profiles: Profile[]
   isAddOpen: boolean
   setIsAddOpen: (open: boolean) => void
   isEditOpen: boolean
@@ -64,26 +69,74 @@ export function ProjectDialogs({
   onSuccess,
   defaultPortfolioId = null,
 }: ProjectDialogsProps) {
-  const [loading, setLoading] = useState(false)
+  return (
+    <>
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent className="sm:max-w-125">
+          <DialogHeader>
+            <DialogTitle>Add Project Profile</DialogTitle>
+            <DialogDescription>Create a new ongoing project deployment record.</DialogDescription>
+          </DialogHeader>
+          {/* Content unmounts when the dialog closes, so each opening starts a blank project. */}
+          <ProjectForm
+            project={null}
+            defaultPortfolioId={defaultPortfolioId}
+            profiles={profiles}
+            onCancel={() => setIsAddOpen(false)}
+            onSaved={() => {
+              setIsAddOpen(false)
+              onSuccess()
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
-  // Form states
-  const [projectName, setProjectName] = useState("")
-  const [location, setLocation] = useState("")
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
-  const [capacity, setCapacity] = useState("")
-  const [techType, setTechType] = useState("")
-  const [managerId, setManagerId] = useState("")
-  const [description, setDescription] = useState("")
-  const [status, setStatus] = useState<"planning" | "active" | "on_hold" | "completed" | "cancelled">("planning")
-  const [portfolioId, setPortfolioId] = useState("")
-  const [priority, setPriority] = useState<ProjectPriority>(DEFAULT_PROJECT_PRIORITY)
-  const { data: portfoliosData } = usePortfolios({ enabled: isAddOpen || isEditOpen })
-  const portfolios = portfoliosData?.data ?? []
+      <Dialog open={isEditOpen && Boolean(selectedProject)} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-125">
+          <DialogHeader>
+            <DialogTitle>Edit Project Profile</DialogTitle>
+            <DialogDescription>Modify fields and overall status of the deployment profile.</DialogDescription>
+          </DialogHeader>
+          {selectedProject && (
+            <ProjectForm
+              key={selectedProject.id}
+              project={selectedProject}
+              defaultPortfolioId={null}
+              profiles={profiles}
+              onCancel={() => setIsEditOpen(false)}
+              onSaved={() => {
+                setIsEditOpen(false)
+                onSuccess()
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
 
+/** One form for both dialogs — they were two copies that had to be kept in step by hand. */
+function ProjectForm({
+  project,
+  defaultPortfolioId,
+  profiles,
+  onCancel,
+  onSaved,
+}: {
+  project: Project | null
+  defaultPortfolioId: string | null
+  profiles: Profile[]
+  onCancel: () => void
+  onSaved: () => void
+}) {
+  const isEdit = Boolean(project)
+  // A project may sit outside every portfolio, so a failed load must not block
+  // the form — it just leaves the selector empty.
+  const { data: portfoliosData } = usePortfolios({ enabled: true })
   const portfolioOptions = [
     { value: "", label: "No portfolio" },
-    ...portfolios.map((portfolio) => ({
+    ...(portfoliosData?.data ?? []).map((portfolio) => ({
       value: portfolio.id,
       label: portfolio.code ? `${portfolio.code} — ${portfolio.name}` : portfolio.name,
     })),
@@ -93,432 +146,184 @@ export function ProjectDialogs({
     ...profiles.map((p) => ({ value: p.id, label: p.full_name || `${p.first_name} ${p.last_name}` })),
   ]
 
-  // A project may sit outside every portfolio, so a failed load must not block
-  // the form — it just leaves the selector empty.
+  const form = useForm<ProjectInput>({
+    resolver: zodResolver(ProjectInputSchema),
+    defaultValues: project
+      ? {
+          project_name: project.project_name,
+          location: project.location,
+          deployment_start_date: project.deployment_start_date,
+          deployment_end_date: project.deployment_end_date,
+          capacity_w: project.capacity_w ? String(project.capacity_w) : "",
+          technology_type: project.technology_type || "",
+          project_manager_id: project.project_manager_id || "",
+          description: project.description || "",
+          status: project.status,
+          portfolio_id: project.portfolio_id || "",
+          priority: normalizePriority(project.priority),
+        }
+      : {
+          project_name: "",
+          location: "",
+          deployment_start_date: "",
+          deployment_end_date: "",
+          capacity_w: "",
+          technology_type: "",
+          project_manager_id: "",
+          description: "",
+          status: "planning",
+          portfolio_id: defaultPortfolioId ?? "",
+          priority: DEFAULT_PROJECT_PRIORITY,
+        },
+  })
 
-  // Sync form states with selected project for editing
-  useEffect(() => {
-    if (selectedProject && isEditOpen) {
-      setProjectName(selectedProject.project_name)
-      setLocation(selectedProject.location)
-      setStartDate(selectedProject.deployment_start_date)
-      setEndDate(selectedProject.deployment_end_date)
-      setCapacity(selectedProject.capacity_w ? String(selectedProject.capacity_w) : "")
-      setTechType(selectedProject.technology_type || "")
-      setManagerId(selectedProject.project_manager_id || "")
-      setDescription(selectedProject.description || "")
-      setStatus(selectedProject.status)
-      setPortfolioId(selectedProject.portfolio_id || "")
-      setPriority(normalizePriority(selectedProject.priority))
-    } else {
-      // Reset for add
-      setProjectName("")
-      setLocation("")
-      setStartDate("")
-      setEndDate("")
-      setCapacity("")
-      setTechType("")
-      setManagerId("")
-      setDescription("")
-      setStatus("planning")
-      setPriority(DEFAULT_PROJECT_PRIORITY)
-      setPortfolioId(defaultPortfolioId ?? "")
-    }
-  }, [selectedProject, isEditOpen, isAddOpen, defaultPortfolioId])
-
-  // Handle Add Project submit
-  const handleAddSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!projectName || !location || !startDate || !endDate) {
-      toast.error("Please fill in all required fields")
-      return
-    }
-
-    setLoading(true)
-    try {
-      const res = await apiFetch("/api/projects", {
-        method: "POST",
+  const save = useMutation({
+    mutationFn: (values: ProjectInput) =>
+      apiJson(isEdit ? `/api/projects/${project!.id}` : "/api/projects", {
+        method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_name: projectName,
-          location,
-          deployment_start_date: startDate,
-          deployment_end_date: endDate,
-          capacity_w: capacity ? Number(capacity) : null,
-          technology_type: techType || null,
-          project_manager_id: managerId || null,
-          description: description || null,
-          status,
-          priority,
-          portfolio_id: portfolioId || null,
+          ...values,
+          capacity_w: values.capacity_w ? Number(values.capacity_w) : null,
+          technology_type: values.technology_type || null,
+          project_manager_id: values.project_manager_id || null,
+          description: values.description || null,
+          portfolio_id: values.portfolio_id || null,
         }),
-      })
+      }),
+    onSuccess: () => {
+      toast.success(isEdit ? "Project updated successfully!" : "Project created successfully!")
+      onSaved()
+    },
+    onError: (error) => {
+      const message = applyServerErrors(error, form.setError, Object.keys(form.getValues()))
+      if (message) toast.error(message)
+    },
+  })
 
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to create project")
+  const required = <span className="text-danger-foreground">*</span>
 
-      toast.success("Project created successfully!")
-      setIsAddOpen(false)
-      onSuccess()
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred while creating project")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const textField = (
+    name: "project_name" | "location" | "technology_type" | "deployment_start_date" | "deployment_end_date",
+    label: React.ReactNode,
+    options: { type?: string; placeholder?: string } = {}
+  ) => (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className="text-xs font-semibold">{label}</FormLabel>
+          <FormControl>
+            <Input type={options.type} placeholder={options.placeholder} {...field} value={field.value ?? ""} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  )
 
-  // Handle Edit Project submit
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedProject) return
-
-    if (!projectName || !location || !startDate || !endDate) {
-      toast.error("Please fill in all required fields")
-      return
-    }
-
-    setLoading(true)
-    try {
-      const res = await apiFetch(`/api/projects/${selectedProject.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_name: projectName,
-          location,
-          deployment_start_date: startDate,
-          deployment_end_date: endDate,
-          capacity_w: capacity ? Number(capacity) : null,
-          technology_type: techType || null,
-          project_manager_id: managerId || null,
-          description: description || null,
-          status,
-          priority,
-          portfolio_id: portfolioId || null,
-        }),
-      })
-
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to update project")
-
-      toast.success("Project updated successfully!")
-      setIsEditOpen(false)
-      onSuccess()
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred while updating project")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const selectField = (
+    name: "portfolio_id" | "project_manager_id" | "priority" | "status",
+    label: string,
+    selectOptions: Array<{ value: string; label: string }>,
+    placeholder: string,
+    searchPlaceholder: string
+  ) => (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className="text-xs font-semibold">{label}</FormLabel>
+          <SearchableSelect
+            value={(field.value as string | null | undefined) ?? ""}
+            onValueChange={(value) => field.onChange(name === "priority" ? normalizePriority(value) : value)}
+            options={selectOptions}
+            placeholder={placeholder}
+            searchPlaceholder={searchPlaceholder}
+          />
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  )
 
   return (
-    <>
-      {/* ADD PROJECT DIALOG */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-125">
-          <DialogHeader>
-            <DialogTitle>Add Project Profile</DialogTitle>
-            <DialogDescription>Create a new ongoing project deployment record.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddSubmit} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="add-name" className="text-xs font-semibold">
-                Project Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="add-name"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. 1155KWp INTERCONNECTED MINI-GRID"
-                required
-              />
-            </div>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((values) => save.mutate(values))} className="space-y-4 py-2">
+        {textField("project_name", <>Project Title {required}</>, {
+          placeholder: isEdit ? "Project name" : "e.g. 1155KWp INTERCONNECTED MINI-GRID",
+        })}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="add-location" className="text-xs font-semibold">
-                  Site Location <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="add-location"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="City, State"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="add-tech" className="text-xs font-semibold">
-                  Technology Type
-                </Label>
-                <Input
-                  id="add-tech"
-                  value={techType}
-                  onChange={(e) => setTechType(e.target.value)}
-                  placeholder="e.g. Interconnected Mini-Grid"
-                />
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-4">
+          {textField("location", <>Site Location {required}</>, { placeholder: isEdit ? "Location" : "City, State" })}
+          {textField("technology_type", "Technology Type", {
+            placeholder: isEdit ? "Tech" : "e.g. Interconnected Mini-Grid",
+          })}
+        </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="add-capacity" className="text-xs font-semibold">
-                  Power Capacity (Watts)
-                </Label>
-                <Input
-                  id="add-capacity"
-                  type="number"
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
-                  placeholder="e.g. 1155000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Portfolio</Label>
-                <SearchableSelect
-                  value={portfolioId}
-                  onValueChange={setPortfolioId}
-                  options={portfolioOptions}
-                  placeholder="No portfolio"
-                  searchPlaceholder="Search portfolios..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Project Manager</Label>
-                <SearchableSelect
-                  value={managerId}
-                  onValueChange={setManagerId}
-                  options={managerOptions}
-                  placeholder="Unassigned"
-                  searchPlaceholder="Search staff..."
-                />
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="capacity_w"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-semibold">Power Capacity (Watts)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder={isEdit ? "Watts" : "e.g. 1155000"}
+                    {...field}
+                    value={field.value ?? ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {selectField("portfolio_id", "Portfolio", portfolioOptions, "No portfolio", "Search portfolios...")}
+          {selectField("project_manager_id", "Project Manager", managerOptions, "Unassigned", "Search staff...")}
+        </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="add-start" className="text-xs font-semibold">
-                  Start Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="add-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="add-end" className="text-xs font-semibold">
-                  Target End Date <span className="text-red-500">*</span>
-                </Label>
-                <Input id="add-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-              </div>
-            </div>
+        <div className="grid grid-cols-2 gap-4">
+          {textField("deployment_start_date", <>Start Date {required}</>, { type: "date" })}
+          {textField("deployment_end_date", <>Target End Date {required}</>, { type: "date" })}
+        </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Priority</Label>
-                <SearchableSelect
-                  value={priority}
-                  onValueChange={(value) => setPriority(normalizePriority(value))}
-                  options={PRIORITY_OPTIONS}
-                  placeholder="Select priority"
-                  searchPlaceholder="Search priority..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Stage</Label>
-                <SearchableSelect
-                  value={status}
-                  onValueChange={(value) => setStatus(value as typeof status)}
-                  options={STATUS_OPTIONS}
-                  placeholder="Select stage"
-                  searchPlaceholder="Search stage..."
-                />
-              </div>
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {selectField("priority", "Priority", PRIORITY_OPTIONS, "Select priority", "Search priority...")}
+          {selectField("status", "Stage", STATUS_OPTIONS, "Select stage", "Search stage...")}
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="add-desc" className="text-xs font-semibold">
-                Project Description
-              </Label>
-              <Textarea
-                id="add-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Details of project scope, timelines, etc."
-                rows={3}
-              />
-            </div>
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-semibold">Project Description</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder={isEdit ? "Description" : "Details of project scope, timelines, etc."}
+                  rows={3}
+                  {...field}
+                  value={field.value ?? ""}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={loading}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Creating..." : "Create Project"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* EDIT PROJECT DIALOG */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-125">
-          <DialogHeader>
-            <DialogTitle>Edit Project Profile</DialogTitle>
-            <DialogDescription>Modify fields and overall status of the deployment profile.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name" className="text-xs font-semibold">
-                Project Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="edit-name"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Project name"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-location" className="text-xs font-semibold">
-                  Site Location <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="edit-location"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Location"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-tech" className="text-xs font-semibold">
-                  Technology Type
-                </Label>
-                <Input
-                  id="edit-tech"
-                  value={techType}
-                  onChange={(e) => setTechType(e.target.value)}
-                  placeholder="Tech"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-capacity" className="text-xs font-semibold">
-                  Power Capacity (Watts)
-                </Label>
-                <Input
-                  id="edit-capacity"
-                  type="number"
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
-                  placeholder="Watts"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Portfolio</Label>
-                <SearchableSelect
-                  value={portfolioId}
-                  onValueChange={setPortfolioId}
-                  options={portfolioOptions}
-                  placeholder="No portfolio"
-                  searchPlaceholder="Search portfolios..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Project Manager</Label>
-                <SearchableSelect
-                  value={managerId}
-                  onValueChange={setManagerId}
-                  options={managerOptions}
-                  placeholder="Unassigned"
-                  searchPlaceholder="Search staff..."
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-start" className="text-xs font-semibold">
-                  Start Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="edit-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-end" className="text-xs font-semibold">
-                  Target End Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="edit-end"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Priority</Label>
-                <SearchableSelect
-                  value={priority}
-                  onValueChange={(value) => setPriority(normalizePriority(value))}
-                  options={PRIORITY_OPTIONS}
-                  placeholder="Select priority"
-                  searchPlaceholder="Search priority..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold">Stage</Label>
-                <SearchableSelect
-                  value={status}
-                  onValueChange={(value) => setStatus(value as typeof status)}
-                  options={STATUS_OPTIONS}
-                  placeholder="Select stage"
-                  searchPlaceholder="Search stage..."
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-desc" className="text-xs font-semibold">
-                Project Description
-              </Label>
-              <Textarea
-                id="edit-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Description"
-                rows={3}
-              />
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} disabled={loading}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+        <DialogFooter className="pt-2">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={save.isPending}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={save.isPending}>
+            {isEdit ? "Save Changes" : "Create Project"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
   )
 }
