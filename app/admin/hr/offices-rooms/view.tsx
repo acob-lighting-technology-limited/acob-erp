@@ -145,6 +145,8 @@ export function OfficeLocationsPage({
   const [editingLocation, setEditingLocation] = useState<OfficeLocation | null>(null)
   const [deletingLocation, setDeletingLocation] = useState<OfficeLocation | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Blocks a second submit while one is in flight (a double click created duplicates and re-ran the rename cascade).
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     type: "office",
@@ -185,6 +187,9 @@ export function OfficeLocationsPage({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    if (saving) return
+
+    setSaving(true)
     try {
       if (!canManageLocations) {
         toast.error("You can view office locations but cannot modify them")
@@ -228,6 +233,8 @@ export function OfficeLocationsPage({
       log.error("Error saving office location:", err)
       const message = err instanceof Error ? err.message : "Failed to save room / office"
       toast.error(message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -469,7 +476,9 @@ export function OfficeLocationsPage({
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">{editingLocation ? "Update" : "Create"}</Button>
+                  <Button type="submit" loading={saving}>
+                    {editingLocation ? "Update" : "Create"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
