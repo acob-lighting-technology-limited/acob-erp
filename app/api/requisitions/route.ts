@@ -3,10 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { EMERGENCY_BYPASSED_STAGES, getInitialStage, getStageLabel } from "@/lib/requisitions/workflow"
-import { isRequisitionApprover, resolveRequisitionActor } from "@/lib/requisitions/authorization"
 import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode, validationError } from "@/lib/api/errors"
 import { CreateRequisitionSchema } from "@/lib/requisitions/schemas"
+import { listRequisitions } from "@/lib/requisitions/load"
 import { createNotification } from "@/lib/notifications/create"
 import { formatCurrency } from "@/lib/format"
 
@@ -31,52 +31,17 @@ export async function GET(request: NextRequest) {
     if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
 
     const url = new URL(request.url)
-    const userOnly = url.searchParams.get("user_only") === "true"
-    const statusParam = url.searchParams.get("status")
-    const stageParam = url.searchParams.get("stage")
-
-    // Visibility: everyone sees their own; admins and the leads who sign a stage
-    // see the whole queue; other department leads see their department's.
-    const actor = await resolveRequisitionActor(supabase, user.id)
-    const seesAll = actor ? isRequisitionApprover(actor) : false
-    const dataClient = getAdminClient() || supabase
-
-    let query = dataClient
-      .from("requisitions")
-      .select(
-        `
-        *,
-        requester:profiles!requisitions_user_id_fkey(id, full_name, department, company_email)
-      `
-      )
-      .order("created_at", { ascending: false })
-
-    if (userOnly || !actor) {
-      query = query.eq("user_id", user.id)
-    } else if (!seesAll) {
-      const depts = actor.ledDepartments
-      query =
-        depts.length > 0
-          ? query.or(`user_id.eq.${user.id},department.in.(${depts.map((d) => `"${d}"`).join(",")})`)
-          : query.eq("user_id", user.id)
-    }
-
-    if (statusParam) {
-      query = query.eq("status", statusParam)
-    }
-
-    if (stageParam) {
-      query = query.eq("current_stage_code", stageParam)
-    }
-
-    const { data, error } = await query
-
-    if (error) {
+    try {
+      const data = await listRequisitions(supabase, user.id, {
+        userOnly: url.searchParams.get("user_only") === "true",
+        status: url.searchParams.get("status"),
+        stage: url.searchParams.get("stage"),
+      })
+      return NextResponse.json({ data })
+    } catch (error) {
       log.error("Error fetching requisitions:", error)
       return apiError("Failed to load requisitions", ApiErrorCode.INTERNAL_ERROR, 500)
     }
-
-    return NextResponse.json({ data: data || [] })
   } catch (err) {
     log.error("Unexpected error in GET /api/requisitions:", err)
     return apiError("Internal Server Error", ApiErrorCode.INTERNAL_ERROR, 500)
