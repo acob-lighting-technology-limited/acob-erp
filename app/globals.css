@@ -142,6 +142,11 @@
   --admin-sidebar-border: oklch(0.9 0 0);
   --admin-content-bg: var(--background);
   --admin-ribbon-bg: oklch(1 0 0 / 0.92);
+
+  /* Matrix logo (components/matrix-logo.tsx). --logo-accent is the A: the
+     exact brand green here, retinted per surface on html:has(.admin-shell). */
+  --logo-ink: oklch(0.24 0 0);
+  --logo-accent: #00d056;
 }
 
 .dark {
@@ -207,6 +212,8 @@
   --admin-sidebar-border: oklch(0.28 0.006 72);
   --admin-content-bg: var(--background);
   --admin-ribbon-bg: oklch(0.19 0.004 72 / 0.88);
+
+  --logo-ink: oklch(0.985 0 0);
 }
 
 .admin-shell {
@@ -405,6 +412,7 @@ html:has(.admin-shell) {
   --accent-foreground: var(--admin-primary-foreground);
   --ring: var(--admin-primary);
   --scrollbar-thumb: var(--admin-primary);
+  --logo-accent: var(--admin-primary);
 }
 
 html:has(.admin-shell[data-scope="lead"]) {
@@ -416,6 +424,31 @@ html:has(.admin-shell[data-scope="lead"]) {
   --accent-foreground: var(--lead-primary-foreground);
   --ring: var(--lead-primary);
   --scrollbar-thumb: var(--lead-primary);
+  --logo-accent: var(--lead-primary);
+}
+
+/* ── Matrix logo layers ──────────────────────────────────────────────────
+   Two stacked alpha masks filled with theme tokens; see components/matrix-logo.tsx.
+   -webkit-mask-* is still required by Safari/iOS. */
+.matrix-logo-layer {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+.matrix-logo-ink {
+  background-color: var(--logo-ink);
+  -webkit-mask-image: url("/images/matrix-logo-ink-mask.png");
+  mask-image: url("/images/matrix-logo-ink-mask.png");
+}
+.matrix-logo-accent {
+  background-color: var(--logo-accent);
+  -webkit-mask-image: url("/images/matrix-logo-a-mask.png");
+  mask-image: url("/images/matrix-logo-a-mask.png");
 }
 
 /* ── Opt-out: scroller with no visible bar ────────────────────────────────

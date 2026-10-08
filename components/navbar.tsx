@@ -30,13 +30,10 @@ import {
 } from "lucide-react"
 import { NotificationBell } from "@/components/notification-bell"
 import { UniversalSearch } from "@/components/universal-search"
-import Image from "next/image"
 import { useSidebarSafe } from "@/components/sidebar-context"
-import { useTheme } from "next-themes"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { cn, getInitials } from "@/lib/utils"
-import { getSeasonalLogoPaths, isTemporary2026LogoPeriod } from "@/lib/seasonal-branding"
-import { useMounted } from "@/hooks/use-mounted"
+import { MatrixLogo } from "@/components/matrix-logo"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { depsChanged } from "@/lib/utils/deps-changed"
 
@@ -58,7 +55,6 @@ interface NavbarProps {
 export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = false }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const mounted = useMounted()
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(
     avatarUrl || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
   )
@@ -66,20 +62,12 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
   const router = useRouter()
   const pathname = usePathname()
   const isMaintenancePage = pathname.startsWith("/maintenance")
-  const { resolvedTheme } = useTheme()
   const dashboardHref = isAdminMode ? "/admin" : "/profile"
-  const logoWidth = 180
-  const logoHeight = 180
-  const logoClassName = "h-8 md:h-10 w-auto object-contain max-h-10 transition-all"
+  const logoClassName = "h-8 md:h-10"
 
   // Get sidebar context safely (returns null if not available)
   const sidebarContext = useSidebarSafe()
   const { isCollapsed, setIsCollapsed } = sidebarContext || { isCollapsed: false, setIsCollapsed: () => {} }
-
-  // Default to light logo for SSR to prevent hydration mismatch
-  const logoSrc = !mounted
-    ? getSeasonalLogoPaths("light").navbar
-    : getSeasonalLogoPaths(resolvedTheme === "dark" ? "dark" : "light").navbar
 
   // Follow the avatar prop, else the auth profile picture — adjusted during render, not in an effect.
   const [avatarFor, setAvatarFor] = useState<readonly unknown[] | null>(null)
@@ -296,15 +284,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
               </TooltipContent>
             </Tooltip>
             <Link href={dashboardHref} className="flex h-full items-center px-4">
-              <Image
-                key={logoSrc}
-                src={logoSrc}
-                alt="ACOB Lighting"
-                width={logoWidth}
-                height={logoHeight}
-                priority
-                className={logoClassName}
-              />
+              <MatrixLogo className={logoClassName} />
             </Link>
           </div>
         )}
@@ -312,15 +292,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
         {/* Mobile - Logo only */}
         <div className="flex items-center gap-2 px-4 lg:hidden">
           <Link href={dashboardHref} className="flex items-center">
-            <Image
-              key={logoSrc}
-              src={logoSrc}
-              alt="ACOB Lighting"
-              width={logoWidth}
-              height={logoHeight}
-              priority
-              className={logoClassName}
-            />
+            <MatrixLogo className={logoClassName} />
           </Link>
         </div>
 
