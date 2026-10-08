@@ -19,7 +19,7 @@ export function isTemporary2026LogoPeriod(date = new Date()): boolean {
 
 export function getSeasonalLogoPaths(theme: "light" | "dark", date = new Date()) {
   const isDark = theme === "dark"
-  const logoPath = isDark ? "/images/matrix-logo-dark.png?v=4" : "/images/matrix-logo-light.png?v=4"
+  const logoPath = isDark ? "/images/matrix-logo-dark.png?v=5" : "/images/matrix-logo-light.png?v=5"
 
   return {
     navbar: logoPath,

@@ -316,8 +316,8 @@ export const EXPORT_LOGOS = {
   acobInverse: { path: "/images/exports/acob-lighting-inverse.png", ratio: 460 / 120 },
   /** Matrix "MA" mark, dark text — for white/light backgrounds. */
   matrixMark: { path: "/images/exports/matrix-mark.png", ratio: 320 / 233 },
-  /** Matrix "MA" mark, white/silver text — for dark/green backgrounds. */
-  matrixMarkInverse: { path: "/images/exports/matrix-mark-inverse.png", ratio: 320 / 245 },
+  /** Matrix "MA" mark, flat white M + green A — for dark/deep-green backgrounds. */
+  matrixMarkInverse: { path: "/images/exports/matrix-mark-inverse.png", ratio: 320 / 233 },
 } as const
 
 export type ExportLogo = (typeof EXPORT_LOGOS)[keyof typeof EXPORT_LOGOS]

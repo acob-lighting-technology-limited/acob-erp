@@ -1012,7 +1012,7 @@ const addWeeklyHeaderAndFooter = (
   })
 
   // Matrix mark, top right. The header bar is dark in both themes, so this is
-  // always the inverse (white/silver) variant.
+  // always the inverse (flat white) variant.
   const markBox = logoBoxByHeight(EXPORT_LOGOS.matrixMarkInverse, 0.45)
   try {
     slide.addImage({
