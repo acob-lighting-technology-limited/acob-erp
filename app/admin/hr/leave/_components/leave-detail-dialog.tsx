@@ -33,7 +33,7 @@ import {
   Paperclip,
   CalendarCheck2,
 } from "lucide-react"
-import { LeaveItem, approvalStageKey, resolvePersonName, getStageBadge } from "../view"
+import { LeaveItem, approvalStageKey, resolvePersonName, getStageBadge } from "../_lib/leave-items"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { leaveEvidenceHref, leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { formatName, cn } from "@/lib/utils"
