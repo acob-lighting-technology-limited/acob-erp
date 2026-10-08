@@ -21,6 +21,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("settings-users")
 
@@ -54,12 +55,14 @@ export default function UsersPage() {
   const users = useMemo(() => settingsData?.users ?? [], [settingsData?.users])
   const currentUserRole: string = settingsData?.currentUserRole ?? ""
 
-  useEffect(() => {
+  // Take the role filter from the URL when it changes — adjusted during render, not in an effect.
+  const [roleFromUrl, setRoleFromUrl] = useState<readonly unknown[] | null>(null)
+  const roleFromUrlNext = [searchParams] as const
+  if (depsChanged(roleFromUrl, roleFromUrlNext)) {
+    setRoleFromUrl(roleFromUrlNext)
     const roleParam = searchParams.get("role")
-    if (roleParam && (roleParam === "all" || isValidRole(roleParam))) {
-      setRoleFilter(roleParam)
-    }
-  }, [searchParams])
+    if (roleParam && (roleParam === "all" || isValidRole(roleParam))) setRoleFilter(roleParam)
+  }
 
   async function handleUpdateRole(e: React.FormEvent) {
     e.preventDefault()

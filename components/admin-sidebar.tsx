@@ -67,6 +67,7 @@ import {
 } from "@/lib/admin/policy-v2"
 import { useDepartmentCode } from "@/hooks/use-department-code"
 import { usePublishNavPages } from "@/lib/nav/page-index"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface AdminSidebarProps {
   user?: {
@@ -618,29 +619,34 @@ export function AdminSidebar({
     })
   }
 
-  useEffect(() => {
-    if (!pathname) return
-    // Use dept nav when in dept shell so the correct parent sections auto-expand.
-    const nav = deptId ? buildDeptNavigation(deptId) : adminNavigation
-    for (const item of nav) {
-      if (!item.children) continue
-      for (const child of item.children) {
-        const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
-        if (childActive) {
-          setOpenSections((prev) => new Set([...prev, item.href]))
-        }
-        if (child.children) {
-          const grandchildActive = child.children.some(
-            (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
-          )
-          if (grandchildActive) {
+  // Open the sections holding the current page — adjusted during render, not in an effect.
+  const [expandedFor, setExpandedFor] = useState<readonly unknown[] | null>(null)
+  const expandedForNext = [pathname, deptId] as const
+  if (depsChanged(expandedFor, expandedForNext)) {
+    setExpandedFor(expandedForNext)
+    if (pathname) {
+      // Use dept nav when in dept shell so the correct parent sections auto-expand.
+      const nav = deptId ? buildDeptNavigation(deptId) : adminNavigation
+      for (const item of nav) {
+        if (!item.children) continue
+        for (const child of item.children) {
+          const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
+          if (childActive) {
             setOpenSections((prev) => new Set([...prev, item.href]))
-            setOpenSubSections((prev) => new Set([...prev, child.href]))
+          }
+          if (child.children) {
+            const grandchildActive = child.children.some(
+              (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
+            )
+            if (grandchildActive) {
+              setOpenSections((prev) => new Set([...prev, item.href]))
+              setOpenSubSections((prev) => new Set([...prev, child.href]))
+            }
           }
         }
       }
     }
-  }, [pathname, deptId])
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

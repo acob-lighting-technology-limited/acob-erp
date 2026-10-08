@@ -310,6 +310,7 @@ export function PdfTools() {
   // so reordering here reorders the generated PDF.
   useEffect(() => {
     const urls = imageFiles.map((file) => URL.createObjectURL(file))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- object URLs must be created and revoked alongside the files
     setImagePreviews(urls)
     return () => urls.forEach((url) => URL.revokeObjectURL(url))
   }, [imageFiles])

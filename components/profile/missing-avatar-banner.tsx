@@ -24,6 +24,7 @@ export function MissingAvatarBanner({ hasAvatar }: MissingAvatarBannerProps) {
   useEffect(() => {
     try {
       const until = Number(window.localStorage.getItem(DISMISS_KEY) || 0)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the dismissal from localStorage after hydration
       setIsDismissed(until > Date.now())
     } catch {
       setIsDismissed(false)

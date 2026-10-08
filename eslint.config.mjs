@@ -17,10 +17,11 @@ export default defineConfig([
       "react-hooks/purity": "error",
       "react-hooks/error-boundaries": "error",
       "react-hooks/static-components": "error",
-      // Data loading moved to TanStack Query (audit 6.2). The sites left are mostly
-      // "reset the form when a dialog opens"; they are being fixed by mounting the
-      // form only while open. Off until zero, because lint:strict fails on warnings.
-      "react-hooks/set-state-in-effect": "off",
+      // Derived/seeded state is adjusted during render (lib/utils/deps-changed.ts);
+      // effects only sync with things outside React. The few real ones (timers,
+      // localStorage, object URLs, window.location) carry a disable comment with
+      // the reason — reportUnusedDisableDirectives keeps those honest.
+      "react-hooks/set-state-in-effect": "error",
       // Off, with reasons:
       // - incompatible-library flags library APIs (react-hook-form `watch`, etc.)
       //   that the React Compiler cannot optimise; nothing to fix on our side.

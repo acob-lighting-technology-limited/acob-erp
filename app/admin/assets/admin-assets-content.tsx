@@ -64,6 +64,7 @@ import { apiFetch } from "@/lib/api-client"
 import { ASSET_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
 import { layout as tablePageLayout } from "./_layout"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("assets-admin-assets-content")
 
@@ -398,12 +399,13 @@ export function AdminAssetsContent({
     initialData: ASSET_TYPES,
   })
 
-  // Keep assetTypes in sync with query result
-  useEffect(() => {
-    if (fetchedAssetTypes) {
-      setAssetTypes(fetchedAssetTypes)
-    }
-  }, [fetchedAssetTypes])
+  // Keep assetTypes in step with the query result — adjusted during render, not in an effect.
+  const [syncedTypes, setSyncedTypes] = useState<readonly unknown[] | null>(null)
+  const syncedTypesNext = [fetchedAssetTypes] as const
+  if (depsChanged(syncedTypes, syncedTypesNext)) {
+    setSyncedTypes(syncedTypesNext)
+    if (fetchedAssetTypes) setAssetTypes(fetchedAssetTypes)
+  }
 
   useEffect(() => {
     if (initialError) {
@@ -1169,9 +1171,13 @@ export function AdminAssetsContent({
     })
   }, [assets, employees, userProfile, scopedDepartments, scopedOffices])
 
-  useEffect(() => {
+  // Export defaults to every asset in scope until the table narrows it — adjusted during render, not in an effect.
+  const [syncedExport, setSyncedExport] = useState<readonly unknown[] | null>(null)
+  const syncedExportNext = [scopedAssets] as const
+  if (depsChanged(syncedExport, syncedExportNext)) {
+    setSyncedExport(syncedExportNext)
     setFilteredAssetsForExport(scopedAssets)
-  }, [scopedAssets])
+  }
 
   const stats = {
     total: scopedAssets.filter((d) => !d.deleted_at).length,

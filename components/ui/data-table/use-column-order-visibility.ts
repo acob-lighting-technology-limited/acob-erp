@@ -14,14 +14,17 @@ export function useColumnOrderVisibility<TData>({ columns }: UseColumnOrderVisib
   )
   const [columnOrder, setColumnOrder] = useState<string[]>(() => columns.map((c) => c.key))
 
-  useEffect(() => {
+  // Keep the user's order, drop removed columns, append new ones — adjusted during render.
+  const [orderedFor, setOrderedFor] = useState(columns)
+  if (orderedFor !== columns) {
+    setOrderedFor(columns)
     setColumnOrder((prev) => {
       const incoming = columns.map((c) => c.key)
       const kept = prev.filter((k) => incoming.includes(k))
       const added = incoming.filter((k) => !prev.includes(k))
       return [...kept, ...added]
     })
-  }, [columns])
+  }
 
   const orderedColumns = useMemo(
     () =>

@@ -126,6 +126,7 @@ export default function CbtPage() {
   useEffect(() => {
     try {
       if (new URLSearchParams(window.location.search).get("verify") === "identity") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reads window.location after hydration
         setVerifyMode("identity")
       }
     } catch {
@@ -144,6 +145,7 @@ export default function CbtPage() {
 
   useEffect(() => {
     if (!result) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the countdown alongside the redirect interval
       setRedirectCountdown(10)
       return
     }
@@ -179,6 +181,7 @@ export default function CbtPage() {
         const parsed = JSON.parse(saved)
         if (parsed.attempt_id === session.attempt_id) {
           if (typeof parsed.currentIndex === "number") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the attempt from localStorage after hydration
             setCurrentIndex(parsed.currentIndex)
           }
           if (parsed.answers) {
@@ -297,6 +300,7 @@ export default function CbtPage() {
 
   useEffect(() => {
     if (!session || !testStarted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the exam timer alongside its interval
       setTimeLeftSeconds(null)
       return
     }

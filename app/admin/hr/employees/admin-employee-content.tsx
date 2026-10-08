@@ -1008,6 +1008,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     if (employeeId && employees.length > 0 && !isViewDialogOpen) {
       const employee = employees.find((e) => e.id === employeeId)
       if (employee) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- deep link: opening the editor loads the employee first
         void handleEditEmployee(employee)
       }
     }

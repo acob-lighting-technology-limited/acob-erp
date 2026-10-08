@@ -62,6 +62,7 @@ export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDia
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- today's date is chosen after hydration so server and client render match
     setNow(new Date())
   }, [])
 

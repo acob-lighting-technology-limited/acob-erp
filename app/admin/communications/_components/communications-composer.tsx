@@ -30,6 +30,7 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { DEPT_ADMIN_HR } from "@/shared/departments"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 import { toLocalISODate } from "@/lib/utils/date"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("communications-composer")
 
@@ -296,58 +297,60 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
 
   // ── Effects ────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
-  }, [mode, reminderType])
+  // These settle themselves during render: each condition is false once its state is set.
+  if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
 
-  useEffect(() => {
-    if (meetingPreparedByOptions.length > 0 && !meetingPreparedByOptions.some((p) => p.id === meetingPreparedById)) {
-      const rafiatPreferred = meetingPreparedByOptions.find((p) => (p.full_name || "").toLowerCase().includes("rafiat"))
-      const preferred =
-        rafiatPreferred?.id ||
-        (isCurrentUserAdminHr &&
-        currentUserName &&
-        meetingPreparedByOptions.some((p) => p.full_name === currentUserName)
-          ? meetingPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
-          : meetingPreparedByOptions[0].id)
-      setMeetingPreparedById(preferred || meetingPreparedByOptions[0].id)
-    }
-  }, [currentUserName, isCurrentUserAdminHr, meetingPreparedById, meetingPreparedByOptions])
+  if (meetingPreparedByOptions.length > 0 && !meetingPreparedByOptions.some((p) => p.id === meetingPreparedById)) {
+    const rafiatPreferred = meetingPreparedByOptions.find((p) => (p.full_name || "").toLowerCase().includes("rafiat"))
+    const preferred =
+      rafiatPreferred?.id ||
+      (isCurrentUserAdminHr && currentUserName && meetingPreparedByOptions.some((p) => p.full_name === currentUserName)
+        ? meetingPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
+        : meetingPreparedByOptions[0].id)
+    setMeetingPreparedById(preferred || meetingPreparedByOptions[0].id)
+  }
 
-  useEffect(() => {
-    if (broadcastPreparedByOptions.length === 0) return
-    if (!broadcastPreparedByOptions.some((p) => p.id === broadcastPreparedById)) {
-      const preferred =
-        currentUserName && broadcastPreparedByOptions.some((p) => p.full_name === currentUserName)
-          ? broadcastPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
-          : broadcastPreparedByOptions[0].id
-      setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
-    }
-  }, [broadcastPreparedById, broadcastPreparedByOptions, currentUserName])
+  if (
+    broadcastPreparedByOptions.length > 0 &&
+    !broadcastPreparedByOptions.some((p) => p.id === broadcastPreparedById)
+  ) {
+    const preferred =
+      currentUserName && broadcastPreparedByOptions.some((p) => p.full_name === currentUserName)
+        ? broadcastPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
+        : broadcastPreparedByOptions[0].id
+    setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
+  }
 
-  useEffect(() => {
-    const senderEmail = (
-      selectedBroadcastPreparedBy?.company_email ||
-      selectedBroadcastPreparedBy?.additional_email ||
-      ""
+  // Reply-to follows the chosen sender — adjusted during render, not in an effect.
+  const [replyToFor, setReplyToFor] = useState<readonly unknown[] | null>(null)
+  const replyToForNext = [selectedBroadcastPreparedBy] as const
+  if (depsChanged(replyToFor, replyToForNext)) {
+    setReplyToFor(replyToForNext)
+    setBroadcastReplyToEmail(
+      (selectedBroadcastPreparedBy?.company_email || selectedBroadcastPreparedBy?.additional_email || "")
+        .trim()
+        .toLowerCase()
     )
-      .trim()
-      .toLowerCase()
-    setBroadcastReplyToEmail(senderEmail)
-  }, [selectedBroadcastPreparedBy])
+  }
 
-  useEffect(() => {
-    if (reminderType !== "meeting") return
-    if (!canonicalMeetingSetup) return
-    setMeetingDate(canonicalMeetingSetup.meetingDate)
-    setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
-  }, [canonicalMeetingSetup, reminderType])
+  // Take the meeting date and time from the week's setup — adjusted during render, not in an effect.
+  const [meetingSetupFor, setMeetingSetupFor] = useState<readonly unknown[] | null>(null)
+  const meetingSetupForNext = [canonicalMeetingSetup, reminderType] as const
+  if (depsChanged(meetingSetupFor, meetingSetupForNext)) {
+    setMeetingSetupFor(meetingSetupForNext)
+    if (reminderType === "meeting" && canonicalMeetingSetup) {
+      setMeetingDate(canonicalMeetingSetup.meetingDate)
+      setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
+    }
+  }
 
-  useEffect(() => {
-    if (reminderType !== "meeting") return
-    if (!defaultAgendaData) return
-    setAgendaText(defaultAgendaData.agenda.join("\n"))
-  }, [defaultAgendaData, reminderType])
+  // Take the agenda from the shared default — adjusted during render, not in an effect.
+  const [agendaFor, setAgendaFor] = useState<readonly unknown[] | null>(null)
+  const agendaForNext = [defaultAgendaData, reminderType] as const
+  if (depsChanged(agendaFor, agendaForNext)) {
+    setAgendaFor(agendaForNext)
+    if (reminderType === "meeting" && defaultAgendaData) setAgendaText(defaultAgendaData.agenda.join("\n"))
+  }
 
   // Teams link is per-week (can change each meeting); agenda is global (rarely changes week to week).
   const meetingDraftStorageKey = useMemo(() => {
@@ -372,6 +375,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     try {
       const savedDraft = JSON.parse(savedDraftRaw) as { teamsLink?: string }
       if (typeof savedDraft.teamsLink === "string" && savedDraft.teamsLink.trim()) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- restores this week's Teams link from localStorage
         setTeamsLink(savedDraft.teamsLink)
       }
     } catch {
@@ -432,9 +436,13 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     },
   })
 
-  useEffect(() => {
+  // Local schedule list starts from each fetch — adjusted during render, not in an effect.
+  const [schedulesFor, setSchedulesFor] = useState<readonly unknown[] | null>(null)
+  const schedulesForNext = [schedulesData] as const
+  if (depsChanged(schedulesFor, schedulesForNext)) {
+    setSchedulesFor(schedulesForNext)
     if (schedulesData) setActiveSchedules(schedulesData)
-  }, [schedulesData])
+  }
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {

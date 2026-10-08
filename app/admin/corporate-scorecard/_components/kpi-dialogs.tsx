@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 export const PERSPECTIVES = ["Financial", "Customer", "Internal Process", "Organizational Capacity"] as const
 
@@ -381,7 +382,11 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
     return (deptData?.data ?? []).map((d) => d.name).sort((a, b) => a.localeCompare(b))
   }, [deptData])
 
-  useEffect(() => {
+  // Seed the editor from the row being edited — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [row] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
     if (row) {
       setPerspective(row.perspective)
       if (STANDARD_PILLARS.includes(row.strategic_priority as any)) {
@@ -433,7 +438,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
         setAssignments(fallback)
       }
     }
-  }, [row])
+  }
 
   const unassignedDepartments = useMemo(() => {
     const assignedSet = new Set(assignments.map((a) => a.department.toLowerCase()))

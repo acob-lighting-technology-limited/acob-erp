@@ -48,6 +48,7 @@ import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { layout as tablePageLayout } from "./_layout"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("dashboard-attendance-attendance-content")
 
@@ -326,11 +327,13 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
 
   // No month is pre-selected, so seed filteredRows with everything fetched and let
   // the stat cards reflect the full range until the user picks a month.
-  useEffect(() => {
-    if (rows.length > 0) {
-      setFilteredRows(rows)
-    }
-  }, [rows])
+  // Re-seed when a new set of rows arrives — adjusted during render, not in an effect.
+  const [seededRows, setSeededRows] = useState<readonly unknown[] | null>(null)
+  const seededRowsNext = [rows] as const
+  if (depsChanged(seededRows, seededRowsNext)) {
+    setSeededRows(seededRowsNext)
+    if (rows.length > 0) setFilteredRows(rows)
+  }
 
   const columns = useMemo<DataTableColumn<AttendanceRow>[]>(
     () => [

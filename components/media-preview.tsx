@@ -47,6 +47,7 @@ export function MediaPreview({
   useEffect(() => {
     if (mediaFile) {
       const url = URL.createObjectURL(mediaFile)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- object URL is created and revoked with the file
       setMediaUrl(url)
       return () => URL.revokeObjectURL(url)
     }

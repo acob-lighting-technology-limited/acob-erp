@@ -11,6 +11,7 @@ import { useUrlListState } from "./use-url-list-state"
 import { useRowInteraction } from "./use-row-interaction"
 import { useTableDataProcessing } from "./use-table-data-processing"
 import { useColumnOrderVisibility } from "./use-column-order-visibility"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const AUTO_PAGINATE_AFTER = 200
 const AUTO_PAGINATION: PaginationConfig = { pageSize: 50 }
@@ -177,9 +178,13 @@ export function useDataTableState<TData>({
   const activePage = isServerPagination ? currentPage : clientPage
   const pageSize = pagination?.pageSize ?? data.length
 
-  useEffect(() => {
+  // Back to page one when the search, filters or row count change — adjusted during render, not in an effect.
+  const [pagedFor, setPagedFor] = useState<readonly unknown[] | null>(null)
+  const pagedForNext = [searchQuery, filterValues, data.length, isServerPagination] as const
+  if (depsChanged(pagedFor, pagedForNext)) {
+    setPagedFor(pagedForNext)
     if (!isServerPagination) setClientPage(0)
-  }, [searchQuery, filterValues, data.length, isServerPagination])
+  }
 
   // ─── Data processing (Filter, Sort, Paginate) ────────────────────────────
   const { filteredData, sortedData, paginatedData, total, totalPages } = useTableDataProcessing({

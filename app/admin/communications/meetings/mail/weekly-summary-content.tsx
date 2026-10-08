@@ -14,6 +14,7 @@ import { SchedulingOptions } from "./_components/SchedulingOptions"
 import { SendResultPanel } from "./_components/SendResultPanel"
 import { SummarySidebarCard } from "./_components/SummarySidebarCard"
 import { useWeeklySummarySend } from "./_components/use-weekly-summary-send"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type Employee = {
   id: string
@@ -135,7 +136,7 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
   const [scheduledTime, setScheduledTime] = useState("09:00")
   const [recurringDay, setRecurringDay] = useState("monday")
   const [recurringTime, setRecurringTime] = useState("09:00")
-  const hasAppliedDefaultPreparer = useRef(false)
+  const [appliedDefaultPreparer, setAppliedDefaultPreparer] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -298,24 +299,25 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
     [currentDocByType.knowledgeSharingSession, currentDocByType.minutesOfMeeting]
   )
 
-  useEffect(() => {
+  // Untick a document type once its document is gone — adjusted during render, not in an effect.
+  const [prunedFor, setPrunedFor] = useState<readonly unknown[] | null>(null)
+  const prunedForNext = [currentDocByType.knowledgeSharingSession, currentDocByType.minutesOfMeeting] as const
+  if (depsChanged(prunedFor, prunedForNext)) {
+    setPrunedFor(prunedForNext)
     setSelectedContentChoices((prev) => {
       let changed = false
       const next = new Set(prev)
-
       if (!currentDocByType.knowledgeSharingSession && next.has("knowledge_sharing_session")) {
         next.delete("knowledge_sharing_session")
         changed = true
       }
-
       if (!currentDocByType.minutesOfMeeting && next.has("minutes_of_meeting")) {
         next.delete("minutes_of_meeting")
         changed = true
       }
-
       return changed ? next : prev
     })
-  }, [currentDocByType.knowledgeSharingSession, currentDocByType.minutesOfMeeting])
+  }
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
@@ -390,28 +392,26 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
     [employees, selectedPreparedBy]
   )
 
-  useEffect(() => {
+  // Default the preparer, then keep it valid as options change — adjusted during render, not in an effect.
+  const [preparerFor, setPreparerFor] = useState<readonly unknown[] | null>(null)
+  const preparerForNext = [currentUser?.full_name, preparerOptions, selectedPreparedBy] as const
+  if (depsChanged(preparerFor, preparerForNext)) {
+    setPreparerFor(preparerForNext)
     if (preparerOptions.length === 0) {
       setSelectedPreparedBy("Terna")
-      return
+    } else {
+      const currentName = (currentUser?.full_name || "").trim()
+      const currentUserOption = currentName && preparerOptions.includes(currentName) ? currentName : null
+      const ternaName = preparerOptions.find((name) => name.trim().toLowerCase().includes("terna"))
+      const preferredName = currentUserOption || ternaName || preparerOptions[0]
+      if (!appliedDefaultPreparer) {
+        setSelectedPreparedBy(preferredName)
+        setAppliedDefaultPreparer(true)
+      } else if (!selectedPreparedBy || !preparerOptions.includes(selectedPreparedBy)) {
+        setSelectedPreparedBy(preferredName)
+      }
     }
-
-    const currentName = (currentUser?.full_name || "").trim()
-    const currentUserOption = currentName && preparerOptions.includes(currentName) ? currentName : null
-    const ternaName = preparerOptions.find((name) => name.trim().toLowerCase().includes("terna"))
-
-    const preferredName = currentUserOption || ternaName || preparerOptions[0]
-
-    if (!hasAppliedDefaultPreparer.current) {
-      setSelectedPreparedBy(preferredName)
-      hasAppliedDefaultPreparer.current = true
-      return
-    }
-
-    if (!selectedPreparedBy || !preparerOptions.includes(selectedPreparedBy)) {
-      setSelectedPreparedBy(preferredName)
-    }
-  }, [currentUser?.full_name, preparerOptions, selectedPreparedBy])
+  }
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const toggleEmployee = useCallback((id: string) => {

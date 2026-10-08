@@ -339,6 +339,7 @@ export function LunchRegisterPage({
 
   useEffect(() => {
     if (activeTab !== "daily") return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loader writes its own state; this page should move to React Query
     void loadDateLogs(selectedDate)
   }, [selectedDate, activeTab, loadDateLogs])
 
@@ -435,6 +436,7 @@ export function LunchRegisterPage({
 
   useEffect(() => {
     if (activeTab !== "menus") return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loader writes its own state; this page should move to React Query
     void loadMenus()
   }, [activeTab, loadMenus])
 
@@ -455,6 +457,7 @@ export function LunchRegisterPage({
 
   useEffect(() => {
     if (activeTab !== "reviews") return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loader writes its own state; this page should move to React Query
     void loadReviews()
   }, [activeTab, loadReviews])
 

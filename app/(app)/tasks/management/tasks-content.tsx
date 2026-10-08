@@ -235,6 +235,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
     if (taskIdParam && tasks.length > 0) {
       const match = tasks.find((t) => t.id === taskIdParam)
       if (match) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- deep link: opening the task loads its updates first
         void openTaskDetails(match)
       }
     }

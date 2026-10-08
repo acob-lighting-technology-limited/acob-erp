@@ -56,6 +56,7 @@ import { useSidebar } from "./sidebar-context"
 import { useDepartmentCode } from "@/hooks/use-department-code"
 import { isAnniversaryPeriod } from "@/lib/seasonal-branding"
 import { usePublishNavPages } from "@/lib/nav/page-index"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface SidebarProps {
   user?: {
@@ -281,25 +282,30 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     })
   }
 
-  useEffect(() => {
-    if (!pathname) return
-    for (const item of [...allNavItems, MD_DESK_NAV_ITEM]) {
-      if (!item.children) continue
-      for (const child of item.children) {
-        const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
-        if (childActive) setOpenSections((prev) => new Set([...prev, item.href]))
-        if (child.children) {
-          const grandchildActive = child.children.some(
-            (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
-          )
-          if (grandchildActive) {
-            setOpenSections((prev) => new Set([...prev, item.href]))
-            setOpenSubSections((prev) => new Set([...prev, child.href]))
+  // Open the sections holding the current page — adjusted during render, not in an effect.
+  const [expandedFor, setExpandedFor] = useState<readonly unknown[] | null>(null)
+  const expandedForNext = [pathname] as const
+  if (depsChanged(expandedFor, expandedForNext)) {
+    setExpandedFor(expandedForNext)
+    if (pathname) {
+      for (const item of [...allNavItems, MD_DESK_NAV_ITEM]) {
+        if (!item.children) continue
+        for (const child of item.children) {
+          const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
+          if (childActive) setOpenSections((prev) => new Set([...prev, item.href]))
+          if (child.children) {
+            const grandchildActive = child.children.some(
+              (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
+            )
+            if (grandchildActive) {
+              setOpenSections((prev) => new Set([...prev, item.href]))
+              setOpenSubSections((prev) => new Set([...prev, child.href]))
+            }
           }
         }
       }
     }
-  }, [pathname])
+  }
 
   const handleLogout = async () => {
     const supabase = createClient()

@@ -29,6 +29,7 @@ import { averageCappedPct, ragStatus, type RagStatus } from "@/lib/corporate-sco
 import { formatWATDate } from "@/lib/utils/date"
 import { exportDepartmentCascadeToExcel, exportDepartmentCascadeToPdf } from "@/lib/corporate-scorecard/export"
 import { PlanYearSelect } from "./plan-year-select"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type CascadeRow = {
   assignment_id: string
@@ -138,13 +139,16 @@ export function DepartmentCascadeContent({
     [department, onDepartmentChange]
   )
 
-  useEffect(() => {
-    if (lockedDepartment && department !== lockedDepartment) {
-      setDepartment(lockedDepartment)
-    }
-  }, [lockedDepartment, department])
+  // A department console stays on its own department (adjusted during render).
+  if (lockedDepartment && department !== lockedDepartment) {
+    setDepartment(lockedDepartment)
+  }
 
-  useEffect(() => {
+  // Mirror the department picker into the table filter — adjusted during render, not in an effect.
+  const [filterSyncedFor, setFilterSyncedFor] = useState<readonly unknown[] | null>(null)
+  const filterSyncedForNext = [department, lockedDepartment] as const
+  if (depsChanged(filterSyncedFor, filterSyncedForNext)) {
+    setFilterSyncedFor(filterSyncedForNext)
     if (!lockedDepartment && department) {
       setFilterValues((prev) => {
         const currentInFilter = prev.department?.[0]
@@ -158,7 +162,7 @@ export function DepartmentCascadeContent({
         return prev
       })
     }
-  }, [department, lockedDepartment])
+  }
 
   // null = let the server pick (current year, or the latest loaded plan).
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -598,13 +602,18 @@ function EditTargetDialog({
 
   const open = row !== null
 
-  useEffect(() => {
-    if (!row) return
-    setTargetValue(row.target_value != null ? String(row.target_value) : "")
-    setTargetUnit(row.target_unit || "")
-    setDepartmentTarget(row.department_target || "")
-    setProposedAction(row.proposed_action || "")
-  }, [row])
+  // Seed the target form from the row being edited — adjusted during render, not in an effect.
+  const [seededTarget, setSeededTarget] = useState<readonly unknown[] | null>(null)
+  const seededTargetNext = [row] as const
+  if (depsChanged(seededTarget, seededTargetNext)) {
+    setSeededTarget(seededTargetNext)
+    if (row) {
+      setTargetValue(row.target_value != null ? String(row.target_value) : "")
+      setTargetUnit(row.target_unit || "")
+      setDepartmentTarget(row.department_target || "")
+      setProposedAction(row.proposed_action || "")
+    }
+  }
 
   async function handleSave() {
     if (!row) return
@@ -721,8 +730,11 @@ function RecordActualDialog({
   const isMilestone = row?.measure_type === "milestone"
   const targetDepartment = row?.department || department
 
-  useEffect(() => {
-    if (!row) return
+  // Seed the actuals form from the row being edited — adjusted during render, not in an effect.
+  const [seededActual, setSeededActual] = useState<readonly unknown[] | null>(null)
+  const seededActualNext = [row] as const
+  if (row && depsChanged(seededActual, seededActualNext)) {
+    setSeededActual(seededActualNext)
     if (row.latest_actual) {
       setActualValue(row.latest_actual.actual_value != null ? String(row.latest_actual.actual_value) : "")
       setMilestonesCompleted(
@@ -743,7 +755,7 @@ function RecordActualDialog({
       setMilestonesTotal("3")
       setNote("")
     }
-  }, [row])
+  }
 
   async function handleResetToAuto() {
     if (!row) return

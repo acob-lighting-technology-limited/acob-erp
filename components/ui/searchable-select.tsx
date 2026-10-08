@@ -59,16 +59,18 @@ export function SearchableSelect({
 
   const selectedOption = options.find((opt) => opt.value === value)
 
-  // Clear search when dropdown closes
+  // Clear the search when the dropdown closes (adjusted during render).
+  const [wasOpen, setWasOpen] = React.useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (!open) setSearchQuery("")
+  }
+
+  // Focus the input once the dropdown has opened (a DOM side effect).
   React.useEffect(() => {
-    if (!open) {
-      setSearchQuery("")
-    } else {
-      // Focus the input when dropdown opens
-      setTimeout(() => {
-        inputRef.current?.focus()
-      }, 100)
-    }
+    if (!open) return
+    const timer = setTimeout(() => inputRef.current?.focus(), 100)
+    return () => clearTimeout(timer)
   }, [open])
 
   React.useEffect(() => {

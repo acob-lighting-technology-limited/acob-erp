@@ -75,6 +75,7 @@ import { toLocalISODate, formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch, apiJson, readCsrfCookie, readDeptContext } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface DepartmentDocumentsBrowserProps {
   initialPath?: string
@@ -396,7 +397,11 @@ export function DepartmentDocumentsBrowser({
     folderInputRef.current?.setAttribute("directory", "")
   }, [])
 
-  useEffect(() => {
+  // Drop selections for files no longer listed — adjusted during render, not in an effect.
+  const [prunedFor, setPrunedFor] = useState<readonly unknown[] | null>(null)
+  const prunedForNext = [files] as const
+  if (depsChanged(prunedFor, prunedForNext)) {
+    setPrunedFor(prunedForNext)
     setSelectedPaths((prev) => {
       const valid = new Set(files.map((file) => file.path))
       const next = new Set<string>()
@@ -405,7 +410,7 @@ export function DepartmentDocumentsBrowser({
       })
       return next
     })
-  }, [files])
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())

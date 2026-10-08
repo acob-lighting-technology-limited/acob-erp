@@ -76,18 +76,23 @@ export function SearchableMultiSelect({
 
   const selectedOptions = options.filter((opt) => values.includes(opt.value))
 
+  // Clear the search when the list closes (adjusted during render).
+  const [wasOpen, setWasOpen] = React.useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (!open) setSearchQuery("")
+  }
+
+  // Focus the search box once the list has opened (a DOM side effect).
   React.useEffect(() => {
-    if (!open) {
-      setSearchQuery("")
-      return
-    }
-    setTimeout(() => {
-      inputRef.current?.focus()
-    }, 100)
+    if (!open) return
+    const timer = setTimeout(() => inputRef.current?.focus(), 100)
+    return () => clearTimeout(timer)
   }, [open])
 
   React.useEffect(() => {
     if (portal !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resolves the portal container from the trigger's DOM position
       setResolvedPortal(portal)
       return
     }
