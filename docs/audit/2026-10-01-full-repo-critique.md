@@ -270,7 +270,7 @@ What you have: a decent shared skeleton set in `components/skeletons/` (Table ×
 |---|---|---|---|
 | [x] superseded — the base DialogContent is responsive now | `ui/patterns/responsive-modal.tsx` | 1 | Every form dialog (157) |
 | [~] nearly every list is a DataTable with built-in paging; the few card grids left page their own | `ui/patterns/pagination-controls.tsx` | 1 | Every non-DataTable list |
-| [~] ListToolbar built with shared URL sync (3b4187c7); only the department documents browser uses it so far | `ui/patterns/list-toolbar.tsx` | 1 | Card/grid pages with search |
+| [x] ListToolbar built with shared URL sync (3b4187c7) for the one card page that had its own bar (department documents). The other 17 "Search…" inputs are inside dialogs and pickers (recipient pickers, role users, notification bell) — local filters, not page toolbars, so they correctly stay as they are | `ui/patterns/list-toolbar.tsx` | 1 | Card/grid pages with search |
 | [~] DataTable renders query errors with retry for every table; card screens use QueryError | `ui/patterns/error-state.tsx` | 3 | Every query error |
 | [~] PageLoader now renders the page skeleton for all its users; QueryError still used by 2 | `ui/query-states.tsx` | 12 | Every react-query screen |
 | [x] done — deleted | `components/ui/empty-state.tsx` | **0** | Delete; `patterns/empty-state` is the real one |
