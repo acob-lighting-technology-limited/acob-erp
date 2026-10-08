@@ -192,7 +192,11 @@
      - It preserves strong contrast in both light and dark modes
      - It communicates a focused, constrained workspace
 ─────────────────────────────────────────────────────────────────────────── */
-.admin-shell[data-scope="lead"] {
+.admin-shell[data-scope="lead"],
+/* Same tokens at <html> so chrome OUTSIDE the shell (navbar, search, portals)
+   resolves navy too. Without this, --admin-primary up there stays the root
+   gold and anything using it on a dept page renders gold. */
+html:has(.admin-shell[data-scope="lead"]) {
   --primary: var(--lead-primary); /* deep navy blue */
   --primary-foreground: var(--lead-primary-foreground);
   --ring: var(--lead-primary);
@@ -205,7 +209,8 @@
   --admin-sidebar-border: oklch(0.84 0.06 258);
 }
 
-.dark .admin-shell[data-scope="lead"] {
+.dark .admin-shell[data-scope="lead"],
+html.dark:has(.admin-shell[data-scope="lead"]) {
   --primary: var(--lead-primary);
   --primary-foreground: var(--lead-primary-foreground);
   --ring: var(--lead-primary);
@@ -491,12 +496,12 @@ body::-webkit-scrollbar-corner,
 
 #nprogress .bar {
   @apply fixed top-0 left-0 z-[9999] h-[3px] w-full;
-  background-color: var(--nprogress-color, var(--primary));
+  background-color: var(--primary);
 }
 
 #nprogress .peg {
   @apply absolute right-0 block h-full w-[100px] opacity-100;
-  color: var(--nprogress-color, var(--primary));
+  color: var(--primary);
   box-shadow:
     0 0 10px currentColor,
     0 0 5px currentColor;
