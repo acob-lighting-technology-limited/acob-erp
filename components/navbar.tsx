@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import {
   LogOut,
@@ -58,11 +58,13 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string | null>(
     avatarUrl || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
   )
-  const navRef = useRef<HTMLElement>(null)
   const router = useRouter()
   const pathname = usePathname()
   const isMaintenancePage = pathname.startsWith("/maintenance")
   const dashboardHref = isAdminMode ? "/admin" : "/profile"
+  // Admin (gold) and dept (navy) both render inside .admin-shell; the colour
+  // itself comes from the tokens globals.css resolves on <html>.
+  const isScopedSurface = isAdminMode || pathname.startsWith("/dept")
   const logoClassName = "h-8 md:h-10"
 
   // Get sidebar context safely (returns null if not available)
@@ -92,50 +94,6 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
       window.removeEventListener("profile-avatar-changed", handleAvatarChange)
     }
   }, [])
-
-  // Navbar sits outside .admin-shell, so mirror scope tokens for scoped parts
-  // (search surface + initials avatars) without changing the full navbar theme.
-  useEffect(() => {
-    if (!isAdminMode) return
-
-    const applyScopedNavbarTokens = () => {
-      const nav = navRef.current
-      if (!nav) return
-      const adminShell = document.querySelector(".admin-shell") as HTMLElement | null
-      if (!adminShell) {
-        nav.style.removeProperty("--navbar-admin-primary")
-        nav.style.removeProperty("--navbar-admin-primary-foreground")
-        nav.style.removeProperty("--navbar-admin-accent-soft")
-        nav.style.removeProperty("--navbar-admin-sidebar-border")
-        return
-      }
-
-      const shellStyles = getComputedStyle(adminShell)
-      const primary = shellStyles.getPropertyValue("--admin-primary").trim()
-      const primaryForeground = shellStyles.getPropertyValue("--admin-primary-foreground").trim()
-      const accentSoft = shellStyles.getPropertyValue("--admin-accent-soft").trim()
-      const sidebarBorder = shellStyles.getPropertyValue("--admin-sidebar-border").trim()
-
-      if (primary) nav.style.setProperty("--navbar-admin-primary", primary)
-      if (primaryForeground) nav.style.setProperty("--navbar-admin-primary-foreground", primaryForeground)
-      if (accentSoft) nav.style.setProperty("--navbar-admin-accent-soft", accentSoft)
-      if (sidebarBorder) nav.style.setProperty("--navbar-admin-sidebar-border", sidebarBorder)
-    }
-
-    applyScopedNavbarTokens()
-
-    const observer = new MutationObserver(() => {
-      applyScopedNavbarTokens()
-    })
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ["data-scope", "class"],
-    })
-
-    return () => observer.disconnect()
-  }, [isAdminMode, pathname])
 
   // Listen for sidebar state changes
   useEffect(() => {
@@ -171,8 +129,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             <AvatarFallback
               className={cn(
                 "text-xs font-semibold lg:text-sm",
-                isAdminMode
-                  ? "bg-[var(--navbar-admin-primary,var(--admin-primary))] text-[var(--navbar-admin-primary-foreground,var(--admin-primary-foreground))]"
+                isScopedSurface
+                  ? "bg-[var(--admin-primary)] text-[var(--admin-primary-foreground)]"
                   : "bg-primary text-primary-foreground"
               )}
             >
@@ -251,10 +209,9 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
 
   return (
     <nav
-      ref={navRef}
       className={cn(
         "fixed top-0 right-0 left-0 z-50 w-full overflow-visible border-b",
-        isAdminMode
+        isScopedSurface
           ? "border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] backdrop-blur-md"
           : "border-border bg-card"
       )}
@@ -270,8 +227,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
                   size="icon"
                   className={cn(
                     "h-full w-10 rounded-none",
-                    isAdminMode &&
-                      "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+                    isScopedSurface && "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                   )}
                   onClick={() => setIsCollapsed(!isCollapsed)}
                   aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -336,7 +292,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
         <div
           className={cn(
             "space-y-2 border-t py-4 lg:hidden",
-            isAdminMode ? "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))]" : "border-border"
+            isScopedSurface ? "border-[var(--admin-sidebar-border)]" : "border-border"
           )}
         >
           <div className={`flex items-center px-4 py-2 mb-2${isCollapsed ? "" : "gap-3"}`}>
@@ -351,8 +307,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
               <AvatarFallback
                 className={cn(
                   "font-semibold",
-                  isAdminMode
-                    ? "bg-[var(--navbar-admin-primary,var(--admin-primary))] text-[var(--navbar-admin-primary-foreground,var(--admin-primary-foreground))]"
+                  isScopedSurface
+                    ? "bg-[var(--admin-primary)] text-[var(--admin-primary-foreground)]"
                     : "bg-primary text-primary-foreground"
                 )}
               >
@@ -368,8 +324,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             href="/profile"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
-              isAdminMode
-                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+              isScopedSurface
+                ? "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                 : "hover:bg-accent"
             )}
           >
@@ -380,8 +336,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             href="/tasks"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
-              isAdminMode
-                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+              isScopedSurface
+                ? "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                 : "hover:bg-accent"
             )}
           >
@@ -392,8 +348,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             href="/help-desk"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
-              isAdminMode
-                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+              isScopedSurface
+                ? "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                 : "hover:bg-accent"
             )}
           >
@@ -404,8 +360,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             href="/hr/leave"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
-              isAdminMode
-                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+              isScopedSurface
+                ? "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                 : "hover:bg-accent"
             )}
           >
@@ -416,8 +372,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             href="/hr/attendance"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
-              isAdminMode
-                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+              isScopedSurface
+                ? "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                 : "hover:bg-accent"
             )}
           >
@@ -428,8 +384,8 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             href="/settings"
             className={cn(
               "flex items-center gap-2 rounded px-4 py-2 text-sm",
-              isAdminMode
-                ? "hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+              isScopedSurface
+                ? "hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                 : "hover:bg-accent"
             )}
           >
@@ -441,9 +397,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
               <div
                 className={cn(
                   "my-2 border-t",
-                  isAdminMode
-                    ? "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))]"
-                    : "border-border"
+                  isScopedSurface ? "border-[var(--admin-sidebar-border)]" : "border-border"
                 )}
               />
               <Link href="/admin" className="hover:bg-accent flex items-center gap-2 rounded px-4 py-2 text-sm">
@@ -453,10 +407,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             </>
           )}
           <div
-            className={cn(
-              "my-2 border-t",
-              isAdminMode ? "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))]" : "border-border"
-            )}
+            className={cn("my-2 border-t", isScopedSurface ? "border-[var(--admin-sidebar-border)]" : "border-border")}
           />
           <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start">
             <LogOut className="mr-2 h-4 w-4" />

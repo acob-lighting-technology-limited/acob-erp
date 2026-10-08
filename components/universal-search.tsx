@@ -226,15 +226,14 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
         className={cn(
           "group text-muted-foreground border-input/60 bg-muted/40 hover:bg-muted/80 hover:border-input hover:text-foreground relative h-9.5 w-full justify-start text-sm font-normal transition-all duration-200 sm:pr-12 md:w-64 lg:w-80",
           isScoped &&
-            "border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))] bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))] text-[var(--navbar-admin-primary,var(--admin-primary))] hover:bg-[var(--navbar-admin-accent-soft,var(--admin-accent-soft))]/80 hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+            "border-[var(--admin-sidebar-border)] bg-[var(--admin-accent-soft)] text-[var(--admin-primary)] hover:bg-[var(--admin-accent-soft)]/80 hover:text-[var(--admin-primary)]"
         )}
         onClick={openSearch}
       >
         <Search
           className={cn(
             "text-muted-foreground group-hover:text-foreground mr-2 h-4 w-4 transition-colors",
-            isScoped &&
-              "text-[var(--navbar-admin-primary,var(--admin-primary))] group-hover:text-[var(--navbar-admin-primary,var(--admin-primary))]"
+            isScoped && "text-[var(--admin-primary)] group-hover:text-[var(--admin-primary)]"
           )}
         />
         <span className="group-hover:text-foreground transition-colors">Search anything...</span>
@@ -242,7 +241,7 @@ export function UniversalSearch({ isAdminMode = false }: UniversalSearchProps) {
           className={cn(
             "border-border/60 bg-background/80 text-muted-foreground group-hover:border-border group-hover:bg-background group-hover:text-foreground pointer-events-none absolute top-1.5 right-1.5 hidden h-6 items-center gap-1 rounded border px-1.5 font-mono text-xs font-medium transition-colors select-none sm:flex",
             isScoped &&
-              "bg-background/40 group-hover:bg-background/60 border-[var(--navbar-admin-sidebar-border,var(--admin-sidebar-border))] text-[var(--navbar-admin-primary,var(--admin-primary))]"
+              "bg-background/40 group-hover:bg-background/60 border-[var(--admin-sidebar-border)] text-[var(--admin-primary)]"
           )}
         >
           <span className="text-xs">⌘</span>K

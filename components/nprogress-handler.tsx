@@ -8,33 +8,8 @@ export function NProgressHandler() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const syncNProgressColor = () => {
-      const root = document.documentElement
-      const adminShell = document.querySelector(".admin-shell") as HTMLElement | null
-      if (!adminShell) {
-        root.style.removeProperty("--nprogress-color")
-        return
-      }
-
-      const adminPrimary = getComputedStyle(adminShell).getPropertyValue("--admin-primary").trim()
-      if (adminPrimary) {
-        root.style.setProperty("--nprogress-color", adminPrimary)
-      } else {
-        root.style.removeProperty("--nprogress-color")
-      }
-    }
-
-    syncNProgressColor()
-
-    const observer = new MutationObserver(() => {
-      syncNProgressColor()
-    })
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ["data-scope", "class"],
-    })
+    // Bar colour is CSS: --primary, which globals.css retints on <html> for
+    // admin (gold) and dept (navy) pages. No JS sync needed.
 
     // Start progress on link clicks
     const handleAnchorClick = (e: MouseEvent) => {
@@ -44,14 +19,12 @@ export function NProgressHandler() {
 
       // Only show progress for internal navigation
       if (href && href !== currentUrl && href.startsWith(window.location.origin)) {
-        syncNProgressColor()
         NProgress.start()
       }
     }
 
     // Start progress on browser back/forward
     const handlePopState = () => {
-      syncNProgressColor()
       NProgress.start()
     }
 
@@ -62,7 +35,6 @@ export function NProgressHandler() {
     window.addEventListener("popstate", handlePopState)
 
     return () => {
-      observer.disconnect()
       links.forEach((link) => link.removeEventListener("click", handleAnchorClick))
       window.removeEventListener("popstate", handlePopState)
     }
