@@ -197,6 +197,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
         multi: false,
         defaultValues: [month],
         mode: "custom",
+        pinned: true,
         filterFn: () => true,
       },
       {
