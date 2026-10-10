@@ -48,6 +48,8 @@ import { isLate } from "@/lib/hr/attendance-utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { apiFetch } from "@/lib/api-client"
 import { StatusBadge, labelSource } from "../_components/status-badge"
+import { ClockTimes, NameWithDept } from "../_components/clock-times"
+import { useDepartmentCodes } from "@/hooks/use-department-code"
 
 const log = logger("admin-attendance-records")
 
@@ -88,6 +90,7 @@ export function AdminAttendanceRecordsPage({
   backLinkHref,
   lockedDepartment,
 }: { backLinkHref?: string; lockedDepartment?: string } = {}) {
+  const deptCode = useDepartmentCodes()
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRecords, setProcessedRecords] = useState<AttendanceRecord[]>([])
@@ -543,9 +546,13 @@ export function AdminAttendanceRecordsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (r) => `${r.user_name} · ${formatDate(r.date)}`,
-            subtitle: (r) =>
-              `${r.department} · In: ${formatTime(r.clock_in)} · Out: ${formatTime(r.clock_out)} · ${r.total_hours?.toFixed(1) ?? 0}h`,
+            title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
+            subtitle: (r) => (
+              <>
+                <ClockTimes clockIn={r.clock_in} clockOut={r.clock_out} />
+                {` · ${r.total_hours?.toFixed(1) ?? 0}h · ${formatDate(r.date)}`}
+              </>
+            ),
             trailing: (r) => <StatusBadge status={r.status} record={r} />,
             detail: {
               title: (r) => r.user_name,

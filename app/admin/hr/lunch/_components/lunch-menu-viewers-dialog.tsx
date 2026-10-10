@@ -238,14 +238,21 @@ export function LunchMenuViewersDialog({
             </div>
           ) : (
             filteredRows.map((row) => (
-              <div key={row.id} className="flex items-center justify-between gap-3 py-2.5 text-xs">
-                <div className="flex min-w-0 items-center gap-3">
+              // Phones: name and Override on the first line, view status and vote below —
+              // one line squeezed the name to nothing and stacked the badges on top of it.
+              <div
+                key={row.id}
+                className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 text-xs sm:grid-cols-[2rem_minmax(0,1fr)_auto_auto]"
+              >
+                <div className="col-start-1 row-start-1">
                   <Avatar className="h-8 w-8 shrink-0">
                     {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.full_name} />}
                     <AvatarFallback className="bg-muted text-[11px] font-semibold">
                       {getInitials(row.full_name)}
                     </AvatarFallback>
                   </Avatar>
+                </div>
+                <div className="col-start-2 row-start-1 min-w-0">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-foreground truncate font-semibold">{row.full_name}</span>
@@ -256,12 +263,11 @@ export function LunchMenuViewersDialog({
                     <span className="text-muted-foreground block truncate text-[11px]">{row.department}</span>
                   </div>
                 </div>
-
-                <div className="flex shrink-0 items-center gap-3">
+                <div className="col-span-2 col-start-2 row-start-2 flex flex-wrap items-center justify-between gap-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:flex-nowrap sm:justify-end sm:gap-3">
                   {/* View Status & Timestamp */}
-                  <div className="text-right">
+                  <div className="flex items-center gap-2 text-right sm:block">
                     {row.hasViewed ? (
-                      <div>
+                      <div className="flex items-center gap-2 sm:block">
                         <Badge
                           variant="outline"
                           className={
@@ -272,7 +278,7 @@ export function LunchMenuViewersDialog({
                         >
                           {row.viewedDuringWindow ? "During Voting" : "After Cut-off"}
                         </Badge>
-                        <span className="text-muted-foreground mt-0.5 block text-[10px]">
+                        <span className="text-muted-foreground block text-[10px] sm:mt-0.5">
                           {row.first_viewed_at ? formatWATTime(row.first_viewed_at) : ""}
                         </span>
                       </div>
@@ -284,11 +290,11 @@ export function LunchMenuViewersDialog({
                   </div>
 
                   {/* Meal / Vote Status */}
-                  <div className="min-w-[130px] text-right">
+                  <div className="min-w-0 text-right sm:min-w-[130px]">
                     {row.vote ? (
                       row.vote.is_eating ? (
                         <div>
-                          <Badge className="inline-block max-w-[150px] truncate border-0 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
+                          <Badge className="inline-block max-w-[180px] truncate border-0 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 sm:max-w-[150px]">
                             {row.mealChoice}
                           </Badge>
                         </div>
@@ -301,7 +307,8 @@ export function LunchMenuViewersDialog({
                       <span className="text-muted-foreground text-[11px] italic">No vote</span>
                     )}
                   </div>
-
+                </div>
+                <div className="col-start-3 row-start-1 sm:col-start-4">
                   {/* Override Action */}
                   {onOverrideVote && (
                     <Tooltip>
