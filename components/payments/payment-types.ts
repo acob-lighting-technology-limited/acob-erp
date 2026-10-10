@@ -34,6 +34,17 @@ export interface Payment {
     name: string
   }
   documents?: PaymentDocument[]
+  project?: { id: string; project_name: string } | null
+  site?: StarlinkKit | null
+}
+
+/** A Starlink kit (`starlink_sites`). `serial_number` holds the ACC-... account number. */
+export interface StarlinkKit {
+  id: string
+  site_name: string
+  state: string | null
+  serial_number: string | null
+  kit_number: string | null
 }
 
 export interface Department {
