@@ -68,17 +68,29 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
-    const { data: payment, error } = await dataClient
-      .from("department_payments")
-      .select(
-        `
+    const baseSelect = `
                 *,
                 department:departments(*),
-                documents:payment_documents(*)
-            `
-      )
+                documents:payment_documents(*)`
+    const linkedSelect = `${baseSelect},
+                project:projects(id, project_name),
+                site:starlink_sites(id, site_name, state, serial_number, kit_number)`
+
+    let { data: payment, error } = await dataClient
+      .from("department_payments")
+      .select(linkedSelect)
       .eq("id", id)
       .single()
+
+    // Until migration 20261010120000 is live there is no project_id/kit_number to
+    // join on; fall back to the unlinked payment rather than failing the page.
+    if (error && (error.code === "PGRST200" || error.code === "42703")) {
+      ;({ data: payment, error } = await dataClient
+        .from("department_payments")
+        .select(baseSelect)
+        .eq("id", id)
+        .single())
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 404 })

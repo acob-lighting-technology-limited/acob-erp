@@ -22,6 +22,8 @@ export type ProjectRecord = {
   updated_at: string
   portfolio_id: string | null
   priority?: string | null
+  /** Slug on acoblighting.com/projects; null for projects not on the website. */
+  website_slug?: string | null
   project_manager?: {
     id: string
     full_name: string | null
