@@ -51,6 +51,7 @@ const CreatePaymentSchema = z
     issuer_phone_number: z.string().trim().min(1, "Missing required fields (including Issuer Name & Phone)"),
     issuer_address: z.string().optional().nullable(),
     payment_reference: z.string().optional().nullable(),
+    project_id: z.string().uuid().optional().nullable(),
     notes: z.string().optional().nullable(),
   })
   .superRefine((value, ctx) => {
@@ -269,6 +270,7 @@ export async function POST(request: Request) {
       issuer_address,
       payment_reference,
       notes,
+      project_id,
     } = parsed.data
 
     // Derive payment_type from category (they are now the same)
@@ -334,6 +336,7 @@ export async function POST(request: Request) {
         issuer_address,
         payment_reference,
         notes,
+        project_id: project_id || null,
         created_by: user.id,
       })
       .select(

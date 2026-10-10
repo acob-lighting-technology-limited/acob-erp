@@ -126,6 +126,9 @@ serve(async (req) => {
       .eq("payment_type", "recurring")
       .not("next_payment_due", "is", null)
       .in("status", ["due", "overdue"])
+      // Starlink kit payments are settled from Starlink's own emails and alert the
+      // people chosen under Accounts > Starlink Kits > Alerts, not the creator.
+      .is("site_id", null)
 
     if (paymentsError) throw paymentsError
 

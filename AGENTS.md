@@ -15,7 +15,6 @@ Do not treat a task as complete until all required checks pass:
   - Do **not** infer migration status from `git status` alone. Untracked files may already be live.
   - If any migration has an empty `remote` field, push it: `npx supabase db push --include-all --yes`
   - If a migration cannot be pushed automatically or is intentionally held back, **always explicitly state and remind the user that the SQL migration is pending and has not been pushed to the live database**.
-<!-- - `npm run build` -->
 
 If a change cannot satisfy all checks or if migrations remain unapplied without explicit user consent, report the blocker/pending status clearly instead of claiming completion.
 
@@ -52,8 +51,8 @@ re-litigate it, do not quietly implement a different thing, and do not sandbag t
 - Never use `git push --no-verify`.
 - Do not bypass failing hooks. Fix the underlying issue.
 - Pre-commit must pass `lint-staged` including ESLint and Prettier.
-- Pre-push must pass `npm run build`.
-- Confirm the build passes locally before pushing.
+- Pre-push runs `npm run lint:strict` and `npm run type-check` only. It does **not** run `npm run build`.
+- Do not run `npm run build` locally to verify work — it is slow and competes with the dev server for `.next/`. Vercel is the only place the production build runs.
 
 ## Commit Grouping Strategy — Mandatory Before Any Commit
 

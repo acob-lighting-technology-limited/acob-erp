@@ -19,6 +19,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { Department } from "./payment-types"
+import { ProjectSelect } from "./project-select"
 import { PAYMENT_TYPES } from "@/lib/validation"
 
 export interface CreatePaymentFormData {
@@ -36,6 +37,8 @@ export interface CreatePaymentFormData {
   issuer_address: string
   payment_reference: string
   notes: string
+  /** Project the payment is charged to; "" for none. */
+  project_id: string
 }
 
 interface CreatePaymentDialogProps {
@@ -68,6 +71,7 @@ const CreatePaymentDialogSchema = z
     issuer_address: z.string(),
     payment_reference: z.string(),
     notes: z.string(),
+    project_id: z.string(),
   })
   .superRefine((value, ctx) => {
     if (value.payment_type === "recurring" && (!value.recurrence_period || !value.next_payment_due)) {
@@ -314,6 +318,8 @@ export function CreatePaymentDialog({
               </div>
             </div>
           )}
+
+          <ProjectSelect value={values.project_id} onChange={(v) => form.setValue("project_id", v)} />
 
           <div className="space-y-2">
             <Label htmlFor="payment_reference">Reference Number (Optional)</Label>
