@@ -36,6 +36,7 @@ export const ENTITY_TYPE_DISPLAY_MAP: Record<string, string> = {
   payment_documents: "Finance",
   payment_categories: "Finance",
   starlink_payments: "Finance",
+  starlink_kit: "Finance",
 
   // Leave / HR
   leave_requests: "Leave",

@@ -355,6 +355,7 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
       { name: "Payments", href: "/admin/accounts/payments" },
+      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
       { name: "Bills", href: "/admin/accounts/bills" },
       { name: "Invoices", href: "/admin/accounts/invoices" },
       { name: "Payroll", href: "/admin/payroll" },

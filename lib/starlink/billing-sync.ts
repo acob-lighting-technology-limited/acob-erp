@@ -27,6 +27,7 @@ type GraphMessage = {
   receivedDateTime: string
   hasAttachments: boolean
   body: { contentType: string; content: string }
+  toRecipients?: Array<{ emailAddress?: { address?: string } }>
 }
 
 type GraphAttachment = {
@@ -109,7 +110,7 @@ async function listStarlinkMessages(since: string): Promise<GraphMessage[]> {
   )
   let next: string | null =
     `/users/${mailbox}/messages?$filter=${filter}` +
-    `&$select=id,internetMessageId,subject,receivedDateTime,hasAttachments,body&$top=100`
+    `&$select=id,internetMessageId,subject,receivedDateTime,hasAttachments,body,toRecipients&$top=100`
   const messages: GraphMessage[] = []
   while (next) {
     const page: { value: GraphMessage[]; "@odata.nextLink"?: string } = await graphGet(next)
@@ -293,7 +294,8 @@ export async function syncStarlinkBilling(
     const kind = classifyStarlinkMail(message.subject)
     if (!kind) continue
     const prior = events.get(message.internetMessageId)
-    if (prior && prior.outcome !== "waiting" && prior.outcome !== "error") {
+    // Unmatched emails are retried too: their kit may have been added since.
+    if (prior && prior.outcome !== "waiting" && prior.outcome !== "error" && prior.outcome !== "unmatched") {
       summary.skipped += 1
       continue
     }
@@ -343,6 +345,7 @@ export async function syncStarlinkBilling(
         kind,
         received_at: message.receivedDateTime,
         account_number: parsed?.accountNumber ?? null,
+        recipient_email: message.toRecipients?.[0]?.emailAddress?.address?.toLowerCase() ?? null,
         invoice_number: parsed?.invoiceNumber ?? null,
         amount: parsed?.amount ?? null,
         currency: parsed?.currency ?? null,
