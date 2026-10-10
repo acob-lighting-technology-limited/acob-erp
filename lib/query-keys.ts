@@ -27,6 +27,7 @@ export const QUERY_KEYS = {
 
   // Admin
   departments: () => ["departments"],
+  departmentRows: () => ["departments", "rows"],
   officeLocations: () => ["office-locations"],
   staffAvatars: () => ["staff-avatars"],
   staffCard: (id: string) => ["staff-card", id],
