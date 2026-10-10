@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import { format, parseISO } from "date-fns"
-import { AlertTriangle, CreditCard, FolderKanban, Inbox, Pencil, Plus, Satellite, Wifi } from "lucide-react"
+import { AlertTriangle, Bell, CreditCard, FolderKanban, Inbox, Pencil, Plus, Satellite, Wifi } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -15,6 +15,7 @@ import { apiFetch } from "@/lib/api-client"
 import { isPaidStatus, type StarlinkMonthStatus } from "@/lib/starlink/billing-schedule"
 import type { StarlinkKitListRow, StarlinkKitsData, UnmatchedStarlinkAccount } from "@/lib/starlink/kits"
 import { cn } from "@/lib/utils"
+import { StarlinkAlertsDialog } from "./_components/alerts-dialog"
 import { KitDialog, type KitDialogTarget } from "./_components/kit-dialog"
 
 export const STARLINK_KITS_QUERY_KEY = ["starlink-kits"] as const
@@ -73,6 +74,7 @@ export function StarlinkKitsPage() {
   const searchParams = useSearchParams()
   const tab = searchParams.get("tab") === "new" ? "new" : "kits"
   const [dialog, setDialog] = useState<KitDialogTarget | null>(null)
+  const [alertsOpen, setAlertsOpen] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery({ queryKey: STARLINK_KITS_QUERY_KEY, queryFn: fetchKits })
   const kits = useMemo(() => data?.kits ?? [], [data])
@@ -269,11 +271,17 @@ export function StarlinkKitsPage() {
       activeTab={tab}
       onTabChange={(next) => router.replace(next === "new" ? "?tab=new" : "?", { scroll: false })}
       actions={
-        <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
-          <Plus className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Add Kit</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setAlertsOpen(true)}>
+            <Bell className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Alerts</span>
+          </Button>
+          <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Kit</span>
+            <span className="sm:hidden">Add</span>
+          </Button>
+        </div>
       }
       stats={
         <StatGrid>
@@ -392,6 +400,7 @@ export function StarlinkKitsPage() {
       )}
 
       <KitDialog target={dialog} onOpenChange={(open) => !open && setDialog(null)} onSaved={() => void refetch()} />
+      <StarlinkAlertsDialog open={alertsOpen} onOpenChange={setAlertsOpen} />
     </DataTablePage>
   )
 }

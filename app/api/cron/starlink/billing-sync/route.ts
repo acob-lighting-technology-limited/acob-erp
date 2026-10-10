@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { isGraphConfigured } from "@/lib/graph/client"
 import { logger } from "@/lib/logger"
+import { sendStarlinkBillingAlerts } from "@/lib/starlink/billing-alerts"
 import { syncStarlinkBilling } from "@/lib/starlink/billing-sync"
 
 export const dynamic = "force-dynamic"
@@ -20,8 +21,9 @@ function safeCompare(a: string, b: string): boolean {
 
 /**
  * Files new Starlink billing emails from the ict mailbox against each kit's
- * payment (invoice PDFs, paid months, failed payments). Called hourly by
- * pg_cron via public.call_app_endpoint.
+ * payment (invoice PDFs, paid months, failed payments), then sends the
+ * configured failed / due alerts. Called hourly by pg_cron via
+ * public.call_app_endpoint.
  */
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization") ?? ""
@@ -44,7 +46,17 @@ export async function GET(request: NextRequest) {
     const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString()
     const summary = await syncStarlinkBilling(supabase, { since })
     log.info(summary, "Starlink billing sync finished")
-    return NextResponse.json({ data: summary })
+    // Alerts run on what the sync just filed; a failure here must not hide the sync result.
+    let alerts: Awaited<ReturnType<typeof sendStarlinkBillingAlerts>> | { error: string }
+    try {
+      alerts = await sendStarlinkBillingAlerts(supabase, {
+        appUrl: process.env.NEXT_PUBLIC_SITE_URL || "https://matrix.acoblighting.com",
+      })
+    } catch (err) {
+      alerts = { error: err instanceof Error ? err.message : String(err) }
+      log.error(alerts, "Starlink billing alerts failed")
+    }
+    return NextResponse.json({ data: { ...summary, alerts } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     log.error({ err: message }, "Starlink billing sync failed")

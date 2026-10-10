@@ -289,6 +289,19 @@ export async function syncStarlinkBilling(
     return { outcome: "applied", periodStart, detail: `${periodStart} paid (${parsed.invoiceNumber})` }
   }
 
+  function latestBillBefore(siteId: string, receivedAt: string): string | null {
+    // Graph and Postgres format timestamps differently ("Z" vs "+00:00"), so compare as times.
+    const cutoff = Date.parse(receivedAt)
+    let best: { at: number; period: string } | null = null
+    for (const e of events.values()) {
+      if (e.kind !== "reminder" || e.site_id !== siteId || !e.period_start) continue
+      const at = Date.parse(e.received_at)
+      if (at > cutoff) continue
+      if (!best || at > best.at) best = { at, period: e.period_start }
+    }
+    return best?.period ?? null
+  }
+
   // 1. File each email --------------------------------------------------------
   for (const message of messages) {
     const kind = classifyStarlinkMail(message.subject)
@@ -320,7 +333,16 @@ export async function syncStarlinkBilling(
         const base = { siteId: kit.id, paymentId: payment.id }
         if (kind === "reminder") result = { ...base, ...(await fileReminder(parsed, payment, pdfs)) }
         else if (kind === "processed") result = { ...base, ...(await fileProcessed(parsed, payment)) }
-        else result = { ...base, outcome: "applied", detail: `Payment of ${parsed.amount ?? "?"} failed` }
+        else {
+          // A failure belongs to the kit's latest bill before it.
+          const bill = latestBillBefore(kit.id, message.receivedDateTime)
+          result = {
+            ...base,
+            outcome: "applied",
+            periodStart: bill,
+            detail: `Payment of ${parsed.amount ?? "?"} failed${bill ? ` for the ${bill} bill` : ""}`,
+          }
+        }
       }
     } catch (err) {
       result = { outcome: "error", detail: err instanceof Error ? err.message : String(err) }
