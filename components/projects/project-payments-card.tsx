@@ -51,7 +51,7 @@ export function ProjectPaymentsCard({ projectId }: { projectId: string }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <CreditCard className="h-4 w-4" />
-          Starlink &amp; Payments
+          Payments
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -62,7 +62,7 @@ export function ProjectPaymentsCard({ projectId }: { projectId: string }) {
             {error instanceof Error ? error.message : "Couldn't load payments."}
           </p>
         ) : kits.length === 0 && payments.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No Starlink kit or payments are linked to this project yet.</p>
+          <p className="text-muted-foreground text-sm">No payments are linked to this project yet.</p>
         ) : (
           <>
             {kits.length > 0 && (
