@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   PanelLeftClose,
   PanelLeftOpen,
+  CircleHelp,
 } from "lucide-react"
 import { NotificationBell } from "@/components/notification-bell"
 import { UniversalSearch } from "@/components/universal-search"
@@ -166,6 +167,19 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
     router.push("/auth/login")
   }
 
+  const guideButton = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/guide" aria-label="Matrix guide">
+            <CircleHelp className="h-[1.2rem] w-[1.2rem]" />
+          </Link>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Matrix guide</TooltipContent>
+    </Tooltip>
+  )
+
   const accountMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -235,6 +249,12 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
               <Link href="/settings" className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/guide" className="cursor-pointer">
+                <CircleHelp className="mr-2 h-4 w-4" />
+                Matrix guide
               </Link>
             </DropdownMenuItem>
             {canAccessAdmin && (
@@ -328,6 +348,7 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
             {!isMaintenancePage && <UniversalSearch isAdminMode={isAdminMode} />}
           </div>
           <div className="hidden items-center gap-4 overflow-visible md:flex">
+            {!isMaintenancePage && guideButton}
             {!isMaintenancePage && <NotificationBell isAdmin={isAdminMode} />}
             <ThemeToggle />
             {accountMenu}

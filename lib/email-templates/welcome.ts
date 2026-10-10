@@ -199,7 +199,7 @@ export function renderWelcomeEmail({
             <div class="quick-links">
                 <div class="quick-links-title">📌 Quick Access: Key Routes</div>
                 <div class="links-grid">
-                    • <strong>Welcome & Launch Presentation:</strong> <a href="${safePortalUrl}/launch">${safePortalUrl}/launch</a><br>
+                    • <strong>Matrix Guide (start here):</strong> <a href="${safePortalUrl}/guide">${safePortalUrl}/guide</a><br>
                     • <strong>Biometric Attendance Logs:</strong> <a href="${safePortalUrl}/attendance">${safePortalUrl}/attendance</a><br>
                     • <strong>Leave Management:</strong> <a href="${safePortalUrl}/leave">${safePortalUrl}/leave</a><br>
                     • <strong>Task Board:</strong> <a href="${safePortalUrl}/tasks">${safePortalUrl}/tasks</a><br>

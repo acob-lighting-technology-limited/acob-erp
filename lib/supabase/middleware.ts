@@ -329,7 +329,6 @@ export async function updateSession(request: NextRequest) {
     pathname !== "/" &&
     !user &&
     !pathname.startsWith("/auth") &&
-    !pathname.startsWith("/launch") &&
     // Lunch share links — WhatsApp's preview crawler has no session.
     !LUNCH_SHARE_PATH_PATTERN.test(pathname) &&
     !pathname.startsWith("/employee/new") &&
