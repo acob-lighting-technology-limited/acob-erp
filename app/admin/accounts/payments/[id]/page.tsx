@@ -49,6 +49,7 @@ import type {
   PaymentDocument,
   PaymentEditFormData,
 } from "@/components/payments/payment-types"
+import { paymentUsesReceipts } from "@/components/payments/payment-types"
 
 interface AdminPaymentPageData {
   payment: Payment
@@ -221,7 +222,7 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
       const dateStr = format(dateToPay, "yyyy-MM-dd")
       const hasReceipt = payment.documents?.some((d) => d.applicable_date === dateStr && d.document_type === "receipt")
 
-      if (!hasReceipt) {
+      if (paymentUsesReceipts(payment) && !hasReceipt) {
         toast.error("Please upload a payment receipt first.", {
           action: { label: "Upload", onClick: () => handleUploadClick(dateToPay, "receipt") },
           duration: 5000,
@@ -395,6 +396,7 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
   const realStatus = getRealStatus(payment)
 
   const hasReceiptForMark = (() => {
+    if (!paymentUsesReceipts(payment)) return true
     if (payment.payment_type === "one-time") {
       return payment.documents?.some((d) => d.document_type === "receipt") ?? false
     } else if (payment.next_payment_due) {
@@ -476,6 +478,7 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
                       </CardHeader>
                       <CardContent>
                         <ScheduleList
+                          receiptsEnabled={paymentUsesReceipts(payment)}
                           items={schedule.filter((i) => i.status !== "paid")}
                           onUpload={handleUploadClick}
                           onView={(_, doc) => downloadPaymentDocument(doc)}
@@ -495,6 +498,7 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
                         </CardHeader>
                         <CardContent>
                           <ScheduleList
+                            receiptsEnabled={paymentUsesReceipts(payment)}
                             items={schedule.filter((i) => i.status === "paid")}
                             onUpload={handleUploadClick}
                             onView={(_, doc) => downloadPaymentDocument(doc)}

@@ -1,10 +1,12 @@
 import { createServerClient } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { classifyStarlinkMonths, type StarlinkMonth } from "@/lib/starlink/billing-schedule"
 
 type PaymentsClient = Awaited<ReturnType<typeof createClient>>
 
@@ -47,6 +49,41 @@ function normalizeDepartment(value: string | null | undefined): string {
 
 function isFinanceDepartment(value: string | null | undefined): boolean {
   return normalizeDepartment(value) === "accounts"
+}
+
+/**
+ * A Starlink kit's payment also carries each billed month's status (confirmed /
+ * autopay / failed / pending), worked out from its billing emails.
+ */
+async function withStarlinkMonths<T extends { site_id?: string | null }>(
+  client: SupabaseClient,
+  payment: T
+): Promise<T & { starlink_months?: StarlinkMonth[] }> {
+  if (!payment?.site_id) return payment
+  const { data, error } = await client
+    .from("starlink_billing_events")
+    .select("kind, received_at, period_start, outcome")
+    .eq("site_id", payment.site_id)
+    .in("outcome", ["applied", "already_recorded", "waiting"])
+  if (error) return payment
+  const events = (data || []) as Array<{
+    kind: "reminder" | "processed" | "failed"
+    received_at: string
+    period_start: string | null
+    outcome: string
+  }>
+  return {
+    ...payment,
+    starlink_months: classifyStarlinkMonths(
+      events.map((e) => ({
+        kind: e.kind,
+        receivedAt: e.received_at,
+        periodStart: e.period_start,
+        waiting: e.outcome === "waiting",
+      })),
+      new Date()
+    ),
+  }
 }
 
 // GET /api/payments/[id] - Get a single payment
@@ -109,7 +146,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       }
     } else {
       if (payment?.created_by === user.id) {
-        return NextResponse.json({ data: payment })
+        return NextResponse.json({ data: await withStarlinkMonths(dataClient, payment) })
       }
 
       if (!isFinanceDepartment(profile?.department)) {
@@ -120,7 +157,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       }
     }
 
-    return NextResponse.json({ data: payment })
+    return NextResponse.json({ data: await withStarlinkMonths(dataClient, payment) })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal Server Error"
     return NextResponse.json({ error: message }, { status: 500 })

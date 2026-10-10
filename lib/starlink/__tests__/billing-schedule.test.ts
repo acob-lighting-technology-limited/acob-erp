@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { reconcileStarlinkSchedule, type BillingEventForSchedule } from "../billing-schedule"
+import { classifyStarlinkMonths, reconcileStarlinkSchedule, type BillingEventForSchedule } from "../billing-schedule"
 
 const NOW = new Date("2026-10-10T12:00:00Z")
 
@@ -51,4 +51,29 @@ test("never moves the schedule backwards over months already settled", () => {
 test("does not skip over a month with no bill on record", () => {
   const plan = reconcileStarlinkSchedule("2026-04-03", [bill("2026-04-03"), bill("2026-06-03")], NOW)
   assert.deepEqual(plan?.nextDue, "2026-05-03")
+})
+
+test("labels each month confirmed, autopay, failed or pending", () => {
+  const months = classifyStarlinkMonths(
+    [
+      bill("2026-07-03"),
+      bill("2026-08-03"),
+      failed("2026-08-03T11:00:00Z"),
+      processed("2026-08-03", "2026-08-06T21:00:00Z"),
+      bill("2026-09-03"),
+      failed("2026-09-03T11:00:00Z"),
+      failed("2026-09-05T11:00:00Z"),
+      bill("2026-10-09", "2026-10-09T02:00:00Z"),
+    ],
+    NOW
+  )
+  assert.deepEqual(
+    months.map((m) => [m.periodStart, m.status, m.failedAttempts]),
+    [
+      ["2026-07-03", "autopay", 0],
+      ["2026-08-03", "confirmed", 1],
+      ["2026-09-03", "failed", 2],
+      ["2026-10-09", "pending", 0],
+    ]
+  )
 })

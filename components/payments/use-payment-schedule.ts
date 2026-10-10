@@ -64,6 +64,9 @@ function buildSchedule(payment: Payment): ScheduleItem[] {
     }
   }
 
+  const starlinkMonths = new Map((payment.starlink_months ?? []).map((m) => [m.periodStart, m]))
+  const getStarlinkMonth = (date: Date) => starlinkMonths.get(format(date, "yyyy-MM-dd"))
+
   const getDocsForDate = (date: Date): PaymentDocument[] => {
     if (!payment.documents) return []
     const dateStr = format(date, "yyyy-MM-dd")
@@ -80,6 +83,7 @@ function buildSchedule(payment: Payment): ScheduleItem[] {
       status: "paid",
       label: "Completed",
       documents: getDocsForDate(pastDate),
+      starlink: getStarlinkMonth(pastDate),
     })
     lookbackCount++
   }
@@ -108,7 +112,7 @@ function buildSchedule(payment: Payment): ScheduleItem[] {
       }
     }
 
-    items.push({ date, status, label, documents: getDocsForDate(date) })
+    items.push({ date, status, label, documents: getDocsForDate(date), starlink: getStarlinkMonth(date) })
   }
 
   return items
