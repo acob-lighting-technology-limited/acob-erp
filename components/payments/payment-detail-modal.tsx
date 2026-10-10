@@ -126,6 +126,7 @@ export function PaymentDetailModal({
     issuer_address: "",
     payment_reference: "",
     notes: "",
+    project_id: "",
   })
 
   const { data: pageData, isLoading: loading } = useQuery({
@@ -184,6 +185,7 @@ export function PaymentDetailModal({
       issuer_address: payment.issuer_address || "",
       payment_reference: payment.payment_reference || "",
       notes: payment.notes || "",
+      project_id: payment.project?.id ?? "",
     })
     setEditDialogOpen(true)
   }

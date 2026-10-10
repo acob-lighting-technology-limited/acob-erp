@@ -109,6 +109,7 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
     issuer_address: "",
     payment_reference: "",
     notes: "",
+    project_id: "",
   })
 
   const { data: pageData, isLoading: loading } = useQuery({
@@ -158,6 +159,7 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
       issuer_address: payment.issuer_address || "",
       payment_reference: payment.payment_reference || "",
       notes: payment.notes || "",
+      project_id: payment.project?.id ?? "",
     })
     setEditDialogOpen(true)
   }
@@ -170,6 +172,7 @@ export default function PaymentDetailsPage(props: { params: Promise<{ id: string
         amount: parseFloat(submittedFormData.amount),
         next_payment_due: submittedFormData.next_payment_due || null,
         payment_date: submittedFormData.payment_date || null,
+        project_id: submittedFormData.project_id || null,
       }
 
       const response = await apiFetch(`/api/payments/${params.id}`, {

@@ -97,4 +97,6 @@ export interface PaymentEditFormData {
   issuer_address: string
   payment_reference: string
   notes: string
+  /** Project the payment is charged to; "" for none. */
+  project_id: string
 }
