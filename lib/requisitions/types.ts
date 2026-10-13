@@ -1,12 +1,15 @@
-export type RequisitionStageCode =
-  | "pending_reviewed_by"
-  | "pending_authorized_by"
-  | "pending_verified_by"
-  | "pending_approved_by"
-  | "completed"
-  | "rejected"
+export type RequisitionFormType = "payment_request" | "petty_cash"
 
-export type RequisitionStatus = "pending" | "approved" | "rejected"
+export type RequisitionStatus = "pending" | "awaiting_payment" | "partly_paid" | "paid" | "rejected"
+
+export type RequisitionStageCode = "reviewed" | "authorized" | "verified" | "approved"
+
+export type RequisitionStageState = "pending" | "signed" | "bypassed" | "not_required" | "rejected"
+
+/** Who a stage was routed to. */
+export type RequisitionRoleKey = "hr_lead" | "hcs" | "accounts_lead" | "md" | "department_lead"
+
+export type RequisitionPaymentMethod = "transfer" | "cash"
 
 export interface BeneficiaryDetail {
   account_name: string
@@ -15,11 +18,19 @@ export interface BeneficiaryDetail {
   amount?: number | string
 }
 
+export interface RequisitionLineItem {
+  description: string
+  amount: number
+}
+
 export interface RequisitionAttachment {
   file_name: string
-  file_url: string
+  /** Path inside the private requisition_documents bucket. */
+  file_path: string
   file_type?: string
   file_size?: number
+  /** Short-lived signed URL, added by the API when the requisition is read. */
+  signed_url?: string | null
 }
 
 export interface RequisitionFundingCategory {
@@ -31,55 +42,83 @@ export interface RequisitionFundingCategory {
   sort_order: number
 }
 
-export interface RequisitionApproverProfile {
+export interface RequisitionPerson {
   id: string
-  full_name: string
-  role?: string
+  full_name: string | null
+  department?: string | null
   designation?: string | null
+}
+
+export interface RequisitionStage {
+  id: string
+  requisition_id: string
+  position: number
+  stage_code: RequisitionStageCode
+  role_key: RequisitionRoleKey
+  role_label: string
+  assignee_id: string | null
+  state: RequisitionStageState
+  state_note: string | null
+  acted_by: string | null
+  acted_at: string | null
+  comments: string | null
+  signature_path: string | null
+  assignee?: RequisitionPerson | null
+  actor?: RequisitionPerson | null
+  /** Signed URL of the signature captured at signing, added by the API. */
+  signature_url?: string | null
+}
+
+export interface RequisitionAmountChange {
+  id: string
+  stage_id: string | null
+  changed_by: string | null
+  old_amount: number
+  new_amount: number
+  old_line_items: RequisitionLineItem[]
+  new_line_items: RequisitionLineItem[]
+  reason: string
+  created_at: string
+  changer?: RequisitionPerson | null
+}
+
+export interface RequisitionPayment {
+  id: string
+  amount: number
+  paid_on: string
+  method: RequisitionPaymentMethod
+  reference: string | null
+  receipt_path: string | null
+  note: string | null
+  recorded_by: string | null
+  signature_path: string | null
+  created_at: string
+  recorder?: RequisitionPerson | null
+  receipt_url?: string | null
+  signature_url?: string | null
 }
 
 export interface Requisition {
   id: string
   requisition_number: string
+  form_type: RequisitionFormType
   user_id: string
   department: string
-  project_name: string
+  project_name: string | null
+  purpose: string | null
+  site_location: string | null
   amount: number
+  original_amount: number
+  amount_paid: number
   amount_in_words: string
-  purpose: string
+  line_items: RequisitionLineItem[]
   beneficiary_details: BeneficiaryDetail[]
   attachments: RequisitionAttachment[]
-  current_stage_code: RequisitionStageCode
   status: RequisitionStatus
 
   funding_category_id?: string | null
   funding_category_name?: string | null
-  funding_category?: RequisitionFundingCategory | null
-
-  is_emergency: boolean
-  emergency_justification?: string | null
-  /** Stage codes skipped by the expedited emergency route. */
-  bypassed_stages?: string[] | null
-
-  reviewed_by?: string | null
-  reviewed_at?: string | null
-  reviewed_comments?: string | null
-  reviewer_profile?: RequisitionApproverProfile | null
-
-  authorized_by?: string | null
-  authorized_at?: string | null
-  authorized_comments?: string | null
-  authorizer_profile?: RequisitionApproverProfile | null
-
-  verified_by?: string | null
-  verified_at?: string | null
-  verified_comments?: string | null
-  verifier_profile?: RequisitionApproverProfile | null
-
-  approved_by?: string | null
-  approved_at?: string | null
-  approved_comments?: string | null
-  approver_profile?: RequisitionApproverProfile | null
+  help_desk_ticket_id?: string | null
 
   rejection_reason?: string | null
   rejected_by?: string | null
@@ -88,29 +127,20 @@ export interface Requisition {
   created_at: string
   updated_at: string
 
-  requester?: {
-    id: string
-    full_name: string
-    department: string | null
-    designation?: string | null
-    company_email?: string | null
-  } | null
+  requester?: (RequisitionPerson & { company_email?: string | null }) | null
+  stages?: RequisitionStage[]
+  amount_changes?: RequisitionAmountChange[]
+  payments?: RequisitionPayment[]
+  help_desk_ticket?: { id: string; ticket_number: string; title: string } | null
 }
 
-export interface CreateRequisitionPayload {
-  department: string
-  project_name: string
-  amount: number
-  amount_in_words: string
-  purpose: string
-  beneficiary_details: BeneficiaryDetail[]
-  attachments: RequisitionAttachment[]
-  funding_category_id: string
-  is_emergency?: boolean
-  emergency_justification?: string
-}
-
-export interface ApproveRequisitionPayload {
-  action: "approve" | "reject"
-  comments?: string
+/** What the signed-in user may do on a requisition, computed by the API. */
+export interface RequisitionViewerActions {
+  /** The pending stage this user would sign (bypassing anything before it). */
+  sign_stage_id: string | null
+  /** Stage ids that signing now would bypass. */
+  would_bypass_stage_ids: string[]
+  can_record_payment: boolean
+  /** What is missing before this user can sign or record a payment. */
+  signing_setup_missing: ("signature" | "pin")[]
 }

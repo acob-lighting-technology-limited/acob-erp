@@ -8,7 +8,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     <PageWrapper maxWidth="full" background="gradient">
       <PageHeader
         title="Settings"
-        description="Manage your profile, security, and notification preferences."
+        description="Manage your profile, security, signing and notification preferences."
         icon={Settings}
         backLink={{ href: "/profile", label: "Back to Home" }}
       />
