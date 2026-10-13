@@ -39,7 +39,6 @@ export interface HelpDeskTicketDetailResponse {
 export interface HelpDeskContentProps {
   userId: string
   userDepartment: string | null
-  canReviewPendingApprovals: boolean
   initialDepartments: string[]
   initialTickets: HelpDeskTicket[]
   initialError?: string | null

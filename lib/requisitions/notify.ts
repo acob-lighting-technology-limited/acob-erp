@@ -24,6 +24,7 @@ const log = logger("requisition-notify")
  */
 export type RequisitionEvent =
   | { kind: "submitted"; req: Requisition }
+  | { kind: "raised"; req: Requisition }
   | { kind: "signed"; req: Requisition; actorId: string; bypassedStageIds: string[]; amountChanged: boolean }
   | { kind: "rejected"; req: Requisition; actorId: string }
   | { kind: "payment"; req: Requisition; actorId: string; amount: number }
@@ -182,6 +183,36 @@ async function notifyProcessors(admin: SupabaseClient, req: Requisition, actorId
   await emailActionNeeded(admin, ids, req, title, message, "Record payment")
 }
 
+/** The help desk ticket a requisition was raised for: tell its requester and handler. */
+async function notifyTicketPeople(admin: SupabaseClient, req: Requisition, actorId: string, message: string) {
+  if (!req.help_desk_ticket_id) return
+  const { data: ticket } = await admin
+    .from("help_desk_tickets")
+    .select("id, ticket_number, requester_id, assigned_to")
+    .eq("id", req.help_desk_ticket_id)
+    .maybeSingle()
+  if (!ticket) return
+  const ids = [ticket.requester_id, ticket.assigned_to].filter((id): id is string => Boolean(id) && id !== actorId)
+  for (const userId of new Set(ids)) {
+    try {
+      await admin.rpc("create_notification", {
+        p_user_id: userId,
+        p_type: "system",
+        p_category: "approvals",
+        p_title: `Ticket ${ticket.ticket_number}: requisition update`,
+        p_message: message,
+        p_priority: "normal",
+        p_link_url: `/help-desk/${ticket.id}`,
+        p_actor_id: actorId,
+        p_entity_type: "help_desk_ticket",
+        p_entity_id: ticket.id,
+      })
+    } catch (err) {
+      log.error({ err: String(err), userId }, "Ticket requisition notification failed")
+    }
+  }
+}
+
 export async function notifyRequisitionEvent(admin: SupabaseClient, event: RequisitionEvent): Promise<void> {
   const { req } = event
   try {
@@ -189,6 +220,15 @@ export async function notifyRequisitionEvent(admin: SupabaseClient, event: Requi
       case "submitted":
         if (req.status === "awaiting_payment") await notifyProcessors(admin, req, req.user_id)
         else await notifyNextSigner(admin, req, req.user_id)
+        return
+
+      case "raised":
+        await notifyTicketPeople(
+          admin,
+          req,
+          req.user_id,
+          `${req.requester?.full_name || "Someone"} raised ${label(req)} (${formatNaira(req.amount)}) for this ticket.`
+        )
         return
 
       case "signed": {
@@ -261,6 +301,14 @@ export async function notifyRequisitionEvent(admin: SupabaseClient, event: Requi
               : `${formatNaira(event.amount)} was paid on ${req.requisition_number}. ${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)} paid so far.`,
           priority: "high",
         })
+        await notifyTicketPeople(
+          admin,
+          req,
+          event.actorId,
+          req.status === "paid"
+            ? `${label(req)} for this ticket has been paid.`
+            : `${label(req)} for this ticket is partly paid (${formatNaira(req.amount_paid)} of ${formatNaira(req.amount)}).`
+        )
         return
     }
   } catch (err) {

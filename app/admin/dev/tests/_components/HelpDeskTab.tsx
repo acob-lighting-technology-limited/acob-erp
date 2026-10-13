@@ -22,7 +22,6 @@ interface HelpDeskTabProps {
 export function HelpDeskTab({ employees, departments }: HelpDeskTabProps) {
   const [requesterId, setRequesterId] = useState("")
   const [dept, setDept] = useState("")
-  const [requestType, setRequestType] = useState<"support" | "procurement">("support")
   const [supportMode, setSupportMode] = useState<"open_queue" | "lead_review_required">("open_queue")
   const [cleanup, setCleanup] = useState(true)
   const [running, setRunning] = useState(false)
@@ -43,7 +42,6 @@ export function HelpDeskTab({ employees, departments }: HelpDeskTabProps) {
           kind: "help_desk",
           requester_id: requesterId,
           service_department: dept,
-          request_type: requestType,
           support_mode: supportMode,
           cleanup,
         }),
@@ -72,10 +70,7 @@ export function HelpDeskTab({ employees, departments }: HelpDeskTabProps) {
             <Ticket className="h-4 w-4" />
             Help Desk Flow Test
           </CardTitle>
-          <CardDescription>
-            Tests either the support lifecycle or the procurement approval chain, depending on the selected request
-            type.
-          </CardDescription>
+          <CardDescription>Tests the support lifecycle: queue or lead review, assignment, resolution.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -105,34 +100,20 @@ export function HelpDeskTab({ employees, departments }: HelpDeskTabProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Request Type</Label>
-              <Select value={requestType} onValueChange={(value: "support" | "procurement") => setRequestType(value)}>
+              <Label>Support Mode</Label>
+              <Select
+                value={supportMode}
+                onValueChange={(value: "open_queue" | "lead_review_required") => setSupportMode(value)}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select request type" />
+                  <SelectValue placeholder="Select support mode" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="support">Support</SelectItem>
-                  <SelectItem value="procurement">Procurement</SelectItem>
+                  <SelectItem value="open_queue">Open Queue</SelectItem>
+                  <SelectItem value="lead_review_required">Lead Review Required</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {requestType === "support" && (
-              <div className="space-y-2">
-                <Label>Support Mode</Label>
-                <Select
-                  value={supportMode}
-                  onValueChange={(value: "open_queue" | "lead_review_required") => setSupportMode(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select support mode" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open_queue">Open Queue</SelectItem>
-                    <SelectItem value="lead_review_required">Lead Review Required</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
             <div className="flex items-end gap-3 pb-1">
               <Switch checked={cleanup} onCheckedChange={setCleanup} id="hd-cleanup" />
               <Label htmlFor="hd-cleanup" className="cursor-pointer">

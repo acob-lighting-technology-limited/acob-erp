@@ -16,20 +16,13 @@ export default async function HelpDeskTicketPage(props: { params: Promise<{ id: 
     supabase.from("help_desk_comments").select("*").eq("ticket_id", params.id).order("created_at", { ascending: true }),
   ])
 
-  const [eventsResult, approvalsResult] = ticketResult.data
-    ? await Promise.all([
-        supabase
-          .from("help_desk_events")
-          .select("*")
-          .eq("ticket_id", params.id)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("help_desk_approvals")
-          .select("*")
-          .eq("ticket_id", params.id)
-          .order("requested_at", { ascending: true }),
-      ])
-    : [{ data: [] }, { data: [] }]
+  const eventsResult = ticketResult.data
+    ? await supabase
+        .from("help_desk_events")
+        .select("*")
+        .eq("ticket_id", params.id)
+        .order("created_at", { ascending: true })
+    : { data: [] }
 
   const ticket = ticketResult.data
 
@@ -51,7 +44,6 @@ export default async function HelpDeskTicketPage(props: { params: Promise<{ id: 
       viewerId={user.id}
       canRate={ticket.requester_id === user.id && ["resolved", "closed"].includes(String(ticket.status))}
       events={eventsResult.data || []}
-      approvals={approvalsResult.data || []}
       comments={commentsResult.data || []}
     />
   )

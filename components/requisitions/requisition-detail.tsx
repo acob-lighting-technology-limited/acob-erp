@@ -366,7 +366,7 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
             <Card>
               <CardContent className="pt-6 text-sm">
                 Raised for help desk ticket{" "}
-                <Link href={`/help-desk?ticket=${requisition.help_desk_ticket.id}`} className="text-primary underline">
+                <Link href={`/help-desk/${requisition.help_desk_ticket.id}`} className="text-primary underline">
                   {requisition.help_desk_ticket.ticket_number}
                 </Link>
                 : {requisition.help_desk_ticket.title}

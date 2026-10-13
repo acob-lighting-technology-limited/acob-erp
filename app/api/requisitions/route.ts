@@ -172,7 +172,10 @@ export async function POST(request: NextRequest) {
 
     const id = (created as { id: string }).id
     const req = await loadRequisition(admin, id)
-    if (req) await notifyRequisitionEvent(admin, { kind: "submitted", req })
+    if (req) {
+      await notifyRequisitionEvent(admin, { kind: "submitted", req })
+      if (req.help_desk_ticket_id) await notifyRequisitionEvent(admin, { kind: "raised", req })
+    }
 
     await writeAuditLog(
       supabase,

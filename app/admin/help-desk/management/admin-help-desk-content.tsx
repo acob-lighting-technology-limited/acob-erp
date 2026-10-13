@@ -6,7 +6,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { PromptDialog } from "@/components/ui/prompt-dialog"
+import { NewRequisitionDialog } from "@/components/requisitions/new-requisition-dialog"
 import {
   Headset,
   Clock,
@@ -14,9 +14,7 @@ import {
   History,
   UserCheck,
   ShieldCheck,
-  Check,
-  X,
-  Shuffle,
+  Receipt,
   MoveRight,
   Building2,
 } from "lucide-react"
@@ -71,9 +69,8 @@ export function AdminHelpDeskContent({
   const [activeTab, setActiveTab] = useState("my-actions")
   const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({})
   const [loadingTicketId, setLoadingTicketId] = useState<string | null>(null)
-  const [approvalPrompt, setApprovalPrompt] = useState<{ ticketId: string; decision: "approved" | "rejected" } | null>(
-    null
-  )
+  // Help desk handles support only; anything that needs buying becomes a requisition.
+  const [requisitionTicket, setRequisitionTicket] = useState<HelpDeskTicket | null>(null)
 
   const stats = useMemo(() => {
     const now = Date.now()
@@ -82,7 +79,7 @@ export function AdminHelpDeskContent({
     ).length
     return {
       total: tickets.length,
-      pendingApproval: tickets.filter((t) => t.status === "pending_approval").length,
+      pendingReview: tickets.filter((t) => t.status === "pending_lead_review").length,
       inProgress: tickets.filter((t) => t.status === "in_progress").length,
       breached,
     }
@@ -249,51 +246,6 @@ export function AdminHelpDeskContent({
     }
   }
 
-  async function pivot(ticketId: string) {
-    setLoadingTicketId(ticketId)
-    try {
-      const res = await apiFetch(`/api/help-desk/tickets/${ticketId}/pivot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Requires procurement support" }),
-      })
-      if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error || "Pivot failed")
-      }
-      toast.success("Ticket moved to procurement approval")
-      await refresh()
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Pivot failed"))
-    } finally {
-      setLoadingTicketId(null)
-    }
-  }
-
-  async function submitApproval(comments: string) {
-    if (!approvalPrompt) return
-    const { ticketId, decision } = approvalPrompt
-    setLoadingTicketId(ticketId)
-    try {
-      const res = await apiFetch(`/api/help-desk/tickets/${ticketId}/approvals`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, comments: comments || null }),
-      })
-      if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error || "Decision failed")
-      }
-      toast.success(decision === "approved" ? "Approval recorded" : "Rejection recorded")
-      await refresh()
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Decision failed"))
-    } finally {
-      setLoadingTicketId(null)
-      setApprovalPrompt(null)
-    }
-  }
-
   const columns: DataTableColumn<HelpDeskTicket>[] = useMemo(
     () => [
       {
@@ -443,7 +395,7 @@ export function AdminHelpDeskContent({
           <StatCard
             variant="compact"
             title="Pending Review"
-            value={stats.pendingApproval}
+            value={stats.pendingReview}
             icon={AlertCircle}
             iconBgColor="bg-amber-500/10"
             iconColor="text-amber-500"
@@ -493,23 +445,10 @@ export function AdminHelpDeskContent({
                   hidden: (r) => r.status !== "pending_lead_review" && r.status !== "department_queue",
                 },
                 {
-                  label: "Pivot to Procurement",
-                  icon: Shuffle,
-                  onClick: (r) => pivot(r.id),
-                  hidden: (r) => !(["in_progress", "assigned"].includes(r.status) && r.assigned_to === viewer.id),
-                },
-                {
-                  label: "Approve",
-                  icon: Check,
-                  onClick: (r) => setApprovalPrompt({ ticketId: r.id, decision: "approved" }),
-                  hidden: (r) => !(r.status === "pending_approval" && myActionQueueIds.has(r.id)),
-                },
-                {
-                  label: "Reject",
-                  icon: X,
-                  variant: "destructive",
-                  onClick: (r) => setApprovalPrompt({ ticketId: r.id, decision: "rejected" }),
-                  hidden: (r) => !(r.status === "pending_approval" && myActionQueueIds.has(r.id)),
+                  label: "Raise requisition",
+                  icon: Receipt,
+                  onClick: (r) => setRequisitionTicket(r),
+                  hidden: (r) => ["resolved", "closed", "cancelled", "rejected"].includes(r.status),
                 },
               ]
             : []
@@ -625,24 +564,20 @@ export function AdminHelpDeskContent({
         urlSync
       />
 
-      <PromptDialog
-        open={approvalPrompt !== null}
+      <NewRequisitionDialog
+        open={requisitionTicket !== null}
         onOpenChange={(open) => {
-          if (!open) setApprovalPrompt(null)
+          if (!open) setRequisitionTicket(null)
         }}
-        title={approvalPrompt?.decision === "rejected" ? "Reject Ticket" : "Approve Ticket"}
-        description={
-          approvalPrompt?.decision === "rejected"
-            ? "Provide a reason for rejecting this service request."
-            : "Add optional comments for this approval."
+        helpDeskTicket={
+          requisitionTicket
+            ? {
+                id: requisitionTicket.id,
+                ticket_number: requisitionTicket.ticket_number,
+                title: requisitionTicket.title,
+              }
+            : null
         }
-        label="Comments"
-        placeholder="Write your note here..."
-        inputType="textarea"
-        required={approvalPrompt?.decision === "rejected"}
-        confirmLabel="Confirm Decision"
-        confirmVariant={approvalPrompt?.decision === "rejected" ? "destructive" : "default"}
-        onConfirm={submitApproval}
       />
     </DataTablePage>
   )
