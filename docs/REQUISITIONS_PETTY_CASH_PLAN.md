@@ -1,6 +1,6 @@
 # Requisitions: Payment Request + Petty Cash — Implementation Plan
 
-Status: **draft for approval** · 2026-10-13
+Status: **approved, in progress** · 2026-10-13
 Source forms: *ACOB Requisition Form.pdf* (Payment Request Form) and the
 *Petty-Cash Voucher* sheet.
 
@@ -160,37 +160,39 @@ this work, the way `docs/audit/2026-10-01-full-repo-critique.md` describes:
 5. **Requester notifications are probably being dropped.** The route sends
    `requisition_rejected` / `requisition_approved` / `requisition_stage_passed`,
    which are not in `notifications_type_check` as of the repo's latest
-   migration, and the insert error is swallowed. (Live DB not yet checked —
-   the Supabase MCP was unauthorised this session.)
+   migration, and the insert error is swallowed.
 6. **Every new requisition notifies every admin and every department lead**,
    not the person whose stage it is.
 
-Items 1–4 are security holes and could ship ahead of the rest as Phase 0.
+Items 1–4 are security holes. **Live check 2026-10-13: production has 0
+requisitions and 0 help desk tickets** — the feature has never been used — so
+they are fixed by the rebuild itself rather than patched in the old route.
 
 ---
 
 ## 5. Data model
 
-One migration, additive, no columns dropped in this release.
+One migration. The live `requisitions` table is empty (checked 2026-10-13),
+so old columns are dropped instead of kept for compatibility.
 
 **`requisitions` (existing) — add / change**
 - `form_type text not null default 'payment_request'`
   check in (`payment_request`, `petty_cash`)
 - `site_location text null`
 - `line_items jsonb not null default '[]'` (petty cash: `{description, amount}`)
-- `original_amount numeric(12,2)` (backfilled = `amount`)
+- `original_amount numeric(12,2) not null`
 - `amount_paid numeric(12,2) not null default 0`
 - `project_name`, `purpose` → nullable, with a check that a Payment Request has them
-- `status` check widened to `pending, awaiting_payment, partly_paid, paid, rejected`
-  (`approved` kept valid only for legacy rows until backfilled)
+- `status` check becomes `pending, awaiting_payment, partly_paid, paid, rejected`
 - `requisition_number` set by a `BEFORE INSERT` trigger from a per-year
   counter (see **Numbering** below); the old column default and
   `requisition_number_seq` are dropped
-- `previous_requisition_number text null` — the pre-renumbering reference,
-  searchable
 - checks: petty cash ≤ 50,000 on insert; payment request ≥ 30,000 on insert
   (enforced in the API, as amount changes may later move it)
-- emergency columns kept, no longer written
+- **dropped:** `reviewed_* / authorized_* / verified_* / approved_*`,
+  `rejected_*`, `current_stage_code`, `is_emergency`,
+  `emergency_justification`, `bypassed_stages` (replaced by
+  `requisition_stages`); `rejection_reason` kept
 
 **`requisition_stages`** (new) — one row per stage
 `id, requisition_id, position, stage_code (reviewed|authorized|verified|approved),
@@ -236,23 +238,8 @@ No policies for `authenticated`; service role only.
   `Africa/Lagos` time so a 31 Dec 11:30pm request is numbered in that year.
 - Counter table: RLS on, no policies for `authenticated` — only the trigger
   writes it.
-- **Existing rows are renumbered** from 0001 per year in `created_at` order;
-  the old number moves to `previous_requisition_number`. Detail page shows
-  "Previously REQ-2026-01005"; list search matches either number.
-  Notification links use the row id, so they keep working.
+- No existing rows to renumber: the first real reference is `REQ-2026-0001`.
 
-**Backfill of existing rows**
-- `form_type = 'payment_request'`, `original_amount = amount`.
-- Stages created from the existing `reviewed_by / authorized_by / verified_by /
-  approved_by` columns (signed where filled; `bypassed` where listed in
-  `bypassed_stages`).
-- Pending rows: remaining unsigned stages resolved with the new rules.
-- `approved` rows → **Awaiting payment** (decided 2026-10-13), so a processor
-  confirms each one. Processors are notified once with the backlog count, not
-  once per row.
-
-The old per-stage columns stay (read-only) for one release, then are dropped
-in a follow-up migration.
 
 ---
 
@@ -325,9 +312,9 @@ approval route still work.
   `request_type: "procurement"` for new tickets.
 - Remove the "Pivot to procurement" action and route
   (`app/api/help-desk/tickets/[id]/pivot`) — returns 410.
-- The procurement approval route
-  (`app/api/help-desk/tickets/[id]/approvals`) stays only until the open
-  procurement tickets are dealt with, then is removed.
+- Remove the procurement approval route
+  (`app/api/help-desk/tickets/[id]/approvals`) and its UI — there are no
+  tickets in production, so nothing is waiting on it.
 - New **"Raise requisition"** button on a ticket (handler or requester):
   opens the form chooser with the ticket number and title pre-filled into the
   purpose. Amount decides the form, as everywhere else.
@@ -339,10 +326,6 @@ approval route still work.
 - Help desk statuses `pending_approval` / `approved_for_procurement` stay
   valid for historic rows only; no code path sets them.
 
-**Open procurement tickets at switch-over**
-Listed for you first (number, title, requester, current approval stage).
-Each is then either raised as a requisition by its handler or closed.
-Not converted automatically — a ticket has no amount or beneficiary.
 
 ---
 
@@ -352,8 +335,7 @@ Each phase is one or more commits once tsc, eslint and tests pass.
 
 | Phase | Content |
 |---|---|
-| 0 | Security fixes from §4 (approver check, RLS SELECT/UPDATE, private bucket, notification types) |
-| 1 | Migration + backfill (**shown to you before it touches the live DB**) |
+| 1 | Migration (**shown to you before it touches the live DB**) |
 | 2 | `routing.ts`, `limits.ts` + tests |
 | 3 | Signing setup: signature, PIN, reset, profile page |
 | 4 | Create / act / payment API routes |
@@ -361,19 +343,17 @@ Each phase is one or more commits once tsc, eslint and tests pass.
 | 6 | PDFs + export |
 | 7 | Notifications (in-app + email) + MD's Desk |
 | 8 | Help desk: remove procurement, "Raise requisition", ticket ↔ requisition link |
-| 9 | Retire the help desk procurement approval route once open tickets are cleared |
 | Later | Passkeys for login + approvals |
 
-Before Phase 1 is pushed: confirm live state of `requisitions` (row counts by
-status, current policies, bucket) and list open help desk procurement
-tickets — this could not be checked this session.
+Live state checked 2026-10-13: 0 requisitions, 4 funding categories, 0 help desk tickets.
 
 ---
 
-## 9. Decisions log
+## 9. Decisions log (2026-10-13)
 
-Decided 2026-10-13: existing approved → Awaiting payment; email + in-app;
-signature upload **and** draw on screen.
-
-Decided: pending requisitions at switch-over are re-routed — signed stages
-kept, remaining stages resolved with the new rules.
+- Notifications to signers and processors go by email and in-app.
+- Signature: upload **and** draw on screen.
+- Numbering: per-form, per-year counters from 0001.
+- Help desk becomes support-only.
+- Existing-data decisions (approved → Awaiting payment, pending re-routed,
+  renumbering) were made, then found moot: production has no requisitions.
