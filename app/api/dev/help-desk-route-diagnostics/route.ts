@@ -3,7 +3,6 @@
  *
  * Validates help-desk routing prerequisites:
  * - support flow: department lead coverage per service department
- * - procurement flow: department lead + HCS + MD approver availability
  *
  * Protected: developer role only.
  */
@@ -12,16 +11,10 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
-import { DEPT_EXECUTIVE_MANAGEMENT, DEPT_CORPORATE_SERVICES } from "@/config/constants"
 
 type DiagRow = {
-  flow_kind: "support" | "procurement"
-  stage_code:
-    | "department_lead"
-    | "requester_department_lead"
-    | "service_department_lead"
-    | "head_corporate_services"
-    | "managing_director"
+  flow_kind: "support"
+  stage_code: "department_lead"
   scope: string
   resolved: boolean
   resolved_user_id?: string | null
@@ -51,28 +44,6 @@ function getManagedDepartments(profile: DiagnosticProfile | null | undefined): s
 function isLeadForDepartment(profile: DiagnosticProfile | null | undefined, departmentName: string): boolean {
   if (!profile?.is_department_lead) return false
   return getManagedDepartments(profile).includes(departmentName)
-}
-
-function isHcsCandidate(profile: DiagnosticProfile | null | undefined): boolean {
-  if (!profile) return false
-  const managed = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
-  return Boolean(
-    (profile.role === "developer" ||
-      profile.role === "super_admin" ||
-      profile.role === "admin" ||
-      profile.is_department_lead) &&
-      (profile.department === DEPT_CORPORATE_SERVICES || managed.includes(DEPT_CORPORATE_SERVICES))
-  )
-}
-
-function isMdCandidate(profile: DiagnosticProfile | null | undefined): boolean {
-  if (!profile) return false
-  return Boolean(
-    ((profile.role === "developer" || profile.role === "super_admin" || profile.role === "admin") &&
-      profile.department === DEPT_EXECUTIVE_MANAGEMENT) ||
-      profile.role === "developer" ||
-      profile.role === "super_admin"
-  )
 }
 
 export async function GET() {
@@ -146,61 +117,6 @@ export async function GET() {
           : undefined,
     })
   }
-
-  for (const departmentName of departments) {
-    const deptLead = profiles.find((p) => isLeadForDepartment(p, departmentName))
-    const isConflict = Boolean(deptLead?.id && multiDepartmentLeadIds.has(deptLead.id))
-    rows.push({
-      flow_kind: "procurement",
-      stage_code: "requester_department_lead",
-      scope: departmentName,
-      resolved: Boolean(deptLead) && !isConflict,
-      resolved_user_id: deptLead?.id ?? null,
-      resolved_name: deptLead?.full_name ?? null,
-      fail_reason: !deptLead
-        ? `No active department lead for "${departmentName}"`
-        : isConflict
-          ? `${deptLead.full_name || deptLead.id} is assigned as lead for multiple departments; one person cannot lead more than one department`
-          : undefined,
-    })
-    rows.push({
-      flow_kind: "procurement",
-      stage_code: "service_department_lead",
-      scope: departmentName,
-      resolved: Boolean(deptLead) && !isConflict,
-      resolved_user_id: deptLead?.id ?? null,
-      resolved_name: deptLead?.full_name ?? null,
-      fail_reason: !deptLead
-        ? `No active department lead for "${departmentName}"`
-        : isConflict
-          ? `${deptLead.full_name || deptLead.id} is assigned as lead for multiple departments; one person cannot lead more than one department`
-          : undefined,
-    })
-  }
-
-  const hcsCandidate = profiles.find((p) => isHcsCandidate(p))
-  rows.push({
-    flow_kind: "procurement",
-    stage_code: "head_corporate_services",
-    scope: "global",
-    resolved: Boolean(hcsCandidate),
-    resolved_user_id: hcsCandidate?.id ?? null,
-    resolved_name: hcsCandidate?.full_name ?? null,
-    fail_reason: hcsCandidate
-      ? undefined
-      : "No active HCS approver candidate (Corporate Services lead/admin context) found",
-  })
-
-  const mdCandidate = profiles.find((p) => isMdCandidate(p))
-  rows.push({
-    flow_kind: "procurement",
-    stage_code: "managing_director",
-    scope: "global",
-    resolved: Boolean(mdCandidate),
-    resolved_user_id: mdCandidate?.id ?? null,
-    resolved_name: mdCandidate?.full_name ?? null,
-    fail_reason: mdCandidate ? undefined : "No active MD approver candidate found",
-  })
 
   const broken = rows.filter((r) => !r.resolved)
   return NextResponse.json({ results: rows, broken_count: broken.length, total: rows.length })

@@ -152,6 +152,46 @@ async function loadSelfAssignedTasksAwaitingMd(db: SupabaseClient, mdId: string 
  * delegate (the PA) is not the approver. Only summary fields are returned — no
  * leave reasons, amounts-in-words or letter bodies.
  */
+/**
+ * Requisitions whose next signature is the MD's. The MD may also sign earlier
+ * (bypassing the stages before), but only those already at the MD's stage are
+ * "waiting on" them.
+ */
+async function loadRequisitionsAwaitingMd(db: SupabaseClient, mdId: string | null) {
+  if (!mdId) return { data: [], error: null }
+  const { data, error } = await db
+    .from("requisitions")
+    .select(
+      "id, requisition_number, user_id, department, amount, purpose, line_items, created_at, stages:requisition_stages(position, state, assignee_id)"
+    )
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+  if (error) return { data: [], error }
+  const rows = (data ?? []) as {
+    id: string
+    requisition_number: string | null
+    user_id: string
+    department: string | null
+    amount: number | null
+    purpose: string | null
+    line_items: { description: string }[] | null
+    created_at: string
+    stages: { position: number; state: string; assignee_id: string | null }[]
+  }[]
+  return {
+    data: rows
+      .filter((r) => {
+        const next = [...r.stages].sort((a, b) => a.position - b.position).find((s) => s.state === "pending")
+        return next?.assignee_id === mdId
+      })
+      .map(({ stages: _stages, line_items, ...r }) => ({
+        ...r,
+        purpose: r.purpose || line_items?.[0]?.description || null,
+      })),
+    error: null,
+  }
+}
+
 export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQueue> {
   const db = getServiceRoleClientOrFallback(session.supabase)
 
@@ -171,12 +211,7 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
           .eq("current_approver_user_id", mdId)
           .order("created_at", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
-    db
-      .from("requisitions")
-      .select("id, requisition_number, user_id, department, amount, purpose, is_emergency, created_at")
-      .eq("status", "pending")
-      .eq("current_stage_code", "pending_approved_by")
-      .order("created_at", { ascending: true }),
+    loadRequisitionsAwaitingMd(db, mdId),
     db
       .from("correspondence_approvals")
       .select("id, correspondence_id, requested_at, created_at")
@@ -205,7 +240,6 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
     department: string | null
     amount: number | null
     purpose: string | null
-    is_emergency: boolean | null
     created_at: string
   }[]
   const approvals = (corrRes.data ?? []) as {
@@ -262,8 +296,8 @@ export async function loadWaitingOnMd(session: EventsSession): Promise<MdDeskQue
       requester: displayName(names.get(r.user_id)),
       department: r.department,
       waiting_since: r.created_at,
-      href: "/admin/accounts/requisitions",
-      urgent: Boolean(r.is_emergency),
+      href: `/accounts/requisitions/${r.id}`,
+      urgent: false,
       amount: r.amount,
     })),
     ...approvals.flatMap((a) => {

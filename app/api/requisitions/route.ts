@@ -1,228 +1,201 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { z } from "zod"
-import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
-import {
-  EMERGENCY_BYPASSED_STAGES,
-  EMERGENCY_JUSTIFICATION_MIN_LENGTH,
-  getInitialStage,
-  getStageLabel,
-} from "@/lib/requisitions/workflow"
-import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
+import { writeAuditLog } from "@/lib/audit/write-audit"
+import { lineItemsTotal } from "@/lib/requisitions/limits"
+import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
+import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
+import { resolveRequisitionStages } from "@/lib/requisitions/routing"
+import { parseCreateRequisition } from "@/lib/requisitions/schemas"
+import { REQUISITION_LIST_SELECT, getViewerContext, loadRequisition, loadRoutingLeads } from "@/lib/requisitions/server"
+import { isOwnUploadPath, requireRequisitionUser, requisitionErrorResponse } from "@/lib/requisitions/route-helpers"
+import type { Requisition } from "@/lib/requisitions/types"
+import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { normalizeDepartmentName } from "@/shared/departments"
 
-const log = logger("api-requisitions")
-
-const BeneficiarySchema = z.object({
-  account_name: z.string().trim().min(1, "Account name is required"),
-  account_number: z.string().trim().min(1, "Account number is required"),
-  bank_name: z.string().trim().min(1, "Bank name is required"),
-  amount: z.union([z.number(), z.string()]).optional(),
+const ListQuerySchema = z.object({
+  view: z.enum(["mine", "action", "payment", "all", "department"]).default("mine"),
+  department: z.string().trim().max(120).optional(),
 })
 
-const AttachmentSchema = z.object({
-  file_name: z.string().trim().min(1, "File name is required"),
-  file_url: z.string().trim().min(1, "File URL is required"),
-  file_type: z.string().optional(),
-  file_size: z.number().optional(),
-})
-
-const CreateRequisitionSchema = z.object({
-  department: z.string().trim().min(1, "Department is required"),
-  project_name: z.string().trim().min(1, "Project name is required"),
-  amount: z.number().positive("Amount must be greater than zero"),
-  amount_in_words: z.string().optional(),
-  purpose: z.string().trim().min(3, "Purpose must be at least 3 characters"),
-  beneficiary_details: z.array(BeneficiarySchema).min(1, "At least one beneficiary is required"),
-  // Supporting documents are optional — not every requisition has a receipt or
-  // invoice available at the time it is raised.
-  attachments: z.array(AttachmentSchema).optional().default([]),
-  funding_category_id: z.string().uuid("Select the project funding category"),
-  is_emergency: z.boolean().optional(),
-  emergency_justification: z.string().trim().optional(),
-})
-
-function getAdminClient() {
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-  }
-  return null
-}
-
+/**
+ * GET /api/requisitions?view=
+ *   mine        what I raised
+ *   action      what is waiting on my signature
+ *   payment     what is waiting to be paid (payment processors)
+ *   all         everything (admins, payment processors)
+ *   department  one department (&department=; its lead or an admin)
+ */
 export async function GET(request: NextRequest) {
+  const auth = await requireRequisitionUser()
+  if ("error" in auth) return auth.error
+  const { user, admin } = auth
+
+  const parsed = ListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams))
+  if (!parsed.success) return apiError("Invalid list filter", ApiErrorCode.VALIDATION_ERROR, 400)
+  const { view } = parsed.data
+
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const viewer = await getViewerContext(admin, user.id)
+    const viewerFlags = { is_admin: viewer.isAdminLike, is_payment_processor: viewer.isPaymentProcessor }
+    const empty = () => NextResponse.json({ data: [], viewer: viewerFlags })
+    let query = admin.from("requisitions").select(REQUISITION_LIST_SELECT).order("created_at", { ascending: false })
 
-    if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
-
-    const url = new URL(request.url)
-    const userOnly = url.searchParams.get("user_only") === "true"
-    const statusParam = url.searchParams.get("status")
-    const stageParam = url.searchParams.get("stage")
-
-    let query = supabase
-      .from("requisitions")
-      .select(
-        `
-        *,
-        requester:profiles!requisitions_user_id_fkey(id, full_name, department, company_email)
-      `
-      )
-      .order("created_at", { ascending: false })
-
-    if (userOnly) {
+    if (view === "mine") {
       query = query.eq("user_id", user.id)
+    } else if (view === "action") {
+      const { data: stages, error } = await admin
+        .from("requisition_stages")
+        .select("requisition_id")
+        .eq("assignee_id", user.id)
+        .eq("state", "pending")
+      if (error) throw error
+      const ids = Array.from(new Set((stages || []).map((s) => s.requisition_id as string)))
+      if (!ids.length) return empty()
+      query = query.in("id", ids).eq("status", "pending").neq("user_id", user.id)
+    } else if (view === "payment") {
+      if (!viewer.isPaymentProcessor) return empty()
+      query = query.in("status", ["awaiting_payment", "partly_paid"]).neq("user_id", user.id)
+    } else if (view === "all") {
+      if (!viewer.isAdminLike && !viewer.isPaymentProcessor) {
+        return apiError("You cannot view every requisition", ApiErrorCode.FORBIDDEN, 403)
+      }
+    } else {
+      const department = normalizeDepartmentName(parsed.data.department)
+      if (!department) return apiError("Pick a department", ApiErrorCode.VALIDATION_ERROR, 400)
+      if (!viewer.isAdminLike && !viewer.leadDepartments.includes(department)) {
+        return apiError("You cannot view this department's requisitions", ApiErrorCode.FORBIDDEN, 403)
+      }
+      query = query.eq("department", department)
     }
 
-    if (statusParam) {
-      query = query.eq("status", statusParam)
-    }
-
-    if (stageParam) {
-      query = query.eq("current_stage_code", stageParam)
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      log.error("Error fetching requisitions:", error)
-      return apiError(error.message, ApiErrorCode.INTERNAL_ERROR, 500)
-    }
-
-    return NextResponse.json({ data: data || [] })
+    const { data, error } = await query.returns<Requisition[]>()
+    if (error) throw error
+    const rows = (data || []).map((req) => ({
+      ...req,
+      stages: [...(req.stages || [])].sort((a, b) => a.position - b.position),
+    }))
+    return NextResponse.json({ data: rows, viewer: viewerFlags })
   } catch (err) {
-    log.error("Unexpected error in GET /api/requisitions:", err)
-    return apiError("Internal Server Error", ApiErrorCode.INTERNAL_ERROR, 500)
+    return requisitionErrorResponse(err, "Failed to list requisitions")
   }
 }
 
+/** POST /api/requisitions — raise a Payment Request or a Petty Cash voucher. */
 export async function POST(request: NextRequest) {
+  const rl = await rateLimit(`requisition-create:${getClientId(request)}`, { limit: 20, windowSec: 300 })
+  if (!rl.allowed) return apiError("Too many requests. Try again shortly.", ApiErrorCode.RATE_LIMITED, 429)
+
+  const auth = await requireRequisitionUser()
+  if ("error" in auth) return auth.error
+  const { user, admin, supabase } = auth
+
+  const parsed = parseCreateRequisition(await request.json().catch(() => null))
+  if (!parsed.success) {
+    return apiError(
+      parsed.error.issues[0]?.message || "Check the form and try again",
+      ApiErrorCode.VALIDATION_ERROR,
+      400,
+      parsed.error.issues
+    )
+  }
+  const input = parsed.data
+
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
-
-    const body = await request.json()
-    const parsed = CreateRequisitionSchema.safeParse(body)
-
-    if (!parsed.success) {
+    const { data: requester } = await admin
+      .from("profiles")
+      .select("id, department, is_department_lead, lead_departments")
+      .eq("id", user.id)
+      .maybeSingle()
+    const department = normalizeDepartmentName(requester?.department)
+    if (!requester || !department) {
       return apiError(
-        parsed.error.issues[0]?.message || "Validation error",
-        ApiErrorCode.VALIDATION_ERROR,
-        400,
-        parsed.error.issues
-      )
-    }
-
-    const payload = parsed.data
-    const computedAmountInWords = payload.amount_in_words?.trim() || numberToNairaWords(payload.amount)
-
-    const adminClient = getAdminClient() || supabase
-
-    const isEmergency = payload.is_emergency === true
-    const emergencyJustification = payload.emergency_justification?.trim() || ""
-
-    if (isEmergency && emergencyJustification.length < EMERGENCY_JUSTIFICATION_MIN_LENGTH) {
-      return apiError(
-        `An emergency requisition needs a written justification of at least ${EMERGENCY_JUSTIFICATION_MIN_LENGTH} characters.`,
+        "Your profile has no department, so the requisition cannot be routed. Ask HR to set it.",
         ApiErrorCode.VALIDATION_ERROR,
         400
       )
     }
 
-    // Resolve the funding category and snapshot its label onto the requisition so
-    // the printed form stays accurate if the category is renamed later.
-    const { data: fundingCategory, error: fundingError } = await adminClient
-      .from("requisition_funding_categories")
-      .select("id, name, is_active")
-      .eq("id", payload.funding_category_id)
-      .maybeSingle()
-
-    if (fundingError) {
-      log.error("Failed to resolve funding category:", fundingError)
-      return apiError("Failed to validate funding category", ApiErrorCode.INTERNAL_ERROR, 500)
+    if ((input.attachments || []).some((file) => !isOwnUploadPath(file.file_path, user.id))) {
+      return apiError("Attach only files you uploaded", ApiErrorCode.VALIDATION_ERROR, 400)
     }
 
-    if (!fundingCategory || !fundingCategory.is_active) {
-      return apiError("Selected funding category is unavailable", ApiErrorCode.VALIDATION_ERROR, 400)
-    }
-
-    const initialStage = getInitialStage(isEmergency)
-
-    // Create the requisition row
-    const { data: newReq, error } = await adminClient
-      .from("requisitions")
-      .insert({
-        user_id: user.id,
-        department: payload.department,
-        project_name: payload.project_name,
-        amount: payload.amount,
-        amount_in_words: computedAmountInWords,
-        purpose: payload.purpose,
-        beneficiary_details: payload.beneficiary_details,
-        attachments: payload.attachments,
-        funding_category_id: fundingCategory.id,
-        funding_category_name: fundingCategory.name,
-        is_emergency: isEmergency,
-        emergency_justification: isEmergency ? emergencyJustification : null,
-        bypassed_stages: isEmergency ? EMERGENCY_BYPASSED_STAGES : [],
-        current_stage_code: initialStage,
-        status: "pending",
-      })
-      .select()
-      .single()
-
-    if (error || !newReq) {
-      log.error("Failed to insert requisition:", error)
-      return apiError(error?.message || "Failed to create requisition", ApiErrorCode.INTERNAL_ERROR, 500)
-    }
-
-    // Notify the approver pool for whichever stage this requisition enters at.
-    // Emergency requisitions skip straight to MD / Executive approval, so they go
-    // out as urgent.
-    try {
-      const { data: adminHrProfiles } = await adminClient
-        .from("profiles")
-        .select("id")
-        .or("role.eq.super_admin,role.eq.admin,is_department_lead.eq.true")
-
-      if (adminHrProfiles && adminHrProfiles.length > 0) {
-        const title = isEmergency ? "EMERGENCY Requisition — Immediate Approval Needed" : "New Requisition for Review"
-        const message = isEmergency
-          ? `Emergency requisition ${newReq.requisition_number} (₦${payload.amount.toLocaleString()}) bypassed review, authorization and verification and is awaiting MD / Executive approval.`
-          : `Requisition ${newReq.requisition_number} (₦${payload.amount.toLocaleString()}) submitted for ${getStageLabel(initialStage).replace(/^Pending /, "")}.`
-
-        for (const target of adminHrProfiles) {
-          await adminClient.rpc("create_notification", {
-            p_user_id: target.id,
-            p_type: "approval_request",
-            p_category: "approvals",
-            p_title: title,
-            p_message: message,
-            p_priority: isEmergency ? "urgent" : "normal",
-            p_link_url: `/accounts/requisitions/${newReq.id}`,
-            p_actor_id: user.id,
-            p_entity_type: "requisition",
-            p_entity_id: newReq.id,
-          })
-        }
+    let fundingCategoryName: string | null = null
+    if (input.funding_category_id) {
+      const { data: category } = await admin
+        .from("requisition_funding_categories")
+        .select("name, is_active")
+        .eq("id", input.funding_category_id)
+        .maybeSingle()
+      if (!category?.is_active) {
+        return apiError("That funding category is no longer available", ApiErrorCode.VALIDATION_ERROR, 400)
       }
-    } catch (notifErr) {
-      log.error("Failed to send notification for new requisition:", notifErr)
+      fundingCategoryName = category.name
     }
 
-    return NextResponse.json({ data: newReq, message: "Requisition created successfully" }, { status: 201 })
+    if (input.help_desk_ticket_id) {
+      const { data: ticket } = await admin
+        .from("help_desk_tickets")
+        .select("id")
+        .eq("id", input.help_desk_ticket_id)
+        .maybeSingle()
+      if (!ticket) return apiError("That help desk ticket was not found", ApiErrorCode.NOT_FOUND, 404)
+    }
+
+    const amount = input.form_type === "petty_cash" ? lineItemsTotal(input.line_items) : input.amount
+    const stages = resolveRequisitionStages(
+      input.form_type,
+      { ...requester, department },
+      await loadRoutingLeads(admin)
+    )
+
+    const { data: created, error } = await admin.rpc("requisition_create", {
+      p_requisition: {
+        user_id: user.id,
+        form_type: input.form_type,
+        department,
+        project_name: input.form_type === "payment_request" ? input.project_name : null,
+        purpose: input.form_type === "payment_request" ? input.purpose : null,
+        site_location: input.form_type === "payment_request" ? input.site_location || null : null,
+        amount,
+        amount_in_words: numberToNairaWords(amount),
+        line_items: input.form_type === "petty_cash" ? input.line_items : [],
+        beneficiary_details: input.beneficiary_details,
+        attachments: input.attachments || [],
+        funding_category_id: input.funding_category_id || null,
+        funding_category_name: fundingCategoryName,
+        help_desk_ticket_id: input.help_desk_ticket_id || null,
+      },
+      p_stages: stages,
+    })
+    if (error) throw error
+
+    const id = (created as { id: string }).id
+    const req = await loadRequisition(admin, id)
+    if (req) {
+      await notifyRequisitionEvent(admin, { kind: "submitted", req })
+      if (req.help_desk_ticket_id) await notifyRequisitionEvent(admin, { kind: "raised", req })
+    }
+
+    await writeAuditLog(
+      supabase,
+      {
+        action: "create",
+        entityType: "requisition",
+        entityId: id,
+        newValues: {
+          requisition_number: req?.requisition_number,
+          form_type: input.form_type,
+          amount,
+          stages: stages.map((s) => ({ stage: s.stage_code, assignee: s.assignee_id, state: s.state })),
+        },
+        context: { actorId: user.id, source: "api", route: "/api/requisitions" },
+      },
+      { failOpen: true }
+    )
+
+    return NextResponse.json({ data: req, message: `${req?.requisition_number} submitted` }, { status: 201 })
   } catch (err) {
-    log.error("Unexpected error in POST /api/requisitions:", err)
-    return apiError("Internal Server Error", ApiErrorCode.INTERNAL_ERROR, 500)
+    return requisitionErrorResponse(err, "Failed to create requisition")
   }
 }

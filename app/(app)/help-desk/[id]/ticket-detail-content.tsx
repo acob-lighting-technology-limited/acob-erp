@@ -11,6 +11,7 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
+import { TicketRequisitionsCard } from "@/components/requisitions/ticket-requisitions-card"
 
 type Ticket = {
   id: string
@@ -62,7 +63,6 @@ export function TicketDetailContent({
   viewerId,
   canRate,
   events,
-  approvals,
   comments,
 }: {
   ticket: Ticket | null
@@ -75,7 +75,6 @@ export function TicketDetailContent({
     new_status?: string | null
     created_at?: string | null
   }>
-  approvals: Array<{ id: string; approval_stage?: string | null; status?: string | null; requested_at?: string | null }>
   comments: Array<{ id: string; comment?: string | null; body?: string | null; created_at?: string | null }>
 }) {
   const staffAvatars = useStaffAvatars()
@@ -197,21 +196,10 @@ export function TicketDetailContent({
               ))}
             </CardContent>
           </Card>
-          {ticket.category?.toLowerCase().includes("procurement") ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Approval Chain</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {approvals.map((approval) => (
-                  <div key={approval.id} className="flex items-center justify-between rounded border p-3">
-                    <div>{approval.approval_stage || "Stage"}</div>
-                    <Badge variant="outline">{approval.status || "pending"}</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
+          <TicketRequisitionsCard
+            ticket={{ id: ticket.id, ticket_number: ticket.ticket_number, title: ticket.title }}
+            canRaise={!["resolved", "closed", "cancelled", "rejected"].includes(ticket.status)}
+          />
         </div>
         <div className="space-y-6">
           <Card>

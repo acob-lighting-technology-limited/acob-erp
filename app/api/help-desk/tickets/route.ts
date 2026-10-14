@@ -44,7 +44,13 @@ const CreateTicketSchema = z.object({
   title: z.string().trim().min(1, "title and service_department are required"),
   description: z.string().optional(),
   service_department: z.string().trim().min(1, "title and service_department are required"),
-  request_type: z.enum(["procurement", "support"]).optional().default("support"),
+  // The help desk is support-only: anything that costs money is a requisition.
+  request_type: z
+    .literal("support", {
+      errorMap: () => ({ message: "Procurement goes through Requisitions, not the help desk." }),
+    })
+    .optional()
+    .default("support"),
   priority: z.enum(HELP_DESK_PRIORITIES).optional().default("medium"),
 })
 
@@ -233,13 +239,10 @@ export async function POST(request: NextRequest) {
 
     const submittedAt = new Date()
     const slaTarget = getSlaTarget(priority, submittedAt)
-    const approvalRequired = requestType === "procurement"
-    const supportMode: "open_queue" | "lead_review_required" | null = requestType === "support" ? "open_queue" : null
-
-    const initialStatus = approvalRequired ? "pending_approval" : "department_queue"
-    const initialHandlingMode = approvalRequired ? "individual" : "queue"
-
-    const commonCategoryValue = requestType === "procurement" ? "Procurement" : "Support"
+    const supportMode = "open_queue" as const
+    const initialStatus = "department_queue"
+    const initialHandlingMode = "queue"
+    const commonCategoryValue = "Support"
 
     const modernInsertPayload = {
       title,
@@ -255,11 +258,11 @@ export async function POST(request: NextRequest) {
       requester_department: profile.department || null,
       support_mode: supportMode,
       handling_mode: initialHandlingMode,
-      approval_required: approvalRequired,
+      approval_required: false,
       submitted_at: submittedAt.toISOString(),
       sla_target_at: slaTarget.toISOString(),
-      paused_at: approvalRequired ? submittedAt.toISOString() : null,
-      current_approval_stage: approvalRequired ? "requester_department_lead" : null,
+      paused_at: null,
+      current_approval_stage: null,
     }
 
     const legacyInsertPayload = {
@@ -269,13 +272,13 @@ export async function POST(request: NextRequest) {
       request_type: requestType,
       category: commonCategoryValue,
       priority,
-      status: approvalRequired ? "pending_approval" : "new",
+      status: "new",
       requester_id: user.id,
       created_by: user.id,
-      approval_required: approvalRequired,
+      approval_required: false,
       submitted_at: submittedAt.toISOString(),
       sla_target_at: slaTarget.toISOString(),
-      paused_at: approvalRequired ? submittedAt.toISOString() : null,
+      paused_at: null,
     }
 
     const insertTicketWithCollisionRetry = async (payload: Record<string, unknown>): Promise<InsertTicketResult> => {
@@ -318,26 +321,7 @@ export async function POST(request: NextRequest) {
       .select("id, role, full_name, is_department_lead, lead_departments, department")
       .eq("is_department_lead", true)
 
-    const requesterLead = resolveLeadForDepartment(leadCandidates || [], profile.department)
     const serviceLead = resolveLeadForDepartment(leadCandidates || [], serviceDepartment)
-
-    if (approvalRequired) {
-      const modernApprovals = [
-        { ticket_id: created.id, approval_stage: "requester_department_lead", status: "pending" },
-        { ticket_id: created.id, approval_stage: "service_department_lead", status: "pending" },
-        { ticket_id: created.id, approval_stage: "head_corporate_services", status: "pending" },
-        { ticket_id: created.id, approval_stage: "managing_director", status: "pending" },
-      ]
-      const legacyApprovals = [
-        { ticket_id: created.id, approval_stage: "department_lead", status: "pending" },
-        { ticket_id: created.id, approval_stage: "head_corporate_services", status: "pending" },
-        { ticket_id: created.id, approval_stage: "managing_director", status: "pending" },
-      ]
-      const { error: approvalsError } = await supabase.from("help_desk_approvals").insert(modernApprovals)
-      if (approvalsError) {
-        await supabase.from("help_desk_approvals").insert(legacyApprovals)
-      }
-    }
 
     await appendHelpDeskEvent({
       ticketId: created.id,
@@ -370,14 +354,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const firstApprover = approvalRequired ? requesterLead : serviceLead
+    const firstApprover = serviceLead
 
     if (firstApprover?.id) {
       await supabase.rpc("create_notification", {
         p_user_id: firstApprover.id,
-        p_type: approvalRequired ? "approval_request" : "task_assigned",
-        p_category: approvalRequired ? "approvals" : "tasks",
-        p_title: approvalRequired ? "Procurement ticket needs approval" : "New help desk ticket in your queue",
+        p_type: "task_assigned",
+        p_category: "tasks",
+        p_title: "New help desk ticket in your queue",
         p_message: `${created.ticket_number} - ${created.title}`,
         p_priority: priority === "urgent" ? "urgent" : priority === "high" ? "high" : "normal",
         p_link_url: "/admin/help-desk",
@@ -401,7 +385,7 @@ export async function POST(request: NextRequest) {
         title: "New Help Desk Ticket Submitted",
         message: `${created.title} (${created.service_department}) has been submitted with ${created.priority} priority.`,
         ticketNumber: created.ticket_number,
-        ctaPath: approvalRequired ? "/admin/help-desk" : "/help-desk",
+        ctaPath: "/help-desk",
       })
     } catch (mailError) {
       log.error({ err: String(mailError) }, "Help desk mail error on create")
