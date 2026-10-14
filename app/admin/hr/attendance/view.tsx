@@ -1092,6 +1092,7 @@ export function AttendanceReportsPage({
       multi: false,
       defaultValues: [yearMonth],
       mode: "custom",
+      pinned: true,
       filterFn: () => true,
     },
   ]

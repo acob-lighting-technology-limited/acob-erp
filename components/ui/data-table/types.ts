@@ -113,6 +113,12 @@ export interface DataTableFilter<TData = unknown> {
   defaultValues?: string[]
   /** Custom filter rendering */
   render?: (selectedValues: string[], onChange: (values: string[]) => void) => ReactNode
+  /**
+   * Keep this filter visible on phones instead of tucking it into the Filters
+   * sheet — for controls that choose *which data loads* (the roster's day, a
+   * month), which a reader needs at a glance and changes often.
+   */
+  pinned?: boolean
 }
 
 // ─── Tab Definition ──────────────────────────────────────────────────────────
