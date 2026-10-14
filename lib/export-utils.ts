@@ -1825,8 +1825,8 @@ const EXPORT_LOGOS = {
   acobInverse: { path: "/images/exports/acob-lighting-inverse.png", ratio: 460 / 120 },
   /** Matrix "MA" mark, dark text — for white/light backgrounds. */
   matrixMark: { path: "/images/exports/matrix-mark.png", ratio: 320 / 233 },
-  /** Matrix "MA" mark, white/silver text — for dark/green backgrounds. */
-  matrixMarkInverse: { path: "/images/exports/matrix-mark-inverse.png", ratio: 320 / 245 },
+  /** Matrix "MA" mark, flat white M + green A — for dark/deep-green backgrounds. */
+  matrixMarkInverse: { path: "/images/exports/matrix-mark-inverse.png", ratio: 320 / 233 },
 } as const
 
 type ExportLogo = (typeof EXPORT_LOGOS)[keyof typeof EXPORT_LOGOS]
@@ -2597,7 +2597,7 @@ const addWeeklyHeaderAndFooter = (
   })
 
   // Matrix mark, top right. The header bar is dark in both themes, so this is
-  // always the inverse (white/silver) variant.
+  // always the inverse (flat white) variant.
   const markBox = logoBoxByHeight(EXPORT_LOGOS.matrixMarkInverse, 0.45)
   try {
     slide.addImage({
@@ -3001,14 +3001,7 @@ const renderDepartmentWeeklySlides = (
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
 
   let pageCursor = startPageNumber
-  const titleSlide = addDeptTitleSlide(
-    pres,
-    report.department,
-    name,
-    pageCursor,
-    theme,
-    position
-  )
+  const titleSlide = addDeptTitleSlide(pres, report.department, name, pageCursor, theme, position)
   applyWeeklySlideTransition(titleSlide)
   if (typeof pageCursor === "number") pageCursor += 1
 
@@ -3017,15 +3010,10 @@ const renderDepartmentWeeklySlides = (
   // could not tell what was coming up until you were already on the last slide
   // of the department. Where you are within the department is now carried by
   // the "1 OF 2" / "2 OF 2" label in the header.
-  const workDoneSlide = addWorkDoneSlide(
-    pres,
-    report.department,
-    workDone,
-    nextDepartmentName,
-    pageCursor,
-    theme,
-    { index: 1, total: 2 }
-  )
+  const workDoneSlide = addWorkDoneSlide(pres, report.department, workDone, nextDepartmentName, pageCursor, theme, {
+    index: 1,
+    total: 2,
+  })
   applyWeeklySlideTransition(workDoneSlide)
   if (typeof pageCursor === "number") pageCursor += 1
 
