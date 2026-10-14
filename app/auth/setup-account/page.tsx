@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createClient } from "@/lib/supabase/client"
+import { requestPasswordResetEmail } from "@/lib/supabase/password-reset"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
@@ -95,15 +96,12 @@ function SetupAccountContent() {
       return
     }
 
-    const supabase = createClient()
     setIsLoading(true)
 
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://matrix.acoblighting.com"
-      // Use the callback route for proper PKCE code exchange, then redirect to setup-account
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${appUrl}/auth/callback?next=/auth/setup-account`,
-      })
+      // Same email as a password reset: the 6-digit code is verified below, and
+      // the link (if clicked instead) lands on /auth/reset-password via /auth/confirm.
+      const { error } = await requestPasswordResetEmail(email)
 
       if (error) throw error
 
