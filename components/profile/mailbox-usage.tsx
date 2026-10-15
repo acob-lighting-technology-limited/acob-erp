@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ExternalLink, HardDrive, Loader2 } from "lucide-react"
+import { ExternalLink, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -26,7 +26,8 @@ async function fetchMailboxUsage(): Promise<MailboxUsage | null> {
 
 /**
  * The signed-in user's company mailbox storage and a one-click "Open mailbox"
- * (Roundcube, already signed in), for the profile contact strip.
+ * (Roundcube, already signed in) — the second line under their company email
+ * in the profile contact strip.
  * Renders nothing when there is no cPanel mailbox to show, or cPanel is down —
  * a storage gauge is never worth an error on someone's profile.
  */
@@ -66,16 +67,16 @@ export function MailboxUsage() {
   }
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    // ml-5 lines the bar up with the email text, past the envelope icon above it.
+    <div className="ml-5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex min-w-0 items-center gap-1.5" tabIndex={0} aria-label="Mailbox storage">
-            <HardDrive className="h-3.5 w-3.5 shrink-0" />
+          <div className="min-w-0" tabIndex={0} aria-label="Mailbox storage">
             <MailboxUsageBar
               usedBytes={data.usedBytes}
               quotaBytes={data.quotaBytes}
               usedPercent={data.usedPercent}
-              className="w-36"
+              layout="inline"
             />
           </div>
         </TooltipTrigger>
@@ -92,9 +93,9 @@ export function MailboxUsage() {
         </TooltipContent>
       </Tooltip>
       <Button
-        variant="outline"
+        variant="link"
         size="sm"
-        className="h-7 gap-1 px-2 text-xs"
+        className="text-primary h-auto gap-1 p-0 text-xs"
         onClick={() => void openWebmail()}
         disabled={opening}
         aria-label="Open my mailbox in webmail"

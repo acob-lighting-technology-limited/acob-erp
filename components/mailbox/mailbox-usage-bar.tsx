@@ -16,28 +16,34 @@ const LEVEL_TEXT: Record<MailboxLevel, string> = {
   alert: "text-red-600 dark:text-red-400",
 }
 
-/** Mailbox storage as a bar plus "used / quota": green, amber from 80%, red from 90%. */
+/**
+ * Mailbox storage as a bar plus "used / quota": green, amber from 80%, red from 90%.
+ * `stacked` (default) puts the figures under the bar; `inline` puts them beside it,
+ * for a single line such as the profile contact strip.
+ */
 export function MailboxUsageBar({
   usedBytes,
   quotaBytes,
   usedPercent,
+  layout = "stacked",
   className,
 }: {
   usedBytes: number
   quotaBytes: number | null
   usedPercent: number | null
+  layout?: "stacked" | "inline"
   className?: string
 }) {
   const level = mailboxLevel(usedPercent)
   return (
-    <div className={cn("min-w-0 space-y-1", className)}>
+    <div className={cn("min-w-0", layout === "inline" ? "flex items-center gap-2" : "space-y-1", className)}>
       <Progress
         value={usedPercent ?? 0}
-        className="h-1.5"
+        className={cn("h-1.5", layout === "inline" && "w-24 shrink-0")}
         indicatorClassName={LEVEL_BAR[level]}
         aria-label="Mailbox storage used"
       />
-      <p className={cn("text-xs tabular-nums", LEVEL_TEXT[level])}>
+      <p className={cn("text-xs whitespace-nowrap tabular-nums", LEVEL_TEXT[level])}>
         {formatBytes(usedBytes)} / {formatQuota(quotaBytes)}
         {usedPercent != null && <span className="ml-1 opacity-80">({Math.round(usedPercent)}%)</span>}
       </p>

@@ -473,35 +473,47 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
         </div>
 
         {/* Contact strip */}
-        <div className="text-muted-foreground mt-5 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t pt-4 text-sm sm:mt-6 sm:grid-cols-2 sm:pt-5 lg:flex lg:flex-wrap lg:items-center">
+        <div className="text-muted-foreground mt-5 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t pt-4 text-sm sm:mt-6 sm:grid-cols-2 sm:pt-5 lg:flex lg:flex-wrap lg:items-start">
           {profile.company_email && (
-            <a
-              href={`mailto:${profile.company_email}`}
-              className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
-              title={profile.company_email}
-            >
-              <Mail className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{profile.company_email}</span>
-            </a>
+            // Email on top, its mailbox storage underneath: one item, two lines.
+            <div className="flex min-w-0 flex-col gap-1">
+              <a
+                href={`mailto:${profile.company_email}`}
+                className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
+                title={profile.company_email}
+              >
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{profile.company_email}</span>
+              </a>
+              <MailboxUsage />
+            </div>
           )}
-          {profile.company_email && <MailboxUsage />}
-          {profile.phone_number && (
-            <a
-              href={`tel:${profile.phone_number}`}
-              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
-            >
-              <Phone className="h-3.5 w-3.5 shrink-0" />
-              {profile.phone_number}
-            </a>
-          )}
-          {birthdayLabel && (
-            <span className="flex items-center gap-1.5">
-              <Cake className="h-3.5 w-3.5 shrink-0" />
-              {birthdayLabel}
-            </span>
+          {(profile.phone_number || birthdayLabel) && (
+            // Phone and birthday stacked as the second column, matching the email block.
+            <div className="flex min-w-0 flex-col gap-1">
+              {profile.phone_number && (
+                <a
+                  href={`tel:${profile.phone_number}`}
+                  className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+                >
+                  <Phone className="h-3.5 w-3.5 shrink-0" />
+                  {profile.phone_number}
+                </a>
+              )}
+              {birthdayLabel && (
+                <span className="flex items-center gap-1.5">
+                  <Cake className="h-3.5 w-3.5 shrink-0" />
+                  {birthdayLabel}
+                </span>
+              )}
+            </div>
           )}
           {profile.residential_address && (
-            <span className="flex min-w-0 items-center gap-1.5" title={profile.residential_address}>
+            // Its own full-width line, below the email and phone/birthday blocks.
+            <span
+              className="flex min-w-0 items-center gap-1.5 sm:col-span-2 lg:basis-full"
+              title={profile.residential_address}
+            >
               <Home className="h-3.5 w-3.5 shrink-0" />
               <span className="truncate">{profile.residential_address}</span>
             </span>
