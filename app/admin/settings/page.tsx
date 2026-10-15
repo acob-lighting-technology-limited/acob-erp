@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Settings, Users, Building2, Shield, Mail, Clock, Brain } from "lucide-react"
+import { Settings, Users, Building2, Shield, Mail, Clock, Brain, HardDrive } from "lucide-react"
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { IconFill } from "@/components/ui/icon-fill"
@@ -149,6 +149,30 @@ export default async function AdminSettingsPage() {
             <CardContent className="space-y-4">
               <Link href="/admin/settings/mail" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
                 Open Mail Settings
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {scope.isAdminLike && (
+          <Card className="group">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2.5">
+                <IconFill
+                  icon={HardDrive}
+                  fillColor="bg-sky-500"
+                  className="h-8 w-8 rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-600 transition-transform duration-200 group-hover:scale-105 dark:text-sky-400"
+                  iconClassName="h-4 w-4"
+                />
+                <span className="transition-colors group-hover:text-sky-500">Mailboxes</span>
+              </CardTitle>
+              <CardDescription>
+                Staff mailbox storage and quotas on cPanel, matched to employee records.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Link href="/admin/settings/mailboxes" className={cn(buttonVariants({ variant: "default" }), "w-full")}>
+                Open Mailboxes
               </Link>
             </CardContent>
           </Card>

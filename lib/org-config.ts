@@ -163,6 +163,8 @@ export const ORG_MAIL_ROUTING: Record<
    * away with the mail it is warning about.
    */
   "System Health": { replyTo: ORG_ICT_EMAIL, listId: listId("health") },
+  /** Staff mailbox storage on cPanel. ICT raises quotas, so replies go to them. */
+  Mailboxes: { replyTo: ORG_ICT_EMAIL, listId: listId("mailboxes") },
 }
 
 /**

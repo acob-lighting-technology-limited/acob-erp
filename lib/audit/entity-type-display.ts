@@ -19,6 +19,9 @@ export const ENTITY_TYPE_DISPLAY_MAP: Record<string, string> = {
   pending_user: "Employees",
   admin_action: "Employees",
 
+  // Staff mailboxes (cPanel)
+  mailbox: "Mailboxes",
+
   // Tasks
   task: "Tasks",
   tasks: "Tasks",
