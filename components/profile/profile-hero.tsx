@@ -488,35 +488,36 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
               <MailboxUsage />
             </div>
           )}
-          {(profile.phone_number || birthdayLabel) && (
-            // Phone and birthday stacked as the second column, matching the email block.
+          {(profile.phone_number || birthdayLabel || profile.residential_address) && (
+            // Second column, mirroring the email block: phone and birthday on one
+            // line, the home address directly under them.
             <div className="flex min-w-0 flex-col gap-1">
-              {profile.phone_number && (
-                <a
-                  href={`tel:${profile.phone_number}`}
-                  className="hover:text-foreground flex items-center gap-1.5 transition-colors"
-                >
-                  <Phone className="h-3.5 w-3.5 shrink-0" />
-                  {profile.phone_number}
-                </a>
+              {(profile.phone_number || birthdayLabel) && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {profile.phone_number && (
+                    <a
+                      href={`tel:${profile.phone_number}`}
+                      className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+                    >
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      {profile.phone_number}
+                    </a>
+                  )}
+                  {birthdayLabel && (
+                    <span className="flex items-center gap-1.5">
+                      <Cake className="h-3.5 w-3.5 shrink-0" />
+                      {birthdayLabel}
+                    </span>
+                  )}
+                </div>
               )}
-              {birthdayLabel && (
-                <span className="flex items-center gap-1.5">
-                  <Cake className="h-3.5 w-3.5 shrink-0" />
-                  {birthdayLabel}
+              {profile.residential_address && (
+                <span className="flex min-w-0 items-center gap-1.5" title={profile.residential_address}>
+                  <Home className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{profile.residential_address}</span>
                 </span>
               )}
             </div>
-          )}
-          {profile.residential_address && (
-            // Its own full-width line, below the email and phone/birthday blocks.
-            <span
-              className="flex min-w-0 items-center gap-1.5 sm:col-span-2 lg:basis-full"
-              title={profile.residential_address}
-            >
-              <Home className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{profile.residential_address}</span>
-            </span>
           )}
         </div>
       </CardContent>
