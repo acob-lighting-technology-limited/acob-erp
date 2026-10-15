@@ -171,6 +171,11 @@ export async function POST(req: Request) {
     },
   ])
   if (insertError) {
+    // A concurrent submission can win the race past the duplicate checks above;
+    // the database's unique key on pending_users.email then rejects this one.
+    if (insertError.code === "23505") {
+      return NextResponse.json({ error: "An application for this person is already pending review." }, { status: 409 })
+    }
     return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 
