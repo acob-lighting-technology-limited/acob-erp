@@ -516,6 +516,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
+      if (editForm.mailbox_actions_invalid) {
+        toast.error("Enter a valid address to forward their mail to, or untick forwarding")
+        setIsSaving(false)
+        return
+      }
+
       // A new staff-domain address needs a mailbox decision first; cPanel is
       // only touched when the admin says so. Cancel aborts the whole save.
       const staffDomainSuffix = `@${ORG_STAFF_DOMAIN.toLowerCase()}`
@@ -634,6 +640,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             suspension_end_date:
               editForm.employment_status === "suspended" ? editForm.suspension_end_date || null : undefined,
             separation_date: editForm.employment_status === "exited" ? editForm.separation_date || null : undefined,
+            // Mailbox steps only travel with an actual status change.
+            mailbox: editForm.employment_status !== currentStatus ? editForm.mailbox_actions : undefined,
           }),
         })
 
@@ -641,6 +649,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           error?: string
           has_blockers?: boolean
           blockers?: string[]
+          mailbox?: { done: string[]; errors: string[] } | null
+        }
+        if (statusRes.ok && statusPayload.mailbox) {
+          if (statusPayload.mailbox.done.length > 0) toast.success(statusPayload.mailbox.done.join(" · "))
+          for (const err of statusPayload.mailbox.errors) toast.warning(`Mailbox: ${err}`, { duration: 12000 })
         }
 
         if (!statusRes.ok) {

@@ -55,6 +55,8 @@ import { createClient } from "@/lib/supabase/client"
 import type { UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import type { EmployeeAssignedItems, EmployeeProfile, EmployeeViewData } from "./types"
 import { apiFetch } from "@/lib/api-client"
+import { EmployeeMailboxSection } from "./EmployeeMailboxSection"
+import type { EmployeeMailboxActions } from "@/lib/employees/mailbox-state"
 
 export interface EditForm {
   role: UserRole
@@ -91,6 +93,10 @@ export interface EditForm {
   employment_type: "full_time" | "part_time" | "contract"
   contract_category_code?: string
   nysc_cds_day?: string
+  /** Mailbox steps to apply with a status change (set by EmployeeMailboxSection). */
+  mailbox_actions?: EmployeeMailboxActions
+  /** True while the mailbox forward address is invalid — saving is refused. */
+  mailbox_actions_invalid?: boolean
 }
 
 export interface EmployeeViewModalProps {
@@ -225,6 +231,20 @@ export function EmployeeViewModal({
   const supabase = createClient()
   const [innerTab, setInnerTab] = useState<"assets" | "tasks" | "docs">("assets")
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Stable, and a no-op when nothing changed, so the section's effect cannot
+  // loop through setEditForm.
+  const handleMailboxActionsChange = useCallback(
+    (actions: EmployeeMailboxActions | undefined, invalid: boolean) => {
+      setEditForm((prev) =>
+        JSON.stringify(prev.mailbox_actions) === JSON.stringify(actions) &&
+        Boolean(prev.mailbox_actions_invalid) === invalid
+          ? prev
+          : { ...prev, mailbox_actions: actions, mailbox_actions_invalid: invalid }
+      )
+    },
+    [setEditForm]
+  )
 
   const handleCopy = useCallback((text: string, fieldName: string) => {
     if (!text) return
@@ -1044,6 +1064,15 @@ export function EmployeeViewModal({
                           />
                         </div>
                       </>
+                    )}
+
+                    {viewEmployeeProfile && (
+                      <EmployeeMailboxSection
+                        employeeId={viewEmployeeProfile.id}
+                        fromStatus={String(viewEmployeeProfile.employment_status || "active")}
+                        toStatus={editForm.employment_status}
+                        onActionsChange={handleMailboxActionsChange}
+                      />
                     )}
                   </div>
 
