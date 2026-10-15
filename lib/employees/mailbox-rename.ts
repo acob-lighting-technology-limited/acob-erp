@@ -46,9 +46,19 @@ export async function renameStaffMailbox(
     return result
   }
 
+  // The old mailbox only decides the quota and whether to forward/suspend; a
+  // failed lookup must not stop the new mailbox being created.
   let oldMailbox = null
+  if (isStaffDomain(oldEmail)) {
+    try {
+      oldMailbox = await getMailbox(oldEmail)
+    } catch (err) {
+      result.errors.push(
+        `Reading ${oldEmail}: ${err instanceof CpanelError ? err.message : String(err)} (forward and suspend skipped)`
+      )
+    }
+  }
   try {
-    oldMailbox = isStaffDomain(oldEmail) ? await getMailbox(oldEmail) : null
     const existing = await getMailbox(newEmail)
     if (existing) {
       result.done.push(`${newEmail} already exists on cPanel — left as it is`)

@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { Mail, KeyRound, Copy, Check, Eye, EyeOff, Sparkles, AlertCircle, Wand2 } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { NewMailboxPasswordDialog } from "@/components/employees/EmailChangeMailboxDialog"
 
 interface DispatchEmployee {
   id: string
@@ -58,8 +59,12 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
   const [showPassword, setShowPassword] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Set when Matrix changed the mailbox password but the welcome letter failed.
+  const [orphanedCredentials, setOrphanedCredentials] = useState<{ email: string; password: string } | null>(null)
 
-  if (!employee) return null
+  if (!employee) {
+    return <NewMailboxPasswordDialog credentials={orphanedCredentials} onClose={() => setOrphanedCredentials(null)} />
+  }
 
   const employeeName =
     employee.full_name || [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Employee"
@@ -107,8 +112,13 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
         error?: string
         warnings?: string[]
         mailbox?: string
+        mailboxEmail?: string
+        mailboxPassword?: string
       } | null
       if (!res.ok) {
+        if (data?.mailboxEmail && data.mailboxPassword) {
+          setOrphanedCredentials({ email: data.mailboxEmail, password: data.mailboxPassword })
+        }
         throw new Error(data?.error || `Failed to dispatch credentials (${res.status} ${res.statusText})`)
       }
 
@@ -312,6 +322,7 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
           </DialogFooter>
         </form>
       </DialogContent>
+      <NewMailboxPasswordDialog credentials={orphanedCredentials} onClose={() => setOrphanedCredentials(null)} />
     </Dialog>
   )
 }

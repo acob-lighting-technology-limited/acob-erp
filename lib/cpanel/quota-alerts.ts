@@ -85,16 +85,17 @@ export async function runMailboxQuotaAlerts(serviceClient: SupabaseClient): Prom
     return summary
   }
 
+  // Matched in code, not with .in(): stored company_email may differ in case
+  // or carry stray spaces, which an exact-match filter would silently miss.
+  const dueEmails = new Set(due.map((m) => m.email))
   const { data: ownerRows } = await serviceClient
     .from("profiles")
     .select("id, first_name, full_name, department, company_email")
-    .in(
-      "company_email",
-      due.map((m) => m.email)
-    )
+    .not("company_email", "is", null)
   const owners = new Map<string, OwnerRow>()
   for (const o of (ownerRows ?? []) as OwnerRow[]) {
-    if (o.company_email) owners.set(o.company_email.trim().toLowerCase(), o)
+    const key = o.company_email?.trim().toLowerCase()
+    if (key && dueEmails.has(key)) owners.set(key, o)
   }
   const ownerIds = [...owners.values()].map((o) => o.id)
   const inAppEligible = await resolveChannelEligibleUserIds(db, {
@@ -161,7 +162,7 @@ export async function runMailboxQuotaAlerts(serviceClient: SupabaseClient): Prom
 
     if (owner && !m.suspendedLogin && inAppEligible.includes(owner.id)) {
       try {
-        await serviceClient.rpc("create_notification", {
+        const { error: rpcError } = await serviceClient.rpc("create_notification", {
           p_user_id: owner.id,
           p_type: "system",
           p_category: "system",
@@ -172,6 +173,7 @@ export async function runMailboxQuotaAlerts(serviceClient: SupabaseClient): Prom
           p_entity_type: "mailbox",
           p_entity_id: m.email,
         })
+        if (rpcError) log.error({ err: rpcError.message, mailbox: m.email }, "Mailbox in-app alert failed")
       } catch (err) {
         log.error({ err: String(err), mailbox: m.email }, "Mailbox in-app alert failed")
       }

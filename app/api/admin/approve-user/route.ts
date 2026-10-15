@@ -11,6 +11,7 @@ import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { ORG_MAIL_ROUTING } from "@/lib/org-config"
+import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
 import { provisionStaffMailbox } from "@/lib/employees/mailbox-provisioning"
 import { WELCOME_PROFILE_COLUMNS, sendMailboxWelcome, type WelcomeProfile } from "@/lib/employees/mailbox-welcome"
 import type { ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
@@ -426,12 +427,13 @@ export async function POST(req: Request) {
       throw new Error(`Profile creation failed: ${approvalError.message}`)
     }
 
-    // Clean up any remaining duplicate pending submissions from this applicant
+    // Clean up any remaining duplicate pending submissions from this applicant.
+    // Values are applicant-supplied, so they are quoted for PostgREST; phone is
+    // not used — a shared number would delete another applicant's submission.
     const duplicateOrFilters: string[] = []
-    if (pendingUser.personal_email) duplicateOrFilters.push(`personal_email.eq.${pendingUser.personal_email}`)
-    if (pendingUser.email) duplicateOrFilters.push(`email.eq.${pendingUser.email}`)
-    if (pendingUser.company_email) duplicateOrFilters.push(`company_email.eq.${pendingUser.company_email}`)
-    if (pendingUser.phone_number) duplicateOrFilters.push(`phone_number.eq.${pendingUser.phone_number}`)
+    if (pendingUser.personal_email) duplicateOrFilters.push(`personal_email.eq.${q(pendingUser.personal_email)}`)
+    if (pendingUser.email) duplicateOrFilters.push(`email.eq.${q(pendingUser.email)}`)
+    if (pendingUser.company_email) duplicateOrFilters.push(`company_email.eq.${q(pendingUser.company_email)}`)
 
     if (duplicateOrFilters.length > 0) {
       const { error: cleanupError } = await supabaseAdmin
@@ -460,9 +462,13 @@ export async function POST(req: Request) {
       designation: callerProfile?.designation || null,
       department: callerProfile?.department || "Admin and HR",
     }
+    // Create-only: if the address already has a mailbox it may belong to
+    // someone else (same initial + first name, a shared or hand-made box), so
+    // approval never resets its password — ICT is asked to sort it out instead.
     const provisioned = await provisionStaffMailbox(supabaseAdmin, {
       profileId: authUserId!,
       email: pendingUser.company_email,
+      createOnly: true,
     })
     let mailbox: ApprovalMailboxOutcome
     if (provisioned.ok) {

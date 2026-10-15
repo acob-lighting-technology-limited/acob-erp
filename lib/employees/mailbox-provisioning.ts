@@ -29,10 +29,14 @@ export type ProvisionResult =
  *
  * `manual: true` means Matrix cannot do this here at all (cPanel not configured,
  * or the address is not on the cPanel staff domain) — ICT handles it by hand.
+ *
+ * `createOnly` refuses to touch a mailbox that already exists (it is reported
+ * as a failure instead of having its password reset). Approval uses it: an
+ * existing address may belong to someone else.
  */
 export async function provisionStaffMailbox(
   dataClient: SupabaseClient,
-  params: { profileId: string; email: string }
+  params: { profileId: string; email: string; createOnly?: boolean }
 ): Promise<ProvisionResult> {
   const email = params.email.trim().toLowerCase()
 
@@ -45,12 +49,20 @@ export async function provisionStaffMailbox(
   let result: ProvisionResult
   try {
     const existing = await getMailbox(email)
-    if (existing) {
-      await setMailboxPassword(email, password)
+    if (existing && params.createOnly) {
+      result = {
+        ok: false,
+        reason: `A mailbox for ${email} already exists, so its password was not changed`,
+        manual: false,
+      }
     } else {
-      await createMailbox(email, password, DEFAULT_MAILBOX_QUOTA_MB)
+      if (existing) {
+        await setMailboxPassword(email, password)
+      } else {
+        await createMailbox(email, password, DEFAULT_MAILBOX_QUOTA_MB)
+      }
+      result = { ok: true, password, created: !existing }
     }
-    result = { ok: true, password, created: !existing }
   } catch (err) {
     const reason = err instanceof CpanelError ? err.message : "Unexpected error talking to cPanel"
     log.error({ err: String(err), email, profileId: params.profileId }, "Mailbox provisioning failed")

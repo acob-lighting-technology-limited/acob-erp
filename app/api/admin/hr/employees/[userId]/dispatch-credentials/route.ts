@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
+import { getScopedDepartments } from "@/lib/admin/api-scope"
+import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { isCpanelConfigured } from "@/lib/cpanel/client"
 import { provisionStaffMailbox } from "@/lib/employees/mailbox-provisioning"
@@ -76,6 +78,22 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Employee does not have a company email assigned" }, { status: 422 })
     }
 
+    // HR access alone is not enough: a department lead may only act on their
+    // own department's staff — this can reset someone's mailbox password.
+    const scopedDepartments = getScopedDepartments(scope)
+    if (scopedDepartments !== null && !scopedDepartments.includes(profile.department ?? "")) {
+      return NextResponse.json({ error: "This employee is outside your department scope" }, { status: 403 })
+    }
+
+    // Check before touching cPanel: a reset whose letter can never be sent
+    // would leave the mailbox with a password nobody knows.
+    if (!(await isSystemNotificationChannelEnabled(dataClient, "onboarding", "email"))) {
+      return NextResponse.json(
+        { error: "Onboarding email notifications are currently disabled in system settings" },
+        { status: 400 }
+      )
+    }
+
     let mailboxPassword = manualPassword
     let mailboxCreated: boolean | null = null
     if (mailboxPassword === null) {
@@ -108,7 +126,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
     })
 
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: result.status })
+      // Matrix already set this password on cPanel. Hand it to the admin rather
+      // than losing it, or the mailbox is locked with a password nobody knows.
+      return NextResponse.json(
+        {
+          error: result.error,
+          ...(mailboxCreated !== null ? { mailboxEmail: profile.company_email, mailboxPassword } : {}),
+        },
+        { status: result.status }
+      )
     }
 
     await writeAuditLog(

@@ -168,7 +168,9 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
     setForwardTo(mailboxState?.suggestedForward ?? "")
     setRestoreMailboxLogin(true)
     setRemoveForwards(true)
-  }, [status, mailboxState])
+    // Primitive deps only: a background refetch hands back a new mailboxState
+    // object and must not wipe the admin's choices.
+  }, [status, mailboxState?.suggestedForward])
 
   /** The mailbox steps for the chosen status, or undefined when there are none. */
   const buildMailboxActions = (): EmployeeMailboxActions | undefined => {
