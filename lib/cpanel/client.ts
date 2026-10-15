@@ -1,4 +1,5 @@
 import "server-only"
+import crypto from "crypto"
 import { logger } from "@/lib/logger"
 
 const log = logger("cpanel-client")
@@ -46,17 +47,31 @@ interface UapiEnvelope<T> {
   errors: string[] | null
 }
 
-async function uapi<T>(fn: string, params: Record<string, string | number> = {}): Promise<T> {
+/**
+ * Calls one UAPI function. Writes go as a POST body so passwords never land in
+ * a URL (and so in cPanel's access log).
+ */
+async function uapi<T>(
+  fn: string,
+  params: Record<string, string | number> = {},
+  method: "GET" | "POST" = "GET"
+): Promise<T> {
   const config = readConfig()
   if (!config) throw new CpanelError("cPanel is not configured (CPANEL_HOST / CPANEL_USER / CPANEL_API_TOKEN)", fn)
 
   const query = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))
-  const url = `https://${config.host}:2083/execute/${fn}${query.size > 0 ? `?${query}` : ""}`
+  const base = `https://${config.host}:2083/execute/${fn}`
+  const url = method === "GET" && query.size > 0 ? `${base}?${query}` : base
 
   let res: Response
   try {
     res = await fetch(url, {
-      headers: { Authorization: `cpanel ${config.user}:${config.token}` },
+      method,
+      headers: {
+        Authorization: `cpanel ${config.user}:${config.token}`,
+        ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+      },
+      body: method === "POST" ? query.toString() : undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
@@ -155,7 +170,104 @@ export async function setMailboxQuota(email: string, quotaMb: number): Promise<v
   if (!Number.isInteger(quotaMb) || quotaMb <= 0)
     throw new CpanelError("Quota must be a positive whole number", "Email")
   const { user, domain } = splitAddress(email)
-  await uapi("Email/edit_pop_quota", { email: user, domain, quota: quotaMb })
+  await uapi("Email/edit_pop_quota", { email: user, domain, quota: quotaMb }, "POST")
+}
+
+/** Creates a mailbox. cPanel's own welcome email is suppressed — Matrix sends its own. */
+export async function createMailbox(email: string, password: string, quotaMb: number): Promise<void> {
+  const { user, domain } = splitAddress(email)
+  await uapi("Email/add_pop", { email: user, domain, password, quota: quotaMb, send_welcome_email: 0 }, "POST")
+}
+
+export async function setMailboxPassword(email: string, password: string): Promise<void> {
+  const { user, domain } = splitAddress(email)
+  await uapi("Email/passwd_pop", { email: user, domain, password }, "POST")
+}
+
+/** Blocks (or restores) logging in to the mailbox. Incoming mail keeps arriving either way. */
+export async function setMailboxLoginSuspended(email: string, suspended: boolean): Promise<void> {
+  const address = email.trim().toLowerCase()
+  splitAddress(address)
+  await uapi(suspended ? "Email/suspend_login" : "Email/unsuspend_login", { email: address }, "POST")
+}
+
+/**
+ * A strong random mailbox password. cPanel rejects weak passwords, so it
+ * always mixes upper, lower, digits and a symbol.
+ */
+export function generateMailboxPassword(): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+  const lower = "abcdefghijkmnpqrstuvwxyz"
+  const digits = "23456789"
+  const symbols = "!@#$%*?"
+  const all = upper + lower + digits + symbols
+  const pick = (set: string) => set[crypto.randomInt(set.length)]
+  const chars = [pick(upper), pick(lower), pick(digits), pick(symbols)]
+  while (chars.length < 16) chars.push(pick(all))
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1)
+    ;[chars[i], chars[j]] = [chars[j], chars[i]]
+  }
+  return chars.join("")
+}
+
+// ---------------------------------------------------------------------------
+// Forwarders
+// ---------------------------------------------------------------------------
+
+interface RawForwarder {
+  dest: string
+  forward: string
+}
+
+/** Addresses mail to `email` is forwarded to. */
+export async function listForwardTargets(email: string): Promise<string[]> {
+  const { domain } = splitAddress(email)
+  const address = email.trim().toLowerCase()
+  const rows = await uapi<RawForwarder[]>("Email/list_forwarders", { domain })
+  return rows.filter((r) => r.dest.toLowerCase() === address).map((r) => r.forward.toLowerCase())
+}
+
+/** Forwards copies of mail sent to `from` on to `to`. No-op when that forwarder already exists. */
+export async function addForwarder(from: string, to: string): Promise<void> {
+  const source = from.trim().toLowerCase()
+  const target = to.trim().toLowerCase()
+  const { domain } = splitAddress(source)
+  splitAddress(target)
+  if ((await listForwardTargets(source)).includes(target)) return
+  await uapi("Email/add_forwarder", { domain, email: source, fwdopt: "fwd", fwdemail: target }, "POST")
+}
+
+export async function deleteForwarder(from: string, to: string): Promise<void> {
+  await uapi(
+    "Email/delete_forwarder",
+    { address: from.trim().toLowerCase(), forwarder: to.trim().toLowerCase() },
+    "POST"
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Webmail
+// ---------------------------------------------------------------------------
+
+/**
+ * A one-time link that opens Roundcube already signed in as `email` — no
+ * mailbox password involved. Short-lived: create it at the moment of the click.
+ */
+export async function createWebmailLoginUrl(email: string): Promise<string> {
+  const config = readConfig()
+  if (!config) throw new CpanelError("cPanel is not configured", "Session")
+  const { user, domain } = splitAddress(email)
+  const data = await uapi<{ session: string; token: string; hostname: string | null }>(
+    "Session/create_webmail_session_for_mail_user",
+    { login: user, domain },
+    "POST"
+  )
+  if (!data?.session || !data.token?.startsWith("/cpsess")) {
+    throw new CpanelError("cPanel did not return a webmail session", "Session")
+  }
+  const host = data.hostname || config.host
+  return `https://${host}:2096${data.token}/login/?session=${encodeURIComponent(data.session)}`
 }
 
 // ---------------------------------------------------------------------------

@@ -42,6 +42,12 @@ import { logger } from "@/lib/logger"
 import { ManageUsersDialog } from "@/components/hr/manage-users-dialog"
 import { ManageContractCategoriesDialog } from "@/components/hr/manage-contract-categories-dialog"
 import { DispatchCredentialsDialog } from "@/components/employees/DispatchCredentialsDialog"
+import {
+  EmailChangeMailboxDialog,
+  NewMailboxPasswordDialog,
+  type EmailChangeChoice,
+} from "@/components/employees/EmailChangeMailboxDialog"
+import { ORG_STAFF_DOMAIN } from "@/lib/org-config"
 import { normalizeDepartmentName } from "@/shared/departments"
 import {
   EmployeeViewModal,
@@ -128,6 +134,9 @@ export interface Employee {
   avatar_url?: string | null
   created_at: string
   mailbox_credentials_sent_at?: string | null
+  /** cPanel mailbox provisioning outcome: "created" | "failed" | null (not attempted by Matrix) */
+  mailbox_status?: string | null
+  mailbox_error?: string | null
   nysc_cds_day?: string | null
 }
 
@@ -215,6 +224,14 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [modalViewMode, setModalViewMode] = useState<"profile" | "employment" | "edit" | "signature">("profile")
   const [dispatchingEmployee, setDispatchingEmployee] = useState<Employee | null>(null)
+  // A changed company email waits on the admin's mailbox choice before saving.
+  const [emailChangeRequest, setEmailChangeRequest] = useState<{
+    oldEmail: string
+    newEmail: string
+    oldIsCpanel: boolean
+    resolve: (choice: EmailChangeChoice) => void
+  } | null>(null)
+  const [newMailboxCredentials, setNewMailboxCredentials] = useState<{ email: string; password: string } | null>(null)
 
   // Export state
   const [exportOptionsOpen, setExportOptionsOpen] = useState(false)
@@ -499,6 +516,27 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         return
       }
 
+      // A new staff-domain address needs a mailbox decision first; cPanel is
+      // only touched when the admin says so. Cancel aborts the whole save.
+      const staffDomainSuffix = `@${ORG_STAFF_DOMAIN.toLowerCase()}`
+      const previousCompanyEmail = (selectedEmployee.company_email || "").trim().toLowerCase()
+      let emailChoice: EmailChangeChoice = { mode: "record_only" }
+      if (companyEmail !== previousCompanyEmail && companyEmail.endsWith(staffDomainSuffix)) {
+        emailChoice = await new Promise<EmailChangeChoice>((resolve) =>
+          setEmailChangeRequest({
+            oldEmail: previousCompanyEmail,
+            newEmail: companyEmail,
+            oldIsCpanel: previousCompanyEmail.endsWith(staffDomainSuffix),
+            resolve,
+          })
+        )
+        setEmailChangeRequest(null)
+        if (!emailChoice) {
+          setIsSaving(false)
+          return
+        }
+      }
+
       // 1. Fetch current profile state from DB to compare changes
       const { data: currentProfile, error: fetchErr } = await supabase
         .from("profiles")
@@ -674,9 +712,23 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       const emailSyncResponse = await apiFetch(`/api/admin/hr/employees/${selectedEmployee.id}/email`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyEmail, additionalEmail: additionalEmail || null }),
+        body: JSON.stringify({
+          companyEmail,
+          additionalEmail: additionalEmail || null,
+          mailbox: emailChoice.mode === "mailbox" ? emailChoice.options : undefined,
+        }),
       })
-      if (!emailSyncResponse.ok) throw new Error("Failed to sync employee login email")
+      const emailSyncPayload = (await emailSyncResponse.json().catch(() => null)) as {
+        error?: string
+        mailbox?: { password: string | null; done: string[]; errors: string[] } | null
+      } | null
+      if (!emailSyncResponse.ok) throw new Error(emailSyncPayload?.error || "Failed to sync employee login email")
+      const mailboxResult = emailSyncPayload?.mailbox
+      if (mailboxResult) {
+        if (mailboxResult.done.length > 0) toast.success(mailboxResult.done.join(" · "))
+        for (const err of mailboxResult.errors) toast.warning(`Mailbox: ${err}`, { duration: 12000 })
+        if (mailboxResult.password) setNewMailboxCredentials({ email: companyEmail, password: mailboxResult.password })
+      }
 
       const { error } = await supabase.from("profiles").update(updateData).eq("id", selectedEmployee.id)
       if (error) throw error
@@ -846,6 +898,19 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">Click to copy additional email</TooltipContent>
+              </Tooltip>
+            )}
+            {r.mailbox_status === "failed" && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge className="ml-5 w-fit bg-red-100 text-[10px] font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                    Mailbox failed
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  {r.mailbox_error || "Matrix could not create this mailbox on cPanel."} Use Send Webmail Credentials to
+                  retry.
+                </TooltipContent>
               </Tooltip>
             )}
           </div>
@@ -1449,6 +1514,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         onOpenChange={(open) => !open && setDispatchingEmployee(null)}
         onSuccess={() => void refetch()}
       />
+      <EmailChangeMailboxDialog
+        request={emailChangeRequest}
+        onResolve={(choice) => emailChangeRequest?.resolve(choice)}
+      />
+      <NewMailboxPasswordDialog credentials={newMailboxCredentials} onClose={() => setNewMailboxCredentials(null)} />
     </DataTablePage>
   )
 }

@@ -209,6 +209,23 @@ export function MailboxesPage() {
         hideOnMobile: true,
         accessor: (r) => r.employmentStatus,
       },
+      {
+        key: "provisioning",
+        label: "Matrix attempt",
+        sortable: true,
+        accessor: (r) => (r.provisioningError ? "failed" : "none"),
+        render: (r) =>
+          r.provisioningError ? (
+            <Badge
+              className="bg-red-100 font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400"
+              title={r.provisioningError}
+            >
+              Failed: {r.provisioningError}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-sm">-</span>
+          ),
+      },
     ],
     []
   )
@@ -221,6 +238,14 @@ export function MailboxesPage() {
         options: Array.from(new Set(missing.map((r) => r.department ?? "-")))
           .sort()
           .map((d) => ({ value: d, label: d })),
+      },
+      {
+        key: "provisioning",
+        label: "Matrix Attempt",
+        options: [
+          { value: "failed", label: "Failed" },
+          { value: "none", label: "Not attempted" },
+        ],
       },
       {
         key: "employmentStatus",

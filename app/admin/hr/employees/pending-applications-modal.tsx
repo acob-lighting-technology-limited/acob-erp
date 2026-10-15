@@ -19,6 +19,7 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { useDepartments } from "@/hooks/use-departments"
 import { OFFICE_LOCATIONS } from "@/lib/rooms-and-offices"
 import { generateStaffEmail } from "@/lib/employees/email"
+import { describeApprovalMailbox, type ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
@@ -58,7 +59,7 @@ interface ApprovalEmailPreview {
 }
 
 interface ApprovalEmailWarning {
-  audience: "ict" | "management"
+  audience: "ict" | "management" | "employee"
   reason: string
   recipients: string[]
 }
@@ -237,9 +238,12 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         throw new Error(result.error || "Failed to approve user")
       }
 
-      toast.success("Employee approved. Staff ID generated and ICT notified to set up their webmail.")
-      const ictWarning = (result.emailWarnings as ApprovalEmailWarning[] | undefined)?.find((w) => w.audience === "ict")
-      if (ictWarning) toast.warning(`ICT email not sent: ${ictWarning.reason}`)
+      const outcome = describeApprovalMailbox(result.mailbox as ApprovalMailboxOutcome | undefined)
+      if (outcome.tone === "success") toast.success(outcome.message)
+      else toast.warning(outcome.message, { duration: 12000 })
+      for (const warning of (result.emailWarnings as ApprovalEmailWarning[] | undefined) ?? []) {
+        toast.warning(warning.audience === "ict" ? `ICT email not sent: ${warning.reason}` : warning.reason)
+      }
 
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
@@ -653,7 +657,8 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         <div>
                           <h3 className="text-base font-bold tracking-tight">ICT Email Preview</h3>
                           <p className="text-muted-foreground text-xs">
-                            The email ICT receives on approval, asking them to create the mailbox.
+                            Approval creates the mailbox on cPanel automatically. ICT gets this email only if that
+                            fails, asking them to create it by hand.
                           </p>
                         </div>
                         {isLoadingApprovalPreview ? <Loader2 className="text-primary h-4 w-4 animate-spin" /> : null}

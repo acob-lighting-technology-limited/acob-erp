@@ -22,7 +22,9 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { AlertTriangle, Loader2, CheckCircle2, List, Mail } from "lucide-react"
+import { AlertTriangle, Loader2, CheckCircle2, List, Mail, Inbox } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import type { EmployeeMailboxActions, EmployeeMailboxState } from "@/lib/employees/mailbox-state"
 import { toast } from "sonner"
 import type { EmploymentStatus } from "@/types/database"
 import { EmployeeStatusBadge } from "./employee-status-badge"
@@ -99,6 +101,15 @@ async function fetchEmployeeStatusBlockers(employeeId: string): Promise<ExitBloc
   return result.blockers || null
 }
 
+async function fetchEmployeeMailbox(employeeId: string): Promise<EmployeeMailboxState | null> {
+  const response = await apiFetch(`/api/admin/hr/employees/${employeeId}/mailbox`, { method: "GET" })
+  if (!response.ok) return null
+  const result = await response.json().catch(() => null)
+  return (result?.data ?? null) as EmployeeMailboxState | null
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 async function fetchActiveLeaveTypes(): Promise<LeaveTypeOption[]> {
   const supabase = createClient()
   const { data, error } = await supabase.from("leave_types").select("id, name").eq("is_active", true).order("name")
@@ -118,6 +129,12 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
   const [isSendingNotification, setIsSendingNotification] = useState(false)
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState("")
   const [localBlockersOverride, setLocalBlockersOverride] = useState<ExitBlockers | null>(null)
+  // Company mailbox steps, confirmed alongside the status change.
+  const [suspendMailboxLogin, setSuspendMailboxLogin] = useState(true)
+  const [forwardMail, setForwardMail] = useState(true)
+  const [forwardTo, setForwardTo] = useState("")
+  const [restoreMailboxLogin, setRestoreMailboxLogin] = useState(true)
+  const [removeForwards, setRemoveForwards] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -136,6 +153,41 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
   })
 
   const blockers = localBlockersOverride ?? queryBlockers ?? null
+
+  const { data: mailboxState, isFetching: isFetchingMailbox } = useQuery({
+    queryKey: ["hr-employee-mailbox", employee.id],
+    queryFn: () => fetchEmployeeMailbox(employee.id),
+    enabled: Boolean(employee.id),
+    staleTime: 60 * 1000,
+  })
+  const mailboxManaged = Boolean(mailboxState?.managed && mailboxState.exists)
+
+  useEffect(() => {
+    setSuspendMailboxLogin(true)
+    setForwardMail(true)
+    setForwardTo(mailboxState?.suggestedForward ?? "")
+    setRestoreMailboxLogin(true)
+    setRemoveForwards(true)
+  }, [status, mailboxState])
+
+  /** The mailbox steps for the chosen status, or undefined when there are none. */
+  const buildMailboxActions = (): EmployeeMailboxActions | undefined => {
+    if (!mailboxManaged || !mailboxState) return undefined
+    if (status === "suspended") return suspendMailboxLogin ? { suspendLogin: true } : undefined
+    if (status === "exited") {
+      const target = forwardMail ? forwardTo.trim().toLowerCase() : ""
+      if (!suspendMailboxLogin && !target) return undefined
+      return { suspendLogin: suspendMailboxLogin, forwardTo: target || null }
+    }
+    if (status === "active") {
+      const actions: EmployeeMailboxActions = {
+        restoreLogin: mailboxState.suspendedLogin && restoreMailboxLogin,
+        removeForwards: removeForwards ? mailboxState.forwards : [],
+      }
+      return actions.restoreLogin || (actions.removeForwards?.length ?? 0) > 0 ? actions : undefined
+    }
+    return undefined
+  }
 
   const { data: leaveTypeOptions = [], isFetching: isLoadingLeaveTypes } = useQuery({
     queryKey: QUERY_KEYS.hrLeaveTypesActive(),
@@ -161,6 +213,11 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
 
     if (status === "exited" && !exitDate) {
       toast.error("Please provide an exit date")
+      return
+    }
+
+    if (status === "exited" && mailboxManaged && forwardMail && !EMAIL_PATTERN.test(forwardTo.trim())) {
+      toast.error("Enter a valid address to forward mail to, or untick forwarding")
       return
     }
 
@@ -202,6 +259,7 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
           leave_type_name: status === "on_leave" ? selectedLeaveType?.name : undefined,
           suspension_end_date: status === "suspended" ? suspensionEndDate || null : undefined,
           separation_date: status === "exited" ? exitDate : undefined,
+          mailbox: buildMailboxActions(),
         }),
       })
 
@@ -213,8 +271,13 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
         throw new Error(error.error || "Failed to update status")
       }
 
-      const result = await response.json()
+      const result = (await response.json()) as {
+        message?: string
+        mailbox?: { done: string[]; errors: string[] } | null
+      }
       toast.success(result.message || "Status updated successfully")
+      if (result.mailbox?.done.length) toast.success(result.mailbox.done.join(" · "))
+      for (const error of result.mailbox?.errors ?? []) toast.warning(`Mailbox: ${error}`, { duration: 12000 })
 
       router.refresh()
 
@@ -404,6 +467,94 @@ export function ChangeStatusContent({ employee, onSuccess, onCancel }: ChangeSta
             <p className="text-xs text-amber-600 italic dark:text-amber-400">
               * Exit is blocked until every active responsibility is unassigned/reassigned.
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Company mailbox (cPanel) */}
+      {isStatusChanged && (isSuspending || isExiting || status === "active") && mailboxState?.email && (
+        <div className="space-y-3 rounded-lg border p-4">
+          <h4 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+            <Inbox className="h-4 w-4" /> Company mailbox
+            <span className="text-muted-foreground font-mono text-xs font-normal">{mailboxState.email}</span>
+          </h4>
+          {isFetchingMailbox && !mailboxState ? (
+            <p className="text-muted-foreground text-xs">Checking the mailbox...</p>
+          ) : mailboxState.error ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Could not reach cPanel ({mailboxState.error}). The status will still change; update the mailbox in cPanel.
+            </p>
+          ) : !mailboxState.managed ? (
+            <p className="text-muted-foreground text-xs">Not a cPanel mailbox, so Matrix cannot change it.</p>
+          ) : !mailboxState.exists ? (
+            <p className="text-muted-foreground text-xs">No mailbox exists on cPanel for this address.</p>
+          ) : status === "active" ? (
+            <>
+              {mailboxState.suspendedLogin ? (
+                <label className="flex items-start gap-2 text-sm">
+                  <Checkbox
+                    checked={restoreMailboxLogin}
+                    onCheckedChange={(v) => setRestoreMailboxLogin(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span>Restore mailbox login</span>
+                </label>
+              ) : (
+                <p className="text-muted-foreground text-xs">Mailbox login is already active.</p>
+              )}
+              {mailboxState.forwards.length > 0 && (
+                <label className="flex items-start gap-2 text-sm">
+                  <Checkbox
+                    checked={removeForwards}
+                    onCheckedChange={(v) => setRemoveForwards(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span>Stop forwarding to {mailboxState.forwards.join(", ")}</span>
+                </label>
+              )}
+            </>
+          ) : (
+            <>
+              <label className="flex items-start gap-2 text-sm">
+                <Checkbox
+                  checked={suspendMailboxLogin}
+                  onCheckedChange={(v) => setSuspendMailboxLogin(v === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Suspend mailbox login
+                  <span className="text-muted-foreground block text-xs">
+                    {mailboxState.suspendedLogin
+                      ? "Already suspended."
+                      : "They can no longer open the mailbox. Incoming mail still arrives."}
+                  </span>
+                </span>
+              </label>
+              {isExiting && (
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox
+                      checked={forwardMail}
+                      onCheckedChange={(v) => setForwardMail(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span>Forward their incoming mail to</span>
+                  </label>
+                  {forwardMail && (
+                    <Input
+                      type="email"
+                      value={forwardTo}
+                      onChange={(e) => setForwardTo(e.target.value)}
+                      placeholder="line.manager@org.acoblighting.com"
+                      className="font-mono text-xs"
+                    />
+                  )}
+                  {forwardMail && mailboxState.suggestedForward && (
+                    <p className="text-muted-foreground text-xs">Defaults to their department lead.</p>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

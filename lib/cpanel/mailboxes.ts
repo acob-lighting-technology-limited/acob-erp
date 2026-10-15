@@ -27,6 +27,8 @@ export interface MissingMailboxRow {
   department: string | null
   email: string
   employmentStatus: string
+  /** cPanel's reason when Matrix's own attempt to create the mailbox failed. */
+  provisioningError: string | null
 }
 
 export interface MailboxReport {
@@ -45,6 +47,8 @@ interface ProfileRow {
   department: string | null
   company_email: string | null
   employment_status: string | null
+  mailbox_status: string | null
+  mailbox_error: string | null
 }
 
 const INACTIVE_STATUSES = new Set(["exited", "suspended"])
@@ -64,7 +68,9 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
     getAccountUsage(),
     serviceClient
       .from("profiles")
-      .select("id, full_name, first_name, last_name, department, company_email, employment_status")
+      .select(
+        "id, full_name, first_name, last_name, department, company_email, employment_status, mailbox_status, mailbox_error"
+      )
       .not("company_email", "is", null),
   ])
   if (profilesResult.error) throw new Error(profilesResult.error.message)
@@ -106,6 +112,7 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
       department: p.department,
       email: (p.company_email ?? "").trim().toLowerCase(),
       employmentStatus: p.employment_status ?? "active",
+      provisioningError: p.mailbox_status === "failed" ? (p.mailbox_error ?? "Failed") : null,
     }))
 
   return { mailboxes: rows, missing, account, staffDomain }
