@@ -297,7 +297,7 @@ export async function PATCH() {
           const leaveTypeName = (leaveType as { name?: string } | null)?.name || "Leave"
           const pendingStage = leaveStageLabel(request.current_stage_code || "")
           const currentApprover = displayName(approver, "the assigned approver")
-          const leaveReference = formatLeaveReference(request.id)
+          const leaveReference = formatLeaveReference(request.id) ?? "Leave request"
           const period = request.start_date
             ? request.end_date
               ? `${request.start_date} to ${request.end_date}`
