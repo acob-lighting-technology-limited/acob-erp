@@ -18,9 +18,9 @@ import { SuspensionDialog, type SuspensionTarget } from "./_components/suspensio
 
 export const MAILBOXES_QUERY_KEY = ["admin-mailboxes"] as const
 
-type TabKey = "all" | "attention" | "suspended" | "missing"
+type TabKey = "active" | "attention" | "suspended" | "missing"
 
-const TAB_KEYS: TabKey[] = ["all", "attention", "suspended", "missing"]
+const TAB_KEYS: TabKey[] = ["active", "attention", "suspended", "missing"]
 
 const OWNER_LABELS: Record<MailboxReportRow["ownerKind"], string> = {
   staff: "Staff",
@@ -70,13 +70,13 @@ function OwnerCell({ row }: { row: MailboxReportRow }) {
 
 export function MailboxesPage() {
   // The tab lives in state, not the URL: DataTable's own query-string handling
-  // rewrites the URL and would drop ?tab=, bouncing back to "all" in a loop.
+  // rewrites the URL and would drop ?tab=, bouncing back to the first tab in a loop.
   // The URL is still read once so a link (e.g. from the 90% alert email) lands
   // on the right tab.
   const searchParams = useSearchParams()
   const [tab, setTab] = useState<TabKey>(() => {
     const fromUrl = searchParams.get("tab") as TabKey | null
-    return fromUrl && TAB_KEYS.includes(fromUrl) ? fromUrl : "all"
+    return fromUrl && TAB_KEYS.includes(fromUrl) ? fromUrl : "active"
   })
   const [quotaTarget, setQuotaTarget] = useState<MailboxReportRow | null>(null)
   const [suspensionTarget, setSuspensionTarget] = useState<SuspensionTarget | null>(null)
@@ -85,7 +85,10 @@ export function MailboxesPage() {
   const mailboxes = useMemo(() => data?.mailboxes ?? [], [data])
   const missing = useMemo(() => data?.missing ?? [], [data])
   const attention = useMemo(() => mailboxes.filter((m) => m.needsAttention), [mailboxes])
+  // Active and Suspended split every mailbox between them, so none is hidden;
+  // a leaver nobody suspended stays in Active and is flagged in Needs attention.
   const suspended = useMemo(() => mailboxes.filter((m) => m.suspendedLogin || m.suspendedIncoming), [mailboxes])
+  const active = useMemo(() => mailboxes.filter((m) => !m.suspendedLogin && !m.suspendedIncoming), [mailboxes])
 
   const stats = useMemo(() => {
     const account = data?.account
@@ -282,14 +285,14 @@ export function MailboxesPage() {
   )
 
   const tabs: DataTableTab[] = [
-    { key: "all", label: `All mailboxes (${mailboxes.length})`, icon: Inbox },
+    { key: "active", label: `Active (${active.length})`, icon: Inbox },
     { key: "attention", label: `Needs attention (${attention.length})`, icon: AlertTriangle },
     { key: "suspended", label: `Suspended (${suspended.length})`, icon: Lock },
     { key: "missing", label: `No mailbox (${missing.length})`, icon: UserX },
   ]
 
   const errorMessage = error instanceof Error ? error.message : null
-  const mailboxRows = tab === "attention" ? attention : tab === "suspended" ? suspended : mailboxes
+  const mailboxRows = tab === "attention" ? attention : tab === "suspended" ? suspended : active
 
   return (
     <DataTablePage
@@ -401,14 +404,14 @@ export function MailboxesPage() {
               ? "Nothing needs attention"
               : tab === "suspended"
                 ? "No suspended mailboxes"
-                : "No mailboxes"
+                : "No active mailboxes"
           }
           emptyDescription={
             tab === "attention"
               ? "Mailboxes 90% full or more, and mailboxes of exited or suspended staff that can still log in, show up here."
               : tab === "suspended"
                 ? "Mailboxes whose login or incoming mail is suspended show up here."
-                : "cPanel returned no mailboxes."
+                : "Every mailbox is suspended — see the Suspended tab."
           }
           emptyIcon={Inbox}
         />
