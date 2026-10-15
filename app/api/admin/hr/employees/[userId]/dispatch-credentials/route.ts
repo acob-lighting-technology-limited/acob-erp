@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import crypto from "crypto"
 import { createClient } from "@/lib/supabase/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -16,6 +17,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 
 const log = logger("api-dispatch-credentials")
+const SETUP_TOKEN_TTL_MS = 72 * 60 * 60 * 1000
 
 interface RouteContext {
   params: Promise<{ userId: string }>
@@ -79,6 +81,30 @@ export async function POST(req: NextRequest, context: RouteContext) {
       .eq("id", user.id)
       .maybeSingle()
 
+    // Account activation is not a password reset. Generate a one-time, opaque
+    // activation token for the welcome letter so a new colleague is never sent
+    // Supabase's recovery email merely to choose their first password.
+    const setupToken = crypto.randomBytes(32).toString("base64url")
+    const setupTokenHash = crypto.createHash("sha256").update(setupToken).digest("hex")
+    const setupTokenExpiresAt = new Date(Date.now() + SETUP_TOKEN_TTL_MS).toISOString()
+    const portalUrl = (process.env.NEXT_PUBLIC_PORTAL_URL || "https://matrix.acoblighting.com").replace(/\/$/, "")
+    const activationUrl = `${portalUrl}/auth/setup-account?token=${encodeURIComponent(setupToken)}`
+
+    const { error: tokenError } = await dataClient
+      .from("profiles")
+      .update({
+        setup_token: setupTokenHash,
+        setup_token_expires_at: setupTokenExpiresAt,
+        must_reset_password: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+
+    if (tokenError) {
+      log.error({ err: tokenError, profileId: id }, "Failed to issue account activation token")
+      return NextResponse.json({ error: "Could not prepare the Matrix activation link" }, { status: 500 })
+    }
+
     // Render Welcome Email HTML
     const emailHtml = renderWelcomeEmail({
       pendingUser: {
@@ -94,6 +120,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         phone_number: profile.phone_number || undefined,
       },
       tempPassword: rawPassword,
+      activationUrl,
       preparedBy: {
         name: callerProfile?.full_name || "Admin & IT",
         designation: callerProfile?.designation || "Administrator",
@@ -121,6 +148,11 @@ export async function POST(req: NextRequest, context: RouteContext) {
     })
 
     if (!sendResult.sent) {
+      await dataClient
+        .from("profiles")
+        .update({ setup_token: null, setup_token_expires_at: null, must_reset_password: false })
+        .eq("id", id)
+        .eq("setup_token", setupTokenHash)
       log.error({ reason: sendResult.reason, recipient: profile.personal_email }, "Failed to send credentials email")
       return NextResponse.json({ error: `Failed to deliver email: ${sendResult.reason}` }, { status: 502 })
     }
