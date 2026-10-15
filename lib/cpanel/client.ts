@@ -192,6 +192,24 @@ export async function setMailboxLoginSuspended(email: string, suspended: boolean
 }
 
 /**
+ * Rejects (or accepts again) mail sent TO the mailbox — senders get a bounce.
+ * Only for a mailbox that is truly abandoned; for a leaver, suspending login
+ * and forwarding is usually right, so their mail is not lost.
+ */
+export async function setMailboxIncomingSuspended(email: string, suspended: boolean): Promise<void> {
+  const address = email.trim().toLowerCase()
+  splitAddress(address)
+  await uapi(suspended ? "Email/suspend_incoming" : "Email/unsuspend_incoming", { email: address }, "POST")
+}
+
+/** Blocks (or allows again) sending from the mailbox, including by scripts or a leaked password. */
+export async function setMailboxOutgoingSuspended(email: string, suspended: boolean): Promise<void> {
+  const address = email.trim().toLowerCase()
+  splitAddress(address)
+  await uapi(suspended ? "Email/suspend_outgoing" : "Email/unsuspend_outgoing", { email: address }, "POST")
+}
+
+/**
  * A strong random mailbox password. cPanel rejects weak passwords, so it
  * always mixes upper, lower, digits and a symbol.
  */

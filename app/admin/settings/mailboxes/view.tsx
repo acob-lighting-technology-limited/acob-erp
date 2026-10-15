@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { useRouter, useSearchParams } from "next/navigation"
-import { AlertTriangle, Database, HardDrive, Inbox, MailWarning, UserX } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { AlertTriangle, Database, HardDrive, Inbox, Lock, LockOpen, MailWarning, UserX } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -11,13 +11,16 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { MailboxUsageBar } from "@/components/mailbox/mailbox-usage-bar"
 import { apiFetch } from "@/lib/api-client"
-import { MAILBOX_ALERT_PERCENT, mailboxLevel } from "@/lib/cpanel/quota"
+import { MAILBOX_ALERT_PERCENT, formatBytes, mailboxLevel } from "@/lib/cpanel/quota"
 import type { MailboxReport, MailboxReportRow, MissingMailboxRow } from "@/lib/cpanel/mailboxes"
 import { QuotaDialog } from "./_components/quota-dialog"
+import { SuspensionDialog, type SuspensionTarget } from "./_components/suspension-dialog"
 
 export const MAILBOXES_QUERY_KEY = ["admin-mailboxes"] as const
 
-type TabKey = "all" | "attention" | "missing"
+type TabKey = "all" | "attention" | "suspended" | "missing"
+
+const TAB_KEYS: TabKey[] = ["all", "attention", "suspended", "missing"]
 
 const OWNER_LABELS: Record<MailboxReportRow["ownerKind"], string> = {
   staff: "Staff",
@@ -25,7 +28,12 @@ const OWNER_LABELS: Record<MailboxReportRow["ownerKind"], string> = {
   none: "No staff record",
 }
 
-const LEVEL_LABELS = { ok: "Under 80%", warn: "80–89%", alert: "90% and over" } as const
+/** How full a mailbox is against its OWN quota — not how big it is. Sort the Used column for size. */
+const LEVEL_LABELS = {
+  ok: "Under 80% of quota",
+  warn: "80–89% of quota (filling up)",
+  alert: "90%+ of quota (almost full)",
+} as const
 
 async function fetchReport(): Promise<MailboxReport> {
   const res = await apiFetch("/api/admin/mailboxes", { cache: "no-store" })
@@ -61,16 +69,23 @@ function OwnerCell({ row }: { row: MailboxReportRow }) {
 }
 
 export function MailboxesPage() {
-  const router = useRouter()
+  // The tab lives in state, not the URL: DataTable's own query-string handling
+  // rewrites the URL and would drop ?tab=, bouncing back to "all" in a loop.
+  // The URL is still read once so a link (e.g. from the 90% alert email) lands
+  // on the right tab.
   const searchParams = useSearchParams()
-  const rawTab = searchParams.get("tab")
-  const tab: TabKey = rawTab === "attention" || rawTab === "missing" ? rawTab : "all"
+  const [tab, setTab] = useState<TabKey>(() => {
+    const fromUrl = searchParams.get("tab") as TabKey | null
+    return fromUrl && TAB_KEYS.includes(fromUrl) ? fromUrl : "all"
+  })
   const [quotaTarget, setQuotaTarget] = useState<MailboxReportRow | null>(null)
+  const [suspensionTarget, setSuspensionTarget] = useState<SuspensionTarget | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery({ queryKey: MAILBOXES_QUERY_KEY, queryFn: fetchReport })
   const mailboxes = useMemo(() => data?.mailboxes ?? [], [data])
   const missing = useMemo(() => data?.missing ?? [], [data])
   const attention = useMemo(() => mailboxes.filter((m) => m.needsAttention), [mailboxes])
+  const suspended = useMemo(() => mailboxes.filter((m) => m.suspendedLogin || m.suspendedIncoming), [mailboxes])
 
   const stats = useMemo(() => {
     const account = data?.account
@@ -111,7 +126,7 @@ export function MailboxesPage() {
       },
       {
         key: "usage",
-        label: "Storage",
+        label: "Fullness",
         sortable: true,
         accessor: (m) => m.usedPercent ?? 0,
         initialWidth: 200,
@@ -123,6 +138,14 @@ export function MailboxesPage() {
             className="w-44"
           />
         ),
+      },
+      {
+        key: "used",
+        label: "Used",
+        sortable: true,
+        hideOnMobile: true,
+        accessor: (m) => m.usedBytes,
+        render: (m) => <span className="text-sm tabular-nums">{formatBytes(m.usedBytes)}</span>,
       },
       {
         key: "login",
@@ -157,7 +180,7 @@ export function MailboxesPage() {
       },
       {
         key: "level",
-        label: "Storage",
+        label: "Fullness",
         mode: "custom",
         options: (Object.keys(LEVEL_LABELS) as Array<keyof typeof LEVEL_LABELS>).map((k) => ({
           value: k,
@@ -261,11 +284,12 @@ export function MailboxesPage() {
   const tabs: DataTableTab[] = [
     { key: "all", label: `All mailboxes (${mailboxes.length})`, icon: Inbox },
     { key: "attention", label: `Needs attention (${attention.length})`, icon: AlertTriangle },
+    { key: "suspended", label: `Suspended (${suspended.length})`, icon: Lock },
     { key: "missing", label: `No mailbox (${missing.length})`, icon: UserX },
   ]
 
   const errorMessage = error instanceof Error ? error.message : null
-  const mailboxRows = tab === "attention" ? attention : mailboxes
+  const mailboxRows = tab === "attention" ? attention : tab === "suspended" ? suspended : mailboxes
 
   return (
     <DataTablePage
@@ -275,7 +299,7 @@ export function MailboxesPage() {
       backLink={{ href: "/admin/settings", label: "Back to Settings" }}
       tabs={tabs}
       activeTab={tab}
-      onTabChange={(next) => router.replace(next === "all" ? "?" : `?tab=${next}`, { scroll: false })}
+      onTabChange={(next) => setTab(next as TabKey)}
       stats={
         <StatGrid>
           <StatCard
@@ -342,7 +366,22 @@ export function MailboxesPage() {
           isLoading={isLoading}
           error={errorMessage}
           onRetry={() => void refetch()}
-          rowActions={[{ label: "Change quota", icon: HardDrive, onClick: (m) => setQuotaTarget(m) }]}
+          rowActions={[
+            { label: "Change quota", icon: HardDrive, onClick: (m) => setQuotaTarget(m) },
+            {
+              label: "Suspend mailbox",
+              icon: Lock,
+              variant: "destructive",
+              hidden: (m) => m.suspendedLogin,
+              onClick: (m) => setSuspensionTarget({ mailbox: m, action: "suspend" }),
+            },
+            {
+              label: "Restore mailbox",
+              icon: LockOpen,
+              hidden: (m) => !m.suspendedLogin && !m.suspendedIncoming,
+              onClick: (m) => setSuspensionTarget({ mailbox: m, action: "restore" }),
+            },
+          ]}
           mobileRow={{
             title: (m) => m.email,
             subtitle: (m) => m.owner?.name ?? "No staff record",
@@ -357,20 +396,32 @@ export function MailboxesPage() {
             onSelect: (m) => setQuotaTarget(m),
           }}
           pagination={{ pageSize: 50 }}
-          emptyTitle={tab === "attention" ? "Nothing needs attention" : "No mailboxes"}
+          emptyTitle={
+            tab === "attention"
+              ? "Nothing needs attention"
+              : tab === "suspended"
+                ? "No suspended mailboxes"
+                : "No mailboxes"
+          }
           emptyDescription={
             tab === "attention"
               ? "Mailboxes 90% full or more, and mailboxes of exited or suspended staff that can still log in, show up here."
-              : "cPanel returned no mailboxes."
+              : tab === "suspended"
+                ? "Mailboxes whose login or incoming mail is suspended show up here."
+                : "cPanel returned no mailboxes."
           }
           emptyIcon={Inbox}
-          urlSync
         />
       )}
 
       <QuotaDialog
         mailbox={quotaTarget}
         onOpenChange={(open) => !open && setQuotaTarget(null)}
+        onSaved={() => void refetch()}
+      />
+      <SuspensionDialog
+        target={suspensionTarget}
+        onOpenChange={(open) => !open && setSuspensionTarget(null)}
         onSaved={() => void refetch()}
       />
     </DataTablePage>
