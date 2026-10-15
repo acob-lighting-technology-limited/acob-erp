@@ -7,12 +7,20 @@ import { logger } from "@/lib/logger"
 import { createClient } from "@/lib/supabase/server"
 import { formValidation } from "@/lib/validation"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { renameStaffMailbox } from "@/lib/employees/mailbox-rename"
+import { MailboxRenameOptionsSchema, type MailboxRenameResult } from "@/lib/employees/mailbox-rename-types"
 
 const log = logger("admin-hr-employee-email")
 
 const UpdateEmployeeEmailSchema = z.object({
   companyEmail: z.string().trim().toLowerCase().min(1, "Company email is required"),
   additionalEmail: z.string().trim().toLowerCase().nullable().optional(),
+  /**
+   * Set only when the admin confirmed, in the email-change dialog, that the new
+   * address should get a cPanel mailbox. Without it this route changes the
+   * record and login email only — cPanel is never touched implicitly.
+   */
+  mailbox: MailboxRenameOptionsSchema.optional(),
 })
 
 type EmployeeEmailClient = Awaited<ReturnType<typeof createClient>>
@@ -142,6 +150,29 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ use
       return NextResponse.json({ error: profileUpdateError.message }, { status: 400 })
     }
 
+    const previousEmail = (currentProfile.company_email ?? "").trim().toLowerCase()
+    let mailbox: MailboxRenameResult | null = null
+    if (parsed.data.mailbox && previousEmail !== companyEmail) {
+      mailbox = await renameStaffMailbox(serviceSupabase, {
+        profileId: employeeId,
+        oldEmail: previousEmail,
+        newEmail: companyEmail,
+        options: parsed.data.mailbox,
+      })
+      await writeAuditLog(
+        supabase,
+        {
+          action: "update",
+          entityType: "mailbox",
+          entityId: companyEmail,
+          oldValues: { company_email: previousEmail },
+          newValues: { steps: mailbox.done, errors: mailbox.errors },
+          context: { actorId: user.id, source: "api", route: "/api/admin/hr/employees/[userId]/email" },
+        },
+        { failOpen: true }
+      )
+    }
+
     await writeAuditLog(
       supabase,
       {
@@ -163,7 +194,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ use
       { failOpen: true }
     )
 
-    return NextResponse.json({ ok: true, companyEmail, additionalEmail })
+    return NextResponse.json({ ok: true, companyEmail, additionalEmail, mailbox })
   } catch (error: unknown) {
     log.error({ err: String(error) }, "Failed to sync employee email")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

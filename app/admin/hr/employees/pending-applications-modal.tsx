@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
-import { Loader2, CheckCircle, UserPlus, ChevronRight, ShieldCheck, Hash, Mail } from "lucide-react"
+import { Loader2, CheckCircle, UserPlus, ChevronRight, ShieldCheck, Hash, Mail, RefreshCw } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -18,6 +18,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { toLocalISODate } from "@/lib/utils/date"
 import { useDepartments } from "@/hooks/use-departments"
 import { OFFICE_LOCATIONS } from "@/lib/rooms-and-offices"
+import { generateStaffEmail } from "@/lib/employees/email"
+import { describeApprovalMailbox, type ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
@@ -57,7 +59,7 @@ interface ApprovalEmailPreview {
 }
 
 interface ApprovalEmailWarning {
-  audience: "ict" | "management"
+  audience: "ict" | "management" | "employee"
   reason: string
   recipients: string[]
 }
@@ -136,6 +138,34 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
     enabled: isOpen && !!selectedUser?.id,
   })
 
+  const [isEmailManuallyEdited, setIsEmailManuallyEdited] = useState(false)
+
+  const expectedEmail = generateStaffEmail(firstName, lastName)
+  const isEmailOutOfSync = Boolean(
+    expectedEmail && companyEmail && companyEmail.toLowerCase().trim() !== expectedEmail.toLowerCase().trim()
+  )
+
+  const handleFirstNameChange = (val: string) => {
+    setFirstName(val)
+    if (!isEmailManuallyEdited) {
+      const nextExpected = generateStaffEmail(val, lastName)
+      if (nextExpected) setCompanyEmail(nextExpected)
+    }
+  }
+
+  const handleLastNameChange = (val: string) => {
+    setLastName(val)
+    if (!isEmailManuallyEdited) {
+      const nextExpected = generateStaffEmail(firstName, val)
+      if (nextExpected) setCompanyEmail(nextExpected)
+    }
+  }
+
+  const handleCompanyEmailChange = (val: string) => {
+    setCompanyEmail(val)
+    setIsEmailManuallyEdited(true)
+  }
+
   const handleUserSelect = useCallback((user: PendingUser) => {
     setSelectedUser(user)
     setEmploymentType((user.employment_type as any) || "full_time")
@@ -146,6 +176,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
     setDepartment(user.department || "")
     setDesignation(user.designation || "")
     setCompanyEmail(user.company_email || "")
+    setIsEmailManuallyEdited(false)
     setPersonalEmailState(user.personal_email || "")
     setPhoneNumber(user.phone_number || "")
     setResidentialAddress(user.residential_address || "")
@@ -207,9 +238,12 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
         throw new Error(result.error || "Failed to approve user")
       }
 
-      toast.success("Employee approved. Staff ID generated and ICT notified to set up their webmail.")
-      const ictWarning = (result.emailWarnings as ApprovalEmailWarning[] | undefined)?.find((w) => w.audience === "ict")
-      if (ictWarning) toast.warning(`ICT email not sent: ${ictWarning.reason}`)
+      const outcome = describeApprovalMailbox(result.mailbox as ApprovalMailboxOutcome | undefined)
+      if (outcome.tone === "success") toast.success(outcome.message)
+      else toast.warning(outcome.message, { duration: 12000 })
+      for (const warning of (result.emailWarnings as ApprovalEmailWarning[] | undefined) ?? []) {
+        toast.warning(warning.audience === "ict" ? `ICT email not sent: ${warning.reason}` : warning.reason)
+      }
 
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
@@ -413,7 +447,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         value={
                           <Input
                             value={firstName}
-                            onChange={(e) => setFirstName(e.target.value)}
+                            onChange={(e) => handleFirstNameChange(e.target.value)}
                             className="focus-visible:ring-primary h-8 border-0 bg-transparent font-medium shadow-none focus-visible:ring-1"
                           />
                         }
@@ -423,7 +457,7 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         value={
                           <Input
                             value={lastName}
-                            onChange={(e) => setLastName(e.target.value)}
+                            onChange={(e) => handleLastNameChange(e.target.value)}
                             className="focus-visible:ring-primary h-8 border-0 bg-transparent font-medium shadow-none focus-visible:ring-1"
                           />
                         }
@@ -474,11 +508,38 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                           <DetailRow
                             label="System Email"
                             value={
-                              <Input
-                                value={companyEmail}
-                                onChange={(e) => setCompanyEmail(e.target.value)}
-                                className="focus-visible:ring-primary h-8 border-0 bg-transparent font-medium shadow-none focus-visible:ring-1"
-                              />
+                              <div className="flex w-full flex-col gap-1 py-0.5">
+                                <div className="flex w-full items-center gap-1.5">
+                                  <Input
+                                    value={companyEmail}
+                                    onChange={(e) => handleCompanyEmailChange(e.target.value)}
+                                    className="focus-visible:ring-primary h-8 flex-1 border-0 bg-transparent font-medium shadow-none focus-visible:ring-1"
+                                  />
+                                  {isEmailOutOfSync && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="flex h-7 shrink-0 items-center gap-1 px-2 text-xs font-normal text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
+                                      onClick={() => {
+                                        setCompanyEmail(expectedEmail)
+                                        setIsEmailManuallyEdited(false)
+                                        toast.info(`Email synced to ${expectedEmail}`)
+                                      }}
+                                      title={`Sync with current name: ${expectedEmail}`}
+                                    >
+                                      <RefreshCw className="h-3 w-3" />
+                                      Sync ({expectedEmail.split("@")[0]})
+                                    </Button>
+                                  )}
+                                </div>
+                                {isEmailOutOfSync && (
+                                  <span className="pl-3 text-[11px] text-amber-600/90">
+                                    Notice: does not match current name (expected:{" "}
+                                    <strong className="font-mono">{expectedEmail}</strong>)
+                                  </span>
+                                )}
+                              </div>
                             }
                           />
                           <DetailRow
@@ -596,7 +657,8 @@ export function PendingApplicationsModal({ onEmployeeCreated }: PendingApplicati
                         <div>
                           <h3 className="text-base font-bold tracking-tight">ICT Email Preview</h3>
                           <p className="text-muted-foreground text-xs">
-                            The email ICT receives on approval, asking them to create the mailbox.
+                            Approval creates the mailbox on cPanel automatically. ICT gets this email only if that
+                            fails, asking them to create it by hand.
                           </p>
                         </div>
                         {isLoadingApprovalPreview ? <Loader2 className="text-primary h-4 w-4 animate-spin" /> : null}

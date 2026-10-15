@@ -9,6 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { MailboxUsage, OpenMailboxButton } from "@/components/profile/mailbox-usage"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -472,37 +473,54 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
         </div>
 
         {/* Contact strip */}
-        <div className="text-muted-foreground mt-5 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t pt-4 text-sm sm:mt-6 sm:grid-cols-2 sm:pt-5 lg:flex lg:flex-wrap lg:items-center">
+        <div className="text-muted-foreground mt-5 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t pt-4 text-sm sm:mt-6 sm:grid-cols-2 sm:pt-5 lg:flex lg:flex-wrap lg:items-start">
           {profile.company_email && (
-            <a
-              href={`mailto:${profile.company_email}`}
-              className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
-              title={profile.company_email}
-            >
-              <Mail className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{profile.company_email}</span>
-            </a>
+            // Email on top, its mailbox storage underneath: one item, two lines.
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-1">
+                <a
+                  href={`mailto:${profile.company_email}`}
+                  className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
+                  title={profile.company_email}
+                >
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{profile.company_email}</span>
+                </a>
+                <OpenMailboxButton />
+              </div>
+              <MailboxUsage />
+            </div>
           )}
-          {profile.phone_number && (
-            <a
-              href={`tel:${profile.phone_number}`}
-              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
-            >
-              <Phone className="h-3.5 w-3.5 shrink-0" />
-              {profile.phone_number}
-            </a>
-          )}
-          {birthdayLabel && (
-            <span className="flex items-center gap-1.5">
-              <Cake className="h-3.5 w-3.5 shrink-0" />
-              {birthdayLabel}
-            </span>
-          )}
-          {profile.residential_address && (
-            <span className="flex min-w-0 items-center gap-1.5" title={profile.residential_address}>
-              <Home className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{profile.residential_address}</span>
-            </span>
+          {(profile.phone_number || birthdayLabel || profile.residential_address) && (
+            // Second column, mirroring the email block: phone and birthday on one
+            // line, the home address directly under them.
+            <div className="flex min-w-0 flex-col gap-1">
+              {(profile.phone_number || birthdayLabel) && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {profile.phone_number && (
+                    <a
+                      href={`tel:${profile.phone_number}`}
+                      className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+                    >
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      {profile.phone_number}
+                    </a>
+                  )}
+                  {birthdayLabel && (
+                    <span className="flex items-center gap-1.5">
+                      <Cake className="h-3.5 w-3.5 shrink-0" />
+                      {birthdayLabel}
+                    </span>
+                  )}
+                </div>
+              )}
+              {profile.residential_address && (
+                <span className="flex min-w-0 items-center gap-1.5" title={profile.residential_address}>
+                  <Home className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{profile.residential_address}</span>
+                </span>
+              )}
+            </div>
           )}
         </div>
       </CardContent>

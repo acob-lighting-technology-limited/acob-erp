@@ -53,6 +53,7 @@ import { logger } from "@/lib/logger"
 import type { UserRole } from "@/types/database"
 import type { Employee, UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import { apiFetch } from "@/lib/api-client"
+import { describeApprovalMailbox, type ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
 const log = logger("manage-users-dialog")
 
@@ -375,9 +376,13 @@ export function ManageUsersDialog({
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || "Failed to approve")
-      toast.success("Employee approved. Staff ID generated and ICT notified to set up their webmail.")
-      if (Array.isArray(result.emailWarnings) && result.emailWarnings.length > 0) {
-        toast.warning(`ICT email not sent: ${result.emailWarnings[0].reason}`)
+      const outcome = describeApprovalMailbox(result.mailbox as ApprovalMailboxOutcome | undefined)
+      if (outcome.tone === "success") toast.success(outcome.message)
+      else toast.warning(outcome.message, { duration: 12000 })
+      if (Array.isArray(result.emailWarnings)) {
+        for (const warning of result.emailWarnings as Array<{ audience: string; reason: string }>) {
+          toast.warning(warning.audience === "ict" ? `ICT email not sent: ${warning.reason}` : warning.reason)
+        }
       }
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })

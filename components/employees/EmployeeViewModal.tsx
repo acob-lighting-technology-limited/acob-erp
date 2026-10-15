@@ -55,6 +55,8 @@ import { createClient } from "@/lib/supabase/client"
 import type { UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import type { EmployeeAssignedItems, EmployeeProfile, EmployeeViewData } from "./types"
 import { apiFetch } from "@/lib/api-client"
+import { EmployeeMailboxSection } from "./EmployeeMailboxSection"
+import type { EmployeeMailboxActions } from "@/lib/employees/mailbox-state"
 
 export interface EditForm {
   role: UserRole
@@ -91,6 +93,10 @@ export interface EditForm {
   employment_type: "full_time" | "part_time" | "contract"
   contract_category_code?: string
   nysc_cds_day?: string
+  /** Mailbox steps to apply with a status change (set by EmployeeMailboxSection). */
+  mailbox_actions?: EmployeeMailboxActions
+  /** True while the mailbox forward address is invalid — saving is refused. */
+  mailbox_actions_invalid?: boolean
 }
 
 export interface EmployeeViewModalProps {
@@ -226,6 +232,20 @@ export function EmployeeViewModal({
   const [innerTab, setInnerTab] = useState<"assets" | "tasks" | "docs">("assets")
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
+  // Stable, and a no-op when nothing changed, so the section's effect cannot
+  // loop through setEditForm.
+  const handleMailboxActionsChange = useCallback(
+    (actions: EmployeeMailboxActions | undefined, invalid: boolean) => {
+      setEditForm((prev) =>
+        JSON.stringify(prev.mailbox_actions) === JSON.stringify(actions) &&
+        Boolean(prev.mailbox_actions_invalid) === invalid
+          ? prev
+          : { ...prev, mailbox_actions: actions, mailbox_actions_invalid: invalid }
+      )
+    },
+    [setEditForm]
+  )
+
   const handleCopy = useCallback((text: string, fieldName: string) => {
     if (!text) return
     void navigator.clipboard.writeText(text)
@@ -280,7 +300,12 @@ export function EmployeeViewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
+      <DialogContent
+        className={cn(
+          "flex h-[90vh] max-h-[90vh] flex-col gap-0 overflow-hidden p-0 transition-[max-width] duration-200 sm:rounded-xl",
+          modalViewMode === "signature" ? "max-w-5xl" : "max-w-3xl"
+        )}
+      >
         <DialogHeader className="bg-muted/20 border-b px-5 py-3.5 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -1040,6 +1065,15 @@ export function EmployeeViewModal({
                         </div>
                       </>
                     )}
+
+                    {viewEmployeeProfile && (
+                      <EmployeeMailboxSection
+                        employeeId={viewEmployeeProfile.id}
+                        fromStatus={String(viewEmployeeProfile.employment_status || "active")}
+                        toStatus={editForm.employment_status}
+                        onActionsChange={handleMailboxActionsChange}
+                      />
+                    )}
                   </div>
 
                   <div className="bg-muted/30 rounded border p-2.5 text-xs">
@@ -1227,7 +1261,7 @@ export function EmployeeViewModal({
 
           {viewEmployeeProfile && modalViewMode === "signature" && (
             <ScrollArea className="h-full">
-              <div className="p-5 sm:p-6">
+              <div className="p-5 pb-20 sm:p-6">
                 <SignatureCreator
                   profile={viewEmployeeProfile}
                   variant="selectable"

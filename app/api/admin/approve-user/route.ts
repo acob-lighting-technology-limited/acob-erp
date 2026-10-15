@@ -11,6 +11,10 @@ import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { ORG_MAIL_ROUTING } from "@/lib/org-config"
+import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
+import { provisionStaffMailbox } from "@/lib/employees/mailbox-provisioning"
+import { WELCOME_PROFILE_COLUMNS, sendMailboxWelcome, type WelcomeProfile } from "@/lib/employees/mailbox-welcome"
+import type { ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
 const log = logger("approve-user")
 
@@ -63,7 +67,7 @@ export async function POST(req: Request) {
   log.info({ callerId: caller.id }, "Starting approval process")
   try {
     const emailWarnings: Array<{
-      audience: "ict" | "management"
+      audience: "ict" | "management" | "employee"
       reason: string
       recipients: string[]
     }> = []
@@ -423,46 +427,109 @@ export async function POST(req: Request) {
       throw new Error(`Profile creation failed: ${approvalError.message}`)
     }
 
+    // Clean up any remaining duplicate pending submissions from this applicant.
+    // Values are applicant-supplied, so they are quoted for PostgREST; phone is
+    // not used — a shared number would delete another applicant's submission.
+    const duplicateOrFilters: string[] = []
+    if (pendingUser.personal_email) duplicateOrFilters.push(`personal_email.eq.${q(pendingUser.personal_email)}`)
+    if (pendingUser.email) duplicateOrFilters.push(`email.eq.${q(pendingUser.email)}`)
+    if (pendingUser.company_email) duplicateOrFilters.push(`company_email.eq.${q(pendingUser.company_email)}`)
+
+    if (duplicateOrFilters.length > 0) {
+      const { error: cleanupError } = await supabaseAdmin
+        .from("pending_users")
+        .delete()
+        .or(duplicateOrFilters.join(","))
+      if (cleanupError) {
+        log.error({ err: cleanupError.message }, "Failed to clean up duplicate pending_users")
+      }
+    }
+
     // No leave records to create: entitlement is derived from the leave type's allowance minus
     // the employee's own requests, so the new employee has their full allowance immediately.
 
-    // 6. Ask ICT to create the webmail account. The employee's welcome letter
-    // and the HCS / HR / department-lead notice follow from dispatch-credentials
-    // once ICT has set the mailbox password.
-    const ictEmail = await buildApprovalEmailPreview({
-      supabase: supabaseAdmin,
-      pendingUser,
-      employeeNumber: employeeId,
-      approvedBy: {
-        name:
-          callerProfile?.full_name ||
-          [callerProfile?.first_name, callerProfile?.last_name].filter(Boolean).join(" ").trim() ||
-          caller.email ||
-          "Admin and HR Lead",
-        designation: callerProfile?.designation || null,
-        department: callerProfile?.department || "Admin and HR",
-      },
+    // 6. Company mailbox. Matrix creates it on cPanel and sends the welcome
+    // letter (to the personal email) plus the HCS / HR / department-lead notice
+    // straight away. If it cannot, approval still stands: the profile is marked
+    // mailbox_status = failed and ICT gets the "create the webmail account"
+    // email, with cPanel's reason, as before.
+    const approvedBy = {
+      name:
+        callerProfile?.full_name ||
+        [callerProfile?.first_name, callerProfile?.last_name].filter(Boolean).join(" ").trim() ||
+        caller.email ||
+        "Admin and HR Lead",
+      designation: callerProfile?.designation || null,
+      department: callerProfile?.department || "Admin and HR",
+    }
+    // Create-only: if the address already has a mailbox it may belong to
+    // someone else (same initial + first name, a shared or hand-made box), so
+    // approval never resets its password — ICT is asked to sort it out instead.
+    const provisioned = await provisionStaffMailbox(supabaseAdmin, {
+      profileId: authUserId!,
+      email: pendingUser.company_email,
+      createOnly: true,
     })
-      .then((preview) => preview.ict)
-      .catch((error: unknown) => {
-        log.error({ err: String(error) }, "Failed to build ICT webmail setup email")
-        return null
-      })
-
-    if (ictEmail?.enabled) {
-      try {
-        if (ictEmail.recipients.length === 0) throw new Error("No ICT inbox configured")
-        const result = await sendNotificationEmailWithRetry({
-          ...ORG_MAIL_ROUTING.Onboarding,
-          to: ictEmail.recipients,
-          subject: ictEmail.subject,
-          html: ictEmail.html,
+    let mailbox: ApprovalMailboxOutcome
+    if (provisioned.ok) {
+      mailbox = { status: "created", email: normalizedCompanyEmail, welcomeSent: false }
+      const { data: welcomeProfile } = await supabaseAdmin
+        .from("profiles")
+        .select(WELCOME_PROFILE_COLUMNS)
+        .eq("id", authUserId!)
+        .single<WelcomeProfile>()
+      const welcome = welcomeProfile
+        ? await sendMailboxWelcome(supabaseAdmin, {
+            profile: welcomeProfile,
+            mailboxPassword: provisioned.password,
+            preparedBy: approvedBy,
+          })
+        : ({ ok: false, status: 404, error: "Profile not found after approval" } as const)
+      if (welcome.ok) {
+        mailbox.welcomeSent = true
+        for (const warning of welcome.warnings) {
+          emailWarnings.push({ audience: "management", reason: warning, recipients: [] })
+        }
+      } else {
+        emailWarnings.push({
+          audience: "employee",
+          reason: `Mailbox created, but the welcome letter was not sent: ${welcome.error}. Use Send Webmail Credentials to resend.`,
+          recipients: pendingUser.personal_email ? [pendingUser.personal_email] : [],
         })
-        if (!result.sent) throw new Error(result.reason)
-      } catch (emailError) {
-        const reason = emailError instanceof Error ? emailError.message : String(emailError)
-        emailWarnings.push({ audience: "ict", reason, recipients: ictEmail.recipients })
-        log.error({ reason, recipients: ictEmail.recipients }, "ICT webmail setup email was not sent")
+      }
+    } else {
+      mailbox = provisioned.manual
+        ? { status: "manual", email: normalizedCompanyEmail, reason: provisioned.reason }
+        : { status: "failed", email: normalizedCompanyEmail, reason: provisioned.reason }
+
+      const ictEmail = await buildApprovalEmailPreview({
+        supabase: supabaseAdmin,
+        pendingUser,
+        employeeNumber: employeeId,
+        approvedBy,
+        automationFailure: provisioned.manual ? null : provisioned.reason,
+      })
+        .then((preview) => preview.ict)
+        .catch((error: unknown) => {
+          log.error({ err: String(error) }, "Failed to build ICT webmail setup email")
+          return null
+        })
+
+      if (ictEmail?.enabled) {
+        try {
+          if (ictEmail.recipients.length === 0) throw new Error("No ICT inbox configured")
+          const result = await sendNotificationEmailWithRetry({
+            ...ORG_MAIL_ROUTING.Onboarding,
+            to: ictEmail.recipients,
+            subject: ictEmail.subject,
+            html: ictEmail.html,
+          })
+          if (!result.sent) throw new Error(result.reason)
+        } catch (emailError) {
+          const reason = emailError instanceof Error ? emailError.message : String(emailError)
+          emailWarnings.push({ audience: "ict", reason, recipients: ictEmail.recipients })
+          log.error({ reason, recipients: ictEmail.recipients }, "ICT webmail setup email was not sent")
+        }
       }
     }
 
@@ -497,7 +564,12 @@ export async function POST(req: Request) {
           employment_type: employmentType,
           contract_category_id: contractCategoryId,
         },
-        metadata: { source: "approve-user", pending_user_id: pendingUserId, email_warnings: emailWarnings },
+        metadata: {
+          source: "approve-user",
+          pending_user_id: pendingUserId,
+          email_warnings: emailWarnings,
+          mailbox: mailbox.status,
+        },
       },
       { failOpen: true }
     )
@@ -507,6 +579,7 @@ export async function POST(req: Request) {
       employeeId,
       profileId: authUserId,
       emailWarnings,
+      mailbox,
     })
   } catch (error: unknown) {
     log.error({ err: String(error) }, "Approval process failed")

@@ -524,6 +524,7 @@ const adminNavigation: NavItem[] = [
       { name: "Attendance", href: "/admin/settings/attendance" },
       { name: "CBT", href: "/admin/settings/cbt" },
       { name: "Mail", href: "/admin/settings/mail" },
+      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],
   },
