@@ -9,7 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { MailboxUsage } from "@/components/profile/mailbox-usage"
+import { MailboxUsage, OpenMailboxButton } from "@/components/profile/mailbox-usage"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -477,14 +477,17 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
           {profile.company_email && (
             // Email on top, its mailbox storage underneath: one item, two lines.
             <div className="flex min-w-0 flex-col gap-1">
-              <a
-                href={`mailto:${profile.company_email}`}
-                className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
-                title={profile.company_email}
-              >
-                <Mail className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{profile.company_email}</span>
-              </a>
+              <div className="flex min-w-0 items-center gap-1">
+                <a
+                  href={`mailto:${profile.company_email}`}
+                  className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
+                  title={profile.company_email}
+                >
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{profile.company_email}</span>
+                </a>
+                <OpenMailboxButton />
+              </div>
               <MailboxUsage />
             </div>
           )}

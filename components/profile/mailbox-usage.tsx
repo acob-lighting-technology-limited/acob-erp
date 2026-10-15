@@ -24,21 +24,22 @@ async function fetchMailboxUsage(): Promise<MailboxUsage | null> {
   return (json?.data ?? null) as MailboxUsage | null
 }
 
-/**
- * The signed-in user's company mailbox storage and a one-click "Open mailbox"
- * (Roundcube, already signed in) — the second line under their company email
- * in the profile contact strip.
- * Renders nothing when there is no cPanel mailbox to show, or cPanel is down —
- * a storage gauge is never worth an error on someone's profile.
- */
-export function MailboxUsage() {
-  const { data } = useQuery({
+/** Both pieces read the same cached query, so the mailbox is fetched once. */
+function useMailboxUsage() {
+  return useQuery({
     queryKey: ["profile-mailbox-usage"],
     queryFn: fetchMailboxUsage,
     staleTime: 5 * 60 * 1000,
     retry: false,
-  })
+  }).data
+}
 
+/**
+ * Icon button beside the company email: opens Roundcube already signed in
+ * (one-time cPanel session, no password). Hidden when there is no cPanel mailbox.
+ */
+export function OpenMailboxButton() {
+  const data = useMailboxUsage()
   const [opening, setOpening] = useState(false)
 
   if (!data) return null
@@ -67,8 +68,37 @@ export function MailboxUsage() {
   }
 
   return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-primary h-6 w-6 shrink-0"
+          onClick={() => void openWebmail()}
+          disabled={opening}
+          aria-label="Open my mailbox in webmail"
+        >
+          {opening ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Open mailbox</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/**
+ * The signed-in user's company mailbox storage — the line under their company
+ * email in the profile contact strip. Renders nothing when there is no cPanel
+ * mailbox to show, or cPanel is down: a storage gauge is never worth an error
+ * on someone's profile.
+ */
+export function MailboxUsage() {
+  const data = useMailboxUsage()
+  if (!data) return null
+
+  return (
     // ml-5 lines the bar up with the email text, past the envelope icon above it.
-    <div className="ml-5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+    <div className="ml-5 min-w-0">
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="min-w-0" tabIndex={0} aria-label="Mailbox storage">
@@ -92,17 +122,6 @@ export function MailboxUsage() {
           </p>
         </TooltipContent>
       </Tooltip>
-      <Button
-        variant="link"
-        size="sm"
-        className="text-primary h-auto gap-1 p-0 text-xs"
-        onClick={() => void openWebmail()}
-        disabled={opening}
-        aria-label="Open my mailbox in webmail"
-      >
-        {opening ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
-        Open mailbox
-      </Button>
     </div>
   )
 }
