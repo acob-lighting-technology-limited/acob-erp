@@ -280,7 +280,12 @@ export function EmployeeViewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] max-h-[90vh] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
+      <DialogContent
+        className={cn(
+          "flex h-[90vh] max-h-[90vh] flex-col gap-0 overflow-hidden p-0 transition-[max-width] duration-200 sm:rounded-xl",
+          modalViewMode === "signature" ? "max-w-5xl" : "max-w-3xl"
+        )}
+      >
         <DialogHeader className="bg-muted/20 border-b px-5 py-3.5 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -1227,7 +1232,7 @@ export function EmployeeViewModal({
 
           {viewEmployeeProfile && modalViewMode === "signature" && (
             <ScrollArea className="h-full">
-              <div className="p-5 sm:p-6">
+              <div className="p-5 pb-20 sm:p-6">
                 <SignatureCreator
                   profile={viewEmployeeProfile}
                   variant="selectable"

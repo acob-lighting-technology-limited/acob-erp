@@ -739,7 +739,7 @@ export function SignatureCreator({
         : "Copy Signature"
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div className="grid gap-6 md:grid-cols-2">
       {/* Form */}
       <Card>
         <CardHeader>
@@ -756,10 +756,16 @@ export function SignatureCreator({
                   setSelectedSignatureMode(value as "default" | "anniversary" | "anniversary-hosted")
                 }
               >
-                <TabsList className="h-auto w-full justify-start">
-                  <TabsTrigger value="default">Standard</TabsTrigger>
-                  <TabsTrigger value="anniversary">10th Anniversary</TabsTrigger>
-                  <TabsTrigger value="anniversary-hosted">Anniversary (Hosted Images)</TabsTrigger>
+                <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1">
+                  <TabsTrigger value="default" className="shrink-0 px-2.5 py-1.5 text-xs">
+                    Standard
+                  </TabsTrigger>
+                  <TabsTrigger value="anniversary" className="shrink-0 px-2.5 py-1.5 text-xs">
+                    10th Anniversary
+                  </TabsTrigger>
+                  <TabsTrigger value="anniversary-hosted" className="shrink-0 px-2.5 py-1.5 text-xs">
+                    Anniversary (Hosted Images)
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
               <p className="text-muted-foreground text-xs">
@@ -849,9 +855,13 @@ export function SignatureCreator({
           <div className="space-y-2">
             <Label>Email Order</Label>
             <Tabs value={emailContactOrder} onValueChange={(value) => setEmailContactOrder(value as EmailContactOrder)}>
-              <TabsList className="h-auto w-full justify-start">
-                <TabsTrigger value="main-first">Main First</TabsTrigger>
-                <TabsTrigger value="alternative-first">Alternative First</TabsTrigger>
+              <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1">
+                <TabsTrigger value="main-first" className="shrink-0 px-2.5 py-1.5 text-xs">
+                  Main First
+                </TabsTrigger>
+                <TabsTrigger value="alternative-first" className="shrink-0 px-2.5 py-1.5 text-xs">
+                  Alternative First
+                </TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -876,17 +886,17 @@ export function SignatureCreator({
       </Card>
 
       {/* Preview */}
-      <Card>
+      <Card className="flex flex-col">
         <CardHeader>
           <div>
             <CardTitle>{previewTitle}</CardTitle>
             <CardDescription>{previewDescription}</CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1">
           {isFormValid ? (
             <div
-              className="rounded-lg border bg-white p-4 text-sm"
+              className="overflow-x-auto rounded-lg border bg-white p-4 text-sm shadow-xs"
               dangerouslySetInnerHTML={{ __html: generateSignature() }}
             />
           ) : (
