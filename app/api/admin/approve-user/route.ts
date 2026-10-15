@@ -423,6 +423,23 @@ export async function POST(req: Request) {
       throw new Error(`Profile creation failed: ${approvalError.message}`)
     }
 
+    // Clean up any remaining duplicate pending submissions from this applicant
+    const duplicateOrFilters: string[] = []
+    if (pendingUser.personal_email) duplicateOrFilters.push(`personal_email.eq.${pendingUser.personal_email}`)
+    if (pendingUser.email) duplicateOrFilters.push(`email.eq.${pendingUser.email}`)
+    if (pendingUser.company_email) duplicateOrFilters.push(`company_email.eq.${pendingUser.company_email}`)
+    if (pendingUser.phone_number) duplicateOrFilters.push(`phone_number.eq.${pendingUser.phone_number}`)
+
+    if (duplicateOrFilters.length > 0) {
+      const { error: cleanupError } = await supabaseAdmin
+        .from("pending_users")
+        .delete()
+        .or(duplicateOrFilters.join(","))
+      if (cleanupError) {
+        log.error({ err: cleanupError.message }, "Failed to clean up duplicate pending_users")
+      }
+    }
+
     // No leave records to create: entitlement is derived from the leave type's allowance minus
     // the employee's own requests, so the new employee has their full allowance immediately.
 

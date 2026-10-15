@@ -62,12 +62,18 @@ export async function POST(req: Request) {
 
   const personalEmail = parsed.data.personal_email.toLowerCase()
   const companyEmail = parsed.data.company_email.toLowerCase()
+  const rawPhone = (parsed.data.phone_number || "").trim()
   const nowIso = new Date().toISOString()
+
+  const profileOrFilters = [`personal_email.eq.${personalEmail}`, `company_email.eq.${companyEmail}`]
+  if (rawPhone) {
+    profileOrFilters.push(`phone_number.eq.${rawPhone}`)
+  }
 
   const { data: existingProfile } = await supabase
     .from("profiles")
     .select("id")
-    .or(`personal_email.eq.${personalEmail},company_email.eq.${companyEmail}`)
+    .or(profileOrFilters.join(","))
     .maybeSingle()
   if (existingProfile?.id) {
     return NextResponse.json(
@@ -76,10 +82,15 @@ export async function POST(req: Request) {
     )
   }
 
+  const pendingOrFilters = [`personal_email.eq.${personalEmail}`, `company_email.eq.${companyEmail}`]
+  if (rawPhone) {
+    pendingOrFilters.push(`phone_number.eq.${rawPhone}`)
+  }
+
   const { data: existingPending, error: pendingError } = await supabase
     .from("pending_users")
     .select("id, status")
-    .or(`personal_email.eq.${personalEmail},company_email.eq.${companyEmail}`)
+    .or(pendingOrFilters.join(","))
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
