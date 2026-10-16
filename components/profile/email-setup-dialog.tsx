@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MAIL_CLIENT_SETTINGS, WEBMAIL_URL } from "@/lib/mail/client-settings"
-import { buildDefaultSignatureHtml, formatNameProperly, formatSignaturePhone } from "@/lib/signature/default-signature"
+import {
+  buildAnniversarySignatureHtml,
+  formatNameProperly,
+  formatSignaturePhone,
+} from "@/lib/signature/default-signature"
 
 function useCopy() {
   const [copied, setCopied] = useState<string | null>(null)
@@ -69,8 +73,8 @@ function Steps({ items }: { items: React.ReactNode[] }) {
 
 /**
  * "Set up email on my phone": one-tap install for iPhone, filled-in settings
- * with copy buttons for Gmail / Android / Outlook, and the standard ACOB
- * signature (the same one the Signature Creator makes) to paste into the app.
+ * with copy buttons for Gmail / Android / Outlook, and the current ACOB
+ * signature (the 10th-anniversary one, as the Signature Creator makes it) to paste.
  * Every value is the signed-in user's own.
  */
 export function EmailSetupDialog({
@@ -113,7 +117,7 @@ export function EmailSetupDialog({
     </div>
   )
 
-  const signatureHtml = buildDefaultSignatureHtml({
+  const signatureHtml = buildAnniversarySignatureHtml({
     fullName: formatNameProperly(fullName),
     companyRole: designation ?? "",
     phoneNumber: phone ?? "",
@@ -243,7 +247,7 @@ export function EmailSetupDialog({
           </TabsContent>
 
           <TabsContent value="signature" className="space-y-4 pt-2">
-            <p className="text-sm">Your ACOB signature — the same one the Signature Creator makes.</p>
+            <p className="text-sm">Your ACOB 10th-anniversary signature — the same one the Signature Creator makes.</p>
             <div className="max-h-64 overflow-auto rounded-lg border bg-white p-3 text-black">
               <div dangerouslySetInnerHTML={{ __html: signatureHtml }} />
             </div>
@@ -271,7 +275,7 @@ export function EmailSetupDialog({
                   computer, or iPhone Mail.
                 </li>
               </ul>
-              <Link href="/tools/signature" className="text-primary text-xs underline">
+              <Link href="/tools/signature-anniversary" className="text-primary text-xs underline">
                 Need to change something? Open the Signature Creator
               </Link>
             </div>
