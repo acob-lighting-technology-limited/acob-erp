@@ -491,6 +491,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                   fullName={fullName}
                   designation={profile.designation ?? null}
                   phone={profile.phone_number ?? null}
+                  additionalEmail={profile.additional_email ?? null}
                 />
               </div>
               <MailboxUsage />

@@ -3,13 +3,12 @@
 import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { Check, Copy, Download, ExternalLink, Smartphone } from "lucide-react"
+import { Check, Copy, Download, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MAIL_CLIENT_SETTINGS, WEBMAIL_URL } from "@/lib/mail/client-settings"
-
-const OFFICE_PHONE = "+234 704 920 2634"
+import { buildDefaultSignatureHtml, formatNameProperly, formatSignaturePhone } from "@/lib/signature/default-signature"
 
 function useCopy() {
   const [copied, setCopied] = useState<string | null>(null)
@@ -70,7 +69,8 @@ function Steps({ items }: { items: React.ReactNode[] }) {
 
 /**
  * "Set up email on my phone": one-tap install for iPhone, filled-in settings
- * with copy buttons for Gmail / Android / Outlook, and the signature to paste.
+ * with copy buttons for Gmail / Android / Outlook, and the standard ACOB
+ * signature (the same one the Signature Creator makes) to paste into the app.
  * Every value is the signed-in user's own.
  */
 export function EmailSetupDialog({
@@ -80,6 +80,7 @@ export function EmailSetupDialog({
   fullName,
   designation,
   phone,
+  additionalEmail,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -87,6 +88,7 @@ export function EmailSetupDialog({
   fullName: string
   designation: string | null
   phone: string | null
+  additionalEmail: string | null
 }) {
   const { copied, copy } = useCopy()
   const s = MAIL_CLIENT_SETTINGS
@@ -111,15 +113,35 @@ export function EmailSetupDialog({
     </div>
   )
 
-  const mobileSignature = [
-    fullName,
-    designation,
-    "ACOB Lighting Technology Limited",
-    phone ? `${phone} | ${OFFICE_PHONE}` : OFFICE_PHONE,
-    "www.acoblighting.com",
-  ]
-    .filter(Boolean)
-    .join("\n")
+  const signatureHtml = buildDefaultSignatureHtml({
+    fullName: formatNameProperly(fullName),
+    companyRole: designation ?? "",
+    phoneNumber: phone ?? "",
+    formattedPhone: formatSignaturePhone(phone ?? ""),
+    companyEmail: email,
+    alternativeEmail: additionalEmail ?? "",
+    emailContactOrder: "main-first",
+  })
+
+  // Rich copy, exactly as the Signature Creator does, so pasting keeps the
+  // logo, icons and layout.
+  const copySignature = async () => {
+    try {
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([signatureHtml], { type: "text/html" }),
+            "text/plain": new Blob([signatureHtml], { type: "text/plain" }),
+          }),
+        ])
+      } else {
+        await navigator.clipboard.writeText(signatureHtml)
+      }
+      toast.success("Signature copied — paste it into your mail app's signature settings")
+    } catch {
+      toast.error("Could not copy the signature")
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -168,7 +190,8 @@ export function EmailSetupDialog({
             />
             <p className="text-muted-foreground text-xs">
               iPhone shows the profile as &quot;Not Verified&quot; — that is normal for company profiles. To remove it
-              later: Settings → General → VPN &amp; Device Management.
+              later: Settings → General → VPN &amp; Device Management. The same file works on a Mac: download it, then
+              System Settings → Profiles → Install.
             </p>
           </TabsContent>
 
@@ -220,42 +243,37 @@ export function EmailSetupDialog({
           </TabsContent>
 
           <TabsContent value="signature" className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Full signature — webmail and Outlook on a computer</p>
-              <Button asChild variant="outline" className="w-full gap-2">
-                <Link href="/tools/signature">
-                  <ExternalLink className="h-4 w-4" />
-                  Open Signature Creator and copy
-                </Link>
-              </Button>
-              <p className="text-muted-foreground text-xs">
-                Paste it into the app&apos;s signature settings. On iPhone Mail you can paste the full one too: open the
-                Signature Creator in Safari on the phone, copy, then Settings → Apps → Mail → Signature.
-              </p>
+            <p className="text-sm">Your ACOB signature — the same one the Signature Creator makes.</p>
+            <div className="max-h-64 overflow-auto rounded-lg border bg-white p-3 text-black">
+              <div dangerouslySetInnerHTML={{ __html: signatureHtml }} />
             </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Short signature — Gmail and Outlook phone apps</p>
-              <p className="text-muted-foreground text-xs">
-                Phone apps only take plain text, so use this short version.
-              </p>
-              <pre className="bg-muted/40 rounded-lg border p-3 text-xs whitespace-pre-wrap">{mobileSignature}</pre>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                onClick={() => void copy("mobile-signature", mobileSignature)}
-              >
-                {copied === "mobile-signature" ? (
-                  <Check className="h-4 w-4 text-emerald-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-                Copy short signature
-              </Button>
-              <p className="text-muted-foreground text-xs">
-                Gmail app: Settings → your account → Mobile signature. Outlook app: Settings → Signature.
-              </p>
+            <Button type="button" className="w-full gap-2" onClick={() => void copySignature()}>
+              <Copy className="h-4 w-4" />
+              Copy signature
+            </Button>
+            <div className="space-y-1.5 text-sm">
+              <p className="font-medium">Where to paste it</p>
+              <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-xs">
+                <li>
+                  <strong>Webmail:</strong> Settings → Identities → your address → Signature → switch to HTML → paste →
+                  Save.
+                </li>
+                <li>
+                  <strong>Outlook (computer):</strong> Settings → Signatures → New → paste.
+                </li>
+                <li>
+                  <strong>iPhone Mail:</strong> open this window on the iPhone, copy, then Settings → Apps → Mail →
+                  Signature → paste.
+                </li>
+                <li>
+                  <strong>Outlook / Gmail phone apps:</strong> their signature boxes accept text only, so the logo and
+                  icons are dropped. For mail that should carry the full signature, send from webmail, Outlook on a
+                  computer, or iPhone Mail.
+                </li>
+              </ul>
+              <Link href="/tools/signature" className="text-primary text-xs underline">
+                Need to change something? Open the Signature Creator
+              </Link>
             </div>
           </TabsContent>
         </Tabs>

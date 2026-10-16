@@ -19,6 +19,16 @@ import {
   INSTAGRAM_ICON,
   ANNIVERSARY_LOGO,
 } from "@/lib/signature-assets"
+import {
+  buildContactSequence as buildSharedContactSequence,
+  buildDefaultSignatureHtml,
+  buildEmailContactHtml as buildSharedEmailContactHtml,
+  buildOfficeRowHtml as buildSharedOfficeRowHtml,
+  buildPhoneContactHtml as buildSharedPhoneContactHtml,
+  formatNameProperly as formatSharedName,
+  formatSignaturePhone,
+  type EmailContactOrder,
+} from "@/lib/signature/default-signature"
 
 interface SignatureCreatorProps {
   profile: {
@@ -46,8 +56,6 @@ interface FormData {
   alternativeEmail: string
 }
 
-type EmailContactOrder = "main-first" | "alternative-first"
-
 const ANNIVERSARY_FONT_OPTIONS = [
   {
     id: "trebuchet",
@@ -61,9 +69,6 @@ const ANNIVERSARY_TEMPLATE_OPTIONS = [{ id: "minimal", label: "Template 7" }] as
 /** Absolute base URL used when generating "hosted images" anniversary signatures.
  *  Falls back to a relative root so signatures still render in dev/preview. */
 const HOSTED_IMAGES_BASE = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "")
-const OFFICE_PHONE_NUMBER_VALUE = "+2347049202634"
-const OFFICE_PHONE_NUMBER_LABEL = "+234 704 920 2634"
-const OFFICE_EMAIL = "info@acoblighting.com"
 
 const normalizePreferredCompanyEmail = (email?: string | null) => {
   const normalizedEmail = email?.trim().toLowerCase() || ""
@@ -125,19 +130,7 @@ export function SignatureCreator({
     }
   }, [formData.companyEmail, formData.firstName, formData.lastName])
 
-  const formatPhoneNumber = (phone: string) => {
-    const digits = phone.replace(/\D/g, "")
-
-    if (digits.startsWith("0") && digits.length === 11) {
-      const withoutLeadingZero = digits.substring(1)
-      return `+234 ${withoutLeadingZero.substring(
-        0,
-        3
-      )} ${withoutLeadingZero.substring(3, 6)} ${withoutLeadingZero.substring(6)}`
-    }
-
-    return phone
-  }
+  const formatPhoneNumber = (phone: string) => formatSignaturePhone(phone)
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -154,116 +147,32 @@ export function SignatureCreator({
     return digits.length >= 11
   }
 
-  const formatNameProperly = (name: string) => {
-    if (!name) return ""
-    // Split by spaces first to preserve word boundaries
-    return name
-      .split(/\s+/)
-      .map((word) => {
-        // For each word, handle hyphens separately
-        return word
-          .split(/-/)
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-          .join("-")
-      })
-      .join(" ")
-  }
+  // The standard signature and its building blocks live in
+  // lib/signature/default-signature so the profile's email-setup dialog copies
+  // exactly the same signature. These wrappers keep the anniversary variants
+  // below reading the form state as before.
+  const formatNameProperly = (name: string) => formatSharedName(name)
 
-  const buildContactSequence = (sections: string[]) => {
-    if (sections.length === 0) {
-      return ""
-    }
+  const buildContactSequence = (sections: string[]) => buildSharedContactSequence(sections)
 
-    const [firstSection, ...restSections] = sections
-    return `${firstSection}${restSections
-      .map(
-        (section) =>
-          `<span style="white-space: nowrap;"><span style="color: #6b7280;">&nbsp;|&nbsp;</span>${section}</span>`
-      )
-      .join("")}`
-  }
+  const buildPhoneContactHtml = (formattedPhone: string) =>
+    buildSharedPhoneContactHtml(formData.phoneNumber, formattedPhone)
 
-  const buildPhoneContactHtml = (formattedPhone: string) => {
-    const primaryPhoneHref = formData.phoneNumber.replace(/\s+/g, "")
-    return `<a href="tel:${primaryPhoneHref}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formattedPhone}</a>`
-  }
+  const buildEmailContactHtml = () =>
+    buildSharedEmailContactHtml(formData.companyEmail, formData.alternativeEmail, emailContactOrder)
 
-  const buildEmailContactHtml = () => {
-    const primaryEmailSection = `<a href="mailto:${formData.companyEmail}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.companyEmail}</a>`
-    const alternativeEmailSection = formData.alternativeEmail
-      ? `<a href="mailto:${formData.alternativeEmail}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${formData.alternativeEmail}</a>`
-      : ""
+  const buildOfficeRowHtml = () => buildSharedOfficeRowHtml()
 
-    if (!alternativeEmailSection) {
-      return primaryEmailSection
-    }
-
-    if (emailContactOrder === "alternative-first") {
-      return buildContactSequence([alternativeEmailSection, primaryEmailSection])
-    }
-
-    return buildContactSequence([primaryEmailSection, alternativeEmailSection])
-  }
-
-  const buildOfficeRowHtml = () => {
-    const websiteHtml = `<a href="https://www.acoblighting.com" style="color: #1f2937; text-decoration: none; vertical-align: middle;">www.acoblighting.com</a>`
-    const officePhoneHtml = `<a href="tel:${OFFICE_PHONE_NUMBER_VALUE}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${OFFICE_PHONE_NUMBER_LABEL}</a>`
-    const officeEmailHtml = `<a href="mailto:${OFFICE_EMAIL}" style="color: #1f2937; text-decoration: none; vertical-align: middle;">${OFFICE_EMAIL}</a>`
-    return `<img src="${OFFICE_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Office" />${buildContactSequence([websiteHtml, officePhoneHtml, officeEmailHtml])}`
-  }
-
-  const generateDefaultSignature = (fullName: string, formattedPhone: string) => {
-    const phoneContactHtml = buildPhoneContactHtml(formattedPhone)
-    const emailContactHtml = buildEmailContactHtml()
-    const officeRowHtml = buildOfficeRowHtml()
-
-    return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 1000px; margin: 0; padding: 12px 0; line-height: 1.5;">
-  <!-- Thin green line -->
-  <div style="color: #000000;">&mdash;&mdash;</div>
-  
-  <!-- Greeting -->
-  <p style="margin: 0 0 4px 0; font-size: 14px; color: #374151; font-style: italic;">Best Regards,</p>
-
-  <!-- Name & Role -->
-  <div style="border-bottom: 1.5px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 6px;">
-    <p style="margin: 0 0 0 0; line-height: 1; font-size: 20px; font-weight: bold; color: #1f2937; letter-spacing: -0.025em;">${fullName}</p>
-    <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 500; color: #1f2937;">${formData.companyRole}</p>
-    
-    <!-- Contact details -->
-    <div style="font-size: 14px; color: #374151; line-height: 1.3;">
-      <div style="margin: 0 0 4px 0;">
-        <img src="${PHONE_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Phone" />${phoneContactHtml}
-      </div>
-      <div style="margin: 0 0 4px 0;">
-        <img src="${MAIL_ICON}" width="18" height="18" style="vertical-align: middle; opacity: 0.8; margin-right: 6px; display: inline-block;" alt="Email" />${emailContactHtml}
-      </div>
-      <div>
-        ${officeRowHtml}
-      </div>
-    </div>
-  </div>
-  
-  <!-- Logo + Socials (stacked vertically) -->
-  <div style="margin-bottom: 8px;">
-    <img src="${ACOB_LOGO}" width="200" height="47" alt="ACOB Lighting Technology Limited" style="display: block; margin-bottom: 8px;" />
-    
-   <div style="display: inline-block;">
-  <a href="https://www.linkedin.com/company/acob-lighting-technology-limited" style="text-decoration: none; display: inline-block;"><img src="${LINKEDIN_ICON}" width="22" height="22" alt="LinkedIn" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://twitter.com/AcobLimited" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${X_ICON}" width="22" height="22" alt="X (Twitter)" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://www.facebook.com/acoblightingtechltd" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${FACEBOOK_ICON}" width="22" height="22" alt="Facebook" style="border-radius: 4px; display: inline-block;" /></a>
-  <a href="https://www.instagram.com/acob_lighting/" style="text-decoration: none; display: inline-block; margin-left: 4px;"><img src="${INSTAGRAM_ICON}" width="22" height="22" alt="Instagram" style="border-radius: 4px; display: inline-block;" /></a>
-</div>
-  </div>
-  
-  <!-- Footer -->
-  <div style="border-top: 1.5px solid #e5e7eb; padding-top: 6px; font-size: 11px; color: #6b7280; line-height: 1.4;">
-    <p style="margin: 0 0 6px 0; font-style: italic;">This email, including any attachments, contains confidential information intended solely for the recipient(s) named above. If you have received this email in error, please notify the sender immediately and delete the email from your system. Any unauthorized use, disclosure, distribution, or copying of this email is strictly prohibited and may be unlawful.</p>
-    <p style="margin: 0 0 4px 0; font-weight: 600; font-style: italic;">ACOB Lighting Technology Limited is a renewable energy company registered under the Laws of the Federal Republic of Nigeria.</p>
-    <p style="margin: 0 0 2px 0; font-weight: 600; font-style: italic;">We are a leading provider of solar and energy solutions for homes, businesses, and communities.</p>
-    <p style="margin: 0; font-weight: 600; font-style: italic;">Lighting up Nigeria!</p>
-  </div>
-</div>`
-  }
+  const generateDefaultSignature = (fullName: string, formattedPhone: string) =>
+    buildDefaultSignatureHtml({
+      fullName,
+      companyRole: formData.companyRole,
+      phoneNumber: formData.phoneNumber,
+      formattedPhone,
+      companyEmail: formData.companyEmail,
+      alternativeEmail: formData.alternativeEmail,
+      emailContactOrder,
+    })
 
   const generateAnniversarySignature = (fullName: string, formattedPhone: string) => {
     const phoneContactHtml = buildPhoneContactHtml(formattedPhone)

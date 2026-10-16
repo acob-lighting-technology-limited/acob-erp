@@ -43,10 +43,12 @@ export function EmailSetupButton({
   fullName,
   designation,
   phone,
+  additionalEmail,
 }: {
   fullName: string
   designation: string | null
   phone: string | null
+  additionalEmail: string | null
 }) {
   const data = useMailboxUsage()
   const [open, setOpen] = useState(false)
@@ -75,6 +77,7 @@ export function EmailSetupButton({
         fullName={fullName}
         designation={designation}
         phone={phone}
+        additionalEmail={additionalEmail}
       />
     </>
   )
