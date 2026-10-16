@@ -487,6 +487,9 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                   <span className="truncate">{profile.company_email}</span>
                 </a>
                 <OpenMailboxButton />
+              </div>
+              <MailboxUsage />
+              <div className="ml-5">
                 <EmailSetupButton
                   fullName={fullName}
                   designation={profile.designation ?? null}
@@ -494,7 +497,6 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                   additionalEmail={profile.additional_email ?? null}
                 />
               </div>
-              <MailboxUsage />
             </div>
           )}
           {(profile.phone_number || birthdayLabel || profile.residential_address) && (

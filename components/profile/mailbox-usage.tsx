@@ -36,8 +36,9 @@ function useMailboxUsage() {
 }
 
 /**
- * Icon button beside the company email: step-by-step setup of the work mailbox
- * in a phone or computer mail app. Hidden when there is no cPanel mailbox.
+ * "Set up email on phone" button under the company email: step-by-step setup of
+ * the work mailbox in a phone or computer mail app, and the signature to paste.
+ * Hidden when there is no cPanel mailbox.
  */
 export function EmailSetupButton({
   fullName,
@@ -56,20 +57,16 @@ export function EmailSetupButton({
 
   return (
     <>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-primary h-6 w-6 shrink-0"
-            onClick={() => setOpen(true)}
-            aria-label="Set up work email on my phone"
-          >
-            <Smartphone className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="top">Set up on phone</TooltipContent>
-      </Tooltip>
+      {/* A labelled button, not a bare icon: staff need to see and recognise it. */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-primary h-7 shrink-0 gap-1.5 px-2.5 text-xs"
+        onClick={() => setOpen(true)}
+      >
+        <Smartphone className="h-3.5 w-3.5" />
+        Set up email on phone
+      </Button>
       <EmailSetupDialog
         open={open}
         onOpenChange={setOpen}
