@@ -71,8 +71,11 @@ export function EmployeeMailboxSection({
   useEffect(() => {
     if (!relevant || !manageable || !mailbox) return onActionsChange(undefined, false)
     if (leaving) {
-      const target = toStatus === "exited" && forwardMail ? forwardTo.trim().toLowerCase() : ""
-      if (target && !EMAIL_PATTERN.test(target)) return onActionsChange(undefined, true)
+      // Ticking "forward" is a promise to forward: a blank address blocks the
+      // save just like a malformed one, rather than silently forwarding nothing.
+      const wantsForward = toStatus === "exited" && forwardMail
+      const target = wantsForward ? forwardTo.trim().toLowerCase() : ""
+      if (wantsForward && !EMAIL_PATTERN.test(target)) return onActionsChange(undefined, true)
       if (!suspendLogin && !target) return onActionsChange(undefined, false)
       return onActionsChange({ suspendLogin, forwardTo: target || null }, false)
     }
@@ -97,8 +100,7 @@ export function EmployeeMailboxSection({
 
   if (!relevant) return null
 
-  const forwardInvalid =
-    toStatus === "exited" && forwardMail && forwardTo.trim() !== "" && !EMAIL_PATTERN.test(forwardTo.trim())
+  const forwardInvalid = toStatus === "exited" && forwardMail && !EMAIL_PATTERN.test(forwardTo.trim())
 
   return (
     <div className="space-y-2.5 rounded border p-3 text-xs sm:col-span-2">
@@ -166,11 +168,11 @@ export function EmployeeMailboxSection({
                     aria-invalid={forwardInvalid}
                   />
                   <p className={forwardInvalid ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}>
-                    {forwardInvalid
-                      ? "Enter a valid email address, or untick forwarding."
-                      : mailbox.suggestedForward
-                        ? "Defaults to their department lead."
-                        : "No department lead found. Enter an address, or untick forwarding."}
+                    {!forwardInvalid
+                      ? "Defaults to their department lead."
+                      : forwardTo.trim() === "" && !mailbox.suggestedForward
+                        ? "No department lead found. Enter an address, or untick forwarding."
+                        : "Enter a valid email address, or untick forwarding."}
                   </p>
                 </>
               )}

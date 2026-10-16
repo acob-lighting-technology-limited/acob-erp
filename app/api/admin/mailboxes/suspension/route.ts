@@ -42,36 +42,58 @@ export async function PATCH(request: NextRequest) {
   }
   const { email, action, rejectIncoming } = parsed.data
 
-  try {
-    const before = await getMailbox(email)
-    if (!before) return NextResponse.json({ error: "That mailbox does not exist on cPanel" }, { status: 404 })
-
-    if (action === "suspend") {
-      if (!before.suspendedLogin) await setMailboxLoginSuspended(email, true)
-      if (rejectIncoming && !before.suspendedIncoming) await setMailboxIncomingSuspended(email, true)
-    } else {
-      if (before.suspendedLogin) await setMailboxLoginSuspended(email, false)
-      if (before.suspendedIncoming) await setMailboxIncomingSuspended(email, false)
-    }
-    const after = await getMailbox(email)
-
-    await writeAuditLog(
+  // Each cPanel call is recorded as it lands, so a failure part-way through
+  // still leaves an audit trail of what did change.
+  const applied: string[] = []
+  let before: Awaited<ReturnType<typeof getMailbox>> = null
+  const audit = (newValues: Record<string, unknown>) =>
+    writeAuditLog(
       auth.supabase,
       {
         action: "update",
         entityType: "mailbox",
         entityId: email,
-        oldValues: { suspended_login: before.suspendedLogin, suspended_incoming: before.suspendedIncoming },
-        newValues: { suspended_login: after?.suspendedLogin, suspended_incoming: after?.suspendedIncoming },
+        oldValues: before
+          ? { suspended_login: before.suspendedLogin, suspended_incoming: before.suspendedIncoming }
+          : null,
+        newValues: { ...newValues, applied },
         context: { actorId: auth.scope.userId, source: "api", route: "/api/admin/mailboxes/suspension" },
       },
       { failOpen: true }
     )
 
+  try {
+    before = await getMailbox(email)
+    if (!before) return NextResponse.json({ error: "That mailbox does not exist on cPanel" }, { status: 404 })
+
+    if (action === "suspend") {
+      if (!before.suspendedLogin) {
+        await setMailboxLoginSuspended(email, true)
+        applied.push("suspend_login")
+      }
+      if (rejectIncoming && !before.suspendedIncoming) {
+        await setMailboxIncomingSuspended(email, true)
+        applied.push("suspend_incoming")
+      }
+    } else {
+      if (before.suspendedLogin) {
+        await setMailboxLoginSuspended(email, false)
+        applied.push("unsuspend_login")
+      }
+      if (before.suspendedIncoming) {
+        await setMailboxIncomingSuspended(email, false)
+        applied.push("unsuspend_incoming")
+      }
+    }
+    const after = await getMailbox(email)
+
+    await audit({ suspended_login: after?.suspendedLogin, suspended_incoming: after?.suspendedIncoming })
+
     return NextResponse.json({ data: after })
   } catch (err) {
-    log.error({ err: String(err), email, action }, "Failed to change mailbox suspension")
+    log.error({ err: String(err), email, action, applied }, "Failed to change mailbox suspension")
     const message = err instanceof CpanelError ? err.message : "Failed to update the mailbox"
+    if (applied.length > 0) await audit({ partial: true, error: message })
     return NextResponse.json({ error: message }, { status: 502 })
   }
 }

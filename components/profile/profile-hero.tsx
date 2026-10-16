@@ -9,7 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { MailboxUsage, OpenMailboxButton } from "@/components/profile/mailbox-usage"
+import { EmailSetupButton, MailboxUsage, OpenMailboxButton } from "@/components/profile/mailbox-usage"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -489,6 +489,14 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 <OpenMailboxButton />
               </div>
               <MailboxUsage />
+              <div className="ml-5">
+                <EmailSetupButton
+                  fullName={fullName}
+                  designation={profile.designation ?? null}
+                  phone={profile.phone_number ?? null}
+                  additionalEmail={profile.additional_email ?? null}
+                />
+              </div>
             </div>
           )}
           {(profile.phone_number || birthdayLabel || profile.residential_address) && (

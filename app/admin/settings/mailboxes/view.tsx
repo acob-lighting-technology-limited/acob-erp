@@ -25,6 +25,7 @@ const TAB_KEYS: TabKey[] = ["active", "attention", "suspended", "missing"]
 const OWNER_LABELS: Record<MailboxReportRow["ownerKind"], string> = {
   staff: "Staff",
   inactive_staff: "Exited / suspended staff",
+  site: "Project site",
   none: "No staff record",
 }
 
@@ -56,6 +57,14 @@ function LoginBadge({ row }: { row: MailboxReportRow }) {
 }
 
 function OwnerCell({ row }: { row: MailboxReportRow }) {
+  if (row.site) {
+    return (
+      <div className="min-w-0 space-y-0.5">
+        <p className="truncate text-sm font-medium">Site – {row.site.name}</p>
+        <p className="text-muted-foreground truncate text-xs">{row.site.projectName ?? "No project linked"}</p>
+      </div>
+    )
+  }
   if (!row.owner) return <span className="text-muted-foreground text-sm">No staff record</span>
   return (
     <div className="min-w-0 space-y-0.5">
@@ -122,7 +131,7 @@ export function MailboxesPage() {
         key: "owner",
         label: "Owner",
         sortable: true,
-        accessor: (m) => m.owner?.name ?? "",
+        accessor: (m) => m.owner?.name ?? (m.site ? `Site – ${m.site.name}` : ""),
         resizable: true,
         initialWidth: 220,
         render: (m) => <OwnerCell row={m} />,
@@ -365,7 +374,11 @@ export function MailboxesPage() {
           filters={mailboxFilters}
           getRowId={(m) => m.email}
           searchPlaceholder="Search mailbox or owner..."
-          searchFn={(m, q) => `${m.email} ${m.owner?.name ?? ""}`.toLowerCase().includes(q.toLowerCase())}
+          searchFn={(m, q) =>
+            `${m.email} ${m.owner?.name ?? ""} ${m.site?.name ?? ""} ${m.site?.projectName ?? ""}`
+              .toLowerCase()
+              .includes(q.toLowerCase())
+          }
           isLoading={isLoading}
           error={errorMessage}
           onRetry={() => void refetch()}
@@ -387,7 +400,7 @@ export function MailboxesPage() {
           ]}
           mobileRow={{
             title: (m) => m.email,
-            subtitle: (m) => m.owner?.name ?? "No staff record",
+            subtitle: (m) => m.owner?.name ?? (m.site ? `Site – ${m.site.name}` : "No staff record"),
             trailing: (m) => (
               <MailboxUsageBar
                 usedBytes={m.usedBytes}
