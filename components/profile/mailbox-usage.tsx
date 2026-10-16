@@ -2,11 +2,12 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ExternalLink, Loader2 } from "lucide-react"
+import { ExternalLink, Loader2, Smartphone } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { MailboxUsageBar } from "@/components/mailbox/mailbox-usage-bar"
+import { EmailSetupDialog } from "@/components/profile/email-setup-dialog"
 import { apiFetch } from "@/lib/api-client"
 import { MAILBOX_ALERT_PERCENT, formatBytes, formatQuota } from "@/lib/cpanel/quota"
 
@@ -32,6 +33,51 @@ function useMailboxUsage() {
     staleTime: 5 * 60 * 1000,
     retry: false,
   }).data
+}
+
+/**
+ * Icon button beside the company email: step-by-step setup of the work mailbox
+ * in a phone or computer mail app. Hidden when there is no cPanel mailbox.
+ */
+export function EmailSetupButton({
+  fullName,
+  designation,
+  phone,
+}: {
+  fullName: string
+  designation: string | null
+  phone: string | null
+}) {
+  const data = useMailboxUsage()
+  const [open, setOpen] = useState(false)
+  if (!data) return null
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-primary h-6 w-6 shrink-0"
+            onClick={() => setOpen(true)}
+            aria-label="Set up work email on my phone"
+          >
+            <Smartphone className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Set up on phone</TooltipContent>
+      </Tooltip>
+      <EmailSetupDialog
+        open={open}
+        onOpenChange={setOpen}
+        email={data.email}
+        fullName={fullName}
+        designation={designation}
+        phone={phone}
+      />
+    </>
+  )
 }
 
 /**
