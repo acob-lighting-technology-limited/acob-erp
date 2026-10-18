@@ -53,6 +53,7 @@ import { logger } from "@/lib/logger"
 import type { UserRole } from "@/types/database"
 import type { Employee, UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import { apiFetch } from "@/lib/api-client"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 const log = logger("manage-users-dialog")
 
@@ -846,9 +847,8 @@ export function ManageUsersDialog({
                   <ScrollArea className="flex-1">
                     <div className="divide-border divide-y">
                       {isLoadingPending ? (
-                        <div className="flex flex-col items-center gap-3 p-10 opacity-50">
-                          <Loader2 className="text-primary h-5 w-5 animate-spin" />
-                          <p className="text-xs">Loading…</p>
+                        <div className="p-4">
+                          <RowsSkeleton rows={4} />
                         </div>
                       ) : pendingUsers.length === 0 ? (
                         <div className="space-y-2 p-10 text-center opacity-40">

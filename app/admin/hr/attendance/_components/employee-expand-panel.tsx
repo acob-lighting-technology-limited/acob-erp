@@ -30,6 +30,7 @@ import { StatusBadge, labelSource } from "./status-badge"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 /** The per-employee expand panel of the attendance report (day calendar, hours breakdown, timeline) and its helpers. Split from attendance/view.tsx (audit 6.1). */
 export interface AttendanceReport {
@@ -470,7 +471,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
   }
 
   if (!days) {
-    return <div className="text-muted-foreground py-4 text-center text-sm">Loading days…</div>
+    return <LinesSkeleton lines={4} className="py-4" />
   }
 
   const today = toLocalISODate()
@@ -740,7 +741,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
 
           <div className="max-h-105 space-y-3 overflow-y-auto">
             {historyLoading ? (
-              <p className="text-muted-foreground text-sm">Loading…</p>
+              <LinesSkeleton lines={3} />
             ) : historyItems.length === 0 ? (
               <p className="text-muted-foreground text-sm">No recorded events for this day.</p>
             ) : (

@@ -43,6 +43,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { layout as tablePageLayout } from "./_layout"
 import { depsChanged } from "@/lib/utils/deps-changed"
+import { MenuSkeleton } from "@/components/skeletons/section-skeletons"
 
 const log = logger("lunch-content")
 
@@ -564,9 +565,8 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
           </div>
 
           {loadingDay ? (
-            <div className="text-muted-foreground flex items-center justify-center gap-3 p-12">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm">Loading menu…</span>
+            <div className="p-4">
+              <MenuSkeleton />
             </div>
           ) : !menu ? (
             <EmptyState

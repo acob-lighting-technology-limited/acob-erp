@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { MeetingSourceDialog, type MeetingSource } from "./meeting-source-dialog"
 import { apiFetch } from "@/lib/api-client"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 type SourceRow = MeetingSource & {
   last_synced_at: string | null
@@ -301,7 +302,7 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
           </div>
 
           {isLoading ? (
-            <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+            <RowsSkeleton rows={4} className="py-4" />
           ) : error ? (
             <div className="text-destructive py-8 text-center text-sm">
               {error instanceof Error ? error.message : "Failed to load"}

@@ -1,3 +1,5 @@
+import { FormPageSkeleton } from "@/components/skeletons"
+
 export default function MailSettingsLoading() {
-  return <div className="text-muted-foreground p-6 text-sm">Loading mail settings...</div>
+  return <FormPageSkeleton sections={2} fieldsPerSection={3} showSidebar={false} />
 }

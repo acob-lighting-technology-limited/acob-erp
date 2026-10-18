@@ -7,6 +7,7 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface CbtAttemptDetailProps {
   profileId: string
@@ -71,7 +72,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 p-8">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Loading CBT detailed response...</span>
+        <LinesSkeleton lines={4} />
       </div>
     )
   }

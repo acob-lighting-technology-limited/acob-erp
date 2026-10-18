@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { Holiday, formatDay, ConfirmDialog } from "./shared"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 // ────────────────────────────────────────────────────────────
 // Tab: Holiday
@@ -168,7 +169,7 @@ export function HolidayTab({ onChanged }: { onChanged: () => void }) {
         />
         <div className="max-h-60 space-y-2 overflow-auto rounded border p-2">
           {allHolidays === null ? (
-            <p className="text-muted-foreground py-2 text-center text-sm">Loading…</p>
+            <RowsSkeleton rows={4} />
           ) : monthKeys.length === 0 ? (
             <p className="text-muted-foreground py-2 text-center text-sm">
               {listQuery ? "No matches" : "No holidays configured"}

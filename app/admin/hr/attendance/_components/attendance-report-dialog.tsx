@@ -19,6 +19,7 @@ import { EmployeeRecipientPicker } from "@/components/admin/employee-recipient-p
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const DEFAULT_SEND_TIMES = ["11:00", "23:00"]
 
@@ -114,7 +115,7 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
         </DialogHeader>
 
         {loading ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+          <LinesSkeleton lines={6} className="py-8" />
         ) : (
           <div className="space-y-4">
             <div className="space-y-3 rounded-lg border p-3">

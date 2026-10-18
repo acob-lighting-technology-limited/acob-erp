@@ -19,6 +19,7 @@ import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { apiFetch } from "@/lib/api-client"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 import { depsChanged } from "@/lib/utils/deps-changed"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 type EmployeeOption = {
   id: string
@@ -576,7 +577,7 @@ export function WeekSetupCard() {
           {showYearConfig && (
             <div className="mt-4 space-y-4">
               {yearConfigLoading ? (
-                <p className="text-muted-foreground text-sm">Loading...</p>
+                <LinesSkeleton lines={2} />
               ) : (
                 <div className="space-y-2">
                   {yearRows.map((row) => (

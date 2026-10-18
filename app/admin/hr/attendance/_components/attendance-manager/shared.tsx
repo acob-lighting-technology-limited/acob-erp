@@ -19,6 +19,7 @@ import { Select } from "@/components/ui/select"
 import { Trash2, Pencil } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { logger } from "@/lib/logger"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 export const log = logger("attendance-manager-dialog")
 
@@ -164,7 +165,7 @@ export function EntriesPanel({
       )}
       <div className="max-h-56 space-y-1 overflow-auto rounded border p-2">
         {loading ? (
-          <p className="text-muted-foreground py-2 text-center text-sm">Loading…</p>
+          <RowsSkeleton rows={4} />
         ) : count === 0 ? (
           <p className="text-muted-foreground py-2 text-center text-sm">{search?.trim() ? "No matches" : emptyText}</p>
         ) : (
