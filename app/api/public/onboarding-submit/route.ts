@@ -13,6 +13,7 @@ import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
 
 const log = logger("api/public/onboarding-submit")
+import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
 
 const OnboardingSubmitSchema = z.object({
   first_name: z.string().trim().min(2),
@@ -66,24 +67,51 @@ export async function POST(req: Request) {
 
   const personalEmail = parsed.data.personal_email.toLowerCase()
   const companyEmail = parsed.data.company_email.toLowerCase()
+  const rawPhone = (parsed.data.phone_number || "").trim()
   const nowIso = new Date().toISOString()
 
-  const { data: existingProfile } = await supabase
+  // Every value below is applicant-supplied, so it is quoted before it enters
+  // PostgREST filter syntax.
+  const emailFilters = [`personal_email.eq.${q(personalEmail)}`, `company_email.eq.${q(companyEmail)}`]
+  const identityFilters = rawPhone ? [...emailFilters, `phone_number.eq.${q(rawPhone)}`] : emailFilters
+
+  // Email and phone may each match a different employee, so ask for "any match"
+  // rather than exactly one row.
+  const { data: existingProfiles, error: profileError } = await supabase
     .from("profiles")
     .select("id")
-    .or(`personal_email.eq.${personalEmail},company_email.eq.${companyEmail}`)
-    .maybeSingle()
-  if (existingProfile?.id) {
+    .or(identityFilters.join(","))
+    .limit(1)
+  if (profileError) {
+    return serverError(log, profileError)
+  }
+  if ((existingProfiles ?? []).length > 0) {
     return NextResponse.json(
       { error: "This person already exists in employee records. Contact HR if details need correction." },
       { status: 409 }
     )
   }
 
+  // An application still awaiting review blocks a resubmission on any identity match.
+  const { data: pendingMatches, error: pendingMatchError } = await supabase
+    .from("pending_users")
+    .select("id")
+    .or(identityFilters.join(","))
+    .eq("status", "pending")
+    .limit(1)
+  if (pendingMatchError) {
+    return serverError(log, pendingMatchError)
+  }
+  if ((pendingMatches ?? []).length > 0) {
+    return NextResponse.json({ error: "An application for this person is already pending review." }, { status: 409 })
+  }
+
+  // An earlier (non-pending) application is only reused when an email matches —
+  // a shared phone number alone must never let one applicant overwrite another's record.
   const { data: existingPending, error: pendingError } = await supabase
     .from("pending_users")
     .select("id, status")
-    .or(`personal_email.eq.${personalEmail},company_email.eq.${companyEmail}`)
+    .or(emailFilters.join(","))
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -131,10 +159,6 @@ export async function POST(req: Request) {
   }
 
   if (existingPending?.id) {
-    if (String(existingPending.status || "").toLowerCase() === "pending") {
-      return NextResponse.json({ error: "An application for this person is already pending review." }, { status: 409 })
-    }
-
     const { error: updateError } = await supabase.from("pending_users").update(payload).eq("id", existingPending.id)
     if (updateError) {
       return serverError(log, updateError)
@@ -151,6 +175,11 @@ export async function POST(req: Request) {
     },
   ])
   if (insertError) {
+    // A concurrent submission can win the race past the duplicate checks above;
+    // the database's unique key on pending_users.email then rejects this one.
+    if (insertError.code === "23505") {
+      return NextResponse.json({ error: "An application for this person is already pending review." }, { status: 409 })
+    }
     return serverError(log, insertError)
   }
 

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { EMERGENCY_JUSTIFICATION_MIN_LENGTH } from "./workflow"
+import { MAX_BENEFICIARIES, PETTY_CASH_MAX, amountOutOfRangeMessage, lineItemsTotal } from "./limits"
 
 /** The editable fields of a requisition funding category — the form and both API methods use these. */
 export const FundingCategoryFieldsSchema = z.object({
@@ -31,54 +31,163 @@ export const UpdateFundingCategorySchema = FundingCategoryFieldsSchema.partial()
   is_active: z.boolean().optional(),
 })
 
+const money = z
+  .number({ invalid_type_error: "Enter an amount in naira" })
+  .positive("Amount must be greater than zero")
+  .max(999_999_999.99, "That amount is too large")
+  .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, { message: "Use at most two decimal places" })
+
 export const BeneficiarySchema = z.object({
-  account_name: z.string().trim().min(1, "Account name is required"),
-  account_number: z.string().trim().min(1, "Account number is required"),
-  bank_name: z.string().trim().min(1, "Bank name is required"),
-  amount: z.union([z.number(), z.string()]).optional(),
+  account_name: z.string().trim().min(1, "Account name is required").max(200),
+  account_number: z
+    .string()
+    .trim()
+    .regex(/^\d{10}$/, "Account number must be 10 digits"),
+  bank_name: z.string().trim().min(1, "Bank name is required").max(120),
+  amount: money.optional(),
+})
+
+export const LineItemSchema = z.object({
+  description: z.string().trim().min(1, "Describe the item").max(300),
+  amount: money,
 })
 
 export const RequisitionAttachmentSchema = z.object({
-  file_name: z.string().trim().min(1, "File name is required"),
-  file_url: z.string().trim().min(1, "File URL is required"),
-  file_type: z.string().optional(),
-  file_size: z.number().optional(),
+  file_name: z.string().trim().min(1, "File name is required").max(255),
+  file_path: z.string().trim().min(1, "File path is required").max(500),
+  file_type: z.string().max(100).optional(),
+  file_size: z.number().int().nonnegative().optional(),
 })
 
-const RequisitionBaseSchema = z.object({
-  department: z.string().trim().min(1, "Department is required"),
-  project_name: z.string().trim().min(1, "Project name is required"),
-  amount: z.number({ invalid_type_error: "Enter the amount in naira" }).positive("Amount must be greater than zero"),
-  amount_in_words: z.string().optional(),
-  purpose: z.string().trim().min(3, "Purpose must be at least 3 characters"),
-  beneficiary_details: z.array(BeneficiarySchema).min(1, "At least one beneficiary is required"),
-  // Supporting documents are optional — not every requisition has a receipt or
-  // invoice available at the time it is raised.
-  attachments: z.array(RequisitionAttachmentSchema).optional().default([]),
-  funding_category_id: z.string().uuid("Select the project funding category"),
-  is_emergency: z.boolean().optional(),
-  emergency_justification: z.string().trim().optional(),
-})
+const PIN = z.string().regex(/^\d{6}$/, "Enter your 6-digit approval PIN")
 
-function requireEmergencyJustification(
-  value: { is_emergency?: boolean; emergency_justification?: string },
-  ctx: z.RefinementCtx
+function checkBeneficiarySplit(
+  beneficiaries: { amount?: number }[],
+  total: number,
+  ctx: z.RefinementCtx,
+  path: (string | number)[]
 ) {
-  if (value.is_emergency && (value.emergency_justification ?? "").trim().length < EMERGENCY_JUSTIFICATION_MIN_LENGTH) {
+  if (beneficiaries.length < 2) return
+  const withAmounts = beneficiaries.filter((b) => b.amount != null)
+  if (withAmounts.length === 0) return
+  if (withAmounts.length !== beneficiaries.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path, message: "Give every beneficiary an amount, or none of them" })
+    return
+  }
+  const sum = lineItemsTotal(withAmounts.map((b) => ({ amount: b.amount! })))
+  if (Math.abs(sum - total) > 0.001) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ["emergency_justification"],
-      message: `An emergency requisition needs a written justification of at least ${EMERGENCY_JUSTIFICATION_MIN_LENGTH} characters.`,
+      path,
+      message: "The beneficiaries' amounts must add up to the total",
     })
   }
 }
 
-/** POST /api/requisitions */
-export const CreateRequisitionSchema = RequisitionBaseSchema.superRefine(requireEmergencyJustification)
+const CommonFields = {
+  beneficiary_details: z.array(BeneficiarySchema).min(1, "Add at least one beneficiary"),
+  // Supporting documents are optional — a receipt or invoice is not always to hand.
+  attachments: z.array(RequisitionAttachmentSchema).max(10).optional().default([]),
+  funding_category_id: z.string().uuid().nullish(),
+  help_desk_ticket_id: z.string().uuid().nullish(),
+}
 
-/** The new-requisition form: everything but the department, which comes from the requester's profile. */
-export const RequisitionFormSchema = RequisitionBaseSchema.omit({ department: true }).superRefine(
-  requireEmergencyJustification
-)
+export const PaymentRequestSchema = z
+  .object({
+    form_type: z.literal("payment_request"),
+    project_name: z.string().trim().min(1, "Project is required").max(200),
+    purpose: z.string().trim().min(3, "Purpose must be at least 3 characters").max(2000),
+    site_location: z.string().trim().max(200).optional(),
+    amount: money,
+    ...CommonFields,
+  })
+  .superRefine((value, ctx) => {
+    const range = amountOutOfRangeMessage("payment_request", value.amount)
+    if (range) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["amount"], message: range })
+    if (value.beneficiary_details.length > MAX_BENEFICIARIES.payment_request) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["beneficiary_details"],
+        message: `A Payment Request has at most ${MAX_BENEFICIARIES.payment_request} beneficiaries`,
+      })
+    }
+    checkBeneficiarySplit(value.beneficiary_details, value.amount, ctx, ["beneficiary_details"])
+  })
 
-export type RequisitionFormValues = z.input<typeof RequisitionFormSchema>
+export const PettyCashSchema = z
+  .object({
+    form_type: z.literal("petty_cash"),
+    line_items: z.array(LineItemSchema).min(1, "Add at least one item").max(30),
+    ...CommonFields,
+  })
+  .superRefine((value, ctx) => {
+    const total = lineItemsTotal(value.line_items)
+    if (total > PETTY_CASH_MAX) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["line_items"],
+        message: amountOutOfRangeMessage("petty_cash", total) || "Over the petty cash limit",
+      })
+    }
+    if (value.beneficiary_details.length > MAX_BENEFICIARIES.petty_cash) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["beneficiary_details"],
+        message: `Petty Cash has at most ${MAX_BENEFICIARIES.petty_cash} beneficiaries`,
+      })
+    }
+    checkBeneficiarySplit(value.beneficiary_details, total, ctx, ["beneficiary_details"])
+  })
+
+/** POST /api/requisitions — picks the form's schema by `form_type`. */
+export function parseCreateRequisition(body: unknown) {
+  const formType = (body as { form_type?: unknown } | null)?.form_type
+  return formType === "petty_cash" ? PettyCashSchema.safeParse(body) : PaymentRequestSchema.safeParse(body)
+}
+
+export type PaymentRequestInput = z.input<typeof PaymentRequestSchema>
+export type PettyCashInput = z.input<typeof PettyCashSchema>
+
+/** A signer's change to the amount. Petty cash changes its lines; a Payment Request its amount. */
+export const AmountChangeSchema = z.object({
+  amount: money.optional(),
+  line_items: z.array(LineItemSchema).min(1).max(30).optional(),
+  beneficiary_details: z.array(BeneficiarySchema).min(1).max(4).optional(),
+  reason: z.string().trim().min(3, "Say why the amount is changing").max(1000),
+})
+
+/** POST /api/requisitions/[id]/act */
+export const RequisitionActSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("sign"),
+    pin: PIN,
+    comments: z.string().trim().max(2000).optional(),
+    amount_change: AmountChangeSchema.optional(),
+  }),
+  z.object({
+    action: z.literal("reject"),
+    pin: PIN,
+    reason: z.string().trim().min(3, "Say why it is being rejected").max(2000),
+  }),
+])
+
+/** POST /api/requisitions/[id]/payments */
+export const RecordPaymentSchema = z.object({
+  amount: money,
+  paid_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the payment date"),
+  method: z.enum(["transfer", "cash"]),
+  reference: z.string().trim().max(200).optional(),
+  receipt_path: z.string().trim().max(500).optional(),
+  note: z.string().trim().max(1000).optional(),
+  pin: PIN,
+})
+
+/** PATCH /api/requisitions/[id]/stages/[stageId] */
+export const ReassignStageSchema = z.object({
+  assignee_id: z.string().uuid("Pick someone"),
+})
+
+/** POST /api/requisitions/payment-processors */
+export const PaymentProcessorSchema = z.object({
+  profile_id: z.string().uuid("Pick someone"),
+})

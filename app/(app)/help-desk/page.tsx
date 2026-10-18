@@ -23,7 +23,6 @@ type HelpDeskPageData =
   | {
       userId: string
       userDepartment: string | null
-      canReviewPendingApprovals: boolean
       initialDepartments: string[]
       tickets: HelpDeskTicket[]
       loadError: string | null
@@ -99,8 +98,6 @@ async function getData() {
   return {
     userId: user.id,
     userDepartment: profile?.department || null,
-    // User portal never grants approval review — admins/leads use /admin/help-desk for that.
-    canReviewPendingApprovals: false,
     initialDepartments: ((departmentRows as DepartmentRow[] | null) || [])
       .map((row) => String(row.name || "").trim())
       .filter(Boolean),
@@ -129,7 +126,6 @@ export default async function PortalHelpDeskPage() {
     <HelpDeskContent
       userId={data.userId}
       userDepartment={data.userDepartment}
-      canReviewPendingApprovals={data.canReviewPendingApprovals}
       initialDepartments={data.initialDepartments || []}
       initialTickets={data.tickets}
       initialError={data.loadError}

@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
+import type { RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
 /** Leave request item types and the stage/approver display helpers shared by the leave approvals page and its dialogs. Split from leave/view.tsx (audit 6.1). */
 export interface LeaveItem {
@@ -82,6 +83,8 @@ export interface LeaveItem {
   required_documents?: string[]
   missing_documents?: string[]
   evidence_complete?: boolean
+  requester_route_kind?: string | null
+  route_snapshot?: RouteSnapshotStage[] | null
 }
 
 export interface LeaveActionHistoryItem {

@@ -177,6 +177,7 @@ export function PaymentsTable({
     issuer_address: "",
     payment_reference: "",
     notes: "",
+    project_id: "",
   })
 
   const {
@@ -569,6 +570,7 @@ export function PaymentsTable({
           ...submittedFormData,
           category: submittedFormData.payment_type,
           amount: parseFloat(submittedFormData.amount),
+          project_id: submittedFormData.project_id || null,
         }),
       })
 
@@ -616,6 +618,7 @@ export function PaymentsTable({
         issuer_address: "",
         payment_reference: "",
         notes: "",
+        project_id: "",
       })
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.paymentsTable() })
     } catch {

@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { generateStaffEmail } from "@/lib/employees/email"
 
 const log = logger("employee-new")
 
@@ -147,8 +148,8 @@ export default function EmployeeOnboardingForm() {
 
   const safeFirst = sanitize(firstName || "")
   const safeLast = sanitize(lastName || "")
-  const companyEmail =
-    safeFirst && safeLast ? `${safeLast.charAt(0)}.${safeFirst}@org.acoblighting.com` : "Wait for name input..."
+  const generatedEmail = generateStaffEmail(safeFirst, safeLast)
+  const companyEmail = generatedEmail || "Wait for name input..."
 
   const currentTrackValue =
     selectedEmploymentType === "full_time"
@@ -331,21 +332,35 @@ export default function EmployeeOnboardingForm() {
                     <label className="text-foreground text-sm font-medium">
                       First Name <span className="text-destructive">*</span>
                     </label>
-                    <Input className="h-11" placeholder="e.g. Adewale" {...register("first_name")} />
+                    <Input className="h-11" placeholder="e.g. Blessing" {...register("first_name")} />
                     {errors.first_name && <p className="text-destructive mt-1 text-sm">{errors.first_name.message}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-foreground text-sm font-medium">
-                      Last Name <span className="text-destructive">*</span>
+                      Surname (Last Name) <span className="text-destructive">*</span>
                     </label>
-                    <Input className="h-11" placeholder="e.g. Okafor" {...register("last_name")} />
+                    <Input className="h-11" placeholder="e.g. Funsho (Family Name)" {...register("last_name")} />
                     {errors.last_name && <p className="text-destructive mt-1 text-sm">{errors.last_name.message}</p>}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-foreground text-sm font-medium">Other Names (Optional)</label>
-                  <Input className="h-11" placeholder="Middle name" {...register("other_names")} />
+                  <label className="text-foreground text-sm font-medium">Middle / Other Names (Optional)</label>
+                  <Input className="h-11" placeholder="e.g. Kemi" {...register("other_names")} />
                 </div>
+                {generatedEmail && (
+                  <div className="border-primary/20 bg-primary/5 text-muted-foreground flex flex-col justify-between gap-2 rounded-xl border p-3.5 text-xs shadow-xs sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-2">
+                      <Mail className="text-primary h-4 w-4 shrink-0" />
+                      <span>
+                        Your Official ACOB Email will be:{" "}
+                        <strong className="text-foreground font-mono font-semibold">{companyEmail}</strong>
+                      </span>
+                    </div>
+                    <span className="text-muted-foreground/80 text-[11px] sm:text-right">
+                      Format: [Surname initial].[First name]@org.acoblighting.com
+                    </span>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-foreground text-sm font-medium">

@@ -20,6 +20,7 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { Department, Category, PaymentEditFormData } from "./payment-types"
+import { ProjectSelect } from "./project-select"
 
 interface PaymentEditDialogProps {
   open: boolean
@@ -50,6 +51,7 @@ const PaymentEditDialogSchema = z.object({
   issuer_address: z.string(),
   payment_reference: z.string(),
   notes: z.string(),
+  project_id: z.string(),
 })
 
 export function PaymentEditDialog({
@@ -282,6 +284,8 @@ export function PaymentEditDialog({
               />
             </div>
           )}
+
+          <ProjectSelect value={values.project_id} onChange={(v) => form.setValue("project_id", v)} />
 
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>

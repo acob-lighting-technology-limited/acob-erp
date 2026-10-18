@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { getRequestScope } from "@/lib/admin/api-scope"
-import { canAccessAdminSection, isAdminLikeRole } from "@/lib/admin/rbac"
+import { canManageRequisitionSettings } from "@/lib/requisitions/route-helpers"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { apiError, ApiErrorCode, validationError } from "@/lib/api/errors"
@@ -32,12 +31,7 @@ function slugifyCode(name: string): string {
 }
 
 /** Only finance admins may curate the funder list. */
-async function canManageFundingCategories(): Promise<boolean> {
-  const scope = await getRequestScope()
-  if (!scope) return false
-  if (isAdminLikeRole(scope.role)) return canAccessAdminSection(scope, "finance")
-  return false
-}
+const canManageFundingCategories = canManageRequisitionSettings
 
 export async function GET(request: NextRequest) {
   try {

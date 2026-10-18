@@ -1,8 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { QUERY_KEYS } from "@/lib/query-keys"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,10 +8,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
-import { Headset, Play, CheckCircle2, LifeBuoy, MessageSquare, ShieldCheck, Star, Building2 } from "lucide-react"
+import { Headset, Play, CheckCircle2, LifeBuoy, MessageSquare, Star, Building2 } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { PendingApprovalsCard } from "@/components/help-desk/pending-approvals-card"
 import { CreateTicketDialog, type CreateTicketForm } from "@/components/help-desk/create-ticket-dialog"
 import type { HelpDeskTicket, HelpDeskContentProps } from "@/components/help-desk/help-desk-types"
 import type { HelpDeskTicketDetailResponse } from "@/components/help-desk/help-desk-types"
@@ -41,13 +38,7 @@ type CommentCreateResponse = {
 
 type TicketTab = "my_requests" | "assigned_to_me" | "department_assigned"
 
-const DEPARTMENT_FLOW_STATUSES = new Set([
-  "department_queue",
-  "department_assigned",
-  "pending_lead_review",
-  "pending_approval",
-  "approved_for_procurement",
-])
+const DEPARTMENT_FLOW_STATUSES = new Set(["department_queue", "department_assigned", "pending_lead_review"])
 
 function belongsToTab(ticket: HelpDeskTicket, tab: TicketTab, userId: string, userDepartment: string | null) {
   if (tab === "my_requests") return ticket.requester_id === userId
@@ -85,19 +76,15 @@ function canUserChangeTicketStatus(ticket: HelpDeskTicket, userId: string) {
 export function HelpDeskContent({
   userId,
   userDepartment,
-  canReviewPendingApprovals,
   initialDepartments,
   initialTickets,
   initialError,
 }: HelpDeskContentProps) {
-  const queryClient = useQueryClient()
   const [tickets, setTickets] = useState<HelpDeskTicket[]>(initialTickets)
   const [isSaving, setIsSaving] = useState(false)
   const [isDetailSaving, setIsDetailSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [availableDepartments] = useState<string[]>(initialDepartments || [])
-  const [pendingApprovalsOpen, setPendingApprovalsOpen] = useState(false)
-  const [processingApprovalId, setProcessingApprovalId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TicketTab>("my_requests")
   const [ratingDrafts, setRatingDrafts] = useState<Record<string, string>>({})
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
@@ -121,24 +108,6 @@ export function HelpDeskContent({
     }
   }, [initialError])
 
-  const pendingApprovalsPath = canReviewPendingApprovals
-    ? "/api/help-desk/tickets?scope=department&status=pending_approval"
-    : "/api/help-desk/tickets?scope=mine&status=pending_approval"
-
-  const { data: pendingApprovalsData } = useQuery({
-    queryKey: QUERY_KEYS.tickets({
-      scope: canReviewPendingApprovals ? "department" : "mine",
-      status: "pending_approval",
-    }),
-    queryFn: async () => {
-      const res = await apiFetch(pendingApprovalsPath, { cache: "no-store" })
-      const json = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(buildFetchDebugLabel("Pending approvals load", res.status, json))
-      return json.data || []
-    },
-  })
-  const pendingApprovals: HelpDeskTicket[] = pendingApprovalsData || []
-
   const filteredByTab = useMemo(
     () => tickets.filter((ticket) => belongsToTab(ticket, activeTab, userId, userDepartment)),
     [tickets, activeTab, userId, userDepartment]
@@ -152,7 +121,6 @@ export function HelpDeskContent({
     () => filteredByTab.filter((ticket) => ticket.status === "resolved").length,
     [filteredByTab]
   )
-  const pendingReviewCount = pendingApprovals.length
 
   const departmentOptions = useMemo(() => {
     const options = new Set<string>()
@@ -354,12 +322,6 @@ export function HelpDeskContent({
       ).values()
     ) as HelpDeskTicket[]
     setTickets(merged)
-    queryClient.invalidateQueries({
-      queryKey: QUERY_KEYS.tickets({
-        scope: canReviewPendingApprovals ? "department" : "mine",
-        status: "pending_approval",
-      }),
-    })
   }
 
   async function createTicket(e: React.FormEvent) {
@@ -539,30 +501,11 @@ export function HelpDeskContent({
     }
   }
 
-  async function decideApproval(ticketId: string, decision: "approved" | "rejected", comments?: string) {
-    setProcessingApprovalId(ticketId)
-    try {
-      const response = await apiFetch(`/api/help-desk/tickets/${ticketId}/approvals`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, comments: comments || null }),
-      })
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null
-      if (!response.ok) throw new Error(payload?.error || "Failed to process approval")
-      toast.success(`Ticket ${decision === "approved" ? "approved" : "rejected"}`)
-      await refreshTickets()
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to process approval"))
-    } finally {
-      setProcessingApprovalId(null)
-    }
-  }
-
   return (
     <DataTablePage
       layout={tablePageLayout}
       title="Help Desk"
-      description="Submit and track support/procurement tickets."
+      description="Submit and track support tickets."
       icon={Headset}
       backLink={{ href: "/profile", label: "Back to Dashboard" }}
       tabs={tabs}
@@ -572,13 +515,6 @@ export function HelpDeskContent({
       actionsPlacement="inline-always"
       actions={
         <div className="flex items-center gap-2">
-          {pendingReviewCount > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setPendingApprovalsOpen(true)}>
-              <ShieldCheck className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Pending Reviews ({pendingReviewCount})</span>
-              <span className="sm:hidden">{pendingReviewCount}</span>
-            </Button>
-          )}
           <CreateTicketDialog
             open={createOpen}
             onOpenChange={setCreateOpen}
@@ -609,18 +545,6 @@ export function HelpDeskContent({
             iconBgColor="bg-emerald-500/10"
             iconColor="text-emerald-500"
           />
-          {/* Conditional in step with its badge — someone who reviews nothing should
-              not be shown a permanent "Pending Review: 0". */}
-          {pendingReviewCount > 0 && (
-            <StatCard
-              variant="compact"
-              title="Pending Review"
-              value={pendingReviewCount}
-              icon={ShieldCheck}
-              iconBgColor="bg-amber-500/10"
-              iconColor="text-amber-500"
-            />
-          )}
           <StatCard
             variant="compact"
             title="Avg CSAT"
@@ -628,21 +552,10 @@ export function HelpDeskContent({
             icon={Star}
             iconBgColor="bg-violet-500/10"
             iconColor="text-violet-500"
-            className={pendingReviewCount > 0 ? "hidden sm:block" : undefined}
           />
         </StatGrid>
       }
     >
-      {pendingReviewCount > 0 && (
-        <PendingApprovalsCard
-          open={pendingApprovalsOpen}
-          onOpenChange={setPendingApprovalsOpen}
-          tickets={pendingApprovals}
-          processingId={processingApprovalId}
-          onDecision={decideApproval}
-        />
-      )}
-
       <DataTable<HelpDeskTicket>
         data={filteredByTab}
         columns={columns}

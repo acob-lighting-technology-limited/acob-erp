@@ -13,6 +13,7 @@ import {
   Clock,
   FolderKanban,
   FolderTree,
+  Globe,
   Layers,
   MapPin,
   Pencil,
@@ -36,6 +37,7 @@ import {
   formatCapacity,
 } from "@/components/projects/project-summary"
 import { ProjectCharts } from "@/components/projects/project-charts"
+import { ProjectPaymentsCard } from "@/components/projects/project-payments-card"
 import { ProjectDialogs } from "@/app/admin/projects/_components/project-dialogs"
 import { ProjectPlanBoard } from "@/app/admin/projects/_components/project-plan-board"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
@@ -143,6 +145,24 @@ export function ProjectDetail({
     },
     { icon: Wrench, label: "Technology", value: project.technology_type || "-" },
     { icon: Zap, label: "Capacity", value: formatCapacity(project.capacity_w) },
+    ...(project.website_slug
+      ? [
+          {
+            icon: Globe,
+            label: "Website",
+            value: (
+              <a
+                href={`https://acoblighting.com/projects/${project.website_slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                View on acoblighting.com
+              </a>
+            ),
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -258,6 +278,8 @@ export function ProjectDetail({
             </dl>
           </CardContent>
         </Card>
+
+        {isAdmin && <ProjectPaymentsCard projectId={project.id} />}
 
         {activeTab === "charts" ? (
           <ProjectCharts projects={chartProjects} filterBy="none" />

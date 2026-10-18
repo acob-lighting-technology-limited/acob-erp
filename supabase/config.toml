@@ -226,10 +226,12 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Supabase Auth templates are maintained in this repository. Apply targeted
+# changes with `supabase config push` only after reviewing `config diff`, since
+# this local development config deliberately differs from production elsewhere.
+[auth.email.template.recovery]
+subject = "Reset your Matrix password"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

@@ -67,11 +67,15 @@ export function ClientErrorMonitor() {
     const onWindowError = (event: ErrorEvent) => {
       const message = normalizeMessage(event.error || event.message || "Window error")
 
-      if (isChunkLoadError(message) && tryChunkReload()) {
-        return
+      if (isChunkLoadError(message)) {
+        void reportClientError({ source: "window.error", message, context: { isChunkError: true } })
+        if (tryChunkReload()) {
+          return
+        }
       }
 
       if (isBenignHydrationWarning(message)) {
+        void reportClientError({ source: "window.error", message })
         return
       }
 
@@ -97,11 +101,15 @@ export function ClientErrorMonitor() {
       const reason = event.reason
       const message = normalizeMessage(reason)
 
-      if (isChunkLoadError(message) && tryChunkReload()) {
-        return
+      if (isChunkLoadError(message)) {
+        void reportClientError({ source: "unhandledrejection", message, context: { isChunkError: true } })
+        if (tryChunkReload()) {
+          return
+        }
       }
 
       if (isBenignHydrationWarning(message)) {
+        void reportClientError({ source: "unhandledrejection", message })
         return
       }
 

@@ -32,6 +32,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
 import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
+import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 import { layout as tablePageLayout } from "./_layout"
 
@@ -88,6 +90,7 @@ export function WeeklyReportsPortal() {
 
   const reports = useMemo(() => reportsData?.reports ?? [], [reportsData?.reports])
   const trackingData = useMemo(() => reportsData?.trackingData ?? [], [reportsData?.trackingData])
+  const staffAvatars = useStaffAvatars()
 
   const { data: lockState } = useWeeklyReportLockState(weekFilter, yearFilter)
 
@@ -239,7 +242,12 @@ export function WeeklyReportsPortal() {
         },
         render: (report) => {
           const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-          return profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
+          const name = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
+          return report.user_id ? (
+            <StaffNameWithAvatar name={name} profileId={report.user_id} src={staffAvatars[report.user_id]} />
+          ) : (
+            name
+          )
         },
       },
       {
@@ -271,7 +279,7 @@ export function WeeklyReportsPortal() {
         },
       },
     ],
-    [meetingDate, trackingData]
+    [meetingDate, staffAvatars, trackingData]
   )
 
   const filters = useMemo<DataTableFilter<WeeklyReport>[]>(
@@ -574,8 +582,17 @@ export function WeeklyReportsPortal() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{report.department}</p>
-                  <p className="text-muted-foreground text-sm">
-                    {submitterName} (W{report.week_number})
+                  <p className="text-muted-foreground flex items-center gap-1 text-sm">
+                    {report.user_id ? (
+                      <StaffNameWithAvatar
+                        name={submitterName}
+                        profileId={report.user_id}
+                        src={staffAvatars[report.user_id]}
+                      />
+                    ) : (
+                      submitterName
+                    )}
+                    <span className="shrink-0">(W{report.week_number})</span>
                   </p>
                 </div>
                 <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>

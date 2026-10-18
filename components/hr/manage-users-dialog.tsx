@@ -41,7 +41,7 @@ import {
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { cn, formatName } from "@/lib/utils"
-import { useContractCategories } from "@/hooks/use-contract-categories"
+import { createClient } from "@/lib/supabase/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { toLocalISODate } from "@/lib/utils/date"
 import { useDepartments } from "@/hooks/use-departments"
@@ -53,7 +53,7 @@ import { logger } from "@/lib/logger"
 import type { UserRole } from "@/types/database"
 import type { Employee, UserProfile } from "@/app/admin/hr/employees/admin-employee-content"
 import { apiFetch } from "@/lib/api-client"
-import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
+import { describeApprovalMailbox, type ApprovalMailboxOutcome } from "@/lib/employees/approval-mailbox"
 
 const log = logger("manage-users-dialog")
 
@@ -151,6 +151,7 @@ export function ManageUsersDialog({
   userProfile,
 }: ManageUsersDialogProps) {
   const [activeTab, setActiveTab] = useState<string>(defaultTab)
+  const [supabase] = useState(() => createClient())
   const queryClient = useQueryClient()
   const today = toLocalISODate()
   const { departments: DEPARTMENTS } = useDepartments()
@@ -190,7 +191,19 @@ export function ManageUsersDialog({
   const contractCategoryCodeValue = watch("contractCategoryCode")
   const selectedGender = watch("gender")
 
-  const { data: contractCategories = [] } = useContractCategories(open)
+  const { data: contractCategories = [] } = useQuery<any[]>({
+    queryKey: ["contract-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contract_categories")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+      if (error) throw error
+      return data || []
+    },
+    enabled: open,
+  })
 
   const currentTrackValue =
     employmentTypeValue === "full_time"
@@ -331,23 +344,30 @@ export function ManageUsersDialog({
     if (!selectedUser) return
     setIsProcessing(true)
     try {
-      // Approve — the route saves the corrected details first, server-side.
+      // 1. Update the record in pending_users with the edited details
+      const { error: updateError } = await supabase
+        .from("pending_users")
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          other_names: otherNames || null,
+          department: department,
+          designation: designation,
+          company_email: companyEmail,
+          personal_email: personalEmailState,
+          phone_number: phoneNumber,
+          residential_address: residentialAddress,
+          office_location: officeLocation || null,
+        })
+        .eq("id", selectedUser.id)
+
+      if (updateError) throw updateError
+
+      // 2. Call the approve-user API route
       const res = await apiFetch("/api/admin/approve-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          details: {
-            first_name: firstName,
-            last_name: lastName,
-            other_names: otherNames || null,
-            department,
-            designation,
-            company_email: companyEmail,
-            personal_email: personalEmailState,
-            phone_number: phoneNumber || null,
-            residential_address: residentialAddress || null,
-            office_location: officeLocation || null,
-          },
           pendingUserId: selectedUser.id,
           hireDate,
           employmentType,
@@ -356,9 +376,13 @@ export function ManageUsersDialog({
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || "Failed to approve")
-      toast.success("Employee approved. Staff ID generated and ICT notified to set up their webmail.")
-      if (Array.isArray(result.emailWarnings) && result.emailWarnings.length > 0) {
-        toast.warning(`ICT email not sent: ${result.emailWarnings[0].reason}`)
+      const outcome = describeApprovalMailbox(result.mailbox as ApprovalMailboxOutcome | undefined)
+      if (outcome.tone === "success") toast.success(outcome.message)
+      else toast.warning(outcome.message, { duration: 12000 })
+      if (Array.isArray(result.emailWarnings)) {
+        for (const warning of result.emailWarnings as Array<{ audience: string; reason: string }>) {
+          toast.warning(warning.audience === "ict" ? `ICT email not sent: ${warning.reason}` : warning.reason)
+        }
       }
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingApplications() })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminEmployees() })
@@ -839,7 +863,7 @@ export function ManageUsersDialog({
             <TabsContent value="applications" className="mt-0 flex min-h-0 flex-1 overflow-hidden">
               <div className="flex min-h-0 flex-1">
                 {/* Queue sidebar */}
-                <aside className="border-border bg-muted/10 flex w-70 shrink-0 flex-col border-r">
+                <aside className="border-border bg-muted/10 flex w-[280px] shrink-0 flex-col border-r">
                   <div className="border-border bg-background border-b p-5">
                     <h3 className="font-bold">Queue</h3>
                     <p className="text-muted-foreground text-xs">Verification Needed</p>
@@ -847,8 +871,9 @@ export function ManageUsersDialog({
                   <ScrollArea className="flex-1">
                     <div className="divide-border divide-y">
                       {isLoadingPending ? (
-                        <div className="p-4">
-                          <RowsSkeleton rows={4} />
+                        <div className="flex flex-col items-center gap-3 p-10 opacity-50">
+                          <Loader2 className="text-primary h-5 w-5 animate-spin" />
+                          <p className="text-xs">Loading…</p>
                         </div>
                       ) : pendingUsers.length === 0 ? (
                         <div className="space-y-2 p-10 text-center opacity-40">
@@ -1196,7 +1221,7 @@ export function ManageUsersDialog({
             <TabsContent value="exit" className="mt-0 flex min-h-0 flex-1 overflow-hidden">
               <div className="flex min-h-0 flex-1">
                 {/* Left: employee list */}
-                <div className="border-border flex w-75 shrink-0 flex-col border-r">
+                <div className="border-border flex w-[300px] shrink-0 flex-col border-r">
                   <div className="border-border space-y-3 border-b p-4">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold">Active Employees</p>
@@ -1357,7 +1382,7 @@ export function ManageUsersDialog({
                           variant="destructive"
                           disabled={isExiting || !allExitValid}
                           onClick={() => setExitConfirmOpen(true)}
-                          className="min-w-40"
+                          className="min-w-[160px]"
                         >
                           {isExiting ? (
                             <>

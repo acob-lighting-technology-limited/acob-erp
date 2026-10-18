@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,6 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { EmailSetupButton, MailboxUsage, OpenMailboxButton } from "@/components/profile/mailbox-usage"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Pencil, Mail, Phone, Cake, Home, Camera, Trash2, Loader2 } from "lucide-react"
 import { formatName, cn } from "@/lib/utils"
-import { formatWATDate, formatBirthdayLabel, toLocalISODate, formatDDMMYYYY } from "@/lib/utils/date"
+import { formatWATDate, formatBirthdayLabel, toLocalISODate, toLocalTimeString, formatDDMMYYYY } from "@/lib/utils/date"
 import { isWeekend } from "@/lib/hr/attendance-utils"
 import { getRoleBadgeColor, getRoleDisplayName } from "@/lib/permissions"
 import { apiFetch } from "@/lib/api-client"
@@ -106,8 +107,10 @@ function getInitials(firstName?: string | null, lastName?: string | null): strin
   return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase()
 }
 
+// WAT, not the runtime clock: the server renders in UTC and the phone in WAT,
+// so local hours disagreed for an hour twice a day and broke hydration.
 function getGreeting(): string {
-  const hour = new Date().getHours()
+  const hour = Number(toLocalTimeString().slice(0, 2))
   if (hour < 12) return "Good morning"
   if (hour < 17) return "Good afternoon"
   return "Good evening"
@@ -177,6 +180,13 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
   const [isUploading, setIsUploading] = useState(false)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false)
+
+  // The upload-photo popup asks for the file picker from here, since /profile owns the input.
+  useEffect(() => {
+    const openPicker = () => fileInputRef.current?.click()
+    window.addEventListener("profile-avatar-pick-request", openPicker)
+    return () => window.removeEventListener("profile-avatar-pick-request", openPicker)
+  }, [])
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -463,37 +473,62 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
         </div>
 
         {/* Contact strip */}
-        <div className="text-muted-foreground mt-5 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t pt-4 text-sm sm:mt-6 sm:grid-cols-2 sm:pt-5 lg:flex lg:flex-wrap lg:items-center">
+        <div className="text-muted-foreground mt-5 grid grid-cols-1 gap-x-6 gap-y-2.5 border-t pt-4 text-sm sm:mt-6 sm:grid-cols-2 sm:pt-5 lg:flex lg:flex-wrap lg:items-start">
           {profile.company_email && (
-            <a
-              href={`mailto:${profile.company_email}`}
-              className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
-              title={profile.company_email}
-            >
-              <Mail className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{profile.company_email}</span>
-            </a>
+            // Email on top, its mailbox storage underneath: one item, two lines.
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-1">
+                <a
+                  href={`mailto:${profile.company_email}`}
+                  className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
+                  title={profile.company_email}
+                >
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{profile.company_email}</span>
+                </a>
+                <OpenMailboxButton />
+              </div>
+              <MailboxUsage />
+              <div className="ml-5">
+                <EmailSetupButton
+                  fullName={fullName}
+                  designation={profile.designation ?? null}
+                  phone={profile.phone_number ?? null}
+                  additionalEmail={profile.additional_email ?? null}
+                />
+              </div>
+            </div>
           )}
-          {profile.phone_number && (
-            <a
-              href={`tel:${profile.phone_number}`}
-              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
-            >
-              <Phone className="h-3.5 w-3.5 shrink-0" />
-              {profile.phone_number}
-            </a>
-          )}
-          {birthdayLabel && (
-            <span className="flex items-center gap-1.5">
-              <Cake className="h-3.5 w-3.5 shrink-0" />
-              {birthdayLabel}
-            </span>
-          )}
-          {profile.residential_address && (
-            <span className="flex min-w-0 items-center gap-1.5" title={profile.residential_address}>
-              <Home className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{profile.residential_address}</span>
-            </span>
+          {(profile.phone_number || birthdayLabel || profile.residential_address) && (
+            // Second column, mirroring the email block: phone and birthday on one
+            // line, the home address directly under them.
+            <div className="flex min-w-0 flex-col gap-1">
+              {(profile.phone_number || birthdayLabel) && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {profile.phone_number && (
+                    <a
+                      href={`tel:${profile.phone_number}`}
+                      className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+                    >
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      {profile.phone_number}
+                    </a>
+                  )}
+                  {birthdayLabel && (
+                    <span className="flex items-center gap-1.5">
+                      <Cake className="h-3.5 w-3.5 shrink-0" />
+                      {birthdayLabel}
+                    </span>
+                  )}
+                </div>
+              )}
+              {profile.residential_address && (
+                <span className="flex min-w-0 items-center gap-1.5" title={profile.residential_address}>
+                  <Home className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{profile.residential_address}</span>
+                </span>
+              )}
+            </div>
           )}
         </div>
       </CardContent>

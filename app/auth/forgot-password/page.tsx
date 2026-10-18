@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createClient } from "@/lib/supabase/client"
+import { requestPasswordResetEmail } from "@/lib/supabase/password-reset"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
@@ -19,14 +19,10 @@ export default function ForgotPasswordPage() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
 
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://matrix.acoblighting.com"
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${appUrl}/auth/callback?next=/auth/reset-password`,
-      })
+      const { error } = await requestPasswordResetEmail(email)
 
       if (error) throw error
 

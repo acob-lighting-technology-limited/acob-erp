@@ -276,6 +276,7 @@ export const adminNavigation: NavItem[] = [
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
       { name: "Payments", href: "/admin/accounts/payments" },
+      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
       { name: "Bills", href: "/admin/accounts/bills" },
       { name: "Invoices", href: "/admin/accounts/invoices" },
       { name: "Payroll", href: "/admin/payroll" },
@@ -397,6 +398,7 @@ export const adminNavigation: NavItem[] = [
         children: [
           { name: "Report Mail-out", href: "/admin/communications/meetings/mail" },
           { name: "Reminders", href: "/admin/communications/meetings/reminders" },
+          { name: "Knowledge Sharing", href: "/admin/communications/meetings/kss" },
         ],
       },
     ],
@@ -443,6 +445,7 @@ export const adminNavigation: NavItem[] = [
       { name: "Attendance", href: "/admin/settings/attendance" },
       { name: "CBT", href: "/admin/settings/cbt" },
       { name: "Mail", href: "/admin/settings/mail" },
+      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],
   },
@@ -460,7 +463,7 @@ export const adminNavigation: NavItem[] = [
       { name: "Role Escalations", href: "/admin/dev/role-escalations" },
       { name: "Security Events", href: "/admin/dev/security-events" },
       { name: "Impersonation", href: "/admin/dev/impersonation" },
-      { name: "UI Errors", href: "/admin/dev/ui-errors" },
+      { name: "Error Monitor", href: "/admin/dev/ui-errors" },
       { name: "Tests", href: "/admin/dev/tests" },
       { name: "ACOBot", href: "/admin/dev/acobot" },
     ],

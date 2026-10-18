@@ -96,6 +96,7 @@ export const QUERY_KEYS = {
   departments: () => ["departments"],
   officeLocations: () => ["office-locations"],
   staffAvatars: () => ["staff-avatars"],
+  staffCard: (id: string) => ["staff-card", id],
   profiles: (filters?: Record<string, unknown>) => (filters ? ["profiles", filters] : ["profiles"]),
   profile: (id: string) => ["profile", id],
   assets: (filters?: Record<string, unknown>) => (filters ? ["assets", filters] : ["assets"]),
@@ -251,6 +252,7 @@ export const QUERY_KEYS = {
 
   // Communications
   adminReminderSchedules: (mode: string) => ["admin-reminder-schedules", mode],
+  adminKssRotation: () => ["admin-kss-rotation"],
 
   // Events calendar
   events: (range?: Record<string, unknown>) => (range ? ["events", range] : ["events"]),

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -18,19 +19,14 @@ import {
 } from "./composer-utils"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { MeetingReminderForm } from "./MeetingReminderForm"
-import { KnowledgeSessionForm } from "./KnowledgeSessionForm"
 import { BroadcastForm } from "./BroadcastForm"
 import { RecipientSelector } from "./RecipientSelector"
 import { SchedulingOptions } from "./SchedulingOptions"
 import { SendSummary } from "./SendSummary"
-import { ReminderTypeSelector } from "./ReminderTypeSelector"
 import { getCurrentOfficeWeek, getOfficeWeekFromDate } from "@/lib/meeting-week"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
-import { apiFetch, apiJson } from "@/lib/api-client"
+import { apiFetch } from "@/lib/api-client"
 import { DEPT_ADMIN_HR } from "@/shared/departments"
-import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
-import { toLocalISODate } from "@/lib/utils/date"
-import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("communications-composer")
 
@@ -110,33 +106,10 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [agendaText, setAgendaText] = useState(DEFAULT_AGENDA.join("\n"))
   // On Sunday (last day of office week), default to next week since the user
   // is preparing for the upcoming meeting — avoids a visible flash from W13→W14.
-  // A week picked by hand; until then the meeting week follows the lock state.
-  const [manualMeetingWeek, setManualMeetingWeek] = useState<{ week: number; year: number } | null>(null)
-  // Advance to next week once this week's report is locked, or its meeting date
-  // has passed (e.g. the meeting was Mon/Tue and today is later in the week — the
-  // user is preparing next week's reminder, not re-sending one already held).
-  const currentLockQuery = useAdminWeeklyReportLockState(currentOfficeWeekWeek, currentOfficeWeekYear, {
-    enabled: mode !== "communications" && !manualMeetingWeek,
-  })
-  const autoMeetingWeek = useMemo(() => {
-    const current = { week: currentOfficeWeekWeek, year: currentOfficeWeekYear }
-    const next = { week: nextOfficeWeekWeek, year: nextOfficeWeekYear }
-    const lock = currentLockQuery.data
-    // On Sunday (last day of office week) default to next week while the lock
-    // state resolves — avoids a visible flash from W13 to W14.
-    if (!lock) return currentLockQuery.isError ? current : new Date().getDay() === 0 ? next : current
-    let shouldAdvance = lock.isLocked
-    if (!shouldAdvance && lock.meetingDate) shouldAdvance = toLocalISODate() > lock.meetingDate
-    return shouldAdvance ? next : current
-  }, [
-    currentLockQuery.data,
-    currentLockQuery.isError,
-    currentOfficeWeekWeek,
-    currentOfficeWeekYear,
-    nextOfficeWeekWeek,
-    nextOfficeWeekYear,
-  ])
-  const activeMeetingWeek = manualMeetingWeek ?? autoMeetingWeek
+  const [activeMeetingWeek, setActiveMeetingWeek] = useState(() =>
+    new Date().getDay() === 0 ? nextOfficeWeek : currentOfficeWeek
+  )
+  const [hasManualMeetingWeekOverride, setHasManualMeetingWeekOverride] = useState(false)
   const [savingMeetingDraft, setSavingMeetingDraft] = useState(false)
 
   // Knowledge sharing fields
@@ -146,7 +119,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [knowledgeDepartment, setKnowledgeDepartment] = useState("none")
   const [knowledgePresenterId, setKnowledgePresenterId] = useState("none")
   const [knowledgePresenterName, setKnowledgePresenterName] = useState("")
-  const [meetingPreparedById, setMeetingPreparedById] = useState("none")
 
   // Broadcast fields
   const [broadcastSubject, setBroadcastSubject] = useState("")
@@ -164,10 +136,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [recurringTime, setRecurringTime] = useState("18:00")
 
   const [isSending, setIsSending] = useState(false)
-
   const [sendResult, setSendResult] = useState<any>(null)
-
-  const [activeSchedules, setActiveSchedules] = useState<any[]>([])
   const meetingWeekOptions = useMemo(() => Array.from({ length: 53 }, (_, index) => index + 1), [])
   const meetingYearOptions = useMemo(
     () => [currentOfficeWeekYear - 1, currentOfficeWeekYear, currentOfficeWeekYear + 1, currentOfficeWeekYear + 2],
@@ -177,8 +146,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const queryClient = useQueryClient()
   const currentUserDept = (currentUser?.department || "").trim()
   const currentUserName = (currentUser?.full_name || "").trim()
-  const isCurrentUserAdminHr =
-    currentUserDept.toLowerCase().includes("admin") && currentUserDept.toLowerCase().includes("hr")
 
   const { data: canonicalMeetingSetup } = useQuery({
     queryKey: ["canonical-meeting-date", activeMeetingWeek.week, activeMeetingWeek.year],
@@ -254,22 +221,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     }
   }, [knowledgeDepartment, knowledgePresenterName, selectedPresenter])
 
-  const meetingPreparedByOptions = useMemo(
-    () =>
-      employees
-        .filter((e) => {
-          const dept = (e.department || "").toLowerCase()
-          return dept.includes("admin") && dept.includes("hr")
-        })
-        .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || "")),
-    [employees]
-  )
-
-  const selectedMeetingPreparedBy = useMemo(
-    () => (meetingPreparedById === "none" ? null : employees.find((e) => e.id === meetingPreparedById) || null),
-    [employees, meetingPreparedById]
-  )
-
   const broadcastPreparedByOptions = useMemo(
     () =>
       employees
@@ -296,20 +247,60 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   }, [employees])
 
   // ── Effects ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (mode === "communications") return
+    if (hasManualMeetingWeekOverride) return
 
-  // These settle themselves during render: each condition is false once its state is set.
+    let cancelled = false
+    const resolveActiveMeetingWeek = async () => {
+      try {
+        const res = await apiFetch(
+          `/api/admin/reports/weekly-lock-state?week=${currentOfficeWeekWeek}&year=${currentOfficeWeekYear}`,
+          { cache: "no-store" }
+        )
+        if (!res.ok) throw new Error("Failed to resolve meeting lock state")
+        const currentLock = (await res.json()) as { isLocked: boolean; meetingDate: string }
+        if (cancelled) return
+
+        // Advance to next week if:
+        // 1. The current week's report is already locked, OR
+        // 2. The current week's meeting date has already passed (e.g. meeting was
+        //    Mon/Tue and today is later in the week — the user wants to prepare
+        //    next week's reminder, not re-send for a meeting that already happened).
+        let shouldAdvance = currentLock.isLocked
+        if (!shouldAdvance && currentLock.meetingDate) {
+          const today = new Date()
+          const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+          shouldAdvance = todayIso > currentLock.meetingDate
+        }
+
+        setActiveMeetingWeek(
+          shouldAdvance
+            ? { week: nextOfficeWeekWeek, year: nextOfficeWeekYear }
+            : { week: currentOfficeWeekWeek, year: currentOfficeWeekYear }
+        )
+      } catch {
+        if (!cancelled) setActiveMeetingWeek({ week: currentOfficeWeekWeek, year: currentOfficeWeekYear })
+      }
+    }
+
+    void resolveActiveMeetingWeek()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    currentOfficeWeekWeek,
+    currentOfficeWeekYear,
+    hasManualMeetingWeekOverride,
+    mode,
+    nextOfficeWeekWeek,
+    nextOfficeWeekYear,
+  ])
+
+  // Communications always sends an admin broadcast; guarded, so it settles after one render.
   if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
 
-  if (meetingPreparedByOptions.length > 0 && !meetingPreparedByOptions.some((p) => p.id === meetingPreparedById)) {
-    const rafiatPreferred = meetingPreparedByOptions.find((p) => (p.full_name || "").toLowerCase().includes("rafiat"))
-    const preferred =
-      rafiatPreferred?.id ||
-      (isCurrentUserAdminHr && currentUserName && meetingPreparedByOptions.some((p) => p.full_name === currentUserName)
-        ? meetingPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
-        : meetingPreparedByOptions[0].id)
-    setMeetingPreparedById(preferred || meetingPreparedByOptions[0].id)
-  }
-
+  // Pick a valid preparer when the current one is missing from the options (guarded, so it settles).
   if (
     broadcastPreparedByOptions.length > 0 &&
     !broadcastPreparedByOptions.some((p) => p.id === broadcastPreparedById)
@@ -321,11 +312,11 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
   }
 
-  // Reply-to follows the chosen sender — adjusted during render, not in an effect.
-  const [replyToFor, setReplyToFor] = useState<readonly unknown[] | null>(null)
-  const replyToForNext = [selectedBroadcastPreparedBy] as const
-  if (depsChanged(replyToFor, replyToForNext)) {
-    setReplyToFor(replyToForNext)
+  // Reply-to follows the preparer, during render rather than in an effect.
+  const [seededSender, setSeededSender] = useState<readonly unknown[] | null>(null)
+  const senderNext = [selectedBroadcastPreparedBy] as const
+  if (depsChanged(seededSender, senderNext)) {
+    setSeededSender(senderNext)
     setBroadcastReplyToEmail(
       (selectedBroadcastPreparedBy?.company_email || selectedBroadcastPreparedBy?.additional_email || "")
         .trim()
@@ -333,23 +324,25 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     )
   }
 
-  // Take the meeting date and time from the week's setup — adjusted during render, not in an effect.
-  const [meetingSetupFor, setMeetingSetupFor] = useState<readonly unknown[] | null>(null)
-  const meetingSetupForNext = [canonicalMeetingSetup, reminderType] as const
-  if (depsChanged(meetingSetupFor, meetingSetupForNext)) {
-    setMeetingSetupFor(meetingSetupForNext)
+  // Seed the meeting date and time from the canonical week, during render rather than in an effect.
+  const [seededMeeting, setSeededMeeting] = useState<readonly unknown[] | null>(null)
+  const meetingNext = [canonicalMeetingSetup, reminderType] as const
+  if (depsChanged(seededMeeting, meetingNext)) {
+    setSeededMeeting(meetingNext)
     if (reminderType === "meeting" && canonicalMeetingSetup) {
       setMeetingDate(canonicalMeetingSetup.meetingDate)
       setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
     }
   }
 
-  // Take the agenda from the shared default — adjusted during render, not in an effect.
-  const [agendaFor, setAgendaFor] = useState<readonly unknown[] | null>(null)
-  const agendaForNext = [defaultAgendaData, reminderType] as const
-  if (depsChanged(agendaFor, agendaForNext)) {
-    setAgendaFor(agendaForNext)
-    if (reminderType === "meeting" && defaultAgendaData) setAgendaText(defaultAgendaData.agenda.join("\n"))
+  // Seed the agenda from the default agenda, during render rather than in an effect.
+  const [seededAgenda, setSeededAgenda] = useState<readonly unknown[] | null>(null)
+  const agendaNext = [defaultAgendaData, reminderType] as const
+  if (depsChanged(seededAgenda, agendaNext)) {
+    setSeededAgenda(agendaNext)
+    if (reminderType === "meeting" && defaultAgendaData) {
+      setAgendaText(defaultAgendaData.agenda.join("\n"))
+    }
   }
 
   // Teams link is per-week (can change each meeting); agenda is global (rarely changes week to week).
@@ -375,7 +368,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     try {
       const savedDraft = JSON.parse(savedDraftRaw) as { teamsLink?: string }
       if (typeof savedDraft.teamsLink === "string" && savedDraft.teamsLink.trim()) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- restores this week's Teams link from localStorage
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the per-week draft from localStorage, an external store
         setTeamsLink(savedDraft.teamsLink)
       }
     } catch {
@@ -383,47 +376,66 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     }
   }, [meetingDraftStorageKey, reminderType])
 
-  // Pre-fill the knowledge-sharing department and presenter from the KSS roster
-  // for the meeting's week. The fields stay editable in the knowledge-sharing form.
-  const rosterWeek = useMemo(() => {
+  useEffect(() => {
+    if (reminderType !== "meeting") return
+    if (!meetingDate) return
+
     const [year, month, day] = meetingDate.split("-").map((part) => Number(part))
-    return year && month && day ? getOfficeWeekFromDate(new Date(year, month - 1, day)) : null
-  }, [meetingDate])
-  const rosterQuery = useQuery({
-    queryKey: QUERY_KEYS.kssRoster(rosterWeek?.week ?? 0, rosterWeek?.year ?? 0),
-    queryFn: async () =>
-      (
-        await apiJson<{
-          data?: Array<{ is_active?: boolean; department?: unknown; presenter_id?: unknown; presenter_name?: unknown }>
-        }>(`/api/reports/kss-roster?week=${rosterWeek!.week}&year=${rosterWeek!.year}`)
-      ).data ?? [],
-    enabled: reminderType === "meeting" && Boolean(rosterWeek),
-  })
-  // Apply each roster result once (React's "adjust state when an input changes"
-  // pattern — no effect, no extra render pass).
-  const rosterApplyKey =
-    reminderType === "meeting" && rosterQuery.data
-      ? `${meetingDate}:${rosterQuery.dataUpdatedAt}:${employees.length}`
-      : null
-  const [appliedRosterKey, setAppliedRosterKey] = useState<string | null>(null)
-  if (rosterApplyKey && rosterApplyKey !== appliedRosterKey) {
-    setAppliedRosterKey(rosterApplyKey)
-    const roster = rosterQuery.data ?? []
-    const picked = roster.find((entry) => entry?.is_active !== false) ?? roster[0]
-    const presenterId = typeof picked?.presenter_id === "string" ? picked.presenter_id : null
-    setKnowledgeDepartment(
-      typeof picked?.department === "string" && picked.department.trim() ? picked.department : "none"
-    )
-    if (presenterId && employees.some((emp) => emp.id === presenterId)) {
-      setKnowledgePresenterId(presenterId)
-      setKnowledgePresenterName("")
-    } else {
-      setKnowledgePresenterId("none")
-      setKnowledgePresenterName(
-        typeof picked?.presenter_name === "string" && picked.presenter_name.trim() ? picked.presenter_name.trim() : ""
-      )
+    if (!year || !month || !day) return
+    const officeWeek = getOfficeWeekFromDate(new Date(year, month - 1, day))
+
+    let cancelled = false
+    const autoFillFromRoster = async () => {
+      try {
+        const res = await apiFetch(`/api/reports/kss-roster?week=${officeWeek.week}&year=${officeWeek.year}`)
+        const payload = await res.json()
+        if (!res.ok) return
+
+        const roster = Array.isArray(payload?.data) ? payload.data : []
+        const picked = roster.find((entry: { is_active?: boolean }) => entry?.is_active !== false) ?? roster[0]
+        if (cancelled) return
+        if (!picked) {
+          // No roster entry: the rotation still knows which department presents.
+          setKnowledgePresenterId("none")
+          setKnowledgePresenterName("")
+          const rotationRes = await apiFetch(
+            `/api/admin/communications/kss-rotation?week=${officeWeek.week}&year=${officeWeek.year}`
+          )
+          const rotation = await rotationRes.json().catch(() => null)
+          const department = rotationRes.ok ? rotation?.data?.department : null
+          if (cancelled) return
+          setKnowledgeDepartment(typeof department === "string" && department.trim() ? department : "none")
+          return
+        }
+
+        if (typeof picked.department === "string" && picked.department.trim()) {
+          setKnowledgeDepartment(picked.department)
+        } else {
+          setKnowledgeDepartment("none")
+        }
+
+        const presenterId = typeof picked.presenter_id === "string" ? picked.presenter_id : null
+        if (presenterId && employees.some((emp) => emp.id === presenterId)) {
+          setKnowledgePresenterId(presenterId)
+          setKnowledgePresenterName("")
+        } else {
+          setKnowledgePresenterId("none")
+          setKnowledgePresenterName(
+            typeof picked.presenter_name === "string" && picked.presenter_name.trim()
+              ? picked.presenter_name.trim()
+              : ""
+          )
+        }
+      } catch {
+        // Fail silently; form still works with manual selection.
+      }
     }
-  }
+
+    autoFillFromRoster()
+    return () => {
+      cancelled = true
+    }
+  }, [employees, meetingDate, reminderType])
 
   // ── Query: active schedules ───────────────────────────────────────────────
   const { data: schedulesData } = useQuery({
@@ -436,13 +448,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     },
   })
 
-  // Local schedule list starts from each fetch — adjusted during render, not in an effect.
-  const [schedulesFor, setSchedulesFor] = useState<readonly unknown[] | null>(null)
-  const schedulesForNext = [schedulesData] as const
-  if (depsChanged(schedulesFor, schedulesForNext)) {
-    setSchedulesFor(schedulesForNext)
-    if (schedulesData) setActiveSchedules(schedulesData)
-  }
+  const activeSchedules: any[] = schedulesData ?? []
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
@@ -625,10 +631,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       }
     }
 
-    if (reminderType === "meeting" && !selectedMeetingPreparedBy?.full_name) {
-      toast.error("Prepared by is required")
-      return
-    }
     if (reminderType === "meeting") {
       const agendaItems = parseAgendaItems(agendaText)
       if (agendaItems.length === 0) {
@@ -679,12 +681,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
             knowledgeSharingDepartment:
               reminderType === "meeting" && knowledgeDepartment !== "none" ? knowledgeDepartment : undefined,
             knowledgeSharingPresenter: reminderType === "meeting" ? selectedKnowledgePresenter || undefined : undefined,
-            meetingPreparedByName:
-              reminderType === "meeting" ? selectedMeetingPreparedBy?.full_name || "ACOB Team" : undefined,
-            meetingPreparedByDesignation:
-              reminderType === "meeting" ? selectedMeetingPreparedBy?.designation || null : undefined,
-            meetingPreparedByDepartment:
-              reminderType === "meeting" ? selectedMeetingPreparedBy?.department || DEPT_ADMIN_HR : undefined,
             sessionDate: reminderType === "knowledge_sharing" ? sessionDate : undefined,
             sessionTime: reminderType === "knowledge_sharing" ? sessionTime : undefined,
             duration: reminderType === "knowledge_sharing" ? duration : undefined,
@@ -740,7 +736,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminReminderSchedules(mode) })
       } catch (err: unknown) {
         log.error({ err: String(err) }, "Schedule error")
-
         toast.error((err as any).message || "Failed to save schedule", { id: toastId })
       }
       return
@@ -780,9 +775,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         payload.agenda = parseAgendaItems(agendaText)
         if (knowledgeDepartment !== "none") payload.knowledgeSharingDepartment = knowledgeDepartment
         if (selectedKnowledgePresenter) payload.knowledgeSharingPresenter = selectedKnowledgePresenter
-        payload.meetingPreparedByName = selectedMeetingPreparedBy?.full_name || "ACOB Team"
-        payload.meetingPreparedByDesignation = selectedMeetingPreparedBy?.designation || null
-        payload.meetingPreparedByDepartment = selectedMeetingPreparedBy?.department || DEPT_ADMIN_HR
       } else if (reminderType === "knowledge_sharing") {
         payload.sessionDate = formatDateNice(sessionDate)
         payload.sessionTime = sessionTime
@@ -829,7 +821,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       }
 
       const successCount = data.results?.filter((r: any) => r.success).length || 0
-
       const failCount = data.results?.filter((r: any) => !r.success).length || 0
 
       if (failCount === 0) {
@@ -848,13 +839,11 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           failure_count: failCount,
           recipient_count: resolvedRecipients.length,
           subject: label,
-          prepared_by: selectedMeetingPreparedBy?.full_name || null,
           attachment_count: 0,
         },
       })
     } catch (err: unknown) {
       log.error({ err: String(err) }, "Meeting reminder error")
-
       toast.error((err as any).message || "Failed to send", { id: toastId })
     } finally {
       setIsSending(false)
@@ -911,7 +900,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         description={
           mode === "communications"
             ? "Send branded department-level broadcast emails to selected recipients."
-            : "Send meeting reminders and knowledge-sharing alerts to selected recipients."
+            : "Send the general meeting reminder to selected recipients."
         }
         icon={Megaphone}
         backLink={{
@@ -923,11 +912,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start">
         {/* ── LEFT: Settings ────────────────────────────────────────────── */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Reminder Type selector (meetings mode only) */}
-          {mode !== "communications" && (
-            <ReminderTypeSelector reminderType={reminderType} setReminderType={setReminderType} />
-          )}
-
           {/* Details Card */}
           <Card>
             <CardHeader className="pb-3">
@@ -950,8 +934,20 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   meetingYear={activeMeetingWeek.year}
                   weekOptions={meetingWeekOptions}
                   yearOptions={meetingYearOptions}
-                  setMeetingWeek={(value) => setManualMeetingWeek({ ...activeMeetingWeek, week: value })}
-                  setMeetingYear={(value) => setManualMeetingWeek({ ...activeMeetingWeek, year: value })}
+                  setMeetingWeek={(value) => {
+                    setHasManualMeetingWeekOverride(true)
+                    setActiveMeetingWeek((prev) => ({
+                      ...prev,
+                      week: value,
+                    }))
+                  }}
+                  setMeetingYear={(value) => {
+                    setHasManualMeetingWeekOverride(true)
+                    setActiveMeetingWeek((prev) => ({
+                      ...prev,
+                      year: value,
+                    }))
+                  }}
                   meetingDate={meetingDate}
                   meetingTime={meetingTime}
                   teamsLink={teamsLink}
@@ -963,20 +959,8 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
                   knowledgeDepartment={knowledgeDepartment}
                   knowledgePresenterId={knowledgePresenterId}
                   knowledgePresenterName={knowledgePresenterName}
-                  meetingPreparedById={meetingPreparedById}
-                  setMeetingPreparedById={setMeetingPreparedById}
                   departmentOptions={departmentOptions}
                   presenterOptions={presenterOptions}
-                  meetingPreparedByOptions={meetingPreparedByOptions}
-                />
-              ) : reminderType === "knowledge_sharing" ? (
-                <KnowledgeSessionForm
-                  sessionDate={sessionDate}
-                  setSessionDate={setSessionDate}
-                  sessionTime={sessionTime}
-                  setSessionTime={setSessionTime}
-                  duration={duration}
-                  setDuration={setDuration}
                 />
               ) : (
                 <BroadcastForm
@@ -1067,7 +1051,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
           sessionTime={sessionTime}
           broadcastDepartment={broadcastDepartment}
           broadcastSubject={broadcastSubject}
-          selectedMeetingPreparedByName={selectedMeetingPreparedBy?.full_name ?? null}
           selectedBroadcastPreparedByName={selectedBroadcastPreparedBy?.full_name ?? null}
           selectedPresenterName={selectedKnowledgePresenter?.full_name ?? null}
           knowledgeDepartment={knowledgeDepartment}

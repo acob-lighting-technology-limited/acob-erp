@@ -7,7 +7,38 @@ import { CheckCircle, Clock, AlertCircle, Upload, Receipt, Calendar } from "luci
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { EmptyState } from "@/components/ui/patterns"
+import type { StarlinkMonth } from "@/lib/starlink/billing-schedule"
 import type { ScheduleItem, PaymentDocument } from "./payment-types"
+
+const STARLINK_BADGES: Record<StarlinkMonth["status"], { label: string; className: string }> = {
+  confirmed: {
+    label: "Paid · confirmed by Starlink",
+    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  },
+  autopay: {
+    label: "Paid · autopay",
+    className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400",
+  },
+  failed: {
+    label: "Payment failed",
+    className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  },
+  pending: {
+    label: "Awaiting payment",
+    className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+  },
+}
+
+function StarlinkMonthBadge({ month }: { month: StarlinkMonth }) {
+  const badge = STARLINK_BADGES[month.status]
+  const attempts = month.status === "failed" && month.failedAttempts > 1 ? ` (${month.failedAttempts}×)` : ""
+  return (
+    <Badge className={cn("text-xs font-normal", badge.className)}>
+      {badge.label}
+      {attempts}
+    </Badge>
+  )
+}
 
 interface ScheduleListProps {
   items: ScheduleItem[]
@@ -15,9 +46,18 @@ interface ScheduleListProps {
   onView: (e: React.MouseEvent, doc: PaymentDocument) => void
   onMarkPaid?: (d: Date) => void
   onReplace?: (d: Date, t: "invoice" | "receipt", docId: string) => void
+  /** False for Starlink kits: Starlink sends no receipts, so months settle from its emails. */
+  receiptsEnabled?: boolean
 }
 
-export function ScheduleList({ items, onUpload, onView, onMarkPaid, onReplace }: ScheduleListProps) {
+export function ScheduleList({
+  items,
+  onUpload,
+  onView,
+  onMarkPaid,
+  onReplace,
+  receiptsEnabled = true,
+}: ScheduleListProps) {
   if (items.length === 0) {
     return (
       <EmptyState
@@ -70,6 +110,7 @@ export function ScheduleList({ items, onUpload, onView, onMarkPaid, onReplace }:
                   <Badge variant="secondary" className="text-xs font-normal">
                     {item.label}
                   </Badge>
+                  {item.starlink && <StarlinkMonthBadge month={item.starlink} />}
                   {receiptDoc && (
                     <span className="flex items-center gap-0.5 text-xs text-green-600">
                       <Receipt className="h-3 w-3" /> Rec
@@ -102,6 +143,7 @@ export function ScheduleList({ items, onUpload, onView, onMarkPaid, onReplace }:
                 </Button>
               )}
 
+              {/* Existing receipts always open; adding or replacing one only where receipts are in use. */}
               {(item.status === "paid" || item.status === "overdue" || item.status === "due") &&
                 (receiptDoc ? (
                   <div className="flex items-center gap-1">
@@ -115,7 +157,7 @@ export function ScheduleList({ items, onUpload, onView, onMarkPaid, onReplace }:
                     >
                       <CheckCircle className="h-3 w-3" /> Receipt
                     </a>
-                    {onReplace && (
+                    {receiptsEnabled && onReplace && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -127,24 +169,28 @@ export function ScheduleList({ items, onUpload, onView, onMarkPaid, onReplace }:
                     )}
                   </div>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "h-7 border-dashed text-xs",
-                      item.status === "overdue" && "border-red-300 text-red-600 hover:bg-red-50"
-                    )}
-                    onClick={() => onUpload(item.date, "receipt")}
-                  >
-                    <Upload className="mr-1 h-3 w-3" /> Receipt
-                  </Button>
+                  receiptsEnabled && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-7 border-dashed text-xs",
+                        item.status === "overdue" && "border-red-300 text-red-600 hover:bg-red-50"
+                      )}
+                      onClick={() => onUpload(item.date, "receipt")}
+                    >
+                      <Upload className="mr-1 h-3 w-3" /> Receipt
+                    </Button>
+                  )
                 ))}
 
-              {(item.status === "overdue" || item.status === "due") && onMarkPaid && receiptDoc && (
-                <Button size="sm" className="h-7 text-xs" onClick={() => onMarkPaid(item.date)}>
-                  Mark Paid
-                </Button>
-              )}
+              {(item.status === "overdue" || item.status === "due") &&
+                onMarkPaid &&
+                (receiptDoc || !receiptsEnabled) && (
+                  <Button size="sm" className="h-7 text-xs" onClick={() => onMarkPaid(item.date)}>
+                    Mark Paid
+                  </Button>
+                )}
             </div>
           </div>
         )

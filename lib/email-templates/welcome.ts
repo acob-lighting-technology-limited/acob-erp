@@ -20,6 +20,7 @@ export interface PendingUser {
 interface WelcomeEmailProps {
   pendingUser: PendingUser
   tempPassword: string
+  activationUrl: string
   portalUrl?: string
   webmailUrl?: string
   preparedBy?: {
@@ -32,6 +33,7 @@ interface WelcomeEmailProps {
 export function renderWelcomeEmail({
   pendingUser,
   tempPassword,
+  activationUrl,
   portalUrl = MATRIX_PORTAL_URL,
   webmailUrl = WEBMAIL_LOGIN_URL,
   preparedBy,
@@ -46,7 +48,7 @@ export function renderWelcomeEmail({
   const safeTempPassword = escapeHtml(tempPassword)
   const safeWebmailUrl = escapeHtml(webmailUrl)
   const safePortalUrl = escapeHtml(portalUrl)
-  const safeSetupUrl = escapeHtml(`${portalUrl}/auth/setup-account`)
+  const safeActivationUrl = escapeHtml(activationUrl)
   const safeLoginUrl = escapeHtml(`${portalUrl}/auth/login`)
   const preparedByName = escapeHtml((preparedBy?.name || "Admin & IT Team").trim())
   const preparedByDesignation = escapeHtml((preparedBy?.designation || "").trim())
@@ -148,7 +150,7 @@ export function renderWelcomeEmail({
                 </div>
                 <div style="padding: 14px 16px;">
                     <p style="margin: 0 0 12px 0; font-size: 13px; color: #334155; line-height: 1.5;">
-                        Your official corporate mailbox has been provisioned. <strong>Log in here first</strong>, as your Matrix ERP activation verification code and company announcements will be delivered to this inbox:
+                        Your official corporate mailbox has been provisioned. <strong>Log in here first</strong>, then use the Matrix activation link below to create your own Matrix password.
                     </p>
                     <table>
                         <tr>
@@ -180,17 +182,16 @@ export function renderWelcomeEmail({
                 </div>
                 <div style="padding: 14px 16px;">
                     <p style="margin: 0 0 10px 0; font-size: 13px; color: #334155; line-height: 1.5;">
-                        Once you have accessed your Webmail, activate your account on the Matrix ERP employee portal:
+                        Once you have accessed your Webmail, activate your account on Matrix:
                     </p>
                     <ol class="instruction-list">
-                        <li>Visit the Setup Link: <a href="${safeSetupUrl}" style="color: #16a34a; font-weight: 600; text-decoration: none;">${safeSetupUrl}</a></li>
-                        <li>Enter your company email: <code style="background: #f1f5f9; padding: 1px 5px; border-radius: 3px;">${email}</code> and click <strong>Set Up</strong>.</li>
-                        <li>Check your <strong>Webmail</strong> (from Step 1) for the <strong>6-digit verification code</strong>.</li>
-                        <li>Enter the 6-digit code on screen, click <strong>Verify and Continue</strong>, and set your new secure password.</li>
+                        <li>Open the secure activation link below.</li>
+                        <li>Create a strong Matrix password for <code style="background: #f1f5f9; padding: 1px 5px; border-radius: 3px;">${email}</code>.</li>
+                        <li>Sign in to Matrix using your company email and new password.</li>
                         <li>Log in to Matrix anytime at <a href="${safeLoginUrl}" style="color: #16a34a; text-decoration: none;">${safeLoginUrl}</a>.</li>
                     </ol>
                     <div style="text-align: center; margin-top: 14px;">
-                        <a href="${safeSetupUrl}" class="cta-btn">👉 Activate Matrix Account</a>
+                        <a href="${safeActivationUrl}" class="cta-btn">Activate your Matrix account</a>
                     </div>
                 </div>
             </div>
@@ -199,7 +200,7 @@ export function renderWelcomeEmail({
             <div class="quick-links">
                 <div class="quick-links-title">📌 Quick Access: Key Routes</div>
                 <div class="links-grid">
-                    • <strong>Welcome & Launch Presentation:</strong> <a href="${safePortalUrl}/launch">${safePortalUrl}/launch</a><br>
+                    • <strong>Matrix Guide (start here):</strong> <a href="${safePortalUrl}/guide">${safePortalUrl}/guide</a><br>
                     • <strong>Biometric Attendance Logs:</strong> <a href="${safePortalUrl}/attendance">${safePortalUrl}/attendance</a><br>
                     • <strong>Leave Management:</strong> <a href="${safePortalUrl}/leave">${safePortalUrl}/leave</a><br>
                     • <strong>Task Board:</strong> <a href="${safePortalUrl}/tasks">${safePortalUrl}/tasks</a><br>
@@ -219,7 +220,7 @@ export function renderWelcomeEmail({
             ${preparedByDesignation ? `${preparedByDesignation}<br>` : ""}
             ${preparedByDepartment}<br>
             <strong style="color:#fff;">ACOB Lighting Technology Limited</strong><br>
-            <span style="color:#16a34a;font-weight:600;">Employee Management System</span>
+            <span style="color:#16a34a;font-weight:600;">ACOB Matrix</span>
             <br>
             <span class="footer-note">This is an automated notification, but replies are read — reply to this email to reach the ICT team.</span>
           </td></tr>

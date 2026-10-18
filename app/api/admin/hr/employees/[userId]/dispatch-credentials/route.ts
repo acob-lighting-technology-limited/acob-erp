@@ -3,17 +3,12 @@ import { parseJsonBody } from "@/lib/api/parse-body"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
-import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import {
-  sendNotificationEmailWithRetry,
-  sendNotificationEmailsIndividuallyWithRetry,
-} from "@/lib/notifications/email-gateway"
-import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
+import { getScopedDepartments } from "@/lib/admin/api-scope"
 import { isSystemNotificationChannelEnabled } from "@/lib/notifications/delivery-policy"
-import { renderWelcomeEmail } from "@/lib/email-templates/welcome"
-import { renderInternalNotificationEmail } from "@/lib/email-templates/internal-notification"
-import { withSubjectPrefix } from "@/lib/notifications/subject-policy"
-import { resolveOnboardedNoticeRecipients } from "@/lib/onboarding/recipients"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { isCpanelConfigured } from "@/lib/cpanel/client"
+import { provisionStaffMailbox } from "@/lib/employees/mailbox-provisioning"
+import { WELCOME_PROFILE_COLUMNS, sendMailboxWelcome, type WelcomeProfile } from "@/lib/employees/mailbox-welcome"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 
@@ -23,10 +18,20 @@ interface RouteContext {
   params: Promise<{ userId: string }>
 }
 
+/**
+ * POST /api/admin/hr/employees/[userId]/dispatch-credentials
+ *
+ * Sends the welcome letter (webmail password + Matrix activation link) to the
+ * employee's personal email. Two modes:
+ * - automatic (no `password` in the body): Matrix creates the cPanel mailbox,
+ *   or resets its password if it exists, with a generated password. This is
+ *   also the retry for a mailbox that failed to create on approval.
+ * - manual (`password` given): ICT already set the mailbox up in cPanel and
+ *   types the password they chose.
+ */
 export async function POST(req: NextRequest, context: RouteContext) {
   try {
-    const { userId } = await context.params
-    const id = userId
+    const { userId: id } = await context.params
     if (!id) {
       return NextResponse.json({ error: "Missing employee ID" }, { status: 400 })
     }
@@ -42,63 +47,80 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const parsed = await parseJsonBody(
-      req,
-      z.object({
-        password: z.string().trim().min(6, "A valid password of at least 6 characters is required").max(128),
-      })
-    )
+    const parsed = await parseJsonBody(req, z.object({ password: z.string().trim().max(128).optional() }))
     if (!parsed.ok) return parsed.response
-    const rawPassword = parsed.data.password
+    const manualPassword = parsed.data.password || null
+    if (manualPassword !== null && manualPassword.length < 6) {
+      return NextResponse.json({ error: "A valid password of at least 6 characters is required" }, { status: 400 })
+    }
+    if (manualPassword === null && !isCpanelConfigured()) {
+      return NextResponse.json(
+        { error: "Automatic mailbox setup is unavailable (cPanel not configured). Enter the password ICT set." },
+        { status: 400 }
+      )
+    }
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
-    // Fetch employee profile
     const { data: profile, error: profileErr } = await dataClient
       .from("profiles")
-      .select(
-        "id, first_name, last_name, employee_number, department, designation, company_email, personal_email, office_location, residential_address, phone_number, mailbox_credentials_sent_at"
-      )
+      .select(WELCOME_PROFILE_COLUMNS)
       .eq("id", id)
-      .single()
+      .single<WelcomeProfile>()
 
     if (profileErr || !profile) {
       return NextResponse.json({ error: "Employee profile not found" }, { status: 404 })
     }
-
     if (!profile.personal_email) {
       return NextResponse.json(
         { error: "Employee does not have a personal email on file to receive credentials" },
         { status: 422 }
       )
     }
-
     if (!profile.company_email) {
       return NextResponse.json({ error: "Employee does not have a company email assigned" }, { status: 422 })
     }
 
-    // Fetch caller profile for email signature
+    // HR access alone is not enough: a department lead may only act on their
+    // own department's staff — this can reset someone's mailbox password.
+    const scopedDepartments = getScopedDepartments(scope)
+    if (scopedDepartments !== null && !scopedDepartments.includes(profile.department ?? "")) {
+      return NextResponse.json({ error: "This employee is outside your department scope" }, { status: 403 })
+    }
+
+    // Check before touching cPanel: a reset whose letter can never be sent
+    // would leave the mailbox with a password nobody knows.
+    if (!(await isSystemNotificationChannelEnabled(dataClient, "onboarding", "email"))) {
+      return NextResponse.json(
+        { error: "Onboarding email notifications are currently disabled in system settings" },
+        { status: 400 }
+      )
+    }
+
+    let mailboxPassword = manualPassword
+    let mailboxCreated: boolean | null = null
+    if (mailboxPassword === null) {
+      const provisioned = await provisionStaffMailbox(dataClient, {
+        profileId: profile.id,
+        email: profile.company_email,
+      })
+      if (!provisioned.ok) {
+        return NextResponse.json({ error: `Mailbox not set up: ${provisioned.reason}` }, { status: 502 })
+      }
+      mailboxPassword = provisioned.password
+      mailboxCreated = provisioned.created
+    }
+
+    // Fetch caller profile for the email signature
     const { data: callerProfile } = await dataClient
       .from("profiles")
       .select("full_name, designation, department")
       .eq("id", user.id)
       .maybeSingle()
 
-    // Render Welcome Email HTML
-    const emailHtml = renderWelcomeEmail({
-      pendingUser: {
-        first_name: profile.first_name || "",
-        last_name: profile.last_name || "",
-        department: profile.department || "General",
-        designation: profile.designation || "Staff",
-        company_email: profile.company_email,
-        personal_email: profile.personal_email,
-        employee_number: profile.employee_number || undefined,
-        office_location: profile.office_location || undefined,
-        residential_address: profile.residential_address || undefined,
-        phone_number: profile.phone_number || undefined,
-      },
-      tempPassword: rawPassword,
+    const result = await sendMailboxWelcome(dataClient, {
+      profile,
+      mailboxPassword,
       preparedBy: {
         name: callerProfile?.full_name || "Admin & IT",
         designation: callerProfile?.designation || "Administrator",
@@ -106,98 +128,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
       },
     })
 
-    const onboardingMailEnabled = await isSystemNotificationChannelEnabled(dataClient, "onboarding", "email")
-    if (!onboardingMailEnabled) {
+    if (!result.ok) {
+      // Matrix already set this password on cPanel. Hand it to the admin rather
+      // than losing it, or the mailbox is locked with a password nobody knows.
       return NextResponse.json(
-        { error: "Onboarding email notifications are currently disabled in system settings" },
-        { status: 400 }
+        {
+          error: result.error,
+          ...(mailboxCreated !== null ? { mailboxEmail: profile.company_email, mailboxPassword } : {}),
+        },
+        { status: result.status }
       )
     }
 
-    const sendResult = await sendNotificationEmailWithRetry({
-      // This is renderWelcomeEmail — the same letter approve-user sends — so it
-      // takes the same speaker and routing. Sending one letter under two
-      // different From names depending on which route triggered it is a bug.
-      from: ORG_EMAIL_SENDERS.company,
-      ...ORG_MAIL_ROUTING.Onboarding,
-      to: [profile.personal_email],
-      subject: "Welcome to ACOB - Official Company Email & Matrix Setup",
-      html: emailHtml,
-    })
-
-    if (!sendResult.sent) {
-      log.error({ reason: sendResult.reason, recipient: profile.personal_email }, "Failed to send credentials email")
-      return NextResponse.json({ error: `Failed to deliver email: ${sendResult.reason}` }, { status: 502 })
-    }
-
-    const dispatchedAt = new Date().toISOString()
-    const warnings: string[] = []
-
-    // First dispatch only: tell HCS, the Admin & HR lead and the new hire's
-    // department lead that they are onboarded. A resend (wrong password, lost
-    // mail) concerns the employee alone and must not re-announce the hire.
-    if (!profile.mailbox_credentials_sent_at) {
-      try {
-        const recipients = await resolveOnboardedNoticeRecipients(dataClient, profile.department)
-        const name = `${profile.first_name || ""} ${profile.last_name || ""}`.replace(/[\r\n]/g, "").trim()
-        const result = await sendNotificationEmailsIndividuallyWithRetry({
-          ...ORG_MAIL_ROUTING.Onboarding,
-          to: recipients,
-          subject: withSubjectPrefix("Onboarding", `New Employee Onboarded - ${name}`),
-          html: renderInternalNotificationEmail({
-            pendingUser: {
-              first_name: profile.first_name || "",
-              last_name: profile.last_name || "",
-              department: profile.department || "General",
-              designation: profile.designation || "Staff",
-              company_email: profile.company_email,
-              personal_email: profile.personal_email,
-              office_location: profile.office_location || undefined,
-              phone_number: profile.phone_number || undefined,
-            },
-            preparedBy: {
-              name: callerProfile?.full_name || "Admin & IT",
-              designation: callerProfile?.designation || null,
-              department: callerProfile?.department || "Admin and HR",
-            },
-          }),
-        })
-        if (!result.sent) {
-          const summary = result.failedRecipients.map((f) => `${f.recipient}: ${f.reason}`).join("; ")
-          warnings.push(`Onboarded notice: ${summary || "not delivered"}`)
-          log.error({ failedRecipients: result.failedRecipients }, "Onboarded notice failed for some recipients")
-        }
-      } catch (noticeError) {
-        warnings.push(`Onboarded notice: ${noticeError instanceof Error ? noticeError.message : String(noticeError)}`)
-        log.error({ err: noticeError, profileId: id }, "Failed to send onboarded notice")
-      }
-    }
-
-    // Update mailbox_credentials_sent_at on profile
-    const { error: updateErr } = await dataClient
-      .from("profiles")
-      .update({
-        mailbox_credentials_sent_at: dispatchedAt,
-        updated_at: dispatchedAt,
-      })
-      .eq("id", id)
-
-    if (updateErr) {
-      log.error({ err: updateErr, profileId: id }, "Failed to update mailbox_credentials_sent_at")
-    }
-
-    // Create in-app announcement notification
-    await dataClient.from("notifications").insert({
-      user_id: id,
-      type: "announcement",
-      category: "system",
-      priority: "high",
-      title: "Welcome to ACOB",
-      message: "Your official company email credentials and portal setup instructions have been dispatched.",
-      link_url: null,
-    })
-
-    // Audit log
     await writeAuditLog(
       supabase,
       {
@@ -205,9 +147,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
         entityType: "profile",
         entityId: id,
         newValues: {
-          recipient: profile.personal_email,
+          recipient: result.recipient,
           company_email: profile.company_email,
-          dispatched_at: dispatchedAt,
+          dispatched_at: result.dispatchedAt,
+          mailbox: mailboxCreated === null ? "manual" : mailboxCreated ? "created" : "password_reset",
         },
         context: {
           actorId: user.id,
@@ -222,14 +165,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return NextResponse.json({
       success: true,
       message: "Webmail credentials dispatched successfully",
-      dispatchedAt,
-      warnings,
+      dispatchedAt: result.dispatchedAt,
+      mailbox: mailboxCreated === null ? "manual" : mailboxCreated ? "created" : "password_reset",
+      warnings: result.warnings,
     })
   } catch (error) {
     log.error({ error }, "Unhandled error in dispatch-credentials")
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

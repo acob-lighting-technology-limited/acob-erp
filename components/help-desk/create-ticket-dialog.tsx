@@ -147,34 +147,20 @@ export function CreateTicketDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Type</Label>
-            <Select value={form.request_type} onValueChange={(value) => onFormChange({ ...form, request_type: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="support">Support</SelectItem>
-                <SelectItem value="procurement">Procurement</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="border-primary/30 bg-primary/5 text-foreground rounded-lg border p-3 text-sm md:col-span-2">
+            <p className="font-medium">Need something bought or paid for?</p>
+            <p className="text-muted-foreground mt-1">
+              The help desk is for support. Money goes through a Payment Request or Petty Cash, which routes it for
+              signatures and payment.
+            </p>
+            <Link
+              href="/accounts/requisitions"
+              className="text-primary mt-2 inline-flex items-center gap-1 font-medium hover:underline"
+            >
+              Go to Requisitions
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
-          {form.request_type === "procurement" && (
-            <div className="border-primary/30 bg-primary/5 text-foreground rounded-lg border p-3 text-sm md:col-span-2">
-              <p className="font-medium">Procurement runs through a requisition</p>
-              <p className="text-muted-foreground mt-1">
-                Raising a requisition captures the amount, beneficiaries and funding category, and routes it for
-                approval. Use that form instead of a help desk ticket.
-              </p>
-              <Link
-                href="/accounts/requisitions"
-                className="text-primary mt-2 inline-flex items-center gap-1 font-medium hover:underline"
-              >
-                Go to Requisitions
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          )}
           <div className="md:col-span-2">
             <Button type="submit" disabled={isSaving}>
               {isSaving ? "Submitting..." : "Submit Ticket"}

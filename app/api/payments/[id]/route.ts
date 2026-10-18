@@ -1,17 +1,14 @@
-import { createServerClient } from "@supabase/ssr"
-import { parseJsonBody } from "@/lib/api/parse-body"
 import { z } from "zod"
-import { isFinanceDepartment, normalizeDepartment } from "@/lib/payments/department"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { createServerClient } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
-import { serverError } from "@/lib/api/errors"
-import { logger } from "@/lib/logger"
-
-const log = logger("api/payments/id")
+import { classifyStarlinkMonths, type StarlinkMonth } from "@/lib/starlink/billing-schedule"
 
 type PaymentsClient = Awaited<ReturnType<typeof createClient>>
 
@@ -48,6 +45,49 @@ function getRelatedDepartmentName(payment: PaymentDepartmentRecord | null | unde
   return relation?.name ?? null
 }
 
+function normalizeDepartment(value: string | null | undefined): string {
+  return normalizeDepartmentName(String(value || "").trim()).toLowerCase()
+}
+
+function isFinanceDepartment(value: string | null | undefined): boolean {
+  return normalizeDepartment(value) === "accounts"
+}
+
+/**
+ * A Starlink kit's payment also carries each billed month's status (confirmed /
+ * autopay / failed / pending), worked out from its billing emails.
+ */
+async function withStarlinkMonths<T extends { site_id?: string | null }>(
+  client: SupabaseClient,
+  payment: T
+): Promise<T & { starlink_months?: StarlinkMonth[] }> {
+  if (!payment?.site_id) return payment
+  const { data, error } = await client
+    .from("starlink_billing_events")
+    .select("kind, received_at, period_start, outcome")
+    .eq("site_id", payment.site_id)
+    .in("outcome", ["applied", "already_recorded", "waiting"])
+  if (error) return payment
+  const events = (data || []) as Array<{
+    kind: "reminder" | "processed" | "failed"
+    received_at: string
+    period_start: string | null
+    outcome: string
+  }>
+  return {
+    ...payment,
+    starlink_months: classifyStarlinkMonths(
+      events.map((e) => ({
+        kind: e.kind,
+        receivedAt: e.received_at,
+        periodStart: e.period_start,
+        waiting: e.outcome === "waiting",
+      })),
+      new Date()
+    ),
+  }
+}
+
 // GET /api/payments/[id] - Get a single payment
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -67,20 +107,32 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const { data: profile } = await supabase.from("profiles").select("department").eq("id", user.id).single()
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
-    const { data: payment, error } = await dataClient
-      .from("department_payments")
-      .select(
-        `
+    const baseSelect = `
                 *,
                 department:departments(*),
-                documents:payment_documents(*)
-            `
-      )
+                documents:payment_documents(*)`
+    const linkedSelect = `${baseSelect},
+                project:projects(id, project_name),
+                site:starlink_sites(id, site_name, state, serial_number, kit_number)`
+
+    let { data: payment, error } = await dataClient
+      .from("department_payments")
+      .select(linkedSelect)
       .eq("id", id)
       .single()
 
+    // Until migration 20261010120000 is live there is no project_id/kit_number to
+    // join on; fall back to the unlinked payment rather than failing the page.
+    if (error && (error.code === "PGRST200" || error.code === "42703")) {
+      ;({ data: payment, error } = await dataClient
+        .from("department_payments")
+        .select(baseSelect)
+        .eq("id", id)
+        .single())
+    }
+
     if (error) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 })
+      return NextResponse.json({ error: error.message }, { status: 404 })
     }
 
     if (scope) {
@@ -96,7 +148,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       }
     } else {
       if (payment?.created_by === user.id) {
-        return NextResponse.json({ data: payment })
+        return NextResponse.json({ data: await withStarlinkMonths(dataClient, payment) })
       }
 
       if (!isFinanceDepartment(profile?.department)) {
@@ -107,7 +159,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       }
     }
 
-    return NextResponse.json({ data: payment })
+    return NextResponse.json({ data: await withStarlinkMonths(dataClient, payment) })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal Server Error"
     return NextResponse.json({ error: message }, { status: 500 })
@@ -119,6 +171,10 @@ const optionalDate = z.string().trim().max(40).nullable().optional()
 
 const UpdatePaymentSchema = z.object({
   department_id: z.union([z.string().uuid(), z.literal("")]).optional(),
+  project_id: z
+    .union([z.string().uuid(), z.literal("")])
+    .nullable()
+    .optional(),
   payment_type: z.string().max(40).optional(),
   category: z.enum(["one-time", "recurring"]).optional(),
   title: z.string().trim().min(1).max(200).optional(),
@@ -150,13 +206,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   try {
     const supabase = await createClient()
     const { id } = params
-    // Only editable columns pass; created_by, id, timestamps and unknown keys are
-    // stripped. (The update below runs with the service role, so the raw body
-    // used to let any caller who passed the checks rewrite any column.)
     const parsed = await parseJsonBody(request, UpdatePaymentSchema)
     if (!parsed.ok) return parsed.response
-    const body: Record<string, unknown> = { ...parsed.data }
-    if (body.department_id === "") delete body.department_id
+    const body = parsed.data
 
     const {
       data: { user },
@@ -228,8 +280,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
 
     // Validate and sync category with payment_type if category is being updated
-    // Sync payment_type with category (the schema already limits category).
-    if (body.category) body.payment_type = body.category
+    if (body.category) {
+      if (body.category !== "one-time" && body.category !== "recurring") {
+        return NextResponse.json({ error: "Category must be 'one-time' or 'recurring'" }, { status: 400 })
+      }
+      // Sync payment_type with category
+      body.payment_type = body.category
+    }
 
     const { data: updatedPayment, error } = await dataClient
       .from("department_payments")
@@ -239,7 +296,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       .single()
 
     if (error) {
-      return serverError(log, error)
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     await writeAuditLog(
@@ -322,7 +379,7 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
       .single()
 
     if (error) {
-      return serverError(log, error)
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     await writeAuditLog(

@@ -34,6 +34,7 @@ import {
   CalendarCheck2,
 } from "lucide-react"
 import { LeaveItem, approvalStageKey, resolvePersonName, getStageBadge } from "../_lib/leave-items"
+import { resolveLeaveRouteStages } from "@/lib/hr/leave-stages"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { leaveEvidenceHref, leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { formatName, cn } from "@/lib/utils"
@@ -113,7 +114,7 @@ export function LeaveDetailDialog({
     }
   }
 
-  const stageOrder = ["reliever", "department_lead", "admin_hr_lead", "hcs", "md"]
+  const stageOrder = resolveLeaveRouteStages(leave)
   const stageName: Record<string, string> = {
     reliever: "Reliever Review",
     department_lead: "Department Lead",
@@ -159,6 +160,7 @@ export function LeaveDetailDialog({
               <StaffAvatar
                 name={employeeName}
                 src={staffAvatars[leave.user_id]}
+                profileId={leave.user_id}
                 initials={getInitials(employeeName)}
                 className="h-10 w-10 border text-xs shadow-xs"
               />

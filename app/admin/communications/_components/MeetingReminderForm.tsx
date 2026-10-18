@@ -34,11 +34,8 @@ interface MeetingReminderFormProps {
   knowledgeDepartment: string
   knowledgePresenterId: string
   knowledgePresenterName: string
-  meetingPreparedById: string
-  setMeetingPreparedById: (v: string) => void
   departmentOptions: string[]
   presenterOptions: Employee[]
-  meetingPreparedByOptions: Employee[]
 }
 
 export function MeetingReminderForm({
@@ -59,11 +56,8 @@ export function MeetingReminderForm({
   knowledgeDepartment,
   knowledgePresenterId,
   knowledgePresenterName,
-  meetingPreparedById,
-  setMeetingPreparedById,
   departmentOptions,
   presenterOptions,
-  meetingPreparedByOptions,
 }: MeetingReminderFormProps) {
   const VISITOR_ITEM_VALUE = "__visitor_presenter__"
   const presenterSelectValue =
@@ -75,7 +69,7 @@ export function MeetingReminderForm({
         <div className="space-y-2">
           <Label htmlFor="meeting-week">Week</Label>
           <Select value={String(meetingWeek)} onValueChange={(value) => setMeetingWeek(Number(value))}>
-            <SelectTrigger id="meeting-week" className="w-35">
+            <SelectTrigger id="meeting-week" className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -90,7 +84,7 @@ export function MeetingReminderForm({
         <div className="space-y-2">
           <Label htmlFor="meeting-year">Year</Label>
           <Select value={String(meetingYear)} onValueChange={(value) => setMeetingYear(Number(value))}>
-            <SelectTrigger id="meeting-year" className="w-35">
+            <SelectTrigger id="meeting-year" className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -104,18 +98,18 @@ export function MeetingReminderForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="meet-date">Meeting Date</Label>
-          <Input id="meet-date" type="date" value={meetingDate} className="w-45" disabled readOnly />
+          <Input id="meet-date" type="date" value={meetingDate} className="w-[180px]" disabled readOnly />
           <p className="text-muted-foreground text-xs">
             The date updates automatically from the selected week&apos;s Admin Reports setup. This value is read-only
             here.
           </p>
-          <Button variant="outline" size="sm" asChild className="h-7 px-2 text-xs">
+          <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
             <Link href="/admin/reports/general-meeting">Manage Meeting Date</Link>
           </Button>
         </div>
         <div className="space-y-2">
           <Label htmlFor="meet-time">Meeting Time</Label>
-          <Input id="meet-time" type="time" value={meetingTime} className="w-35" disabled readOnly />
+          <Input id="meet-time" type="time" value={meetingTime} className="w-[140px]" disabled readOnly />
           <p className="text-muted-foreground text-xs">
             Managed from Admin Reports week setup. This value is read-only here.
           </p>
@@ -156,7 +150,7 @@ export function MeetingReminderForm({
           <div className="space-y-2">
             <Label htmlFor="ks-department">Department</Label>
             <Select value={knowledgeDepartment} disabled>
-              <SelectTrigger id="ks-department" className="w-55">
+              <SelectTrigger id="ks-department" className="w-[220px]">
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
@@ -172,7 +166,7 @@ export function MeetingReminderForm({
           <div className="space-y-2">
             <Label htmlFor="ks-presenter">Presenter</Label>
             <Select value={presenterSelectValue} disabled>
-              <SelectTrigger id="ks-presenter" className="w-65">
+              <SelectTrigger id="ks-presenter" className="w-[260px]">
                 <SelectValue placeholder="Select presenter" />
               </SelectTrigger>
               <SelectContent>
@@ -191,25 +185,6 @@ export function MeetingReminderForm({
         </div>
         <p className="text-muted-foreground text-xs">
           Department and presenter are managed from Admin Reports week setup so the reminder and KSS stay in sync.
-        </p>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="meeting-prepared-by">Prepared by</Label>
-        <Select value={meetingPreparedById} onValueChange={setMeetingPreparedById}>
-          <SelectTrigger id="meeting-prepared-by" className="w-80">
-            <SelectValue placeholder="Select person" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Select person</SelectItem>
-            {meetingPreparedByOptions.map((emp) => (
-              <SelectItem key={emp.id} value={emp.id}>
-                {emp.full_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-muted-foreground text-xs">
-          Admin &amp; HR only. This appears as &quot;Prepared by&quot; in the footer.
         </p>
       </div>
     </>

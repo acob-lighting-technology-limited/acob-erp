@@ -38,6 +38,10 @@ import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
+import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
+
+export { resolveLeaveRouteStages }
+export type { RouteSnapshotStage }
 
 import { layout as tablePageLayout } from "./_layout"
 import {
@@ -582,7 +586,7 @@ export function LeaveApprovePage({
                   }
                 }
 
-                const stageOrder = ["reliever", "department_lead", "admin_hr_lead", "hcs", "md"]
+                const stageOrder = resolveLeaveRouteStages(r)
                 const stageName: Record<string, string> = {
                   reliever: "Reliever",
                   department_lead: "Department Lead",
@@ -824,6 +828,7 @@ export function LeaveApprovePage({
                   <StaffAvatar
                     name={r.user?.full_name || "Employee"}
                     src={staffAvatars[r.user_id]}
+                    profileId={r.user_id}
                     size="xl"
                     className="text-xl"
                   />

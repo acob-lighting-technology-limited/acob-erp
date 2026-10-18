@@ -39,11 +39,6 @@ export function HeaderWrapper({ user, canAccessAdmin = false, avatarUrl }: Heade
     return null
   }
 
-  // Public launch / landing page has its own full-screen design
-  if (pathname?.startsWith("/launch")) {
-    return null
-  }
-
   // Suspended account page is an isolated security lockout screen
   if (pathname?.startsWith("/suspended")) {
     return null

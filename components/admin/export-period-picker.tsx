@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { monthBounds, toLocalYearMonth } from "@/lib/hr/attendance-utils"
-import { apiJson } from "@/lib/api-client"
-import { useQuery } from "@tanstack/react-query"
-import { QUERY_KEYS } from "@/lib/query-keys"
+import { apiFetch } from "@/lib/api-client"
+import { logger } from "@/lib/logger"
+
+const log = logger("export-period-picker")
 
 export type ExportPeriodType = "month" | "custom" | "payroll"
 
@@ -39,11 +40,24 @@ export function useExportPeriod() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [payrollPeriodId, setPayrollPeriodId] = useState("")
-  const { data: payrollPeriods = [] } = useQuery({
-    queryKey: QUERY_KEYS.payrollPeriods(),
-    queryFn: async () =>
-      (await apiJson<{ data?: PayrollPeriodOption[] }>("/api/admin/payroll/periods", { cache: "no-store" })).data ?? [],
-  })
+  const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriodOption[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await apiFetch("/api/admin/payroll/periods", { cache: "no-store" })
+        const payload = (await res.json().catch(() => null)) as { data?: PayrollPeriodOption[] } | null
+        if (!cancelled && res.ok) setPayrollPeriods(payload?.data ?? [])
+      } catch (err) {
+        log.error({ err: String(err) }, "Failed to load payroll periods for export picker")
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function resolve(): ResolvedExportPeriod | null {
     if (periodType === "month") {

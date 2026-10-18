@@ -9,6 +9,9 @@ import { logger } from "@/lib/logger"
 import type { EmploymentStatus } from "@/types/database"
 import { toLocalISODate } from "@/lib/utils/date"
 import { serverError } from "@/lib/api/errors"
+import { writeAuditLog } from "@/lib/audit/write-audit"
+import { applyEmployeeMailboxActions, type MailboxActionResult } from "@/lib/employees/mailbox-offboarding"
+import { EmployeeMailboxActionsSchema } from "@/lib/employees/mailbox-state"
 
 const log = logger("api-employee-status")
 
@@ -61,6 +64,8 @@ const ChangeStatusSchema = z.object({
   leave_type_name: z.string().trim().max(100).optional(),
   suspension_end_date: z.string().trim().max(40).nullable().optional(),
   separation_date: z.string().trim().max(40).optional(),
+  /** Mailbox steps the admin confirmed in the Change Status dialog. */
+  mailbox: z.unknown().optional(),
 })
 
 export async function PATCH(request: Request, { params }: RouteContext) {
@@ -72,6 +77,14 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const parsed = await parseJsonBody(request, ChangeStatusSchema)
     if (!parsed.ok) return parsed.response
     const body = parsed.data
+    const mailboxParsed = body.mailbox == null ? null : EmployeeMailboxActionsSchema.safeParse(body.mailbox)
+    if (mailboxParsed && !mailboxParsed.success) {
+      return NextResponse.json(
+        { error: mailboxParsed.error.issues[0]?.message ?? "Invalid mailbox options" },
+        { status: 400 }
+      )
+    }
+    const mailboxActions = mailboxParsed?.success ? mailboxParsed.data : null
     const { status, reason_code, reason_label, leave_type_id, suspension_end_date, separation_date } = body
 
     // Block exit if employee has active assignments
@@ -163,8 +176,40 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     // Also invalidates the active session so the user is forced to re-authenticate.
     await syncEmploymentStatusToAuth(ctx.employeeId, status)
 
+    // Company mailbox: only the steps the admin ticked. The status change is
+    // already saved, so a cPanel failure is reported back, never rolled back.
+    let mailbox: MailboxActionResult | null = null
+    if (mailboxActions) {
+      const { data: target } = await ctx.dataClient
+        .from("profiles")
+        .select("company_email")
+        .eq("id", ctx.employeeId)
+        .maybeSingle<{ company_email: string | null }>()
+      const email = target?.company_email?.trim().toLowerCase()
+      if (email) {
+        mailbox = await applyEmployeeMailboxActions(email, mailboxActions)
+        if (mailbox.done.length > 0 || mailbox.errors.length > 0) {
+          await writeAuditLog(
+            ctx.supabase,
+            {
+              action: "update",
+              entityType: "mailbox",
+              entityId: email,
+              newValues: { steps: mailbox.done, errors: mailbox.errors, employment_status: status },
+              context: {
+                actorId: ctx.user.id,
+                source: "api",
+                route: "/api/v1/hr/employees/[employeeId]/status",
+              },
+            },
+            { failOpen: true }
+          )
+        }
+      }
+    }
+
     log.info({ employeeId: ctx.employeeId, newStatus: status, changedBy: ctx.user.id }, "Employment status updated")
-    return NextResponse.json({ message: "Status updated successfully" })
+    return NextResponse.json({ message: "Status updated successfully", mailbox })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update status"
     log.error({ error, employeeId }, "PATCH employee status failed")

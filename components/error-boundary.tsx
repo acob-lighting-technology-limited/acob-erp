@@ -1,10 +1,8 @@
 "use client"
 
 import React from "react"
+import { reportClientError } from "@/lib/telemetry/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { logger } from "@/lib/logger"
-
-const log = logger("components-error-boundary")
 
 type ErrorBoundaryProps = {
   children: React.ReactNode
@@ -30,7 +28,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    log.error({ err: String(error), componentStack: errorInfo.componentStack }, "ErrorBoundary caught an error")
+    void reportClientError({
+      source: "react.error_boundary",
+      message: error.message,
+      stack: error.stack,
+      context: { componentStack: errorInfo.componentStack },
+    })
   }
 
   private resetError = () => {

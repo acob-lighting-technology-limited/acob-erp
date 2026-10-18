@@ -24,6 +24,8 @@ interface ApprovalEmailPreviewParams {
     designation?: string | null
     department?: string | null
   }
+  /** Set when Matrix tried to create the mailbox on cPanel and could not; shown to ICT. */
+  automationFailure?: string | null
 }
 
 interface ApprovalPreviewEmail {
@@ -34,9 +36,10 @@ interface ApprovalPreviewEmail {
 }
 
 /**
- * Approval mails only ICT, asking them to create the webmail account. The
- * employee's welcome letter and the HCS/HR/lead notice go out later, from
- * dispatch-credentials, once that account exists.
+ * The ICT "create the webmail account" email. Approval now creates the mailbox
+ * on cPanel itself; this goes out only when it cannot (cPanel not configured,
+ * or the attempt failed — `automationFailure` carries cPanel's reason). The
+ * welcome letter and the HCS/HR/lead notice then follow from dispatch-credentials.
  */
 export interface ApprovalEmailPreview {
   ict: ApprovalPreviewEmail
@@ -47,6 +50,7 @@ export async function buildApprovalEmailPreview({
   pendingUser,
   employeeNumber,
   approvedBy,
+  automationFailure,
 }: ApprovalEmailPreviewParams): Promise<ApprovalEmailPreview> {
   const enabled = await isSystemNotificationChannelEnabled(supabase, "onboarding", "email")
   const name = `${pendingUser.first_name} ${pendingUser.last_name}`.replace(/[\r\n]/g, "")
@@ -59,6 +63,7 @@ export async function buildApprovalEmailPreview({
       html: renderOnboardingIctSetupEmail({
         employee: { ...pendingUser, employee_number: employeeNumber ?? "Assigned on approval" },
         approvedBy,
+        automationFailure,
       }),
     },
   }

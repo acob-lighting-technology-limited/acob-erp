@@ -2,12 +2,14 @@ import { NextResponse } from "next/server"
 import { safeCompare } from "@/lib/security/bearer-auth"
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { formatLeaveReference, leaveStageLabel, notifyUsers } from "@/lib/hr/leave-workflow"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getRequestScope } from "@/lib/admin/api-scope"
-import { toLocalISODate } from "@/lib/utils/date"
+import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
+import { isSameDepartment, DEPT_ADMIN_HR } from "@/shared/departments"
 
 const log = logger("hr-leave-sla-reminders")
 
@@ -54,12 +56,58 @@ function displayName(profile: LapseProfileRow | undefined, fallback: string) {
   )
 }
 
+function formatOverdueDuration(milliseconds: number) {
+  const totalMinutes = Math.max(0, Math.floor(milliseconds / (60 * 1000)))
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+
+  const parts = [
+    days > 0 ? `${days} day${days === 1 ? "" : "s"}` : null,
+    hours > 0 ? `${hours} hour${hours === 1 ? "" : "s"}` : null,
+    minutes > 0 || (days === 0 && hours === 0) ? `${minutes} minute${minutes === 1 ? "" : "s"}` : null,
+  ].filter((part): part is string => Boolean(part))
+
+  return parts.join(" ")
+}
+
 const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_reliever: "reliever_pending",
   pending_department_lead: "supervisor_pending",
   pending_admin_hr_lead: "hr_pending",
   pending_md: "hr_pending",
   pending_hcs: "hr_pending",
+}
+
+async function resolveAdminHrLeadUserIds(db: SupabaseClient<any, any, any>): Promise<string[]> {
+  const { data: leads } = await db
+    .from("profiles")
+    .select("id, department, lead_departments")
+    .eq("is_department_lead", true)
+
+  const matched = ((leads || []) as { id: string; department?: string | null; lead_departments?: string[] | null }[])
+    .filter((profile) => {
+      const managed = Array.isArray(profile.lead_departments) ? profile.lead_departments : []
+      return (
+        isSameDepartment(profile.department, DEPT_ADMIN_HR) ||
+        managed.some((dept) => isSameDepartment(dept, DEPT_ADMIN_HR))
+      )
+    })
+    .map((p) => p.id)
+
+  if (matched.length > 0) return matched
+
+  const { data: assignee } = await db
+    .from("leave_approval_role_assignees")
+    .select("user_id")
+    .eq("role_code", "admin_hr_lead")
+    .eq("is_active", true)
+
+  const assigneeIds = ((assignee || []) as { user_id: string }[]).map((a) => a.user_id).filter(Boolean)
+  if (assigneeIds.length > 0) return assigneeIds
+
+  log.warn("No Admin & HR lead found for leave SLA breach escalation")
+  return []
 }
 
 export async function PATCH() {
@@ -117,6 +165,7 @@ export async function PATCH() {
 
     const now = Date.now()
     const today = toLocalISODate()
+    const hrLeadUserIds = await resolveAdminHrLeadUserIds(db)
     let remindersSent = 0
 
     for (const request of (pendingRequests || []) as PendingLeaveRequestRow[]) {
@@ -229,20 +278,60 @@ export async function PATCH() {
         remindersSent += 1
       }
 
-      if (now >= dueAt && policy.escalate_to_role) {
-        const { data: escalatedUsers } = await db.from("profiles").select("id").eq("role", policy.escalate_to_role)
+      // Leave approval SLA breaches escalate exclusively to the Admin & HR Lead.
+      if (now >= dueAt) {
+        if (hrLeadUserIds.length > 0) {
+          const approverId = request.current_approver_user_id
+          const [{ data: people }, { data: leaveType }] = await Promise.all([
+            db
+              .from("profiles")
+              .select("id, full_name, first_name, last_name, company_email, department")
+              .in("id", approverId ? [request.user_id, approverId] : [request.user_id]),
+            request.leave_type_id
+              ? db.from("leave_types").select("name").eq("id", request.leave_type_id).maybeSingle()
+              : Promise.resolve({ data: null }),
+          ])
+          const profiles = (people || []) as LapseProfileRow[]
+          const requester = profiles.find((profile) => profile.id === request.user_id)
+          const approver = approverId ? profiles.find((profile) => profile.id === approverId) : undefined
+          const requesterName = displayName(requester, "Employee")
+          const leaveTypeName = (leaveType as { name?: string } | null)?.name || "Leave"
+          const pendingStage = leaveStageLabel(request.current_stage_code || "")
+          const currentApprover = displayName(approver, "the assigned approver")
+          const leaveReference = formatLeaveReference(request.id) ?? "Leave request"
+          const period = request.start_date
+            ? request.end_date
+              ? `${request.start_date} to ${request.end_date}`
+              : request.start_date
+            : "Not specified"
+          const duration = request.days_count ? `${request.days_count} day(s)` : "Not specified"
 
-        const escalateRecipients = ((escalatedUsers || []) as ProfileIdRow[]).map((row) => row.id)
-        if (escalateRecipients.length) {
           await notifyUsers(db, {
-            userIds: escalateRecipients,
-            title: "Leave approval SLA breached",
-            message: `Leave request ${formatLeaveReference(request.id)} has breached SLA at the ${leaveStageLabel(request.current_stage_code || "")} stage.`,
+            userIds: hrLeadUserIds,
+            title: "Action needed: leave approval SLA breached",
+            message: `${requesterName}'s ${leaveTypeName} request is overdue at the ${pendingStage} stage. Review it now and ensure it is approved, rejected, or reassigned so the employee is not left waiting.`,
             linkUrl: "/admin/hr/leave/approve",
             entityId: request.id,
             emailEvent: "sla_breached",
+            emailSubject: `Action required: overdue leave approval — ${leaveReference}`,
+            badgeText: "Escalation Required",
+            badgeVariant: "warning",
+            detailsTitle: "Overdue Leave Approval",
+            details: [
+              { label: "Leave Reference", value: leaveReference },
+              { label: "Employee", value: requesterName },
+              { label: "Department", value: requester?.department || "Not specified" },
+              { label: "Leave Type", value: leaveTypeName },
+              { label: "Leave Period", value: period },
+              { label: "Duration", value: duration },
+              { label: "Pending Stage", value: pendingStage },
+              { label: "Awaiting Action From", value: currentApprover },
+              { label: "SLA Deadline", value: formatWATDateTime(new Date(dueAt)) },
+              { label: "Overdue By", value: formatOverdueDuration(now - dueAt) },
+            ],
+            ctaLabel: "Review Overdue Approval",
           })
-          remindersSent += escalateRecipients.length
+          remindersSent += hrLeadUserIds.length
         }
       }
     }

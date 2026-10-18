@@ -32,6 +32,7 @@ export function EmployeeProfileCard({ profile, fullName, initials }: EmployeePro
             <StaffAvatar
               name={fullName}
               src={staffAvatars[profile.id]}
+              profileId={profile.id}
               initials={initials}
               size="lg"
               fallbackClassName="bg-primary text-primary-foreground"

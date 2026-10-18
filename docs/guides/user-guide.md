@@ -13,7 +13,7 @@ New users must activate their accounts before their first login:
 📌 Quick Access: Key Routes
 For direct navigation, here are the most frequently used paths:
 
-* **Welcome & Launch Presentation:** [https://matrix.acoblighting.com/launch](https://matrix.acoblighting.com/launch) (Overview, slides, and walk-throughs)
+* **Matrix Guide (start here):** [https://matrix.acoblighting.com/guide](https://matrix.acoblighting.com/guide) (What Matrix is, your modules, first-week steps and FAQs — also the ? icon in the top bar)
 * **Attendance Logs:** [https://matrix.acoblighting.com/attendance](https://matrix.acoblighting.com/attendance) (Biometric clock-in/out records)
 * **Leave Management:** [https://matrix.acoblighting.com/leave](https://matrix.acoblighting.com/leave) (Request leave and view balances)
 * **Task Board:** [https://matrix.acoblighting.com/tasks](https://matrix.acoblighting.com/tasks) (Individual and department-assigned tasks)

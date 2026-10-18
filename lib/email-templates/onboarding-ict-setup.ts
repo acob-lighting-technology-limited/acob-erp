@@ -16,6 +16,8 @@ export interface OnboardingIctSetupEmailProps {
     department?: string | null
   }
   employeesUrl?: string
+  /** cPanel's reason when Matrix tried and failed to create the mailbox itself. */
+  automationFailure?: string | null
 }
 
 function row(label: string, value: string, last = false) {
@@ -36,12 +38,16 @@ export function renderOnboardingIctSetupEmail({
   employee,
   approvedBy,
   employeesUrl,
+  automationFailure,
 }: OnboardingIctSetupEmailProps): string {
   const name = `${escapeHtml(employee.first_name)} ${escapeHtml(employee.last_name)}`
   const companyEmail = escapeHtml(employee.company_email)
   const approvedByName = escapeHtml((approvedBy?.name || "Admin and HR Lead").trim())
   const approvedByDesignation = escapeHtml((approvedBy?.designation || "").trim())
   const approvedByDepartment = escapeHtml((approvedBy?.department || "Admin and HR").trim())
+  const failureNote = automationFailure
+    ? `<div style="margin: 0 0 20px 0; padding: 12px 16px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 6px; font-size: 13px; color: #991b1b; line-height: 1.5;">Matrix tried to create this mailbox automatically, but cPanel said: <strong>${escapeHtml(automationFailure)}</strong>. Fix the cause and use <strong>Send Webmail Credentials</strong> to retry automatically, or create the mailbox by hand.</div>`
+    : ""
   const actionUrl = escapeHtml(
     employeesUrl || `${process.env.NEXT_PUBLIC_PORTAL_URL || "https://matrix.acoblighting.com"}/admin/hr/employees`
   )
@@ -68,6 +74,7 @@ export function renderOnboardingIctSetupEmail({
         <div style="font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 12px;">Webmail Setup Required</div>
         <p style="font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 16px 0;">Dear ICT Team,</p>
         <p style="font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 16px 0;">The onboarding application for <strong>${name}</strong> has been approved. Please create their official company mailbox on webmail.</p>
+        ${failureNote}
         <p style="font-size: 14px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0;">Once the mailbox exists, open the employee in Matrix and use <strong>Send Webmail Credentials</strong> with the password you set. That sends the employee their onboarding email and notifies HCS, Admin &amp; HR and their department lead.</p>
 
         <div style="margin-top: 20px; border: 1px solid #e5e7eb; overflow: hidden; background: #fbfbfb; border-radius: 6px;">

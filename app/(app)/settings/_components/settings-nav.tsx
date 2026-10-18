@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { User, KeyRound, Bell } from "lucide-react"
+import { User, KeyRound, Bell, PenLine } from "lucide-react"
 
 const SETTINGS_TABS = [
   {
@@ -18,6 +18,11 @@ const SETTINGS_TABS = [
     icon: KeyRound,
   },
   {
+    name: "Signing",
+    href: "/settings/signing",
+    icon: PenLine,
+  },
+  {
     name: "Notifications",
     href: "/settings/notifications",
     icon: Bell,
@@ -28,7 +33,7 @@ export function SettingsNav() {
   const pathname = usePathname()
 
   return (
-    <div className="bg-muted text-muted-foreground inline-flex h-11 items-center justify-start rounded-lg p-1">
+    <div className="bg-muted text-muted-foreground inline-flex h-11 max-w-full items-center justify-start overflow-x-auto rounded-lg p-1">
       {SETTINGS_TABS.map((tab) => {
         const Icon = tab.icon
         const isActive = pathname === tab.href || (tab.exactHref && pathname === tab.exactHref)

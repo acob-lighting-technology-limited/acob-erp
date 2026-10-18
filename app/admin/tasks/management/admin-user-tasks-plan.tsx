@@ -106,11 +106,12 @@ export function AdminUserTasksPlan({
   const currentYear = new Date().getFullYear()
 
   // Period filter state — driven directly by DataTable's single-select filter
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("this_week")
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("all_time")
 
   // Options for the Time Period filter dropdown
   const periodOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [
+      { value: "all_time", label: "All Time" },
       { value: "this_week", label: `This Week (W${currentWeekInfo.week})` },
       { value: "last_week", label: `Last Week (W${currentWeekInfo.week > 1 ? currentWeekInfo.week - 1 : 52})` },
       { value: "today", label: "Today" },
@@ -347,7 +348,13 @@ export function AdminUserTasksPlan({
         accessor: (r) => r.name,
         render: (r) => (
           <div className="flex items-center gap-3">
-            <StaffAvatar name={r.name} src={staffAvatars[r.userId]} size="sm" className="text-xs" />
+            <StaffAvatar
+              name={r.name}
+              src={staffAvatars[r.userId]}
+              profileId={r.userId}
+              size="sm"
+              className="text-xs"
+            />
             <div className="min-w-0">
               <p className="truncate font-medium">{r.name}</p>
               <p className="text-muted-foreground truncate text-xs">{r.email}</p>
@@ -475,7 +482,6 @@ export function AdminUserTasksPlan({
         label: "Time Period",
         multi: false,
         placeholder: "All Time",
-        defaultValues: ["this_week"],
         options: periodOptions,
         mode: "custom",
         filterFn: () => true,
@@ -505,7 +511,7 @@ export function AdminUserTasksPlan({
   const [searchQuery, setSearchQuery] = useState("")
 
   const handlePeriodFilterChange = useCallback((fv: Record<string, string[]>) => {
-    setSelectedPeriod(fv["period"]?.[0] || "all")
+    setSelectedPeriod(fv["period"]?.[0] || "all_time")
     setFilterValues(fv)
   }, [])
 
