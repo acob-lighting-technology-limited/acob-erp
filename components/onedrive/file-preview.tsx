@@ -15,6 +15,7 @@ import { FileIcon } from "./file-icon"
 import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface FilePreviewProps {
   file: FileItem | null
@@ -82,7 +83,7 @@ export function FilePreview({
       return (
         <div className="flex h-96 flex-col items-center justify-center gap-4">
           <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading preview...</p>
+          <LinesSkeleton lines={3} />
         </div>
       )
     }

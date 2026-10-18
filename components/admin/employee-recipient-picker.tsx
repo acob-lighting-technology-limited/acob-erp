@@ -8,6 +8,7 @@ import { Search, X } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchDirectoryRows } from "@/lib/directory/client"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 export interface DirectoryEmployee {
   id: string
@@ -106,7 +107,7 @@ export function EmployeeRecipientPicker({
       </div>
       <div className="max-h-[240px] space-y-1 overflow-y-auto rounded-lg border p-2">
         {loading ? (
-          <div className="text-muted-foreground py-6 text-center text-sm">Loading employees…</div>
+          <RowsSkeleton rows={4} className="py-2" />
         ) : filtered.length === 0 ? (
           <div className="text-muted-foreground py-6 text-center text-sm">No employees found</div>
         ) : (

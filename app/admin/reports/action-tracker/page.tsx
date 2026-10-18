@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ActionTrackerContent } from "./action-tracker-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
+import { TablePageSkeleton } from "@/components/skeletons"
 
 type DepartmentRow = {
   department: string | null
@@ -38,7 +39,7 @@ export default async function ActionTrackerPage() {
   departments.sort()
 
   return (
-    <Suspense fallback={<div className="flex justify-center py-20">Loading Tracker...</div>}>
+    <Suspense fallback={<TablePageSkeleton statCards={4} filters={2} columns={6} rows={8} showStats={true} />}>
       <ActionTrackerContent
         initialDepartments={departments}
         scopedDepartments={[]}

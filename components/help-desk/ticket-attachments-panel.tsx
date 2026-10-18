@@ -9,6 +9,7 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface TicketAttachment {
   id: string
@@ -123,7 +124,7 @@ export function TicketAttachmentsPanel({ ticketId, currentUserId }: TicketAttach
       />
 
       {loading ? (
-        <p className="text-muted-foreground text-xs">Loading attachments…</p>
+        <LinesSkeleton lines={2} />
       ) : attachments.length === 0 ? (
         <p className="text-muted-foreground text-xs">
           No files yet. Attach a screenshot, invoice or document to help whoever picks this up.

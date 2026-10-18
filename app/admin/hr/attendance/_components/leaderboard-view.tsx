@@ -20,6 +20,7 @@ import {
 import { apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface LeaderboardReport {
   user_id: string
@@ -328,7 +329,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
         </CardHeader>
         <CardContent className="pt-0">
           {loading ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">Loading…</p>
+            <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
             <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
           ) : (
@@ -380,7 +381,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
         </CardHeader>
         <CardContent className="pt-0">
           {loading ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">Loading…</p>
+            <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
             <p className="text-muted-foreground py-4 text-center text-xs">No department data for this period.</p>
           ) : (

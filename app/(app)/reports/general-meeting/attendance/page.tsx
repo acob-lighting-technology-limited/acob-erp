@@ -27,6 +27,7 @@ import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatTime } from "@/lib/format"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface SessionData {
   session: {
@@ -505,7 +506,13 @@ export default function MeetingCheckInPage() {
         icon={UserCheck}
         backLink={{ href: "/reports/general-meeting", label: "Back to General Meeting" }}
       />
-      <Suspense fallback={<div className="text-muted-foreground py-10 text-center">Loading check-in session...</div>}>
+      <Suspense
+        fallback={
+          <div className="mx-auto max-w-md py-6">
+            <Skeleton className="h-48 w-full rounded-xl" />
+          </div>
+        }
+      >
         <CheckInContent />
       </Suspense>
     </PageWrapper>

@@ -38,6 +38,7 @@ import {
   type MdInvolvement,
 } from "@/lib/events/types"
 import { saveEvent } from "./use-events"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const NONE = "__none__"
 /** WAT is UTC+1 all year (no daylight saving), so local form values carry a fixed offset. */
@@ -545,7 +546,7 @@ export function EventFormDialog({
             onDone={() => onOpenChange(false)}
           />
         ) : (
-          <p className="text-muted-foreground py-6 text-center text-sm">Loading form…</p>
+          <LinesSkeleton lines={6} className="py-6" />
         )}
       </DialogContent>
     </Dialog>

@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const log = logger("action-tracker-blocker-dialog")
 
@@ -267,7 +268,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
             ) : null}
 
             {isLoadingEvidence ? (
-              <p className="text-muted-foreground text-sm">Loading evidence…</p>
+              <LinesSkeleton lines={2} />
             ) : evidence.length === 0 && pendingFiles.length === 0 ? (
               <p className="text-muted-foreground text-sm italic">No evidence attached.</p>
             ) : (

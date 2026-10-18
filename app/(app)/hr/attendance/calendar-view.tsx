@@ -12,6 +12,7 @@ import { apiJson } from "@/lib/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { buildCalendarCells, formatMonthLabel, navigateMonth } from "@/lib/utils/calendar-grid"
+import { CalendarGridSkeleton } from "@/components/skeletons/section-skeletons"
 
 type DayStatus =
   | "present"
@@ -173,7 +174,7 @@ export function EmployeeCalendarView() {
       </div>
 
       {loading ? (
-        <div className="text-muted-foreground py-16 text-center text-sm">Loading calendar…</div>
+        <CalendarGridSkeleton />
       ) : (
         <div className="bg-card text-card-foreground overflow-hidden rounded-lg border shadow-xs">
           {/* Day-of-week headers */}
