@@ -1,3 +1,8 @@
 {
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/cron/attendance/device-reconcile",
+      "schedule": "0 22 * * *"
+    }
+  ]
 }

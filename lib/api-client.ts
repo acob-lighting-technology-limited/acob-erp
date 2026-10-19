@@ -57,3 +57,36 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
 
   return fetch(input, { ...init, headers })
 }
+
+/**
+ * apiFetch + JSON parse + throw on a non-2xx status, using the route's
+ * `{ error }` body as the message. The standard queryFn for React Query:
+ *
+ *   useQuery({ queryKey: ["maintenance"], queryFn: () => apiJson<State>("/api/dev/maintenance") })
+ */
+export async function apiJson<T = unknown>(input: RequestInfo | URL, init: RequestInit = {}): Promise<T> {
+  const response = await apiFetch(input, init)
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const message = typeof payload?.error === "string" ? payload.error : `Request failed (${response.status})`
+    const fields = payload?.details?.fields
+    throw new ApiError(message, response.status, fields && typeof fields === "object" ? fields : {})
+  }
+  return payload as T
+}
+
+/**
+ * A non-2xx response from `apiJson`. `fields` holds the per-field messages a
+ * route's zod validation returned (`validationError` in lib/api/errors), keyed
+ * by field path, so a form can show each one under its own input.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly fields: Record<string, string> = {}
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}

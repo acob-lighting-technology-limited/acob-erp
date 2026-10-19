@@ -5,9 +5,8 @@ import { logger } from "@/lib/logger"
 import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
 import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_ICT_EMAIL, ORG_MAIL_ROUTING } from "@/lib/org-config"
-import { isWorkingDay } from "@/lib/hr/leave-days"
-import { getHolidaySet } from "@/lib/hr/leave-workflow"
-import { toLocalISODate } from "@/lib/utils/date"
+import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
+import { getDeviceHealth } from "@/lib/hr/device-health"
 
 const log = logger("cron-attendance-device-health")
 
@@ -26,47 +25,20 @@ function safeCompare(a: string, b: string): boolean {
  * appeals sat in the queue. The ingest route cannot detect its own silence, so
  * this checks for it.
  *
- * "No punch for N hours" would fire every afternoon - punches cluster at
- * arrival and departure. So it checks the two moments punches must arrive:
- *   morning  - from 10:00 WAT, no clock-in received for today at all;
- *   evening  - from 19:00 WAT, a normal number of clock-ins but few clock-outs.
- * Each fires at most once per day; working days only.
+ * The offline rules live in getDeviceHealth (lib/hr/device-health), shared
+ * with the banner staff see on /hr/attendance. Each alert fires at most once
+ * per day.
  */
-const MORNING_FROM_HOUR = 10
-const EVENING_FROM_HOUR = 19
-/** Below this many clock-ins the evening ratio means nothing (a quiet day, a holiday nobody entered). */
-const EVENING_MIN_CLOCK_INS = 5
-/** Fewer clock-outs than this share of clock-ins by 19:00 means they are not arriving. */
-const EVENING_MIN_OUT_RATIO = 1 / 3
 /** system_settings key holding { "<yyyy-mm-dd>:<kind>": "<alerted at>" } so each alert fires once. */
 const STATE_SETTING_KEY = "attendance_device_health"
 /** Same recipients as the meeting-reminder watchdog: the people who fix integrations. */
 const RECIPIENTS_SETTING_KEY = "reminder_failure_alert"
-
-type AlertKind = "morning" | "evening"
 
 function serviceClient(url: string, key: string) {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
 type Supabase = ReturnType<typeof serviceClient>
-
-function watHour(now: Date): number {
-  return Number(
-    new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", hour: "2-digit", hour12: false }).format(now)
-  )
-}
-
-async function countDevicePunches(supabase: Supabase, date: string, eventType: string): Promise<number> {
-  const { count, error } = await supabase
-    .from("attendance_events")
-    .select("id", { head: true, count: "exact" })
-    .eq("source", "hikvision")
-    .eq("event_type", eventType)
-    .eq("event_date", date)
-  if (error) throw error
-  return count ?? 0
-}
 
 async function resolveRecipients(supabase: Supabase): Promise<{ userIds: string[]; emails: string[] }> {
   const { data: setting } = await supabase
@@ -130,33 +102,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const now = new Date()
-    const today = toLocalISODate(now)
-    const hour = watHour(now)
-
-    const holidays = await getHolidaySet(supabase, null, today, today)
-    if (!isWorkingDay(today, holidays)) return NextResponse.json({ data: { skipped: "not_a_working_day" } })
-    if (hour < MORNING_FROM_HOUR) return NextResponse.json({ data: { skipped: "too_early" } })
-
-    const [clockIns, clockOuts] = await Promise.all([
-      countDevicePunches(supabase, today, "device_punch_in"),
-      countDevicePunches(supabase, today, "device_punch_out"),
-    ])
-
-    let kind: AlertKind | null = null
-    let detail = ""
-    if (clockIns === 0) {
-      kind = "morning"
-      detail = `It is past ${MORNING_FROM_HOUR}:00 WAT on a working day and no clock-ins have been received from the device today.`
-    } else if (
-      hour >= EVENING_FROM_HOUR &&
-      clockIns >= EVENING_MIN_CLOCK_INS &&
-      clockOuts < clockIns * EVENING_MIN_OUT_RATIO
-    ) {
-      kind = "evening"
-      detail = `By ${EVENING_FROM_HOUR}:00 WAT the device has sent ${clockIns} clock-ins but only ${clockOuts} clock-outs today.`
-    }
-
+    // Same verdict the /hr/attendance banner shows staff, so the alert and the page agree.
+    const health = await getDeviceHealth(supabase, now)
+    const { date: today, clockIns, clockOuts } = health
+    const kind = health.offline
     if (!kind) return NextResponse.json({ data: { healthy: true, clockIns, clockOuts } })
+
+    const lastSeen = health.lastPunchAt ? formatWATDateTime(health.lastPunchAt) : "over a week ago"
+    const detail =
+      kind === "morning"
+        ? `It is a working day and no clock-ins have been received from the device today. Last punch received: ${lastSeen}.`
+        : `The device has sent ${clockIns} clock-ins but only ${clockOuts} clock-outs today, and nothing since ${lastSeen}.`
 
     const { data: stateRow } = await supabase
       .from("system_settings")
