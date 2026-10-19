@@ -212,7 +212,7 @@ async function notifyHROfSubmission(
     })
 
     await sendNotificationEmail({
-      from: ORG_EMAIL_SENDERS.system,
+      from: ORG_EMAIL_SENDERS.company,
       ...ORG_MAIL_ROUTING.Onboarding,
       to: recipients,
       subject,

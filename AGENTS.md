@@ -864,7 +864,7 @@ only three valid answers:
 |---|---|---|
 | The platform | `ACOB Matrix` | every automated notification (the default) |
 | A department | `ACOB <Department>` | task mail, Communications broadcasts |
-| The company | `ACOB Lighting Technology Limited` | birthday wishes, staff exit notices |
+| The company | `ACOB Lighting Technology Limited` | birthday wishes, staff exit notices, onboarding notices |
 
 The platform default is deliberate: every recipient already works here, so the
 registered company name carried no signal on routine mail — it just repeated on every
