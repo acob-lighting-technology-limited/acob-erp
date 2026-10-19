@@ -34,3 +34,15 @@ export function getServiceRoleClientOrFallback<T = unknown>(fallback: SupabaseCl
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
+
+/**
+ * Service-role client, or null when the service key is not configured. Prefer this
+ * over getServiceRoleClientOrFallback for calls that are *only* granted to
+ * service_role (locked-down RPCs) — a session-client fallback would just fail.
+ */
+export function getServiceClient(): SupabaseClient | null {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  return createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
