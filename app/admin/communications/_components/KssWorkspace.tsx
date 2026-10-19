@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
+
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -241,7 +243,7 @@ export function KssWorkspace() {
     }
   }
 
-  if (isLoading) return <p className="text-muted-foreground text-sm">Loading…</p>
+  if (isLoading) return <RowsSkeleton rows={6} />
   if (error || !data) {
     return <p className="text-destructive text-sm">{(error as Error | null)?.message || "Failed to load"}</p>
   }

@@ -16,6 +16,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
+
 import { EmployeeRecipientPicker } from "@/components/admin/employee-recipient-picker"
 import { apiFetch } from "@/lib/api-client"
 import { depsChanged } from "@/lib/utils/deps-changed"
@@ -85,7 +87,7 @@ export function StarlinkAlertsDialog({ open, onOpenChange }: { open: boolean; on
         </DialogHeader>
 
         {loading ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+          <LinesSkeleton lines={4} className="py-8" />
         ) : (
           <div className="space-y-5">
             <section className="space-y-3 rounded-lg border p-3">
