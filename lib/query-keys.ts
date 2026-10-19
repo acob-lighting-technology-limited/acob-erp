@@ -11,6 +11,7 @@ export const QUERY_KEYS = {
   leavePolicies: () => ["leave-policies"],
 
   // Attendance
+  attendanceDeviceStatus: () => ["attendance-device-status"],
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance

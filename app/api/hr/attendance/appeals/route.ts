@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { getServiceClient, getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { deviceOutageStartDate, getDeviceHealth } from "@/lib/hr/device-health"
 import { logger } from "@/lib/logger"
 import { toLocalYearMonth, monthBounds, loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { toLocalISODate } from "@/lib/utils/date"
@@ -132,6 +133,26 @@ export async function POST(request: NextRequest) {
         { error: "You can appeal a day once it has ended. Check back tomorrow if it still looks wrong." },
         { status: 400 }
       )
+    }
+
+    // While the device is holding punches it has not delivered, every day since its
+    // last delivery looks absent or incomplete only because the backlog has not
+    // arrived. The /hr/attendance banner tells staff to wait; this enforces it.
+    const deviceClient = getServiceClient()
+    if (deviceClient) {
+      const health = await getDeviceHealth(deviceClient).catch((error: unknown) => {
+        log.error({ err: String(error) }, "Device health check failed during appeal")
+        return null
+      })
+      if (health?.offline && appealDate >= deviceOutageStartDate(health)) {
+        return NextResponse.json(
+          {
+            error:
+              "The clock-in device has lost connection and has not sent all records yet. If you clocked in or out, it is saved on the device and will show once it reconnects. Please check again after it is restored.",
+          },
+          { status: 409 }
+        )
+      }
     }
 
     // Validate requested_status first — it determines how far back the appeal may reach.
