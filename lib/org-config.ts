@@ -40,6 +40,13 @@ export const ORG_LEGAL_NAME = process.env.NEXT_PUBLIC_ORG_LEGAL_NAME ?? "ACOB Li
 /** IT/ICT contact email shown in system emails */
 export const ORG_ICT_EMAIL = process.env.NEXT_PUBLIC_ORG_ICT_EMAIL ?? `ict@${ORG_PRIMARY_DOMAIN}`
 
+/**
+ * Receives database-integrity alerts: changes made outside the ERP and the
+ * nightly attendance-vs-device corrections. Deliberately one person, not a
+ * shared mailbox.
+ */
+export const ORG_SECURITY_ALERT_EMAIL = process.env.SECURITY_ALERT_EMAIL ?? "i.chibuikem@org.acoblighting.com"
+
 /** Admin & HR department mailbox — replies to HR, leave, exit, attendance mail. */
 export const ORG_HR_EMAIL = process.env.ORG_HR_EMAIL ?? `hradmin@${ORG_PRIMARY_DOMAIN}`
 
