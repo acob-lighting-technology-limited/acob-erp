@@ -34,8 +34,9 @@ export const EDGE_SENDERS = {
   /** The platform speaking: every automated notification. */
   system: Deno.env.get("ORG_NOTIFICATION_SENDER") || edgeSender(`${ORG_CODE} Matrix`),
   /**
-   * The company speaking, under its registered name — birthday wishes and exit
-   * notices, which are institutional acts rather than system notifications.
+   * The company speaking, under its registered name — birthday wishes, exit
+   * notices and onboarding notices, which are institutional acts rather than
+   * system notifications.
    * Mirrors ORG_EMAIL_SENDERS.company. Do not widen it to other mail.
    */
   company: edgeSender(ORG_LEGAL_NAME),
