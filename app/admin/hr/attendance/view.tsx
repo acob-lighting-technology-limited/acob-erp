@@ -1199,7 +1199,7 @@ export function AttendanceReportsPage({
         ) : undefined
       }
     >
-      <DeviceStatusBanner audience="admin" />
+      <DeviceStatusBanner />
       {activeTab === "daily" && <DailyRosterView departments={departments} lockedDepartment={lockedDepartment} />}
       {activeTab === "leaderboard" && <LeaderboardView departments={departments} lockedDepartment={lockedDepartment} />}
       {activeTab === "calendar" && <CalendarView employees={employeeOptions} />}
