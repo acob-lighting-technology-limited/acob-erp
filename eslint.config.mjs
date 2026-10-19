@@ -44,6 +44,16 @@ export default defineConfig([
       ],
     },
   },
+  {
+    // next/og image routes can only render a plain <img>. The Next plugin already
+    // skips these files, but it matches them with a forward-slash path, so on
+    // Windows the rule still fires; a disable comment then reads as "unused" on
+    // Linux CI. Turning the rule off here is correct on both.
+    files: ["app/**/opengraph-image.tsx", "app/**/twitter-image.tsx"],
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
   // ---------------------------------------------------------------------------
   // AGENTS.md enforcement: admin & dept client components must NOT query
   // Supabase directly from the browser — it bypasses middleware scope injection

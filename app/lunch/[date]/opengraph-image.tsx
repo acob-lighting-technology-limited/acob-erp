@@ -60,7 +60,6 @@ export default async function Image({ params }: { params: Promise<{ date: string
       >
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
           {logo ? (
-            // eslint-disable-next-line @next/next/no-img-element -- next/og renders plain <img> only
             <img src={logo} width={88} height={64} alt="" />
           ) : (
             <div style={{ display: "flex", fontSize: 32, fontWeight: 700, letterSpacing: 6 }}>MATRIX</div>
