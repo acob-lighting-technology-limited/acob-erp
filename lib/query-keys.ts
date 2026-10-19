@@ -27,6 +27,7 @@ export const QUERY_KEYS = {
   attendanceReports: (filters: Record<string, unknown>) => ["attendance-reports", filters],
   myAttendanceAppeals: () => ["my-attendance-appeals"],
   myAttendanceRecent: () => ["my-attendance-recent"],
+  attendanceDeviceStatus: () => ["attendance-device-status"],
   dailyRoster: (date: string, department: string | null) => ["daily-roster", date, department],
   attendanceLeaderboard: (filters: Record<string, unknown>) => ["attendance-leaderboard", filters],
   attendanceRecords: (filters: Record<string, unknown>) => ["attendance-records", filters],

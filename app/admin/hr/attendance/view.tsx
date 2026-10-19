@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import { DeviceStatusBanner } from "@/components/hr/device-status-banner"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -426,6 +427,7 @@ export function AttendanceReportsPage({
         ) : undefined
       }
     >
+      <DeviceStatusBanner audience="admin" />
       {activeTab === "daily" && <DailyRosterView departments={departments} lockedDepartment={lockedDepartment} />}
       {activeTab === "leaderboard" && <LeaderboardView departments={departments} lockedDepartment={lockedDepartment} />}
       {activeTab === "calendar" && <CalendarView employees={employeeOptions} />}
