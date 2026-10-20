@@ -18,7 +18,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatWATDateTime } from "@/lib/utils/date"
 
 interface DeviceStatus {
-  offline: "morning" | "evening" | null
+  offline: "morning" | "evening" | "carried_over" | null
   lastPunchAt: string | null
   outageStartDate: string | null
 }

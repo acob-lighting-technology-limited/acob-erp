@@ -17,7 +17,11 @@ import { toLocalISODate } from "@/lib/utils/date"
  *   evening - from 17:30 WAT, a normal number of clock-ins, fewer than half
  *             clocked out, and nothing received for 45 minutes. The silence
  *             test keeps a slow but working evening from tripping it.
- * Working days only.
+ *   carried_over - the device died partway through an earlier working day
+ *             (it sent clock-ins but fewer than half the clock-outs) and has
+ *             sent nothing since. Holds from midnight, so the notice does not
+ *             vanish overnight and reappear at 09:00.
+ * Working days only. Clears as soon as any punch arrives.
  */
 const MORNING_FROM_MINUTES = 9 * 60
 const EVENING_FROM_MINUTES = 17 * 60 + 30
@@ -26,7 +30,7 @@ const EVENING_MIN_CLOCK_INS = 5
 const EVENING_MIN_OUT_RATIO = 1 / 2
 const EVENING_SILENCE_MS = 45 * 60_000
 
-export type DeviceOfflineKind = "morning" | "evening"
+export type DeviceOfflineKind = "morning" | "evening" | "carried_over"
 
 export interface DeviceHealth {
   /** Today in WAT, yyyy-mm-dd. */
@@ -61,6 +65,22 @@ async function countPunches(supabase: SupabaseClient, date: string, eventType: s
   return count ?? 0
 }
 
+/**
+ * True when the day of the last punch received was cut short: it had clock-ins
+ * but the clock-outs never arrived. On a normal day the evening clock-outs all
+ * come through, so the last punch day looks complete.
+ */
+async function outageCarriedOver(supabase: SupabaseClient, lastPunchAt: string | null, today: string): Promise<boolean> {
+  if (!lastPunchAt) return false
+  const lastDate = toLocalISODate(new Date(lastPunchAt))
+  if (lastDate >= today) return false
+  const [ins, outs] = await Promise.all([
+    countPunches(supabase, lastDate, "device_punch_in"),
+    countPunches(supabase, lastDate, "device_punch_out"),
+  ])
+  return ins >= EVENING_MIN_CLOCK_INS && outs < ins * EVENING_MIN_OUT_RATIO
+}
+
 /** Reads attendance_events across all staff, so pass a service-role client. */
 export async function getDeviceHealth(supabase: SupabaseClient, now: Date = new Date()): Promise<DeviceHealth> {
   const date = toLocalISODate(now)
@@ -86,7 +106,9 @@ export async function getDeviceHealth(supabase: SupabaseClient, now: Date = new 
   if (!isWorkingDay(date, holidays)) return health
 
   const minutes = watMinutes(now)
-  if (minutes >= MORNING_FROM_MINUTES && clockIns === 0) {
+  if (clockIns === 0 && (await outageCarriedOver(supabase, lastPunchAt, date))) {
+    health.offline = "carried_over"
+  } else if (minutes >= MORNING_FROM_MINUTES && clockIns === 0) {
     health.offline = "morning"
   } else if (
     minutes >= EVENING_FROM_MINUTES &&
