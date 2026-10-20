@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { resolveAdminScope } from "@/lib/admin/rbac"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Brain } from "lucide-react"
@@ -18,7 +18,7 @@ export default async function CbtSettingsPage() {
   }
 
   const scope = await resolveAdminScope(supabase, user.id)
-  if (!scope || (scope.role !== "super_admin" && scope.role !== "developer")) {
+  if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
     redirect("/admin/settings")
   }
 

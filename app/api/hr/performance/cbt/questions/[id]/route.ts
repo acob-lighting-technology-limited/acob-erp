@@ -7,6 +7,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 import { canMutateV2, type AccessContextV2 } from "@/lib/admin/policy-v2"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("hr-performance-cbt-question-detail")
 
@@ -123,7 +124,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       .single()
 
     if (error || !data) {
-      return NextResponse.json({ error: error?.message || "Failed to update question" }, { status: 500 })
+      return serverError(log, error, "Failed to update question")
     }
 
     await writeAuditLog(
@@ -175,7 +176,7 @@ export async function DELETE(_: NextRequest, props: { params: Promise<{ id: stri
 
     const { error } = await dataClient.from("cbt_questions").delete().eq("id", params.id)
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     await writeAuditLog(

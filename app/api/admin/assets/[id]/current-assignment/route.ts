@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/id/current-assignment")
 
 export const dynamic = "force-dynamic"
 
@@ -26,7 +30,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .single()
 
   if (error && error.code !== "PGRST116") {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
   return NextResponse.json({ data: data ?? null, currentUserId: scope.userId })
 }

@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { apiFetch } from "@/lib/api-client"
 import { Briefcase, Save, Edit2, Clock, Printer } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { formatName } from "@/lib/utils"
-import { writeAuditLogClient } from "@/lib/audit/client"
 import { PageHeader } from "@/components/layout"
 import { EmptyState } from "@/components/ui/patterns"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -32,8 +32,6 @@ interface JobDescriptionData {
   phone_number: string | null
   userId: string
 }
-
-type AuditClient = Parameters<typeof writeAuditLogClient>[0]
 
 async function fetchJobDescription(supabase: ReturnType<typeof createClient>): Promise<JobDescriptionData> {
   const {
@@ -100,37 +98,15 @@ export default function JobDescriptionPage() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error("Not authenticated")
-
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          job_description: jobDescription,
-          job_description_updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id)
-
-      if (error) throw error
-
-      await writeAuditLogClient(
-        supabase as AuditClient,
-        {
-          action: "update",
-          entityType: "job_description",
-          entityId: user.id,
-          newValues: { job_description: jobDescription },
-          context: {
-            source: "ui",
-            route: "/tools/job-description",
-            department: profile?.department || null,
-            actorId: user.id,
-          },
-        },
-        { failOpen: true }
-      )
+      const res = await apiFetch("/api/profile/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_description: jobDescription }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || "Failed to save job description")
+      }
 
       toast.success("Job description saved successfully")
       setIsEditing(false)

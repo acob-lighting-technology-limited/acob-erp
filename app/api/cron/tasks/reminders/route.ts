@@ -1,17 +1,13 @@
-import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { isCronRequest } from "@/lib/security/bearer-auth"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
 import { computeProjectHealth, describeAttention, type ProjectHealthTask } from "@/lib/projects/health"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("cron-tasks-reminders")
-
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
 
 /**
  * Deadline reminders go out on the day itself and no earlier.
@@ -76,9 +72,7 @@ function daysUntil(from: string, to: string): number {
  * them outright; this one only ever looks forward.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? ""
-  const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
+  if (!isCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -142,7 +136,7 @@ async function notify(
 ): Promise<boolean> {
   try {
     // supabase-js reports RPC failures in the result rather than throwing.
-    const { error } = await supabase.rpc("create_notification", {
+    const { error } = await createNotification({
       p_user_id: params.userId,
       p_type: params.type,
       p_category: "tasks",

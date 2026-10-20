@@ -5,6 +5,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("survey-route")
 
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
 
       if (updateError || !updated) {
         log.error({ err: String(updateError) }, "Failed to update survey")
-        return NextResponse.json({ error: updateError?.message || "Failed to update survey" }, { status: 500 })
+        return serverError(log, updateError, "Failed to update survey")
       }
 
       await writeAuditLog(
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError || !created) {
       log.error({ err: String(insertError) }, "Failed to insert survey")
-      return NextResponse.json({ error: insertError?.message || "Failed to submit survey" }, { status: 500 })
+      return serverError(log, insertError, "Failed to submit survey")
     }
 
     await writeAuditLog(
@@ -204,7 +205,7 @@ export async function PUT(request: NextRequest) {
 
     if (updateError || !updated) {
       log.error({ err: String(updateError) }, "Failed to update survey")
-      return NextResponse.json({ error: updateError?.message || "Failed to update survey" }, { status: 500 })
+      return serverError(log, updateError, "Failed to update survey")
     }
 
     await writeAuditLog(

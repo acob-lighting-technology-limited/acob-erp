@@ -37,7 +37,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { AttendanceRecord } from "./page"
 import { logger } from "@/lib/logger"
-import { RemoteCheckinModal } from "@/components/attendance/remote-checkin-modal"
 import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { computeAttendanceDay, attendanceRateFrom, NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
 import {
@@ -54,7 +53,6 @@ const log = logger("dashboard-attendance-attendance-content")
 interface AttendanceContentProps {
   initialTodayRecord: AttendanceRecord | null
   initialRecentRecords: AttendanceRecord[]
-  remoteCheckinEnabled?: boolean
 }
 
 type AttendanceRow = AttendanceRecord & {
@@ -178,18 +176,12 @@ const ATTENDANCE_TABS: DataTableTab[] = [
   { key: "calendar", label: "Calendar" },
 ]
 
-export function AttendanceContent({
-  initialTodayRecord,
-  initialRecentRecords,
-  remoteCheckinEnabled = false,
-}: AttendanceContentProps) {
+export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: AttendanceContentProps) {
   const [activeTab, setActiveTab] = useState<"log" | "calendar">("log")
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(initialTodayRecord)
   const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>(initialRecentRecords)
   const [unifiedDays, setUnifiedDays] = useState<UnifiedDay[] | null>(null)
   const [filteredRows, setFilteredRows] = useState<AttendanceRow[]>([])
-  const [remoteModalOpen, setRemoteModalOpen] = useState(false)
-  const [remoteMode, setRemoteMode] = useState<"clock-in" | "clock-out">("clock-in")
   const [appeals, setAppeals] = useState<AppealRecord[]>([])
   const [appealDialogRow, setAppealDialogRow] = useState<AttendanceRow | null>(null)
   const [editAppeal, setEditAppeal] = useState<AppealRecord | null>(null)
@@ -587,23 +579,6 @@ export function AttendanceContent({
         onTabChange={(t) => setActiveTab(t as "log" | "calendar")}
         actions={
           <div className="flex items-center gap-2">
-            {remoteCheckinEnabled && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  // Determine mode: if clocked in today but no clock-out → clock-out; else → clock-in
-                  const mode = todayRecord?.clock_in && !todayRecord?.clock_out ? "clock-out" : "clock-in"
-                  setRemoteMode(mode)
-                  setRemoteModalOpen(true)
-                }}
-              >
-                <MapPin className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">
-                  Remote {todayRecord?.clock_in && !todayRecord?.clock_out ? "Clock Out" : "Clock In"}
-                </span>
-              </Button>
-            )}
             <Button variant="outline" onClick={exportCSV} size="sm">
               <Download className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
@@ -1022,18 +997,6 @@ export function AttendanceContent({
           />
         )}
       </DataTablePage>
-
-      {remoteCheckinEnabled && (
-        <RemoteCheckinModal
-          open={remoteModalOpen}
-          mode={remoteMode}
-          onClose={() => setRemoteModalOpen(false)}
-          onSuccess={() => {
-            setRemoteModalOpen(false)
-            void fetchAttendanceData()
-          }}
-        />
-      )}
 
       {appealDialogRow && (
         <AppealDialog

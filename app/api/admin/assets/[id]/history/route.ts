@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/id/history")
 
 export const dynamic = "force-dynamic"
 
@@ -25,13 +29,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       "id, assigned_at, handed_over_at, assignment_notes, handover_notes, assigned_by, assigned_to, department, office_location, assignment_type"
     )
     .eq("asset_id", assetId)
-  if (assignmentsError) return NextResponse.json({ error: assignmentsError.message }, { status: 500 })
+  if (assignmentsError) return serverError(log, assignmentsError)
 
   const { data: issues, error: issuesError } = await db
     .from("asset_issues")
     .select("id, description, resolved, created_at, resolved_at, created_by, resolved_by")
     .eq("asset_id", assetId)
-  if (issuesError) return NextResponse.json({ error: issuesError.message }, { status: 500 })
+  if (issuesError) return serverError(log, issuesError)
 
   const { data: auditLogs, error: auditError } = await db
     .from("audit_logs")
@@ -39,7 +43,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .eq("table_name", "assets")
     .eq("record_id", assetId)
     .eq("operation", "UPDATE")
-  if (auditError) return NextResponse.json({ error: auditError.message }, { status: 500 })
+  if (auditError) return serverError(log, auditError)
 
   const userIds = new Set<string>()
   assignments?.forEach((a) => {

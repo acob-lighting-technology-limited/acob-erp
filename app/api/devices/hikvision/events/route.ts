@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import { readBearerToken, safeCompare } from "@/lib/security/bearer-auth"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
@@ -333,18 +334,20 @@ async function processHikvisionEvent(event: ParsedEvent) {
 }
 
 export async function POST(request: NextRequest) {
-  const rl = await rateLimit(`hikvision-events:${getClientId(request)}`, { limit: 60, windowSec: 60 })
+  // Every staff swipe arrives from the office NAT's single IP, and the morning
+  // rush can exceed one event per second; 60/min dropped real clock-ins.
+  const rl = await rateLimit(`hikvision-events:${getClientId(request)}`, { limit: 600, windowSec: 60 })
   if (!rl.allowed) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 })
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────────
+  // The terminal's "HTTP Listening" mode cannot set request headers, so the
+  // token travels in the URL (?token=). A bearer header is preferred when the
+  // caller can send one. Both are compared in constant time.
   const secret = process.env.HIKVISION_WEBHOOK_SECRET
-  const authHeader = request.headers.get("authorization")
-  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
-  const queryToken = request.nextUrl.searchParams.get("token")
-  const token = bearerToken ?? queryToken
-  if (!secret || token !== secret) {
+  const token = readBearerToken(request) ?? request.nextUrl.searchParams.get("token")
+  if (!secret || !token || !safeCompare(token, secret)) {
     log.warn("Invalid or missing webhook token")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

@@ -1,15 +1,14 @@
 "use client"
 
 import { useState } from "react"
+import { deleteOwnFeedback } from "@/lib/feedback/client"
 import { formatWATDate, formatWATTime } from "@/lib/utils/date"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trash2, Edit2 } from "lucide-react"
 import { toast } from "sonner"
 import { FeedbackEditModal } from "./feedback-edit-modal"
-import { writeAuditLogClient } from "@/lib/audit/client"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -63,39 +62,8 @@ export function UserFeedbackList({ feedback }: UserFeedbackListProps) {
   }
 
   const handleDelete = async (id: string) => {
-    const supabase = createClient()
-
     try {
-      // Get feedback details before deleting for audit log
-      const feedbackToDelete = feedbackList.find((item) => item.id === id)
-
-      const { error } = await supabase.from("feedback").delete().eq("id", id)
-
-      if (error) throw error
-
-      // Log audit
-      if (feedbackToDelete) {
-        await writeAuditLogClient(
-          supabase,
-          {
-            action: "delete",
-            entityType: "feedback",
-            entityId: id,
-            oldValues: {
-              feedback_type: feedbackToDelete.feedback_type,
-              title: feedbackToDelete.title,
-              description: feedbackToDelete.description,
-              status: feedbackToDelete.status,
-            },
-            context: {
-              source: "ui",
-              route: "/tools/feedback",
-            },
-          },
-          { failOpen: true }
-        )
-      }
-
+      await deleteOwnFeedback(id)
       setFeedbackList(feedbackList.filter((item) => item.id !== id))
       toast.success("Feedback deleted successfully!")
     } catch (error: unknown) {

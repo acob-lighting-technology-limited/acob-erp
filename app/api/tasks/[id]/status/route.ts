@@ -11,6 +11,7 @@ import { TASK_STATUSES, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_RATING_MAX, TASK_RATING_MIN, isValidRating } from "@/lib/tasks/scoring"
 import { SELF_RATING_BLOCKED_REASON, isLeadForTaskDepartment, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("tasks-status-route")
 
@@ -352,7 +353,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
       if (spawnedTask) {
         try {
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: newAssigneeId,
             p_type: "task_assigned",
             p_category: "tasks",
@@ -406,7 +407,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
       for (const reviewerId of reviewers) {
         try {
-          await supabase.rpc("create_notification", {
+          await createNotification({
             p_user_id: reviewerId,
             p_type: "task_awaiting_review",
             p_category: "tasks",
@@ -438,7 +439,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     if (nextStatus === "completed" && task.assigned_to && task.assigned_to !== user.id) {
       try {
-        await supabase.rpc("create_notification", {
+        await createNotification({
           p_user_id: task.assigned_to,
           p_type: "task_completed",
           p_category: "tasks",
@@ -457,7 +458,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     if (nextStatus === "unable_to_complete" && task.assigned_by && task.assigned_by !== user.id) {
       try {
-        await supabase.rpc("create_notification", {
+        await createNotification({
           p_user_id: task.assigned_by,
           p_type: "task_blocked",
           p_category: "tasks",

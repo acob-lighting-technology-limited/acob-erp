@@ -5,40 +5,55 @@ import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
 import { checkRequestSize } from "@/lib/api/request-size"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 
-type AssignmentType = "individual" | "department" | "office"
+const AssignmentTypeSchema = z.enum(["individual", "department", "office"])
+type AssignmentType = z.infer<typeof AssignmentTypeSchema>
 
-interface AssetFormPayload {
-  asset_type: string
-  acquisition_year: number
-  asset_model?: string
-  serial_number?: string
-  status: string
-  notes?: string
-  assignment_type: AssignmentType
-  assigned_to?: string
-  assignment_department?: string
-  office_location?: string
-  assignment_notes?: string
-  assigned_by?: string
-  assigned_at?: string
-}
+const optionalText = z.string().optional()
 
-interface SaveAssetPayload {
-  mode: "create" | "update"
-  assetForm: AssetFormPayload
-  quantity?: number
-  selectedAsset?: {
-    id: string
-    status: string
-  } | null
-  originalAssetForm?: {
-    assigned_to?: string
-    assignment_department?: string
-    office_location?: string
-  } | null
-}
+const AssetFormSchema = z.object({
+  asset_type: z.string().trim().min(1, "Please select an asset type"),
+  // The form sends a number; coerce so a numeric string from older clients still works.
+  acquisition_year: z.coerce.number({ invalid_type_error: "Enter the acquisition year" }).int(),
+  asset_model: optionalText,
+  serial_number: optionalText,
+  status: z.string().trim().min(1, "Status is required"),
+  notes: optionalText,
+  assignment_type: AssignmentTypeSchema,
+  assigned_to: optionalText,
+  assignment_department: optionalText,
+  office_location: optionalText,
+  assignment_notes: optionalText,
+  assigned_by: optionalText,
+  assigned_at: optionalText,
+})
+type AssetFormPayload = z.infer<typeof AssetFormSchema>
+
+const SaveAssetSchema = z.object({
+  mode: z.enum(["create", "update"]),
+  assetForm: AssetFormSchema,
+  quantity: z.coerce
+    .number()
+    .int("Quantity must be an integer between 1 and 100")
+    .min(1, "Quantity must be an integer between 1 and 100")
+    .max(100, "Quantity must be an integer between 1 and 100")
+    .optional(),
+  selectedAsset: z
+    .object({ id: z.string().min(1), status: z.string() })
+    .nullable()
+    .optional(),
+  originalAssetForm: z
+    .object({
+      assigned_to: optionalText,
+      assignment_department: optionalText,
+      office_location: optionalText,
+    })
+    .nullable()
+    .optional(),
+})
 
 type AdminAssetsClient = Awaited<ReturnType<typeof createClient>>
 
@@ -141,17 +156,11 @@ export async function PATCH(request: NextRequest) {
   const sizeError = checkRequestSize(request)
   if (sizeError) return sizeError
 
-  const payload = (await request.json().catch(() => null)) as SaveAssetPayload | null
-  const mode = payload?.mode
-  const form = payload?.assetForm
-
-  if (!mode || !form) {
-    return apiError("Invalid payload", ApiErrorCode.VALIDATION_ERROR, 400)
-  }
-
-  if (!String(form.asset_type || "").trim()) {
-    return apiError("Please select an asset type", ApiErrorCode.MISSING_REQUIRED_FIELD, 400)
-  }
+  const parsed = await parseJsonBody(request, SaveAssetSchema)
+  if (!parsed.ok) return parsed.response
+  const payload = parsed.data
+  const mode = payload.mode
+  const form = payload.assetForm
 
   const dataClient = getServiceRoleClientOrFallback(supabase as AdminAssetsClient)
   const createdCodes: string[] = []
@@ -226,11 +235,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: "Asset updated successfully" })
     }
 
-    const rawQuantity = Number(payload?.quantity ?? 1)
-    if (!Number.isInteger(rawQuantity) || rawQuantity < 1 || rawQuantity > 100) {
-      return apiError("Quantity must be an integer between 1 and 100", ApiErrorCode.VALIDATION_ERROR, 400)
-    }
-    const quantity = rawQuantity
+    const quantity = payload.quantity ?? 1
 
     if (quantity > 1 && String(form.serial_number || "").trim()) {
       return apiError(

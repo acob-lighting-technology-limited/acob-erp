@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("hr-attendance-report-config")
 const SETTINGS_KEY = "attendance_daily_report_config"
@@ -99,9 +100,8 @@ export async function PATCH(request: NextRequest) {
       .select("value")
       .eq("key", SETTINGS_KEY)
       .maybeSingle()
-    const existingLastSent = ((existingRow?.value as Partial<ReportConfig>)?.lastSentByTime as
-      | Record<string, string>
-      | undefined) ?? {}
+    const existingLastSent =
+      ((existingRow?.value as Partial<ReportConfig>)?.lastSentByTime as Record<string, string> | undefined) ?? {}
     const lastSentByTime = Object.fromEntries(
       Object.entries(existingLastSent).filter(([time]) => parsed.data.sendTimes.includes(time))
     )
@@ -121,7 +121,7 @@ export async function PATCH(request: NextRequest) {
       { onConflict: "key" }
     )
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
     return NextResponse.json({ success: true })
   } catch (error) {
     log.error({ err: String(error) }, "Failed to save attendance report config")

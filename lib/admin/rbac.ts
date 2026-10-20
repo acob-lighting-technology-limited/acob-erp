@@ -6,7 +6,12 @@ import {
   normalizeDepartmentList as normalizeCanonicalDepartmentList,
   getDepartmentAliases,
 } from "@/shared/departments"
-import { GRANTABLE_ADMIN_ROUTES, type AdminRouteKeyV2 } from "@/lib/admin/policy-v2"
+import {
+  GRANTABLE_ADMIN_ROUTES,
+  buildAccessContextV2,
+  canAccessRouteV2,
+  type AdminRouteKeyV2,
+} from "@/lib/admin/policy-v2"
 
 export type AdminRole = "developer" | "super_admin" | "admin" | "employee" | "visitor" | string
 export type AdminDomain = "hr" | "finance" | "assets" | "reports" | "tasks" | "projects" | "communications"
@@ -326,4 +331,37 @@ export async function requireAdminSectionAccess(section: AdminSection): Promise<
   if (!canAccessAdminSection(scope, section)) redirect("/admin")
 
   return scope
+}
+
+/**
+ * True when the scope holds `route` as an admin (not via department-lead
+ * visibility). An admin is a super_admin scoped to their assigned routes:
+ * developer/super_admin hold every route, an admin holds what admin_routes
+ * grants (with the hr.main / accounts aliases canAccessRouteV2 applies).
+ */
+export function scopeHoldsAdminRoute(scope: AdminScope, route: AdminRouteKeyV2): boolean {
+  if (scope.scopeMode === "lead" || !scope.isAdminLike) return false
+  return canAccessRouteV2(buildAccessContextV2(scope), route)
+}
+
+/**
+ * True when the scope may write org-wide general-meeting data (meeting
+ * documents, KSS, meeting artifacts) — the /admin/reports pages other than
+ * weekly reports, i.e. the reports.other route.
+ */
+export function hasGlobalReportsWriteAccess(scope: AdminScope): boolean {
+  return scopeHoldsAdminRoute(scope, "reports.other")
+}
+
+/**
+ * True when the scope may change general-meeting data (KSS roster, meeting
+ * documents) for a week whose lock deadline has passed. An admin is a
+ * super_admin scoped to their assigned routes, so an admin holding the
+ * reports route gets the same override developer/super_admin have there.
+ *
+ * Deliberately not done in weekly_report_lock_state: that function also locks
+ * every employee's own weekly report submissions, which must stay locked.
+ */
+export function canOverrideReportsWeekLock(scope: AdminScope): boolean {
+  return scopeHoldsAdminRoute(scope, "reports.other")
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope, scopeHoldsAdminRoute, type AdminScope } from "@/lib/admin/rbac"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -67,12 +68,10 @@ const UpdateLeaveFlowSchema = z.object({
   assignments: z.array(LeaveApproverAssignmentSchema).optional(),
 })
 
-function canViewFlow(role?: string | null) {
-  return ["developer", "super_admin", "admin"].includes(role || "")
-}
-
-function canEditFlow(role?: string | null) {
-  return ["developer", "super_admin"].includes(role || "")
+// The approval chain is org-wide leave configuration: whoever holds the leave
+// route as an admin (hr.leave, or full hr.main) may view and edit it.
+function canManageFlow(scope: AdminScope | null) {
+  return scope !== null && scopeHoldsAdminRoute(scope, "hr.leave")
 }
 
 export async function GET() {
@@ -84,8 +83,8 @@ export async function GET() {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (!canViewFlow(profile?.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const scope = await resolveAdminScope(supabase, user.id)
+    if (!canManageFlow(scope)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const [rolesRes, routesRes, assignmentsRes, healthRes] = await Promise.all([
       supabase.from("leave_approver_roles").select("*").order("code"),
@@ -111,7 +110,7 @@ export async function GET() {
         health: healthRes.data?.[0] || null,
       },
       permissions: {
-        can_edit: canEditFlow(profile?.role),
+        can_edit: true,
       },
     })
   } catch (error) {
@@ -135,8 +134,8 @@ export async function PATCH(request: NextRequest) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (!canEditFlow(profile?.role)) {
+    const scope = await resolveAdminScope(supabase, user.id)
+    if (!canManageFlow(scope)) {
       return NextResponse.json({ error: "Only super admin or developer can edit leave flow" }, { status: 403 })
     }
 

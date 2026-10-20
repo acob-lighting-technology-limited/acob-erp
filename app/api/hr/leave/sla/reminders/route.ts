@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { safeCompare } from "@/lib/security/bearer-auth"
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -127,7 +128,7 @@ export async function PATCH() {
       .get("authorization")
       ?.replace(/^Bearer\s+/i, "")
       .trim()
-    const isAuthorizedCron = Boolean(cronSecret && bearerToken && bearerToken === cronSecret)
+    const isAuthorizedCron = Boolean(cronSecret && bearerToken && safeCompare(bearerToken, cronSecret))
 
     if (!isAuthorizedCron) {
       const {

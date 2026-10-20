@@ -13,6 +13,7 @@ import {
   isOneDriveCorrespondenceDocumentPath,
 } from "@/lib/correspondence/document-storage"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("correspondence-records-documents")
 
@@ -68,7 +69,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
 
       const { data: signed, error: signedError } = await supabase.storage.from(BUCKET).createSignedUrl(filePath, 3600)
       if (signedError || !signed?.signedUrl) {
-        return NextResponse.json({ error: signedError?.message || "Failed to create download link" }, { status: 500 })
+        return serverError(log, signedError, "Failed to create download link")
       }
 
       return NextResponse.redirect(signed.signedUrl)
@@ -81,7 +82,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
       .order("version_no", { ascending: false })
 
     if (versionError) {
-      return NextResponse.json({ error: versionError.message }, { status: 500 })
+      return serverError(log, versionError)
     }
 
     const files = [] as Array<Record<string, unknown>>
@@ -188,7 +189,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file)
 
       if (uploadError) {
-        return NextResponse.json({ error: uploadError.message || "Failed to upload file" }, { status: 500 })
+        return serverError(log, uploadError, "Failed to upload file")
       }
     }
 
@@ -201,7 +202,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         .single()
 
       if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 })
+        return serverError(log, updateError)
       }
 
       await appendCorrespondenceEvent({
@@ -245,11 +246,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     ])
 
     if (versionError) {
-      return NextResponse.json({ error: versionError.message }, { status: 500 })
+      return serverError(log, versionError)
     }
 
     if (recordUpdateError) {
-      return NextResponse.json({ error: recordUpdateError.message }, { status: 500 })
+      return serverError(log, recordUpdateError)
     }
 
     await appendCorrespondenceEvent({

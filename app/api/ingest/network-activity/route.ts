@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { hasBearerSecret } from "@/lib/security/bearer-auth"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
 import { lookupMacVendor } from "@/lib/security/mac-vendor"
@@ -23,11 +23,6 @@ const NetworkActivityBatchSchema = z.object({
   entries: z.array(NetworkActivityEntrySchema).min(1).max(5000),
 })
 
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
-
 /**
  * Receives MikroTik router batches and archives each one to SharePoint as a CSV.
  *
@@ -37,9 +32,7 @@ function safeCompare(a: string, b: string): boolean {
  */
 export async function POST(request: NextRequest) {
   const secret = process.env.NETWORK_ACTIVITY_INGEST_SECRET
-  const authHeader = request.headers.get("authorization") ?? ""
-  const expected = `Bearer ${secret ?? ""}`
-  if (!secret || !safeCompare(authHeader, expected)) {
+  if (!hasBearerSecret(request, secret)) {
     log.warn("Invalid or missing network activity ingest token")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

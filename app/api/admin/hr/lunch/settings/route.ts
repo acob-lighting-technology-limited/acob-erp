@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { LunchSettingsSchema } from "@/lib/hr/lunch-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -32,14 +34,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { cost, subsidy_percent, eating_days, voting_deadline, voting_enabled } = body as {
-      cost: number
-      subsidy_percent: number
-      eating_days?: string[]
-      voting_deadline?: string
-      voting_enabled?: boolean
-    }
+    const parsed = await parseJsonBody(request, LunchSettingsSchema)
+    if (!parsed.ok) return parsed.response
+    const { cost, subsidy_percent, eating_days, voting_deadline, voting_enabled } = parsed.data
 
     if (isNaN(cost) || isNaN(subsidy_percent) || cost < 0 || subsidy_percent < 0 || subsidy_percent > 100) {
       return NextResponse.json({ error: "Invalid cost or subsidy percentage" }, { status: 400 })

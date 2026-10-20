@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { PayslipBulkEmailSchema } from "@/lib/hr/payroll-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -34,10 +36,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json().catch(() => null)
-    const payrollPeriodId = body?.payroll_period_id
-    const protect = body?.protect !== false
-    const limit = Math.min(MAX_BATCH_SIZE, Math.max(1, Number(body?.limit) || DEFAULT_BATCH_SIZE))
+    const parsed = await parseJsonBody(request, PayslipBulkEmailSchema)
+    if (!parsed.ok) return parsed.response
+    const payrollPeriodId = parsed.data.payroll_period_id
+    const protect = parsed.data.protect !== false
+    const limit = Math.min(MAX_BATCH_SIZE, Math.max(1, parsed.data.limit || DEFAULT_BATCH_SIZE))
 
     if (!payrollPeriodId) {
       return NextResponse.json({ error: "payroll_period_id is required" }, { status: 400 })

@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/pending-users")
 
 type CallerProfile = {
   role?: string | null
@@ -50,7 +54,7 @@ export async function GET() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   if (callerIsAdminLike) {

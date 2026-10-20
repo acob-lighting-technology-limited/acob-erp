@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { UpsertSalarySchema } from "@/lib/hr/payroll-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -133,12 +135,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json()
+    const parsed = await parseJsonBody(request, UpsertSalarySchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
     const db = getServiceRoleClientOrFallback(supabase)
     const today = toLocalISODate(new Date())
 
-    if (Array.isArray(body?.updates)) {
-      const updates = body.updates as Array<{ user_id: string; gross_salary: number; effective_from?: string }>
+    if ("updates" in body) {
+      const updates = body.updates
       if (updates.length === 0) {
         return NextResponse.json({ error: "No updates provided" }, { status: 400 })
       }

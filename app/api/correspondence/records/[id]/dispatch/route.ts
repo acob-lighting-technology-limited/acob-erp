@@ -4,6 +4,7 @@ import { appendCorrespondenceAuditLog, canAccessRecord, getAuthContext, isAdminR
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 const log = logger("correspondence-records-dispatch")
 
@@ -62,7 +63,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const finalStatus = parsed.data.final_status
     const dispatchMethod = parsed.data.dispatch_method
 
-    const { data: updatedRecord, error: dispatchError } = await supabase.rpc("atomic_dispatch_correspondence", {
+    // atomic_dispatch_correspondence is service-role only; the checks above are
+    // the authorization for this call.
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const { data: updatedRecord, error: dispatchError } = await dataClient.rpc("atomic_dispatch_correspondence", {
       p_record_id: record.id,
       p_actor_id: user.id,
       p_final_status: finalStatus,

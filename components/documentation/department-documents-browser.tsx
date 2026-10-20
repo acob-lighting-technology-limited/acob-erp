@@ -156,7 +156,7 @@ function basename(path: string): string {
 }
 
 function createUploadId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return crypto.randomUUID()
 }
 
 function toTitleCase(value?: string): string {

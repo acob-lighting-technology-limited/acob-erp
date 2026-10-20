@@ -8,6 +8,7 @@ import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { normalizeDateToISO } from "@/lib/utils/date"
+import { serverError, validationError } from "@/lib/api/errors"
 import type { Database } from "@/types/database"
 
 const log = logger("admin-hr-employee-profile")
@@ -41,7 +42,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .single()
 
   if (error || !profile) {
-    return NextResponse.json({ error: error?.message ?? "Employee not found" }, { status: 404 })
+    if (error) log.error({ err: error.message }, "employee profile read failed")
+    return NextResponse.json({ error: "Employee not found" }, { status: 404 })
   }
 
   return NextResponse.json({ data: profile })
@@ -64,19 +66,17 @@ const UpdateEmployeeProfileSchema = z.object({
   phone_number: z.string().nullable().optional(),
   additional_phone: z.string().nullable().optional(),
   residential_address: z.string().nullable().optional(),
-  bank_name: z.string().nullable().optional(),
-  bank_account_number: z.string().nullable().optional(),
-  bank_account_name: z.string().nullable().optional(),
   birthday: z.string().nullable().optional(),
   birth_year: z.union([z.string(), z.number()]).nullable().optional(),
   employment_date: z.string().nullable().optional(),
   confirmation_date: z.string().nullable().optional(),
   job_description: z.string().nullable().optional(),
   attendance_exempt: z.boolean().optional(),
+  nysc_cds_day: z.string().nullable().optional(),
 })
 
 /**
- * PATCH applies the general profile edit — role, department, personal & bank details, etc.
+ * PATCH applies the general profile edit — role, department, personal details, etc.
  * Employment status/suspension/exit changes go through /api/v1/hr/employees/[id]/status, and
  * employment-type/contract-category conversion through /api/admin/employees/convert-type, as
  * in the original employees page; this endpoint only owns what that page wrote via a direct
@@ -97,9 +97,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const { userId } = await params
   const parsed = UpdateEmployeeProfileSchema.safeParse(await request.json())
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
-  }
+  if (!parsed.success) return validationError(parsed.error.issues)
   const body = parsed.data
 
   if (!formValidation.isCompanyEmail(body.company_email)) {
@@ -171,9 +169,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     phone_number: body.phone_number || null,
     additional_phone: body.additional_phone || null,
     residential_address: body.residential_address || null,
-    bank_name: body.bank_name || null,
-    bank_account_number: body.bank_account_number || null,
-    bank_account_name: body.bank_account_name || null,
     birthday: body.birthday || null,
     birth_year: body.birth_year ? Number(body.birth_year) : null,
     employment_date: normalizeDateToISO(body.employment_date),
@@ -183,11 +178,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   ;(updateData as Record<string, unknown>).attendance_exempt = Boolean(body.attendance_exempt)
   ;(updateData as Record<string, unknown>).personal_email = body.personal_email || null
+  if (body.nysc_cds_day !== undefined) {
+    ;(updateData as Record<string, unknown>).nysc_cds_day = body.nysc_cds_day || null
+  }
 
   const { error: updateError } = await db.from("profiles").update(updateData).eq("id", userId)
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 400 })
-  }
+  if (updateError) return serverError(log, updateError, "Could not update the employee")
 
   const { data: updatedProfile, error: refetchError } = await db
     .from("profiles")

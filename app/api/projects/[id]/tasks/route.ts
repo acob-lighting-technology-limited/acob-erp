@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse, after } from "next/server"
+import { ProjectTaskInputSchema } from "@/lib/projects/schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { clampWeight } from "@/lib/tasks/scoring"
 import { logger } from "@/lib/logger"
 import { sendTaskEmail } from "@/lib/tasks/mailer"
+import { createNotification } from "@/lib/notifications/create"
+import { serverError } from "@/lib/api/errors"
 
 export const dynamic = "force-dynamic"
 const log = logger("project-tasks-api")
@@ -18,7 +22,7 @@ async function notifyProjectTaskAssigned(
   params: { taskId: string; title: string; priority: string | null; assigneeId: string; actorId: string }
 ) {
   try {
-    const { error } = await supabase.rpc("create_notification", {
+    const { error } = await createNotification({
       p_user_id: params.assigneeId,
       p_type: "task_assigned",
       p_category: "tasks",
@@ -76,7 +80,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     if (error) {
       log.error({ err: error.message }, "Failed to fetch project tasks")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ data: tasks || [] })
@@ -99,12 +103,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
   }
 
   try {
-    const body = await request.json()
-    const { title, description, status, assigned_to, priority, weight, goal_id } = body
-
-    if (!title) {
-      return NextResponse.json({ error: "Task title is required" }, { status: 400 })
-    }
+    const parsed = await parseJsonBody(request, ProjectTaskInputSchema)
+    if (!parsed.ok) return parsed.response
+    const { title, description, status, assigned_to, priority, weight, goal_id } = parsed.data
 
     const { data: task, error } = await (supabase as any)
       .from("tasks")
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
     if (error) {
       log.error({ err: error.message }, "Failed to create task")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     if (task.assigned_to && task.assigned_to !== user.id) {
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     return NextResponse.json({ data: task })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project tasks POST")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }
 
@@ -200,7 +201,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
     if (error) {
       log.error({ err: error.message }, "Failed to update task")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     if (task.assigned_to && task.assigned_to !== previous?.assigned_to && task.assigned_to !== user.id) {
@@ -216,7 +217,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
     return NextResponse.json({ data: task })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project tasks PUT")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }
 
@@ -244,12 +245,12 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
     if (error) {
       log.error({ err: error.message }, "Failed to delete task")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project tasks DELETE")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }

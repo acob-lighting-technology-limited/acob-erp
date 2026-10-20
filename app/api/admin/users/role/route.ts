@@ -9,7 +9,8 @@ import {
   canManageSuperAdminAccounts,
 } from "@/lib/role-management"
 import { logger } from "@/lib/logger"
-import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
+import { getServiceRoleClientOrFallback, syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { GRANTABLE_ADMIN_ROUTES } from "@/lib/admin/policy-v2"
@@ -125,7 +126,7 @@ export async function PATCH(request: Request) {
         .eq("role", "super_admin")
 
       if (superAdminCountError) {
-        return NextResponse.json({ error: superAdminCountError.message }, { status: 400 })
+        return serverError(log, superAdminCountError, "The request could not be completed")
       }
 
       if ((count || 0) <= 1) {
@@ -143,11 +144,11 @@ export async function PATCH(request: Request) {
       payload.employment_status = employmentStatus
     }
 
-    const { error: updateError } = await supabase.from("profiles").update(payload).eq("id", targetUserId)
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 400 })
-    }
+    // Privileged columns are not writable by the session role (column grants on
+    // profiles), so the write uses the service role after the checks above.
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const { error: updateError } = await dataClient.from("profiles").update(payload).eq("id", targetUserId)
+    if (updateError) return serverError(log, updateError, "Could not update the user's role")
 
     // Sync employment_status into JWT metadata so middleware doesn't need a DB query
     if (employmentStatus) {

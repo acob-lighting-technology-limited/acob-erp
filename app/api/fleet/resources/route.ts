@@ -1,5 +1,9 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/fleet/resources")
 
 export async function GET() {
   try {
@@ -19,7 +23,7 @@ export async function GET() {
       .order("name")
 
     if (error) {
-      return NextResponse.json({ error: error.message || "Failed to fetch fleet resources" }, { status: 500 })
+      return serverError(log, error, "Failed to fetch fleet resources")
     }
 
     return NextResponse.json({ data: data || [] })

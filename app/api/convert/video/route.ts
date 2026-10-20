@@ -4,6 +4,10 @@ import { readFile, unlink, writeFile } from "fs/promises"
 import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/convert/video")
 
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
@@ -94,7 +98,7 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
-    return NextResponse.json({ error: error.message || "Video conversion failed" }, { status: 500 })
+    return serverError(log, error, "Video conversion failed")
   }
 }
 

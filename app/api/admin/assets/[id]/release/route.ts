@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/id/release")
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +19,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   const { id: assetId } = await params
   const db = getServiceRoleClientOrFallback(supabase)
   const { error } = await db.rpc("release_asset", { p_asset_id: assetId, p_released_by: scope.userId })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

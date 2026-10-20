@@ -10,6 +10,10 @@ import { resolveSubmissionRecipients } from "@/lib/onboarding/recipients"
 import { renderOnboardingSubmissionEmail } from "@/lib/email-templates/onboarding-submission"
 import { formatName } from "@/lib/utils"
 import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/public/onboarding-submit")
 
 const OnboardingSubmitSchema = z.object({
   first_name: z.string().trim().min(2),
@@ -79,7 +83,7 @@ export async function POST(req: Request) {
     .or(identityFilters.join(","))
     .limit(1)
   if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 })
+    return serverError(log, profileError)
   }
   if ((existingProfiles ?? []).length > 0) {
     return NextResponse.json(
@@ -96,7 +100,7 @@ export async function POST(req: Request) {
     .eq("status", "pending")
     .limit(1)
   if (pendingMatchError) {
-    return NextResponse.json({ error: pendingMatchError.message }, { status: 500 })
+    return serverError(log, pendingMatchError)
   }
   if ((pendingMatches ?? []).length > 0) {
     return NextResponse.json({ error: "An application for this person is already pending review." }, { status: 409 })
@@ -113,7 +117,7 @@ export async function POST(req: Request) {
     .maybeSingle()
 
   if (pendingError) {
-    return NextResponse.json({ error: pendingError.message }, { status: 500 })
+    return serverError(log, pendingError)
   }
 
   // Resolve contract category ID if contract
@@ -157,7 +161,7 @@ export async function POST(req: Request) {
   if (existingPending?.id) {
     const { error: updateError } = await supabase.from("pending_users").update(payload).eq("id", existingPending.id)
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return serverError(log, updateError)
     }
     // Notify HR department of the updated submission in the background
     void notifyHROfSubmission(supabase, parsed.data, personalEmail)
@@ -176,7 +180,7 @@ export async function POST(req: Request) {
     if (insertError.code === "23505") {
       return NextResponse.json({ error: "An application for this person is already pending review." }, { status: 409 })
     }
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return serverError(log, insertError)
   }
 
   // Notify HR department of the new submission in the background

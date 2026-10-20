@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { safeCompare } from "@/lib/security/bearer-auth"
 import { headers } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
@@ -44,7 +45,7 @@ async function isAuthorizedCronRequest() {
     ?.replace(/^Bearer\s+/i, "")
     .trim()
 
-  return Boolean(cronSecret && bearerToken && bearerToken === cronSecret)
+  return Boolean(cronSecret && bearerToken && safeCompare(bearerToken, cronSecret))
 }
 
 async function getCandidateWeeks(dataClient: ReportsBackfillClient) {

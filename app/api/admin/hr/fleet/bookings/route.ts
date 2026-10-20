@@ -4,6 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { resolveApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("admin-fleet-bookings")
 
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: rawBookings, error } = await query
-    if (error) return NextResponse.json({ error: error.message || "Failed to load bookings" }, { status: 500 })
+    if (error) return serverError(log, error, "Failed to load bookings")
 
     // Apply department scope filter for leads
     let bookings = rawBookings ?? []

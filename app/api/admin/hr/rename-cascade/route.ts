@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -31,10 +33,16 @@ export async function POST(request: NextRequest) {
   const scope = await resolveAdminScope(supabase as RenameCascadeClient, user.id)
   if (!scope?.isAdminLike) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  const body = (await request.json()) as { field?: string; oldName?: string; newName?: string }
-  const field = String(body.field || "")
-  const oldName = String(body.oldName || "").trim()
-  const newName = String(body.newName || "").trim()
+  const parsed = await parseJsonBody(
+    request,
+    z.object({
+      field: z.string(),
+      oldName: z.string().trim().min(1).max(200),
+      newName: z.string().trim().min(1).max(200),
+    })
+  )
+  if (!parsed.ok) return parsed.response
+  const { field, oldName, newName } = parsed.data
 
   if (!ALLOWED_FIELDS.has(field)) {
     return NextResponse.json({ error: "Unsupported field" }, { status: 400 })

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PDFDocument } from "pdf-lib"
 import { callDocumentService, isDocumentServiceConfigured } from "@/lib/pdf/document-service"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/pdf/password")
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     console.error("Error processing PDF password:", error)
-    return NextResponse.json({ error: error.message || "Failed to process PDF password" }, { status: 500 })
+    return serverError(log, error, "Failed to process PDF password")
   }
 }
 

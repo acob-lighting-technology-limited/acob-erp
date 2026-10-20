@@ -7,6 +7,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 import { canMutateV2 } from "@/lib/admin/policy-v2"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("hr-performance-cbt-questions")
 
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
       .single<CbtQuestionRow>()
 
     if (error || !data) {
-      return NextResponse.json({ error: error?.message || "Failed to create question" }, { status: 500 })
+      return serverError(log, error, "Failed to create question")
     }
 
     await writeAuditLog(

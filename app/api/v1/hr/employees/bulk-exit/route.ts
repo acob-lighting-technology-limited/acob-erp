@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
@@ -10,12 +12,20 @@ import { DEPT_ADMIN_HR, isSameDepartment } from "@/shared/departments"
 
 const log = logger("api-bulk-exit")
 
-interface BulkExitEntry {
-  employeeId: string
-  exitDate: string
-  reasonCode: string
-  reasonLabel?: string
-}
+const BulkExitSchema = z.object({
+  employees: z
+    .array(
+      z.object({
+        employeeId: z.string().uuid(),
+        exitDate: z.string().trim().min(1).max(40),
+        reasonCode: z.string().trim().min(1).max(100),
+        reasonLabel: z.string().trim().max(200).optional(),
+      })
+    )
+    .min(1, "No employees provided")
+    .max(200),
+  sendNotification: z.boolean().optional().default(false),
+})
 
 export async function POST(request: Request) {
   try {
@@ -30,10 +40,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = (await request.json()) as {
-      employees: BulkExitEntry[]
-      sendNotification: boolean
-    }
+    const parsed = await parseJsonBody(request, BulkExitSchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
 
     const { employees: entries, sendNotification } = body
     if (!Array.isArray(entries) || entries.length === 0) {

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/feedback/filters")
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +27,7 @@ export async function GET() {
   }
 
   const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   const employees = (data ?? []) as { id: string; first_name: string; last_name: string; department: string }[]
   const departments = Array.from(new Set(employees.map((e) => e.department).filter(Boolean))).sort()

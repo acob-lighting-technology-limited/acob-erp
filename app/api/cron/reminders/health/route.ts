@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { isCronRequest } from "@/lib/security/bearer-auth"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gateway"
@@ -7,13 +7,9 @@ import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_ICT_EMAIL, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { taskDeadline } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("cron-reminders-health")
-
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
 
 /** Must match max_attempts in process_reminder_schedules(). */
 const MAX_ATTEMPTS = 3
@@ -196,7 +192,7 @@ async function alertStaleExpiry(supabase: Supabase, staleCount: number): Promise
       .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString())
     if (count && count > 0) continue
 
-    const { error } = await supabase.rpc("create_notification", {
+    const { error } = await createNotification({
       p_user_id: userId,
       p_type: "system",
       p_category: "system",
@@ -226,9 +222,7 @@ async function alertStaleExpiry(supabase: Supabase, staleCount: number): Promise
  * edge functions does not also take out the alert.
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? ""
-  const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
+  if (!isCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -267,7 +261,7 @@ export async function GET(request: NextRequest) {
     let notified = 0
     for (const userId of userIds) {
       for (const failure of failures) {
-        const { error: notifyError } = await supabase.rpc("create_notification", {
+        const { error: notifyError } = await createNotification({
           p_user_id: userId,
           p_type: "system",
           p_category: "system",

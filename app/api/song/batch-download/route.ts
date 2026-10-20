@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { run, parseHttpUrl } from "@/lib/shell/run"
 import { findNewestFile } from "@/lib/media/temp-files"
 import { readFile, unlink, mkdir, readdir } from "fs/promises"
@@ -6,6 +8,13 @@ import { existsSync } from "fs"
 import path from "path"
 import { tmpdir } from "os"
 import JSZip from "jszip"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/song/batch-download")
+
+// Each URL runs a yt-dlp process for up to two minutes, so a batch is capped.
+const MAX_BATCH_URLS = 20
 
 export async function POST(request: NextRequest) {
   const tempDir = path.join(tmpdir(), "song-batch-downloads")
@@ -14,12 +23,18 @@ export async function POST(request: NextRequest) {
   const files: string[] = []
 
   try {
-    const body = await request.json()
-    const { urls, playlistName } = body
-
-    if (!urls || !Array.isArray(urls) || urls.length === 0) {
-      return NextResponse.json({ error: "URLs array is required" }, { status: 400 })
-    }
+    const parsed = await parseJsonBody(
+      request,
+      z.object({
+        urls: z
+          .array(z.string().max(2000))
+          .min(1, "URLs array is required")
+          .max(MAX_BATCH_URLS, `At most ${MAX_BATCH_URLS} links per batch`),
+        playlistName: z.string().max(200).optional(),
+      })
+    )
+    if (!parsed.ok) return parsed.response
+    const { urls, playlistName } = parsed.data
 
     const validUrls = urls
       .map((url: string) => url.trim())
@@ -144,7 +159,7 @@ export async function POST(request: NextRequest) {
       console.error("Error cleaning up on error:", err)
     }
 
-    return NextResponse.json({ error: error.message || "Batch download failed" }, { status: 500 })
+    return serverError(log, error, "Batch download failed")
   }
 }
 

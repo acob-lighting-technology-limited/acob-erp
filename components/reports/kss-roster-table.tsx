@@ -30,7 +30,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { createClient } from "@/lib/supabase/client"
-import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { getCurrentOfficeWeek, getReportingOfficeWeek } from "@/lib/meeting-week"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { REPORT_DOC_MAX_SIZE_BYTES, formatLimitMb } from "@/lib/reports/document-upload-limits"
 import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
@@ -110,7 +110,8 @@ interface Props {
   title?: string
   readOnly?: boolean
   currentUserId?: string
-  currentUserRole?: string | null
+  /** Server-resolved: may change weeks past their lock deadline (canOverrideReportsWeekLock). */
+  canOverrideWeekLock?: boolean
   enableScoring?: boolean
 }
 
@@ -144,14 +145,17 @@ export function KssRosterTable({
   title = "Knowledge Sharing Session",
   readOnly = false,
   currentUserId,
-  currentUserRole,
+  canOverrideWeekLock = false,
   enableScoring = false,
 }: Props) {
   const supabase = createClient()
   const queryClient = useQueryClient()
   const currentOfficeWeek = getCurrentOfficeWeek()
-  const defaultWeek = currentOfficeWeek.week
-  const defaultYear = currentOfficeWeek.year
+  // Open on the week being prepared for, like Add Weekly Report: from Friday the
+  // upcoming Monday's meeting, so the form never starts on a week already closed.
+  const reportingOfficeWeek = getReportingOfficeWeek()
+  const defaultWeek = reportingOfficeWeek.week
+  const defaultYear = reportingOfficeWeek.year
 
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -172,7 +176,7 @@ export function KssRosterTable({
   const [scoreValue, setScoreValue] = useState("")
   const [scoreFeedback, setScoreFeedback] = useState("")
 
-  const hasGraceOverride = currentUserRole === "developer" || currentUserRole === "super_admin"
+  const hasGraceOverride = canOverrideWeekLock
 
   const weekOptions = useMemo(() => Array.from({ length: 53 }, (_, i) => i + 1), [])
   const yearOptions = useMemo(
@@ -247,7 +251,9 @@ export function KssRosterTable({
     },
   })
 
-  const isSelectedWeekLocked = Boolean(selectedWeekLockRow?.is_locked)
+  // The lock RPC only exempts developer/super_admin; route-scoped reports admins
+  // get the same override (see canOverrideReportsWeekLock).
+  const isSelectedWeekLocked = Boolean(selectedWeekLockRow?.is_locked) && !hasGraceOverride
   const [showOverrideConfirm, setShowOverrideConfirm] = useState(false)
 
   const isSelectedWeekOutsideGrace = useMemo(() => {
@@ -1079,7 +1085,7 @@ export function KssRosterTable({
                 <Select
                   value={String(weekNumber)}
                   onValueChange={(v) => setWeekNumber(Number(v))}
-                  disabled={Boolean(editingId) || isFormLocked}
+                  disabled={Boolean(editingId)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1099,7 +1105,7 @@ export function KssRosterTable({
                 <Select
                   value={String(yearNumber)}
                   onValueChange={(v) => setYearNumber(Number(v))}
-                  disabled={Boolean(editingId) || isFormLocked}
+                  disabled={Boolean(editingId)}
                 >
                   <SelectTrigger>
                     <SelectValue />

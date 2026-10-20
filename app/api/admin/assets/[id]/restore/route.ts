@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/assets/id/restore")
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +23,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .from("assets")
     .update({ deleted_at: null, deleted_by: null, delete_reason: null, updated_at: new Date().toISOString() })
     .eq("id", assetId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

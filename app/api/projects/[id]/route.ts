@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { PROJECT_PRIORITIES } from "@/lib/projects/priority"
+import { ProjectInputSchema, parseCapacity } from "@/lib/projects/schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 export const dynamic = "force-dynamic"
 const log = logger("projects-detail-api")
@@ -18,7 +20,8 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
   }
 
   try {
-    const body = await request.json()
+    const parsed = await parseJsonBody(request, ProjectInputSchema)
+    if (!parsed.ok) return parsed.response
     const {
       project_name,
       location,
@@ -31,28 +34,16 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
       status,
       portfolio_id,
       priority,
-    } = body
+    } = parsed.data
 
-    if (!project_name || !location || !deployment_start_date || !deployment_end_date) {
-      return NextResponse.json(
-        { error: "Project name, location, start date, and end date are required" },
-        { status: 400 }
-      )
-    }
-
-    if (priority !== undefined && !PROJECT_PRIORITIES.includes(priority)) {
-      return NextResponse.json({ error: "Priority must be critical, high, medium or low" }, { status: 400 })
-    }
-
-    // Update project using authenticated user's client cast to any
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("projects")
       .update({
         project_name,
         location,
         deployment_start_date,
         deployment_end_date,
-        capacity_w: capacity_w === "" || capacity_w === null ? null : Number(capacity_w),
+        capacity_w: parseCapacity(capacity_w),
         technology_type,
         project_manager_id: project_manager_id || null,
         portfolio_id: portfolio_id || null,
@@ -67,12 +58,12 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ id: s
 
     if (error) {
       log.error({ err: error.message }, "Failed to update project")
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error, "The request could not be completed")
     }
 
     return NextResponse.json({ data })
   } catch (err: any) {
     log.error({ err }, "Unexpected error in project PUT")
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 })
+    return serverError(log, err, "Internal server error")
   }
 }

@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { FileSpreadsheet, Loader2, Upload } from "lucide-react"
 import * as XLSX from "@e965/xlsx"
-import { createClient } from "@/lib/supabase/client"
+import { apiFetch } from "@/lib/api-client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 
 const log = logger("action-tracker-excel-import-dialog")
@@ -67,17 +67,6 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete }: ExcelImportDi
           return
         }
 
-        const supabase = createClient()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user) {
-          toast.error("User not authenticated")
-          setIsUploading(false)
-          return
-        }
-
         const actionsToInsert = jsonData.map((row) => {
           // Helper to find column by multiple name variants
           const getCol = (names: string[]) => {
@@ -92,16 +81,18 @@ export function ExcelImportDialog({ isOpen, onClose, onComplete }: ExcelImportDi
             title: String(title).substring(0, 255),
             description: String(getCol(["Detailed Description", "Notes", "Details"]) || "").substring(0, 1000) || null,
             department: String(dept).substring(0, 100),
-            week_number: week,
-            year: year,
-            assigned_by: user.id,
-            status: "pending",
           }
         })
 
-        const { error } = await supabase.from("action_items").insert(actionsToInsert)
-
-        if (error) throw error
+        const res = await apiFetch("/api/reports/action-tracker/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ week_number: week, year, items: actionsToInsert }),
+        })
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null
+          throw new Error(body?.error || "Import failed")
+        }
 
         toast.success(`Successfully imported ${actionsToInsert.length} actions`)
         onComplete()

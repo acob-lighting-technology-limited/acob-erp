@@ -5,6 +5,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/hr/fleet/resources")
 
 type FleetResourcePatch = Record<string, string | boolean | null>
 
@@ -40,7 +44,7 @@ export async function GET() {
       .select("id, name, resource_type, description, is_active, created_at, updated_at")
       .order("name")
 
-    if (error) return NextResponse.json({ error: error.message || "Failed to load resources" }, { status: 500 })
+    if (error) return serverError(log, error, "Failed to load resources")
 
     return NextResponse.json({ data: data || [] })
   } catch (error) {
@@ -91,12 +95,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      const status = String(error.message || "")
-        .toLowerCase()
-        .includes("unique")
-        ? 409
-        : 500
-      return NextResponse.json({ error: error.message || "Failed to create resource" }, { status })
+      if (error.code === "23505") {
+        return NextResponse.json({ error: "A resource with this name already exists." }, { status: 409 })
+      }
+      return serverError(log, error, "Failed to create resource")
     }
 
     await writeAuditLog(
@@ -173,7 +175,7 @@ export async function PATCH(request: NextRequest) {
       .select("id, name, resource_type, description, is_active, created_at, updated_at")
       .single()
 
-    if (error) return NextResponse.json({ error: error.message || "Failed to update resource" }, { status: 500 })
+    if (error) return serverError(log, error, "Failed to update resource")
 
     await writeAuditLog(
       supabase,

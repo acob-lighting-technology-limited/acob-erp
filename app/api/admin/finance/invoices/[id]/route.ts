@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/finance/invoices/id")
 
 export const dynamic = "force-dynamic"
 
@@ -47,8 +51,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     db.from("invoices").select("*").eq("id", id).single(),
     db.from("invoice_items").select("*").eq("invoice_id", id).order("created_at"),
   ])
-  if (invoiceError) return NextResponse.json({ error: invoiceError.message }, { status: 404 })
-  if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 })
+  if (invoiceError) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  if (itemsError) return serverError(log, itemsError)
 
   return NextResponse.json({ data: { invoice, items: items ?? [] } })
 }
@@ -75,7 +79,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       update.balance_due = 0
     }
     const { error } = await db.from("invoices").update(update).eq("id", id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
     return NextResponse.json({ ok: true })
   }
 
@@ -103,10 +107,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       terms: terms || null,
     })
     .eq("id", id)
-  if (invoiceError) return NextResponse.json({ error: invoiceError.message }, { status: 500 })
+  if (invoiceError) return serverError(log, invoiceError)
 
   const { error: deleteItemsError } = await db.from("invoice_items").delete().eq("invoice_id", id)
-  if (deleteItemsError) return NextResponse.json({ error: deleteItemsError.message }, { status: 500 })
+  if (deleteItemsError) return serverError(log, deleteItemsError)
 
   const { error: insertItemsError } = await db.from("invoice_items").insert(
     items.map((item) => ({
@@ -118,7 +122,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       amount: item.amount,
     }))
   )
-  if (insertItemsError) return NextResponse.json({ error: insertItemsError.message }, { status: 500 })
+  if (insertItemsError) return serverError(log, insertItemsError)
 
   return NextResponse.json({ ok: true })
 }

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/job-descriptions")
 
 export const dynamic = "force-dynamic"
 
@@ -19,14 +23,21 @@ export async function GET() {
   }
 
   const depts = getScopedDepartments(scope)
-  let query = db.from("profiles").select("*").order("last_name", { ascending: true })
+  // Only the fields the job-descriptions screen shows: this list goes to the
+  // browser for every employee in scope, so it must not carry personal or HR data.
+  let query = db
+    .from("profiles")
+    .select(
+      "id, first_name, last_name, company_email, department, designation, phone_number, role, job_description, job_description_updated_at, created_at"
+    )
+    .order("last_name", { ascending: true })
   if (depts !== null) {
     if (depts.length === 0) return NextResponse.json({ profiles: [], userProfile })
     query = query.in("department", depts)
   }
 
   const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   return NextResponse.json({ profiles: data ?? [], userProfile })
 }

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
@@ -18,8 +20,9 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = (await request.json().catch(() => ({}))) as { menuId?: string }
-    const menuId = body.menuId
+    const parsed = await parseJsonBody(request, z.object({ menuId: z.string().uuid("menuId is required") }))
+    if (!parsed.ok) return parsed.response
+    const menuId = parsed.data.menuId
     if (!menuId) {
       return NextResponse.json({ error: "menuId is required" }, { status: 400 })
     }

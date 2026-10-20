@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/pdf/extract-text")
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     console.error("Error extracting text from PDF:", error)
-    return NextResponse.json({ error: error.message || "Failed to extract text from PDF" }, { status: 500 })
+    return serverError(log, error, "Failed to extract text from PDF")
   }
 }
 

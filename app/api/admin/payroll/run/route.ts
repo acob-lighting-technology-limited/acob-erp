@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { RunPayrollSchema } from "@/lib/hr/payroll-schemas"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
@@ -13,6 +15,7 @@ import {
 } from "@/lib/hr/payroll-utils"
 import { computePayrollBatch, loadUnpaidLeaveDays } from "@/lib/hr/payroll-compute"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-admin-hr-payroll-run")
 export const dynamic = "force-dynamic"
@@ -52,28 +55,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const body = await request.json().catch(() => null)
-    if (!body || !body.payroll_period_id || !Array.isArray(body.overrides)) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-    }
-
-    const {
-      payroll_period_id,
-      overrides,
-      lockPeriod = false,
-    } = body as {
-      payroll_period_id: string
-      overrides: Array<{
-        user_id: string
-        bonus?: number
-        loanRepayment?: number
-        /** Per-period override of the contract base salary — see the worksheet's Gross/Communication columns. */
-        monthlyBase?: number
-        /** Annual communication allowance override (calculatePayroll's own unit). */
-        communicationConfig?: number
-      }>
-      lockPeriod?: boolean
-    }
+    const parsed = await parseJsonBody(request, RunPayrollSchema)
+    if (!parsed.ok) return parsed.response
+    const { payroll_period_id, overrides, lockPeriod = false } = parsed.data
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
@@ -223,7 +207,7 @@ export async function POST(request: NextRequest) {
 
     if (upsertErr) {
       log.error({ err: upsertErr.message }, "Error saving payroll entries")
-      return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+      return serverError(log, upsertErr)
     }
 
     if (lockPeriod) {
@@ -239,7 +223,7 @@ export async function POST(request: NextRequest) {
 
       if (lockErr) {
         log.error({ err: lockErr.message }, "Error locking payroll period")
-        return NextResponse.json({ error: lockErr.message }, { status: 500 })
+        return serverError(log, lockErr)
       }
     }
 

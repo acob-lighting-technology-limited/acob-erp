@@ -3,6 +3,10 @@ import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/reports/weekly-reports/id")
 
 export const dynamic = "force-dynamic"
 
@@ -26,7 +30,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     .eq("id", id)
     .single()
   if (fetchError || !report) {
-    return NextResponse.json({ error: fetchError?.message ?? "Report not found" }, { status: 404 })
+    return NextResponse.json({ error: "Report not found" }, { status: 404 })
   }
 
   const normalizedRole = (scope.role || "").toLowerCase()
@@ -49,6 +53,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   }
 
   const { error } = await db.from("weekly_reports").delete().eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

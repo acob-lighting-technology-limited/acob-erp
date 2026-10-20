@@ -8,6 +8,7 @@ import { tmpdir } from "os"
 import { hasBinary } from "@/lib/pdf/binaries"
 import { callDocumentService, isDocumentServiceConfigured } from "@/lib/pdf/document-service"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("pdf-compress")
 
@@ -237,7 +238,7 @@ export async function POST(request: NextRequest) {
       console.error("Error during cleanup:", cleanupErr)
     }
 
-    return NextResponse.json({ error: error.message || "Failed to compress PDF" }, { status: 500 })
+    return serverError(log, error, "Failed to compress PDF")
   }
 }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { updateOwnFeedback } from "@/lib/feedback/client"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { writeAuditLogClient } from "@/lib/audit/client"
 import type { EditableFeedbackRecord } from "@/components/feedback/types"
 
 interface FeedbackEditModalProps {
@@ -27,46 +26,14 @@ export function FeedbackEditModal({ feedback, onClose, onSave }: FeedbackEditMod
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSave = async () => {
-    const supabase = createClient()
     setIsLoading(true)
 
     try {
-      const { error } = await supabase
-        .from("feedback")
-        .update({
-          feedback_type: formData.feedbackType,
-          title: formData.title,
-          description: formData.description,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", feedback.id)
-
-      if (error) throw error
-
-      // Log audit
-      await writeAuditLogClient(
-        supabase,
-        {
-          action: "update",
-          entityType: "feedback",
-          entityId: feedback.id,
-          oldValues: {
-            feedback_type: feedback.feedback_type,
-            title: feedback.title,
-            description: feedback.description,
-          },
-          newValues: {
-            feedback_type: formData.feedbackType,
-            title: formData.title,
-            description: formData.description,
-          },
-          context: {
-            source: "ui",
-            route: "/tools/feedback",
-          },
-        },
-        { failOpen: true }
-      )
+      await updateOwnFeedback(feedback.id, {
+        feedbackType: formData.feedbackType,
+        title: formData.title,
+        description: formData.description,
+      })
 
       toast.success("Feedback updated successfully!")
       onSave({

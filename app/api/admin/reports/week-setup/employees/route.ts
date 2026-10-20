@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/reports/week-setup/employees")
 
 export const dynamic = "force-dynamic"
 
@@ -18,7 +22,7 @@ export async function GET() {
     .select("id, full_name, department, employment_status")
     .not("department", "is", null)
     .order("full_name", { ascending: true })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   const employees = (data ?? [])
     .filter((row): row is { id: string; full_name: string; department: string; employment_status: string | null } =>

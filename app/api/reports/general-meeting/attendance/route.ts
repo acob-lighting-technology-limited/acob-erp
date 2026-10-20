@@ -7,6 +7,10 @@ import { getOfficeWeekMonday } from "@/lib/meeting-week"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { getAvatarSignedUrls } from "@/lib/profile-photos"
 import { writeAuditLog } from "@/lib/audit/write-audit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/reports/general-meeting/attendance")
 
 export const dynamic = "force-dynamic"
 
@@ -78,7 +82,7 @@ export async function GET(request: NextRequest) {
     .order("last_name", { ascending: true })
     .order("first_name", { ascending: true })
 
-  if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 })
+  if (profErr) return serverError(log, profErr)
 
   type ProfileRow = {
     id: string
@@ -308,7 +312,7 @@ export async function POST(request: NextRequest) {
       .eq("meeting_year", year)
       .eq("user_id", userId)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase,
@@ -373,7 +377,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
 
   await writeAuditLog(
     supabase,

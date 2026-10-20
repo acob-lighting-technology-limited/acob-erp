@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
 import { fetchActionTrackerItems } from "@/lib/reports/action-tracker-data"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("action-tracker-carry-forward-route")
 
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
     const { data: newItems, error: insertError } = await supabase.from("action_items").insert(insertPayload).select("*")
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 })
+      return serverError(log, insertError)
     }
 
     // Responsible staff carry over with the directive, or accountability resets

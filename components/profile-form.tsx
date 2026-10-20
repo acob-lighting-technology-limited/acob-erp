@@ -4,9 +4,8 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { useDepartments } from "@/hooks/use-departments"
 import { useOfficeLocations } from "@/hooks/use-office-locations"
-import { createClient } from "@/lib/supabase/client"
+import { apiFetch } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -38,15 +37,10 @@ const ProfileFormSchema = z
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     otherNames: z.string().optional(),
-    department: z.string().optional(),
-    companyRole: z.string().optional(),
     phoneNumber: z.string().optional(),
     additionalPhone: z.string().optional(),
     residentialAddress: z.string().optional(),
     officeLocation: z.string().optional(),
-    bankName: z.string().optional(),
-    bankAccountNumber: z.string().optional(),
-    bankAccountName: z.string().optional(),
     birthday: z.string().optional(),
     birthYear: z.string().optional(),
     emailNotifications: z.boolean(),
@@ -59,7 +53,6 @@ const ProfileFormSchema = z
 type ProfileFormValues = z.infer<typeof ProfileFormSchema>
 
 export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: ProfileFormProps) {
-  const { departments: DEPARTMENTS } = useDepartments()
   const { officeLocations } = useOfficeLocations()
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(ProfileFormSchema),
@@ -67,15 +60,10 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
       firstName: profile?.first_name || "",
       lastName: profile?.last_name || "",
       otherNames: profile?.other_names || "",
-      department: profile?.department || "",
-      companyRole: profile?.designation || "",
       phoneNumber: profile?.phone_number || "",
       additionalPhone: profile?.additional_phone || "",
       residentialAddress: profile?.residential_address || "",
       officeLocation: profile?.office_location || "",
-      bankName: profile?.bank_name || "",
-      bankAccountNumber: profile?.bank_account_number || "",
-      bankAccountName: profile?.bank_account_name || "",
       birthday: profile?.birthday || "",
       birthYear: profile?.birth_year != null ? String(profile.birth_year) : "",
       emailNotifications: profile?.email_notifications ?? true,
@@ -85,7 +73,6 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
   const [isLoading, setIsLoading] = useState(false)
 
   const onSubmit = form.handleSubmit(async (data) => {
-    const supabase = createClient()
     setIsLoading(true)
 
     // Clean phone numbers - only digits and + allowed
@@ -96,17 +83,11 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
       first_name: data.firstName,
       last_name: data.lastName,
       other_names: data.otherNames,
-      department: data.department,
-      designation: data.companyRole,
       phone_number: phoneNumber,
       additional_phone: additionalPhone,
       residential_address: data.residentialAddress,
       office_location: data.officeLocation,
-      bank_name: data.bankName,
-      bank_account_number: data.bankAccountNumber,
-      bank_account_name: data.bankAccountName,
       email_notifications: data.emailNotifications,
-      updated_at: new Date().toISOString(),
     }
 
     // `birthday` (MM-DD) is the canonical month/day and the source of the
@@ -119,9 +100,15 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
     }
 
     try {
-      const { error } = await supabase.from("profiles").update(updatePayload).eq("id", user.id)
-
-      if (error) throw error
+      const res = await apiFetch("/api/profile/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatePayload),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || "Failed to update profile")
+      }
       toast.success("Profile updated successfully!")
       onSaved?.()
     } catch (error: unknown) {
@@ -163,33 +150,22 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
               </div>
             </div>
 
-            {/* Company Information */}
+            {/* Company Information — managed by HR */}
             <div className="space-y-4 border-t pt-6">
               <h3 className="font-semibold">Company Information</h3>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
-                  <Select
-                    value={form.watch("department")}
-                    onValueChange={(value) => form.setValue("department", value)}
-                  >
-                    <SelectTrigger id="department">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DEPARTMENTS.map((dept) => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-1.5">
+                  <Label htmlFor="departmentDisplay">Department</Label>
+                  <Input id="departmentDisplay" value={profile?.department || "Not assigned"} disabled readOnly />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="companyRole">Designation</Label>
-                  <Input id="companyRole" {...form.register("companyRole")} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="designationDisplay">Designation</Label>
+                  <Input id="designationDisplay" value={profile?.designation || "Not set"} disabled readOnly />
                 </div>
               </div>
+              <p className="text-muted-foreground text-xs">
+                Department and designation are managed by HR. Contact HR if either is wrong.
+              </p>
             </div>
 
             {/* Contact Information */}
@@ -265,36 +241,6 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
               </div>
             </div>
 
-            {/* Banking Information */}
-            <div className="space-y-4 border-t pt-6">
-              <h3 className="font-semibold">Banking Information</h3>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="bankName">Bank Name</Label>
-                  <Input id="bankName" {...form.register("bankName")} placeholder="e.g., First Bank" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bankAccountNumber">Account Number</Label>
-                  <Input
-                    id="bankAccountNumber"
-                    type="text"
-                    value={form.watch("bankAccountNumber")}
-                    onChange={(e) => {
-                      // Only allow numbers
-                      const value = e.target.value.replace(/[^0-9]/g, "")
-                      form.setValue("bankAccountNumber", value)
-                    }}
-                    placeholder="e.g., 1234567890"
-                    maxLength={10}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bankAccountName">Account Name</Label>
-                  <Input id="bankAccountName" {...form.register("bankAccountName")} placeholder="e.g., John Doe" />
-                </div>
-              </div>
-            </div>
-
             {/* Personal Dates */}
             <div className="space-y-4 border-t pt-6">
               <h3 className="font-semibold">Personal Information</h3>
@@ -338,7 +284,7 @@ export function ProfileForm({ user, profile, hideBackButton = false, onSaved }: 
                       />
                     </div>
                   </div>
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-muted-foreground text-xs">
                     Official employment and confirmation dates are managed strictly by HR/Admin.
                   </p>
                 </div>

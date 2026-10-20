@@ -43,7 +43,7 @@ function isBypassOrOverride(log: AuditLogRow): boolean {
     return true
   }
 
-  // 4. Attendance overrides (LWP/AWP status, remote clock-in source)
+  // 4. Attendance overrides (LWP/AWP status, manual alterations)
   if (entityType.includes("attendance")) {
     const isOverrideStatus = [
       "lateness_with_permission",
@@ -52,13 +52,11 @@ function isBypassOrOverride(log: AuditLogRow): boolean {
       "lwp",
       "iwp",
       "awp",
-      "remote_web",
       "exempt",
       "waiver",
     ].some((term) => allText.includes(term))
 
-    const isManualChange =
-      allText.includes("admin_manual") || allText.includes("manual_alteration") || allText.includes("remote_clock_in")
+    const isManualChange = allText.includes("admin_manual") || allText.includes("manual_alteration")
 
     if (isOverrideStatus || isManualChange) {
       return true

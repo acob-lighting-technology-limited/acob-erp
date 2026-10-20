@@ -8,6 +8,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 import { canMutateV2, type AccessContextV2 } from "@/lib/admin/policy-v2"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-reports-weekly-reports")
 
@@ -199,7 +200,7 @@ export async function PATCH(request: Request) {
 
     if (existingByIdError) {
       log.error({ err: existingByIdError, reportId }, "Failed to look up existing report by id")
-      return NextResponse.json({ error: existingByIdError.message }, { status: 500 })
+      return serverError(log, existingByIdError)
     }
 
     if (existingByKeyError) {
@@ -207,7 +208,7 @@ export async function PATCH(request: Request) {
         { err: existingByKeyError, department, normalizedDepartment, weekNumber, yearNumber },
         "Failed to look up existing report"
       )
-      return NextResponse.json({ error: existingByKeyError.message }, { status: 500 })
+      return serverError(log, existingByKeyError)
     }
 
     if (reportId && !existingById) {
@@ -326,7 +327,7 @@ export async function PATCH(request: Request) {
         },
         "Weekly report database write failed"
       )
-      return NextResponse.json({ error: saveError.message }, { status: 500 })
+      return serverError(log, saveError)
     }
 
     // Keep action_items aligned with weekly_reports.tasks_new_week.

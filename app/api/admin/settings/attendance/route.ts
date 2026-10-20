@@ -4,6 +4,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("admin-settings-attendance")
 
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       log.error({ err: error.message }, "Failed to save attendance policy")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ success: true })

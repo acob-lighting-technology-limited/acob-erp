@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { NOTIFICATION_KEYS, isNotificationKey } from "@/lib/notifications/delivery-policy"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/settings/mail")
 
 type PolicyUpdatePayload = {
   notification_key: string
@@ -34,8 +39,8 @@ async function requirePrivilegedActor(supabase: MailSettingsClient) {
 
   if (!user) return { user: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) }
 
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-  if (!["super_admin", "developer"].includes(profile?.role)) {
+  const scope = await resolveAdminScope(supabase, user.id)
+  if (!scope || !scopeHoldsAdminRoute(scope, "settings.main")) {
     return { user: null, error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
   }
 
@@ -58,7 +63,7 @@ export async function GET() {
       .in("notification_key", [...NOTIFICATION_KEYS])
       .order("notification_key")
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return serverError(log, error)
 
     return NextResponse.json({ policies: data || [] })
   } catch (error) {
@@ -123,7 +128,7 @@ export async function PUT(request: NextRequest) {
       onConflict: "notification_key",
     })
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return serverError(log, error)
 
     await writeAuditLog(
       supabase,

@@ -3,6 +3,10 @@ import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/hr/office-locations/id")
 
 export const dynamic = "force-dynamic"
 
@@ -43,7 +47,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .eq("id", id)
     .select()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   if (!updatedRows || updatedRows.length === 0) {
     return NextResponse.json(
       { error: "Update was blocked by a database policy. Check office location permissions." },
@@ -82,7 +86,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     .select("id, first_name, last_name, company_email, employment_status")
     .eq("office_location", location.name)
 
-  if (profilesError) return NextResponse.json({ error: profilesError.message }, { status: 500 })
+  if (profilesError) return serverError(log, profilesError)
 
   const activeAssigned = (assignedProfiles ?? []).filter((p) =>
     isAssignableEmploymentStatus(p.employment_status, { allowLegacyNullStatus: false })
@@ -113,7 +117,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     .eq("office_location", location.name)
     .eq("status", "assigned")
 
-  if (assetsError) return NextResponse.json({ error: assetsError.message }, { status: 500 })
+  if (assetsError) return serverError(log, assetsError)
 
   if ((assetCount ?? 0) > 0) {
     return NextResponse.json(
@@ -127,7 +131,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { error: deleteError } = await db.from("office_locations").delete().eq("id", id)
 
   if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    return serverError(log, deleteError)
   }
 
   return NextResponse.json({ ok: true })

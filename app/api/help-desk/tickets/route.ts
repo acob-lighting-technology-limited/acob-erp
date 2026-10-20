@@ -21,6 +21,7 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { checkIdempotency, getIdempotencyKey, storeIdempotencyKey } from "@/lib/idempotency"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { getDepartmentAliases } from "@/shared/departments"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("help-desk-tickets")
 export const dynamic = "force-dynamic"
@@ -357,7 +358,7 @@ export async function POST(request: NextRequest) {
     const firstApprover = serviceLead
 
     if (firstApprover?.id) {
-      await supabase.rpc("create_notification", {
+      await createNotification({
         p_user_id: firstApprover.id,
         p_type: "task_assigned",
         p_category: "tasks",

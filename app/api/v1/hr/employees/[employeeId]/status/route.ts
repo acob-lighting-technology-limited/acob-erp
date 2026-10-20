@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback, syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getExitBlockers } from "@/lib/hr/exit-blockers"
 import { logger } from "@/lib/logger"
-import type { EmploymentStatus } from "@/types/database"
 import { toLocalISODate } from "@/lib/utils/date"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { applyEmployeeMailboxActions, type MailboxActionResult } from "@/lib/employees/mailbox-offboarding"
 import { EmployeeMailboxActionsSchema } from "@/lib/employees/mailbox-state"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-employee-status")
 
@@ -51,36 +53,32 @@ export async function GET(_: Request, { params }: RouteContext) {
 }
 
 // PATCH — update employment status
+const ChangeStatusSchema = z.object({
+  status: z.enum(["active", "suspended", "exited", "on_leave", "contract"], {
+    errorMap: () => ({ message: "status is required" }),
+  }),
+  reason_code: z.string().trim().max(100).optional(),
+  reason_label: z.string().trim().max(200).optional(),
+  leave_type_id: z.union([z.string().uuid(), z.literal("")]).optional(),
+  leave_type_name: z.string().trim().max(100).optional(),
+  suspension_end_date: z.string().trim().max(40).nullable().optional(),
+  separation_date: z.string().trim().max(40).optional(),
+  /** Mailbox steps the admin confirmed in the Change Status dialog. */
+  mailbox: EmployeeMailboxActionsSchema.nullish(),
+})
+
 export async function PATCH(request: Request, { params }: RouteContext) {
   const { employeeId } = await params
   try {
     const ctx = await getAdminContext(employeeId)
     if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
 
-    const body = (await request.json()) as {
-      status: EmploymentStatus
-      reason_code?: string
-      reason_label?: string
-      leave_type_id?: string
-      leave_type_name?: string
-      suspension_end_date?: string | null
-      separation_date?: string
-      /** Mailbox steps the admin confirmed in the Change Status dialog. */
-      mailbox?: unknown
-    }
-
-    const mailboxParsed = body.mailbox == null ? null : EmployeeMailboxActionsSchema.safeParse(body.mailbox)
-    if (mailboxParsed && !mailboxParsed.success) {
-      return NextResponse.json(
-        { error: mailboxParsed.error.issues[0]?.message ?? "Invalid mailbox options" },
-        { status: 400 }
-      )
-    }
-    const mailboxActions = mailboxParsed?.success ? mailboxParsed.data : null
+    const parsed = await parseJsonBody(request, ChangeStatusSchema)
+    if (!parsed.ok) return parsed.response
+    const body = parsed.data
+    const mailboxActions = body.mailbox ?? null
 
     const { status, reason_code, reason_label, leave_type_id, suspension_end_date, separation_date } = body
-
-    if (!status) return NextResponse.json({ error: "status is required" }, { status: 400 })
 
     // Block exit if employee has active assignments
     if (status === "exited") {
@@ -121,7 +119,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     if (updateError) {
       log.error({ error: updateError, employeeId: ctx.employeeId }, "Profile status update failed")
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return serverError(log, updateError)
     }
 
     // Record suspension history

@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/maintenance/cleanup-idempotency")
 
 export async function POST() {
   const rl = await rateLimit("admin-maintenance-cleanup-idempotency", { limit: 30, windowSec: 60 })
@@ -24,7 +28,7 @@ export async function POST() {
   const { data, error } = await dataClient.rpc("cleanup_expired_idempotency_keys")
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   return NextResponse.json({ cleaned: Number(data || 0) })

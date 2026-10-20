@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { isCronRequest } from "@/lib/security/bearer-auth"
 import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
@@ -8,15 +8,8 @@ import { materializeOos, oosWorkdays } from "@/lib/hr/oos-materialize"
 
 const log = logger("cron-attendance-mark-incomplete")
 
-function safeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
-  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
-}
-
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization") ?? ""
-  const expected = `Bearer ${process.env.CRON_SECRET ?? ""}`
-  if (!process.env.CRON_SECRET || !safeCompare(authHeader, expected)) {
+  if (!isCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

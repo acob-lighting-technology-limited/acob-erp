@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { assertBookingWindow, assertNoFleetOverlap, assertReason } from "@/lib/fleet-booking"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/fleet/bookings/id")
 
 export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params
@@ -32,11 +38,21 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return NextResponse.json({ error: "Only pending bookings can be updated" }, { status: 400 })
     }
 
-    const body = await request.json()
-    const resourceId = String(body.resource_id || "").trim()
-    const startAt = String(body.start_at || "").trim()
-    const endAt = String(body.end_at || "").trim()
-    const reason = assertReason(String(body.reason || ""))
+    const required = "resource_id, start_at, and end_at are required"
+    const parsed = await parseJsonBody(
+      request,
+      z.object({
+        resource_id: z.string().trim().min(1, required),
+        start_at: z.string().trim().min(1, required),
+        end_at: z.string().trim().min(1, required),
+        reason: z.string().max(2000).optional(),
+      })
+    )
+    if (!parsed.ok) return parsed.response
+    const resourceId = parsed.data.resource_id
+    const startAt = parsed.data.start_at
+    const endAt = parsed.data.end_at
+    const reason = assertReason(parsed.data.reason || "")
 
     if (!resourceId || !startAt || !endAt) {
       return NextResponse.json({ error: "resource_id, start_at, and end_at are required" }, { status: 400 })
@@ -69,7 +85,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       .single()
 
     if (updateError || !updated) {
-      return NextResponse.json({ error: updateError?.message || "Failed to update booking" }, { status: 500 })
+      return serverError(log, updateError, "Failed to update booking")
     }
 
     return NextResponse.json({ data: updated })
@@ -111,7 +127,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
     const { error: deleteError } = await adminClient.from("fleet_bookings").delete().eq("id", id)
     if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 })
+      return serverError(log, deleteError)
     }
 
     await writeAuditLog(

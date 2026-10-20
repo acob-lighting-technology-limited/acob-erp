@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/admin/finance/bills/id")
 
 export const dynamic = "force-dynamic"
 
@@ -13,7 +17,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const db = getServiceRoleClientOrFallback(supabase)
   const { data, error } = await db.from("bills").select("*, items:bill_items(*)").eq("id", id).single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+  if (error) return NextResponse.json({ error: "Not found" }, { status: 404 })
   return NextResponse.json({ data })
 }
 
@@ -27,6 +31,6 @@ export async function PATCH(_request: NextRequest, { params }: { params: Promise
   const { id } = await params
   const db = getServiceRoleClientOrFallback(supabase)
   const { error } = await db.from("bills").update({ status: "paid" }).eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }

@@ -13,6 +13,7 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("help-desk-ticket")
 export const dynamic = "force-dynamic"
@@ -291,7 +292,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     })
 
     if (nextStatus === "resolved") {
-      await supabase.rpc("create_notification", {
+      await createNotification({
         p_user_id: ticket.requester_id,
         p_type: "task_completed",
         p_category: "tasks",

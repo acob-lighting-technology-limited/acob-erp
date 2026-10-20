@@ -8,6 +8,7 @@ import {
   isUserInActionDepartment,
   type ActionTrackerScopeProfile,
 } from "@/lib/reports/action-tracker-permissions"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-reports-general-meeting-challenges")
 
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       log.error({ err: error.message }, "Failed to fetch meeting challenges")
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return serverError(log, error)
     }
 
     return NextResponse.json({ data: data || [] })
@@ -176,7 +177,7 @@ export async function PATCH(request: NextRequest) {
 
     if (updateError) {
       log.error({ err: updateError.message, id }, "Failed to update challenge")
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return serverError(log, updateError)
     }
 
     return NextResponse.json({ data: updated })

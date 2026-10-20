@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { deleteNotifications, markAllNotificationsRead, setNotificationsRead } from "@/lib/notifications/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -161,51 +162,33 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
     }
   }, [supabase, userId])
 
-  const markAsRead = useCallback(
-    async (notificationId: string) => {
-      try {
-        const { error } = await supabase
-          .from("notifications")
-          .update({ read: true, read_at: new Date().toISOString() })
-          .eq("id", notificationId)
-        if (error) throw error
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === notificationId ? { ...n, read: true, read_at: new Date().toISOString() } : n))
-        )
-      } catch (error: unknown) {
-        log.error("Error marking notification read:", error)
-        toast.error("Failed to mark as read")
-      }
-    },
-    [supabase]
-  )
+  const markAsRead = useCallback(async (notificationId: string) => {
+    try {
+      await setNotificationsRead([notificationId], true)
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, read: true, read_at: new Date().toISOString() } : n))
+      )
+    } catch (error: unknown) {
+      log.error("Error marking notification read:", error)
+      toast.error("Failed to mark as read")
+    }
+  }, [])
 
-  const markAsUnread = useCallback(
-    async (notificationId: string) => {
-      try {
-        const { error } = await supabase
-          .from("notifications")
-          .update({ read: false, read_at: null })
-          .eq("id", notificationId)
-        if (error) throw error
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === notificationId ? { ...n, read: false, read_at: undefined } : n))
-        )
-      } catch (error: unknown) {
-        log.error("Error marking notification unread:", error)
-        toast.error("Failed to mark as unread")
-      }
-    },
-    [supabase]
-  )
+  const markAsUnread = useCallback(async (notificationId: string) => {
+    try {
+      await setNotificationsRead([notificationId], false)
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, read: false, read_at: undefined } : n))
+      )
+    } catch (error: unknown) {
+      log.error("Error marking notification unread:", error)
+      toast.error("Failed to mark as unread")
+    }
+  }, [])
 
   const markAllAsRead = useCallback(async () => {
     try {
-      const { error } = await supabase.rpc("mark_notifications_read", {
-        p_user_id: userId,
-        p_notification_ids: null,
-      })
-      if (error) throw error
+      await markAllNotificationsRead()
       setNotifications((prev) =>
         prev.map((n) => ({ ...n, read: true, read_at: n.read_at ?? new Date().toISOString() }))
       )
@@ -214,22 +197,18 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
       log.error("Error marking all notifications read:", error)
       toast.error("Failed to mark all as read")
     }
-  }, [supabase, userId])
+  }, [])
 
-  const deleteNotification = useCallback(
-    async (notificationId: string) => {
-      try {
-        const { error } = await supabase.from("notifications").delete().eq("id", notificationId)
-        if (error) throw error
-        setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-        toast.success("Notification deleted")
-      } catch (error: unknown) {
-        log.error("Error deleting notification:", error)
-        toast.error("Failed to delete notification")
-      }
-    },
-    [supabase]
-  )
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    try {
+      await deleteNotifications([notificationId])
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+      toast.success("Notification deleted")
+    } catch (error: unknown) {
+      log.error("Error deleting notification:", error)
+      toast.error("Failed to delete notification")
+    }
+  }, [])
 
   const openNotification = useCallback(
     async (notification: Notification) => {

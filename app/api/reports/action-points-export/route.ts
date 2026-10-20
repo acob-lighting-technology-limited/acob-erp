@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { parseJsonBody } from "@/lib/api/parse-body"
+import { z } from "zod"
 import { Buffer } from "node:buffer"
 import type { ActionItem } from "@/lib/export-utils"
 import { logger } from "@/lib/logger"
@@ -56,16 +58,18 @@ const buildActionPointsFilename = ({
     .concat(`.${extension}`)
 }
 
-type ExportBody = {
-  actions: ActionItem[]
-  week: number
-  year: number
-  meetingDate?: string
-  department?: string
-  format: "docx" | "pdf"
-  persist?: boolean
-  reuseStored?: boolean
-}
+const ExportBodySchema = z.object({
+  // Rows come from the action tracker the caller is looking at; their shape is
+  // checked by the exporter, so here we only bound the size.
+  actions: z.array(z.object({}).passthrough()).max(2000),
+  week: z.number().int().min(1).max(53),
+  year: z.number().int().min(2000).max(9999),
+  meetingDate: z.string().max(40).nullable().optional(),
+  department: z.string().max(100).nullable().optional(),
+  format: z.enum(["docx", "pdf"]),
+  persist: z.boolean().optional(),
+  reuseStored: z.boolean().optional(),
+})
 
 async function tryReadStoredPdf(filePath: string): Promise<Uint8Array | null> {
   const onedrive = getOneDriveService()
@@ -99,7 +103,14 @@ export async function POST(request: NextRequest) {
       { status: 429 }
     )
   try {
-    const body = (await request.json()) as ExportBody
+    const parsedBody = await parseJsonBody(request, ExportBodySchema)
+    if (!parsedBody.ok) return parsedBody.response
+    const body = {
+      ...parsedBody.data,
+      meetingDate: parsedBody.data.meetingDate ?? undefined,
+      department: parsedBody.data.department ?? undefined,
+      actions: parsedBody.data.actions as unknown as ActionItem[],
+    }
     const { actions, week, year, meetingDate, department, format, persist = false, reuseStored = false } = body
     const filename = buildActionPointsFilename({ week, year, meetingDate, extension: format, department })
 

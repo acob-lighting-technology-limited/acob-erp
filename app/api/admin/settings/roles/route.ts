@@ -3,6 +3,7 @@ import { z } from "zod"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("admin-settings-roles")
 export const dynamic = "force-dynamic"
@@ -28,12 +29,7 @@ export async function GET() {
 
   const { data, error } = await db.from("roles").select("*").order("name")
   if (error) {
-    // Table absent (fresh env) — signal the client to use its built-in defaults.
-    if (error.code === "42P01" || error.message?.includes("relation")) {
-      return NextResponse.json({ data: null, fallback: true })
-    }
-    log.error({ err: error.message }, "failed to load roles")
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverError(log, error)
   }
 
   const { data: profiles } = await db.from("profiles").select("role")
@@ -70,12 +66,12 @@ export async function POST(request: NextRequest) {
       .from("roles")
       .update({ name, description: description || null, permissions })
       .eq("id", id)
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
   } else {
     const { error } = await db
       .from("roles")
       .insert({ name, description: description || null, permissions, is_system: false })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return serverError(log, error)
   }
   return NextResponse.json({ ok: true })
 }
@@ -96,6 +92,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Cannot delete system roles" }, { status: 400 })
   }
   const { error } = await db.from("roles").delete().eq("id", id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(log, error)
   return NextResponse.json({ ok: true })
 }
