@@ -112,11 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_project_members_assigned_by ON public.project_mem
 CREATE INDEX IF NOT EXISTS idx_project_updates_project_id ON public.project_updates (project_id);
 CREATE INDEX IF NOT EXISTS idx_project_updates_user_id ON public.project_updates (user_id);
 CREATE INDEX IF NOT EXISTS idx_remote_tasks_meter_id ON public.remote_tasks (meter_id);
-CREATE INDEX IF NOT EXISTS idx_requisitions_approved_by ON public.requisitions (approved_by);
-CREATE INDEX IF NOT EXISTS idx_requisitions_authorized_by ON public.requisitions (authorized_by);
 CREATE INDEX IF NOT EXISTS idx_requisitions_rejected_by ON public.requisitions (rejected_by);
-CREATE INDEX IF NOT EXISTS idx_requisitions_reviewed_by ON public.requisitions (reviewed_by);
-CREATE INDEX IF NOT EXISTS idx_requisitions_verified_by ON public.requisitions (verified_by);
 CREATE INDEX IF NOT EXISTS idx_risk_register_created_by ON public.risk_register (created_by);
 CREATE INDEX IF NOT EXISTS idx_risk_register_updated_by ON public.risk_register (updated_by);
 CREATE INDEX IF NOT EXISTS idx_salary_structures_salary_component_id ON public.salary_structures (salary_component_id);
