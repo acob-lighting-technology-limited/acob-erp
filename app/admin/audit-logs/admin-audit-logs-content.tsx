@@ -128,23 +128,19 @@ export function AdminAuditLogsContent({
         ),
       },
       {
-        key: "action",
-        label: "Action",
+        key: "action_module",
+        label: "Action & Module",
         sortable: true,
-        accessor: (r) => r.action || "update",
+        resizable: true,
+        initialWidth: 150,
+        accessor: (r) => `${r.action || "update"} ${r.entity_type}`,
         render: (r) => (
-          <Badge className={getAuditActionColor(r.action || "update")}>{formatName(r.action || "update")}</Badge>
-        ),
-      },
-      {
-        key: "entity_type",
-        label: "Module",
-        sortable: true,
-        accessor: (r) => r.entity_type,
-        render: (r) => (
-          <Badge variant="outline" className="font-normal capitalize">
-            {r.entity_type.replace("_", " ")}
-          </Badge>
+          <div className="flex flex-col items-start gap-1">
+            <Badge className={getAuditActionColor(r.action || "update")}>{formatName(r.action || "update")}</Badge>
+            <Badge variant="outline" className="text-xs font-normal capitalize">
+              {r.entity_type.replace(/_/g, " ")}
+            </Badge>
+          </div>
         ),
       },
       {
@@ -178,21 +174,30 @@ export function AdminAuditLogsContent({
         render: (r) => <span className="line-clamp-2 block max-w-[320px] text-sm">{getAuditLogSummary(r)}</span>,
       },
       {
-        key: "target",
-        label: "Target",
-        resizable: true,
-        initialWidth: 190,
-        accessor: (r) => getTargetDescription(r),
-        render: (r) => <span className="block max-w-[190px] truncate text-sm">{getTargetDescription(r)}</span>,
-      },
-      {
-        key: "department",
-        label: "Department",
+        key: "target_department",
+        label: "Target & Dept",
         sortable: true,
         resizable: true,
-        initialWidth: 170,
-        accessor: (r) => getDepartmentLocation(r),
-        render: (r) => <span className="block max-w-[170px] truncate text-sm">{getDepartmentLocation(r)}</span>,
+        initialWidth: 190,
+        accessor: (r) => `${getTargetDescription(r)} ${getDepartmentLocation(r)}`,
+        render: (r) => {
+          const target = getTargetDescription(r)
+          const dept = getDepartmentLocation(r)
+          return (
+            <div className="flex min-w-0 flex-col">
+              <span className="block max-w-48 truncate text-sm font-medium" title={target}>
+                {target}
+              </span>
+              {dept ? (
+                <span className="text-muted-foreground block max-w-48 truncate text-xs" title={dept}>
+                  {dept}
+                </span>
+              ) : (
+                <span className="text-muted-foreground block text-xs">—</span>
+              )}
+            </div>
+          )
+        },
       },
     ],
     []
