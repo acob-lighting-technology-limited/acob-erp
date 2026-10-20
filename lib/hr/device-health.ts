@@ -13,7 +13,10 @@ import { toLocalISODate } from "@/lib/utils/date"
  *
  * Punches cluster at arrival and departure, so silence only means something at
  * those two moments:
- *   morning - from 09:00 WAT, no clock-in received for today at all;
+ *   morning - from 09:00 WAT, no clock-in received for today at all and
+ *             nothing of any kind for 45 minutes. A reconnecting device sends
+ *             the previous day's clock-outs first, so "no clock-ins yet" alone
+ *             would still call it offline while the backlog is arriving;
  *   evening - from 17:30 WAT, a normal number of clock-ins, fewer than half
  *             clocked out, and nothing received for 45 minutes. The silence
  *             test keeps a slow but working evening from tripping it.
@@ -28,7 +31,7 @@ const EVENING_FROM_MINUTES = 17 * 60 + 30
 /** Below this many clock-ins the evening ratio means nothing (a quiet day, a holiday nobody entered). */
 const EVENING_MIN_CLOCK_INS = 5
 const EVENING_MIN_OUT_RATIO = 1 / 2
-const EVENING_SILENCE_MS = 45 * 60_000
+const SILENCE_MS = 45 * 60_000
 
 export type DeviceOfflineKind = "morning" | "evening" | "carried_over"
 
@@ -106,15 +109,16 @@ export async function getDeviceHealth(supabase: SupabaseClient, now: Date = new 
   if (!isWorkingDay(date, holidays)) return health
 
   const minutes = watMinutes(now)
+  const silentFor = (ms: number) => !lastPunchAt || now.getTime() - new Date(lastPunchAt).getTime() >= ms
   if (clockIns === 0 && (await outageCarriedOver(supabase, lastPunchAt, date))) {
     health.offline = "carried_over"
-  } else if (minutes >= MORNING_FROM_MINUTES && clockIns === 0) {
+  } else if (minutes >= MORNING_FROM_MINUTES && clockIns === 0 && silentFor(SILENCE_MS)) {
     health.offline = "morning"
   } else if (
     minutes >= EVENING_FROM_MINUTES &&
     clockIns >= EVENING_MIN_CLOCK_INS &&
     clockOuts < clockIns * EVENING_MIN_OUT_RATIO &&
-    (!lastPunchAt || now.getTime() - new Date(lastPunchAt).getTime() >= EVENING_SILENCE_MS)
+    silentFor(SILENCE_MS)
   ) {
     health.offline = "evening"
   }
