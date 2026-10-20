@@ -201,7 +201,7 @@ function ProjectForm({
     },
   })
 
-  const required = <span className="text-danger-foreground">*</span>
+  const required = <span className="text-red-500">*</span>
 
   const textField = (
     name: "project_name" | "location" | "technology_type" | "deployment_start_date" | "deployment_end_date",
