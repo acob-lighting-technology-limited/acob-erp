@@ -10,7 +10,7 @@ import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gatewa
 import { syncEmploymentStatusToAuth } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { normalizeDepartmentName } from "@/shared/departments"
-import { ORG_MAIL_ROUTING } from "@/lib/org-config"
+import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
 import { provisionStaffMailbox } from "@/lib/employees/mailbox-provisioning"
 import { WELCOME_PROFILE_COLUMNS, sendMailboxWelcome, type WelcomeProfile } from "@/lib/employees/mailbox-welcome"
@@ -519,6 +519,7 @@ export async function POST(req: Request) {
         try {
           if (ictEmail.recipients.length === 0) throw new Error("No ICT inbox configured")
           const result = await sendNotificationEmailWithRetry({
+            from: ORG_EMAIL_SENDERS.company,
             ...ORG_MAIL_ROUTING.Onboarding,
             to: ictEmail.recipients,
             subject: ictEmail.subject,

@@ -111,7 +111,7 @@ export const ORG_EMAIL_SENDERS = {
   /**
    * The company speaking, under its registered name. Reserved for mail that is
    * an institutional act rather than a system notification — birthday wishes,
-   * staff exit notices and the welcome letter, whose own text reads "We are
+   * staff exit notices, onboarding notices and the welcome letter, whose own text reads "We are
    * excited to welcome you to ACOB Lighting Technology Limited". "ACOB Matrix
    * wishes you a happy birthday" names the wrong speaker; the company is the
    * one sending those.
