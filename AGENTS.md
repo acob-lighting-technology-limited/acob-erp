@@ -982,7 +982,7 @@ For any leave workflow event, always use `notifyUsers` from `lib/hr/leave-workfl
 
 ## Email Identity, Routing, and Subjects — Single Source of Truth
 
-**One sender for all automated mail.** Every automated notification sends as
+**One default sender for automated mail.** Routine automated notifications send as
 **`ACOB Matrix <notifications@acoblighting.com>`**. There are
 no per-subsystem display names — they all sent from the same address anyway, which
 is what mail clients thread, filter, and score, so the names bought nothing and
@@ -993,7 +993,7 @@ only three valid answers:
 
 | Speaker | Display name | Used by |
 |---|---|---|
-| The platform | `ACOB Matrix` | every automated notification (the default) |
+| The platform | `ACOB Matrix` | routine automated notifications (the default) |
 | A department | `ACOB <Department>` | task mail, Communications broadcasts |
 | The company | `ACOB Lighting Technology Limited` | birthday wishes, staff exit notices, onboarding notices |
 

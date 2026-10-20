@@ -11,9 +11,9 @@ import { renderOnboardingSubmissionEmail } from "@/lib/email-templates/onboardin
 import { formatName } from "@/lib/utils"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
+import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
 
 const log = logger("api/public/onboarding-submit")
-import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
 
 const OnboardingSubmitSchema = z.object({
   first_name: z.string().trim().min(2),

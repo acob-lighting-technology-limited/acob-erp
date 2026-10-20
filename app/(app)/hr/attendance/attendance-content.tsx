@@ -20,7 +20,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { EmployeeCalendarView } from "./calendar-view"
 import { AppealDialog } from "./_components/appeal-dialog"
-import { DeviceStatusBanner } from "@/components/hr/device-status-banner"
+import { DeviceStatusDialog } from "@/components/hr/device-status-banner"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
@@ -658,7 +658,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
           </TooltipProvider>
         }
       >
-        <DeviceStatusBanner />
+        <DeviceStatusDialog />
         {activeTab === "calendar" ? (
           <EmployeeCalendarView />
         ) : (

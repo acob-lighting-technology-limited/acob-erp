@@ -2,13 +2,18 @@ import { z } from "zod"
 import { parseJsonBody } from "@/lib/api/parse-body"
 import { createServerClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { isFinanceDepartment, normalizeDepartment } from "@/lib/payments/department"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getDepartmentScope, resolveAdminScope, normalizeDepartmentName } from "@/lib/admin/rbac"
+import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { classifyStarlinkMonths, type StarlinkMonth } from "@/lib/starlink/billing-schedule"
+import { serverError } from "@/lib/api/errors"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/payments/id")
 
 type PaymentsClient = Awaited<ReturnType<typeof createClient>>
 
@@ -43,14 +48,6 @@ function getRelatedDepartmentName(payment: PaymentDepartmentRecord | null | unde
   if (!relation) return null
   if (Array.isArray(relation)) return relation[0]?.name ?? null
   return relation?.name ?? null
-}
-
-function normalizeDepartment(value: string | null | undefined): string {
-  return normalizeDepartmentName(String(value || "").trim()).toLowerCase()
-}
-
-function isFinanceDepartment(value: string | null | undefined): boolean {
-  return normalizeDepartment(value) === "accounts"
 }
 
 /**
@@ -132,7 +129,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     }
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 })
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
     if (scope) {
@@ -206,9 +203,15 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   try {
     const supabase = await createClient()
     const { id } = params
+    // Only editable columns pass; created_by, id, timestamps and unknown keys are
+    // stripped. (The update below runs with the service role, so the raw body
+    // used to let any caller who passed the checks rewrite any column.)
     const parsed = await parseJsonBody(request, UpdatePaymentSchema)
     if (!parsed.ok) return parsed.response
-    const body = parsed.data
+    const body: Record<string, unknown> = { ...parsed.data }
+    if (body.department_id === "") delete body.department_id
+    // "" clears the project link.
+    if (body.project_id === "") body.project_id = null
 
     const {
       data: { user },
@@ -280,13 +283,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
 
     // Validate and sync category with payment_type if category is being updated
-    if (body.category) {
-      if (body.category !== "one-time" && body.category !== "recurring") {
-        return NextResponse.json({ error: "Category must be 'one-time' or 'recurring'" }, { status: 400 })
-      }
-      // Sync payment_type with category
-      body.payment_type = body.category
-    }
+    // Sync payment_type with category (the schema already limits category).
+    if (body.category) body.payment_type = body.category
 
     const { data: updatedPayment, error } = await dataClient
       .from("department_payments")
@@ -296,7 +294,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error)
     }
 
     await writeAuditLog(
@@ -379,7 +377,7 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return serverError(log, error)
     }
 
     await writeAuditLog(

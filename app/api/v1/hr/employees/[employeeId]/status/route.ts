@@ -6,12 +6,11 @@ import { getServiceRoleClientOrFallback, syncEmploymentStatusToAuth } from "@/li
 import { canAccessAdminSection, resolveAdminScope } from "@/lib/admin/rbac"
 import { getExitBlockers } from "@/lib/hr/exit-blockers"
 import { logger } from "@/lib/logger"
-import type { EmploymentStatus } from "@/types/database"
 import { toLocalISODate } from "@/lib/utils/date"
-import { serverError } from "@/lib/api/errors"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { applyEmployeeMailboxActions, type MailboxActionResult } from "@/lib/employees/mailbox-offboarding"
 import { EmployeeMailboxActionsSchema } from "@/lib/employees/mailbox-state"
+import { serverError } from "@/lib/api/errors"
 
 const log = logger("api-employee-status")
 
@@ -65,7 +64,7 @@ const ChangeStatusSchema = z.object({
   suspension_end_date: z.string().trim().max(40).nullable().optional(),
   separation_date: z.string().trim().max(40).optional(),
   /** Mailbox steps the admin confirmed in the Change Status dialog. */
-  mailbox: z.unknown().optional(),
+  mailbox: EmployeeMailboxActionsSchema.nullish(),
 })
 
 export async function PATCH(request: Request, { params }: RouteContext) {
@@ -77,14 +76,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const parsed = await parseJsonBody(request, ChangeStatusSchema)
     if (!parsed.ok) return parsed.response
     const body = parsed.data
-    const mailboxParsed = body.mailbox == null ? null : EmployeeMailboxActionsSchema.safeParse(body.mailbox)
-    if (mailboxParsed && !mailboxParsed.success) {
-      return NextResponse.json(
-        { error: mailboxParsed.error.issues[0]?.message ?? "Invalid mailbox options" },
-        { status: 400 }
-      )
-    }
-    const mailboxActions = mailboxParsed?.success ? mailboxParsed.data : null
+    const mailboxActions = body.mailbox ?? null
+
     const { status, reason_code, reason_label, leave_type_id, suspension_end_date, separation_date } = body
 
     // Block exit if employee has active assignments
