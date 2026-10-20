@@ -126,7 +126,12 @@ CREATE POLICY "Users can insert satisfaction survey" ON public.system_satisfacti
 DROP POLICY IF EXISTS "Users can view own satisfaction survey" ON public.system_satisfaction_surveys;
 CREATE POLICY "Users can view own satisfaction survey" ON public.system_satisfaction_surveys
   FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()) OR (SELECT public.is_admin_like()));
+  USING (
+    user_id = (SELECT auth.uid())
+    OR (SELECT public.is_admin_like())
+    -- keeps the legacy is_admin flag holders the old policy admitted
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = (SELECT auth.uid()) AND is_admin = true)
+  );
 
 DROP POLICY IF EXISTS "Users can update own satisfaction survey" ON public.system_satisfaction_surveys;
 CREATE POLICY "Users can update own satisfaction survey" ON public.system_satisfaction_surveys
