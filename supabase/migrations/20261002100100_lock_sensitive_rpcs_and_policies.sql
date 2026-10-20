@@ -40,13 +40,12 @@ END $$;
 
 -- Requisitions (A4) --------------------------------------------------------------
 -- All writes go through /api/requisitions* with the service role. The browser
--- never updates a requisition, so no UPDATE policy is needed at all; SELECT is
--- limited to the requester and admins (approver/lead views are served by the API).
+-- never updates a requisition, so the UPDATE policy goes. SELECT is left as the
+-- live policy requisitions_select_party (can_view_requisition: requester, lead,
+-- assigned approver/verifier, payment processor, admin), because approvers read
+-- requisitions from the browser. Only the stale UPDATE policy is dropped here.
 DROP POLICY IF EXISTS users_update_requisitions ON public.requisitions;
 DROP POLICY IF EXISTS users_select_requisitions ON public.requisitions;
-CREATE POLICY requisitions_select_own_or_admin ON public.requisitions
-  FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()) OR (SELECT public.is_admin_like()));
 
 -- Notifications ------------------------------------------------------------------
 -- Inserts are server-only (createNotification → service role). The old INSERT
