@@ -5,6 +5,9 @@
 -- OR keeps the exact same access semantics and halves the per-row work.
 -- Two groups are rewritten by hand because the old text was wrong, not just slow:
 --
+--   (Admin access follows admin_routes via current_user_holds_admin_route, matching
+--   20261002110000, which went live first; admin_domains is no longer consulted.)
+--
 --   * action_items UPDATE "Users can update their own action items or admins/leads"
 --     had `... OR (role = 'admin' AND ...)` *outside* the `p.id = auth.uid()`
 --     bracket, so the EXISTS matched any admin's row and every signed-in user
@@ -25,7 +28,7 @@ CREATE POLICY action_items_update ON public.action_items
       WHERE p.id = (SELECT auth.uid())
         AND (
           lower(trim(p.role::text)) IN ('developer', 'super_admin')
-          OR (lower(trim(p.role::text)) = 'admin' AND (p.admin_domains IS NULL OR 'reports' = ANY (p.admin_domains)))
+          OR public.current_user_holds_admin_route(ARRAY['reports.other'])
           OR ((lower(trim(p.role::text)) = 'admin' OR p.is_department_lead)
               AND (action_items.department = p.department
                    OR action_items.department = ANY (COALESCE(p.lead_departments, ARRAY[]::text[]))))
@@ -39,7 +42,7 @@ CREATE POLICY action_items_update ON public.action_items
       WHERE p.id = (SELECT auth.uid())
         AND (
           lower(trim(p.role::text)) IN ('developer', 'super_admin')
-          OR (lower(trim(p.role::text)) = 'admin' AND (p.admin_domains IS NULL OR 'reports' = ANY (p.admin_domains)))
+          OR public.current_user_holds_admin_route(ARRAY['reports.other'])
           OR ((lower(trim(p.role::text)) = 'admin' OR p.is_department_lead)
               AND (action_items.department = p.department
                    OR action_items.department = ANY (COALESCE(p.lead_departments, ARRAY[]::text[]))))
