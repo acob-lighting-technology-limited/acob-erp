@@ -110,9 +110,11 @@ export async function GET(request: NextRequest) {
 
     const lastSeen = health.lastPunchAt ? formatWATDateTime(health.lastPunchAt) : "over a week ago"
     const detail =
-      kind === "morning"
-        ? `It is a working day and no clock-ins have been received from the device today. Last punch received: ${lastSeen}.`
-        : `The device has sent ${clockIns} clock-ins but only ${clockOuts} clock-outs today, and nothing since ${lastSeen}.`
+      kind === "carried_over"
+        ? `The device stopped sending before the end of an earlier working day and nothing has arrived since ${lastSeen}.`
+        : kind === "morning"
+          ? `It is a working day and no clock-ins have been received from the device today. Last punch received: ${lastSeen}.`
+          : `The device has sent ${clockIns} clock-ins but only ${clockOuts} clock-outs today, and nothing since ${lastSeen}.`
 
     const { data: stateRow } = await supabase
       .from("system_settings")
