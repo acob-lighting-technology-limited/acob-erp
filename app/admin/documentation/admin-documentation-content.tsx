@@ -198,6 +198,21 @@ export function AdminDocumentationContent({
     []
   )
 
+  // The department-only page: the browser has its own header, so skip the outer
+  // "Employee Documentation" page header that would sit above it.
+  if (hideTabList && activeTab === "department-documents" && departmentDocs.enabled) {
+    return (
+      <DepartmentDocumentsBrowser
+        initialPath={departmentDocs.initialPath}
+        rootLabel={departmentDocs.rootLabel}
+        lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
+        accessMode={departmentDocs.accessMode ?? "admin"}
+        lockedDepartment={departmentDocs.lockedDepartment}
+        backLink={{ href: "/admin/documentation", label: "Back to Documentation" }}
+      />
+    )
+  }
+
   return (
     <DataTablePage
       title="Employee Documentation"
