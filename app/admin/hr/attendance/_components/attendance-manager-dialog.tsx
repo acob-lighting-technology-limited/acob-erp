@@ -34,9 +34,7 @@ import { toast } from "sonner"
 import { toLocalISODate } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { logger } from "@/lib/logger"
-import { apiFetch, apiJson } from "@/lib/api-client"
-import { useQuery } from "@tanstack/react-query"
-import { QUERY_KEYS } from "@/lib/query-keys"
+import { apiFetch } from "@/lib/api-client"
 
 const log = logger("attendance-manager-dialog")
 
@@ -406,20 +404,7 @@ function ExemptionTab({
   const [endDate, setEndDate] = useState("")
   const [reason, setReason] = useState("")
   const [saving, setSaving] = useState(false)
-  const entriesQuery = useQuery({
-    queryKey: QUERY_KEYS.attendanceManager("exemptions"),
-    queryFn: async () => {
-      try {
-        const payload = await apiJson<{ data?: ExemptionEntry[] }>("/api/admin/hr/attendance/exemptions?list=1", {
-          cache: "no-store",
-        })
-        return payload.data ?? []
-      } catch {
-        return []
-      }
-    },
-  })
-  const entries = entriesQuery.data ?? null
+  const [entries, setEntries] = useState<ExemptionEntry[] | null>(null)
   const [listSearch, setListSearch] = useState("")
   const [pastView, setPastView] = useState(false)
   const [confirmEntry, setConfirmEntry] = useState<ExemptionEntry | null>(null)
@@ -431,8 +416,18 @@ function ExemptionTab({
   const [editSaving, setEditSaving] = useState(false)
 
   const loadEntries = useCallback(async () => {
-    await entriesQuery.refetch()
-  }, [entriesQuery])
+    try {
+      const res = await apiFetch("/api/admin/hr/attendance/exemptions?list=1", { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as { data?: ExemptionEntry[] } | null
+      setEntries(res.ok ? (payload?.data ?? []) : [])
+    } catch {
+      setEntries([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadEntries()
+  }, [loadEntries])
 
   async function save() {
     if (selectedIds.length === 0) {
@@ -828,25 +823,24 @@ function HolidayTab({ onChanged }: { onChanged: () => void }) {
   const [isRange, setIsRange] = useState(false)
   const [name, setName] = useState("")
   const [saving, setSaving] = useState(false)
-  const allHolidaysQuery = useQuery({
-    queryKey: QUERY_KEYS.attendanceManager("holidays"),
-    queryFn: async () => {
-      try {
-        const payload = await apiJson<{ data?: Holiday[] }>("/api/admin/hr/attendance/holidays", { cache: "no-store" })
-        return payload.data ?? []
-      } catch {
-        return []
-      }
-    },
-  })
-  const allHolidays = allHolidaysQuery.data ?? null
+  const [allHolidays, setAllHolidays] = useState<Holiday[] | null>(null)
   const [busyDate, setBusyDate] = useState<string | null>(null)
   const [listSearch, setListSearch] = useState("")
   const [confirmHoliday, setConfirmHoliday] = useState<Holiday | null>(null)
 
   const loadAll = useCallback(async () => {
-    await allHolidaysQuery.refetch()
-  }, [allHolidaysQuery])
+    try {
+      const res = await apiFetch("/api/admin/hr/attendance/holidays", { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as { data?: Holiday[] } | null
+      setAllHolidays(res.ok ? (payload?.data ?? []) : [])
+    } catch {
+      setAllHolidays([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAll()
+  }, [loadAll])
 
   async function addHoliday() {
     if (!date || !name.trim()) {
@@ -1045,27 +1039,24 @@ function EarlyClosureTab({ onChanged }: { onChanged: () => void }) {
   const [closeTime, setCloseTime] = useState("15:00")
   const [name, setName] = useState("")
   const [saving, setSaving] = useState(false)
-  const allQuery = useQuery({
-    queryKey: QUERY_KEYS.attendanceManager("early-closures"),
-    queryFn: async () => {
-      try {
-        const payload = await apiJson<{ data?: EarlyClosure[] }>("/api/admin/hr/attendance/early-closures", {
-          cache: "no-store",
-        })
-        return payload.data ?? []
-      } catch {
-        return []
-      }
-    },
-  })
-  const all = allQuery.data ?? null
+  const [all, setAll] = useState<EarlyClosure[] | null>(null)
   const [listSearch, setListSearch] = useState("")
   const [confirm, setConfirm] = useState<EarlyClosure | null>(null)
   const [busyDate, setBusyDate] = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {
-    await allQuery.refetch()
-  }, [allQuery])
+    try {
+      const res = await apiFetch("/api/admin/hr/attendance/early-closures", { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as { data?: EarlyClosure[] } | null
+      setAll(res.ok ? (payload?.data ?? []) : [])
+    } catch {
+      setAll([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAll()
+  }, [loadAll])
 
   async function add() {
     if (!date || !closeTime) {
@@ -1235,27 +1226,24 @@ function LateResumptionTab({ onChanged }: { onChanged: () => void }) {
   const [resumptionTime, setResumptionTime] = useState("10:00")
   const [name, setName] = useState("")
   const [saving, setSaving] = useState(false)
-  const allQuery = useQuery({
-    queryKey: QUERY_KEYS.attendanceManager("late-resumptions"),
-    queryFn: async () => {
-      try {
-        const payload = await apiJson<{ data?: LateResumption[] }>("/api/admin/hr/attendance/late-resumptions", {
-          cache: "no-store",
-        })
-        return payload.data ?? []
-      } catch {
-        return []
-      }
-    },
-  })
-  const all = allQuery.data ?? null
+  const [all, setAll] = useState<LateResumption[] | null>(null)
   const [listSearch, setListSearch] = useState("")
   const [confirm, setConfirm] = useState<LateResumption | null>(null)
   const [busyDate, setBusyDate] = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {
-    await allQuery.refetch()
-  }, [allQuery])
+    try {
+      const res = await apiFetch("/api/admin/hr/attendance/late-resumptions", { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as { data?: LateResumption[] } | null
+      setAll(res.ok ? (payload?.data ?? []) : [])
+    } catch {
+      setAll([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadAll()
+  }, [loadAll])
 
   async function add() {
     if (!date || !resumptionTime) {
@@ -1460,21 +1448,7 @@ function ManualRecordsTab({
   const [endDate, setEndDate] = useState(toLocalISODate())
   const [comment, setComment] = useState("")
   const [saving, setSaving] = useState(false)
-  const entriesQuery = useQuery({
-    queryKey: QUERY_KEYS.attendanceManager("manual-records", { status }),
-    queryFn: async () => {
-      try {
-        const payload = await apiJson<{ data?: ManualRecord[] }>(
-          `/api/admin/hr/attendance/records/manual?status=${status}`,
-          { cache: "no-store" }
-        )
-        return groupRecords(payload.data ?? [])
-      } catch {
-        return []
-      }
-    },
-  })
-  const entries = entriesQuery.data ?? null
+  const [entries, setEntries] = useState<EntryGroup[] | null>(null)
   const [listSearch, setListSearch] = useState("")
   const [pastView, setPastView] = useState(false)
   const [confirmGroup, setConfirmGroup] = useState<EntryGroup | null>(null)
@@ -1483,21 +1457,7 @@ function ManualRecordsTab({
   const [confirmOverride, setConfirmOverride] = useState<{ incomplete: number; complete: number } | null>(null)
 
   // Indefinite OOS directives (open-ended) — only used when oosModes is set.
-  const openOosQuery = useQuery({
-    queryKey: QUERY_KEYS.attendanceManager("oos-periods"),
-    queryFn: async () => {
-      try {
-        const payload = await apiJson<{ data?: OpenOosPeriod[] }>("/api/admin/hr/attendance/oos-periods", {
-          cache: "no-store",
-        })
-        return payload.data ?? []
-      } catch {
-        return []
-      }
-    },
-    enabled: Boolean(oosModes),
-  })
-  const openOos = openOosQuery.data ?? null
+  const [openOos, setOpenOos] = useState<OpenOosPeriod[] | null>(null)
   const [stopping, setStopping] = useState<OpenOosPeriod | null>(null)
   const [stopBusy, setStopBusy] = useState(false)
 
@@ -1509,12 +1469,30 @@ function ManualRecordsTab({
   const [editSaving, setEditSaving] = useState(false)
 
   const loadEntries = useCallback(async () => {
-    await entriesQuery.refetch()
-  }, [entriesQuery])
+    try {
+      const res = await apiFetch(`/api/admin/hr/attendance/records/manual?status=${status}`, { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as { data?: ManualRecord[] } | null
+      setEntries(res.ok ? groupRecords(payload?.data ?? []) : [])
+    } catch {
+      setEntries([])
+    }
+  }, [status])
 
   const loadOpenOos = useCallback(async () => {
-    await openOosQuery.refetch()
-  }, [openOosQuery])
+    if (!oosModes) return
+    try {
+      const res = await apiFetch("/api/admin/hr/attendance/oos-periods", { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as { data?: OpenOosPeriod[] } | null
+      setOpenOos(res.ok ? (payload?.data ?? []) : [])
+    } catch {
+      setOpenOos([])
+    }
+  }, [oosModes])
+
+  useEffect(() => {
+    void loadEntries()
+    void loadOpenOos()
+  }, [loadEntries, loadOpenOos])
 
   /** First and last calendar day of a YYYY-MM month. */
   function monthBounds(ym: string): { start: string; end: string } {
@@ -2064,36 +2042,16 @@ async function fetchLeaveTypeOptions(userId: string): Promise<LeaveTypeOption[]>
   }
 }
 
-const NO_LEAVE_TYPES: LeaveTypeOption[] = []
-
 function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const { data: types = NO_LEAVE_TYPES, isLoading: loadingTypes } = useQuery({
-    queryKey: QUERY_KEYS.manualLeaveTypeOptions(selectedId ?? ""),
-    queryFn: () => fetchLeaveTypeOptions(selectedId!),
-    enabled: Boolean(selectedId),
-  })
-  // Default to the first type until the admin picks one for this employee.
-  const [leaveTypeChoice, setLeaveTypeId] = useState("")
-  const leaveTypeId = types.some((t) => t.id === leaveTypeChoice) ? leaveTypeChoice : (types[0]?.id ?? "")
+  const [types, setTypes] = useState<LeaveTypeOption[]>([])
+  const [loadingTypes, setLoadingTypes] = useState(false)
+  const [leaveTypeId, setLeaveTypeId] = useState("")
   const [startDate, setStartDate] = useState(toLocalISODate())
   const [endDate, setEndDate] = useState(toLocalISODate())
   const [reason, setReason] = useState("")
   const [saving, setSaving] = useState(false)
-  const entriesQuery = useQuery({
-    queryKey: QUERY_KEYS.attendanceManager("manual-leave"),
-    queryFn: async () => {
-      try {
-        const payload = await apiJson<{ data?: ManualLeave[] }>("/api/admin/hr/attendance/leave/manual", {
-          cache: "no-store",
-        })
-        return payload.data ?? []
-      } catch {
-        return []
-      }
-    },
-  })
-  const entries = entriesQuery.data ?? null
+  const [entries, setEntries] = useState<ManualLeave[] | null>(null)
   const [listSearch, setListSearch] = useState("")
   const [pastView, setPastView] = useState(false)
   const [confirmEntry, setConfirmEntry] = useState<ManualLeave | null>(null)
@@ -2109,10 +2067,33 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
   const [editSaving, setEditSaving] = useState(false)
 
   const loadEntries = useCallback(async () => {
-    await entriesQuery.refetch()
-  }, [entriesQuery])
+    try {
+      const res = await apiFetch("/api/admin/hr/attendance/leave/manual", { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as { data?: ManualLeave[] } | null
+      setEntries(res.ok ? (payload?.data ?? []) : [])
+    } catch {
+      setEntries([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadEntries()
+  }, [loadEntries])
 
   // Load the selected employee's leave types + remaining balances.
+  useEffect(() => {
+    if (!selectedId) {
+      setTypes([])
+      setLeaveTypeId("")
+      return
+    }
+    setLoadingTypes(true)
+    void fetchLeaveTypeOptions(selectedId).then((opts) => {
+      setTypes(opts)
+      setLeaveTypeId(opts[0]?.id ?? "")
+      setLoadingTypes(false)
+    })
+  }, [selectedId])
 
   const selectedType = types.find((t) => t.id === leaveTypeId) ?? null
   const previewDays = daysInclusive(startDate, endDate)
