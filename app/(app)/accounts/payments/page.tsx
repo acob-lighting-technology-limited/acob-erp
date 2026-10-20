@@ -4,6 +4,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PaymentsTable } from "@/components/payments/payments-table"
 import { logger } from "@/lib/logger"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("payments-page")
 
 interface Payment {
@@ -142,12 +145,14 @@ export default async function DepartmentPaymentsPage() {
   const paymentsData = data as Exclude<Awaited<ReturnType<typeof getPaymentsData>>, { redirect: "/auth/login" }>
 
   return (
-    <PaymentsTable
-      initialPayments={paymentsData.payments}
-      initialDepartments={paymentsData.departments}
-      initialError={paymentsData.loadError}
-      currentUser={paymentsData.currentUser}
-      basePath="/accounts/payments"
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PaymentsTable
+        initialPayments={paymentsData.payments}
+        initialDepartments={paymentsData.departments}
+        initialError={paymentsData.loadError}
+        currentUser={paymentsData.currentUser}
+        basePath="/accounts/payments"
+      />
+    </TablePageLayoutProvider>
   )
 }

@@ -14,6 +14,7 @@ import {
 } from "@/lib/hr/attendance-status"
 import type { Task, Asset, LeaveItem, LunchLogItem, WorkDayAttendanceItem } from "@/app/(app)/profile/page"
 import { getTaskUrgency, sortTasksByUrgency } from "./work-items"
+import { formatCurrency } from "@/lib/format"
 
 const MAX_TASKS = 6
 const MAX_LEAVE_ITEMS = 5
@@ -29,20 +30,20 @@ function statusBadgeClass(status: string): string {
     case "completed":
     case "resolved":
     case "approved":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success-muted text-success-foreground"
     case "in_progress":
     case "under_review":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info-muted text-info-foreground"
     case "pending":
     case "open":
     case "new":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning-muted text-warning-foreground"
     case "assigned":
       return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
     case "rejected":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+      return "bg-danger-muted text-danger-foreground"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-neutral-muted text-neutral-foreground"
   }
 }
 
@@ -96,11 +97,11 @@ function Row({ href, children }: { href: string; children: React.ReactNode }) {
 function TaskDueBadge({ task, now }: { task: Task; now: Date }) {
   const urgency = getTaskUrgency(task, now)
   if (urgency.kind === "overdue") {
-    return <span className="text-xs font-medium text-red-600 dark:text-red-400">{urgency.days}d overdue</span>
+    return <span className="text-danger-foreground text-xs font-medium">{urgency.days}d overdue</span>
   }
   if (urgency.kind === "due_soon") {
     return (
-      <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+      <span className="text-warning-foreground text-xs font-medium">
         {urgency.days === 0 ? "Due today" : `Due in ${urgency.days}d`}
       </span>
     )
@@ -141,11 +142,11 @@ export function MyTasksCard({ tasks }: { tasks: Task[] }) {
                 </div>
               </div>
               <div className="mt-0.5 flex items-center gap-1.5">
-                <Badge className={cn("px-1.5 py-0 text-[10px] capitalize", statusBadgeClass(task.status))}>
+                <Badge className={cn("px-1.5 py-0 text-xs capitalize", statusBadgeClass(task.status))}>
                   {humanizeStatus(task.status)}
                 </Badge>
                 {task.priority && (
-                  <span className="text-muted-foreground text-[10px] capitalize">{task.priority} priority</span>
+                  <span className="text-muted-foreground text-xs capitalize">{task.priority} priority</span>
                 )}
               </div>
             </Row>
@@ -178,9 +179,9 @@ const LEAVE_STATE_LABELS: Record<LeaveState, string> = {
 
 const LEAVE_STATE_CLASSES: Record<LeaveState, string> = {
   on_leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  upcoming: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  pending_evidence: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  upcoming: "bg-success-muted text-success-foreground",
+  pending: "bg-warning-muted text-warning-foreground",
+  pending_evidence: "bg-warning-muted text-warning-foreground",
 }
 
 // Ongoing leave first, then anything waiting on the employee, then the queue.
@@ -231,11 +232,11 @@ export function LeaveCard({ leave, className }: { leave: LeaveItem[]; className?
             <Row key={item.id} href="/hr/leave">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-sm font-medium">{item.leave_type}</p>
-                <Badge className={cn("shrink-0 px-1.5 py-0 text-[10px]", LEAVE_STATE_CLASSES[state])}>
+                <Badge className={cn("shrink-0 px-1.5 py-0 text-xs", LEAVE_STATE_CLASSES[state])}>
                   {LEAVE_STATE_LABELS[state]}
                 </Badge>
               </div>
-              <p className="text-muted-foreground mt-0.5 text-[11px]">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 {leaveDateRange(item)}
                 {item.days_requested > 0 && (
                   <span className="tabular-nums">
@@ -286,7 +287,7 @@ export function AssetsCard({ assets, className }: { assets: Asset[]; className?:
                 {asset.asset_type}
                 {asset.asset_model ? ` — ${asset.asset_model}` : ""}
               </p>
-              <p className="text-muted-foreground mt-0.5 font-mono text-[10px]">{asset.unique_code || "—"}</p>
+              <p className="text-muted-foreground mt-0.5 font-mono text-xs">{asset.unique_code || "—"}</p>
             </Row>
           ))}
         </ul>
@@ -339,7 +340,7 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
                 : ATTENDANCE_STATUS_LABELS[statusKey] || humanizeStatus(item.status)
             const statusColor =
               item.status === "not_clocked_in"
-                ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                ? "bg-neutral-muted text-neutral-foreground border-neutral/25"
                 : ATTENDANCE_STATUS_COLORS[statusKey] || statusBadgeClass(item.status)
 
             return (
@@ -351,12 +352,12 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
                   </p>
                   <Badge
                     variant="outline"
-                    className={cn("shrink-0 border px-1.5 py-0 text-[10px] font-medium", statusColor)}
+                    className={cn("shrink-0 border px-1.5 py-0 text-xs font-medium", statusColor)}
                   >
                     {statusLabel}
                   </Badge>
                 </div>
-                <div className="text-muted-foreground mt-0.5 flex items-center justify-between text-[11px]">
+                <div className="text-muted-foreground mt-0.5 flex items-center justify-between text-xs">
                   <span>
                     {item.clock_in ? (
                       <>
@@ -378,7 +379,7 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
                     ) : isToday ? (
                       <span className="text-muted-foreground">Not clocked in yet</span>
                     ) : (
-                      <span className="text-red-600 dark:text-red-400">No clock-in</span>
+                      <span className="text-danger-foreground">No clock-in</span>
                     )}
                   </span>
                 </div>
@@ -420,11 +421,9 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
       <div className="bg-muted/30 flex shrink-0 items-center justify-between border-t border-b px-4 py-3 text-sm">
         <div>
           <p className="text-muted-foreground font-medium">{currentMonthName} deductions</p>
-          <p className="text-muted-foreground text-[10px]">Your share, after the company meal subsidy</p>
+          <p className="text-muted-foreground text-xs">Your share, after the company meal subsidy</p>
         </div>
-        <span className="font-mono font-semibold tabular-nums">
-          ₦{totalDeduction.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-        </span>
+        <span className="font-mono font-semibold tabular-nums">{formatCurrency(totalDeduction)}</span>
       </div>
       {recentLogs.length > 0 ? (
         <ul className="flex-1 divide-y overflow-y-auto">
@@ -434,10 +433,12 @@ export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
                 <p className="text-foreground font-semibold">
                   {formatWATDate(log.date, { weekday: "short", month: "short", day: "numeric" })}
                 </p>
-                <p className="text-muted-foreground text-[10px]">Meal price: ₦{Number(log.cost).toLocaleString()}</p>
+                <p className="text-muted-foreground text-xs">
+                  Meal price: {formatCurrency(Number(log.cost), { whole: true })}
+                </p>
               </div>
               <span className="font-mono font-medium tabular-nums">
-                ₦{Number(log.employee_deduction).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {formatCurrency(Number(log.employee_deduction))}
               </span>
             </li>
           ))}

@@ -121,15 +121,12 @@ export function SignatureCreator({
   )
   const [emailContactOrder, setEmailContactOrder] = useState<EmailContactOrder>("main-first")
 
-  useEffect(() => {
-    if (!formData.companyEmail.trim()) {
-      const fallbackEmail = buildCompanyEmailFallback(formData.firstName, formData.lastName)
-
-      if (fallbackEmail) {
-        setFormData((prev) => ({ ...prev, companyEmail: fallbackEmail }))
-      }
-    }
-  }, [formData.companyEmail, formData.firstName, formData.lastName])
+  // An empty company email is filled from the name (adjusted during render; converges
+  // because the condition is false once the email is set).
+  if (!formData.companyEmail.trim()) {
+    const fallbackEmail = buildCompanyEmailFallback(formData.firstName, formData.lastName)
+    if (fallbackEmail) setFormData((prev) => ({ ...prev, companyEmail: fallbackEmail }))
+  }
 
   const formatPhoneNumber = (phone: string) => formatSignaturePhone(phone)
 

@@ -4,6 +4,9 @@ import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { PaymentsTable } from "@/components/payments/payments-table"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 interface Payment {
   id: string
   department_id: string
@@ -65,15 +68,17 @@ export default async function DeptAccountsPaymentsPage({ params }: Props) {
   const { data: authData } = await supabase.auth.getUser()
 
   return (
-    <PaymentsTable
-      initialPayments={(payments || []) as Payment[]}
-      initialDepartments={departments}
-      currentUser={{
-        id: authData.user?.id ?? scope.userId,
-        department_id: deptRow?.id ?? null,
-        isAdmin: scope.isAdminLike,
-      }}
-      basePath={`/dept/${dept_id}/accounts/payments`}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PaymentsTable
+        initialPayments={(payments || []) as Payment[]}
+        initialDepartments={departments}
+        currentUser={{
+          id: authData.user?.id ?? scope.userId,
+          department_id: deptRow?.id ?? null,
+          isAdmin: scope.isAdminLike,
+        }}
+        basePath={`/dept/${dept_id}/accounts/payments`}
+      />
+    </TablePageLayoutProvider>
   )
 }

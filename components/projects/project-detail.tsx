@@ -245,7 +245,7 @@ export function ProjectDetail({
               <PriorityBadge priority={project.priority} />
               <ProjectStatusBadge status={project.status} />
               {health.overdueCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-400">
+                <span className="text-danger-foreground inline-flex items-center gap-1 text-xs font-medium">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {plural(health.overdueCount, "task")} past due
                 </span>
@@ -270,7 +270,7 @@ export function ProjectDetail({
                 <div key={fact.label} className="flex min-w-0 items-start gap-2.5">
                   <fact.icon className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
                   <div className="min-w-0">
-                    <dt className="text-muted-foreground text-[11px] font-medium">{fact.label}</dt>
+                    <dt className="text-muted-foreground text-xs font-medium">{fact.label}</dt>
                     <dd className="truncate text-sm font-medium">{fact.value}</dd>
                   </div>
                 </div>

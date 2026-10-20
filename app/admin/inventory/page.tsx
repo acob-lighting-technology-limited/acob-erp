@@ -10,6 +10,7 @@ import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { IconFill } from "@/components/ui/icon-fill"
+import { formatCurrency } from "@/lib/format"
 
 async function fetchInventoryStats(): Promise<InventoryStats> {
   const res = await fetch("/api/admin/inventory/stats", { cache: "no-store" })
@@ -32,10 +33,6 @@ export default function InventoryDashboard() {
     queryKey: QUERY_KEYS.adminInventoryDashboard(),
     queryFn: fetchInventoryStats,
   })
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
-  }
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -61,7 +58,7 @@ export default function InventoryDashboard() {
           value={stats.lowStockItems}
           icon={AlertTriangle}
           iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600 dark:text-orange-400"
+          iconColor="text-warning-foreground"
           description="Items need reorder"
         />
         <StatCard
@@ -182,7 +179,7 @@ export default function InventoryDashboard() {
           <AlertTriangle className="mt-1 h-6 w-6 text-orange-600" />
           <div>
             <h3 className="font-semibold text-orange-800 dark:text-orange-200">Database Tables Required</h3>
-            <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+            <p className="text-warning-foreground mt-1 text-sm">
               To use the Inventory module, you need to create the following database tables:
               <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">products</code>,
               <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">product_categories</code>,

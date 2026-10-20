@@ -193,7 +193,7 @@ export function RiskImportDialog({ open, onOpenChange, onImported }: RiskImportD
                       {row.warnings.map((warning) => (
                         <p
                           key={`${warning.code}-${warning.message}`}
-                          className="flex gap-1.5 text-xs text-amber-700 dark:text-amber-300"
+                          className="text-warning-foreground flex gap-1.5 text-xs"
                         >
                           <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
                           {warning.message}

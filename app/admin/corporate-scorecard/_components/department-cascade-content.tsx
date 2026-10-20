@@ -29,6 +29,7 @@ import { averageCappedPct, ragStatus, type RagStatus } from "@/lib/corporate-sco
 import { formatWATDate } from "@/lib/utils/date"
 import { exportDepartmentCascadeToExcel, exportDepartmentCascadeToPdf } from "@/lib/corporate-scorecard/export"
 import { PlanYearSelect } from "./plan-year-select"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type CascadeRow = {
   assignment_id: string
@@ -138,13 +139,16 @@ export function DepartmentCascadeContent({
     [department, onDepartmentChange]
   )
 
-  useEffect(() => {
-    if (lockedDepartment && department !== lockedDepartment) {
-      setDepartment(lockedDepartment)
-    }
-  }, [lockedDepartment, department])
+  // A department console stays on its own department (adjusted during render).
+  if (lockedDepartment && department !== lockedDepartment) {
+    setDepartment(lockedDepartment)
+  }
 
-  useEffect(() => {
+  // Mirror the department picker into the table filter — adjusted during render, not in an effect.
+  const [filterSyncedFor, setFilterSyncedFor] = useState<readonly unknown[] | null>(null)
+  const filterSyncedForNext = [department, lockedDepartment] as const
+  if (depsChanged(filterSyncedFor, filterSyncedForNext)) {
+    setFilterSyncedFor(filterSyncedForNext)
     if (!lockedDepartment && department) {
       setFilterValues((prev) => {
         const currentInFilter = prev.department?.[0]
@@ -158,7 +162,7 @@ export function DepartmentCascadeContent({
         return prev
       })
     }
-  }, [department, lockedDepartment])
+  }
 
   // null = let the server pick (current year, or the latest loaded plan).
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -223,7 +227,7 @@ export function DepartmentCascadeContent({
         accessor: (r) => r.strategic_priority || "",
         render: (r) =>
           r.strategic_priority ? (
-            <Badge variant="secondary" className="text-left text-[11px] font-medium whitespace-normal">
+            <Badge variant="secondary" className="text-left text-xs font-medium whitespace-normal">
               {r.strategic_priority}
             </Badge>
           ) : (
@@ -240,7 +244,7 @@ export function DepartmentCascadeContent({
         render: (r) => (
           <div className="flex flex-col gap-0.5">
             <span className="text-xs leading-snug font-medium">{r.measure}</span>
-            <span className="text-muted-foreground text-[11px]">{r.strategic_objective}</span>
+            <span className="text-muted-foreground text-xs">{r.strategic_objective}</span>
           </div>
         ),
       },
@@ -262,9 +266,9 @@ export function DepartmentCascadeContent({
         accessor: (r) => r.role,
         render: (r) =>
           r.role === "core" ? (
-            <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">CORE</Badge>
+            <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">CORE</Badge>
           ) : (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               SUPPORT
             </Badge>
           ),
@@ -278,12 +282,12 @@ export function DepartmentCascadeContent({
             r.department_target ||
             r.target_text ||
             (r.target_value != null ? `${r.target_value} ${r.target_unit || ""}`.trim() : null)
-          if (!targetDisplay) return <span className="text-xs text-amber-600 dark:text-amber-400">Not set</span>
+          if (!targetDisplay) return <span className="text-warning-foreground text-xs">Not set</span>
           return (
             <div className="flex flex-col">
               <span className="text-xs font-medium">{targetDisplay}</span>
               {r.department_target && r.target_text && r.department_target !== r.target_text ? (
-                <span className="text-muted-foreground text-[10px]">Corp: {r.target_text}</span>
+                <span className="text-muted-foreground text-xs">Corp: {r.target_text}</span>
               ) : null}
             </div>
           )
@@ -311,13 +315,13 @@ export function DepartmentCascadeContent({
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-medium">{actualDisplay}</span>
               {r.source === "auto" && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400">
+                <span className="text-info-foreground inline-flex items-center gap-0.5 text-xs font-medium">
                   <Zap className="h-3 w-3" />
                   Auto ({r.task_stats?.completed || 0} tasks)
                 </span>
               )}
               {r.source === "manual" && r.is_override && (
-                <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">✏️ Adjusted</span>
+                <span className="text-warning-foreground text-xs font-medium">✏️ Adjusted</span>
               )}
             </div>
           )
@@ -334,7 +338,7 @@ export function DepartmentCascadeContent({
           ) : (
             <div className="w-28 space-y-1">
               <Progress value={r.capped_pct} />
-              <span className="text-muted-foreground text-[11px]">
+              <span className="text-muted-foreground text-xs">
                 {r.raw_pct}% {r.raw_pct !== r.capped_pct ? "(capped at 100 for rollup)" : ""}
               </span>
             </div>
@@ -483,7 +487,7 @@ export function DepartmentCascadeContent({
                 <p className="mt-1 text-sm">{r.department_target || "Not yet confirmed"}</p>
                 {r.task_stats && r.task_stats.total > 0 && (
                   <div className="mt-3 rounded-md border border-blue-500/20 bg-blue-500/5 p-2 text-xs">
-                    <p className="flex items-center gap-1 text-[10px] font-semibold text-blue-700 uppercase dark:text-blue-300">
+                    <p className="flex items-center gap-1 text-xs font-semibold text-blue-700 uppercase dark:text-blue-300">
                       <Zap className="h-3 w-3" /> Live Task Breakdown
                     </p>
                     <p className="mt-0.5 text-blue-900 dark:text-blue-100">
@@ -502,7 +506,7 @@ export function DepartmentCascadeContent({
                       Latest Recorded Actual
                     </p>
                     <p className="mt-1 text-sm">{r.latest_actual.note || "No note recorded"}</p>
-                    <p className="text-muted-foreground mt-1 text-[11px]">
+                    <p className="text-muted-foreground mt-1 text-xs">
                       Recorded {formatWATDate(r.latest_actual.recorded_at)}
                       {r.is_override ? " (Manual Override)" : ""}
                     </p>
@@ -536,7 +540,7 @@ export function DepartmentCascadeContent({
               {ragBadge(r.capped_pct != null ? ragStatus(r.capped_pct) : null)}
             </div>
             <p className="text-muted-foreground line-clamp-2 text-xs">{r.strategic_objective}</p>
-            <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="flex items-center justify-between border-t pt-2 text-xs">
               <span>Role: {r.role.toUpperCase()}</span>
               <span>Attainment: {r.capped_pct != null ? `${r.capped_pct}%` : "-"}</span>
             </div>
@@ -598,13 +602,18 @@ function EditTargetDialog({
 
   const open = row !== null
 
-  useEffect(() => {
-    if (!row) return
-    setTargetValue(row.target_value != null ? String(row.target_value) : "")
-    setTargetUnit(row.target_unit || "")
-    setDepartmentTarget(row.department_target || "")
-    setProposedAction(row.proposed_action || "")
-  }, [row])
+  // Seed the target form from the row being edited — adjusted during render, not in an effect.
+  const [seededTarget, setSeededTarget] = useState<readonly unknown[] | null>(null)
+  const seededTargetNext = [row] as const
+  if (depsChanged(seededTarget, seededTargetNext)) {
+    setSeededTarget(seededTargetNext)
+    if (row) {
+      setTargetValue(row.target_value != null ? String(row.target_value) : "")
+      setTargetUnit(row.target_unit || "")
+      setDepartmentTarget(row.department_target || "")
+      setProposedAction(row.proposed_action || "")
+    }
+  }
 
   async function handleSave() {
     if (!row) return
@@ -633,7 +642,7 @@ function EditTargetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-120">
         <DialogHeader>
           <DialogTitle>Confirm This Department&apos;s Target</DialogTitle>
           <DialogDescription>{row?.measure}</DialogDescription>
@@ -672,7 +681,7 @@ function EditTargetDialog({
             value={departmentTarget}
             onChange={(e) => setDepartmentTarget(e.target.value)}
             placeholder="This department's commitment toward the corporate target..."
-            className="min-h-[60px] text-xs"
+            className="min-h-15 text-xs"
           />
         </div>
 
@@ -682,7 +691,7 @@ function EditTargetDialog({
             value={proposedAction}
             onChange={(e) => setProposedAction(e.target.value)}
             placeholder="What & how this department will achieve it..."
-            className="min-h-[60px] text-xs"
+            className="min-h-15 text-xs"
           />
         </div>
 
@@ -721,8 +730,11 @@ function RecordActualDialog({
   const isMilestone = row?.measure_type === "milestone"
   const targetDepartment = row?.department || department
 
-  useEffect(() => {
-    if (!row) return
+  // Seed the actuals form from the row being edited — adjusted during render, not in an effect.
+  const [seededActual, setSeededActual] = useState<readonly unknown[] | null>(null)
+  const seededActualNext = [row] as const
+  if (row && depsChanged(seededActual, seededActualNext)) {
+    setSeededActual(seededActualNext)
     if (row.latest_actual) {
       setActualValue(row.latest_actual.actual_value != null ? String(row.latest_actual.actual_value) : "")
       setMilestonesCompleted(
@@ -743,7 +755,7 @@ function RecordActualDialog({
       setMilestonesTotal("3")
       setNote("")
     }
-  }, [row])
+  }
 
   async function handleResetToAuto() {
     if (!row) return
@@ -808,7 +820,7 @@ function RecordActualDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-120">
         <DialogHeader>
           <DialogTitle>Record / Override Actual</DialogTitle>
           <DialogDescription>
@@ -817,7 +829,7 @@ function RecordActualDialog({
         </DialogHeader>
 
         {row?.source === "auto" && (
-          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-700 dark:text-blue-300">
+          <div className="text-info-foreground rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-xs">
             <div className="flex items-center gap-1.5 font-semibold">
               <Zap className="h-3.5 w-3.5" />
               <span>Live Task Derivation Active</span>
@@ -826,14 +838,12 @@ function RecordActualDialog({
               Detected <strong>{row.task_stats?.completed || 0} completed</strong> of {row.task_stats?.total || 0} tasks
               for this KPI in {targetDepartment}.
             </p>
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
-              Saving a value below will set a managerial override.
-            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs">Saving a value below will set a managerial override.</p>
           </div>
         )}
 
         {row?.source === "manual" && row.is_override && (
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
+          <div className="text-warning-foreground rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs">
             <div className="flex items-center justify-between font-semibold">
               <span>✏️ Manual Managerial Override Active</span>
             </div>
@@ -879,7 +889,7 @@ function RecordActualDialog({
               placeholder="e.g. 3"
             />
             {row?.target_value != null && (
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Target is {row.target_value} {row.target_unit || ""}.
               </p>
             )}
@@ -892,7 +902,7 @@ function RecordActualDialog({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Context or reason for this adjustment..."
-            className="min-h-[60px] text-xs"
+            className="min-h-15 text-xs"
           />
         </div>
 

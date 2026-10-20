@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Brain, Eye, RefreshCw, RotateCcw } from "lucide-react"
 import { CbtAttemptDetail } from "@/components/pms/cbt-attempt-detail"
@@ -13,7 +13,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +24,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { personName } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 type TabKey = "individual" | "department" | "cycle"
 
@@ -96,10 +101,6 @@ const TABS: DataTableTab[] = [
   { key: "cycle", label: "Cadence" },
 ]
 
-function employeeName(user: CbtUser | undefined) {
-  return [user?.first_name, user?.last_name].filter(Boolean).join(" ") || "Employee"
-}
-
 function scoreLabel(score: number | null) {
   return typeof score === "number" ? `${score}%` : "-"
 }
@@ -124,7 +125,7 @@ function IndividualCard({ row }: { row: IndividualRow }) {
             className={
               hasTaken
                 ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 shadow-none dark:text-emerald-400"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "text-warning-foreground border-amber-500/30 bg-amber-500/10"
             }
           >
             {hasTaken ? "Taken" : "Not Taken"}
@@ -145,7 +146,7 @@ function IndividualCard({ row }: { row: IndividualRow }) {
             variant="outline"
             className={
               row.tab_switch_count > 0
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                ? "text-warning-foreground border-amber-500/30 bg-amber-500/10"
                 : "border-border text-muted-foreground"
             }
           >
@@ -208,65 +209,51 @@ function CycleCard({ row, onView }: { row: CycleRow; onView?: (row: CycleRow) =>
   )
 }
 
+const EMPTY_CBT: CbtPayload = { users: [], cycles: [], scores: [] }
+
 export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
   const isLeadView = Boolean(deptId)
   const basePath = deptId ? `/dept/${deptId}/pms/cbt` : "/admin/pms/cbt"
   const router = useRouter()
   const [tab, setTab] = useState<TabKey>("individual")
   const [selectedCycleId, setSelectedCycleId] = useState("all")
-  const [data, setData] = useState<CbtPayload>({ users: [], cycles: [], scores: [] })
-  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({})
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const hasLoadedSnapshotRef = useRef(false)
+  const snapshotQuery = useQuery({
+    queryKey: QUERY_KEYS.cbtSnapshot(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: CbtPayload }>("/api/hr/performance/cbt", { cache: "no-store" })
+      if (!payload.data) throw new Error("Failed to load CBT data")
+      return payload.data
+    },
+    meta: { errorMessage: "Failed to load CBT data" },
+  })
+  const data = snapshotQuery.data ?? EMPTY_CBT
+  // Question counts per cycle come from the question bank's own cached list —
+  // one request instead of one per cycle.
+  const questionsQuery = useQuery({
+    queryKey: QUERY_KEYS.cbtQuestions("standard"),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: Array<{ id: string; review_cycle_id?: string | null }> }>(
+          "/api/hr/performance/cbt/questions",
+          { cache: "no-store" }
+        )
+      ).data ?? [],
+  })
+  const questionCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const question of questionsQuery.data ?? []) {
+      if (question.review_cycle_id) counts[question.review_cycle_id] = (counts[question.review_cycle_id] || 0) + 1
+    }
+    return counts
+  }, [questionsQuery.data])
+  const isInitialLoading = snapshotQuery.isPending
+  const isRefreshing = !snapshotQuery.isPending && (snapshotQuery.isFetching || questionsQuery.isFetching)
+  const error = snapshotQuery.error?.message ?? null
+  const loadCbtSnapshot = async () => {
+    await Promise.all([snapshotQuery.refetch(), questionsQuery.refetch()])
+  }
   const [resetConfirmRow, setResetConfirmRow] = useState<IndividualRow | null>(null)
   const [isResetting, setIsResetting] = useState(false)
-
-  const loadCbtSnapshot = useCallback(async () => {
-    if (hasLoadedSnapshotRef.current) {
-      setIsRefreshing(true)
-    } else {
-      setIsInitialLoading(true)
-    }
-    setError(null)
-    try {
-      const response = await fetch("/api/hr/performance/cbt", { cache: "no-store" })
-      const payload = (await response.json().catch(() => null)) as { data?: CbtPayload; error?: string } | null
-      if (!response.ok || !payload?.data) throw new Error(payload?.error || "Failed to load CBT data")
-      const snapshot = payload.data
-      setData(snapshot)
-      hasLoadedSnapshotRef.current = true
-      setSelectedCycleId((current) => current || "all")
-
-      const counts = await Promise.all(
-        snapshot.cycles.map(async (cycle) => {
-          const questionsResponse = await fetch(
-            `/api/hr/performance/cbt/questions?cycle_id=${encodeURIComponent(cycle.id)}`,
-            {
-              cache: "no-store",
-            }
-          )
-          const questionsPayload = (await questionsResponse.json().catch(() => null)) as {
-            data?: Array<{ id: string }>
-          } | null
-          return [cycle.id, questionsPayload?.data?.length || 0] as const
-        })
-      )
-      setQuestionCounts(Object.fromEntries(counts))
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load CBT data"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsInitialLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadCbtSnapshot()
-  }, [loadCbtSnapshot])
 
   const cycleNameById = useMemo(() => new Map(data.cycles.map((cycle) => [cycle.id, cycle.name])), [data.cycles])
 
@@ -287,7 +274,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             id: `${user.id}-${cycle.id}`,
             user_id: user.id,
             review_cycle_id: cycle.id,
-            employee: employeeName(user),
+            employee: personName(user, "Employee"),
             department: user.department || "-",
             cycle: cycle.name,
             cbt_score: score ? score.cbt_score : null,
@@ -303,7 +290,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           id: `${user.id}-none`,
           user_id: user.id,
           review_cycle_id: "",
-          employee: employeeName(user),
+          employee: personName(user, "Employee"),
           department: user.department || "-",
           cycle: "-",
           cbt_score: null,
@@ -434,7 +421,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             Taken
           </Badge>
         ) : (
-          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <Badge variant="outline" className="text-warning-foreground border-amber-500/30 bg-amber-500/10">
             Not Taken
           </Badge>
         )
@@ -471,7 +458,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           variant="outline"
           className={
             row.tab_switch_count > 0
-              ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              ? "text-warning-foreground border-amber-500/30 bg-amber-500/10"
               : "border-border text-muted-foreground"
           }
         >
@@ -702,6 +689,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="PMS CBT"
       description="Review CBT results by employee, department, or cycle, then open the question manager to add or edit CBT tests."
       icon={Brain}
@@ -810,7 +798,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             subtitle: (row) =>
               `${row.department} · ${formatCycleName(row.cycle)} · Score: ${scoreLabel(row.cbt_score)}`,
             trailing: (row) => (
-              <Badge variant={typeof row.cbt_score === "number" ? "default" : "secondary"} className="text-[10px]">
+              <Badge variant={typeof row.cbt_score === "number" ? "default" : "secondary"} className="text-xs">
                 {scoreLabel(row.cbt_score)}
               </Badge>
             ),

@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { UserPlus, History, ArrowUpDown, AlertCircle, CheckCircle2, Calendar, FileText } from "lucide-react"
 import type { Asset } from "@/app/admin/assets/admin-assets-content"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatDateTime } from "@/lib/format"
+import { ASSET_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
 interface AssetActivity {
   id: string
@@ -30,30 +31,6 @@ interface AssetHistoryDialogProps {
   onOpenChange: (open: boolean) => void
   selectedAsset: Asset | null
   assetHistory: AssetActivity[]
-}
-
-function getStatusColor(status: string) {
-  switch (status) {
-    case "assigned":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-    case "available":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-    case "maintenance":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    case "retired":
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    case "archived":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-    default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-  }
-}
-
-function formatDate(dateString?: string | null) {
-  if (!dateString) return "-"
-  const date = new Date(dateString)
-  if (isNaN(date.getTime())) return "-"
-  return formatWATDateTime(date)
 }
 
 export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetHistory }: AssetHistoryDialogProps) {
@@ -91,7 +68,7 @@ export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetH
                   </div>
                   <div className="text-muted-foreground flex items-center gap-2 text-sm">
                     <Calendar className="h-3 w-3" />
-                    {formatDate(activity.timestamp)}
+                    {formatDateTime(activity.timestamp, "-")}
                   </div>
                 </div>
 
@@ -132,7 +109,9 @@ export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetH
                         {activity.details.old_status}
                       </Badge>
                       <ArrowUpDown className="text-muted-foreground h-3 w-3" />
-                      <Badge className={getStatusColor(activity.details.status || "")}>{activity.details.status}</Badge>
+                      <Badge className={statusToneClass(activity.details.status || "", ASSET_STATUS_TONES)}>
+                        {activity.details.status}
+                      </Badge>
                     </div>
                   )}
                 </div>

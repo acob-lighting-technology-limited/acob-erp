@@ -1,7 +1,5 @@
 "use client"
 
-/* eslint-disable @next/next/no-img-element -- signed URLs, not optimizable by next/image */
-
 import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Cake, Loader2, PartyPopper, Search, X } from "lucide-react"
@@ -64,14 +62,16 @@ export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDia
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- today's date is chosen after hydration so server and client render match
     setNow(new Date())
   }, [])
 
-  useEffect(() => {
-    if (!open) {
-      setSearchQuery("")
-    }
-  }, [open])
+  // Clear the search when the dialog closes — adjusted during render, not in an effect.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (!open) setSearchQuery("")
+  }
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin-hr-birthdays-all"],
@@ -176,7 +176,7 @@ export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDia
                     <Badge
                       variant={c.daysUntil === 0 ? "default" : "outline"}
                       className={cn(
-                        "mt-0.5 gap-1 px-1.5 py-0 text-[10px]",
+                        "mt-0.5 gap-1 px-1.5 py-0 text-xs",
                         c.daysUntil === 0 && "bg-primary text-primary-foreground"
                       )}
                     >

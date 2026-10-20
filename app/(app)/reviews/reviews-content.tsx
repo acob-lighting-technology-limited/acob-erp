@@ -35,6 +35,8 @@ import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface ReviewsContentProps {
   initialReviews: Review[]
   currentUserId: string
@@ -226,19 +228,19 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
         <h4 className="text-muted-foreground text-sm font-bold tracking-widest uppercase">Detailed Scores</h4>
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">Attendance</p>
+            <p className="text-muted-foreground text-xs">Attendance</p>
             <p className="font-bold">{formatMetric(r.attendance_score)}/100</p>
           </div>
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">Behaviour</p>
+            <p className="text-muted-foreground text-xs">Behaviour</p>
             <p className="font-bold">{formatMetric(r.behaviour_score)}/100</p>
           </div>
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">KPI Achievement</p>
+            <p className="text-muted-foreground text-xs">KPI Achievement</p>
             <p className="font-bold">{formatMetric(r.kpi_score)}/100</p>
           </div>
           <div className="bg-background rounded border p-2">
-            <p className="text-muted-foreground text-[10px]">CBT Score</p>
+            <p className="text-muted-foreground text-xs">CBT Score</p>
             <p className="font-bold">{formatMetric(r.cbt_score)}/100</p>
           </div>
         </div>
@@ -294,6 +296,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Performance Reviews"
       description="View and acknowledge your quarterly and annual evaluations."
       icon={FileText}
@@ -353,7 +356,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
           trailing: (r) => (
             <Badge
               variant={r.acknowledged_at ? "default" : r.status === "completed" ? "secondary" : "outline"}
-              className="text-[10px] capitalize"
+              className="text-xs capitalize"
             >
               {r.acknowledged_at ? "Acknowledged" : r.status || "draft"}
             </Badge>
@@ -373,7 +376,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
             badges: (r) => (
               <Badge
                 variant={r.acknowledged_at ? "default" : r.status === "completed" ? "secondary" : "outline"}
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {r.acknowledged_at ? "Acknowledged" : r.status || "draft"}
               </Badge>
@@ -430,9 +433,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
             </div>
             <div className="border-border/40 flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground">Final Score</span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                {formatMetric(r.final_score)}%
-              </span>
+              <span className="text-success-foreground font-mono font-bold">{formatMetric(r.final_score)}%</span>
             </div>
           </div>
         )}

@@ -18,6 +18,8 @@ import { toast } from "sonner"
 import { CheckCircle2, Loader2, Trash2, UserCheck } from "lucide-react"
 import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
+import { formatTime as formatClockTime } from "@/lib/format"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface Props {
   open: boolean
@@ -42,7 +44,7 @@ function formatTime(value: string | null | undefined): string {
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+  return formatClockTime(date)
 }
 
 export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onSuccess }: Props) {
@@ -53,24 +55,29 @@ export function AttendanceEditDialog({ open, onOpenChange, item, week, year, onS
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    if (!item) return
-    setStatus(item.status === "unrecorded" ? "present" : item.status)
-    setAttendanceMode(item.attendance_mode || "physical")
-    setComment(item.manual_comment || "")
-    if (item.meeting_clock_in) {
-      try {
-        const d = new Date(item.meeting_clock_in)
-        const hh = String(d.getHours()).padStart(2, "0")
-        const mm = String(d.getMinutes()).padStart(2, "0")
-        setMeetingTime(`${hh}:${mm}`)
-      } catch {
+  // Seed the form from the record being edited — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [item] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (item) {
+      setStatus(item.status === "unrecorded" ? "present" : item.status)
+      setAttendanceMode(item.attendance_mode || "physical")
+      setComment(item.manual_comment || "")
+      if (item.meeting_clock_in) {
+        try {
+          const d = new Date(item.meeting_clock_in)
+          const hh = String(d.getHours()).padStart(2, "0")
+          const mm = String(d.getMinutes()).padStart(2, "0")
+          setMeetingTime(`${hh}:${mm}`)
+        } catch {
+          setMeetingTime("")
+        }
+      } else {
         setMeetingTime("")
       }
-    } else {
-      setMeetingTime("")
     }
-  }, [item])
+  }
 
   if (!item) return null
 

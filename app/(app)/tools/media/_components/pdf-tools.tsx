@@ -310,6 +310,7 @@ export function PdfTools() {
   // so reordering here reorders the generated PDF.
   useEffect(() => {
     const urls = imageFiles.map((file) => URL.createObjectURL(file))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- object URLs must be created and revoked alongside the files
     setImagePreviews(urls)
     return () => urls.forEach((url) => URL.revokeObjectURL(url))
   }, [imageFiles])
@@ -654,7 +655,7 @@ export function PdfTools() {
                     <iframe
                       src={singlePdfPreviewUrl}
                       title={`Preview of ${singlePdfFile?.name || "selected PDF"}`}
-                      className="h-[420px] w-full rounded-md border"
+                      className="h-105 w-full rounded-md border"
                     />
                     <p className="text-muted-foreground text-xs">
                       Scroll to find the pages you want, then enter their numbers below.
@@ -900,7 +901,7 @@ export function PdfTools() {
                     <iframe
                       src={singlePdfPreviewUrl}
                       title={`Preview of ${singlePdfFile?.name || "selected PDF"}`}
-                      className="h-[420px] w-full rounded-md border"
+                      className="h-105 w-full rounded-md border"
                     />
                   </div>
                 )}

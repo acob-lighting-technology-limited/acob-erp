@@ -135,7 +135,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
         render: (r) => (
           <div className="flex flex-col">
             <span className="line-clamp-2 font-medium">{r.title}</span>
-            {r.category && <span className="text-muted-foreground text-[11px]">{r.category}</span>}
+            {r.category && <span className="text-muted-foreground text-xs">{r.category}</span>}
           </div>
         ),
       },
@@ -161,9 +161,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
         render: (r) => (
           <div className="flex flex-col">
             <span className="text-xs font-medium">v{r.current_version?.version_number ?? "—"}</span>
-            <span className="text-muted-foreground text-[11px]">
-              {formatDocDate(r.current_version?.effective_date)}
-            </span>
+            <span className="text-muted-foreground text-xs">{formatDocDate(r.current_version?.effective_date)}</span>
           </div>
         ),
         hideOnMobile: true,
@@ -385,7 +383,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
             `${r.reference_code} · v${r.current_version?.version_number ?? "—"} · ${CONTROLLED_DOC_STATUS_LABELS[r.status]}`,
           trailing: (r) =>
             isPolicy && r.acknowledgement ? (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 {r.acknowledgement.acknowledged}/{r.acknowledgement.total}
               </Badge>
             ) : (

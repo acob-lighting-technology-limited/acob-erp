@@ -50,7 +50,7 @@ export function StatCard({
         <CardContent className="p-2.5 sm:p-3.5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-muted-foreground truncate text-[10px] leading-tight font-medium sm:text-xs">{title}</p>
+              <p className="text-muted-foreground truncate text-xs leading-tight font-medium sm:text-xs">{title}</p>
               <p className="text-foreground mt-0.5 truncate text-base leading-tight font-bold sm:text-xl">{value}</p>
             </div>
             {Icon && (
@@ -60,7 +60,7 @@ export function StatCard({
             )}
           </div>
           {trend && (
-            <p className={cn("mt-1 text-[10px] sm:text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
+            <p className={cn("mt-1 text-xs sm:text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
               {trend.value >= 0 ? "+" : ""}
               {trend.value}% {trend.label}
             </p>
@@ -99,9 +99,9 @@ export function StatCard({
           <div className="min-w-0">
             <p className="text-muted-foreground truncate text-xs font-medium">{title}</p>
             <p className="text-foreground line-clamp-2 text-sm leading-tight font-bold break-words">{value}</p>
-            {description && <p className="text-muted-foreground line-clamp-1 text-[11px]">{description}</p>}
+            {description && <p className="text-muted-foreground line-clamp-1 text-xs">{description}</p>}
             {trend && (
-              <p className={cn("text-[11px]", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
+              <p className={cn("text-xs", trend.value >= 0 ? "text-green-600" : "text-red-600")}>
                 {trend.value >= 0 ? "+" : ""}
                 {trend.value}% {trend.label}
               </p>

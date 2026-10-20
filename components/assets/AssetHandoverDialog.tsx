@@ -24,6 +24,7 @@ import {
   type HandoverPolicyData,
 } from "@/lib/assets/handover-pdf-generator"
 import type { Asset, UserProfile, Employee } from "@/app/admin/assets/admin-assets-content"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type ExtendedEmployee = Employee & {
   designation?: string
@@ -84,9 +85,11 @@ export function AssetHandoverDialog({
     includeDate: true,
   })
 
-  // Auto-populate when dialog opens with selected asset
-  useEffect(() => {
-    if (!asset || !open) return
+  // Auto-populate when the dialog opens with a selected asset — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [asset, open, employees, userProfile] as const
+  if (asset && open && depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
 
     const assignment = asset.current_assignment as ExtendedAssignment | undefined
 
@@ -149,7 +152,7 @@ export function AssetHandoverDialog({
       issuingStaffName: issuerName,
       includeDate: true,
     })
-  }, [asset, open, employees, userProfile])
+  }
 
   const handlePrint = async () => {
     if (!formData.employeeName?.trim()) {
@@ -185,10 +188,10 @@ export function AssetHandoverDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[650px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-162.5">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-600 dark:text-emerald-400">
+            <div className="text-success-foreground rounded-lg bg-emerald-500/10 p-2">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>

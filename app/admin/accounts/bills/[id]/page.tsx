@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/layout/page-header"
 import { PageLoader } from "@/components/ui/query-states"
 import { apiFetch } from "@/lib/api-client"
+import { formatCurrency } from "@/lib/format"
 
 interface Bill {
   id: string
@@ -65,10 +66,6 @@ export default function BillDetailPage() {
     } catch {
       toast.error("Failed to update")
     }
-  }
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
   }
 
   function formatDate(date: string) {

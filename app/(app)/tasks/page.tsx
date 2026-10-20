@@ -4,6 +4,9 @@ import { TasksContent } from "./management/tasks-content"
 import { loadUserTasks } from "@/components/tasks/user-tasks-data"
 import type { Task, TaskUserProfile } from "@/types/task"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 /**
  * The task list is loaded by `loadUserTasks` here and on every client refresh,
  * so the first paint and every later one agree. This page previously ran its
@@ -58,5 +61,9 @@ export default async function TasksPage() {
     userProfile: TaskUserProfile | null
   }
 
-  return <TasksContent initialTasks={tasksData.tasks} userId={tasksData.userId} userProfile={tasksData.userProfile} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <TasksContent initialTasks={tasksData.tasks} userId={tasksData.userId} userProfile={tasksData.userProfile} />
+    </TablePageLayoutProvider>
+  )
 }

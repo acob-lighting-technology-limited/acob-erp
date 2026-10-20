@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { Moon, Sun, Monitor } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
+import { useMounted } from "@/hooks/use-mounted"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface ThemeToggleProps {
@@ -13,15 +14,10 @@ interface ThemeToggleProps {
 export function ThemeToggle({ direction = "down" }: ThemeToggleProps) {
   const { setTheme, theme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const mounted = useMounted()
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 })
   const dropdownRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
-
-  // Ensure component is mounted before showing to prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Calculate dropdown position when opening
   useEffect(() => {

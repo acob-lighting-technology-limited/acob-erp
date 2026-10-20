@@ -25,6 +25,8 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { SupplierFormDialog } from "./_components/supplier-form-dialog"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface Supplier {
   id: string
   name: string
@@ -196,6 +198,7 @@ export default function SuppliersPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Suppliers"
       description="Manage vendor records, contact readiness, and supplier status."
       icon={Users}
@@ -309,7 +312,7 @@ export default function SuppliersPage() {
           title: (supplier) => supplier.name,
           subtitle: (supplier) => `${supplier.code} · ${supplier.contact_person || supplier.email || "No contact"}`,
           trailing: (supplier) => (
-            <Badge variant={supplier.is_active ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={supplier.is_active ? "default" : "secondary"} className="text-xs">
               {supplier.is_active ? "Active" : "Inactive"}
             </Badge>
           ),

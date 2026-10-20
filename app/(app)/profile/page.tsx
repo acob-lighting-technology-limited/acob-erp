@@ -234,44 +234,88 @@ async function getProfileData() {
     }
   }
 
-  let resolvedDepartment = profileData.department || null
+  const todayIso = toLocalISODate()
+  const lookbackStartIso = addIsoDays(todayIso, -20)
+
+  // Tasks need the resolved department name; nothing else depends on another
+  // query, so everything runs at once. These used to run one after another —
+  // ~16 round trips before the landing page could render.
+  const loadTasks = async (): Promise<Task[]> => {
+    let resolvedDepartment = profileData.department || null
+    if (profileData.department_id) {
+      const { data: deptById } = await dataClient
+        .from("departments")
+        .select("name")
+        .eq("id", profileData.department_id)
+        .maybeSingle<DepartmentNameRow>()
+      if (deptById?.name) resolvedDepartment = deptById.name
+    }
+    if (String(resolvedDepartment || "").toLowerCase() === "finance") {
+      resolvedDepartment = "Accounts"
+    }
+    // Shared loader: individual, multiple-user and department tasks.
+    const taskUserProfile: TaskUserProfile = {
+      id: userId,
+      department: resolvedDepartment,
+      role: profileData.role,
+      is_department_lead: profileData.is_department_lead,
+      lead_departments: profileData.lead_departments,
+    }
+    try {
+      return await loadUserTasks(dataClient as unknown as Parameters<typeof loadUserTasks>[0], userId, taskUserProfile)
+    } catch {
+      loadErrors.push("tasks")
+      return []
+    }
+  }
+
+  const loadAnnualLeaveRemaining = async () => {
+    try {
+      const entitlements = await getLeaveEntitlements(dataClient, userId)
+      const annual = entitlements.find(
+        (e) => e.code?.toLowerCase() === "annual" || e.name.toLowerCase().includes("annual")
+      )
+      return annual ? annual.remainingDays : 0
+    } catch {
+      // Fail-safe fallback if leave entitlements computation fails
+      return 0
+    }
+  }
+
+  let paymentsQuery = dataClient
+    .from("department_payments")
+    .select("id, title, payment_type, status, amount, currency, payment_date, created_at")
+    .order("created_at", { ascending: false })
+    .limit(20)
   if (profileData.department_id) {
-    const { data: deptById } = await dataClient
-      .from("departments")
-      .select("name")
-      .eq("id", profileData.department_id)
-      .maybeSingle<DepartmentNameRow>()
-    if (deptById?.name) resolvedDepartment = deptById.name
-  }
-  if (String(resolvedDepartment || "").toLowerCase() === "finance") {
-    resolvedDepartment = "Accounts"
+    paymentsQuery = paymentsQuery.or(`created_by.eq.${userId},department_id.eq.${profileData.department_id}`)
+  } else {
+    paymentsQuery = paymentsQuery.eq("created_by", userId)
   }
 
-  // Load tasks assigned to user using shared loader (individual, multiple-user, and department tasks)
-  const taskUserProfile: TaskUserProfile = {
-    id: userId,
-    department: resolvedDepartment,
-    role: profileData.role,
-    is_department_lead: profileData.is_department_lead,
-    lead_departments: profileData.lead_departments,
-  }
-
-  let allTasks: Task[] = []
-  try {
-    allTasks = await loadUserTasks(
-      dataClient as unknown as Parameters<typeof loadUserTasks>[0],
-      userId,
-      taskUserProfile
-    )
-  } catch (tasksError) {
-    loadErrors.push("tasks")
-  }
-
-  // Load assets assigned to user (individual)
-  const { data: individualAssignments, error: individualAssignmentsError } = await dataClient
-    .from("asset_assignments")
-    .select(
-      `
+  const [
+    allTasks,
+    { data: individualAssignments, error: individualAssignmentsError },
+    { data: docsData, error: docsError },
+    { data: feedbackData, error: feedbackError },
+    { data: correspondenceData, error: correspondenceError },
+    { data: helpDeskData, error: helpDeskError },
+    { data: paymentsData, error: paymentsError },
+    { data: leaveRows, error: leaveError },
+    annualLeaveRemaining,
+    { data: todayRecord },
+    { data: attendanceData, error: attendanceError },
+    dayCtx,
+    policy,
+    { data: lunchLogsData },
+    { data: rawActivity },
+    avatarUrl,
+  ] = await Promise.all([
+    loadTasks(),
+    dataClient
+      .from("asset_assignments")
+      .select(
+        `
       assigned_at,
       asset:assets(
         id,
@@ -284,17 +328,91 @@ async function getProfileData() {
         deleted_at
       )
     `
-    )
-    .eq("assigned_to", userId)
-    .eq("is_current", true)
-    .returns<AssetAssignmentRow[]>()
+      )
+      .eq("assigned_to", userId)
+      .eq("is_current", true)
+      .returns<AssetAssignmentRow[]>(),
+    // Documentation and feedback created by the user
+    dataClient
+      .from("user_documentation")
+      .select("id, title, category, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    dataClient.from("feedback").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    dataClient
+      .from("correspondence_records")
+      .select("id, reference_number, subject, status, created_at")
+      .or(`originator_id.eq.${userId},responsible_officer_id.eq.${userId}`)
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .returns<CorrespondenceItem[]>(),
+    dataClient
+      .from("help_desk_tickets")
+      .select("id, ticket_number, title, status, priority, created_at")
+      .or(`requester_id.eq.${userId},assigned_to.eq.${userId}`)
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .returns<HelpDeskItem[]>(),
+    paymentsQuery.returns<PaymentItem[]>(),
+    // Production's leave_requests has leave_type_id/days_count only. The old
+    // leave_type/days_requested query errored on every load and its fallback
+    // showed the type's UUID as its name, so join the name the way /hr/leave does.
+    dataClient
+      .from("leave_requests")
+      .select("id, status, start_date, end_date, days_count, created_at, leave_type:leave_types(name)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .returns<LeaveRequestRow[]>(),
+    loadAnnualLeaveRemaining(),
+    dataClient
+      .from("attendance_records")
+      .select("id, date, status, clock_in, clock_out, created_at")
+      .eq("user_id", userId)
+      .eq("date", todayIso)
+      .maybeSingle<AttendanceItem>(),
+    dataClient
+      .from("attendance_records")
+      .select("id, date, status, clock_in, clock_out, created_at")
+      .eq("user_id", userId)
+      .lte("date", todayIso)
+      .order("date", { ascending: false })
+      .limit(20)
+      .returns<AttendanceItem[]>(),
+    loadDayContext(dataClient, { userIds: [userId], start: lookbackStartIso, end: todayIso }),
+    loadAttendancePolicy(dataClient),
+    dataClient
+      .from("attendance_lunch_log")
+      .select("id, date, cost, company_subsidy, employee_deduction")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
+      .limit(30)
+      .returns<LunchLogItem[]>(),
+    dataClient
+      .from("audit_logs")
+      .select(
+        "id, user_id, created_at, action, operation, entity_type, table_name, entity_id, metadata, changed_fields, new_values, old_values"
+      )
+      .neq("action", "client_error")
+      .neq("entity_type", "ui_runtime")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .returns<ActivityLogRow[]>(),
+    getAvatarSignedUrl(dataClient, profileData.avatar_path),
+  ])
+
   if (individualAssignmentsError) loadErrors.push("assets")
+  if (docsError) loadErrors.push("documentation")
+  if (feedbackError) loadErrors.push("feedback")
+  if (correspondenceError) loadErrors.push("correspondence")
+  if (helpDeskError) loadErrors.push("help desk")
+  if (paymentsError) loadErrors.push("payments")
+  if (attendanceError) loadErrors.push("attendance")
 
   let allAssets: Asset[] = []
-
-  // Process individual assignments
   if (individualAssignments) {
-    const indAssets = individualAssignments
+    allAssets = individualAssignments
       .map((a): Asset | null =>
         a.asset && !a.asset.deleted_at
           ? {
@@ -305,68 +423,9 @@ async function getProfileData() {
           : null
       )
       .filter(isDefined)
-    allAssets = indAssets
   }
 
-  // Load documentation created by user
-  const { data: docsData, error: docsError } = await dataClient
-    .from("user_documentation")
-    .select("id, title, category, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-  if (docsError) loadErrors.push("documentation")
-
-  // Load feedback submitted by user
-  const { data: feedbackData, error: feedbackError } = await dataClient
-    .from("feedback")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-  if (feedbackError) loadErrors.push("feedback")
-
-  const { data: correspondenceData, error: correspondenceError } = await dataClient
-    .from("correspondence_records")
-    .select("id, reference_number, subject, status, created_at")
-    .or(`originator_id.eq.${userId},responsible_officer_id.eq.${userId}`)
-    .order("created_at", { ascending: false })
-    .limit(20)
-    .returns<CorrespondenceItem[]>()
-  if (correspondenceError) loadErrors.push("correspondence")
-
-  const { data: helpDeskData, error: helpDeskError } = await dataClient
-    .from("help_desk_tickets")
-    .select("id, ticket_number, title, status, priority, created_at")
-    .or(`requester_id.eq.${userId},assigned_to.eq.${userId}`)
-    .order("created_at", { ascending: false })
-    .limit(20)
-    .returns<HelpDeskItem[]>()
-  if (helpDeskError) loadErrors.push("help desk")
-
-  let paymentsQuery = dataClient
-    .from("department_payments")
-    .select("id, title, payment_type, status, amount, currency, payment_date, created_at")
-    .order("created_at", { ascending: false })
-    .limit(20)
-  if (profileData.department_id) {
-    paymentsQuery = paymentsQuery.or(`created_by.eq.${userId},department_id.eq.${profileData.department_id}`)
-  } else {
-    paymentsQuery = paymentsQuery.eq("created_by", userId)
-  }
-  const { data: paymentsData, error: paymentsError } = await paymentsQuery.returns<PaymentItem[]>()
-  if (paymentsError) loadErrors.push("payments")
-
-  // Production's leave_requests has leave_type_id/days_count only. The old
-  // leave_type/days_requested query errored on every load and its fallback
-  // showed the type's UUID as its name, so join the name the way /hr/leave does.
   let leaveData: LeaveItem[] = []
-  const { data: leaveRows, error: leaveError } = await dataClient
-    .from("leave_requests")
-    .select("id, status, start_date, end_date, days_count, created_at, leave_type:leave_types(name)")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(20)
-    .returns<LeaveRequestRow[]>()
-
   if (leaveError) {
     loadErrors.push("leave")
   } else if (leaveRows) {
@@ -383,45 +442,6 @@ async function getProfileData() {
       }
     })
   }
-
-  let annualLeaveRemaining = 0
-  try {
-    const entitlements = await getLeaveEntitlements(dataClient, userId)
-    const annual = entitlements.find(
-      (e) => e.code?.toLowerCase() === "annual" || e.name.toLowerCase().includes("annual")
-    )
-    if (annual) {
-      annualLeaveRemaining = annual.remainingDays
-    }
-  } catch {
-    // Fail-safe fallback if leave entitlements computation fails
-  }
-
-  const todayIso = toLocalISODate()
-  const lookbackStartIso = addIsoDays(todayIso, -20)
-
-  const [{ data: todayRecord }, { data: attendanceData, error: attendanceError }] = await Promise.all([
-    dataClient
-      .from("attendance_records")
-      .select("id, date, status, clock_in, clock_out, created_at")
-      .eq("user_id", userId)
-      .eq("date", todayIso)
-      .maybeSingle<AttendanceItem>(),
-    dataClient
-      .from("attendance_records")
-      .select("id, date, status, clock_in, clock_out, created_at")
-      .eq("user_id", userId)
-      .lte("date", todayIso)
-      .order("date", { ascending: false })
-      .limit(20)
-      .returns<AttendanceItem[]>(),
-  ])
-  if (attendanceError) loadErrors.push("attendance")
-
-  const [dayCtx, policy] = await Promise.all([
-    loadDayContext(dataClient, { userIds: [userId], start: lookbackStartIso, end: todayIso }),
-    loadAttendancePolicy(dataClient),
-  ])
 
   const unifiedTodayStatus = deriveUnifiedAttendanceStatus(
     {
@@ -505,33 +525,11 @@ async function getProfileData() {
     }
   })
 
-  const { data: lunchLogsData } = await dataClient
-    .from("attendance_lunch_log")
-    .select("id, date, cost, company_subsidy, employee_deduction")
-    .eq("user_id", userId)
-    .order("date", { ascending: false })
-    .limit(30)
-    .returns<LunchLogItem[]>()
-
   const loadError = loadErrors.length > 0 ? "Some profile sections failed to load. Please refresh." : null
-
-  const { data: rawActivity } = await dataClient
-    .from("audit_logs")
-    .select(
-      "id, user_id, created_at, action, operation, entity_type, table_name, entity_id, metadata, changed_fields, new_values, old_values"
-    )
-    .neq("action", "client_error")
-    .neq("entity_type", "ui_runtime")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50)
-    .returns<ActivityLogRow[]>()
 
   const filteredRawActivity = (rawActivity || []).filter((item) => !isExcludedActivity(item)).slice(0, 50)
 
   const recentActivity = buildPersonalActivity(filteredRawActivity, userId)
-
-  const avatarUrl = await getAvatarSignedUrl(dataClient, profileData.avatar_path)
 
   return {
     profile: profileData,

@@ -1,19 +1,21 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CalendarDays, Clock, RotateCcw } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { apiFetch } from "@/lib/api-client"
+import { apiJson } from "@/lib/api-client"
 import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
 import { formatWATDate } from "@/lib/utils/date"
-import type { LeaveItem } from "../view"
-import { STAGE_LABELS, getStageBadge, resolvePersonName } from "../view"
+import type { LeaveItem } from "../_lib/leave-items"
+import { getStageBadge, resolvePersonName } from "../_lib/leave-items"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { buildCalendarCells } from "@/lib/utils/calendar-grid"
 
 export interface CalendarStats {
   total_days: number
@@ -88,26 +90,6 @@ function getYearOptions(): number[] {
     years.push(y)
   }
   return years
-}
-
-function monBasedDay(jsDay: number) {
-  return jsDay === 0 ? 6 : jsDay - 1
-}
-
-function buildCalendarCells(yearMonth: string): (string | null)[] {
-  const [year, month] = yearMonth.split("-").map(Number)
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const firstDayOfWeek = new Date(year, month - 1, 1).getDay()
-  const offset = monBasedDay(firstDayOfWeek)
-  const cells: (string | null)[] = [
-    ...Array(offset).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => {
-      const d = i + 1
-      return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-    }),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
-  return cells
 }
 
 /** Color palette definition for different leave types */
@@ -199,6 +181,24 @@ function resolveLeaveTypeColor(typeName?: string | null): LeaveTypeColorDef {
   return LEAVE_TYPE_COLORS.default
 }
 
+type CalendarData = {
+  leaves: LeaveItem[]
+  holidays: HolidayItem[]
+  departments: string[]
+  employees: EmployeeFilterOption[]
+  leave_types: LeaveTypeOption[]
+  stats: CalendarStats
+}
+
+const EMPTY_CALENDAR: CalendarData = {
+  leaves: [],
+  holidays: [],
+  departments: [],
+  employees: [],
+  leave_types: [],
+  stats: { total_days: 0, active_leaves: 0, approved_count: 0, pending_count: 0 },
+}
+
 export function LeaveCalendarView({
   apiBasePath = "/api/admin/hr/leave",
   lockedDepartment,
@@ -211,23 +211,6 @@ export function LeaveCalendarView({
   const [selectedUserId, setSelectedUserId] = useState<string>("all")
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState<string>("all")
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
-
-  const [loading, setLoading] = useState(false)
-  const [calendarData, setCalendarData] = useState<{
-    leaves: LeaveItem[]
-    holidays: HolidayItem[]
-    departments: string[]
-    employees: EmployeeFilterOption[]
-    leave_types: LeaveTypeOption[]
-    stats: { total_days: number; active_leaves: number; approved_count: number; pending_count: number }
-  }>({
-    leaves: [],
-    holidays: [],
-    departments: [],
-    employees: [],
-    leave_types: [],
-    stats: { total_days: 0, active_leaves: 0, approved_count: 0, pending_count: 0 },
-  })
 
   // Day expansion modal for crowded days
   const [expandedDay, setExpandedDay] = useState<{
@@ -245,50 +228,44 @@ export function LeaveCalendarView({
 
   const yearOptions = useMemo(() => getYearOptions(), [])
 
-  const loadCalendar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        year_month: calendarMonth,
-      })
+  const { data: calendarData = EMPTY_CALENDAR, isFetching: loading } = useQuery({
+    queryKey: QUERY_KEYS.leaveCalendar({
+      apiBasePath,
+      calendarMonth,
+      activeDept,
+      selectedUserId,
+      selectedLeaveTypeId,
+      selectedStatus,
+    }),
+    queryFn: async (): Promise<CalendarData> => {
+      const params = new URLSearchParams({ year_month: calendarMonth })
       if (activeDept) params.set("department", activeDept)
       if (selectedUserId && selectedUserId !== "all") params.set("user_id", selectedUserId)
       if (selectedLeaveTypeId && selectedLeaveTypeId !== "all") params.set("leave_type_id", selectedLeaveTypeId)
       if (selectedStatus && selectedStatus !== "all") params.set("status", selectedStatus)
-
       const endpoint = apiBasePath.includes("/dept/")
         ? `${apiBasePath}/calendar?${params.toString()}`
         : `/api/admin/hr/leave/calendar?${params.toString()}`
-
-      const res = await apiFetch(endpoint, { cache: "no-store" })
-      const json = (await res.json().catch(() => null)) as CalendarApiResponse | null
-
-      if (!res.ok) {
-        throw new Error((json as unknown as { error?: string })?.error || "Failed to load calendar")
+      const json = await apiJson<CalendarApiResponse>(endpoint, { cache: "no-store" })
+      const data = json?.data
+      if (!data) return EMPTY_CALENDAR
+      return {
+        leaves: Array.isArray(data.leaves) ? data.leaves : [],
+        holidays: Array.isArray(data.holidays) ? data.holidays : [],
+        departments: Array.isArray(data.departments) ? data.departments : [],
+        employees: Array.isArray(data.employees) ? data.employees : [],
+        leave_types: Array.isArray(data.leave_types) ? data.leave_types : [],
+        stats: data.stats || EMPTY_CALENDAR.stats,
       }
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load leave calendar" },
+  })
 
-      if (json?.data) {
-        const stats = json.data.stats || { total_days: 0, active_leaves: 0, approved_count: 0, pending_count: 0 }
-        setCalendarData({
-          leaves: Array.isArray(json.data.leaves) ? json.data.leaves : [],
-          holidays: Array.isArray(json.data.holidays) ? json.data.holidays : [],
-          departments: Array.isArray(json.data.departments) ? json.data.departments : [],
-          employees: Array.isArray(json.data.employees) ? json.data.employees : [],
-          leave_types: Array.isArray(json.data.leave_types) ? json.data.leave_types : [],
-          stats,
-        })
-        onStatsChange?.(stats)
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load leave calendar")
-    } finally {
-      setLoading(false)
-    }
-  }, [apiBasePath, calendarMonth, activeDept, selectedUserId, selectedLeaveTypeId, selectedStatus, onStatsChange])
-
+  // The parent page shows these totals in its own stat cards.
   useEffect(() => {
-    void loadCalendar()
-  }, [loadCalendar])
+    onStatsChange?.(calendarData.stats)
+  }, [calendarData.stats, onStatsChange])
 
   const today = toLocalISODate()
   const cells = useMemo(() => buildCalendarCells(calendarMonth), [calendarMonth])
@@ -450,8 +427,8 @@ export function LeaveCalendarView({
               return (
                 <div
                   key={day}
-                  className={`py-1.5 text-[11px] font-semibold tracking-wider uppercase ${
-                    isWeekend ? "text-muted-foreground/80" : "text-foreground"
+                  className={`py-1.5 text-xs font-semibold tracking-wider uppercase ${
+                    isWeekend ? "text-muted-foreground" : "text-foreground"
                   }`}
                 >
                   {day}
@@ -469,7 +446,7 @@ export function LeaveCalendarView({
                 return (
                   <div
                     key={`skeleton-${idx}`}
-                    className={`flex min-h-[64px] flex-col justify-between p-1.5 sm:min-h-[74px] ${
+                    className={`flex min-h-16 flex-col justify-between p-1.5 sm:min-h-18.5 ${
                       isLastInRow ? "" : "border-border/60 border-r"
                     }`}
                   >
@@ -491,7 +468,7 @@ export function LeaveCalendarView({
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className={`bg-muted/10 min-h-[64px] p-1 sm:min-h-[74px] ${
+                      className={`bg-muted/10 min-h-16 p-1 sm:min-h-18.5 ${
                         isLastInRow ? "" : "border-border/60 border-r"
                       }`}
                     />
@@ -508,7 +485,7 @@ export function LeaveCalendarView({
                 return (
                   <div
                     key={date}
-                    className={`relative flex min-h-[64px] flex-col p-1 transition-colors sm:min-h-[74px] ${
+                    className={`relative flex min-h-16 flex-col p-1 transition-colors sm:min-h-18.5 ${
                       isLastInRow ? "" : "border-border/60 border-r"
                     } ${isWeekend ? "bg-muted/15" : "bg-card"} ${
                       isToday ? "ring-primary bg-primary/5 ring-2 ring-inset" : ""
@@ -517,7 +494,7 @@ export function LeaveCalendarView({
                     {/* Cell Header: Date Number + Holiday tag */}
                     <div className="mb-0.5 flex items-center justify-between">
                       <span
-                        className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold ${
+                        className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${
                           isToday
                             ? "bg-primary text-primary-foreground font-bold shadow-xs"
                             : isWeekend
@@ -530,7 +507,7 @@ export function LeaveCalendarView({
 
                       {holiday && (
                         <span
-                          className="py-0.2 max-w-[80px] truncate rounded-xs bg-amber-500/15 px-1 text-[8px] font-semibold text-amber-700 dark:text-amber-400"
+                          className="py-0.2 text-warning-foreground max-w-20 truncate rounded-xs bg-amber-500/15 px-1 text-[8px] font-semibold"
                           title={holiday.name}
                         >
                           {holiday.name}
@@ -554,7 +531,7 @@ export function LeaveCalendarView({
                               <button
                                 type="button"
                                 onClick={() => onSelectLeave?.(leave)}
-                                className={`group flex h-4.5 w-full cursor-pointer items-center gap-1 rounded border px-1 py-0 text-left text-[10px] leading-tight transition-all ${
+                                className={`group flex h-4.5 w-full cursor-pointer items-center gap-1 rounded border px-1 py-0 text-left text-xs leading-tight transition-all ${
                                   colorDef.bg
                                 } ${colorDef.text} ${
                                   isPending
@@ -564,9 +541,7 @@ export function LeaveCalendarView({
                               >
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${colorDef.dot}`} />
                                 <span className="flex-1 truncate font-medium">{empName}</span>
-                                {isPending && (
-                                  <Clock className="h-2.5 w-2.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                                )}
+                                {isPending && <Clock className="text-warning-foreground h-2.5 w-2.5 shrink-0" />}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent
@@ -578,11 +553,11 @@ export function LeaveCalendarView({
                               <div className="border-border/40 flex items-start justify-between gap-2 border-b pb-1.5">
                                 <div>
                                   <h4 className="text-foreground text-sm leading-tight font-semibold">{empName}</h4>
-                                  {subtitle && <p className="text-muted-foreground text-[11px]">{subtitle}</p>}
+                                  {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
                                 </div>
                                 <Badge
                                   variant="outline"
-                                  className={`shrink-0 text-[10px] font-medium ${colorDef.badgeClass}`}
+                                  className={`shrink-0 text-xs font-medium ${colorDef.badgeClass}`}
                                 >
                                   {typeName}
                                 </Badge>
@@ -615,13 +590,13 @@ export function LeaveCalendarView({
                                   </div>
                                 )}
                                 {leave.reason && (
-                                  <div className="text-muted-foreground line-clamp-2 pt-1 text-[11px] italic">
+                                  <div className="text-muted-foreground line-clamp-2 pt-1 text-xs italic">
                                     &ldquo;{leave.reason}&rdquo;
                                   </div>
                                 )}
                               </div>
 
-                              <div className="border-border/40 text-primary/80 border-t pt-1 text-center text-[10px] font-medium">
+                              <div className="border-border/40 text-primary/80 border-t pt-1 text-center text-xs font-medium">
                                 Click to view complete details & history
                               </div>
                             </TooltipContent>
@@ -640,7 +615,7 @@ export function LeaveCalendarView({
                               holiday,
                             })
                           }
-                          className="bg-muted/60 py-0.2 text-muted-foreground hover:bg-muted hover:text-foreground mt-auto flex w-full cursor-pointer items-center justify-center rounded-xs text-[9px] font-medium transition-colors"
+                          className="bg-muted/60 py-0.2 text-muted-foreground hover:bg-muted hover:text-foreground mt-auto flex w-full cursor-pointer items-center justify-center rounded-xs text-xs font-medium transition-colors"
                         >
                           +{overflowCount} more
                         </button>
@@ -660,7 +635,7 @@ export function LeaveCalendarView({
             {Object.entries(LEAVE_TYPE_COLORS).map(([key, item]) => (
               <div key={key} className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${item.dot}`} />
-                <span className="text-foreground text-[11px]">{item.label}</span>
+                <span className="text-foreground text-xs">{item.label}</span>
               </div>
             ))}
           </div>
@@ -668,11 +643,11 @@ export function LeaveCalendarView({
           <div className="flex items-center gap-3 border-t pt-1.5 sm:border-t-0 sm:pt-0">
             <div className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-xs border border-dashed border-amber-500 bg-amber-500/20" />
-              <span className="text-muted-foreground text-[11px]">Pending</span>
+              <span className="text-muted-foreground text-xs">Pending</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-xs bg-amber-500/20" />
-              <span className="text-muted-foreground text-[11px]">Holiday</span>
+              <span className="text-muted-foreground text-xs">Holiday</span>
             </div>
           </div>
         </div>

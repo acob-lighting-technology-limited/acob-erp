@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
       audioFormats: audioFormats, // MP3 conversion options
     })
   } catch (error: any) {
-    console.error("Error fetching video info:", error)
+    log.error("Error fetching video info:", error)
     return serverError(log, error, "Failed to fetch video information")
   }
 }

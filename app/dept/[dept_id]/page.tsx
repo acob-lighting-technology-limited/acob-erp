@@ -342,7 +342,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             description="Active profiles in dept"
             icon={Users}
             iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconColor="text-info-foreground"
           />
           <StatCard
             variant="compact"
@@ -360,7 +360,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             description="Tasks in dept"
             icon={ClipboardList}
             iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconColor="text-success-foreground"
           />
           <StatCard
             variant="compact"
@@ -369,7 +369,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             description="Team documentation"
             icon={FileText}
             iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            iconColor="text-orange-600 dark:text-orange-400"
+            iconColor="text-warning-foreground"
           />
           <StatCard
             variant="compact"

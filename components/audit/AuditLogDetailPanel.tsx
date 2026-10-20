@@ -37,7 +37,7 @@ interface AuditLogDetailPanelProps {
 
 /** Inline section label */
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-muted-foreground mb-2 text-[10px] font-black tracking-widest uppercase">{children}</h4>
+  return <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">{children}</h4>
 }
 
 /** A single key→value row inside a detail block */
@@ -75,6 +75,7 @@ function CollapsibleJson({ label, value }: { label: string; value: Record<string
           {label}
         </span>
         <Button
+          aria-label="Copy"
           variant="ghost"
           size="icon"
           className="h-6 w-6"
@@ -156,6 +157,7 @@ export function AuditLogDetailPanel({ log, open, onClose }: AuditLogDetailPanelP
                   <div className="mt-1 flex items-center gap-1">
                     <p className="text-muted-foreground text-xs">{log.user.company_email}</p>
                     <Button
+                      aria-label="Copy"
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5"
@@ -183,6 +185,7 @@ export function AuditLogDetailPanel({ log, open, onClose }: AuditLogDetailPanelP
                   <div className="mt-1 flex items-center gap-1">
                     <code className="text-muted-foreground font-mono text-xs break-all">{log.entity_id}</code>
                     <Button
+                      aria-label="Copy"
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5"
@@ -204,6 +207,7 @@ export function AuditLogDetailPanel({ log, open, onClose }: AuditLogDetailPanelP
                   <div className="flex items-center gap-1">
                     <p className="text-muted-foreground text-xs">{log.target_user.company_email}</p>
                     <Button
+                      aria-label="Copy"
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5"

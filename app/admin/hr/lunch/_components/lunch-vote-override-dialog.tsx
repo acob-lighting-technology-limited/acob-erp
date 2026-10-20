@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiFetch } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
 import { groupHeading, type LunchMenu, type LunchVoteRecord } from "@/lib/hr/lunch-voting"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface LunchVoteOverrideDialogProps {
   open: boolean
@@ -56,27 +57,33 @@ export function LunchVoteOverrideDialog({
 
   // Seed from whatever the person already answered, so an edit starts from
   // their current choice rather than a blank form.
-  useEffect(() => {
+  // Seed from the person's existing answer — adjusted during render, not in an effect.
+  const [seededVote, setSeededVote] = useState<readonly unknown[] | null>(null)
+  const seededVoteNext = [existingVote] as const
+  if (depsChanged(seededVote, seededVoteNext)) {
+    setSeededVote(seededVoteNext)
     if (!existingVote) {
       setAnswer("eating")
       setSelections({})
-      return
+    } else {
+      setAnswer(existingVote.is_eating ? "eating" : "not_eating")
+      setSelections(existingVote.selections)
     }
-    setAnswer(existingVote.is_eating ? "eating" : "not_eating")
-    setSelections(existingVote.selections)
-  }, [existingVote])
+  }
 
-  useEffect(() => {
+  // Pick the default person on open; clear on close — adjusted during render, not in an effect.
+  const [seededOpen, setSeededOpen] = useState<readonly unknown[] | null>(null)
+  const seededOpenNext = [open, defaultUserId] as const
+  if (depsChanged(seededOpen, seededOpenNext)) {
+    setSeededOpen(seededOpenNext)
     if (open) {
-      if (defaultUserId) {
-        setUserId(defaultUserId)
-      }
+      if (defaultUserId) setUserId(defaultUserId)
     } else {
       setUserId("")
       setAnswer("eating")
       setSelections({})
     }
-  }, [open, defaultUserId])
+  }
 
   const missing = menu && answer === "eating" ? menu.groups.filter((g) => g.is_required && !selections[g.id]) : []
 

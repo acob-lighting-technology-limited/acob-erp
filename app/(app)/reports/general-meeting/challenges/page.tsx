@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { ChallengesView } from "@/components/reports/challenges/challenges-view"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default async function PortalChallengesPage() {
   const supabase = await createClient()
   const {
@@ -26,15 +29,17 @@ export default async function PortalChallengesPage() {
   const departments = (deptRows || []).map((d: { name: string }) => d.name).filter(Boolean)
 
   return (
-    <ChallengesView
-      isAdminContext={false}
-      backHref="/reports/general-meeting"
-      backLabel="Back to General Meeting"
-      userRole={profile?.role || ""}
-      userDepartment={profile?.department || null}
-      isDepartmentLead={Boolean(profile?.is_department_lead)}
-      leadDepartments={profile?.lead_departments || []}
-      departments={departments}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <ChallengesView
+        isAdminContext={false}
+        backHref="/reports/general-meeting"
+        backLabel="Back to General Meeting"
+        userRole={profile?.role || ""}
+        userDepartment={profile?.department || null}
+        isDepartmentLead={Boolean(profile?.is_department_lead)}
+        leadDepartments={profile?.lead_departments || []}
+        departments={departments}
+      />
+    </TablePageLayoutProvider>
   )
 }

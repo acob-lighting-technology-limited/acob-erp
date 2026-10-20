@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useNow } from "@/hooks/use-now"
 import { ArrowUpRight, Clock, FileText, Inbox, Wallet } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,9 +14,9 @@ import { MD_DESK_QUEUE_LABELS, type MdDeskQueueItem, type MdDeskQueueKind } from
 import { useMdDeskOverview } from "./use-md-desk"
 
 const KIND_CLASSES: Record<MdDeskQueueKind, string> = {
-  leave: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  requisition: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  correspondence: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+  leave: "bg-emerald-500/10 text-success-foreground",
+  requisition: "bg-amber-500/10 text-warning-foreground",
+  correspondence: "bg-blue-500/10 text-info-foreground",
   task_rating: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
 }
 
@@ -23,10 +24,10 @@ const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN
 
 /** MD's Desk → Overview: everything currently waiting on the MD's decision. */
 export function WaitingOnMd() {
+  const now = useNow()
   const { data, isLoading, error, refetch } = useMdDeskOverview()
   const items = data?.queue.items ?? []
   const counts = data?.queue.counts
-  const now = Date.now()
   const overdue = items.filter((i) => now - new Date(i.waiting_since).getTime() > 3 * 86_400_000).length
 
   const columns: DataTableColumn<MdDeskQueueItem>[] = [
@@ -230,11 +231,11 @@ export function WaitingOnMd() {
           trailing: (i) => (
             <div className="flex items-center gap-1.5">
               {i.urgent && (
-                <Badge variant="destructive" className="text-[10px]">
+                <Badge variant="destructive" className="text-xs">
                   Emergency
                 </Badge>
               )}
-              <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+              <Badge variant="outline" className={`border-transparent text-xs ${KIND_CLASSES[i.kind]}`}>
                 {MD_DESK_QUEUE_LABELS[i.kind]}
               </Badge>
             </div>
@@ -248,11 +249,11 @@ export function WaitingOnMd() {
             badges: (i) => (
               <div className="flex flex-wrap items-center gap-1.5">
                 {i.urgent && (
-                  <Badge variant="destructive" className="text-[10px]">
+                  <Badge variant="destructive" className="text-xs">
                     Emergency
                   </Badge>
                 )}
-                <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+                <Badge variant="outline" className={`border-transparent text-xs ${KIND_CLASSES[i.kind]}`}>
                   {MD_DESK_QUEUE_LABELS[i.kind]}
                 </Badge>
               </div>

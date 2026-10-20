@@ -1,5 +1,7 @@
 "use client"
 
+import { toCsv } from "@/lib/export/csv"
+
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDateTime, formatWATRelative, toLocalISODate } from "@/lib/utils/date"
@@ -26,6 +28,8 @@ import {
   Users,
   UserX,
 } from "lucide-react"
+
+import { layout as tablePageLayout } from "./_layout"
 
 export interface OnboardingRow {
   id: string
@@ -95,7 +99,7 @@ async function fetchOnboarding(): Promise<OnboardingPayload> {
   }
 }
 
-function toCsv(rows: OnboardingRow[]) {
+function buildOnboardingCsv(rows: OnboardingRow[]) {
   const headers = [
     "employee_number",
     "name",
@@ -128,9 +132,7 @@ function toCsv(rows: OnboardingRow[]) {
     row.email_confirmed ? "yes" : "no",
     row.account_created_at || row.profile_created_at,
   ])
-  return [headers, ...body]
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    .join("\n")
+  return toCsv([headers, ...body])
 }
 
 export function OnboardingContent() {
@@ -322,7 +324,7 @@ export function OnboardingContent() {
   )
 
   const exportCsv = () => {
-    const csv = toCsv(scopedRows)
+    const csv = buildOnboardingCsv(scopedRows)
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
@@ -334,6 +336,7 @@ export function OnboardingContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Onboarding"
       description="Every staff profile, including not-yet-onboarded placeholders, and whether the person has ever signed in."
       icon={UserCheck}
@@ -464,11 +467,9 @@ export function OnboardingContent() {
             subtitle: (row) => [row.department, row.employee_number || row.email].filter(Boolean).join(" · ") || "—",
             trailing: (row) =>
               row.has_signed_in ? (
-                <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
-                  Signed in
-                </Badge>
+                <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">Signed in</Badge>
               ) : (
-                <Badge className="border-red-500/20 bg-red-500/10 text-[10px] text-red-600">Never</Badge>
+                <Badge className="border-red-500/20 bg-red-500/10 text-xs text-red-600">Never</Badge>
               ),
             detail: {
               title: (row) => row.full_name,

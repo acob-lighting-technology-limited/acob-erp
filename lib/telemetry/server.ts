@@ -59,6 +59,7 @@ export async function persistFailure(event: ServerFailure): Promise<string | nul
     return id
   } catch {
     // Intentionally use the native console: the logger itself reports errors.
+    // eslint-disable-next-line no-console -- the logger depends on this path, so it cannot be used here
     console.error("Telemetry persistence failed; check hosting logs and telemetry storage configuration")
     return null
   }
@@ -90,6 +91,7 @@ export function scheduleFailure(event: ServerFailure): void {
     after(task)
   } catch {
     // Outside a Next request (scripts/startup), keep the original hosting log.
+    // eslint-disable-next-line no-console -- persisting needs a request scope; this is the fallback
     console.error("Telemetry event outside request lifecycle", redact(event.message))
   }
 }

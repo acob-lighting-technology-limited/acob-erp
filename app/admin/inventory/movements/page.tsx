@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowDown, ArrowUp, ArrowUpDown, Boxes, ClipboardList, Package2 } from "lucide-react"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -10,6 +9,9 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { formatDate } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 interface StockMovement {
   id: string
@@ -44,10 +46,6 @@ async function fetchMovementsList(): Promise<StockMovement[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load movements")
   const json = await res.json()
   return (json.data || []) as StockMovement[]
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getQuantityLabel(movement: StockMovement) {
@@ -228,6 +226,7 @@ export default function MovementsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Stock Movements"
       description="Review stock inflows, outflows, adjustments, and transfer activity."
       icon={Boxes}

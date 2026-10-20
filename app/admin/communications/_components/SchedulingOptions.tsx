@@ -11,7 +11,6 @@ import { toLocalISODate, formatWATDateTime } from "@/lib/utils/date"
 
 type SendTiming = "now" | "scheduled" | "recurring"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Schedule = any
 
 interface SchedulingOptionsProps {
@@ -49,7 +48,7 @@ export function SchedulingOptions({
         <button
           type="button"
           onClick={() => setSendTiming("now")}
-          className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
+          className={`flex min-w-37.5 flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "now"
               ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
@@ -57,7 +56,7 @@ export function SchedulingOptions({
         >
           <Send className={`h-5 w-5 ${sendTiming === "now" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div className={`font-semibold ${sendTiming === "now" ? "text-orange-700 dark:text-orange-400" : ""}`}>
+            <div className={`font-semibold ${sendTiming === "now" ? "text-warning-foreground" : ""}`}>
               Send Immediately
             </div>
             <div className="text-muted-foreground text-xs">Email will be sent right away</div>
@@ -66,7 +65,7 @@ export function SchedulingOptions({
         <button
           type="button"
           onClick={() => setSendTiming("scheduled")}
-          className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
+          className={`flex min-w-37.5 flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "scheduled"
               ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
@@ -74,9 +73,7 @@ export function SchedulingOptions({
         >
           <Clock className={`h-5 w-5 ${sendTiming === "scheduled" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div
-              className={`font-semibold ${sendTiming === "scheduled" ? "text-orange-700 dark:text-orange-400" : ""}`}
-            >
+            <div className={`font-semibold ${sendTiming === "scheduled" ? "text-warning-foreground" : ""}`}>
               Schedule
             </div>
             <div className="text-muted-foreground text-xs">One-time, pick a date &amp; time</div>
@@ -85,7 +82,7 @@ export function SchedulingOptions({
         <button
           type="button"
           onClick={() => setSendTiming("recurring")}
-          className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
+          className={`flex min-w-37.5 flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "recurring"
               ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
@@ -93,9 +90,7 @@ export function SchedulingOptions({
         >
           <Repeat className={`h-5 w-5 ${sendTiming === "recurring" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div
-              className={`font-semibold ${sendTiming === "recurring" ? "text-orange-700 dark:text-orange-400" : ""}`}
-            >
+            <div className={`font-semibold ${sendTiming === "recurring" ? "text-warning-foreground" : ""}`}>
               Recurring
             </div>
             <div className="text-muted-foreground text-xs">Automatic every week (server-side)</div>
@@ -113,7 +108,7 @@ export function SchedulingOptions({
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
               min={toLocalISODate()}
-              className="w-[180px]"
+              className="w-45"
             />
           </div>
           <div className="space-y-2">
@@ -123,7 +118,7 @@ export function SchedulingOptions({
               type="time"
               value={scheduledTime}
               onChange={(e) => setScheduledTime(e.target.value)}
-              className="w-[140px]"
+              className="w-35"
             />
           </div>
         </div>
@@ -135,7 +130,7 @@ export function SchedulingOptions({
             <div className="space-y-2">
               <Label htmlFor="recurring-day">Day of Week</Label>
               <Select value={recurringDay} onValueChange={setRecurringDay}>
-                <SelectTrigger id="recurring-day" className="w-[160px]">
+                <SelectTrigger id="recurring-day" className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -154,7 +149,7 @@ export function SchedulingOptions({
                 type="time"
                 value={recurringTime}
                 onChange={(e) => setRecurringTime(e.target.value)}
-                className="w-[140px]"
+                className="w-35"
               />
             </div>
           </div>

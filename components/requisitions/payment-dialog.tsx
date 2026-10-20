@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
@@ -51,16 +52,21 @@ export function PaymentDialog({
   const [pin, setPin] = useState("")
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    if (!open) return
-    setAmount(String(outstanding))
-    setPaidOn(todayInLagos())
-    setMethod(requisition.form_type === "petty_cash" ? "cash" : "transfer")
-    setReference("")
-    setNote("")
-    setReceipt(null)
-    setPin("")
-  }, [open, outstanding, requisition.form_type])
+  // Reset the form each time the dialog opens, during render rather than in an effect.
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [open, outstanding, requisition.form_type] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
+    if (open) {
+      setAmount(String(outstanding))
+      setPaidOn(todayInLagos())
+      setMethod(requisition.form_type === "petty_cash" ? "cash" : "transfer")
+      setReference("")
+      setNote("")
+      setReceipt(null)
+      setPin("")
+    }
+  }
 
   const value = Number(amount) || 0
   const partial = value > 0 && value < outstanding

@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { PageHeader, PageWrapper } from "@/components/layout"
@@ -22,8 +22,12 @@ import {
   UserCheck,
 } from "lucide-react"
 import { toast } from "sonner"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatTime } from "@/lib/format"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface SessionData {
   session: {
@@ -69,7 +73,7 @@ function formatClockTime(val: string | null | undefined): string {
   }
   const d = new Date(val)
   if (!Number.isNaN(d.getTime())) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    return formatTime(d)
   }
   return val
 }
@@ -84,66 +88,46 @@ function CheckInContent() {
 
   const [week] = useState(initialWeek)
   const [year] = useState(initialYear)
+  // A QR scan arrives with ?code= prefilled; the user still confirms with the button.
   const [code, setCode] = useState(initialCode)
   const [submitting, setSubmitting] = useState(false)
-  const [sessionLoading, setSessionLoading] = useState(true)
-  const [sessionData, setSessionData] = useState<SessionData | null>(null)
-  const [userStatus, setUserStatus] = useState<{
-    hasOfficeClockIn: boolean
-    officeClockIn: string | null
-    officeClockInSource: string | null
-    alreadyCheckedIn: boolean
-    meetingClockIn: string | null
-  } | null>(null)
-  const [successResult, setSuccessResult] = useState<{
-    officeClockIn: string | null
-    meetingClockIn: string
-  } | null>(null)
-  const [biometricError, setBiometricError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const sessionKey = QUERY_KEYS.meetingAttendanceSession(week, year)
 
-  // Fetch session & current user's biometric entrance punch status
-  useEffect(() => {
-    let mounted = true
-    const loadSession = async () => {
-      try {
-        setSessionLoading(true)
-        const res = await apiFetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
-        const data = await res.json()
-        if (mounted) {
-          if (data.session || data.holidayInfo) {
-            setSessionData({
-              session: data.session || null,
-              holidayInfo: data.holidayInfo || null,
-            })
-          }
-          if (data.userStatus) {
-            setUserStatus(data.userStatus)
-            if (data.userStatus.alreadyCheckedIn && data.userStatus.meetingClockIn) {
-              setSuccessResult({
-                officeClockIn: data.userStatus.officeClockIn,
-                meetingClockIn: data.userStatus.meetingClockIn,
-              })
-            }
-          }
-        }
-      } catch {
-        // Fail quietly on network hiccup
-      } finally {
-        if (mounted) setSessionLoading(false)
+  // Session & the current user's biometric entrance punch status.
+  const { data: sessionPayload, isLoading: sessionLoading } = useQuery({
+    queryKey: sessionKey,
+    queryFn: async () => {
+      const data = await apiJson<{
+        session?: SessionData["session"] | null
+        holidayInfo?: SessionData["holidayInfo"] | null
+        userStatus?: UserStatus | null
+      }>(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
+      return {
+        sessionData:
+          data.session || data.holidayInfo
+            ? ({ session: data.session || null, holidayInfo: data.holidayInfo || null } as SessionData)
+            : null,
+        userStatus: data.userStatus ?? null,
       }
-    }
-    loadSession()
-    return () => {
-      mounted = false
-    }
-  }, [week, year])
+    },
+  })
+  const sessionData = sessionPayload?.sessionData ?? null
+  const userStatus = sessionPayload?.userStatus ?? null
 
-  // Auto-submit if code is prefilled via QR scan (length 6)
-  useEffect(() => {
-    if (initialCode && initialCode.length === 6 && !successResult && !submitting) {
-      setCode(initialCode)
-    }
-  }, [initialCode, successResult, submitting])
+  // A check-in made on this visit, or one already on record (until dismissed).
+  const [localResult, setLocalResult] = useState<CheckInResult | null>(null)
+  const [recordedDismissed, setRecordedDismissed] = useState(false)
+  const successResult: CheckInResult | null =
+    localResult ??
+    (!recordedDismissed && userStatus?.alreadyCheckedIn && userStatus.meetingClockIn
+      ? { officeClockIn: userStatus.officeClockIn, meetingClockIn: userStatus.meetingClockIn }
+      : null)
+  const setSuccessResult = (next: CheckInResult | null) => {
+    setLocalResult(next)
+    if (next === null) setRecordedDismissed(true)
+  }
+  const [biometricError, setBiometricError] = useState<string | null>(null)
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -191,7 +175,9 @@ function CheckInContent() {
         officeClockIn: data.record.office_clock_in,
         meetingClockIn: data.record.meeting_clock_in,
       })
-      setUserStatus((prev) => (prev ? { ...prev, alreadyCheckedIn: true } : null))
+      queryClient.setQueryData<typeof sessionPayload>(sessionKey, (prev) =>
+        prev?.userStatus ? { ...prev, userStatus: { ...prev.userStatus, alreadyCheckedIn: true } } : prev
+      )
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error checking in")
     } finally {
@@ -210,7 +196,7 @@ function CheckInContent() {
         <Card className="border shadow-md">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <div className="text-success-foreground flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10">
                 <UserCheck className="h-6 w-6" />
               </div>
               <div>
@@ -225,10 +211,10 @@ function CheckInContent() {
           <CardContent>
             {successResult ? (
               <div className="space-y-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center text-emerald-950 dark:text-emerald-200">
-                <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600 dark:text-emerald-400" />
+                <CheckCircle2 className="text-success-foreground mx-auto h-12 w-12" />
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-emerald-900 dark:text-emerald-100">Attendance Confirmed!</h3>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                  <p className="text-success-foreground text-xs">
                     Your general meeting presence has been recorded and verified.
                   </p>
                 </div>
@@ -250,7 +236,7 @@ function CheckInContent() {
                   )}
                   <div className="flex justify-between border-t pt-1.5">
                     <span className="text-muted-foreground">Verification Gate:</span>
-                    <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-success-foreground flex items-center gap-1 font-semibold">
                       <ShieldCheck className="h-3.5 w-3.5" /> Biometrics Validated
                     </span>
                   </div>
@@ -298,9 +284,9 @@ function CheckInContent() {
                       autoFocus
                       required
                     />
-                    <QrCode className="text-muted-foreground/60 pointer-events-none absolute top-3.5 right-3.5 h-5 w-5" />
+                    <QrCode className="text-muted-foreground pointer-events-none absolute top-3.5 right-3.5 h-5 w-5" />
                   </div>
-                  <p className="text-muted-foreground text-center text-[11px]">
+                  <p className="text-muted-foreground text-center text-xs">
                     Shown on the printed sheet or QR poster in the conference room.
                   </p>
                 </div>
@@ -308,16 +294,16 @@ function CheckInContent() {
                 {/* Biometric status notice */}
                 {sessionLoading ? (
                   <div className="bg-muted/40 text-muted-foreground flex items-center justify-center gap-2 rounded-lg border p-3 text-xs">
-                    <Loader2 className="h-4 w-4 animate-spin text-emerald-600 dark:text-emerald-400" />
+                    <Loader2 className="text-success-foreground h-4 w-4 animate-spin" />
                     <span>Checking office entrance clock-in status...</span>
                   </div>
                 ) : userStatus && !userStatus.hasOfficeClockIn ? (
                   <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
                     <div className="flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
-                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <AlertCircle className="text-warning-foreground h-4 w-4 shrink-0" />
                       <span>No Office Clock-In Recorded Today</span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-amber-700/90 dark:text-amber-300/90">
+                    <p className="text-xs leading-relaxed text-amber-700/90 dark:text-amber-300/90">
                       You haven&apos;t clocked in at the front entrance biometric machine yet today. If you just punched
                       seconds ago, please wait 30 seconds for device sync.
                     </p>
@@ -325,10 +311,10 @@ function CheckInContent() {
                 ) : userStatus && userStatus.hasOfficeClockIn ? (
                   <div className="space-y-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-950 dark:text-emerald-200">
                     <div className="flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
-                      <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      <ShieldCheck className="text-success-foreground h-4 w-4 shrink-0" />
                       <span>Office Entrance Punch Verified</span>
                     </div>
-                    <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90">
+                    <p className="text-xs text-emerald-700/90 dark:text-emerald-300/90">
                       Punched in at {formatClockTime(userStatus.officeClockIn)} (
                       {userStatus.officeClockInSource || "Biometric"}).
                     </p>
@@ -357,7 +343,7 @@ function CheckInContent() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <div className="text-success-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
                   <Calendar className="h-4 w-4" />
                 </div>
                 <div>
@@ -367,7 +353,7 @@ function CheckInContent() {
               </div>
               <Badge
                 variant="outline"
-                className="border-emerald-500/40 bg-emerald-500/10 text-xs text-emerald-700 dark:text-emerald-300"
+                className="text-success-foreground border-emerald-500/40 bg-emerald-500/10 text-xs"
               >
                 Week {week}
               </Badge>
@@ -385,7 +371,7 @@ function CheckInContent() {
               <span className="text-muted-foreground flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" /> Session Status
               </span>
-              <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="text-success-foreground flex items-center gap-1.5 font-medium">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                 Active for Check-In
               </span>
@@ -396,17 +382,11 @@ function CheckInContent() {
                 <UserCheck className="h-3.5 w-3.5" /> Your Status
               </span>
               {successResult || userStatus?.alreadyCheckedIn ? (
-                <Badge
-                  variant="outline"
-                  className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                >
+                <Badge variant="outline" className="text-success-foreground border-emerald-500/40 bg-emerald-500/10">
                   <CheckCircle2 className="mr-1 h-3 w-3" /> Checked In
                 </Badge>
               ) : userStatus && !userStatus.hasOfficeClockIn ? (
-                <Badge
-                  variant="outline"
-                  className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                >
+                <Badge variant="outline" className="text-warning-foreground border-amber-500/40 bg-amber-500/10">
                   <AlertCircle className="mr-1 h-3 w-3" /> Punch Required
                 </Badge>
               ) : (
@@ -417,7 +397,7 @@ function CheckInContent() {
             </div>
 
             {sessionData?.holidayInfo?.isMondayHoliday && (
-              <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-900 dark:text-amber-200">
+              <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
                 <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>Public Holiday Notice</span>
@@ -434,7 +414,7 @@ function CheckInContent() {
         <Card className="border shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <div className="text-success-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
                 <Info className="h-4 w-4" />
               </div>
               <div>
@@ -445,12 +425,12 @@ function CheckInContent() {
           </CardHeader>
           <CardContent className="space-y-3 text-xs">
             <div className="flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <div className="text-success-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold">
                 1
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Front Entrance Biometric Punch</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   Clock in at the main office entrance machine first. Attendance records require an active morning
                   biometric punch.
                 </p>
@@ -458,12 +438,12 @@ function CheckInContent() {
             </div>
 
             <div className="flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <div className="text-success-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold">
                 2
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Room Poster or 6-Digit Code</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   Scan the sign-in poster QR code with your phone camera or enter the 6-digit code shown on the
                   conference room sheet.
                 </p>
@@ -471,12 +451,12 @@ function CheckInContent() {
             </div>
 
             <div className="flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <div className="text-success-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold">
                 3
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Automated Anti-Proxy Verification</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   The system verifies that you are physically in the building before recording your attendance for the
                   session.
                 </p>
@@ -489,7 +469,7 @@ function CheckInContent() {
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Virtual / Off-Site Attendance</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   Colleagues joining remotely or from branch offices are marked present by the session coordinator.
                 </p>
               </div>
@@ -501,6 +481,16 @@ function CheckInContent() {
   )
 }
 
+type UserStatus = {
+  hasOfficeClockIn: boolean
+  officeClockIn: string | null
+  officeClockInSource: string | null
+  alreadyCheckedIn: boolean
+  meetingClockIn: string | null
+}
+
+type CheckInResult = { officeClockIn: string | null; meetingClockIn: string }
+
 export default function MeetingCheckInPage() {
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -510,7 +500,13 @@ export default function MeetingCheckInPage() {
         icon={UserCheck}
         backLink={{ href: "/reports/general-meeting", label: "Back to General Meeting" }}
       />
-      <Suspense fallback={<div className="text-muted-foreground py-10 text-center">Loading check-in session...</div>}>
+      <Suspense
+        fallback={
+          <div className="mx-auto max-w-md py-6">
+            <Skeleton className="h-48 w-full rounded-xl" />
+          </div>
+        }
+      >
         <CheckInContent />
       </Suspense>
     </PageWrapper>

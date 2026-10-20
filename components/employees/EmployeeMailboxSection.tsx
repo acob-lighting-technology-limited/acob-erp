@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { useQuery } from "@tanstack/react-query"
 import { Inbox } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -60,13 +61,16 @@ export function EmployeeMailboxSection({
 
   // Defaults reset only when the target status or suggested forward changes,
   // never on a background refetch, so HR's choices stick.
-  useEffect(() => {
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [toStatus, mailbox?.suggestedForward] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
     setSuspendLogin(true)
     setForwardMail(true)
     setForwardTo(mailbox?.suggestedForward ?? "")
     setRestoreLogin(true)
     setRemoveForwards(true)
-  }, [toStatus, mailbox?.suggestedForward])
+  }
 
   useEffect(() => {
     if (!relevant || !manageable || !mailbox) return onActionsChange(undefined, false)

@@ -1,6 +1,6 @@
 import { TablePageSkeleton } from "@/components/skeletons"
+import { layout } from "./_layout"
 
-// Mirrors EventsWorkspace in staff mode: three tabs and three stat cards.
 export default function Loading() {
-  return <TablePageSkeleton tabs={3} filters={4} columns={7} showStats statCards={4} />
+  return <TablePageSkeleton {...layout} />
 }

@@ -26,6 +26,8 @@ import { FileText, Plus, DollarSign, Calendar, ClipboardList, Calculator } from 
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 export interface PayrollPeriod {
   id: string
   name: string
@@ -179,7 +181,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       render: (row: DbPayrollEntry) => (
         <div>
           <p className="text-foreground font-medium">{row.payroll_periods?.name || "N/A"}</p>
-          <p className="text-muted-foreground text-[11px]">Pay Date: {row.payroll_periods?.pay_date || "N/A"}</p>
+          <p className="text-muted-foreground text-xs">Pay Date: {row.payroll_periods?.pay_date || "N/A"}</p>
         </div>
       ),
     },
@@ -199,7 +201,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "gross_salary",
       label: "Gross Pay",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
+        <span className="text-info-foreground font-mono text-xs font-semibold">
           ₦
           {Number(row.gross_salary || row.breakdown?.monthlyGross || 0).toLocaleString("en-US", {
             minimumFractionDigits: 2,
@@ -211,7 +213,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "tax_amount",
       label: "PAYE Tax",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs text-amber-600 dark:text-amber-400">
+        <span className="text-warning-foreground font-mono text-xs">
           ₦{Number(row.tax_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -220,7 +222,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "total_deductions",
       label: "Deductions",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs text-red-600 dark:text-red-400">
+        <span className="text-danger-foreground font-mono text-xs">
           ₦{Number(row.total_deductions || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -229,7 +231,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "net_salary",
       label: "Net Take-Home",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+        <span className="text-success-foreground font-mono text-xs font-bold">
           ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -242,7 +244,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           variant={row.payroll_periods?.status === "completed" ? "default" : "outline"}
           className={
             row.payroll_periods?.status === "completed"
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              ? "text-success-foreground bg-emerald-500/10"
               : "border-amber-500/30 text-amber-600"
           }
         >
@@ -414,6 +416,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Payroll Management"
       description="Create monthly payroll periods, then open a period's worksheet to run the bulk calculation and publish payslips."
       icon={FileText}
@@ -441,7 +444,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             title: (row) => row.name,
             subtitle: (row) => `${row.start_date} - ${row.end_date} · Pay: ${row.pay_date || "N/A"}`,
             trailing: (row) => (
-              <Badge variant={row.status === "completed" ? "default" : "outline"} className="text-[10px]">
+              <Badge variant={row.status === "completed" ? "default" : "outline"} className="text-xs">
                 {row.status === "completed" ? "Completed" : "Draft"}
               </Badge>
             ),
@@ -461,7 +464,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   {row.status === "completed" ? "Completed" : "Draft"}
                 </Badge>
               </div>
-              <div className="text-muted-foreground flex justify-between border-t pt-2 text-[10px]">
+              <div className="text-muted-foreground flex justify-between border-t pt-2 text-xs">
                 <span>Start: {row.start_date}</span>
                 <span>End: {row.end_date}</span>
               </div>
@@ -491,7 +494,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             subtitle: (row) =>
               `${row.user?.department || "General"} · ${row.payroll_periods?.name || "N/A"} · Net: ₦${Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
             trailing: (row) => (
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-success-foreground font-mono text-xs font-bold">
                 ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </span>
             ),
@@ -503,11 +506,11 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   <p className="text-sm font-semibold">{row.user?.full_name || "Unknown"}</p>
                   <p className="text-muted-foreground text-xs">{row.user?.department || "General"}</p>
                 </div>
-                <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="text-success-foreground font-mono text-xs font-bold">
                   ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 border-t pt-2 text-[11px]">
+              <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                 <div>Gross: ₦{Number(row.gross_salary || 0).toLocaleString("en-US")}</div>
                 <div>Tax: ₦{Number(row.tax_amount || 0).toLocaleString("en-US")}</div>
               </div>

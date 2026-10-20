@@ -6,33 +6,7 @@ import { cn, formatName, getInitials } from "@/lib/utils"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Briefcase,
-  CalendarDays,
-  ChevronsUpDown,
-  ChevronRight,
-  LayoutDashboard,
-  ClipboardList,
-  Ticket,
-  FileText,
-  Landmark,
-  MessageSquare,
-  LogOut,
-  Settings,
-  FileBarChart,
-  FileCode2,
-  Megaphone,
-  ShieldCheck,
-  FlaskConical,
-  User,
-  Users,
-  Building2,
-  FolderKanban,
-  Layers,
-  Target,
-  TrendingUp,
-} from "lucide-react"
+import { ChevronsUpDown, ChevronRight, LogOut, Settings, ShieldCheck, User, Building2 } from "lucide-react"
 import { useState, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -52,21 +26,24 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
-import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
+import { getRoleDisplayName } from "@/lib/permissions"
 import { motion } from "framer-motion"
 import { normalizeDepartmentName } from "@/shared/departments"
-import { mdDeskNavChildren } from "@/components/md-desk/sections"
-import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import { usePendingRsvpCount } from "@/components/events/use-events"
-import type { NavChild, RouteAliases } from "@/lib/nav/types"
+import type { NavChild } from "@/lib/nav/types"
+import { canAccessRouteV2, resolveAdminRouteKeyV2, type AccessContextV2 } from "@/lib/admin/policy-v2"
+import { useDepartmentCode } from "@/hooks/use-department-code"
+import { usePublishNavPages } from "@/lib/nav/page-index"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import {
-  canAccessRouteV2,
-  resolveAdminRouteKeyV2,
-  GRANTABLE_ADMIN_ROUTES,
-  type AccessContextV2,
-  type AdminRouteKeyV2,
-} from "@/lib/admin/policy-v2"
+  buildDeptNavigation,
+  normalizeAdminRoutes,
+  type NavItem,
+  adminNavigation,
+  adminSections,
+  ADMIN_ROUTE_ALIASES,
+} from "./admin-sidebar-nav"
 
 interface AdminSidebarProps {
   user?: {
@@ -101,465 +78,6 @@ interface AdminSidebarProps {
   deptConsoles?: DeptConsole[]
   /** Admin shell only: the viewer is the MD or an MD's Desk delegate. */
   showMdDesk?: boolean
-}
-
-/**
- * Builds dept-scoped navigation for the /dept/[deptId]/ shell.
- * Hrefs point to /dept/[id]/... so clicking a nav item stays in the dept shell.
- *
- * What belongs here: the admin nav, minus anything org-wide. A department lead
- * manages their own department, so a domain is included when it can be
- * meaningfully scoped to one department and left out when it cannot. That is
- * why HR is here but its Departments child is not, and why these are absent:
- *
- *  - Settings, System & Security, Developer — org-wide by definition.
- *  - Notifications, Events, Tools, Corporate Services — single org-wide
- *    consoles with nothing department-shaped to scope to.
- *  - Portfolios, Projects, Purchasing, Inventory — cross-department by nature;
- *    a portfolio or a purchase order does not belong to one department.
- *
- * Add a domain here only once its pages exist under /dept/[dept_id]/ and its
- * queries are scoped by requireDeptScope.
- */
-function buildDeptNavigation(deptId: string): NavItem[] {
-  const base = `/dept/${deptId}`
-  return [
-    {
-      section: "overview",
-      name: "Dashboard",
-      href: base,
-      icon: LayoutDashboard,
-      roles: [],
-    },
-    {
-      section: "management",
-      name: "HR",
-      description: "Human Resources",
-      href: `${base}/hr`,
-      icon: Users,
-      roles: [],
-      children: [
-        { name: "Employees", href: `${base}/hr/employees` },
-        // No "Departments" here — the dept shell is already scoped to one
-        // department, so the org-wide department list belongs to /admin only.
-        { name: "Attendance", href: `${base}/hr/attendance` },
-        { name: "Leave", href: `${base}/hr/leave` },
-        { name: "Offices & Rooms", href: `${base}/hr/offices-rooms` },
-      ],
-    },
-    {
-      section: "management",
-      name: "PMS",
-      description: "Performance Management System",
-      href: `${base}/pms`,
-      icon: TrendingUp,
-      roles: [],
-      children: pmsNavChildren(`${base}/pms`),
-    },
-    {
-      section: "management",
-      name: "Accounts",
-      href: `${base}/accounts`,
-      icon: Landmark,
-      roles: [],
-      children: [
-        { name: "Requisitions", href: `${base}/accounts/requisitions` },
-        { name: "Payments", href: `${base}/accounts/payments` },
-        { name: "Bills", href: `${base}/accounts/bills` },
-        { name: "Invoices", href: `${base}/accounts/invoices` },
-        { name: "Finance Reports", href: `${base}/accounts/reports` },
-        {
-          name: "Assets",
-          href: `${base}/assets`,
-          children: [{ name: "Issues", href: `${base}/assets/issues` }],
-        },
-      ],
-    },
-    {
-      section: "management",
-      name: "Corporate Services",
-      href: `${base}/corporate-services`,
-      icon: Target,
-      roles: [],
-      children: [
-        { name: "Scorecard", href: `${base}/corporate-services/scorecard` },
-        { name: "Risk Register", href: `${base}/corporate-services/risk-register` },
-      ],
-    },
-    {
-      section: "operations",
-      name: "Tasks",
-      href: `${base}/tasks`,
-      icon: ClipboardList,
-      roles: [],
-    },
-    {
-      section: "operations",
-      name: "Help Desk",
-      href: `${base}/help-desk`,
-      icon: Ticket,
-      roles: [],
-    },
-    {
-      section: "operations",
-      name: "Reports",
-      href: `${base}/reports`,
-      icon: FileBarChart,
-      roles: [],
-      children: [{ name: "Weekly", href: `${base}/reports/weekly-reports` }],
-    },
-    {
-      section: "operations",
-      name: "Correspondence",
-      href: `${base}/correspondence`,
-      icon: FileCode2,
-      roles: [],
-    },
-    {
-      section: "operations",
-      name: "Communications",
-      href: `${base}/communications`,
-      icon: Megaphone,
-      roles: [],
-      children: [{ name: "Broadcast", href: `${base}/communications/broadcast` }],
-    },
-    {
-      section: "operations",
-      name: "Documentation",
-      href: `${base}/documentation`,
-      icon: FileText,
-      roles: [],
-      children: [
-        { name: "Policies", href: `${base}/documentation/policies` },
-        { name: "SOPs", href: `${base}/documentation/sops` },
-        { name: "Personal", href: `${base}/documentation/personal` },
-        { name: "Department", href: `${base}/documentation/department` },
-      ],
-    },
-    {
-      section: "operations",
-      name: "Feedback",
-      href: `${base}/feedback`,
-      icon: MessageSquare,
-      roles: [],
-    },
-  ]
-}
-
-function normalizeAdminRoutes(routes: string[] | null | undefined): AdminRouteKeyV2[] {
-  if (!Array.isArray(routes)) return []
-  return Array.from(
-    new Set(
-      routes
-        .map((value) =>
-          String(value || "")
-            .trim()
-            .toLowerCase()
-        )
-        .filter(Boolean)
-    )
-  ).filter((value): value is AdminRouteKeyV2 => GRANTABLE_ADMIN_ROUTES.includes(value as AdminRouteKeyV2))
-}
-
-type NavItem = {
-  section: string
-  name: string
-  href: string
-  icon: React.ElementType
-  roles: string[]
-  /** Expansion or gloss for an abbreviated name, shown on hover. */
-  description?: string
-  children?: NavChild[]
-  /**
-   * The viewer cannot open this branch's own page, so `href` was retargeted to
-   * the first descendant they can reach. The expanded row then toggles instead
-   * of navigating — following it would land on a page whose name does not match
-   * the label. The collapsed rail still uses `href`, since toggling is not
-   * available there.
-   */
-  retargeted?: boolean
-  badge?: number
-}
-
-/**
- * Management runs people -> performance -> money -> what the money bought ->
- * delivery -> governance, and Operations runs day-to-day work first, then the
- * things that report on it. navigationSections in sidebar.tsx lists the same
- * items in the same relative order; keep them in step.
- *
- * Purchasing and Inventory sit inside Accounts rather than beside it, so the
- * accounts -> purchase -> stock workflow reads as one node. They keep their own
- * grantable route keys, and filterNavChildren gates each one separately, so a
- * viewer granted only inventory.main still sees Inventory and nothing else —
- * with the Accounts row rendering as a toggle rather than a link, since it
- * would otherwise point at a page whose name does not match the label.
- */
-const adminNavigation: NavItem[] = [
-  {
-    section: "overview",
-    name: "Dashboard",
-    href: "/admin",
-    icon: LayoutDashboard,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    // Shown to the MD, delegates, super admins and developers (showMdDesk); the page re-checks.
-    section: "management",
-    name: "MD's Desk",
-    href: "/admin/md-desk",
-    icon: Briefcase,
-    roles: ["developer", "super_admin", "admin"],
-    children: mdDeskNavChildren("/admin/md-desk"),
-  },
-  {
-    section: "management",
-    name: "HR",
-    description: "Human Resources",
-    href: "/admin/hr",
-    icon: Users,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Employees", href: "/admin/hr/employees" },
-      { name: "Departments", href: "/admin/hr/departments" },
-      { name: "Job Descriptions", href: "/admin/hr/job-descriptions" },
-      { name: "Attendance", href: "/admin/hr/attendance" },
-      { name: "Leave", href: "/admin/hr/leave" },
-      { name: "Lunch Register", href: "/admin/hr/lunch" },
-      { name: "Resource Booking", href: "/admin/hr/resources" },
-      { name: "Offices & Rooms", href: "/admin/hr/offices-rooms" },
-    ],
-  },
-  {
-    // Split out of HR — it had grown to 11 sub-items nested three levels
-    // deep. Routes are unchanged (still /admin/pms/*), only the sidebar
-    // grouping moved.
-    section: "management",
-    name: "PMS",
-    description: "Performance Management System",
-    href: "/admin/pms",
-    icon: TrendingUp,
-    roles: ["developer", "super_admin", "admin"],
-    children: pmsNavChildren("/admin/pms"),
-  },
-  {
-    // Accounts also surfaces Purchasing, Inventory and Assets as nested groups
-    // so the financial workflow (accounts → purchase → stock → what it bought)
-    // is one coherent node rather than four separate top-level items. This
-    // matches the staff sidebar, which has always listed Assets under Accounts.
-    section: "management",
-    name: "Accounts",
-    href: "/admin/accounts",
-    icon: Landmark,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Requisitions", href: "/admin/accounts/requisitions" },
-      { name: "Payments", href: "/admin/accounts/payments" },
-      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
-      { name: "Bills", href: "/admin/accounts/bills" },
-      { name: "Invoices", href: "/admin/accounts/invoices" },
-      { name: "Payroll", href: "/admin/payroll" },
-      { name: "Finance Reports", href: "/admin/accounts/reports" },
-      {
-        name: "Purchasing",
-        href: "/admin/purchasing",
-        children: [
-          { name: "Orders", href: "/admin/purchasing/orders" },
-          { name: "Receipts", href: "/admin/purchasing/receipts" },
-          { name: "Suppliers", href: "/admin/purchasing/suppliers" },
-        ],
-      },
-      {
-        name: "Inventory",
-        href: "/admin/inventory",
-        children: [
-          { name: "Products", href: "/admin/inventory/products" },
-          { name: "Categories", href: "/admin/inventory/categories" },
-          { name: "Warehouses", href: "/admin/inventory/warehouses" },
-          { name: "Movements", href: "/admin/inventory/movements" },
-        ],
-      },
-      {
-        name: "Assets",
-        href: "/admin/assets",
-        children: [{ name: "Issues", href: "/admin/assets/issues" }],
-      },
-    ],
-  },
-  {
-    section: "management",
-    name: "Portfolios",
-    href: "/admin/portfolios",
-    icon: Layers,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Portfolios", href: "/admin/portfolios" },
-      { name: "Projects", href: "/admin/projects" },
-    ],
-  },
-  {
-    section: "management",
-    name: "Corporate Services",
-    href: "/admin/corporate-services",
-    icon: Target,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
-      { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
-    ],
-  },
-  {
-    // Operations, not Management: tasks are day-to-day work, and the staff shell
-    // has always listed them there.
-    section: "operations",
-    name: "Tasks",
-    href: "/admin/tasks",
-    icon: ClipboardList,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
-    name: "Help Desk",
-    href: "/admin/help-desk",
-    icon: Ticket,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
-    name: "Events",
-    href: "/admin/events",
-    icon: CalendarDays,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
-    name: "Reports",
-    href: "/admin/reports",
-    icon: FileBarChart,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      {
-        name: "General Meeting",
-        href: "/admin/reports/general-meeting",
-        children: [
-          { name: "Attendance", href: "/admin/reports/general-meeting/attendance" },
-          { name: "Action Tracker", href: "/admin/reports/general-meeting/action-tracker" },
-          { name: "Challenges", href: "/admin/reports/general-meeting/challenges" },
-          { name: "KSS", href: "/admin/reports/general-meeting/kss" },
-          { name: "Minutes", href: "/admin/reports/general-meeting/minutes-of-meeting" },
-          { name: "Weekly", href: "/admin/reports/general-meeting/weekly-reports" },
-          { name: "Records", href: "/admin/reports/general-meeting/records" },
-        ],
-      },
-    ],
-  },
-  {
-    section: "operations",
-    name: "Correspondence",
-    href: "/admin/correspondence",
-    icon: FileCode2,
-    roles: ["developer", "super_admin", "admin"],
-  },
-  {
-    section: "operations",
-    name: "Communications",
-    href: "/admin/communications",
-    icon: Megaphone,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Broadcast", href: "/admin/communications/broadcast" },
-      {
-        // Not to be confused with Reports > General Meeting, which is the
-        // reports themselves. This branch is the mail-out and the reminders
-        // that go with them.
-        name: "Meeting Mail",
-        href: "/admin/communications/meetings",
-        children: [
-          { name: "Report Mail-out", href: "/admin/communications/meetings/mail" },
-          { name: "Reminders", href: "/admin/communications/meetings/reminders" },
-          { name: "Knowledge Sharing", href: "/admin/communications/meetings/kss" },
-        ],
-      },
-    ],
-  },
-  {
-    section: "operations",
-    name: "Documentation",
-    href: "/admin/documentation",
-    icon: FileText,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Policies", href: "/admin/documentation/policies" },
-      { name: "SOPs", href: "/admin/documentation/sops" },
-      { name: "Personal", href: "/admin/documentation/personal" },
-      { name: "Department", href: "/admin/documentation/department" },
-    ],
-  },
-  {
-    section: "compliance",
-    name: "System & Security",
-    href: "/admin/security",
-    icon: ShieldCheck,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Audit Logs", href: "/admin/audit-logs" },
-      { name: "Network Activity", href: "/admin/security/network-activity" },
-      { name: "Bypass & Override", href: "/admin/security/bypass-override" },
-    ],
-  },
-  {
-    section: "compliance",
-    name: "Settings",
-    href: "/admin/settings",
-    icon: Settings,
-    roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Users", href: "/admin/settings/users" },
-      // Lists every account and its sign-in state, and resolves to settings.main
-      // for exactly that reason. It sat under HR, where its visibility was
-      // controlled by a grant unrelated to the item it appeared beside.
-      { name: "Onboarding", href: "/admin/onboarding" },
-      { name: "Roles", href: "/admin/settings/roles" },
-      { name: "Company", href: "/admin/settings/company" },
-      { name: "Attendance", href: "/admin/settings/attendance" },
-      { name: "CBT", href: "/admin/settings/cbt" },
-      { name: "Mail", href: "/admin/settings/mail" },
-      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
-      { name: "Maintenance", href: "/admin/settings/maintenance" },
-    ],
-  },
-  {
-    // Its own collapsible item under Compliance. Developer-only —
-    // /admin/dev resolves to dev.main, which canAccessRouteV2 gates to the
-    // developer role, so the whole branch is hidden from admin / super_admin.
-    section: "compliance",
-    name: "Developer",
-    href: "/admin/dev",
-    icon: FlaskConical,
-    roles: ["developer"],
-    children: [
-      { name: "Login Logs", href: "/admin/dev/login-logs" },
-      { name: "Role Escalations", href: "/admin/dev/role-escalations" },
-      { name: "Security Events", href: "/admin/dev/security-events" },
-      { name: "Impersonation", href: "/admin/dev/impersonation" },
-      { name: "Error Monitor", href: "/admin/dev/ui-errors" },
-      { name: "Tests", href: "/admin/dev/tests" },
-      { name: "ACOBot", href: "/admin/dev/acobot" },
-    ],
-  },
-]
-const adminSections = [
-  { key: "overview", label: "Overview" },
-  { key: "management", label: "Management" },
-  { key: "operations", label: "Operations" },
-  { key: "compliance", label: "Compliance" },
-]
-
-const ADMIN_ROUTE_ALIASES: RouteAliases = {
-  // Accounts — legacy /admin/finance and /admin/payments/* redirect into accounts.
-  "/admin/accounts": ["/admin/finance", "/admin/payments"],
-  "/admin/finance": ["/admin/payments"],
-  // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
-  "/admin/corporate-services": ["/admin/corporate-scorecard"],
 }
 
 export function AdminSidebar({
@@ -605,7 +123,7 @@ export function AdminSidebar({
 
   const [openSections, setOpenSections] = useState<Set<string>>(new Set())
   const [openSubSections, setOpenSubSections] = useState<Set<string>>(new Set())
-  const [departmentCode, setDepartmentCode] = useState<string | null>(null)
+  const departmentCode = useDepartmentCode(profile?.department)
 
   const toggleSection = (href: string) => {
     setOpenSections((prev) => {
@@ -621,29 +139,34 @@ export function AdminSidebar({
     })
   }
 
-  useEffect(() => {
-    if (!pathname) return
-    // Use dept nav when in dept shell so the correct parent sections auto-expand.
-    const nav = deptId ? buildDeptNavigation(deptId) : adminNavigation
-    for (const item of nav) {
-      if (!item.children) continue
-      for (const child of item.children) {
-        const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
-        if (childActive) {
-          setOpenSections((prev) => new Set([...prev, item.href]))
-        }
-        if (child.children) {
-          const grandchildActive = child.children.some(
-            (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
-          )
-          if (grandchildActive) {
+  // Open the sections holding the current page — adjusted during render, not in an effect.
+  const [expandedFor, setExpandedFor] = useState<readonly unknown[] | null>(null)
+  const expandedForNext = [pathname, deptId] as const
+  if (depsChanged(expandedFor, expandedForNext)) {
+    setExpandedFor(expandedForNext)
+    if (pathname) {
+      // Use dept nav when in dept shell so the correct parent sections auto-expand.
+      const nav = deptId ? buildDeptNavigation(deptId) : adminNavigation
+      for (const item of nav) {
+        if (!item.children) continue
+        for (const child of item.children) {
+          const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
+          if (childActive) {
             setOpenSections((prev) => new Set([...prev, item.href]))
-            setOpenSubSections((prev) => new Set([...prev, child.href]))
+          }
+          if (child.children) {
+            const grandchildActive = child.children.some(
+              (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
+            )
+            if (grandchildActive) {
+              setOpenSections((prev) => new Set([...prev, item.href]))
+              setOpenSubSections((prev) => new Set([...prev, child.href]))
+            }
           }
         }
       }
     }
-  }, [pathname, deptId])
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -746,6 +269,8 @@ export function AdminSidebar({
       items: filteredNavigation.filter((item) => item.section === section.key),
     }))
     .filter((section) => section.items.length > 0)
+  // The navbar search offers these pages too, so it never lists one the viewer cannot open.
+  usePublishNavPages(groupedNavigation)
 
   const activeTopLevelHref = useMemo(() => {
     const shellRoot = deptId ? `/dept/${deptId}` : "/admin"
@@ -760,34 +285,6 @@ export function AdminSidebar({
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
   )
-  useEffect(() => {
-    let cancelled = false
-    const departmentName = profile?.department ? normalizeDepartmentName(profile.department) : ""
-    if (!departmentName) {
-      setDepartmentCode(null)
-      return
-    }
-
-    async function loadDepartmentCode() {
-      try {
-        const response = await fetch("/api/departments", { cache: "no-store" })
-        if (!response.ok) return
-        const payload = (await response.json().catch(() => null)) as {
-          data?: Array<{ name?: string | null; department_code?: string | null }>
-        } | null
-        const rows = payload?.data || []
-        const match = rows.find((row) => normalizeDepartmentName(String(row.name || "")) === departmentName)
-        if (!cancelled) setDepartmentCode(match?.department_code || null)
-      } catch {
-        if (!cancelled) setDepartmentCode(null)
-      }
-    }
-
-    void loadDepartmentCode()
-    return () => {
-      cancelled = true
-    }
-  }, [profile?.department])
 
   const accountName =
     profile?.first_name && profile?.last_name
@@ -816,7 +313,7 @@ export function AdminSidebar({
                 <div className="mx-1.5 my-1.5 border-t border-[var(--admin-sidebar-border)]" />
               )
             ) : (
-              <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
+              <p className="text-muted-foreground px-3 pt-1 pb-1 text-xs font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
               const hasChildren = !isCollapsed && item.children && item.children.length > 0
@@ -832,7 +329,7 @@ export function AdminSidebar({
                   {hasChildren ? (
                     <div
                       className={cn(
-                        "flex min-h-[36px] items-center rounded-md text-sm font-medium transition-colors duration-150",
+                        "flex min-h-9 items-center rounded-md text-sm font-medium transition-colors duration-150",
                         highlighted ? activeCls : inactiveCls
                       )}
                     >
@@ -876,7 +373,7 @@ export function AdminSidebar({
                           href={item.href}
                           onClick={() => setIsMobileMenuOpen(false)}
                           className={cn(
-                            "flex min-h-[36px] items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
+                            "flex min-h-9 items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
                             isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
                             "text-sm font-medium",
                             highlighted ? activeCls : inactiveCls
@@ -901,7 +398,7 @@ export function AdminSidebar({
                           {!isCollapsed && item.badge != null && item.badge > 0 && (
                             <span
                               className={cn(
-                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tracking-tight",
                                 highlighted ? "bg-primary-foreground text-primary" : "bg-rose-500 text-white"
                               )}
                             >
@@ -935,7 +432,7 @@ export function AdminSidebar({
                             {hasSubChildren ? (
                               <div
                                 className={cn(
-                                  "flex min-h-[32px] items-center rounded-md text-sm font-medium transition-colors duration-150",
+                                  "flex min-h-8 items-center rounded-md text-sm font-medium transition-colors duration-150",
                                   childHighlighted ? activeCls : inactiveCls
                                 )}
                               >
@@ -975,7 +472,7 @@ export function AdminSidebar({
                                 href={child.href}
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={cn(
-                                  "flex min-h-[32px] items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
+                                  "flex min-h-8 items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
                                   isChildActive ? activeCls : inactiveCls
                                 )}
                               >
@@ -994,7 +491,7 @@ export function AdminSidebar({
                                       href={grandchild.href}
                                       onClick={() => setIsMobileMenuOpen(false)}
                                       className={cn(
-                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        "flex min-h-7 items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
                                         isGcActive ? activeCls : inactiveCls
                                       )}
                                     >
@@ -1024,7 +521,7 @@ export function AdminSidebar({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="text-muted-foreground min-h-[52px] w-full justify-center px-2.5 text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
+                    className="text-muted-foreground min-h-13 w-full justify-center px-2.5 text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
                   >
                     <div className="flex items-center">
                       <StaffAvatar
@@ -1044,7 +541,7 @@ export function AdminSidebar({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="text-muted-foreground min-h-[52px] w-full justify-between px-3 text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
+                className="text-muted-foreground min-h-13 w-full justify-between px-3 text-sm transition-[padding,gap,background-color,color] duration-300 ease-in-out hover:bg-[var(--admin-accent-soft)] hover:text-[var(--admin-primary)]"
               >
                 <div className="flex items-center gap-2.5">
                   <StaffAvatar

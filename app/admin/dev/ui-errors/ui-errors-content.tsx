@@ -15,6 +15,7 @@ import { Bug, AlertTriangle, ShieldAlert, Download } from "lucide-react"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
 
 export interface UiErrorRow {
   id: string
@@ -232,6 +233,7 @@ export function UiErrorsContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Error Monitor"
       description="Latest 500 browser, failed request, server and Supabase errors. Refreshes every minute while visible."
       icon={Bug}

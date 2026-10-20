@@ -1,6 +1,6 @@
 import { TablePageSkeleton } from "@/components/skeletons"
+import { layout } from "./_layout"
 
-// Mirrors MdDeskTaskReviews: four stat cards, two filters, the review table.
 export default function Loading() {
-  return <TablePageSkeleton filters={2} columns={7} showStats statCards={4} showBackLink />
+  return <TablePageSkeleton {...layout} />
 }

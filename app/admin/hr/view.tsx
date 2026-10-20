@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { IconFill } from "@/components/ui/icon-fill"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useAdminScope } from "@/components/admin-scope-context"
+import { DataHealthCard } from "@/components/admin/data-health-card"
 
 interface DashboardStats {
   pendingLeaveRequests: number
@@ -146,7 +147,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400"
+                    className="text-info-foreground shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.totalEmployees} Staff
                   </Badge>
@@ -156,7 +157,7 @@ export function HRAdminDashboard({
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Employee Roster</span>
+                <span className="text-muted-foreground text-xs font-medium">Employee Roster</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-blue-500"
@@ -195,7 +196,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">Manage company departments</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Department Units</span>
+                <span className="text-muted-foreground text-xs font-medium">Department Units</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-purple-500"
@@ -234,7 +235,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">View rooms and assigned employees</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Offices & Rooms</span>
+                <span className="text-muted-foreground text-xs font-medium">Offices & Rooms</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-teal-500"
@@ -265,7 +266,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400"
+                    className="text-warning-foreground shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.pendingLeaveRequests} Pending
                   </Badge>
@@ -273,7 +274,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">Review and approve leave requests</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Leave Queue</span>
+                <span className="text-muted-foreground text-xs font-medium">Leave Queue</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-amber-500"
@@ -315,7 +316,7 @@ export function HRAdminDashboard({
                   </p>
                 </div>
                 <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">Shared Assets</span>
+                  <span className="text-muted-foreground text-xs font-medium">Shared Assets</span>
                   <IconFill
                     icon={ChevronRight}
                     fillColor="bg-indigo-500"
@@ -347,7 +348,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400"
+                    className="text-success-foreground shrink-0 rounded-full border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.todayAttendance} Today
                   </Badge>
@@ -355,7 +356,7 @@ export function HRAdminDashboard({
                 <p className="text-muted-foreground text-xs leading-relaxed">View and export attendance data</p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Clocking Logs</span>
+                <span className="text-muted-foreground text-xs font-medium">Clocking Logs</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-emerald-500"
@@ -386,7 +387,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400"
+                    className="text-info-foreground shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     Payroll Panel
                   </Badge>
@@ -396,7 +397,7 @@ export function HRAdminDashboard({
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Payslip Calculations</span>
+                <span className="text-muted-foreground text-xs font-medium">Payslip Calculations</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-blue-500"
@@ -427,7 +428,7 @@ export function HRAdminDashboard({
                   </div>
                   <Badge
                     variant="outline"
-                    className="shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400"
+                    className="text-warning-foreground shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold"
                   >
                     {stats.upcomingReviews} Reviews
                   </Badge>
@@ -437,7 +438,7 @@ export function HRAdminDashboard({
                 </p>
               </div>
               <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Performance System</span>
+                <span className="text-muted-foreground text-xs font-medium">Performance System</span>
                 <IconFill
                   icon={ChevronRight}
                   fillColor="bg-amber-500"
@@ -451,6 +452,12 @@ export function HRAdminDashboard({
           </Link>
         </div>
       </Section>
+
+      {scope.isAdminLike && scope.scopeMode !== "lead" && (
+        <Section title="Data Health">
+          <DataHealthCard />
+        </Section>
+      )}
 
       {/* Pending Actions */}
       <Section title="Pending Actions">

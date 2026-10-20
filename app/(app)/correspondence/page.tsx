@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { PortalReferenceGeneratorContent } from "../tools/reference-generator/portal-reference-generator-content"
+import { PortalReferenceGeneratorContent } from "@/app/(app)/correspondence/portal-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
 interface DepartmentCodeOption {

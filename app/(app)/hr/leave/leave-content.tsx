@@ -46,6 +46,8 @@ import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages } from "@/lib/hr/leave-stages"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface LeaveContentProps {
   currentUserId: string
   initialRequests: LeaveRequest[]
@@ -115,6 +117,34 @@ type CombinedLeaveItem = Omit<LeaveRequest, "user"> & {
     company_email?: string | null
     department?: string | null
   } | null
+}
+
+/**
+ * What still stops a leave request from being submitted, in the order the form
+ * asks for it. The Submit button used to grey out with no reason given.
+ */
+function leaveRequestMissing({
+  formData,
+  totalDays,
+  availableDays,
+  requiresAttachment,
+}: {
+  formData: LeaveRequestFormData
+  totalDays: number
+  availableDays: number
+  requiresAttachment: boolean
+}): string[] {
+  const missing: string[] = []
+  if (!formData.leave_type_id) missing.push("Choose a leave type")
+  if (formData.segments.length === 0) missing.push("Pick your leave dates")
+  else if (totalDays <= 0) missing.push("Pick at least one working day")
+  else if (formData.leave_type_id && totalDays > availableDays)
+    missing.push(`This request is ${totalDays} day${totalDays === 1 ? "" : "s"}; you have ${availableDays} available`)
+  if (!formData.reason) missing.push("Give a reason")
+  if (!formData.reliever_identifier) missing.push("Choose a reliever")
+  if (!formData.handover_file && !formData.handover_checklist_url) missing.push("Attach your handover document")
+  if (requiresAttachment && !formData.attachment) missing.push("Attach the document this leave type requires")
+  return missing
 }
 
 export function LeaveContent({
@@ -471,7 +501,7 @@ export function LeaveContent({
                   ? "destructive"
                   : "outline"
             }
-            className="text-[11px] capitalize"
+            className="text-xs capitalize"
           >
             {formatName(r.status)}
           </Badge>
@@ -483,7 +513,7 @@ export function LeaveContent({
         accessor: (r) => r.current_stage_code || r.approval_stage || "-",
         render: (r) => (
           <span
-            className="text-muted-foreground block max-w-[140px] truncate text-xs"
+            className="text-muted-foreground block max-w-35 truncate text-xs"
             title={approvalStageLabel(r.current_stage_code || r.approval_stage)}
           >
             {approvalStageLabel(r.current_stage_code || r.approval_stage)}
@@ -497,7 +527,7 @@ export function LeaveContent({
         accessor: (r) => resolvePersonName(r.reliever) || "-",
         render: (r) => (
           <span
-            className="text-muted-foreground block max-w-[140px] truncate text-xs"
+            className="text-muted-foreground block max-w-35 truncate text-xs"
             title={resolvePersonName(r.reliever) || "-"}
           >
             {resolvePersonName(r.reliever) || "-"}
@@ -646,6 +676,13 @@ export function LeaveContent({
       if (!response.ok) throw new Error(payload.error || "Failed to submit request")
 
       const createdOrUpdatedId = String(payload?.data?.id || editingRequestId || "")
+      if (!isEditing && createdOrUpdatedId) {
+        // The request now exists. If an upload below fails, a retry must update
+        // this request, not create a second one, and must not re-upload the handover.
+        setEditingRequestId(createdOrUpdatedId)
+        setFormData((prev) => ({ ...prev, handover_file: null, handover_checklist_url: handoverChecklistUrl || null }))
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
+      }
       let successMessage = String(payload?.message || "")
       if (attachment && createdOrUpdatedId) {
         const requiredDocumentsFromResponse = Array.isArray(payload?.data?.required_documents)
@@ -785,6 +822,7 @@ export function LeaveContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Leave Center"
       description="Track eligibility, submit requests, and manage approvals in one view."
       icon={CalendarDays}
@@ -897,7 +935,7 @@ export function LeaveContent({
                     ? "destructive"
                     : "outline"
               }
-              className="text-[10px] capitalize"
+              className="text-xs capitalize"
             >
               {formatName(r.status)}
             </Badge>
@@ -909,11 +947,11 @@ export function LeaveContent({
                 : leaveTypeMap.get(r.leave_type_id)?.name || "—",
             subtitle: (r) => (
               <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-1.5 text-xs">
-                <Badge variant="outline" className="text-[10px] font-medium">
+                <Badge variant="outline" className="text-xs font-medium">
                   {leaveTypeMap.get(r.leave_type_id)?.name || "—"}
                 </Badge>
                 <span className="inline-flex items-center gap-1">
-                  <CalendarDays className="text-muted-foreground/70 h-3.5 w-3.5" />
+                  <CalendarDays className="text-muted-foreground h-3.5 w-3.5" />
                   <span>
                     {r.start_date} to {r.end_date} ({r.days_count} day{Number(r.days_count) > 1 ? "s" : ""})
                   </span>
@@ -929,7 +967,7 @@ export function LeaveContent({
                       ? "destructive"
                       : "outline"
                 }
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {formatName(r.status)}
               </Badge>
@@ -1049,51 +1087,54 @@ export function LeaveContent({
             <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Leave Type</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Leave Type</span>
                   <span className="font-medium">{leaveTypeMap.get(r.leave_type_id)?.name || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Duration</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Duration</span>
                   <span className="font-medium">
                     {r.start_date} to {r.end_date} ({r.days_count} day{Number(r.days_count) > 1 ? "s" : ""})
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Reliever</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Reliever</span>
                   <span className="font-medium">{resolvePersonName(r.reliever) || "Not assigned"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Current Stage</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Current Stage</span>
                   <span className="font-medium">{approvalStageLabel(r.current_stage_code || r.approval_stage)}</span>
                 </div>
               </div>
 
               {r.reason && (
                 <div className="space-y-1 border-t pt-3">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Reason for Leave
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Reason for Leave</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">{r.reason}</p>
                 </div>
               )}
 
               {r.handover_note && !r.handover_note.startsWith("Attached:") && (
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Handover Note</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Handover Note</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">{r.handover_note}</p>
                 </div>
               )}
 
               <div className="space-y-1 border-t pt-3">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                  Approval Timeline
-                </span>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Approval Timeline</span>
                 <p className="text-muted-foreground font-mono text-xs">{getApprovalTimeline(r)}</p>
               </div>
             </div>
           ),
         }}
         emptyTitle={isReviewTab ? "Nothing waiting on you" : "No leave requests"}
+        emptyAction={
+          isReviewTab ? undefined : (
+            <Button size="sm" onClick={openCreateDialog}>
+              Request leave
+            </Button>
+          )
+        }
         emptyDescription={
           isReviewTab
             ? "Requests reach you here when you are the reliever, the department lead, or the next approver in the route."
@@ -1122,7 +1163,7 @@ export function LeaveContent({
                       ? "destructive"
                       : "outline"
                 }
-                className="text-[10px] capitalize"
+                className="text-xs capitalize"
               >
                 {formatName(row.status)}
               </Badge>
@@ -1206,16 +1247,12 @@ export function LeaveContent({
         approvalRouteStages={leaveRoutePreview?.stages || []}
         preview={segmentsPreview(formData.segments, holidaySet)}
         leaveCalendar={leaveCalendar}
-        canSubmit={
-          !!formData.leave_type_id &&
-          formData.segments.length > 0 &&
-          !!formData.reason &&
-          !!formData.reliever_identifier &&
-          (Boolean(formData.handover_file) || Boolean(formData.handover_checklist_url)) &&
-          segmentsTotalDays(formData.segments, holidaySet) > 0 &&
-          segmentsTotalDays(formData.segments, holidaySet) <= selectedAvailableDays &&
-          (!requiresAttachmentOnCreate || Boolean(formData.attachment))
-        }
+        missingRequirements={leaveRequestMissing({
+          formData,
+          totalDays: segmentsTotalDays(formData.segments, holidaySet),
+          availableDays: selectedAvailableDays,
+          requiresAttachment: requiresAttachmentOnCreate,
+        })}
         submitting={submitting}
         onSubmit={handleSubmitRequest}
       />

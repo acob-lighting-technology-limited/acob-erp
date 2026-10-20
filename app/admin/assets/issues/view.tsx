@@ -26,6 +26,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("assets-issues")
 
 interface AssetIssue {
@@ -222,7 +224,7 @@ export function AssetIssuesPage({
       accessor: (issue) => issue.description,
       render: (issue) => (
         <span
-          className={`block max-w-[320px] truncate text-sm ${issue.resolved ? "text-muted-foreground line-through" : ""}`}
+          className={`block max-w-80 truncate text-sm ${issue.resolved ? "text-muted-foreground line-through" : ""}`}
         >
           {issue.description}
         </span>
@@ -305,6 +307,7 @@ export function AssetIssuesPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Asset Issues"
       description="Track and manage asset issues across the organization."
       icon={AlertCircle}
@@ -394,7 +397,7 @@ export function AssetIssuesPage({
           title: (issue) => `${issue.asset?.unique_code || "Asset"} · ${issue.description}`,
           subtitle: (issue) => `Assigned: ${assignedTo(issue)} · Reported: ${formatWATDate(issue.created_at)}`,
           trailing: (issue) => (
-            <Badge variant={issue.resolved ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={issue.resolved ? "default" : "secondary"} className="text-xs">
               {issue.resolved ? "Resolved" : "Unresolved"}
             </Badge>
           ),

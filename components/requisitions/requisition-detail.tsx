@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { toast } from "sonner"
 import {
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dialog"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNaira, progressLabel, STATUS_LABELS, stageTitle } from "@/lib/requisitions/format"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
 import type { Requisition, RequisitionStage, RequisitionViewerActions } from "@/lib/requisitions/types"
@@ -146,29 +148,25 @@ function ReassignDialog({
 
 /** One requisition: the paper form, its history, and what the viewer can do now. */
 export function RequisitionDetail({ id, backHref }: { id: string; backHref: string }) {
-  const [requisition, setRequisition] = useState<Requisition | null>(null)
-  const [viewer, setViewer] = useState<Viewer | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [signMode, setSignMode] = useState<SignMode | null>(null)
   const [paying, setPaying] = useState(false)
   const [reassigning, setReassigning] = useState<RequisitionStage | null>(null)
 
-  const load = useCallback(async () => {
-    setError(null)
-    try {
+  // retry: false so a missing requisition shows the "not found" panel straight away.
+  const detailQuery = useQuery({
+    queryKey: QUERY_KEYS.requisition(id),
+    queryFn: async () => {
       const res = await fetch(`/api/requisitions/${id}`)
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(json?.error || "Could not load this requisition")
-      setRequisition(json.data)
-      setViewer(json.viewer)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load this requisition")
-    }
-  }, [id])
-
-  useEffect(() => {
-    load()
-  }, [load])
+      return { requisition: json.data as Requisition, viewer: json.viewer as Viewer }
+    },
+    retry: false,
+  })
+  const requisition = detailQuery.data?.requisition ?? null
+  const viewer = detailQuery.data?.viewer ?? null
+  const error = detailQuery.error instanceof Error ? detailQuery.error.message : null
+  const load = () => void detailQuery.refetch()
 
   if (error) {
     return (

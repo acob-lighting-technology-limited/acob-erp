@@ -3,6 +3,9 @@ import { getCurrentUserPmsData } from "../_lib"
 import { TASK_WEIGHT_DEFAULT, isTaskInCycle } from "@/lib/tasks/scoring"
 import { EmployeeKpiTabs } from "./_components/employee-kpi-tabs"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 type GoalCycleRow = {
   id: string
   review_cycle_id: string | null
@@ -205,14 +208,16 @@ export default async function PmsKpiPage({
   })
 
   return (
-    <EmployeeKpiTabs
-      department={profile?.department || null}
-      initialTab={tab}
-      cycles={cycles}
-      activeCycleId={activeCycleId}
-      kpiScore={score.kpi_score}
-      cycleName={score.cycle_name || (effectiveCycleId === "all" ? "All Quarters" : "Active Cycle")}
-      rows={rows}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <EmployeeKpiTabs
+        department={profile?.department || null}
+        initialTab={tab}
+        cycles={cycles}
+        activeCycleId={activeCycleId}
+        kpiScore={score.kpi_score}
+        cycleName={score.cycle_name || (effectiveCycleId === "all" ? "All Quarters" : "Active Cycle")}
+        rows={rows}
+      />
+    </TablePageLayoutProvider>
   )
 }

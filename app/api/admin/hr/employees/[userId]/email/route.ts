@@ -7,9 +7,9 @@ import { logger } from "@/lib/logger"
 import { createClient } from "@/lib/supabase/server"
 import { formValidation } from "@/lib/validation"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { serverError } from "@/lib/api/errors"
 import { renameStaffMailbox } from "@/lib/employees/mailbox-rename"
 import { MailboxRenameOptionsSchema, type MailboxRenameResult } from "@/lib/employees/mailbox-rename-types"
-import { serverError } from "@/lib/api/errors"
 
 const log = logger("admin-hr-employee-email")
 

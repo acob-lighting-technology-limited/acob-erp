@@ -25,6 +25,7 @@ export function PushNotificationToggle({ vapidPublicKey }: PushNotificationToggl
 
   useEffect(() => {
     // Support depends on browser APIs, so it can only be resolved on the client.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- push support is only known in the browser
     setSupport(getPushSupport())
     getExistingSubscription()
       .then((subscription) => setIsSubscribed(Boolean(subscription)))

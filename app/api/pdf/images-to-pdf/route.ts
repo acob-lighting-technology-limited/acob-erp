@@ -73,11 +73,11 @@ export async function POST(request: NextRequest) {
             height: height,
           })
         } catch (imgError: any) {
-          console.error(`Error processing image ${i} (${file.name}):`, imgError)
+          log.error(`Error processing image ${i} (${file.name}):`, imgError)
           continue
         }
       } catch (error: any) {
-        console.error(`Error processing image ${i}:`, error)
+        log.error(`Error processing image ${i}:`, error)
       }
     }
 
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error converting images to PDF:", error)
+    log.error("Error converting images to PDF:", error)
     return serverError(log, error, "Failed to convert images to PDF")
   }
 }

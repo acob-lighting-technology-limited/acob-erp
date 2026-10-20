@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react"
+import { FormEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Brain, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
@@ -36,9 +36,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Textarea } from "@/components/ui/textarea"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { useDepartments } from "@/hooks/use-departments"
 import { getCanonicalDepartmentOrder } from "@/shared/departments"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
 
 type ReviewCycle = {
   id: string
@@ -62,6 +66,8 @@ type CbtQuestion = {
   explanation?: string | null
   is_active?: boolean
   created_at?: string
+  is_bonus?: boolean
+  targeted_emails?: string[] | null
 }
 
 function formatDate(date: string | undefined) {
@@ -69,27 +75,18 @@ function formatDate(date: string | undefined) {
   return formatWATDate(date, { day: "2-digit", month: "short", year: "numeric" })
 }
 
-function getPreferredCycleId(cycles: ReviewCycle[], requestedCycleId: string | null) {
-  if (requestedCycleId && cycles.some((cycle) => cycle.id === requestedCycleId)) return requestedCycleId
-
-  const q1Cycle = cycles.find((cycle) => cycle.name.toLowerCase().includes("q1"))
-  if (q1Cycle) return q1Cycle.id
-
-  const activeCycle = cycles.find((cycle) => cycle.status === "active")
-  if (activeCycle) return activeCycle.id
-
-  return cycles[0]?.id || ""
-}
-
 function QuestionCard({
   question,
   cycleName,
+  audience,
   onEdit,
   onDelete,
   deletingId,
 }: {
   question: CbtQuestion
   cycleName: string
+  /** "Department: Accounts" for the bank, "Targeted: a@x, b@y" for bonus questions. */
+  audience: string
   onEdit: (question: CbtQuestion) => void
   onDelete: (questionId: string) => void
   deletingId: string | null
@@ -100,7 +97,7 @@ function QuestionCard({
         <div className="space-y-1">
           <p className="font-semibold">{question.prompt}</p>
           <p className="text-muted-foreground text-xs">{cycleName}</p>
-          <p className="text-muted-foreground text-xs">Department: {question.department || "General"}</p>
+          <p className="text-muted-foreground text-xs">{audience}</p>
           <p className="text-muted-foreground text-xs">Correct answer: Option {question.correct_option}</p>
         </div>
         <Badge variant={question.is_active === false ? "secondary" : "default"}>
@@ -152,9 +149,63 @@ interface CbtQuestionManagerProps {
    * questions) is hidden.
    */
   lockDepartment?: string
+  /**
+   * "bonus" manages the standalone bonus questions: each targets specific
+   * candidate emails instead of a department, and is scored but kept out of
+   * the real CBT score.
+   */
+  variant?: "standard" | "bonus"
+  /** This page's own route, for deep links. Defaults to `${basePath}/question`. */
+  questionPath?: string
 }
 
-export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionManagerProps) {
+const COPY = {
+  standard: {
+    title: "CBT Question Bank",
+    description:
+      "Choose a PMS cycle, then add, edit, or delete CBT questions for that cycle. Q1 can stay editable while the team is still working there.",
+    tableTitle: "Questions",
+    add: "Add Question",
+    added: "Question added",
+    updated: "Question updated",
+    saveFailed: "Failed to save question",
+    dialogAdd: "Add CBT Question",
+    dialogEdit: "Edit CBT Question",
+    dialogAddHint: "Add a new CBT question and choose the PMS cycle it belongs to.",
+    dialogEditHint: "Update the selected CBT question and keep it under the right cycle.",
+    emptyTitle: "No CBT questions in this cycle",
+    emptyDescription: "Choose a cycle and add questions to start building its CBT test.",
+    search: "Search question text, options, explanation, or answer...",
+  },
+  bonus: {
+    title: "CBT Bonus Questions Manager",
+    description:
+      "Manage standalone bonus/joke questions and specify which candidate emails can see them. Scored, but kept out of the real CBT score and never shown to the candidate.",
+    tableTitle: "Bonus Questions",
+    add: "Add Bonus Question",
+    added: "Bonus question added",
+    updated: "Bonus question updated",
+    saveFailed: "Failed to save bonus question",
+    dialogAdd: "Add CBT Bonus Question",
+    dialogEdit: "Edit CBT Bonus Question",
+    dialogAddHint: "Add a new CBT bonus question and choose targeted candidates.",
+    dialogEditHint: "Update the selected CBT bonus question and manage targeted candidates.",
+    emptyTitle: "No CBT bonus questions in this cycle",
+    emptyDescription: "Choose a cycle and add targeted bonus questions for candidates.",
+    search: "Search question text, candidate email, correct answer...",
+  },
+} as const
+
+const EMPTY_QUESTIONS: CbtQuestion[] = []
+
+export function CbtQuestionManager({
+  basePath,
+  lockDepartment,
+  variant = "standard",
+  questionPath: questionPathProp,
+}: CbtQuestionManagerProps) {
+  const isBonus = variant === "bonus"
+  const copy = COPY[variant]
   const { departments: dynamicDepartments } = useDepartments()
   const departmentsList = lockDepartment
     ? [lockDepartment]
@@ -162,15 +213,40 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       ? dynamicDepartments
       : getCanonicalDepartmentOrder()
 
-  const questionPath = `${basePath}/question`
+  const questionPath = questionPathProp ?? `${basePath}/question`
 
   const router = useRouter()
   const searchParams = useSearchParams()
-  const requestedCycleId = searchParams.get("cycleId")
-  const [cycles, setCycles] = useState<ReviewCycle[]>([])
-  const [questions, setQuestions] = useState<CbtQuestion[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { cycles, isLoading: cyclesLoading } = usePerformanceCycles<ReviewCycle>()
+  const questionsQuery = useQuery({
+    queryKey: QUERY_KEYS.cbtQuestions(variant),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: CbtQuestion[] }>(`/api/hr/performance/cbt/questions${isBonus ? "?is_bonus=true" : ""}`, {
+          cache: "no-store",
+        })
+      ).data ?? [],
+    meta: { errorMessage: "Failed to load CBT questions" },
+  })
+  const questions = questionsQuery.data ?? EMPTY_QUESTIONS
+  const isLoading = questionsQuery.isLoading || cyclesLoading
+  const error = questionsQuery.error?.message ?? null
+  const loadPage = () => questionsQuery.refetch()
+
+  // Bonus questions target candidates by email.
+  const { data: candidateEmails = [] } = useQuery({
+    queryKey: QUERY_KEYS.cbtCandidateEmails(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: { candidates?: { company_email: string | null }[] } }>(
+        "/api/hr/performance/cbt/session",
+        { cache: "no-store" }
+      )
+      return (payload.data?.candidates || [])
+        .map((c) => c.company_email)
+        .filter((email): email is string => Boolean(email))
+    },
+    enabled: isBonus,
+  })
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -188,50 +264,11 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       correct_option: "A" as "A" | "B" | "C" | "D",
       explanation: "",
       is_active: true,
+      targeted_emails: [] as string[],
     }),
     [lockDepartment]
   )
   const [form, setForm] = useState(initialForm)
-
-  const loadPage = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const [cyclesResponse, questionsResponse] = await Promise.all([
-        apiFetch("/api/hr/performance/cycles", { cache: "no-store" }),
-        apiFetch("/api/hr/performance/cbt/questions", { cache: "no-store" }),
-      ])
-
-      const cyclesPayload = (await cyclesResponse.json().catch(() => null)) as {
-        data?: ReviewCycle[]
-        error?: string
-      } | null
-      const questionsPayload = (await questionsResponse.json().catch(() => null)) as {
-        data?: CbtQuestion[]
-        error?: string
-      } | null
-
-      if (!cyclesResponse.ok) throw new Error(cyclesPayload?.error || "Failed to load review cycles")
-      if (!questionsResponse.ok) throw new Error(questionsPayload?.error || "Failed to load CBT questions")
-
-      const nextCycles = cyclesPayload?.data || []
-      const nextQuestions = questionsPayload?.data || []
-
-      setCycles(nextCycles)
-      setQuestions(nextQuestions)
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Failed to load CBT questions"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadPage()
-  }, [loadPage])
 
   // Land on the quarter that contains today. PMS is scored quarterly, and
   // half-year/annual cycles cover the same dates, so "first active cycle" can
@@ -283,12 +320,19 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
   // Four filters max (AGENTS.md): Review Type, Quarter, Department, Status.
   const filters: DataTableFilter<CbtQuestion>[] = [
     ...cycleFilters,
-    {
-      key: "department",
-      label: "Department",
-      options: departmentsList.map((dept) => ({ value: dept, label: dept })),
-      placeholder: "All Departments",
-    },
+    isBonus
+      ? {
+          key: "correct_option",
+          label: "Correct Answer",
+          options: (["A", "B", "C", "D"] as const).map((value) => ({ value, label: `Option ${value}` })),
+          placeholder: "All Answers",
+        }
+      : {
+          key: "department",
+          label: "Department",
+          options: departmentsList.map((dept) => ({ value: dept, label: dept })),
+          placeholder: "All Departments",
+        },
     {
       key: "is_active",
       label: "Status",
@@ -316,15 +360,31 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       resizable: true,
       initialWidth: 320,
     },
-    {
-      key: "department",
-      label: "Department",
-      sortable: true,
-      accessor: (row) => row.department || "General",
-      render: (row) => <Badge variant="outline">{row.department || "General"}</Badge>,
-      resizable: true,
-      initialWidth: 180,
-    },
+    isBonus
+      ? {
+          key: "targeted_emails",
+          label: "Target Candidates",
+          sortable: true,
+          accessor: (row) => row.targeted_emails?.join(", ") || "",
+          render: (row) => (
+            <span className="text-muted-foreground text-xs break-all">
+              {row.targeted_emails && row.targeted_emails.length > 0
+                ? row.targeted_emails.join(", ")
+                : "No candidates targeted"}
+            </span>
+          ),
+          resizable: true,
+          initialWidth: 260,
+        }
+      : {
+          key: "department",
+          label: "Department",
+          sortable: true,
+          accessor: (row) => row.department || "General",
+          render: (row) => <Badge variant="outline">{row.department || "General"}</Badge>,
+          resizable: true,
+          initialWidth: 180,
+        },
     {
       key: "review_cycle_id",
       label: "Cycle",
@@ -399,6 +459,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       correct_option: question.correct_option,
       explanation: question.explanation || "",
       is_active: question.is_active !== false,
+      targeted_emails: question.targeted_emails || [],
     })
     setIsModalOpen(true)
   }
@@ -412,7 +473,28 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
         ? `/api/hr/performance/cbt/questions/${encodeURIComponent(editingQuestion.id)}`
         : "/api/hr/performance/cbt/questions"
       const method = editingQuestion ? "PATCH" : "POST"
-      const payload = editingQuestion ? form : form
+      let payload: Record<string, unknown> = form
+      if (isBonus) {
+        const parsedEmails = Array.from(new Set(form.targeted_emails.map((email) => email.trim().toLowerCase())))
+        if (parsedEmails.length === 0) throw new Error("At least one target email is required for bonus questions.")
+        payload = {
+          review_cycle_id: form.review_cycle_id,
+          department: "Bonus",
+          prompt: form.prompt,
+          option_a: form.option_a,
+          option_b: form.option_b,
+          option_c: form.option_c,
+          option_d: form.option_d,
+          correct_option: form.correct_option,
+          explanation: form.explanation || null,
+          is_active: form.is_active,
+          is_bonus: true,
+          targeted_emails: parsedEmails,
+        }
+      } else {
+        const { targeted_emails: _targets, ...standard } = form
+        payload = standard
+      }
 
       const response = await apiFetch(endpoint, {
         method,
@@ -421,9 +503,9 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       })
       const responsePayload = (await response.json().catch(() => null)) as { error?: string } | null
 
-      if (!response.ok) throw new Error(responsePayload?.error || "Failed to save question")
+      if (!response.ok) throw new Error(responsePayload?.error || copy.saveFailed)
 
-      toast.success(editingQuestion ? "Question updated" : "Question added")
+      toast.success(editingQuestion ? copy.updated : copy.added)
       router.replace(`${questionPath}?review_cycle_id=${encodeURIComponent(form.review_cycle_id)}`, {
         scroll: false,
       })
@@ -431,7 +513,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       resetForm(form.review_cycle_id)
       await loadPage()
     } catch (submitError) {
-      toast.error(submitError instanceof Error ? submitError.message : "Failed to save question")
+      toast.error(submitError instanceof Error ? submitError.message : copy.saveFailed)
     } finally {
       setSaving(false)
     }
@@ -460,8 +542,8 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
 
   return (
     <DataTablePage
-      title="CBT Question Bank"
-      description="Choose a PMS cycle, then add, edit, or delete CBT questions for that cycle. Q1 can stay editable while the team is still working there."
+      title={copy.title}
+      description={copy.description}
       icon={Brain}
       backLink={{ href: basePath, label: "Back to PMS CBT" }}
       actions={
@@ -470,14 +552,18 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
-          {!lockDepartment && (
+          {isBonus ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/pms/cbt/extra/scores">View Scores</Link>
+            </Button>
+          ) : !lockDepartment ? (
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/pms/cycles">Manage Cycles</Link>
             </Button>
-          )}
+          ) : null}
           <Button size="sm" onClick={openCreateModal}>
             <Plus className="h-4 w-4" />
-            Add Question
+            {copy.add}
           </Button>
         </div>
       }
@@ -493,7 +579,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
           />
           <StatCard
             variant="compact"
-            title="Questions"
+            title={copy.tableTitle}
             value={filteredQuestions.length}
             icon={Brain}
             iconBgColor="bg-emerald-500/10"
@@ -527,7 +613,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
         mobileRow={{
           title: (question) => question.prompt,
           subtitle: (question) =>
-            `${question.department || "General"} · ${cycleNameById.get(question.review_cycle_id || "") || "Unassigned"}`,
+            `${isBonus ? `Targets: ${question.targeted_emails?.length || 0}` : question.department || "General"} · ${cycleNameById.get(question.review_cycle_id || "") || "Unassigned"}`,
           trailing: (question) => (
             <Badge variant={question.is_active === false ? "secondary" : "default"}>
               {question.is_active === false ? "Inactive" : "Active"}
@@ -536,7 +622,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
           onSelect: openEditModal,
         }}
         pagination={{ pageSize: 50 }}
-        searchPlaceholder="Search question text, options, explanation, or answer..."
+        searchPlaceholder={copy.search}
         searchFn={(question, query) =>
           [
             cycleNameById.get(question.review_cycle_id || "") || "",
@@ -546,6 +632,7 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
             question.option_c,
             question.option_d,
             question.explanation || "",
+            question.targeted_emails?.join(" ") || "",
             question.correct_option,
           ]
             .join(" ")
@@ -564,7 +651,16 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
                   <span className="font-medium">Cycle:</span> {cycleNameById.get(question.review_cycle_id || "") || "-"}
                 </p>
                 <p>
-                  <span className="font-medium">Department:</span> {question.department || "-"}
+                  {isBonus ? (
+                    <>
+                      <span className="font-medium">Target Candidates:</span>{" "}
+                      {question.targeted_emails?.join(", ") || "-"}
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium">Department:</span> {question.department || "-"}
+                    </>
+                  )}
                 </p>
                 <p>
                   <span className="font-medium">Option A:</span> {question.option_a}
@@ -600,6 +696,11 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
           <QuestionCard
             question={question}
             cycleName={cycleNameById.get(question.review_cycle_id || "") || "Unassigned"}
+            audience={
+              isBonus
+                ? `Targeted: ${question.targeted_emails?.join(", ") || "None"}`
+                : `Department: ${question.department || "General"}`
+            }
             onEdit={openEditModal}
             onDelete={(questionId) => {
               void handleDelete(questionId)
@@ -607,8 +708,8 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
             deletingId={deletingId}
           />
         )}
-        emptyTitle="No CBT questions in this cycle"
-        emptyDescription="Choose a cycle and add questions to start building its CBT test."
+        emptyTitle={copy.emptyTitle}
+        emptyDescription={copy.emptyDescription}
         emptyIcon={Brain}
         skeletonRows={6}
         urlSync
@@ -623,12 +724,8 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingQuestion ? "Edit CBT Question" : "Add CBT Question"}</DialogTitle>
-            <DialogDescription>
-              {editingQuestion
-                ? "Update the selected CBT question and keep it under the right cycle."
-                : "Add a new CBT question and choose the PMS cycle it belongs to."}
-            </DialogDescription>
+            <DialogTitle>{editingQuestion ? copy.dialogEdit : copy.dialogAdd}</DialogTitle>
+            <DialogDescription>{editingQuestion ? copy.dialogEditHint : copy.dialogAddHint}</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -654,25 +751,39 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Department</Label>
-                <Select
-                  value={form.department}
-                  disabled={Boolean(lockDepartment)}
-                  onValueChange={(value) => setForm((current) => ({ ...current, department: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departmentsList.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isBonus ? (
+                <div className="space-y-2">
+                  <Label>Target Candidate Emails</Label>
+                  <SearchableMultiSelect
+                    label="Target Candidate Emails"
+                    values={form.targeted_emails}
+                    options={candidateEmails.map((email) => ({ value: email, label: email }))}
+                    onChange={(values) => setForm((current) => ({ ...current, targeted_emails: values }))}
+                    placeholder="Select candidates..."
+                    searchPlaceholder="Search emails..."
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Select
+                    value={form.department}
+                    disabled={Boolean(lockDepartment)}
+                    onValueChange={(value) => setForm((current) => ({ ...current, department: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departmentsList.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -785,8 +896,8 @@ export function CbtQuestionManager({ basePath, lockDepartment }: CbtQuestionMana
               >
                 Cancel
               </Button>
-              <Button type="submit" loading={saving} disabled={!form.review_cycle_id || !form.department}>
-                {editingQuestion ? "Save Changes" : "Add Question"}
+              <Button type="submit" loading={saving} disabled={!form.review_cycle_id || (!isBonus && !form.department)}>
+                {editingQuestion ? "Save Changes" : copy.add}
               </Button>
             </DialogFooter>
           </form>

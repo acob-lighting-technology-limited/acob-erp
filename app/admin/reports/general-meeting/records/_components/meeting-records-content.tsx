@@ -14,6 +14,8 @@ import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { MeetingSyncModal } from "./meeting-sync-modal"
 
+import { layout as tablePageLayout } from "../_layout"
+
 type ArtifactTab = "attendance" | "transcript"
 
 type Row = {
@@ -150,6 +152,7 @@ export function MeetingRecordsContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Meeting Records"
       description="Teams attendance reports and transcripts, auto-synced per meeting week."
       icon={Users}
@@ -234,9 +237,9 @@ export function MeetingRecordsContent() {
                 W{r.meeting_week} {r.meeting_year}
               </Badge>
             </div>
-            <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground">{r.file_name}</span>
-              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => download(r)}>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => download(r)}>
                 <Download className="mr-1 h-3 w-3" /> Download
               </Button>
             </div>

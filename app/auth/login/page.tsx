@@ -47,6 +47,7 @@ export default function LoginPage() {
 
     if (hashError) {
       const message = decodeURIComponent(hashError)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reads auth tokens from window.location.hash after hydration
       setError(message)
       toast.error(message)
       return

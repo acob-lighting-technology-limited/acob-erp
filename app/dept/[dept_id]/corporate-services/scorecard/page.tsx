@@ -2,6 +2,9 @@ import type { Metadata } from "next"
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export const metadata: Metadata = {
   title: "Department Scorecard | Corporate Services | Matrix",
   description: "Departmental KPI commitments, targets, and actual progress against the strategic plan.",
@@ -16,11 +19,13 @@ export default async function DeptScorecardPage({ params }: Props) {
   const scope = await requireDeptScope(dept_id)
 
   return (
-    <DepartmentCascadeContent
-      departments={[scope.deptName]}
-      initialDepartment={scope.deptName}
-      lockedDepartment={scope.deptName}
-      backLink={{ href: `/dept/${dept_id}`, label: "Back to Dashboard" }}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <DepartmentCascadeContent
+        departments={[scope.deptName]}
+        initialDepartment={scope.deptName}
+        lockedDepartment={scope.deptName}
+        backLink={{ href: `/dept/${dept_id}`, label: "Back to Dashboard" }}
+      />
+    </TablePageLayoutProvider>
   )
 }

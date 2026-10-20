@@ -117,11 +117,11 @@ export function ProfileContent({
         <RecentAttendanceCard items={recentWorkDaysAttendance} />
         <LunchHistoryCard lunchLogs={lunchLogs} />
 
-        <LeaveCard leave={leave} className="lg:h-[360px]" />
-        <AssetsCard assets={assets} className="lg:h-[360px]" />
+        <LeaveCard leave={leave} className="lg:h-90" />
+        <AssetsCard assets={assets} className="lg:h-90" />
         <PersonalRecentActivityFeed
           activity={recentActivity.slice(0, MAX_ACTIVITY_ENTRIES)}
-          className="h-[400px] lg:h-[360px]"
+          className="h-100 lg:h-90"
         />
       </div>
 

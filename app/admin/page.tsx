@@ -497,7 +497,7 @@ export default async function AdminDashboardPage() {
             description={`of ${activeStaff.count || 0} active staff`}
             icon={Clock}
             iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconColor="text-info-foreground"
           />
           <StatCard
             variant="compact"
@@ -506,7 +506,7 @@ export default async function AdminDashboardPage() {
             description={overdueTaskCount > 0 ? "Past their deadline" : "Nothing overdue"}
             icon={AlertTriangle}
             iconBgColor={overdueTaskCount > 0 ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"}
-            iconColor={overdueTaskCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}
+            iconColor={overdueTaskCount > 0 ? "text-danger-foreground" : "text-muted-foreground"}
           />
           <StatCard
             variant="compact"
@@ -515,7 +515,7 @@ export default async function AdminDashboardPage() {
             description="Requests not yet decided"
             icon={CalendarClock}
             iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconColor="text-warning-foreground"
           />
           <StatCard
             variant="compact"
@@ -524,7 +524,7 @@ export default async function AdminDashboardPage() {
             description="Pending, in progress, in review or blocked"
             icon={ClipboardList}
             iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconColor="text-success-foreground"
           />
           <StatCard
             variant="compact"

@@ -129,7 +129,7 @@ export function RouteHealthPanel() {
                         </div>
                         {result && (
                           <div className="flex shrink-0 items-center gap-2">
-                            <Badge variant="outline" className="text-[10px]">
+                            <Badge variant="outline" className="text-xs">
                               {result.status ?? "ERR"}
                             </Badge>
                             <span className="text-muted-foreground tabular-nums">{result.ms}ms</span>

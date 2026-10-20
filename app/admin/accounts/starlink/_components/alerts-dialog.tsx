@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { AlertTriangle, CalendarClock } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,32 +16,45 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
+
 import { EmployeeRecipientPicker } from "@/components/admin/employee-recipient-picker"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { DEFAULT_STARLINK_ALERTS, type StarlinkAlertsConfig } from "@/lib/starlink/billing-alerts"
 
 /** Choose who is emailed (and notified in the Matrix) when a Starlink payment fails or a bill is coming due. */
 export function StarlinkAlertsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const [config, setConfig] = useState<StarlinkAlertsConfig>(DEFAULT_STARLINK_ALERTS)
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+
+  // Fetched each time the dialog opens; retry off so a failure is reported once.
+  const alertsQuery = useQuery({
+    queryKey: ["starlink-alerts-config"],
+    queryFn: async (): Promise<StarlinkAlertsConfig> => {
+      const res = await apiFetch("/api/starlink/alerts", { cache: "no-store" })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(json?.error || "Failed to load alert settings")
+      return json.data as StarlinkAlertsConfig
+    },
+    enabled: open,
+    retry: false,
+  })
+  const loading = alertsQuery.isFetching
 
   useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    void (async () => {
-      try {
-        const res = await apiFetch("/api/starlink/alerts", { cache: "no-store" })
-        const json = await res.json().catch(() => null)
-        if (!res.ok) throw new Error(json?.error || "Failed to load alert settings")
-        setConfig(json.data as StarlinkAlertsConfig)
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to load alert settings")
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [open])
+    if (alertsQuery.error) {
+      toast.error(alertsQuery.error instanceof Error ? alertsQuery.error.message : "Failed to load alert settings")
+    }
+  }, [alertsQuery.error])
+
+  // Each open (and each fresh fetch) starts the draft from the saved settings, during render rather than in an effect.
+  const seedNext = [open, alertsQuery.dataUpdatedAt] as const
+  if (depsChanged(seeded, seedNext)) {
+    setSeeded(seedNext)
+    if (alertsQuery.data) setConfig(alertsQuery.data)
+  }
 
   const save = async () => {
     setSaving(true)
@@ -73,7 +87,7 @@ export function StarlinkAlertsDialog({ open, onOpenChange }: { open: boolean; on
         </DialogHeader>
 
         {loading ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+          <LinesSkeleton lines={4} className="py-8" />
         ) : (
           <div className="space-y-5">
             <section className="space-y-3 rounded-lg border p-3">

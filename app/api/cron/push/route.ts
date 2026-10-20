@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 import { sendPushToUsers, isPushConfigured } from "@/lib/push/server"
 import { isNotificationKey, type NotificationKey } from "@/lib/notifications/delivery-policy"
+import { notificationTier } from "@/lib/notifications/tiers"
 
 const log = logger("cron-push")
 
@@ -21,6 +22,8 @@ interface ClaimedNotification {
   id: string
   user_id: string | null
   category: string | null
+  /** Absent until migration 20261003100000 is applied; treated as "push". */
+  type?: string | null
   title: string | null
   message: string | null
   link_url: string | null
@@ -75,7 +78,14 @@ export async function GET(request: NextRequest) {
     }
 
     const cutoff = Date.now() - MAX_PUSH_AGE_MINUTES * 60_000
-    const fresh = claimed.filter((row) => Boolean(row.user_id && row.title) && Date.parse(row.created_at) >= cutoff)
+    // Push is for work waiting on someone (audit 2.1 tiers). Updates stay in the
+    // bell and announcements on the notifications page — pushing all 1,500 a
+    // month trained people to ignore the ones that matter.
+    const pushWorthy = (row: ClaimedNotification) =>
+      row.type === undefined || notificationTier({ type: row.type, priority: row.priority }) === "action"
+    const fresh = claimed.filter(
+      (row) => Boolean(row.user_id && row.title) && Date.parse(row.created_at) >= cutoff && pushWorthy(row)
+    )
     const stale = claimed.length - fresh.length
 
     let sent = 0

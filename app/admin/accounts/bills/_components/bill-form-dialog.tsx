@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger"
 import type { QueryClient } from "@tanstack/react-query"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { formatCurrency } from "@/lib/format"
 
 const log = logger("finance-bill-dialog")
 
@@ -38,14 +39,14 @@ interface BillFormDialogProps {
 export function BillFormDialog({ open, onOpenChange, queryClient }: BillFormDialogProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     supplier_name: "",
     supplier_email: "",
     bill_date: toLocalISODate(),
     due_date: toLocalISODate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
     currency: "NGN",
     notes: "",
-  })
+  }))
   const [items, setItems] = useState<BillItem[]>([
     { id: crypto.randomUUID(), description: "", quantity: 1, unit_price: 0, amount: 0 },
   ])
@@ -90,10 +91,6 @@ export function BillFormDialog({ open, onOpenChange, queryClient }: BillFormDial
 
   function calculateTotals() {
     return { total: items.reduce((sum, item) => sum + item.amount, 0) }
-  }
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: formData.currency }).format(amount)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -218,10 +215,11 @@ export function BillFormDialog({ open, onOpenChange, queryClient }: BillFormDial
                       </div>
                       <div className="space-y-2 text-right sm:col-span-2">
                         <Label>Amount</Label>
-                        <p className="py-2 font-medium">{formatCurrency(item.amount)}</p>
+                        <p className="py-2 font-medium">{formatCurrency(item.amount, formData.currency)}</p>
                       </div>
                       <div className="sm:col-span-1">
                         <Button
+                          aria-label="Delete"
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -292,7 +290,12 @@ export function BillFormDialog({ open, onOpenChange, queryClient }: BillFormDial
                 </CardContent>
               </Card>
 
-              <StatCard variant="compact" title="Total" value={formatCurrency(totals.total)} icon={Receipt} />
+              <StatCard
+                variant="compact"
+                title="Total"
+                value={formatCurrency(totals.total, formData.currency)}
+                icon={Receipt}
+              />
             </div>
           </div>
 

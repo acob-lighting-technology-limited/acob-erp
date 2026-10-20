@@ -1,113 +1,115 @@
-# Matrix — ACOB Lighting internal ERP
+# Matrix — ACOB Lighting ERP
 
-Matrix is the internal staff portal and ERP for ACOB Lighting Technology Limited,
-served at **https://matrix.acoblighting.com**. It is a private, sign-in-only
-application for ACOB staff (`@acoblighting.com` / `@org.acoblighting.com`
-accounts). It is not a public website, and nothing in this repo is meant for
-anonymous visitors. The public company site is a separate project.
+Matrix is the internal operations platform for ACOB Lighting Technology Limited
+(<https://matrix.acoblighting.com>). One app covers the day-to-day work of every
+department: attendance and leave, tasks and projects, performance reviews,
+requisitions and payments, assets, correspondence, help desk, weekly reports and
+the general meeting, and MD's Desk.
 
-> The local folder may still be named `ACOB-Signature-Creator` — the app began as
-> an email-signature tool. The repository is `acob-erp`.
+## Surfaces
 
-## What it covers
+| Surface | Path | Who |
+|---|---|---|
+| Staff app | `app/(app)/…` | Every employee — their own attendance, leave, tasks, reviews, requests |
+| Admin console | `app/admin/…` | HR, finance, ICT and leadership, scoped by `admin_routes` |
+| Department console | `app/dept/[dept_id]/…` | Department leads, locked to their department |
 
-| Area | Examples |
-| --- | --- |
-| HR | Attendance and clock-in, leave, onboarding, payroll, PMS and review cycles, CBT |
-| Work | Tasks, projects, goals, weekly reports, meetings and KSS rotation |
-| Operations | Help desk, assets and inventory, purchasing, payments, Starlink billing |
-| Communications | Notifications (in-app, email, web push), correspondence, events calendar, MD's Desk, birthdays |
-| Governance | Audit logs, policies and SOPs, risk register, corporate scorecard, security |
-| Tools | Email signature creator and other staff utilities |
+All three reuse the same feature components (`components/<feature>/`); the route
+decides the scope, the API route decides what data that scope may see.
 
-Staff-facing pages live under `app/(app)`; admin pages live under `app/admin`.
-For how staff use the system, see [docs/MATRIX_USER_GUIDE.md](docs/MATRIX_USER_GUIDE.md).
+## Modules
 
-## Stack
+Attendance (Hikvision terminal sync, appeals, exemptions, out-of-station) · Leave
+(multi-stage approvals, balances, SLA) · Lunch (daily menu poll) · Tasks & Projects ·
+PMS (KPIs, reviews, CBT, peer feedback) · Corporate scorecard · Requisitions &
+Payments · Payroll · Assets · Inventory & Purchasing · Correspondence register ·
+Help desk · Weekly reports, action tracker & KSS · Events calendar · MD's Desk ·
+Policies & SOPs · Communications & notifications · AcoBot assistant.
 
-- **Next.js 16** (App Router) + **React 19** + **TypeScript**
-- **Tailwind CSS 4** + shadcn/ui components
-- **Supabase** — Postgres with RLS, Auth, Storage, Edge Functions (`supabase/functions`), `pg_cron`
-- **Resend** for transactional email; **Upstash Redis** for rate limiting
-- **Vercel** for hosting; `services/document-service` for PDF/OCR tooling
+## Architecture
+
+```
+Browser ──► Next.js 16 (App Router, React 19)
+              ├─ Server components ──► Supabase (Postgres + RLS)
+              └─ /api/* route handlers ─► Supabase via service role, after
+                                           authorisation (lib/admin/api-scope)
+Supabase ──► pg_cron / Edge Functions ─► /api/cron/* (bearer CRON_SECRET)
+External ──► Hikvision terminal webhook · Microsoft Graph (OneDrive, Teams) ·
+             Resend (email) · Web Push · Groq (AcoBot) · Upstash (rate limits)
+```
+
+Key rules (full list in [`AGENTS.md`](AGENTS.md)):
+
+- **The database is the security boundary.** The anon key is public, so every
+  table has RLS and every `SECURITY DEFINER` function is locked to the roles that
+  need it. Browser code never writes to Supabase directly — it calls an `/api/`
+  route that authorises, validates with zod and writes with the service role.
+- **One component per screen** across staff/admin/dept, shared helpers in `lib/`
+  (`lib/format.ts`, `lib/status-tones.ts`, `lib/api/*`), shared UI in
+  `components/ui/` and `components/ui/patterns/`.
+- **Every list page** uses `DataTablePage` + `DataTable`; every route has a
+  `loading.tsx` skeleton.
+
+## Tech stack
+
+Next.js 16 · React 19 · TypeScript (strict) · Tailwind CSS v4 + shadcn/ui (Radix) ·
+TanStack Query · react-hook-form + zod · Supabase (Postgres, Auth, Storage, Edge
+Functions) · Resend · Vercel.
 
 ## Getting started
 
-Requires Node 24 and access to the ACOB Supabase project.
+Requires Node 22+ and access to the Supabase project.
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in the values — ask ICT for secrets
+cp .env.example .env.local   # fill in the Supabase, Resend and site URL values
 npm run dev                  # http://localhost:3000
 ```
 
-`.env.example` documents every variable. Only the Supabase, Resend and site-URL
-groups are required to boot; the rest switch on optional integrations
-(OneDrive, AcoBot, document service, help-desk SLAs, cron).
+The variables in `.env.example` marked **Required** are needed to sign in and load
+data; the rest enable optional integrations (OneDrive, push, AcoBot, rate limits).
 
-Never commit `.env.local` or any service-role key. See
-[docs/SECURITY_KEY_ROTATION_RUNBOOK.md](docs/SECURITY_KEY_ROTATION_RUNBOOK.md)
-if a secret leaks.
-
-## Checking your work
-
-Use the fast checks. **Do not run `npm run build` locally** — it takes several
-minutes and fights the dev server for `.next/`. Vercel is the only place the
-production build runs.
+## Checks
 
 ```bash
-npm run type-check          # tsc --noEmit
-npm run lint:strict         # ESLint, zero warnings allowed
-npm test                    # unit test suites (tsx --test)
-npm run test:e2e            # Playwright
+npx tsc --noEmit -p tsconfig.json   # types
+npm run lint:strict                 # ESLint, zero warnings
+npm test                            # unit tests (node:test via tsx)
+npm run test:e2e                    # Playwright (needs a running app + session)
 ```
 
-Individual suites are available as `npm run test:<area>` (e.g. `test:attendance`,
-`test:admin-scope`, `test:starlink`).
-
-## Git workflow
-
-- Branch from `main`; never push to `main` directly — the pre-push hook blocks it.
-- Open a pull request; if one is already open for your work, push to its branch.
-- Commits follow Conventional Commits (`commitlint`); `npm run commit` gives a prompt.
-- Pre-commit runs `lint-staged` (ESLint + Prettier). Pre-push runs `lint:strict`
-  and `type-check`. Never bypass hooks with `--no-verify`.
+The pre-push hook runs lint and type-check; CI (`.github/workflows/ci.yml`) runs
+lint, type-check and unit tests on every pull request. Production builds run only
+on Vercel — **do not run `npm run build` locally** (it competes with the dev
+server for `.next/`).
 
 ## Database
 
-Schema changes are SQL migrations in `supabase/migrations/`. The live database is
-the only environment — there is no shared dev database — so treat every push as
-production.
+Migrations live in `supabase/migrations/` and are the only way to change schema,
+policies or grants. Check what is live before pushing:
 
-- Check what is actually applied with `npx supabase migration list` (the
-  `remote` column is the source of truth, not `git status`).
-- Apply pending migrations with `npx supabase db push`.
-- Edge functions live in `supabase/functions/` and are deployed with the
-  Supabase CLI.
+```bash
+npx supabase migration list
+```
 
-## Project conventions
-
-[AGENTS.md](AGENTS.md) is the source of truth for engineering standards and UI
-patterns — table pages (`DataTablePage` + `DataTable`), stat cards, typing,
-commit grouping and migration rules. Read it before making changes. It applies
-to human contributors and AI agents alike.
+There is no staging database: every push hits production, so migrations are
+reviewed first. Archived, non-migration SQL is in `supabase/archive/`.
 
 ## Repository layout
 
 ```
-app/            Routes — (app) staff pages, admin, api, auth
-components/     Shared UI (components/ui = shadcn-based primitives)
-lib/            Domain logic, grouped by area (hr, tasks, starlink, …)
-supabase/       Migrations, edge functions, config
-services/       Out-of-process services (document-service)
-scripts/        Maintenance, audits, test campaigns
-docs/           Runbooks, audits, implementation notes, user guide
-tests/          Playwright end-to-end tests
+app/            routes — (app) staff, admin, dept, api, auth
+components/     feature components and the shared UI kit (components/ui)
+lib/            data access, domain logic, helpers (format, status tones, api)
+hooks/          client hooks
+supabase/       migrations, edge functions, archived SQL
+scripts/        maintained tooling (see scripts/README.md); one-offs in scripts/archive
+docs/           guides, runbooks, integrations, architecture, audits (see docs/README.md)
+templates/      starting points for new pages that follow the house standards
 ```
 
-## Access and support
+## Contributing
 
-Matrix accounts are provisioned by ICT; staff activate theirs at
-`/auth/setup-account`. For access, bugs or questions, contact ACOB ICT.
-
-This is proprietary software of ACOB Lighting Technology Limited. All rights reserved.
+Read [`AGENTS.md`](AGENTS.md) before changing anything — it is the single source
+of truth for engineering standards, shared by every contributor and AI agent.
+Commits follow `type: description` (conventional commits, lowercase, ≤72 chars).

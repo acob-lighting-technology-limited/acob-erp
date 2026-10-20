@@ -14,6 +14,7 @@ import {
   type PmsCadence,
 } from "@/lib/pms/cadence"
 import { toLocalISODate } from "@/lib/utils/date"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 export type CycleFilterCycle = CadenceCycle & { name: string; status?: string | null }
 
@@ -40,13 +41,13 @@ export function useCycleFilters<TRow>({
   const [cadence, setCadence] = useState<PmsCadence>(defaultCadence)
   const [selectedCycleId, setSelectedCycleId] = useState("")
 
-  // If defaultCadence was explicitly passed and differs, set it
-  useEffect(() => {
-    if (defaultCadence && defaultCadence !== cadence) {
-      setCadence(defaultCadence)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultCadence])
+  // A newly passed defaultCadence wins — adjusted during render, not in an effect.
+  const [cadenceFor, setCadenceFor] = useState<readonly unknown[] | null>(null)
+  const cadenceForNext = [defaultCadence] as const
+  if (depsChanged(cadenceFor, cadenceForNext)) {
+    setCadenceFor(cadenceForNext)
+    if (defaultCadence && defaultCadence !== cadence) setCadence(defaultCadence)
+  }
 
   const cycleInfoById = useMemo(() => {
     const map = new Map<string, { review_type?: string | null; name?: string | null }>()
@@ -60,17 +61,18 @@ export function useCycleFilters<TRow>({
   )
 
   // Land on the current cycle as soon as the cycle list arrives or cadence changes.
-  const seededRef = useRef(false)
-  useEffect(() => {
-    if (cycles.length === 0) return
-    if (cadence === "all") {
+  const [seeded, setSeeded] = useState(false)
+  // Land on the current cycle when the list arrives or cadence changes — adjusted during render, not in an effect.
+  const [cycleFor, setCycleFor] = useState<readonly unknown[] | null>(null)
+  const cycleForNext = [cycles, cadence] as const
+  if (depsChanged(cycleFor, cycleForNext)) {
+    setCycleFor(cycleForNext)
+    if (cycles.length > 0 && cadence === "all") {
       setSelectedCycleId("")
-      return
-    }
-    if (!seededRef.current) {
-      seededRef.current = true
+    } else if (cycles.length > 0 && !seeded) {
+      setSeeded(true)
       setSelectedCycleId(pickCurrentCycle(cycles, toLocalISODate(), cadence)?.id ?? "")
-    } else {
+    } else if (cycles.length > 0) {
       setSelectedCycleId((current) => {
         const stillVisible = cycles.some(
           (cycle) => cycle.id === current && matchesCadence(cadence, cycle.review_type, cycle.name)
@@ -79,7 +81,7 @@ export function useCycleFilters<TRow>({
         return pickCurrentCycle(cycles, toLocalISODate(), cadence)?.id ?? ""
       })
     }
-  }, [cycles, cadence])
+  }
 
   const matchesSelection = useCallback(
     (row: TRow, forCadence: PmsCadence) => {
@@ -184,7 +186,7 @@ export function useCycleFilters<TRow>({
                   <div className="flex w-full items-center justify-between gap-2">
                     <span className="truncate">{cycleOptionLabel(cycle, visibleCycles)}</span>{" "}
                     {cycle.status === "active" && (
-                      <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-500">
+                      <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-500">
                         Active
                       </span>
                     )}

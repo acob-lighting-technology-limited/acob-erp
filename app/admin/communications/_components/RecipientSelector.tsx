@@ -103,7 +103,7 @@ export function RecipientSelector({
               Clear
             </Button>
           </div>
-          <div className="max-h-[320px] space-y-1 overflow-y-auto rounded-lg border p-2">
+          <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border p-2">
             {filteredEmployees.map((emp) => (
               <label
                 key={emp.id}

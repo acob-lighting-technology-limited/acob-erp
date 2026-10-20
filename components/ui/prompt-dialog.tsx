@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface PromptDialogProps {
   open: boolean
@@ -56,14 +57,18 @@ export function PromptDialog({
   const [submitting, setSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
 
-  // Reset value when dialog opens
+  // Reset the value when the dialog opens — adjusted during render, not in an effect.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) setValue("")
+  }
+
+  // Focus the input after the open animation (a DOM side effect).
   useEffect(() => {
-    if (open) {
-      setValue("")
-      // Focus input on next tick after dialog animation
-      const t = setTimeout(() => inputRef.current?.focus(), 80)
-      return () => clearTimeout(t)
-    }
+    if (!open) return
+    const t = setTimeout(() => inputRef.current?.focus(), 80)
+    return () => clearTimeout(t)
   }, [open])
 
   async function handleConfirm() {

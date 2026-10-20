@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Loader2, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,10 +16,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { EmployeeRecipientPicker } from "@/components/admin/employee-recipient-picker"
-import { logger } from "@/lib/logger"
-import { apiFetch } from "@/lib/api-client"
-
-const log = logger("attendance-report-dialog")
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const DEFAULT_SEND_TIMES = ["11:00", "23:00"]
 
@@ -35,42 +35,48 @@ type ConfigPayload = {
 }
 
 export function AttendanceReportDialog({ open, onOpenChange }: Props) {
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
-  const [recipientUserIds, setRecipientUserIds] = useState<string[]>([])
-  const [enabled, setEnabled] = useState(false)
-  const [sendTimes, setSendTimes] = useState<string[]>(DEFAULT_SEND_TIMES)
 
-  useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    void (async () => {
-      try {
-        const res = await apiFetch("/api/admin/hr/attendance/report-config", { cache: "no-store" })
-        const payload = (await res.json().catch(() => null)) as { data?: ConfigPayload; error?: string } | null
-        if (!res.ok) throw new Error(payload?.error ?? "Failed to load report configuration")
-        setRecipientUserIds(payload?.data?.recipientUserIds ?? [])
-        setEnabled(Boolean(payload?.data?.enabled))
-        setSendTimes(payload?.data?.sendTimes?.length ? payload.data.sendTimes : DEFAULT_SEND_TIMES)
-      } catch (err) {
-        log.error("Failed to load attendance report config", err)
-        toast.error("Failed to load report configuration")
-      } finally {
-        setLoading(false)
+  const { data: saved, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.attendanceReportConfig(),
+    enabled: open,
+    queryFn: async (): Promise<ConfigPayload> => {
+      const payload = await apiJson<{ data?: ConfigPayload }>("/api/admin/hr/attendance/report-config", {
+        cache: "no-store",
+      })
+      return {
+        recipientUserIds: payload.data?.recipientUserIds ?? [],
+        enabled: Boolean(payload.data?.enabled),
+        sendTimes: payload.data?.sendTimes?.length ? payload.data.sendTimes : DEFAULT_SEND_TIMES,
       }
-    })()
-  }, [open])
+    },
+    meta: { errorMessage: "Failed to load report configuration" },
+  })
+
+  // Unsaved edits. Null means "show what the server has".
+  const [draft, setDraft] = useState<ConfigPayload | null>(null)
+  const form = draft ?? saved ?? { recipientUserIds: [], enabled: false, sendTimes: DEFAULT_SEND_TIMES }
+  const { recipientUserIds, enabled, sendTimes } = form
+  const edit = (patch: Partial<ConfigPayload>) => setDraft({ ...form, ...patch })
+  const setEnabled = (value: boolean) => edit({ enabled: value })
+  const setRecipientUserIds = (ids: string[]) => edit({ recipientUserIds: ids })
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setDraft(null)
+    onOpenChange(next)
+  }
 
   const updateSendTime = (index: number, value: string) => {
-    setSendTimes((prev) => prev.map((t, i) => (i === index ? value : t)))
+    edit({ sendTimes: sendTimes.map((t, i) => (i === index ? value : t)) })
   }
 
   const removeSendTime = (index: number) => {
-    setSendTimes((prev) => prev.filter((_, i) => i !== index))
+    edit({ sendTimes: sendTimes.filter((_, i) => i !== index) })
   }
 
   const addSendTime = () => {
-    setSendTimes((prev) => [...prev, "12:00"])
+    edit({ sendTimes: [...sendTimes, "12:00"] })
   }
 
   const save = async () => {
@@ -87,6 +93,8 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
       })
       const payload = (await res.json().catch(() => null)) as { error?: string } | null
       if (!res.ok) throw new Error(payload?.error ?? "Failed to save")
+      queryClient.setQueryData(QUERY_KEYS.attendanceReportConfig(), form)
+      setDraft(null)
       toast.success("Attendance report settings saved")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save")
@@ -96,7 +104,7 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] w-[95vw] max-w-xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Attendance Reports</DialogTitle>
@@ -107,7 +115,7 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
         </DialogHeader>
 
         {loading ? (
-          <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+          <LinesSkeleton lines={6} className="py-8" />
         ) : (
           <div className="space-y-4">
             <div className="space-y-3 rounded-lg border p-3">
@@ -127,7 +135,7 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
                       type="time"
                       value={time}
                       onChange={(e) => updateSendTime(index, e.target.value)}
-                      className="w-[140px]"
+                      className="w-35"
                     />
                     <Button
                       type="button"
@@ -157,7 +165,7 @@ export function AttendanceReportDialog({ open, onOpenChange }: Props) {
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Close
           </Button>
           <Button onClick={save} disabled={saving || loading}>

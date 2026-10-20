@@ -36,6 +36,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle"
 import { cn, getInitials } from "@/lib/utils"
 import { MatrixLogo } from "@/components/matrix-logo"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface NavbarProps {
   user?: {
@@ -71,13 +72,17 @@ export function Navbar({ user, avatarUrl, canAccessAdmin = false, isAdminMode = 
   const sidebarContext = useSidebarSafe()
   const { isCollapsed, setIsCollapsed } = sidebarContext || { isCollapsed: false, setIsCollapsed: () => {} }
 
-  useEffect(() => {
+  // Follow the avatar prop, else the auth profile picture — adjusted during render, not in an effect.
+  const [avatarFor, setAvatarFor] = useState<readonly unknown[] | null>(null)
+  const avatarForNext = [avatarUrl, user?.user_metadata?.avatar_url, user?.user_metadata?.picture] as const
+  if (depsChanged(avatarFor, avatarForNext)) {
+    setAvatarFor(avatarForNext)
     if (avatarUrl !== undefined) {
       setCurrentAvatarUrl(avatarUrl)
     } else if (user?.user_metadata?.avatar_url || user?.user_metadata?.picture) {
       setCurrentAvatarUrl(user.user_metadata.avatar_url || user.user_metadata.picture || null)
     }
-  }, [avatarUrl, user?.user_metadata?.avatar_url, user?.user_metadata?.picture])
+  }
 
   // Listen for real-time avatar updates from profile photo upload/delete
   useEffect(() => {

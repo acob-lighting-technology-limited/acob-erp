@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid action. Use "protect" or "remove"' }, { status: 400 })
     }
   } catch (error: any) {
-    console.error("Error processing PDF password:", error)
+    log.error("Error processing PDF password:", error)
     return serverError(log, error, "Failed to process PDF password")
   }
 }

@@ -7,6 +7,9 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { Archive, CalendarDays, Download, ExternalLink, HardDrive, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatNumber } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 interface ArchivedDay {
   date: string
@@ -99,7 +102,7 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
       label: "Batches",
       sortable: true,
       accessor: (r) => r.files,
-      render: (r) => r.files.toLocaleString(),
+      render: (r) => formatNumber(r.files),
     },
     {
       key: "bytes",
@@ -132,6 +135,7 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Network Activity"
       description={`Office network logs, archived daily to SharePoint and kept for ${data?.retentionMonths ?? 12} months. Download a day to investigate it in Excel.`}
       icon={ShieldCheck}

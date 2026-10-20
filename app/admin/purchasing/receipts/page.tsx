@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery } from "@tanstack/react-query"
 import { CalendarDays, Package, PackageCheck, ReceiptText, ShoppingBag } from "lucide-react"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -10,6 +9,9 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import { formatDate } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 interface Receipt {
   id: string
@@ -26,10 +28,6 @@ async function fetchReceipts(): Promise<Receipt[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load receipts")
   const json = await res.json()
   return (json.data || []) as Receipt[]
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getItemBand(totalItems: number) {
@@ -180,6 +178,7 @@ export default function ReceiptsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Goods Receipts"
       description="Track received deliveries, linked purchase orders, and inbound item volume."
       icon={Package}
@@ -271,7 +270,7 @@ export default function ReceiptsPage() {
           title: (receipt) => `${receipt.receipt_number} · ${receipt.supplier_name || "Supplier"}`,
           subtitle: (receipt) => `PO: ${receipt.po_number || "None"} · Received ${formatDate(receipt.received_date)}`,
           trailing: (receipt) => (
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="text-xs">
               {receipt.total_items} items
             </Badge>
           ),

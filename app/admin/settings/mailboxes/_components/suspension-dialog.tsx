@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { toast } from "sonner"
 import { Lock, LockOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -35,9 +36,13 @@ export function SuspensionDialog({
   const [rejectIncoming, setRejectIncoming] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
+  // Reset the choice whenever a different target is opened, during render rather than in an effect.
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [target] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
     if (target) setRejectIncoming(false)
-  }, [target])
+  }
 
   if (!target) return null
   const { mailbox, action } = target

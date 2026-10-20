@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 /**
  * Matrix service worker.
  *

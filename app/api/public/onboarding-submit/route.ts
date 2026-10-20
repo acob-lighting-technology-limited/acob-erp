@@ -9,9 +9,9 @@ import { ORG_EMAIL_SENDERS, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { resolveSubmissionRecipients } from "@/lib/onboarding/recipients"
 import { renderOnboardingSubmissionEmail } from "@/lib/email-templates/onboarding-submission"
 import { formatName } from "@/lib/utils"
-import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
+import { quotePostgrestValue as q } from "@/lib/supabase/postgrest-filter"
 
 const log = logger("api/public/onboarding-submit")
 
@@ -223,6 +223,6 @@ async function notifyHROfSubmission(
       html,
     })
   } catch (err) {
-    console.error("Failed to notify HR of onboarding submission:", err)
+    log.error("Failed to notify HR of onboarding submission:", err)
   }
 }

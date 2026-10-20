@@ -1,7 +1,7 @@
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api/parse-body"
 import { createServerClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { parseJsonBody } from "@/lib/api/parse-body"
-import { z } from "zod"
 import { isFinanceDepartment, normalizeDepartment } from "@/lib/payments/department"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
@@ -168,6 +168,10 @@ const optionalDate = z.string().trim().max(40).nullable().optional()
 
 const UpdatePaymentSchema = z.object({
   department_id: z.union([z.string().uuid(), z.literal("")]).optional(),
+  project_id: z
+    .union([z.string().uuid(), z.literal("")])
+    .nullable()
+    .optional(),
   payment_type: z.string().max(40).optional(),
   category: z.enum(["one-time", "recurring"]).optional(),
   title: z.string().trim().min(1).max(200).optional(),
@@ -186,7 +190,6 @@ const UpdatePaymentSchema = z.object({
   payment_reference: z.string().max(200).nullable().optional(),
   invoice_number: z.string().max(200).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
-  project_id: z.string().uuid().nullable().optional(),
 })
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
@@ -207,6 +210,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (!parsed.ok) return parsed.response
     const body: Record<string, unknown> = { ...parsed.data }
     if (body.department_id === "") delete body.department_id
+    // "" clears the project link.
+    if (body.project_id === "") body.project_id = null
 
     const {
       data: { user },

@@ -5,7 +5,6 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -13,6 +12,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Download, ExternalLink, X, Loader2 } from "lucide-react"
 import type { FileItem, FileCategory } from "@/lib/onedrive"
 import { FileIcon } from "./file-icon"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface FilePreviewProps {
   file: FileItem | null
@@ -36,55 +39,23 @@ export function FilePreview({
   accessMode = "self",
   lockedDepartment,
 }: FilePreviewProps) {
-  const [previewData, setPreviewData] = useState<PreviewData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!file || !isOpen) {
-      setPreviewData(null)
-      setError(null)
-      return
-    }
-    let isCancelled = false
-
-    const fetchPreview = async () => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const params = new URLSearchParams({ path: file.path, accessMode })
-        if (lockedDepartment) params.set("department", lockedDepartment)
-        const response = await fetch(`/api/onedrive/preview?${params.toString()}`)
-        const data = await response.json()
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to load preview")
-        }
-
-        if (!isCancelled) {
-          setPreviewData({
-            previewUrl: data.data.previewUrl,
-            previewType: data.data.previewType,
-          })
-        }
-      } catch (err: unknown) {
-        if (!isCancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load preview")
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    fetchPreview()
-
-    return () => {
-      isCancelled = true
-    }
-  }, [accessMode, file, isOpen, lockedDepartment])
+  const {
+    data: previewData = null,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.onedrivePreview(file?.path ?? "", accessMode, lockedDepartment),
+    enabled: Boolean(file && isOpen),
+    queryFn: async (): Promise<PreviewData> => {
+      const params = new URLSearchParams({ path: file!.path, accessMode })
+      if (lockedDepartment) params.set("department", lockedDepartment)
+      const payload = await apiJson<{ data: PreviewData }>(`/api/onedrive/preview?${params.toString()}`)
+      return { previewUrl: payload.data.previewUrl, previewType: payload.data.previewType }
+    },
+    // Preview URLs are short-lived signed links.
+    staleTime: 0,
+  })
+  const error = queryError?.message ?? null
 
   const handleDownload = () => {
     if (!file) return
@@ -112,7 +83,7 @@ export function FilePreview({
       return (
         <div className="flex h-96 flex-col items-center justify-center gap-4">
           <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading preview...</p>
+          <LinesSkeleton lines={3} />
         </div>
       )
     }

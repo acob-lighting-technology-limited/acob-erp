@@ -7,9 +7,9 @@ import { StaffCardDialog, staffCardQueryOptions } from "@/components/ui/staff-ca
 import { cn } from "@/lib/utils"
 
 const STAFF_AVATAR_SIZES = {
-  xs: "h-6 w-6 text-[9px]",
-  sm: "h-8 w-8 text-[10px]",
-  md: "h-9 w-9 text-[11px]",
+  xs: "h-6 w-6 text-xs",
+  sm: "h-8 w-8 text-xs",
+  md: "h-9 w-9 text-xs",
   lg: "h-12 w-12 text-sm",
   xl: "h-16 w-16 text-lg",
 } as const

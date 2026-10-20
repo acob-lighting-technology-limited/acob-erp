@@ -17,6 +17,9 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { apiFetch } from "@/lib/api-client"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
+import { depsChanged } from "@/lib/utils/deps-changed"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 type EmployeeOption = {
   id: string
@@ -101,16 +104,7 @@ export function WeekSetupCard() {
     [employees, kssDepartmentInput, kssPresenterIdInput]
   )
 
-  const { data: lockState } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekNumber, yearNumber),
-    queryFn: async () => {
-      const res = await apiFetch(`/api/admin/reports/weekly-lock-state?week=${weekNumber}&year=${yearNumber}`, {
-        cache: "no-store",
-      })
-      if (!res.ok) throw new Error("Failed to resolve lock state")
-      return res.json()
-    },
-  })
+  const { data: lockState } = useAdminWeeklyReportLockState(weekNumber, yearNumber)
   const computedDeadlineLabel = useMemo(() => {
     if (!lockState?.meetingDate) return null
     const [year, month, day] = lockState.meetingDate.split("-").map(Number)
@@ -136,22 +130,32 @@ export function WeekSetupCard() {
     return !lockState.canMutate
   }, [lockState])
 
-  useEffect(() => {
-    if (!lockState) return
-    setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekNumber, yearNumber))
-    setMeetingGraceHours(lockState.graceHours || 24)
-  }, [lockState, weekNumber, yearNumber])
+  // Seed date and grace hours from the week's lock state — adjusted during render, not in an effect.
+  const [seededLock, setSeededLock] = useState<readonly unknown[] | null>(null)
+  const seededLockNext = [lockState, weekNumber, yearNumber] as const
+  if (depsChanged(seededLock, seededLockNext)) {
+    setSeededLock(seededLockNext)
+    if (lockState) {
+      setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekNumber, yearNumber))
+      setMeetingGraceHours(lockState.graceHours || 24)
+    }
+  }
 
-  useEffect(() => {
-    if (!weekSetupData) return
-    setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
-    setKssDepartmentInput(weekSetupData.kssDepartment || "none")
-    setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
-    setKssPresenterNameInput(weekSetupData.kssPresenterName || "")
-    setKssPresenterType(
-      weekSetupData.kssPresenterId && weekSetupData.kssPresenterId !== "none" ? "employee" : "visitor"
-    )
-  }, [weekSetupData])
+  // Seed the KSS/time inputs from the week's setup — adjusted during render, not in an effect.
+  const [seededSetup, setSeededSetup] = useState<readonly unknown[] | null>(null)
+  const seededSetupNext = [weekSetupData] as const
+  if (depsChanged(seededSetup, seededSetupNext)) {
+    setSeededSetup(seededSetupNext)
+    if (weekSetupData) {
+      setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
+      setKssDepartmentInput(weekSetupData.kssDepartment || "none")
+      setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
+      setKssPresenterNameInput(weekSetupData.kssPresenterName || "")
+      setKssPresenterType(
+        weekSetupData.kssPresenterId && weekSetupData.kssPresenterId !== "none" ? "employee" : "visitor"
+      )
+    }
+  }
 
   const tuesdayIso = useMemo(() => {
     if (!weekSetupData?.mondayDateIso) return null
@@ -343,14 +347,12 @@ export function WeekSetupCard() {
             <span className="text-muted-foreground">{`Grace window: ${lockState.graceHours}h`}</span>
             <span className="text-muted-foreground">{`Deadline: ${computedDeadlineLabel || formatWATDateTime(lockState.lockDeadline)}`}</span>
             {lockState.hasOverrideRole && (
-              <span className="text-emerald-700 dark:text-emerald-300">
+              <span className="text-success-foreground">
                 Your developer/super-admin role can still create, update, and delete after the grace period.
               </span>
             )}
             {!lockState.hasOverrideRole && lockState.unlockUntil && !lockState.isLocked && (
-              <span className="text-amber-700 dark:text-amber-300">
-                This week is open through a temporary unlock window.
-              </span>
+              <span className="text-warning-foreground">This week is open through a temporary unlock window.</span>
             )}
             {!lockState.hasOverrideRole && lockState.isLocked && (
               <span className="text-muted-foreground">This week is read-only because the grace period has ended.</span>
@@ -385,7 +387,7 @@ export function WeekSetupCard() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-6 border-amber-500/40 text-[11px] text-amber-800 hover:bg-amber-100 dark:text-amber-200"
+                    className="h-6 border-amber-500/40 text-xs text-amber-800 hover:bg-amber-100 dark:text-amber-200"
                     onClick={() => setMeetingDateInput(tuesdayIso)}
                     disabled={isWeekSetupLocked}
                   >
@@ -396,7 +398,7 @@ export function WeekSetupCard() {
             )}
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7 xl:items-end">
-              <div className="w-full max-w-[160px]">
+              <div className="w-full max-w-40">
                 <Label className="mb-1.5 block text-xs font-semibold">Week</Label>
                 <Select value={String(weekNumber)} onValueChange={(value) => setWeekNumber(Number(value))}>
                   <SelectTrigger>
@@ -411,7 +413,7 @@ export function WeekSetupCard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-full max-w-[140px]">
+              <div className="w-full max-w-35">
                 <Label className="mb-1.5 block text-xs font-semibold">Year</Label>
                 <Select value={String(yearNumber)} onValueChange={(value) => setYearNumber(Number(value))}>
                   <SelectTrigger>
@@ -426,7 +428,7 @@ export function WeekSetupCard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-full max-w-[220px]">
+              <div className="w-full max-w-55">
                 <Label className="mb-1.5 block text-xs font-semibold">Actual Meeting Date</Label>
                 <Input
                   type="date"
@@ -435,7 +437,7 @@ export function WeekSetupCard() {
                   disabled={isWeekSetupLocked}
                 />
               </div>
-              <div className="w-full max-w-[160px]">
+              <div className="w-full max-w-40">
                 <Label className="mb-1.5 block text-xs font-semibold">Meeting Time</Label>
                 <Input
                   type="time"
@@ -444,7 +446,7 @@ export function WeekSetupCard() {
                   disabled={isWeekSetupLocked}
                 />
               </div>
-              <div className="w-full max-w-[180px]">
+              <div className="w-full max-w-45">
                 <Label className="mb-1.5 block text-xs font-semibold">Grace Hours After Meeting</Label>
                 <Input
                   type="number"
@@ -455,7 +457,7 @@ export function WeekSetupCard() {
                   disabled={isWeekSetupLocked}
                 />
               </div>
-              <div className="w-full max-w-[180px]">
+              <div className="w-full max-w-45">
                 <Label className="mb-1.5 block text-xs font-semibold">Presenter Type</Label>
                 <Select
                   value={kssPresenterType}
@@ -479,7 +481,7 @@ export function WeekSetupCard() {
                 </Select>
               </div>
               {kssPresenterType === "employee" && (
-                <div className="w-full max-w-[240px]">
+                <div className="w-full max-w-60">
                   <Label className="mb-1.5 block text-xs font-semibold">KSS Department</Label>
                   <Select
                     value={kssDepartmentInput}
@@ -544,7 +546,7 @@ export function WeekSetupCard() {
                   {savingMeetingWindow && <Loader2 className="h-4 w-4 animate-spin" />}
                   Save Week Setup
                 </Button>
-                <span className="text-muted-foreground text-[11px]">
+                <span className="text-muted-foreground text-xs">
                   {isWeekSetupLocked
                     ? "This week is locked after the meeting grace window, so the setup is read-only."
                     : lockState?.hasOverrideRole
@@ -575,7 +577,7 @@ export function WeekSetupCard() {
           {showYearConfig && (
             <div className="mt-4 space-y-4">
               {yearConfigLoading ? (
-                <p className="text-muted-foreground text-sm">Loading...</p>
+                <LinesSkeleton lines={2} />
               ) : (
                 <div className="space-y-2">
                   {yearRows.map((row) => (

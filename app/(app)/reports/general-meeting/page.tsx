@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import {
   FileBarChart,
   ClipboardList,
@@ -11,11 +10,11 @@ import {
   AlertTriangle,
   QrCode,
 } from "lucide-react"
-import { PageWrapper, PageHeader } from "@/components/layout"
+import { PageWrapper, PageHeader, ModuleHubGrid } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
-import { Badge } from "@/components/ui/badge"
-import { IconFill } from "@/components/ui/icon-fill"
-import { cn } from "@/lib/utils"
+
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
 
 export default function PortalGeneralMeetingPage() {
   const reportCards = [
@@ -38,7 +37,7 @@ export default function PortalGeneralMeetingPage() {
       icon: FileText,
       tag: "Weekly",
       subLabel: "Department updates",
-      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      color: "bg-emerald-500/10 text-success-foreground border-emerald-500/20",
       fill: "bg-emerald-500",
       hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
       hoverText: "group-hover:text-emerald-500",
@@ -50,7 +49,7 @@ export default function PortalGeneralMeetingPage() {
       icon: ClipboardList,
       tag: "Active",
       subLabel: "Project progress & actions",
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      color: "bg-blue-500/10 text-info-foreground border-blue-500/20",
       fill: "bg-blue-500",
       hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
       hoverText: "group-hover:text-blue-500",
@@ -62,7 +61,7 @@ export default function PortalGeneralMeetingPage() {
       icon: AlertTriangle,
       tag: "Challenges",
       subLabel: "Department blockers & mitigation",
-      color: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+      color: "bg-rose-500/10 text-danger-foreground border-rose-500/20",
       fill: "bg-rose-500",
       hoverBorder: "hover:border-rose-500/60 dark:hover:border-rose-400/60",
       hoverText: "group-hover:text-rose-500",
@@ -86,7 +85,7 @@ export default function PortalGeneralMeetingPage() {
       icon: Users,
       tag: "MOM",
       subLabel: "PDF archives & logs",
-      color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      color: "bg-amber-500/10 text-warning-foreground border-amber-500/20",
       fill: "bg-amber-500",
       hoverBorder: "hover:border-amber-500/60 dark:hover:border-amber-400/60",
       hoverText: "group-hover:text-amber-500",
@@ -94,68 +93,32 @@ export default function PortalGeneralMeetingPage() {
   ]
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      <PageHeader
-        title="General Meeting"
-        description="Access the documents and trackers that support your weekly general meeting."
-        icon={FileBarChart}
-        backLink={{ href: "/reports", label: "Back to Reports" }}
-      />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PageWrapper maxWidth="full" background="gradient">
+        <PageHeader
+          title="General Meeting"
+          description="Access the documents and trackers that support your weekly general meeting."
+          icon={FileBarChart}
+          backLink={{ href: "/reports", label: "Back to Reports" }}
+        />
 
-      <PageSection title="Available Trackers & Reports">
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-          {reportCards.map((card) => (
-            <Link key={card.title} href={card.href} className="group block">
-              <div
-                className={cn(
-                  "bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl",
-                  card.hoverBorder
-                )}
-              >
-                <div className="space-y-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <IconFill
-                        icon={card.icon}
-                        fillColor={card.fill}
-                        className={cn(
-                          "h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105",
-                          card.color
-                        )}
-                        iconClassName="h-5 w-5"
-                      />
-                      <h3 className={cn("text-foreground text-base font-semibold transition-colors", card.hoverText)}>
-                        {card.title}
-                      </h3>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold", card.color)}
-                    >
-                      {card.tag}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground text-xs leading-relaxed">{card.description}</p>
-                </div>
-                <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">{card.subLabel}</span>
-                  <IconFill
-                    icon={ChevronRight}
-                    fillColor={card.fill}
-                    hoverTextClassName="group-hover:text-white"
-                    className={cn(
-                      "border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5",
-                      card.hoverBorder
-                    )}
-                    iconClassName="text-muted-foreground h-3.5 w-3.5"
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </PageSection>
-    </PageWrapper>
+        <PageSection title="Available Trackers & Reports">
+          <ModuleHubGrid
+            cards={reportCards.map((c) => ({
+              title: c.title,
+              description: c.description,
+              href: c.href,
+              icon: c.icon,
+              tag: c.tag,
+              footer: c.subLabel,
+              color: c.color,
+              fill: c.fill,
+              hoverBorder: c.hoverBorder,
+              hoverText: c.hoverText,
+            }))}
+          />
+        </PageSection>
+      </PageWrapper>
+    </TablePageLayoutProvider>
   )
 }

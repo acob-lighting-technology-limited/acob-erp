@@ -9,6 +9,7 @@ import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { formatCurrency } from "@/lib/format"
 
 interface PurchasingStats {
   totalSuppliers: number
@@ -28,10 +29,6 @@ export default function PurchasingDashboard() {
     queryKey: QUERY_KEYS.adminPurchasingDashboard(),
     queryFn: fetchPurchasingStats,
   })
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
-  }
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
@@ -64,7 +61,7 @@ export default function PurchasingDashboard() {
           value={stats.pendingReceipts}
           icon={Clock}
           iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600 dark:text-orange-400"
+          iconColor="text-warning-foreground"
           description="Awaiting delivery"
         />
         <StatCard
@@ -144,7 +141,7 @@ export default function PurchasingDashboard() {
           <AlertTriangle className="mt-1 h-6 w-6 text-orange-600" />
           <div>
             <h3 className="font-semibold text-orange-800 dark:text-orange-200">Database Tables Required</h3>
-            <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+            <p className="text-warning-foreground mt-1 text-sm">
               Required tables:
               <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">suppliers</code>,
               <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">purchase_orders</code>,

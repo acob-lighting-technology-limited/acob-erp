@@ -27,12 +27,12 @@ import { ProjectCharts } from "@/components/projects/project-charts"
 import { ProjectDialogs } from "@/app/admin/projects/_components/project-dialogs"
 import { PortfolioDialog } from "@/app/admin/portfolios/_components/portfolio-dialog"
 import { PortfolioProjectsDialog } from "@/app/admin/portfolios/_components/portfolio-projects-dialog"
-import type { Portfolio, ProjectHealthRow } from "@/app/admin/portfolios/_components/portfolios-content"
-import { apiFetch } from "@/lib/api-client"
-import type { PortfolioHealth } from "@/lib/projects/health"
+import type { Portfolio } from "@/app/admin/portfolios/_components/portfolios-content"
 import { portfoliosListHref, projectHref } from "@/lib/projects/links"
 import { PROJECTS_QUERY_KEY, fetchProjectRecords, projectHealth, toChartProject } from "@/lib/projects/records"
 import { toLocalISODate } from "@/lib/utils/date"
+import { usePortfolios } from "@/hooks/use-portfolios"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type ManagerOption = {
   id: string
@@ -62,18 +62,7 @@ export function PortfolioDetail({
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
 
   // Same key and shape as the portfolios list, so the two pages share a cache.
-  const portfoliosQuery = useQuery<{
-    data: Portfolio[]
-    unassigned: { projects: ProjectHealthRow[]; rollup: PortfolioHealth }
-  }>({
-    queryKey: ["portfolios"],
-    queryFn: async () => {
-      const res = await apiFetch("/api/portfolios", { cache: "no-store" })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to load portfolios")
-      return payload
-    },
-  })
+  const portfoliosQuery = usePortfolios()
   const projectsQuery = useQuery({ queryKey: PROJECTS_QUERY_KEY, queryFn: fetchProjectRecords })
 
   const portfolios = useMemo(() => portfoliosQuery.data?.data ?? [], [portfoliosQuery.data])
@@ -122,7 +111,7 @@ export function PortfolioDetail({
   )
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["portfolios"] })
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })
     void queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
   }
 

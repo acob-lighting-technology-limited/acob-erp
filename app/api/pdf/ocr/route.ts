@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
         })
         allText.push(stdout.trim())
       } catch (e) {
-        console.error(`OCR failed for ${imgFile}:`, e)
+        log.error(`OCR failed for ${imgFile}:`, e)
       }
     }
 
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
             await require("fs").promises.rmdir(outputDir)
           }
         } catch (err) {
-          console.error("Error cleaning up:", err)
+          log.error("Error cleaning up:", err)
         }
       }, 5000)
 
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
       })
     }
   } catch (error: any) {
-    console.error("Error performing OCR:", error)
+    log.error("Error performing OCR:", error)
     try {
       if (tempFile && existsSync(tempFile)) await unlink(tempFile)
       if (outputDir && existsSync(outputDir)) {
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
           .catch(() => {})
       }
     } catch (cleanupErr) {
-      console.error("Error during cleanup:", cleanupErr)
+      log.error("Error during cleanup:", cleanupErr)
     }
     return serverError(log, error, "Failed to perform OCR.")
   }

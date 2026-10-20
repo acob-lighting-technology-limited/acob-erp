@@ -2,6 +2,9 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { KssRosterTable } from "@/components/reports/kss-roster-table"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export default async function DashboardKssPage() {
   const supabase = await createClient()
 
@@ -26,18 +29,20 @@ export default async function DashboardKssPage() {
   }>
 
   return (
-    <KssRosterTable
-      employees={employeeRows.map((e) => ({
-        id: e.id,
-        full_name: e.full_name,
-        department: e.department,
-        employment_status: e.employment_status,
-      }))}
-      backHref="/reports/general-meeting"
-      backLabel="Back to General Meeting"
-      title="Knowledge Sharing Session"
-      currentUserId={user.id}
-      readOnly
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <KssRosterTable
+        employees={employeeRows.map((e) => ({
+          id: e.id,
+          full_name: e.full_name,
+          department: e.department,
+          employment_status: e.employment_status,
+        }))}
+        backHref="/reports/general-meeting"
+        backLabel="Back to General Meeting"
+        title="Knowledge Sharing Session"
+        currentUserId={user.id}
+        readOnly
+      />
+    </TablePageLayoutProvider>
   )
 }

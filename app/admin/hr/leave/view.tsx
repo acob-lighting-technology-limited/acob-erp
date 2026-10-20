@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useRef, useState, useEffect } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMemo, useRef, useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import {
   Clock,
@@ -26,7 +26,7 @@ import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
@@ -36,207 +36,24 @@ import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { LeaveCalendarView } from "./_components/leave-calendar-view"
 import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
 export { resolveLeaveRouteStages }
 export type { RouteSnapshotStage }
 
-export interface LeaveItem {
-  id: string
-  user_id: string
-  start_date: string
-  end_date: string
-  resume_date: string
-  days_count: number
-  reason: string
-  handover_note?: string | null
-  handover_checklist_url?: string | null
-  status: string
-  approval_stage: string
-  current_stage_code?: string
-  current_stage_order?: number
-  current_approver_user_id?: string
-  reliever_id?: string | null
-  supervisor_id?: string | null
-  requester_route_kind?: string | null
-  route_snapshot?: RouteSnapshotStage[] | null
-  created_at: string
-  admin_manual?: boolean | null
-  approved_at?: string | null
-  user?: {
-    id?: string
-    first_name?: string | null
-    last_name?: string | null
-    full_name: string
-    company_email: string
-    department?: string
-  }
-  reliever?: {
-    id?: string
-    first_name?: string | null
-    last_name?: string | null
-    full_name?: string | null
-    company_email?: string | null
-  } | null
-  supervisor?: {
-    id?: string
-    first_name?: string | null
-    last_name?: string | null
-    full_name?: string | null
-    company_email?: string | null
-  } | null
-  approved_by_profile?: {
-    id?: string
-    first_name?: string | null
-    last_name?: string | null
-    full_name?: string | null
-    company_email?: string | null
-  } | null
-  leave_type?: { name: string }
-  current_approver?: { id: string; full_name: string; company_email: string; role?: string | null } | null
-  approvals?: Array<{
-    id: string
-    approver_id?: string | null
-    approval_level?: number | null
-    status?: string | null
-    comments?: string | null
-    approved_at?: string | null
-    stage_code?: string | null
-    stage_order?: number | null
-    approver?: {
-      id?: string
-      full_name?: string | null
-      first_name?: string | null
-      last_name?: string | null
-      company_email?: string | null
-    } | null
-  }>
-  evidence?: Array<{
-    id: string
-    document_type: string
-    file_url: string
-    status: "pending" | "verified" | "rejected"
-    notes?: string | null
-  }>
-  required_documents?: string[]
-  missing_documents?: string[]
-  evidence_complete?: boolean
-}
-
-export interface LeaveActionHistoryItem {
-  id: string
-  leave_request_id: string
-  status?: string | null
-  comments?: string | null
-  approved_at?: string | null
-  stage_code?: string | null
-  request?: LeaveItem | null
-}
-
-export type PersonNameRef = {
-  first_name?: string | null
-  last_name?: string | null
-  full_name?: string | null
-  company_email?: string | null
-}
-
-export const STAGE_LABELS: Record<string, string> = {
-  pending_reliever: "Waiting Reliever",
-  pending_department_lead: "Waiting Department Lead",
-  pending_admin_hr_lead: "Waiting Admin and HR Lead",
-  pending_md: "Waiting MD",
-  pending_hcs: "Waiting HCS",
-  reliever_pending: "Waiting Reliever",
-  supervisor_pending: "Waiting Department Lead",
-  hr_pending: "Waiting Admin and HR Lead",
-  completed: "Completed",
-  rejected: "Rejected",
-  cancelled: "Cancelled",
-}
-
-export function expectedApproverLabel(item: LeaveItem) {
-  const status = String(item.status || "").toLowerCase()
-  if (["approved", "completed", "rejected", "cancelled"].includes(status)) {
-    return "-"
-  }
-  if (item.current_approver?.full_name) return item.current_approver.full_name
-  const stage = item.current_stage_code || item.approval_stage
-  const expectedByStage: Record<string, string> = {
-    pending_reliever: "Assigned Reliever",
-    reliever_pending: "Assigned Reliever",
-    pending_department_lead: "Department Lead",
-    supervisor_pending: "Department Lead",
-    pending_admin_hr_lead: "Admin and HR Lead",
-    hr_pending: "Admin and HR Lead",
-    pending_md: "Managing Director (MD)",
-    pending_hcs: "Head, Corporate Services (HCS)",
-  }
-  return expectedByStage[stage] || "Pending approver"
-}
-
-export function getStageBadge(item: LeaveItem) {
-  const rawStage = item.current_stage_code || item.approval_stage || ""
-  const stage = rawStage.toLowerCase()
-  const label = STAGE_LABELS[rawStage] || rawStage
-
-  let colorClass = "bg-muted/10 text-muted-foreground border-muted-foreground/20"
-  if (stage.includes("reliever")) {
-    colorClass = "bg-purple-500/10 text-purple-500 border-purple-500/20"
-  } else if (stage.includes("department_lead") || stage.includes("supervisor")) {
-    colorClass = "bg-amber-500/10 text-amber-500 border-amber-500/20"
-  } else if (stage.includes("admin_hr_lead") || stage.includes("hr_pending")) {
-    colorClass = "bg-blue-500/10 text-blue-500 border-blue-500/20"
-  } else if (stage.includes("md")) {
-    colorClass = "bg-rose-500/10 text-rose-500 border-rose-500/20"
-  } else if (stage.includes("hcs")) {
-    colorClass = "bg-violet-500/10 text-violet-500 border-violet-500/20"
-  } else if (stage === "completed" || stage === "approved") {
-    colorClass = "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-  } else if (stage === "rejected") {
-    colorClass = "bg-red-500/10 text-red-500 border-red-500/20"
-  } else if (stage === "cancelled") {
-    colorClass = "bg-muted/10 text-muted-foreground border-muted-foreground/20"
-  }
-
-  return (
-    <Badge variant="outline" className={colorClass}>
-      {label}
-    </Badge>
-  )
-}
-
-export function approvalStageKey(code?: string | null) {
-  const value = String(code || "").toLowerCase()
-  if (value.includes("reliever")) return "reliever"
-  if (value.includes("department_lead")) return "department_lead"
-  if (value.includes("admin_hr_lead")) return "admin_hr_lead"
-  if (value.includes("hcs")) return "hcs"
-  if (value.includes("md")) return "md"
-  return value || "unknown"
-}
-
-export function approvalStageLabel(code?: string | null) {
-  const value = String(code || "").toLowerCase()
-  if (value.includes("reliever")) return "Reliever"
-  if (value.includes("department_lead")) return "Department Lead"
-  if (value.includes("admin_hr_lead")) return "Admin and HR Lead"
-  if (value.includes("hcs")) return "HCS"
-  if (value.includes("md")) return "MD"
-  return formatName(code || "Stage")
-}
-
-export function resolvePersonName(person?: PersonNameRef | null) {
-  if (!person) return ""
-  const full = String(person.full_name || "").trim()
-  if (full) return full
-  const composed = `${person.first_name || ""} ${person.last_name || ""}`.trim()
-  if (composed) return composed
-  const email = String(person.company_email || "").trim()
-  if (email) return email.split("@")[0] || email
-  return ""
-}
+import { layout as tablePageLayout } from "./_layout"
+import {
+  type LeaveItem,
+  type LeaveActionHistoryItem,
+  STAGE_LABELS,
+  expectedApproverLabel,
+  getStageBadge,
+  approvalStageKey,
+  approvalStageLabel,
+  resolvePersonName,
+} from "./_lib/leave-items"
 
 interface ActionDialogState {
   open: boolean
@@ -313,7 +130,13 @@ export function LeaveApprovePage({
   const overrideEvidenceRef = useRef(false)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [selectedLeaveDetail, setSelectedLeaveDetail] = useState<LeaveItem | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  // Admin screens read identity through the scoped API, not the browser Supabase client.
+  const { data: currentUserId = null } = useQuery({
+    queryKey: QUERY_KEYS.adminCurrentUser(),
+    queryFn: async () =>
+      (await apiJson<{ userId?: string }>("/api/admin/current-user", { cache: "no-store" })).userId ?? null,
+    staleTime: 10 * 60 * 1000,
+  })
   const [addLeaveOpen, setAddLeaveOpen] = useState(false)
   // Adding leave here creates it already approved, skipping the workflow, so it is
   // Admin & HR only - the server refuses leads too (requireAttendanceAdmin).
@@ -329,15 +152,6 @@ export function LeaveApprovePage({
     approved_count: 0,
     pending_count: 0,
   })
-
-  useEffect(() => {
-    apiFetch("/api/admin/current-user", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (json?.userId) setCurrentUserId(json.userId)
-      })
-      .catch(() => {})
-  }, [])
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.leaveRequests({ scope: "approve", apiBasePath: normalizedApiBasePath }),
@@ -616,6 +430,7 @@ export function LeaveApprovePage({
       />
 
       <DataTablePage
+        layout={tablePageLayout}
         title="Leave Approvals & Scheduling"
         description="Review leave applications, manage approval workflows, and view organizational leave calendar."
         icon={CalendarCheck2}
@@ -943,7 +758,7 @@ export function LeaveApprovePage({
                             >
                               <div className="flex flex-col">
                                 <span className="text-xs font-medium">{doc.document_type}</span>
-                                <Badge variant="outline" className="mt-1 w-fit text-[10px]">
+                                <Badge variant="outline" className="mt-1 w-fit text-xs">
                                   {doc.status}
                                 </Badge>
                               </div>
@@ -1000,7 +815,7 @@ export function LeaveApprovePage({
                           ? "destructive"
                           : "secondary"
                     }
-                    className="text-[10px]"
+                    className="text-xs"
                   >
                     {r.status}
                   </Badge>
@@ -1103,7 +918,7 @@ export function LeaveApprovePage({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-xs">
                       {STAGE_LABELS[r.current_stage_code || r.approval_stage] || r.current_stage_code}
                     </Badge>
                   </div>

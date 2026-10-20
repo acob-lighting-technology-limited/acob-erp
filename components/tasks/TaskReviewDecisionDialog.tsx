@@ -296,9 +296,7 @@ export function TaskReviewDecisionDialog({
               </SelectContent>
             </Select>
             {actionType && (
-              <p className="text-muted-foreground text-[11px]">
-                {DECISIONS.find((d) => d.id === actionType)?.description}
-              </p>
+              <p className="text-muted-foreground text-xs">{DECISIONS.find((d) => d.id === actionType)?.description}</p>
             )}
           </div>
 
@@ -350,7 +348,7 @@ export function TaskReviewDecisionDialog({
                       )
                     )}
                   </div>
-                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  <p className="text-muted-foreground text-xs leading-relaxed">
                     {`Worth up to ${task.weight ?? TASK_WEIGHT_DEFAULT} points toward the assignee's KPI score (task weight ${task.weight ?? TASK_WEIGHT_DEFAULT})`}
                     {rating
                       ? ` — this rating earns ${Math.round((((task.weight ?? TASK_WEIGHT_DEFAULT) * rating) / TASK_RATING_MAX) * 100) / 100}.`
@@ -375,7 +373,7 @@ export function TaskReviewDecisionDialog({
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Enter notes or explanation for audit log..."
-                  className="min-h-[70px] text-xs"
+                  className="min-h-17.5 text-xs"
                 />
               </div>
 

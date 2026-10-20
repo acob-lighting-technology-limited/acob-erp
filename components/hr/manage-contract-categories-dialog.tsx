@@ -186,7 +186,7 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
                 required
                 disabled={!!editingId}
               />
-              <p className="text-muted-foreground text-[10px]">Must be letters/numbers (unique prefix code).</p>
+              <p className="text-muted-foreground text-xs">Must be letters/numbers (unique prefix code).</p>
             </div>
 
             <div className="space-y-1.5">
@@ -228,7 +228,7 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
           {/* Right panel: Table list */}
           <div className="space-y-2 md:col-span-3">
             <h4 className="text-sm font-semibold">Existing Categories</h4>
-            <div className="max-h-[320px] overflow-y-auto rounded-md border">
+            <div className="max-h-80 overflow-y-auto rounded-md border">
               <Table>
                 <TableHeader className="bg-muted/50 sticky top-0">
                   <TableRow>
@@ -256,7 +256,7 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
                     categories.map((cat) => (
                       <TableRow key={cat.id}>
                         <TableCell className="font-mono text-xs font-bold">{cat.code}</TableCell>
-                        <TableCell className="max-w-[120px] truncate text-xs" title={cat.name}>
+                        <TableCell className="max-w-30 truncate text-xs" title={cat.name}>
                           {cat.name}
                         </TableCell>
                         <TableCell className="text-xs">{cat.sort_order}</TableCell>
@@ -270,7 +270,13 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditInit(cat)}>
+                          <Button
+                            aria-label="Edit"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleEditInit(cat)}
+                          >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                         </TableCell>

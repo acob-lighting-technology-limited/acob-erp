@@ -34,7 +34,6 @@ export function humanizeToken(value?: string | null, fallback = "System"): strin
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function pickObject(value: any): Record<string, any> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {}
   return value
@@ -51,7 +50,6 @@ export function actionVerb(value: string): string {
   return humanizeToken(value, "Updated")
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function extractTargetLabel(item: any): string | null {
   const newValues = pickObject(item.new_values || item?.metadata?.new_values)
   const oldValues = pickObject(item.old_values || item?.metadata?.old_values)

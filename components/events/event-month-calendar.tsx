@@ -113,7 +113,7 @@ export function EventMonthCalendar({
       </div>
 
       <div className="overflow-x-auto">
-        <div className="min-w-[640px]">
+        <div className="min-w-160">
           <div className="bg-muted/80 grid grid-cols-7 border-b text-xs font-medium">
             {WEEKDAYS.map((d) => (
               <div key={d} className="text-muted-foreground px-2 py-2 text-center">
@@ -129,7 +129,7 @@ export function EventMonthCalendar({
               return (
                 <div
                   key={day}
-                  className={cn("min-h-[104px] border-b p-1.5", i % 7 !== 6 && "border-r", !inMonth && "bg-muted/30")}
+                  className={cn("min-h-26 border-b p-1.5", i % 7 !== 6 && "border-r", !inMonth && "bg-muted/30")}
                 >
                   <div className="mb-1 flex justify-end">
                     <span
@@ -155,7 +155,7 @@ export function EventMonthCalendar({
                             type="button"
                             onClick={() => onSelectEvent(chip.event)}
                             className={cn(
-                              "focus-visible:ring-ring block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] leading-4 font-medium focus-visible:ring-2 focus-visible:outline-none",
+                              "focus-visible:ring-ring block w-full truncate rounded px-1.5 py-0.5 text-left text-xs leading-4 font-medium focus-visible:ring-2 focus-visible:outline-none",
                               EVENT_TYPE_BADGE_CLASSES[chip.event.type],
                               chip.event.status === "cancelled" && "line-through opacity-60"
                             )}
@@ -171,7 +171,7 @@ export function EventMonthCalendar({
                         ) : (
                           <div
                             key={chip.key}
-                            className="bg-muted text-muted-foreground flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] leading-4"
+                            className="bg-muted text-muted-foreground flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-xs leading-4"
                             title="The MD is busy"
                           >
                             <Lock className="h-3 w-3 shrink-0" aria-hidden />
@@ -182,9 +182,7 @@ export function EventMonthCalendar({
                         )
                       )}
                       {chips.length > MAX_CHIPS_PER_DAY && (
-                        <p className="text-muted-foreground px-1.5 text-[11px]">
-                          +{chips.length - MAX_CHIPS_PER_DAY} more
-                        </p>
+                        <p className="text-muted-foreground px-1.5 text-xs">+{chips.length - MAX_CHIPS_PER_DAY} more</p>
                       )}
                     </div>
                   )}

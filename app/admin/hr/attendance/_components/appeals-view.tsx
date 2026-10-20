@@ -1,67 +1,58 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Clock, CheckCircle2, XCircle, FileQuestion } from "lucide-react"
-import { toast } from "sonner"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { formatWATDate } from "@/lib/utils/date"
-import { logger } from "@/lib/logger"
 import { AppealReviewDialog } from "./appeal-review-dialog"
 import type { AppealRow } from "./appeal-review-dialog"
-
-const log = logger("admin-attendance-appeals-view")
+import { apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface AppealsViewProps {
   lockedDepartment?: string
 }
 
 function statusBadge(status: AppealRow["status"]) {
-  if (status === "approved")
-    return (
-      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Approved</Badge>
-    )
-  if (status === "rejected")
-    return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Rejected</Badge>
+  if (status === "approved") return <Badge className="bg-success-muted text-success-foreground">Approved</Badge>
+  if (status === "rejected") return <Badge className="bg-danger-muted text-danger-foreground">Rejected</Badge>
   // Closed because the day was changed directly rather than through the appeal.
-  if (status === "resolved")
-    return <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
-  return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending</Badge>
+  if (status === "resolved") return <Badge className="bg-info-muted text-info-foreground">Resolved</Badge>
+  return <Badge className="bg-warning-muted text-warning-foreground">Pending</Badge>
 }
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
-  const [appeals, setAppeals] = useState<AppealRow[]>([])
-  const [loading, setLoading] = useState(false)
   const [reviewAppeal, setReviewAppeal] = useState<AppealRow | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
+  const {
+    data: appeals = [],
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.attendanceAppeals({ statusFilter, lockedDepartment }),
+    queryFn: async () => {
       const params = new URLSearchParams()
       if (statusFilter !== "all") params.set("status", statusFilter)
       if (lockedDepartment) params.set("department", lockedDepartment)
-      const res = await fetch(`/api/admin/hr/attendance/appeals?${params.toString()}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load appeals")
-      setAppeals((payload?.data as AppealRow[]) ?? [])
-    } catch (err) {
-      log.error({ err: String(err) }, "Failed to load appeals")
-      toast.error("Failed to load appeals")
-    } finally {
-      setLoading(false)
-    }
-  }, [statusFilter, lockedDepartment])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ data?: AppealRow[] }>(`/api/admin/hr/attendance/appeals?${params.toString()}`, {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load appeals" },
+  })
+  const load = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const stats = useMemo(() => {
     const now = new Date()
@@ -118,14 +109,15 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           <div className="flex flex-col items-start gap-1">
             <Badge
               className={
-                ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
+                ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ??
+                "bg-neutral-muted text-neutral-foreground"
               }
             >
               {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
             </Badge>
             {/* The snapshot can go stale when device punches arrive late. */}
             {r.status === "pending" && r.live_status && r.live_status !== r.current_status && (
-              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+              <span className="text-warning-foreground text-xs font-medium">
                 Now: {ATTENDANCE_STATUS_LABELS[r.live_status as UnifiedAttendanceStatus] ?? r.live_status}
               </span>
             )}
@@ -139,7 +131,8 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         render: (r) => (
           <Badge
             className={
-              ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-blue-100 text-blue-800"
+              ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ??
+              "bg-info-muted text-info-foreground"
             }
           >
             {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}
@@ -260,7 +253,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
               </span>
             </div>
             {r.appeal_reason && (
-              <p className="text-muted-foreground line-clamp-2 border-t pt-2 text-[11px]">{r.appeal_reason}</p>
+              <p className="text-muted-foreground line-clamp-2 border-t pt-2 text-xs">{r.appeal_reason}</p>
             )}
           </div>
         )}

@@ -17,8 +17,8 @@ import type { ActionQueueItem, ActionQueueTone } from "./dashboard-types"
  */
 
 const COUNT_TONES: Record<ActionQueueTone, string> = {
-  critical: "text-red-600 dark:text-red-400",
-  attention: "text-amber-600 dark:text-amber-400",
+  critical: "text-danger-foreground",
+  attention: "text-warning-foreground",
   info: "text-foreground",
 }
 

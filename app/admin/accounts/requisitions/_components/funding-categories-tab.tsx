@@ -1,43 +1,39 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Plus, Wallet } from "lucide-react"
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { ExtraTab } from "@/components/requisitions/requisitions-list-page"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import type { RequisitionFundingCategory } from "@/lib/requisitions/types"
 import { FundingCategoryDialog } from "./funding-category-dialog"
 
 /** Admin tab: the funding lines a requisition may be charged to (optional on both forms). */
 export function useFundingCategoriesTab(): ExtraTab {
-  const [categories, setCategories] = useState<RequisitionFundingCategory[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editing, setEditing] = useState<RequisitionFundingCategory | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  const categoriesQuery = useQuery({
+    queryKey: QUERY_KEYS.requisitionFundingCategories(true),
+    queryFn: async (): Promise<RequisitionFundingCategory[]> => {
       const res = await apiFetch("/api/requisitions/funding-categories?include_inactive=true")
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load funding categories")
-      setCategories(json.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load funding categories")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+      return json.data || []
+    },
+  })
+  const categories = categoriesQuery.data ?? []
+  const isLoading = categoriesQuery.isFetching
+  const loadError = categoriesQuery.error instanceof Error ? categoriesQuery.error.message : null
+  const error = actionError ?? loadError
+  const load = () => categoriesQuery.refetch()
 
   const openEditor = (category: RequisitionFundingCategory | null) => {
     setEditing(category)
@@ -72,7 +68,7 @@ export function useFundingCategoriesTab(): ExtraTab {
   }
 
   const toggleActive = async (category: RequisitionFundingCategory) => {
-    setError(null)
+    setActionError(null)
     try {
       const res = await apiFetch("/api/requisitions/funding-categories", {
         method: "PATCH",
@@ -83,7 +79,7 @@ export function useFundingCategoriesTab(): ExtraTab {
       if (!res.ok) throw new Error(json.error || "Failed to update funding category")
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update funding category")
+      setActionError(err instanceof Error ? err.message : "Failed to update funding category")
     }
   }
 

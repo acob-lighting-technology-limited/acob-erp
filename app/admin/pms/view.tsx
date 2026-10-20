@@ -1,16 +1,14 @@
-import Link from "next/link"
-import { Award, Brain, ChevronRight, Clock3, FileText, RefreshCw, Settings, ShieldCheck, Target } from "lucide-react"
-import { PageHeader, PageWrapper, Section } from "@/components/layout"
+import { Award, Brain, Clock3, FileText, RefreshCw, Settings, ShieldCheck, Target } from "lucide-react"
+import { PageHeader, PageWrapper, Section, ModuleHubGrid } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { IconFill } from "@/components/ui/icon-fill"
-import { cn } from "@/lib/utils"
 import { getAdminPmsData } from "./_lib"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getCbtSettings, canAccessCbt } from "@/lib/cbt-config"
 import { CycleSelector } from "@/app/(app)/pms/_components/cycle-selector"
+import { formatScore } from "@/lib/format"
 
 const adminPmsLinks = [
   {
@@ -18,7 +16,7 @@ const adminPmsLinks = [
     href: "/admin/pms/kpi",
     icon: Target,
     description: "View department KPI drivers and current KPI scores.",
-    color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    color: "bg-blue-500/10 text-info-foreground border-blue-500/20",
     fill: "bg-blue-500",
     hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
     hoverText: "group-hover:text-blue-500",
@@ -29,7 +27,7 @@ const adminPmsLinks = [
     href: "/admin/pms/attendance",
     icon: Clock3,
     description: "Monitor attendance compliance contributing to PMS.",
-    color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    color: "bg-amber-500/10 text-warning-foreground border-amber-500/20",
     fill: "bg-amber-500",
     hoverBorder: "hover:border-amber-500/60 dark:hover:border-amber-400/60",
     hoverText: "group-hover:text-amber-500",
@@ -73,7 +71,7 @@ const adminPmsLinks = [
     href: "/admin/pms/cycles",
     icon: RefreshCw,
     description: "Create and manage performance review cycles.",
-    color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+    color: "bg-blue-500/10 text-info-foreground border-blue-500/20",
     fill: "bg-blue-500",
     hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
     hoverText: "group-hover:text-blue-500",
@@ -84,7 +82,7 @@ const adminPmsLinks = [
     href: "/admin/pms/analytics",
     icon: Settings,
     description: "Performance distribution, trends, and calibration data.",
-    color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+    color: "bg-orange-500/10 text-warning-foreground border-orange-500/20",
     fill: "bg-orange-500",
     hoverBorder: "hover:border-orange-500/60 dark:hover:border-orange-400/60",
     hoverText: "group-hover:text-orange-500",
@@ -102,10 +100,6 @@ const adminPmsLinks = [
     subLabel: "Scoring rubric keys",
   },
 ]
-
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
-}
 
 export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; cycleId?: string } = {}) {
   const base = basePath ?? "/admin"
@@ -135,28 +129,28 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
         <StatCard
           variant="compact"
           title="Avg PMS"
-          value={formatPercent(summary.overallPms)}
+          value={formatScore(summary.overallPms)}
           icon={Award}
           description="Average individual PMS"
         />
         <StatCard
           variant="compact"
           title="Avg KPI"
-          value={formatPercent(summary.overallKpi)}
+          value={formatScore(summary.overallKpi)}
           icon={Target}
           description="Average individual KPI"
         />
         <StatCard
           variant="compact"
           title="Avg CBT"
-          value={formatPercent(summary.cbt)}
+          value={formatScore(summary.cbt)}
           icon={Brain}
           description="Average learning capability score"
         />
         <StatCard
           variant="compact"
           title="Avg Attendance"
-          value={formatPercent(summary.attendance)}
+          value={formatScore(summary.attendance)}
           icon={Clock3}
           description="Attendance compliance"
         />
@@ -166,52 +160,19 @@ export async function AdminPmsPage({ basePath, cycleId }: { basePath?: string; c
         title="PMS Areas"
         description="Open each route from here as the new home for performance visibility and review actions."
       >
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleLinks.map((item) => (
-            <Link key={item.href} href={item.href} className="group block">
-              <div
-                className={cn(
-                  "bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl",
-                  item.hoverBorder
-                )}
-              >
-                <div className="space-y-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <IconFill
-                        icon={item.icon}
-                        fillColor={item.fill}
-                        className={cn(
-                          "h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105",
-                          item.color
-                        )}
-                        iconClassName="h-5 w-5"
-                      />
-                      <h3 className={cn("text-foreground text-base font-semibold transition-colors", item.hoverText)}>
-                        {item.title}
-                      </h3>
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground text-xs leading-relaxed">{item.description}</p>
-                </div>
-                <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">{item.subLabel}</span>
-                  <IconFill
-                    icon={ChevronRight}
-                    fillColor={item.fill}
-                    hoverTextClassName="group-hover:text-white"
-                    className={cn(
-                      "border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5",
-                      item.hoverBorder
-                    )}
-                    iconClassName="text-muted-foreground h-3.5 w-3.5"
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <ModuleHubGrid
+          cards={visibleLinks.map((c) => ({
+            title: c.title,
+            description: c.description,
+            href: c.href,
+            icon: c.icon,
+            footer: c.subLabel,
+            color: c.color,
+            fill: c.fill,
+            hoverBorder: c.hoverBorder,
+            hoverText: c.hoverText,
+          }))}
+        />
       </Section>
     </PageWrapper>
   )

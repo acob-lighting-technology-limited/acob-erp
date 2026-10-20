@@ -88,3 +88,18 @@ launch-video/
 __pycache__/
 *.pyc
 
+
+# Business documents, exports and one-off artefacts live in SharePoint, not git.
+/*.pdf
+/*.docx
+/*.xlsx
+/*.jpg
+/*.png
+/*.html
+~$*
+tmp-*
+test-results/
+playwright-report/
+
+# Database dumps can contain personal data; keep them in private storage.
+supabase/backups/

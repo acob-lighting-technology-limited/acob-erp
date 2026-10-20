@@ -46,10 +46,12 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   const [approvingLoad, setApprovingLoad] = useState(false)
   const [rejectingLoad, setRejectingLoad] = useState(false)
 
-  // Sync note when appeal changes
-  useEffect(() => {
+  // Clear the note when a different appeal is shown — adjusted during render, not in an effect.
+  const [notedAppeal, setNotedAppeal] = useState(appeal)
+  if (notedAppeal !== appeal) {
+    setNotedAppeal(appeal)
     setNote("")
-  }, [appeal])
+  }
 
   const currentNote = appeal ? note : ""
   const isLoading = approvingLoad || rejectingLoad
@@ -128,14 +130,14 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
-                    "bg-gray-100 text-gray-800"
+                    "bg-neutral-muted text-neutral-foreground"
                   }
                 >
                   {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
                 </Badge>
               </div>
               {appeal.live_status && appeal.live_status !== appeal.current_status && (
-                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+                <div className="text-warning-foreground rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
                   This day has changed since the appeal was raised and is now{" "}
                   <strong>
                     {ATTENDANCE_STATUS_LABELS[appeal.live_status as UnifiedAttendanceStatus] ?? appeal.live_status}
@@ -148,7 +150,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.requested_status as UnifiedAttendanceStatus] ??
-                    "bg-blue-100 text-blue-800"
+                    "bg-info-muted text-info-foreground"
                   }
                 >
                   {ATTENDANCE_STATUS_LABELS[appeal.requested_status as UnifiedAttendanceStatus] ??

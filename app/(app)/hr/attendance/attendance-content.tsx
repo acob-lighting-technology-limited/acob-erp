@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
-import { cn } from "@/lib/utils"
 import {
   Clock,
   Download,
   FileQuestion,
   UserCheck,
-  MapPin,
   AlertCircle,
   Calendar,
   MessageSquare,
@@ -38,7 +36,7 @@ import {
 import type { AttendanceRecord } from "./page"
 import { logger } from "@/lib/logger"
 import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
-import { computeAttendanceDay, attendanceRateFrom, NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
+import { computeAttendanceDay, NET_DAY_HOURS } from "@/lib/hr/attendance-ssot"
 import {
   ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
@@ -46,7 +44,12 @@ import {
   normalizeStoredAttendanceStatus,
 } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+
+import { layout as tablePageLayout } from "./_layout"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("dashboard-attendance-attendance-content")
 
@@ -176,13 +179,43 @@ const ATTENDANCE_TABS: DataTableTab[] = [
   { key: "calendar", label: "Calendar" },
 ]
 
+const EMPTY_APPEALS: AppealRecord[] = []
+
 export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: AttendanceContentProps) {
   const [activeTab, setActiveTab] = useState<"log" | "calendar">("log")
-  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(initialTodayRecord)
-  const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>(initialRecentRecords)
-  const [unifiedDays, setUnifiedDays] = useState<UnifiedDay[] | null>(null)
+  // Current month + the two before it, so the log and filter show history.
+  const daysQuery = useQuery({
+    queryKey: QUERY_KEYS.myAttendanceRecent(),
+    queryFn: async () => {
+      const ym = toLocalYearMonth()
+      const months = [getPrevMonth(ym, 2), getPrevMonth(ym, 1), ym]
+      const results = await Promise.all(
+        months.map((m) =>
+          apiJson<{ data?: UnifiedDay[] }>(`/api/hr/attendance/my-days?year_month=${m}`, { cache: "no-store" })
+            .then((d) => d.data ?? [])
+            .catch(() => [] as UnifiedDay[])
+        )
+      )
+      return results.flat()
+    },
+  })
+  const unifiedDays = daysQuery.data ?? null
+  // Server-rendered records cover the first paint until the days arrive.
+  const todayRecord = unifiedDays
+    ? (unifiedDays.find((row) => row.date === toLocalISODate())?.record ?? null)
+    : initialTodayRecord
+  const recentRecords = useMemo(
+    () =>
+      unifiedDays ? (unifiedDays.map((row) => row.record).filter(Boolean) as AttendanceRecord[]) : initialRecentRecords,
+    [unifiedDays, initialRecentRecords]
+  )
   const [filteredRows, setFilteredRows] = useState<AttendanceRow[]>([])
-  const [appeals, setAppeals] = useState<AppealRecord[]>([])
+  const appealsQuery = useQuery({
+    queryKey: QUERY_KEYS.myAttendanceAppeals(),
+    queryFn: async () =>
+      (await apiJson<{ data?: AppealRecord[] }>("/api/hr/attendance/appeals", { cache: "no-store" })).data ?? [],
+  })
+  const appeals = appealsQuery.data ?? EMPTY_APPEALS
   const [appealDialogRow, setAppealDialogRow] = useState<AttendanceRow | null>(null)
   const [editAppeal, setEditAppeal] = useState<AppealRecord | null>(null)
   const [cancelAppealId, setCancelAppealId] = useState<string | null>(null)
@@ -204,41 +237,8 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
     return count
   }, [unifiedDays])
 
-  const fetchAttendanceData = useCallback(async () => {
-    try {
-      const ym = toLocalYearMonth()
-      const today = toLocalISODate()
-      // Fetch current month + 2 previous months so the log and filter show history
-      const months = [getPrevMonth(ym, 2), getPrevMonth(ym, 1), ym]
-      const results = await Promise.all(
-        months.map((m) =>
-          apiFetch(`/api/hr/attendance/my-days?year_month=${m}`, { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => (d?.data as UnifiedDay[]) ?? [])
-            .catch(() => [] as UnifiedDay[])
-        )
-      )
-      const allDays = results.flat()
-      setUnifiedDays(allDays)
-      const todayRec = allDays.find((row) => row.date === today)?.record ?? null
-      setTodayRecord(todayRec)
-      setRecentRecords(allDays.map((row) => row.record).filter(Boolean) as AttendanceRecord[])
-    } catch (error) {
-      log.error("Error fetching attendance:", error)
-    }
-  }, [])
-
-  const fetchAppeals = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/hr/attendance/appeals", { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (res.ok) {
-        setAppeals((payload?.data as AppealRecord[]) ?? [])
-      }
-    } catch (err) {
-      log.error("Error fetching appeals:", err)
-    }
-  }, [])
+  const fetchAttendanceData = useCallback(() => void daysQuery.refetch(), [daysQuery])
+  const fetchAppeals = useCallback(() => void appealsQuery.refetch(), [appealsQuery])
 
   const handleCancelAppeal = useCallback(
     async (appealId: string) => {
@@ -258,11 +258,6 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
     },
     [fetchAppeals, fetchAttendanceData]
   )
-
-  useEffect(() => {
-    void fetchAttendanceData()
-    void fetchAppeals()
-  }, [fetchAttendanceData, fetchAppeals])
 
   const rows = useMemo<AttendanceRow[]>(() => {
     if (unifiedDays === null) return []
@@ -333,11 +328,13 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
 
   // No month is pre-selected, so seed filteredRows with everything fetched and let
   // the stat cards reflect the full range until the user picks a month.
-  useEffect(() => {
-    if (rows.length > 0) {
-      setFilteredRows(rows)
-    }
-  }, [rows])
+  // Re-seed when a new set of rows arrives — adjusted during render, not in an effect.
+  const [seededRows, setSeededRows] = useState<readonly unknown[] | null>(null)
+  const seededRowsNext = [rows] as const
+  if (depsChanged(seededRows, seededRowsNext)) {
+    setSeededRows(seededRowsNext)
+    if (rows.length > 0) setFilteredRows(rows)
+  }
 
   const columns = useMemo<DataTableColumn<AttendanceRow>[]>(
     () => [
@@ -349,7 +346,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         render: (row) => (
           <div className="whitespace-nowrap">
             <span className="text-foreground block text-xs font-semibold sm:text-sm">{row.dayLabel}</span>
-            <span className="text-muted-foreground block text-[11px]">
+            <span className="text-muted-foreground block text-xs">
               {formatWATDate(row.date, { day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
@@ -570,6 +567,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
   return (
     <>
       <DataTablePage
+        layout={tablePageLayout}
         title="Attendance"
         description="Track your work hours and attendance records."
         icon={Clock}
@@ -837,27 +835,21 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                   <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Clock In
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock In</span>
                         <span className="font-mono font-medium">{formatClockTime(row.clock_in)}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Clock Out
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock Out</span>
                         <span className="font-mono font-medium">{getClockOutLabel(row)}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Work Hours
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Work Hours</span>
                         <span className="font-medium">
                           {row.workHours != null ? `${row.workHours.toFixed(2)} hrs` : "-"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">
                           Missed Hours
                         </span>
                         <span className="font-medium">
@@ -869,20 +861,18 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                     {latestAppeal ? (
                       <div className="space-y-2 border-t pt-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground text-[10px] font-semibold uppercase">
+                          <span className="text-muted-foreground text-xs font-semibold uppercase">
                             Appeal Status:{" "}
-                            <Badge variant="outline" className="ml-1 text-[10px] capitalize">
+                            <Badge variant="outline" className="ml-1 text-xs capitalize">
                               {latestAppeal.status}
                             </Badge>
                           </span>
-                          <span className="text-muted-foreground text-[10px]">
+                          <span className="text-muted-foreground text-xs">
                             Submitted {formatWATDateTime(latestAppeal.created_at)}
                           </span>
                         </div>
                         <div className="bg-background rounded border p-2.5">
-                          <span className="text-muted-foreground block text-[10px] font-medium">
-                            Your Appeal Reason:
-                          </span>
+                          <span className="text-muted-foreground block text-xs font-medium">Your Appeal Reason:</span>
                           <p className="mt-0.5 leading-relaxed">{latestAppeal.appeal_reason}</p>
                         </div>
                         {latestAppeal.resolution_note && (
@@ -1068,7 +1058,7 @@ function StatusBadge({ status }: { status: AttendanceRow["normalizedStatus"] }) 
     <Badge
       className={
         ATTENDANCE_STATUS_COLORS[norm as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        "bg-neutral-muted text-neutral-foreground"
       }
     >
       {ATTENDANCE_STATUS_LABELS[norm as keyof typeof ATTENDANCE_STATUS_LABELS] ?? norm}

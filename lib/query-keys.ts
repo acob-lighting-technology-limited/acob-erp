@@ -4,6 +4,11 @@
  */
 export const QUERY_KEYS = {
   // HR
+  leaveCalendar: (filters: Record<string, unknown>) => ["leave-calendar", filters],
+  myLunchHistory: (yearMonth: string) => ["my-lunch-history", yearMonth],
+  grantableLeaveTypes: (userId: string) => ["grantable-leave-types", userId],
+  adminLeaveEmployees: () => ["admin-leave-employees"],
+  myLunchReview: (menuId: string) => ["my-lunch-review", menuId],
   leaveRequests: (filters?: Record<string, unknown>) => (filters ? ["leave-requests", filters] : ["leave-requests"]),
   leaveBalance: (userId?: string) => ["leave-balance", userId],
   leaveTypes: () => ["leave-types"],
@@ -12,10 +17,65 @@ export const QUERY_KEYS = {
   contractCategories: () => ["contract-categories"],
 
   // Attendance
+  manualLeaveTypeOptions: (userId: string) => ["manual-leave-type-options", userId],
+  attendanceManager: (resource: string, filters?: Record<string, unknown>) => [
+    "attendance-manager",
+    resource,
+    filters ?? null,
+  ],
+  attendanceHolidays: (yearMonth: string) => ["attendance-holidays", yearMonth],
+  attendanceReports: (filters: Record<string, unknown>) => ["attendance-reports", filters],
+  myAttendanceAppeals: () => ["my-attendance-appeals"],
+  myAttendanceRecent: () => ["my-attendance-recent"],
   attendanceDeviceStatus: () => ["attendance-device-status"],
+  dailyRoster: (date: string, department: string | null) => ["daily-roster", date, department],
+  attendanceLeaderboard: (filters: Record<string, unknown>) => ["attendance-leaderboard", filters],
+  attendanceRecords: (filters: Record<string, unknown>) => ["attendance-records", filters],
+  employeeAttendanceDays: (userId: string, yearMonth: string, exempt: boolean) => [
+    "employee-attendance-days",
+    userId,
+    yearMonth,
+    exempt,
+  ],
+  attendanceExceptions: (filters: Record<string, unknown>) => ["attendance-exceptions", filters],
+  attendanceChangeLog: (from: string, to: string) => ["attendance-change-log", from, to],
+  myAttendanceDays: (yearMonth: string) => ["my-attendance-days", yearMonth],
+  attendanceAppeals: (filters: Record<string, unknown>) => ["attendance-appeals", filters],
+  attendanceReportConfig: () => ["attendance-report-config"],
+  employeeCycleAttendance: (userId: string, start: string, end: string) => [
+    "employee-cycle-attendance",
+    userId,
+    start,
+    end,
+  ],
   attendance: (userId?: string) => ["attendance", userId],
 
   // Performance
+  departmentKpis: (department: string) => ["department-kpis", department],
+  cbtSessionOptions: () => ["cbt-session-options"],
+  cbtSnapshot: () => ["cbt-snapshot"],
+  cbtCandidateEmails: () => ["cbt-candidate-emails"],
+  cbtQuestions: (variant: string) => ["cbt-questions", variant],
+  metricAddSeed: (metric: string, userId: string, cycleId: string) => ["metric-add-seed", metric, userId, cycleId],
+  metricSnapshot: (metric: string, cycleId: string) => ["metric-snapshot", metric, cycleId],
+  adminDevelopmentPlans: () => ["admin-development-plans"],
+  performanceReviews: (filters: Record<string, unknown>) => ["performance-reviews", filters],
+  performanceReviewSeed: (userId: string, cycleId: string) => ["performance-review-seed", userId, cycleId],
+  competencies: () => ["competencies"],
+  myPeerFeedback: () => ["my-peer-feedback"],
+  adminPeerFeedback: () => ["admin-peer-feedback"],
+  myDevelopmentPlans: () => ["my-development-plans"],
+  performanceCycles: () => ["performance-cycles"],
+  pmsAnalytics: () => ["pms-analytics"],
+  cbtAttemptDetail: (profileId: string, cycleId: string) => ["cbt-attempt-detail", profileId, cycleId],
+  cbtAttempts: () => ["cbt-attempts"],
+  cbtBonusScores: () => ["cbt-bonus-scores"],
+  strategicGoals: (scope: string, department?: string | null, year?: number | null) => [
+    "strategic-goals",
+    scope,
+    department ?? null,
+    year ?? null,
+  ],
   goals: (userId?: string) => ["goals", userId],
   reviews: (userId?: string) => ["reviews", userId],
 
@@ -24,12 +84,17 @@ export const QUERY_KEYS = {
   fleetBookings: (filters?: Record<string, unknown>) => (filters ? ["fleet-bookings", filters] : ["fleet-bookings"]),
 
   // Help desk
+  ticketAttachments: (ticketId: string) => ["ticket-attachments", ticketId],
   tickets: (filters?: Record<string, unknown>) => (filters ? ["tickets", filters] : ["tickets"]),
   ticket: (id: string) => ["ticket", id],
 
   // Admin
+  adminDataHealth: () => ["admin-data-health"],
+  adminCurrentUser: () => ["admin-current-user"],
+  departmentRows: () => ["department-rows"],
+  hrProfilesAll: () => ["hr-profiles-all"],
+  myProfile: () => ["my-profile"],
   departments: () => ["departments"],
-  departmentRows: () => ["departments", "rows"],
   officeLocations: () => ["office-locations"],
   staffAvatars: () => ["staff-avatars"],
   staffCard: (id: string) => ["staff-card", id],
@@ -41,6 +106,11 @@ export const QUERY_KEYS = {
   search: (q: string) => ["search", q],
 
   // Weekly reports
+  kssRoster: (week: number, year: number) => ["kss-roster", week, year],
+  meetingAttendanceSession: (week: number, year: number) => ["meeting-attendance-session", week, year],
+  weeklyReportSeed: (department: string, week: number, year: number) => ["weekly-report-seed", department, week, year],
+  weeklyReportLockState: (week: number, year: number) => ["weekly-report-lock", week, year],
+  weeklyReportsProfile: () => ["weekly-reports", "profile"],
   weeklyReports: (filters?: Record<string, unknown>) => (filters ? ["weekly-reports", filters] : ["weekly-reports"]),
   adminWeeklyReports: (filters?: Record<string, unknown>) =>
     filters ? ["admin-weekly-reports", filters] : ["admin-weekly-reports"],
@@ -172,6 +242,8 @@ export const QUERY_KEYS = {
   hrLeaveTypesActive: () => ["hr-leave-types-active"],
 
   // Components
+  adminSurveys: () => ["admin-surveys"],
+  myFeedbackLeads: () => ["my-feedback-leads"],
   feedbackViewer: () => ["feedback-viewer-filter"],
   paymentsTable: (filters?: Record<string, unknown>) => (filters ? ["payments-table", filters] : ["payments-table"]),
   notificationBell: () => ["notification-bell"],
@@ -196,4 +268,37 @@ export const QUERY_KEYS = {
   adminSecurityEmployees: () => ["admin-security-employees"],
   adminSecurityNetworkActivity: (filters?: Record<string, unknown>) =>
     filters ? ["admin-security-network-activity", filters] : ["admin-security-network-activity"],
+
+  // Dev / maintenance
+  devUserAuditLogs: (userId: string) => ["dev-user-audit-logs", userId],
+  leaveFlowTestFormData: () => ["leave-flow-test-form-data"],
+  devTestsFormData: () => ["dev-tests-form-data"],
+  maintenanceState: () => ["maintenance-state"],
+
+  // Requisitions
+  requisitionFundingCategories: (includeInactive: boolean) => ["requisition-funding-categories", includeInactive],
+  requisitions: (filters?: Record<string, unknown>) => (filters ? ["requisitions", filters] : ["requisitions"]),
+  requisition: (id: string) => ["requisition", id],
+
+  // Payroll
+  payrollPeriods: () => ["payroll-periods"],
+
+  // Documents
+  onedriveFiles: (filters: Record<string, unknown>) => ["onedrive-files", filters],
+  generalDocumentation: () => ["general-documentation"],
+  onedrivePreview: (path: string, accessMode: string, department?: string) => [
+    "onedrive-preview",
+    path,
+    accessMode,
+    department ?? null,
+  ],
+
+  // Correspondence
+  correspondenceCounts: (department: string | null) => ["correspondence-counts", department],
+  correspondenceRecords: (filters: Record<string, unknown>) => ["correspondence-records", filters],
+  correspondenceRequesters: (department: string) => ["correspondence-requesters", department],
+  correspondenceCategories: () => ["correspondence-categories"],
+
+  // Projects
+  portfolios: () => ["portfolios"],
 } as const

@@ -7,6 +7,9 @@ import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { AdminTasksContent, type employee, type UserProfile } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task, TaskPersonSummary } from "@/types/task"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 type GoalFilterOption = { id: string; title: string }
 type GoalRow = { id: string; title: string }
 
@@ -141,13 +144,15 @@ export default async function DeptTasksPage({ params, searchParams }: DeptTasksP
     })
 
   return (
-    <AdminTasksContent
-      initialTasks={filteredTasks}
-      initialemployee={(employeeResult.data || []) as employee[]}
-      initialDepartments={[deptName]}
-      initialProjects={(allProjectsRes.data || []) as Array<{ id: string; project_name: string }>}
-      userProfile={userProfile}
-      initialGoalId={resolvedSearchParams?.goal_id || ""}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <AdminTasksContent
+        initialTasks={filteredTasks}
+        initialemployee={(employeeResult.data || []) as employee[]}
+        initialDepartments={[deptName]}
+        initialProjects={(allProjectsRes.data || []) as Array<{ id: string; project_name: string }>}
+        userProfile={userProfile}
+        initialGoalId={resolvedSearchParams?.goal_id || ""}
+      />
+    </TablePageLayoutProvider>
   )
 }

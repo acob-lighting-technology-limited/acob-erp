@@ -1,16 +1,19 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { Brain, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { apiFetch } from "@/lib/api-client"
+import { apiJson } from "@/lib/api-client"
 import { formatWATDateTime } from "@/lib/utils/date"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+
+import { layout as tablePageLayout } from "./_layout"
 
 type BonusQuestionDetail = {
   id: string
@@ -41,30 +44,25 @@ function scoreLabel(score: number | null) {
 }
 
 export default function AdminPmsCbtExtraScoresPage() {
-  const [rows, setRows] = useState<BonusScoreRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadScores = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await apiFetch("/api/admin/hr/performance/cbt/extra/scores", { cache: "no-store" })
-      const payload = (await response.json().catch(() => null)) as { data?: BonusScoreRow[]; error?: string } | null
-      if (!response.ok) throw new Error(payload?.error || "Failed to load bonus question scores")
-      setRows(payload?.data || [])
-    } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : "Failed to load bonus question scores"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadScores()
-  }, [loadScores])
+  const {
+    data: rows = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.cbtBonusScores(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: BonusScoreRow[] }>("/api/admin/hr/performance/cbt/extra/scores", {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load bonus question scores" },
+  })
+  const error = queryError?.message ?? null
+  const loadScores = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const cycleOptions = useMemo(
     () =>
@@ -138,6 +136,7 @@ export default function AdminPmsCbtExtraScoresPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="CBT Bonus Question Scores"
       description="Only visible here — bonus/joke question results never appear on the candidate's own CBT results or score."
       icon={Brain}
@@ -253,7 +252,7 @@ export default function AdminPmsCbtExtraScoresPage() {
           subtitle: (row) =>
             `${row.department} · ${row.cycle} · Bonus: ${row.bonus_score !== null ? `${row.bonus_score}%` : "None"}`,
           trailing: (row) => (
-            <Badge variant={row.bonus_score === 100 ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={row.bonus_score === 100 ? "default" : "secondary"} className="text-xs">
               {row.bonus_score !== null ? `${row.bonus_score}%` : "None"}
             </Badge>
           ),
@@ -269,7 +268,7 @@ export default function AdminPmsCbtExtraScoresPage() {
                 {row.bonus_score !== null ? `${row.bonus_score}%` : "None"}
               </Badge>
             </div>
-            <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
               <span>{row.department}</span>
               <span>{row.cycle}</span>
             </div>

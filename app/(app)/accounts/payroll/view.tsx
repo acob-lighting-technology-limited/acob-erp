@@ -11,6 +11,8 @@ import { FileText, Eye, Printer, DollarSign, Calendar, Receipt } from "lucide-re
 import { printPayslip, type PayslipLine } from "@/lib/hr/payslip-print"
 import type { UserPayrollEntry } from "./page"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface UserPayrollPageProps {
   initialData: {
     profile: {
@@ -182,6 +184,7 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Payroll & Payslips"
       description="View and print your monthly payslips, tax assessments, and pension contributions."
       icon={FileText}

@@ -164,7 +164,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         accessor: (r) => r.strategic_priority || "",
         render: (r) =>
           r.strategic_priority ? (
-            <Badge variant="secondary" className="text-left text-[11px] font-medium whitespace-normal">
+            <Badge variant="secondary" className="text-left text-xs font-medium whitespace-normal">
               {r.strategic_priority}
             </Badge>
           ) : (
@@ -181,7 +181,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         render: (r) => (
           <div className="flex flex-col gap-0.5">
             <span className="text-xs leading-snug font-medium">{r.target_text}</span>
-            <span className="text-muted-foreground text-[11px]">
+            <span className="text-muted-foreground text-xs">
               {r.perspective} · {r.strategic_objective}
             </span>
           </div>
@@ -215,7 +215,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         render: (r) => (
           <div className="flex flex-wrap gap-1">
             {r.core_departments.map((d) => (
-              <Badge key={d} className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
+              <Badge key={d} className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">
                 {d}
               </Badge>
             ))}
@@ -328,33 +328,33 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                 {/* Top Summary Banner: Pacing & Overall Attainment */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                    <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
                       {planYear} Timeline Pacing:
                     </span>
                     {pacing?.status === "ahead" && (
-                      <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-600">
+                      <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600">
                         <TrendingUp className="h-3 w-3" /> Ahead of schedule ({pacing.elapsedPct}% of year)
                       </Badge>
                     )}
                     {pacing?.status === "on_pace" && (
-                      <Badge className="gap-1 border-blue-500/30 bg-blue-500/10 text-[11px] text-blue-600">
+                      <Badge className="gap-1 border-blue-500/30 bg-blue-500/10 text-xs text-blue-600">
                         <Clock className="h-3 w-3" /> On pace ({pacing.elapsedPct}% of year)
                       </Badge>
                     )}
                     {pacing?.status === "behind" && (
-                      <Badge className="gap-1 border-red-500/30 bg-red-500/10 text-[11px] text-red-600">
+                      <Badge className="gap-1 border-red-500/30 bg-red-500/10 text-xs text-red-600">
                         <AlertTriangle className="h-3 w-3" /> Behind schedule ({pacing.elapsedPct}% of year)
                       </Badge>
                     )}
                     {(!pacing || pacing.status === "no_data") && (
-                      <Badge variant="outline" className="text-muted-foreground text-[11px]">
+                      <Badge variant="outline" className="text-muted-foreground text-xs">
                         No actuals logged yet ({pacing?.elapsedPct ?? 0}% of year elapsed)
                       </Badge>
                     )}
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground text-[11px] font-medium">Overall CORE Attainment:</span>
+                    <span className="text-muted-foreground text-xs font-medium">Overall CORE Attainment:</span>
                     {r.overall_attainment != null ? (
                       <div className="flex items-center gap-2">
                         <div className="w-24">
@@ -371,17 +371,15 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                 {/* Department Ownership & Execution Matrix */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                    <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
                       Department Responsibilities & Quotas (RACI)
                     </p>
-                    <span className="text-muted-foreground text-[11px]">
-                      Only CORE owners drive the scorecard score
-                    </span>
+                    <span className="text-muted-foreground text-xs">Only CORE owners drive the scorecard score</span>
                   </div>
 
                   <div className="bg-background/50 overflow-x-auto rounded-md border">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-muted/50 text-muted-foreground text-[11px] font-medium">
+                      <thead className="bg-muted/50 text-muted-foreground text-xs font-medium">
                         <tr>
                           <th className="px-3 py-2">Department</th>
                           <th className="px-3 py-2">Role</th>
@@ -411,11 +409,11 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                                 <td className="px-3 py-2 font-medium">{a.department}</td>
                                 <td className="px-3 py-2">
                                   {isCore ? (
-                                    <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
+                                    <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">
                                       CORE
                                     </Badge>
                                   ) : (
-                                    <Badge variant="outline" className="text-[10px]">
+                                    <Badge variant="outline" className="text-xs">
                                       SUPPORT
                                     </Badge>
                                   )}
@@ -432,13 +430,13 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                                             : "Recorded"}
                                       </span>
                                       {a.latest_actual.recorded_at && (
-                                        <span className="text-muted-foreground text-[10px]">
+                                        <span className="text-muted-foreground text-xs">
                                           {formatWATDate(a.latest_actual.recorded_at)}
                                         </span>
                                       )}
                                     </div>
                                   ) : (
-                                    <span className="text-muted-foreground text-[11px] italic">No data</span>
+                                    <span className="text-muted-foreground text-xs italic">No data</span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2">
@@ -447,10 +445,10 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                                       <div className="w-16">
                                         <Progress value={a.capped_pct} />
                                       </div>
-                                      <span className="text-[11px] font-medium">{a.capped_pct}%</span>
+                                      <span className="text-xs font-medium">{a.capped_pct}%</span>
                                     </div>
                                   ) : (
-                                    <span className="text-muted-foreground text-[11px]">-</span>
+                                    <span className="text-muted-foreground text-xs">-</span>
                                   )}
                                 </td>
                                 <td
@@ -469,7 +467,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                 </div>
 
                 {/* Operational Evidence & Tasks Summary */}
-                <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-[11px]">
+                <div className="bg-muted/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs">
                   <div className="flex items-center gap-2">
                     <ListTodo className="text-primary h-4 w-4" />
                     <span className="text-foreground font-semibold">Operational Evidence:</span>
@@ -506,7 +504,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
           title: (r) => r.measure,
           subtitle: (r) => `${r.perspective} · ${r.strategic_objective}`,
           trailing: (r) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {r.core_departments.length} depts
             </Badge>
           ),
@@ -527,13 +525,13 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
             <p className="text-muted-foreground line-clamp-2 text-xs">
               {r.perspective} · {r.strategic_objective}
             </p>
-            <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground">Pillar: {r.strategic_priority}</span>
               <div className="flex items-center gap-1">
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 text-[10px]"
+                  className="h-6 text-xs"
                   onClick={(e) => {
                     e.stopPropagation()
                     setEditingRow(r)
@@ -544,7 +542,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 text-[10px]"
+                  className="h-6 text-xs"
                   onClick={(e) => {
                     e.stopPropagation()
                     setManagingRow(r)
@@ -689,7 +687,7 @@ function ManageDepartmentsDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-120">
         <DialogHeader>
           <DialogTitle>Manage Departments</DialogTitle>
           <DialogDescription>{row?.measure}</DialogDescription>
@@ -707,11 +705,9 @@ function ManageDepartmentsDialog({
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{a.department}</span>
                     {a.role === "core" ? (
-                      <Badge className="border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-600">
-                        CORE
-                      </Badge>
+                      <Badge className="border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-600">CORE</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-xs">
                         SUPPORT
                       </Badge>
                     )}
@@ -767,7 +763,7 @@ function ManageDepartmentsDialog({
           </Button>
         </div>
 
-        <p className="text-muted-foreground text-[11px]">
+        <p className="text-muted-foreground text-xs">
           Only CORE departments are scored on this KPI. Set the department&apos;s own numeric target from its cascade
           page after adding it.
         </p>

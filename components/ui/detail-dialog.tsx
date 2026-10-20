@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
  * These exist because every one of those dialogs was independently built from
  * the same template and drifted: nested bordered cards inside a bordered modal,
  * four "hero stat cards" restating values the header already showed, a row of
- * `text-[11px] tracking-wider uppercase` labels, and a fixed `h-[88dvh]` that
+ * `text-xs tracking-wider uppercase` labels, and a fixed `h-[88dvh]` that
  * gave a two-line record a full screen of empty space. Values, not markup, are
  * what a page should be supplying.
  *
@@ -37,7 +37,7 @@ export function DetailField({
     <div className={cn("flex items-start gap-2.5", className)}>
       <Icon className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0">
-        <p className="text-muted-foreground text-[11px]">{label}</p>
+        <p className="text-muted-foreground text-xs">{label}</p>
         <div className="text-sm break-words">{children}</div>
       </div>
     </div>
@@ -74,7 +74,7 @@ export function DetailCallout({
 }) {
   return (
     <div className={cn("rounded-lg border p-3", CALLOUT_TONES[tone])}>
-      <p className="text-[11px] font-semibold">{label}</p>
+      <p className="text-xs font-semibold">{label}</p>
       <div className="mt-0.5 text-sm whitespace-pre-wrap">{children}</div>
     </div>
   )
@@ -109,7 +109,7 @@ export function DetailActionBar({
         <p className="text-muted-foreground text-xs">{label}</p>
         <div className="w-full sm:w-64">{children}</div>
       </div>
-      {hint && <p className="text-muted-foreground mt-1.5 text-[11px]">{hint}</p>}
+      {hint && <p className="text-muted-foreground mt-1.5 text-xs">{hint}</p>}
     </div>
   )
 }
@@ -128,7 +128,7 @@ export function DetailTimelineEntry({
     <li className="border-border/60 border-l-2 pl-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="text-sm font-medium">{title}</span>
-        <span className="text-muted-foreground text-[11px]">{timestamp}</span>
+        <span className="text-muted-foreground text-xs">{timestamp}</span>
       </div>
       {children && (
         <div className="text-muted-foreground mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">{children}</div>

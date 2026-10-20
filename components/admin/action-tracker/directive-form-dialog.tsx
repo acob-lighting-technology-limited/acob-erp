@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 export interface EditableDirective {
   id: string
@@ -114,9 +115,12 @@ export function DirectiveFormDialog({
     return toLocalISODate(getOfficeWeekMonday(week, year))
   }, [defaultMeetingDate, week, year])
 
-  useEffect(() => {
-    if (!isOpen) return
-    if (editingDirective) {
+  // Seed the form each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [isOpen, editingDirective, departments, defaultWeek, defaultYear] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (isOpen && editingDirective) {
       setTitle(editingDirective.title)
       setDescription(editingDirective.description || "")
       setDepartment(editingDirective.department)
@@ -126,21 +130,19 @@ export function DirectiveFormDialog({
       setWeek(editingDirective.week_number)
       setYear(editingDirective.year)
       setMeetingDate(editingDirective.meeting_date ? editingDirective.meeting_date.slice(0, 10) : "")
-      return
+    } else if (isOpen) {
+      setTitle("")
+      setDescription("")
+      setDepartment(departments[0] || "")
+      setAssigneeIds([])
+      setTimeline("")
+      setStatus("not_started")
+      setWeek(defaultWeek || currentOfficeWeek.week)
+      setYear(defaultYear || currentOfficeWeek.year)
+      // Deliberately not a dependency: it follows week/year, which this block also sets.
+      setMeetingDate(defaultMeetingDateForWeek)
     }
-    setTitle("")
-    setDescription("")
-    setDepartment(departments[0] || "")
-    setAssigneeIds([])
-    setTimeline("")
-    setStatus("not_started")
-    setWeek(defaultWeek || currentOfficeWeek.week)
-    setYear(defaultYear || currentOfficeWeek.year)
-    setMeetingDate(defaultMeetingDateForWeek)
-    // defaultMeetingDateForWeek is derived from week/year, which this effect also
-    // sets — including it would re-run the reset on every week change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editingDirective, departments, defaultWeek, defaultYear])
+  }
 
   const resetForNextEntry = () => {
     setTitle("")
@@ -204,7 +206,7 @@ export function DirectiveFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-150">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gavel className="h-4 w-4" />
@@ -220,7 +222,7 @@ export function DirectiveFormDialog({
         <div className="grid gap-5 py-2">
           <div className="bg-muted/30 grid grid-cols-2 gap-4 rounded-lg border p-4 sm:grid-cols-4">
             <div className="col-span-2 space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Meeting Date</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Meeting Date</Label>
               <Input
                 type="date"
                 value={meetingDate}
@@ -229,7 +231,7 @@ export function DirectiveFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Week</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Week</Label>
               <Input
                 type="number"
                 min={1}
@@ -240,7 +242,7 @@ export function DirectiveFormDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-[10px] font-bold uppercase">Year</Label>
+              <Label className="text-muted-foreground text-xs font-bold uppercase">Year</Label>
               <Input
                 type="number"
                 value={year}

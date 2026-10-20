@@ -20,6 +20,7 @@ import { apiFetch } from "@/lib/api-client"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import { isLate } from "@/lib/hr/attendance-utils"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface AppealableRow {
   id: string
@@ -83,8 +84,18 @@ export function AppealDialog({
   const hasLateArrival = Boolean(row.clock_in && isLate(row.clock_in))
   const hasMissingClockOut = Boolean(!row.clock_out || row.normalizedStatus === "incomplete")
 
-  // Reset state when dialog opens or editing changes
-  useEffect(() => {
+  // Reset when the dialog opens or the appeal being edited changes — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [
+    editAppeal,
+    open,
+    row.normalizedStatus,
+    isAbsentDay,
+    hasLateArrival,
+    hasMissingClockOut,
+  ] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
     if (editAppeal) {
       setAbsentReason(editAppeal.appeal_reason)
       setLwpReason(editAppeal.appeal_reason)
@@ -105,7 +116,7 @@ export function AppealDialog({
       setCheckIwp(hasMissingClockOut)
       setCheckOos(false)
     }
-  }, [editAppeal, open, row.normalizedStatus, isAbsentDay, hasLateArrival, hasMissingClockOut])
+  }
 
   // Quota check
   const isPermissionRequested = isAbsentDay ? absentRequestedStatus === "absent_with_permission" : checkLwp || checkIwp
@@ -232,7 +243,9 @@ export function AppealDialog({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Current Status</span>
-              <Badge className={ATTENDANCE_STATUS_COLORS[row.normalizedStatus] ?? "bg-gray-100 text-gray-800"}>
+              <Badge
+                className={ATTENDANCE_STATUS_COLORS[row.normalizedStatus] ?? "bg-neutral-muted text-neutral-foreground"}
+              >
                 {ATTENDANCE_STATUS_LABELS[row.normalizedStatus] ?? row.normalizedStatus}
               </Badge>
             </div>
@@ -344,9 +357,7 @@ export function AppealDialog({
                       disabled={submitting}
                       className="resize-none text-xs"
                     />
-                    <p className="text-muted-foreground text-[11px]">
-                      {oosReason.trim().length} / 10 minimum characters
-                    </p>
+                    <p className="text-muted-foreground text-xs">{oosReason.trim().length} / 10 minimum characters</p>
                   </div>
                 )}
               </div>
@@ -382,7 +393,7 @@ export function AppealDialog({
                             disabled={submitting}
                             className="resize-none text-xs"
                           />
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-xs">
                             {lwpReason.trim().length} / 10 minimum characters
                           </p>
                         </div>
@@ -419,7 +430,7 @@ export function AppealDialog({
                             disabled={submitting}
                             className="resize-none text-xs"
                           />
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-xs">
                             {iwpReason.trim().length} / 10 minimum characters
                           </p>
                         </div>

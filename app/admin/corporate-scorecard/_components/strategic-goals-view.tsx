@@ -1,11 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import type { DataTableTab } from "@/components/ui/data-table"
 import { PmsTablePage } from "@/app/admin/pms/_components/pms-table-page"
 import { RAG_AMBER_THRESHOLD, RAG_GREEN_THRESHOLD } from "@/lib/corporate-scorecard/attainment"
 import type { StrategicGoalRow } from "@/app/api/corporate-scorecard/goals/route"
 import { PlanYearSelect } from "./plan-year-select"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { formatScore } from "@/lib/format"
 
 type GoalScope = "mine" | "department" | "all"
 
@@ -37,10 +41,6 @@ const SCOPE_COPY: Record<GoalScope, { description: string; tableDescription: str
   },
 }
 
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
-}
-
 /** Text the shared status badge already colours: on target / needs attention / at risk. */
 function goalStatus(row: StrategicGoalRow, scope: GoalScope): string {
   if (row.task_total === 0) return "No tasks yet"
@@ -65,30 +65,23 @@ export function StrategicGoalsView({
   activeTab,
   onTabChange,
 }: StrategicGoalsViewProps) {
-  const [goals, setGoals] = useState<StrategicGoalRow[]>([])
   // null = let the server pick (current year, or the latest loaded plan).
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
-  const [planYears, setPlanYears] = useState<{ year?: number; years?: number[] }>({})
 
-  useEffect(() => {
-    const params = new URLSearchParams({ scope })
-    if (department) params.set("department", department)
-    if (selectedYear) params.set("year", String(selectedYear))
-    let cancelled = false
-    fetch(`/api/corporate-scorecard/goals?${params.toString()}`)
-      .then((res) => (res.ok ? res.json() : { data: [] }))
-      .then((payload) => {
-        if (cancelled) return
-        setGoals((payload.data ?? []) as StrategicGoalRow[])
-        setPlanYears({ year: payload.year, years: payload.years })
-      })
-      .catch(() => {
-        if (!cancelled) setGoals([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [scope, department, selectedYear])
+  const { data } = useQuery({
+    queryKey: QUERY_KEYS.strategicGoals(scope, department, selectedYear),
+    queryFn: async () => {
+      const params = new URLSearchParams({ scope })
+      if (department) params.set("department", department)
+      if (selectedYear) params.set("year", String(selectedYear))
+      return apiJson<{ data?: StrategicGoalRow[]; year?: number; years?: number[] }>(
+        `/api/corporate-scorecard/goals?${params.toString()}`
+      )
+    },
+    placeholderData: keepPreviousData,
+  })
+  const goals = useMemo(() => data?.data ?? [], [data])
+  const planYears = { year: data?.year, years: data?.years }
 
   const rows = useMemo(
     () =>
@@ -99,7 +92,7 @@ export function StrategicGoalsView({
         pillar: goal.strategic_priority,
         kpis: goal.kpi_count,
         tasks: `${goal.task_completed} / ${goal.task_total}`,
-        progress: formatPercent(scope === "mine" ? goal.task_score : goal.attainment_pct),
+        progress: formatScore(scope === "mine" ? goal.task_score : goal.attainment_pct),
         status: goalStatus(goal, scope),
       })),
     [goals, scope]

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -135,10 +136,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const [recurringTime, setRecurringTime] = useState("18:00")
 
   const [isSending, setIsSending] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [sendResult, setSendResult] = useState<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [activeSchedules, setActiveSchedules] = useState<any[]>([])
   const meetingWeekOptions = useMemo(() => Array.from({ length: 53 }, (_, index) => index + 1), [])
   const meetingYearOptions = useMemo(
     () => [currentOfficeWeekYear - 1, currentOfficeWeekYear, currentOfficeWeekYear + 1, currentOfficeWeekYear + 2],
@@ -299,44 +297,53 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     nextOfficeWeekYear,
   ])
 
-  useEffect(() => {
-    if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
-  }, [mode, reminderType])
+  // Communications always sends an admin broadcast; guarded, so it settles after one render.
+  if (mode === "communications" && reminderType !== "admin_broadcast") setReminderType("admin_broadcast")
 
-  useEffect(() => {
-    if (broadcastPreparedByOptions.length === 0) return
-    if (!broadcastPreparedByOptions.some((p) => p.id === broadcastPreparedById)) {
-      const preferred =
-        currentUserName && broadcastPreparedByOptions.some((p) => p.full_name === currentUserName)
-          ? broadcastPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
-          : broadcastPreparedByOptions[0].id
-      setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
-    }
-  }, [broadcastPreparedById, broadcastPreparedByOptions, currentUserName])
+  // Pick a valid preparer when the current one is missing from the options (guarded, so it settles).
+  if (
+    broadcastPreparedByOptions.length > 0 &&
+    !broadcastPreparedByOptions.some((p) => p.id === broadcastPreparedById)
+  ) {
+    const preferred =
+      currentUserName && broadcastPreparedByOptions.some((p) => p.full_name === currentUserName)
+        ? broadcastPreparedByOptions.find((p) => p.full_name === currentUserName)?.id
+        : broadcastPreparedByOptions[0].id
+    setBroadcastPreparedById(preferred || broadcastPreparedByOptions[0].id)
+  }
 
-  useEffect(() => {
-    const senderEmail = (
-      selectedBroadcastPreparedBy?.company_email ||
-      selectedBroadcastPreparedBy?.additional_email ||
-      ""
+  // Reply-to follows the preparer, during render rather than in an effect.
+  const [seededSender, setSeededSender] = useState<readonly unknown[] | null>(null)
+  const senderNext = [selectedBroadcastPreparedBy] as const
+  if (depsChanged(seededSender, senderNext)) {
+    setSeededSender(senderNext)
+    setBroadcastReplyToEmail(
+      (selectedBroadcastPreparedBy?.company_email || selectedBroadcastPreparedBy?.additional_email || "")
+        .trim()
+        .toLowerCase()
     )
-      .trim()
-      .toLowerCase()
-    setBroadcastReplyToEmail(senderEmail)
-  }, [selectedBroadcastPreparedBy])
+  }
 
-  useEffect(() => {
-    if (reminderType !== "meeting") return
-    if (!canonicalMeetingSetup) return
-    setMeetingDate(canonicalMeetingSetup.meetingDate)
-    setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
-  }, [canonicalMeetingSetup, reminderType])
+  // Seed the meeting date and time from the canonical week, during render rather than in an effect.
+  const [seededMeeting, setSeededMeeting] = useState<readonly unknown[] | null>(null)
+  const meetingNext = [canonicalMeetingSetup, reminderType] as const
+  if (depsChanged(seededMeeting, meetingNext)) {
+    setSeededMeeting(meetingNext)
+    if (reminderType === "meeting" && canonicalMeetingSetup) {
+      setMeetingDate(canonicalMeetingSetup.meetingDate)
+      setMeetingTime(canonicalMeetingSetup.meetingTime || "08:30")
+    }
+  }
 
-  useEffect(() => {
-    if (reminderType !== "meeting") return
-    if (!defaultAgendaData) return
-    setAgendaText(defaultAgendaData.agenda.join("\n"))
-  }, [defaultAgendaData, reminderType])
+  // Seed the agenda from the default agenda, during render rather than in an effect.
+  const [seededAgenda, setSeededAgenda] = useState<readonly unknown[] | null>(null)
+  const agendaNext = [defaultAgendaData, reminderType] as const
+  if (depsChanged(seededAgenda, agendaNext)) {
+    setSeededAgenda(agendaNext)
+    if (reminderType === "meeting" && defaultAgendaData) {
+      setAgendaText(defaultAgendaData.agenda.join("\n"))
+    }
+  }
 
   // Teams link is per-week (can change each meeting); agenda is global (rarely changes week to week).
   const meetingDraftStorageKey = useMemo(() => {
@@ -361,6 +368,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     try {
       const savedDraft = JSON.parse(savedDraftRaw) as { teamsLink?: string }
       if (typeof savedDraft.teamsLink === "string" && savedDraft.teamsLink.trim()) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the per-week draft from localStorage, an external store
         setTeamsLink(savedDraft.teamsLink)
       }
     } catch {
@@ -440,9 +448,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     },
   })
 
-  useEffect(() => {
-    if (schedulesData) setActiveSchedules(schedulesData)
-  }, [schedulesData])
+  const activeSchedules: any[] = schedulesData ?? []
 
   // ── Computed ────────────────────────────────────────────────────────────────
   const filteredEmployees = useMemo(() => {
@@ -656,7 +662,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     if (sendTiming === "scheduled" || sendTiming === "recurring") {
       const toastId = toast.loading("Saving schedule...")
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const schedulePayload: any = {
           schedule_type: sendTiming === "scheduled" ? "one_time" : "recurring",
           reminder_type: reminderType,
@@ -731,7 +736,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminReminderSchedules(mode) })
       } catch (err: unknown) {
         log.error({ err: String(err) }, "Schedule error")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toast.error((err as any).message || "Failed to save schedule", { id: toastId })
       }
       return
@@ -752,7 +756,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const payload: any = {
         type: reminderType,
         recipients: resolvedRecipients,
@@ -817,9 +820,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         return
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const successCount = data.results?.filter((r: any) => r.success).length || 0
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const failCount = data.results?.filter((r: any) => !r.success).length || 0
 
       if (failCount === 0) {
@@ -843,7 +844,6 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
       })
     } catch (err: unknown) {
       log.error({ err: String(err) }, "Meeting reminder error")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toast.error((err as any).message || "Failed to send", { id: toastId })
     } finally {
       setIsSending(false)

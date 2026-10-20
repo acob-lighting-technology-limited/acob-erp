@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileText, List, Eye, User, FolderOpen, Calendar } from "lucide-react"
-import { formatWATDate } from "@/lib/utils/date"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -15,6 +14,8 @@ import { DepartmentDocumentsBrowser } from "@/components/documentation/departmen
 import { AdminDocViewDialog } from "@/components/documentation/admin-doc-view-dialog"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { AdminDocumentation, UserProfile, employeeMember } from "@/components/documentation/admin-doc-types"
+import { formatDate } from "@/lib/format"
+import { draftToneClass } from "@/lib/status-tones"
 
 // Re-export types for consumers of this module
 export type { UserProfile, employeeMember }
@@ -38,13 +39,7 @@ interface AdminDocumentationContentProps {
   backLinkLabel?: string
 }
 
-const formatDate = (dateString: string) =>
-  formatWATDate(dateString, { month: "short", day: "numeric", year: "numeric" })
-
-const getStatusColor = (isDraft: boolean) =>
-  isDraft
-    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+const getStatusColor = draftToneClass
 
 export function AdminDocumentationContent({
   initialDocumentation,
@@ -293,7 +288,7 @@ export function AdminDocumentationContent({
               subtitle: (doc) =>
                 `${doc.user ? `${doc.user.first_name} ${doc.user.last_name}` : "Unknown"} · ${doc.category || "General"} · ${formatDate(doc.updated_at)}`,
               trailing: (doc) => (
-                <Badge className={`text-[10px] ${getStatusColor(doc.is_draft)}`}>
+                <Badge className={`text-xs ${getStatusColor(doc.is_draft)}`}>
                   {doc.is_draft ? "Draft" : "Published"}
                 </Badge>
               ),

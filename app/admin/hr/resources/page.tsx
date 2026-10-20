@@ -1,9 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { CalendarCheck2, CheckCircle2, Paperclip, Plus, XCircle, Box } from "lucide-react"
 
@@ -23,12 +21,9 @@ import { BookingReviewDialog } from "./_components/booking-review-dialog"
 import { ResourceDialog } from "./_components/resource-dialog"
 import type { FleetAttachment, FleetBooking, FleetResource } from "./_components/fleet-types"
 import { apiFetch } from "@/lib/api-client"
+import { formatDateTime } from "@/lib/format"
 
-function formatDateTime(value: string) {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-  return formatWATDateTime(parsed)
-}
+import { layout as tablePageLayout } from "./_layout"
 
 async function fetchFleetResources(): Promise<FleetResource[]> {
   const response = await apiFetch("/api/admin/hr/fleet/resources")
@@ -50,10 +45,8 @@ const TABS: DataTableTab[] = [
 ]
 
 export default function AdminFleetPage() {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState("bookings")
-  const [accessChecked, setAccessChecked] = useState(false)
 
   const [isResourceDialogOpen, setIsResourceDialogOpen] = useState(false)
   const [resourceName, setResourceName] = useState("")
@@ -65,25 +58,6 @@ export default function AdminFleetPage() {
   const [attachments, setAttachments] = useState<FleetAttachment[]>([])
   const [reviewing, setReviewing] = useState(false)
   const [adminNote, setAdminNote] = useState("")
-
-  useEffect(() => {
-    let isMounted = true
-    async function verifyAccess() {
-      try {
-        const response = await apiFetch("/api/admin/hr/fleet/bookings?status=pending", { cache: "no-store" })
-        if (!response.ok && (response.status === 401 || response.status === 403)) {
-          router.replace("/admin/hr")
-          return
-        }
-      } finally {
-        if (isMounted) setAccessChecked(true)
-      }
-    }
-    void verifyAccess()
-    return () => {
-      isMounted = false
-    }
-  }, [router])
 
   const { data: resources = [], isLoading: loadingResources } = useQuery({
     queryKey: QUERY_KEYS.adminFleetResources(),
@@ -212,7 +186,7 @@ export default function AdminFleetPage() {
         label: "Reason",
         accessor: (r) => r.reason,
         hideOnMobile: true,
-        render: (r) => <span className="max-w-[200px] truncate text-xs">{r.reason}</span>,
+        render: (r) => <span className="max-w-50 truncate text-xs">{r.reason}</span>,
       },
       {
         key: "status",
@@ -303,7 +277,7 @@ export default function AdminFleetPage() {
         render: (r) => (
           <div>
             <p className="font-medium">{r.name}</p>
-            {r.description && <p className="text-muted-foreground max-w-[300px] truncate text-xs">{r.description}</p>}
+            {r.description && <p className="text-muted-foreground max-w-75 truncate text-xs">{r.description}</p>}
           </div>
         ),
       },
@@ -347,25 +321,13 @@ export default function AdminFleetPage() {
   )
 
   // ─── Render ──────────────────────────────────────────────────────────────
-  if (!accessChecked) {
-    return (
-      <DataTablePage
-        title="Resource Booking Admin"
-        description="Manage bookable resources and review booking applications"
-        icon={CalendarCheck2}
-        backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
-      >
-        <div className="text-muted-foreground rounded-md border p-6 text-sm">Loading access policy...</div>
-      </DataTablePage>
-    )
-  }
-
   const pendingCount = bookings.filter((b) => b.status === "pending").length
   const approvedCount = bookings.filter((b) => b.status === "approved").length
   const rejectedCount = bookings.filter((b) => b.status === "rejected").length
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Resource Booking Admin"
       description="Manage bookable resources and review booking applications"
       icon={CalendarCheck2}
@@ -429,11 +391,11 @@ export default function AdminFleetPage() {
             render: (r) => (
               <div className="grid gap-3 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                 <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Trip Purpose & Reason</span>
+                  <span className="text-muted-foreground block text-xs font-medium">Trip Purpose & Reason</span>
                   <p className="text-foreground mt-1 whitespace-pre-wrap">{r.reason || "No reason provided"}</p>
                 </div>
                 <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Schedule Details</span>
+                  <span className="text-muted-foreground block text-xs font-medium">Schedule Details</span>
                   <p className="text-foreground mt-1">
                     From: <span className="font-medium">{formatDateTime(r.start_at)}</span>
                   </p>
@@ -442,15 +404,15 @@ export default function AdminFleetPage() {
                   </p>
                 </div>
                 <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Review & Decision</span>
+                  <span className="text-muted-foreground block text-xs font-medium">Review & Decision</span>
                   {r.reviewer?.full_name ? (
                     <div className="mt-1 space-y-0.5">
                       <p className="text-foreground font-medium">{r.reviewer.full_name}</p>
                       {r.reviewer.department && (
-                        <p className="text-muted-foreground text-[11px]">{r.reviewer.department}</p>
+                        <p className="text-muted-foreground text-xs">{r.reviewer.department}</p>
                       )}
                       {r.reviewed_at && (
-                        <p className="text-muted-foreground text-[11px]">{formatDateTime(r.reviewed_at)}</p>
+                        <p className="text-muted-foreground text-xs">{formatDateTime(r.reviewed_at)}</p>
                       )}
                     </div>
                   ) : (
@@ -478,7 +440,7 @@ export default function AdminFleetPage() {
                         ? "destructive"
                         : "outline"
                 }
-                className="text-[10px]"
+                className="text-xs"
               >
                 {r.status}
               </Badge>
@@ -507,7 +469,7 @@ export default function AdminFleetPage() {
                 </Badge>
               </div>
               <p className="text-muted-foreground line-clamp-2 text-xs">{r.reason}</p>
-              <div className="text-muted-foreground border-t pt-2 text-[10px]">
+              <div className="text-muted-foreground border-t pt-2 text-xs">
                 {formatDateTime(r.start_at)} – {formatDateTime(r.end_at)}
               </div>
             </div>
@@ -537,7 +499,7 @@ export default function AdminFleetPage() {
             title: (r) => r.name,
             subtitle: (r) => `${r.resource_type} · ${r.description || "No description"}`,
             trailing: (r) => (
-              <Badge variant={r.is_active ? "default" : "outline"} className="text-[10px]">
+              <Badge variant={r.is_active ? "default" : "outline"} className="text-xs">
                 {r.is_active ? "Active" : "Inactive"}
               </Badge>
             ),

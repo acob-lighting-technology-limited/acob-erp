@@ -8,6 +8,7 @@ import WireframeForms from "@/components/ui/wireframe-forms"
 import GridTraces from "@/components/ui/grid-traces"
 import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
 import { cn } from "@/lib/utils"
+import { useMounted } from "@/hooks/use-mounted"
 
 /** Card styling shared by every `/auth/*` page so they sit on the shell consistently. */
 export const authCardClassName =
@@ -33,11 +34,7 @@ const DEFAULT_TAGLINE =
 
 export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, className }: AuthShellProps) {
   const { resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useMounted()
 
   // Light until mounted so SSR and first client render match.
   const mode = mounted && resolvedTheme === "dark" ? "dark" : "light"
@@ -57,7 +54,7 @@ export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, cla
 
       <div
         aria-hidden="true"
-        className="bg-primary/15 pointer-events-none absolute top-1/2 left-1/2 h-[560px] w-[760px] -translate-x-[65%] -translate-y-1/2 rounded-full blur-[120px]"
+        className="bg-primary/15 pointer-events-none absolute top-1/2 left-1/2 h-140 w-190 -translate-x-[65%] -translate-y-1/2 rounded-full blur-[120px]"
       />
 
       {/* Faint backdrop on small screens, where there is no brand panel to hold it */}
@@ -78,7 +75,7 @@ export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, cla
 
             {/* Reserved for the matrix wireframe; see SHOW_MATRIX. */}
             {SHOW_MATRIX && mounted && (
-              <div aria-hidden="true" className="pointer-events-none h-[320px]">
+              <div aria-hidden="true" className="pointer-events-none h-80">
                 <WireframeForms variant="matrix" mode={mode} speed={1} size={1} />
               </div>
             )}
@@ -100,7 +97,7 @@ export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, cla
               </ul>
             )}
 
-            <p className="text-muted-foreground/70 font-mono text-[11px]">ACOB Lighting Technology Limited</p>
+            <p className="text-muted-foreground font-mono text-xs">ACOB Lighting Technology Limited</p>
           </div>
         </section>
 

@@ -75,7 +75,6 @@ export default function RolesPage() {
       setFormData({ name: "", description: "", permissions: [] })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminRolesSettings() })
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toast.error((error as any)?.message || "Failed to save")
     }
   }
@@ -91,7 +90,6 @@ export default function RolesPage() {
       toast.success("Deleted")
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminRolesSettings() })
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toast.error((error as any)?.message)
     }
   }
@@ -121,7 +119,6 @@ export default function RolesPage() {
       if (!res.ok) throw new Error(json?.error || "Failed to load role users")
       setRoleUsers((json.data || []) as RoleMember[])
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toast.error((error as any)?.message || "Failed to load role users")
     } finally {
       setRoleUsersLoading(false)
@@ -135,7 +132,6 @@ export default function RolesPage() {
       if (!res.ok) throw new Error(json?.error || "Failed to load users")
       setAvailableUsers((json.data || []) as RoleMember[])
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toast.error((error as any)?.message || "Failed to load users")
     }
   }
@@ -169,7 +165,6 @@ export default function RolesPage() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminRolesSettings() })
       await openRoleUsers(selectedRoleName)
     } catch (error: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       toast.error((error as any)?.message || "Failed to add user")
     } finally {
       setAddingUser(false)
@@ -398,7 +393,7 @@ export default function RolesPage() {
           title: (role) => role.name.replace(/_/g, " "),
           subtitle: (role) => `${role.user_count || 0} users · ${role.permissions?.length || 0} permissions`,
           trailing: (role) => (
-            <Badge variant={role.is_system ? "destructive" : "outline"} className="text-[10px]">
+            <Badge variant={role.is_system ? "destructive" : "outline"} className="text-xs">
               {role.is_system ? "System" : "Custom"}
             </Badge>
           ),

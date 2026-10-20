@@ -21,10 +21,8 @@ import {
   ShieldCheck,
   Ticket,
   TrendingUp,
-  User,
   Users,
   Wrench,
-  FolderKanban,
   Layers,
 } from "lucide-react"
 
@@ -49,13 +47,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
-import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
 import { findActiveBranchHref } from "@/lib/nav/match"
 import type { NavChild, RouteAliases } from "@/lib/nav/types"
 import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
+import { useDepartmentCode } from "@/hooks/use-department-code"
+import { isAnniversaryPeriod } from "@/lib/seasonal-branding"
+import { usePublishNavPages } from "@/lib/nav/page-index"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface SidebarProps {
   user?: {
@@ -207,7 +208,7 @@ const navigationSections: NavSectionDef[] = [
         icon: Wrench,
         children: [
           { name: "Signature", href: "/tools/signature" },
-          { name: "Signature Anniversary", href: "/tools/signature-anniversary" },
+          ...(isAnniversaryPeriod() ? [{ name: "Signature Anniversary", href: "/tools/signature-anniversary" }] : []),
           { name: "My Job Description", href: "/tools/job-description" },
           { name: "Watermark", href: "/tools/watermark" },
           { name: "Media & PDF Suite", href: "/tools/media" },
@@ -237,7 +238,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
-  const [departmentCode, setDepartmentCode] = useState<string | null>(null)
+  const departmentCode = useDepartmentCode(profile?.department)
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
@@ -281,25 +282,30 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     })
   }
 
-  useEffect(() => {
-    if (!pathname) return
-    for (const item of [...allNavItems, MD_DESK_NAV_ITEM]) {
-      if (!item.children) continue
-      for (const child of item.children) {
-        const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
-        if (childActive) setOpenSections((prev) => new Set([...prev, item.href]))
-        if (child.children) {
-          const grandchildActive = child.children.some(
-            (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
-          )
-          if (grandchildActive) {
-            setOpenSections((prev) => new Set([...prev, item.href]))
-            setOpenSubSections((prev) => new Set([...prev, child.href]))
+  // Open the sections holding the current page — adjusted during render, not in an effect.
+  const [expandedFor, setExpandedFor] = useState<readonly unknown[] | null>(null)
+  const expandedForNext = [pathname] as const
+  if (depsChanged(expandedFor, expandedForNext)) {
+    setExpandedFor(expandedForNext)
+    if (pathname) {
+      for (const item of [...allNavItems, MD_DESK_NAV_ITEM]) {
+        if (!item.children) continue
+        for (const child of item.children) {
+          const childActive = pathname === child.href || pathname.startsWith(child.href + "/")
+          if (childActive) setOpenSections((prev) => new Set([...prev, item.href]))
+          if (child.children) {
+            const grandchildActive = child.children.some(
+              (gc) => pathname === gc.href || pathname.startsWith(gc.href + "/")
+            )
+            if (grandchildActive) {
+              setOpenSections((prev) => new Set([...prev, item.href]))
+              setOpenSubSections((prev) => new Set([...prev, child.href]))
+            }
           }
         }
       }
     }
-  }, [pathname])
+  }
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -311,35 +317,6 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)
   )
-
-  useEffect(() => {
-    let cancelled = false
-    const departmentName = profile?.department ? normalizeDepartmentName(profile.department) : ""
-    if (!departmentName) {
-      setDepartmentCode(null)
-      return
-    }
-
-    async function loadDepartmentCode() {
-      try {
-        const response = await fetch("/api/departments", { cache: "no-store" })
-        if (!response.ok) return
-        const payload = (await response.json().catch(() => null)) as {
-          data?: Array<{ name?: string | null; department_code?: string | null }>
-        } | null
-        const rows = payload?.data || []
-        const match = rows.find((row) => normalizeDepartmentName(String(row.name || "")) === departmentName)
-        if (!cancelled) setDepartmentCode(match?.department_code || null)
-      } catch {
-        if (!cancelled) setDepartmentCode(null)
-      }
-    }
-
-    void loadDepartmentCode()
-    return () => {
-      cancelled = true
-    }
-  }, [profile?.department])
 
   const accountName =
     profile?.first_name && profile?.last_name
@@ -373,6 +350,9 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     }
   })
 
+  // The navbar search offers these pages too, so it never lists one the viewer cannot open.
+  usePublishNavPages(visibleSections)
+
   // One winner, so a parent and its child never highlight at the same time —
   // the admin sidebar has always scored matches this way.
   const activeTopLevelHref = useMemo(() => {
@@ -395,7 +375,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             {isCollapsed ? (
               section.key !== "overview" && <div className="mx-1.5 my-1.5 border-t" />
             ) : (
-              <p className="text-muted-foreground px-3 pt-1 pb-1 text-[11px] font-semibold">{section.label}</p>
+              <p className="text-muted-foreground px-3 pt-1 pb-1 text-xs font-semibold">{section.label}</p>
             )}
             {section.items.map((item) => {
               const hasChildren = !isCollapsed && item.children && item.children.length > 0
@@ -409,7 +389,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                   {hasChildren ? (
                     <div
                       className={cn(
-                        "flex min-h-[36px] items-center rounded-md text-sm font-medium transition-colors duration-150",
+                        "flex min-h-9 items-center rounded-md text-sm font-medium transition-colors duration-150",
                         highlighted ? activeCls : inactiveCls
                       )}
                     >
@@ -443,14 +423,14 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           className={cn(
                             "flex items-center rounded-md transition-[padding,gap,background-color,color] duration-300 ease-in-out",
                             isCollapsed ? "justify-center px-2.5 py-2" : "gap-2.5 px-3 py-2",
-                            "min-h-[36px] text-sm font-medium",
+                            "min-h-9 text-sm font-medium",
                             highlighted ? activeCls : inactiveCls
                           )}
                         >
                           <span className="relative inline-flex items-center">
                             <item.icon className="h-4 w-4 shrink-0" />
                             {isCollapsed && item.badge != null && item.badge > 0 && (
-                              <span className="ring-background absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-emerald-500 ring-2">
+                              <span className="ring-background bg-primary absolute -top-1 -right-1 flex h-2 w-2 rounded-full ring-2">
                                 <span className="sr-only">{item.badge} unviewed</span>
                               </span>
                             )}
@@ -459,7 +439,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                           {!isCollapsed && item.badge != null && item.badge > 0 && (
                             <span
                               className={cn(
-                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tracking-tight",
+                                "ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold tracking-tight",
                                 highlighted
                                   ? "bg-primary-foreground text-primary"
                                   : "bg-emerald-600 text-white dark:bg-emerald-500"
@@ -495,7 +475,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                             {hasSubChildren ? (
                               <div
                                 className={cn(
-                                  "flex min-h-[32px] items-center rounded-md text-sm font-medium transition-colors duration-150",
+                                  "flex min-h-8 items-center rounded-md text-sm font-medium transition-colors duration-150",
                                   childHighlighted ? activeCls : inactiveCls
                                 )}
                               >
@@ -524,7 +504,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                                 href={child.href}
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={cn(
-                                  "flex min-h-[32px] items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
+                                  "flex min-h-8 items-center rounded-md px-2 py-1.5 text-sm font-medium transition-colors duration-150",
                                   isChildActive ? activeCls : inactiveCls
                                 )}
                               >
@@ -543,7 +523,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                                       href={grandchild.href}
                                       onClick={() => setIsMobileMenuOpen(false)}
                                       className={cn(
-                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        "flex min-h-7 items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
                                         isGcActive ? activeCls : inactiveCls
                                       )}
                                     >
@@ -574,7 +554,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                   <Button
                     variant="outline"
                     className={cn(
-                      "text-muted-foreground hover:text-foreground min-h-[52px] w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
+                      "text-muted-foreground hover:text-foreground min-h-13 w-full text-sm transition-[padding,gap] duration-300 ease-in-out",
                       "justify-center px-2.5"
                     )}
                   >
@@ -596,7 +576,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="text-muted-foreground hover:text-foreground min-h-[52px] w-full justify-between px-3 text-sm transition-[padding,gap] duration-300 ease-in-out"
+                className="text-muted-foreground hover:text-foreground min-h-13 w-full justify-between px-3 text-sm transition-[padding,gap] duration-300 ease-in-out"
               >
                 <div className="flex items-center gap-2.5">
                   <StaffAvatar

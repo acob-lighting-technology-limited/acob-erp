@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { RiskRegisterView } from "@/app/admin/corporate-services/risk-register/_components/risk-register-view"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export const metadata: Metadata = {
   title: "Department Risk Register | Corporate Services | Matrix",
   description: "Departmental risks, inherent ratings, control owners, and mitigation plans.",
@@ -42,14 +45,16 @@ export default async function DeptRiskRegisterPage({ params }: Props) {
   ).map((s) => ({ id: s.id, name: s.full_name, department: s.department, active: s.employment_status === "active" }))
 
   return (
-    <RiskRegisterView
-      departments={departments}
-      staff={staff}
-      raisableDepartments={[scope.deptName]}
-      currentUserId={scope.userId}
-      isAdminLike={scope.isAdminLike}
-      lockedDepartment={scope.deptName}
-      backLink={{ href: `/dept/${dept_id}`, label: "Back to Dashboard" }}
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <RiskRegisterView
+        departments={departments}
+        staff={staff}
+        raisableDepartments={[scope.deptName]}
+        currentUserId={scope.userId}
+        isAdminLike={scope.isAdminLike}
+        lockedDepartment={scope.deptName}
+        backLink={{ href: `/dept/${dept_id}`, label: "Back to Dashboard" }}
+      />
+    </TablePageLayoutProvider>
   )
 }

@@ -38,7 +38,7 @@ interface ControlledDocViewDialogProps {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">{label}</p>
+      <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{label}</p>
       <div className="text-sm">{children}</div>
     </div>
   )
@@ -99,7 +99,7 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[640px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-160">
         {isLoading || !doc ? (
           <>
             <DialogHeader>
@@ -187,7 +187,7 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
             {doc.doc_type === "policy" && doc.status === "published" && current && (
               <div className="space-y-3 rounded-lg border p-3">
                 {doc.my_acknowledged_at ? (
-                  <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                  <div className="text-success-foreground flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-4 w-4" />
                     You acknowledged version {current.version_number} on {formatDocDate(doc.my_acknowledged_at)}.
                   </div>

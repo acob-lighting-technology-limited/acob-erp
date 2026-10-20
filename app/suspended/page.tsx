@@ -127,7 +127,7 @@ export default function SuspendedPage() {
       <Card className="bg-card w-full max-w-lg border-amber-300/40 shadow-2xl dark:border-amber-900/50">
         <CardHeader className="pb-3 text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/15 ring-8 ring-amber-500/10">
-            <ShieldAlert className="h-7 w-7 text-amber-600 dark:text-amber-400" />
+            <ShieldAlert className="text-warning-foreground h-7 w-7" />
           </div>
           <CardTitle className="text-foreground text-2xl font-bold tracking-tight">Account Suspended</CardTitle>
           <CardDescription className="text-muted-foreground mt-1 text-sm">
@@ -142,7 +142,7 @@ export default function SuspendedPage() {
               {/* Suspension Reason */}
               <div className="rounded-lg border border-amber-300/40 bg-amber-500/10 p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
                 <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold tracking-wider text-amber-900 uppercase dark:text-amber-200">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <AlertTriangle className="text-warning-foreground h-4 w-4" />
                   Reason for Suspension
                 </h3>
                 <p className="text-base font-semibold text-amber-950 dark:text-amber-100">{suspension.reason}</p>
@@ -168,7 +168,7 @@ export default function SuspendedPage() {
                       Until {format(new Date(suspension.end_date), "MMMM d, yyyy")}
                     </span>
                   ) : (
-                    <Badge variant="destructive" className="text-[10px] font-bold uppercase">
+                    <Badge variant="destructive" className="text-xs font-bold uppercase">
                       Indefinite Hold
                     </Badge>
                   )}

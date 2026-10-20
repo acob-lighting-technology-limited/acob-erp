@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
@@ -58,16 +59,21 @@ export function SignDialog({
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    if (!open) return
-    setPin("")
-    setComments("")
-    setChangeAmount(false)
-    setAmount(String(requisition.amount))
-    setLines(requisition.line_items.map((l) => String(l.amount)))
-    setSplits(requisition.beneficiary_details.map((b) => String(b.amount ?? "")))
-    setReason("")
-  }, [open, requisition])
+  // Reset the form each time the dialog opens, during render rather than in an effect.
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [open, requisition] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
+    if (open) {
+      setPin("")
+      setComments("")
+      setChangeAmount(false)
+      setAmount(String(requisition.amount))
+      setLines(requisition.line_items.map((l) => String(l.amount)))
+      setSplits(requisition.beneficiary_details.map((b) => String(b.amount ?? "")))
+      setReason("")
+    }
+  }
 
   const hasSplits =
     requisition.beneficiary_details.length > 1 && requisition.beneficiary_details.some((b) => b.amount != null)

@@ -1,13 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react"
+import { useMemo, useState, type ComponentType } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Timer, UserX, AlertCircle, Sunrise, Sunset, FileWarning, Building2 } from "lucide-react"
-import { toast } from "sonner"
-import { logger } from "@/lib/logger"
 import { cn } from "@/lib/utils"
 import {
   ATTENDANCE_TRACKING_START,
@@ -19,8 +17,10 @@ import {
   toLocalYearMonth,
   type Quarter,
 } from "@/lib/hr/attendance-utils"
-
-const log = logger("hr-attendance-leaderboard")
+import { apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface LeaderboardReport {
   user_id: string
@@ -252,13 +252,16 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
   const [quarterYear, setQuarterYear] = useState(new Date().getFullYear())
   const [department, setDepartment] = useState(lockedDepartment || "all")
   const [viewScope, setViewScope] = useState<"individual" | "department" | "combined">("individual")
-  const [reports, setReports] = useState<LeaderboardReport[]>([])
-  const [departmentStats, setDepartmentStats] = useState<DepartmentStat[]>([])
-  const [loading, setLoading] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
+  const { data, isLoading: loading } = useQuery({
+    queryKey: QUERY_KEYS.attendanceLeaderboard({
+      periodMode,
+      yearMonth,
+      quarterYear,
+      quarter,
+      department: lockedDepartment || department,
+    }),
+    queryFn: async () => {
       const { start, end } =
         periodMode === "month"
           ? monthBounds(yearMonth)
@@ -270,28 +273,17 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
         end_date: end,
         department: lockedDepartment || department,
       })
-      const res = await fetch(`/api/hr/attendance/reports?${params.toString()}`, { cache: "no-store" })
-      const payload = (await res.json().catch(() => null)) as {
-        data?: LeaderboardReport[]
-        department_stats?: DepartmentStat[]
-        error?: string
-      } | null
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load leaderboard")
-      setReports(payload?.data ?? [])
-      setDepartmentStats(payload?.department_stats ?? [])
-    } catch (err) {
-      log.error("Failed to load attendance leaderboard", err)
-      toast.error("Failed to load leaderboard")
-      setReports([])
-      setDepartmentStats([])
-    } finally {
-      setLoading(false)
-    }
-  }, [periodMode, yearMonth, quarter, quarterYear, department, lockedDepartment])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ data?: LeaderboardReport[]; department_stats?: DepartmentStat[] }>(
+        `/api/hr/attendance/reports?${params.toString()}`,
+        { cache: "no-store" }
+      )
+      return { reports: payload.data ?? [], departmentStats: payload.department_stats ?? [] }
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load leaderboard" },
+  })
+  const reports = useMemo(() => data?.reports ?? [], [data])
+  const departmentStats = useMemo(() => data?.departmentStats ?? [], [data])
 
   const departmentOptions = useMemo(() => {
     const visible = lockedDepartment ? [lockedDepartment] : departments
@@ -337,7 +329,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
         </CardHeader>
         <CardContent className="pt-0">
           {loading ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">Loading…</p>
+            <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
             <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
           ) : (
@@ -349,12 +341,12 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                     className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-[10px]">
+                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-xs">
                         {i + 1}
                       </Badge>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-medium">{row.report.user_name}</div>
-                        <div className="text-muted-foreground truncate text-[10px]">{row.report.department}</div>
+                        <div className="text-muted-foreground truncate text-xs">{row.report.department}</div>
                       </div>
                     </div>
                     <span className="shrink-0 text-xs font-semibold">{metric.formatValue(row.value)}</span>
@@ -389,7 +381,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
         </CardHeader>
         <CardContent className="pt-0">
           {loading ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">Loading…</p>
+            <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
             <p className="text-muted-foreground py-4 text-center text-xs">No department data for this period.</p>
           ) : (
@@ -401,12 +393,12 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                     className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-sm"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-[10px]">
+                      <Badge variant="outline" className="w-6 shrink-0 justify-center px-0 text-xs">
                         {i + 1}
                       </Badge>
                       <div className="min-w-0">
                         <div className="truncate text-xs font-medium">{dept.department}</div>
-                        <div className="text-muted-foreground truncate text-[10px]">
+                        <div className="text-muted-foreground truncate text-xs">
                           {dept.employee_count} employee{dept.employee_count === 1 ? "" : "s"}
                         </div>
                       </div>
@@ -427,7 +419,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           <Select value={periodMode} onValueChange={(v) => setPeriodMode(v as "month" | "quarter" | "all")}>
-            <SelectTrigger className="h-9 w-full sm:w-[130px]" aria-label="Cycle">
+            <SelectTrigger className="h-9 w-full sm:w-32.5" aria-label="Cycle">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -439,7 +431,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
 
           {periodMode === "month" && (
             <Select value={yearMonth} onValueChange={setYearMonth}>
-              <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Month">
+              <SelectTrigger className="h-9 w-full sm:w-45" aria-label="Month">
                 <SelectValue placeholder="Select Month" />
               </SelectTrigger>
               <SelectContent>
@@ -455,7 +447,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {periodMode === "quarter" && (
             <>
               <Select value={quarter} onValueChange={(v) => setQuarter(v as Quarter)}>
-                <SelectTrigger className="h-9 w-full sm:w-[90px]" aria-label="Quarter">
+                <SelectTrigger className="h-9 w-full sm:w-22.5" aria-label="Quarter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -466,7 +458,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
                 </SelectContent>
               </Select>
               <Select value={String(quarterYear)} onValueChange={(v) => setQuarterYear(Number(v) || quarterYear)}>
-                <SelectTrigger className="h-9 w-full sm:w-[100px]" aria-label="Year">
+                <SelectTrigger className="h-9 w-full sm:w-25" aria-label="Year">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -483,7 +475,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {!lockedDepartment && (
             <div className={cn(periodMode === "month" && "col-span-2 sm:col-span-1")}>
               <Select value={department} onValueChange={setDepartment}>
-                <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Department">
+                <SelectTrigger className="h-9 w-full sm:w-45" aria-label="Department">
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>

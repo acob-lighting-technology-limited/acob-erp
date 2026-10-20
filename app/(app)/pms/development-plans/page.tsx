@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { BookOpen, CheckCircle2, Clock } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
@@ -10,8 +10,13 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { useCycleFilters, type CycleFilterCycle } from "@/components/pms/use-cycle-filters"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+
+import { layout as tablePageLayout } from "./_layout"
 
 type PlanAction = {
   id: string
@@ -72,34 +77,26 @@ function planProgress(plan: DevelopmentPlan) {
 }
 
 export default function DevelopmentPlansPage() {
-  const [plans, setPlans] = useState<DevelopmentPlan[]>([])
-  const [cycles, setCycles] = useState<CycleFilterCycle[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const loadPlans = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [plansRes, cyclesRes] = await Promise.all([
-        apiFetch("/api/hr/performance/development-plans"),
-        apiFetch("/api/hr/performance/cycles"),
-      ])
-      const data = (await plansRes.json().catch(() => ({}))) as { data?: DevelopmentPlan[]; error?: string }
-      const cyclesData = (await cyclesRes.json().catch(() => ({}))) as { data?: CycleFilterCycle[] }
-      if (!plansRes.ok) throw new Error(data.error || "Failed to load plans")
-      setPlans(data.data || [])
-      setCycles(cyclesData.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadPlans()
-  }, [loadPlans])
+  const queryClient = useQueryClient()
+  const { cycles } = usePerformanceCycles<CycleFilterCycle>()
+  const {
+    data: plans = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.myDevelopmentPlans(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: DevelopmentPlan[] }>("/api/hr/performance/development-plans", {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+  })
+  const error = queryError?.message ?? null
+  const loadPlans = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const { filters: cycleFilters } = useCycleFilters<DevelopmentPlan>({
     cycles,
@@ -120,7 +117,7 @@ export default function DevelopmentPlansPage() {
         throw new Error(data.error || "Failed to update")
       }
       toast.success("Action marked complete")
-      setPlans((current) =>
+      queryClient.setQueryData<DevelopmentPlan[]>(QUERY_KEYS.myDevelopmentPlans(), (current = []) =>
         current.map((plan) =>
           plan.id === planId
             ? {
@@ -152,9 +149,7 @@ export default function DevelopmentPlansPage() {
         render: (plan) => (
           <div className="flex flex-col">
             <span className="font-medium">{plan.title}</span>
-            <span className="text-muted-foreground text-[11px]">
-              {FOCUS_LABELS[plan.focus_area] || plan.focus_area}
-            </span>
+            <span className="text-muted-foreground text-xs">{FOCUS_LABELS[plan.focus_area] || plan.focus_area}</span>
           </div>
         ),
       },
@@ -191,7 +186,7 @@ export default function DevelopmentPlansPage() {
           return (
             <div className="w-28 space-y-1">
               <Progress value={planProgress(plan)} />
-              <span className="text-muted-foreground text-[11px]">
+              <span className="text-muted-foreground text-xs">
                 {totalActions > 0 ? `${completedActions}/${totalActions} actions` : `${planProgress(plan)}%`}
               </span>
             </div>
@@ -237,6 +232,7 @@ export default function DevelopmentPlansPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Development Plans"
       description="Your personal development goals and action steps, set by your manager."
       icon={BookOpen}
@@ -293,7 +289,7 @@ export default function DevelopmentPlansPage() {
           title: (plan) => plan.title,
           subtitle: (plan) => FOCUS_LABELS[plan.focus_area] || plan.focus_area,
           trailing: (plan) => (
-            <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-[10px] capitalize">
+            <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-xs capitalize">
               {plan.status.replace("_", " ")}
             </Badge>
           ),
@@ -323,25 +319,25 @@ export default function DevelopmentPlansPage() {
             <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
               <div className="flex items-start justify-between gap-2">
                 <h4 className="line-clamp-2 text-sm font-semibold">{plan.title}</h4>
-                <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="shrink-0 text-[10px] capitalize">
+                <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="shrink-0 text-xs capitalize">
                   {plan.status.replace("_", " ")}
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-1.5 text-xs">
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Focus</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Focus</p>
                   <p className="font-medium">{FOCUS_LABELS[plan.focus_area] || plan.focus_area}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Priority</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Priority</p>
                   <p className="font-medium capitalize">{plan.priority}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Progress</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Progress</p>
                   <p className="font-medium">{planProgress(plan)}%</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-[10px] font-medium uppercase">Actions</p>
+                  <p className="text-muted-foreground text-xs font-medium uppercase">Actions</p>
                   <p className="font-medium">
                     {doneActions}/{totalActions}
                   </p>

@@ -21,6 +21,8 @@ import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { TicketAttachmentsPanel } from "@/components/help-desk/ticket-attachments-panel"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type ErrorPayload = {
   error?: string
   message?: string
@@ -199,7 +201,7 @@ export function HelpDeskContent({
           >
             {ticket.title}
           </button>
-          <span className="text-muted-foreground text-[10px] uppercase">{ticket.service_department}</span>
+          <span className="text-muted-foreground text-xs uppercase">{ticket.service_department}</span>
         </div>
       ),
     },
@@ -501,6 +503,7 @@ export function HelpDeskContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Help Desk"
       description="Submit and track support tickets."
       icon={Headset}
@@ -626,7 +629,7 @@ export function HelpDeskContent({
           render: (ticket) => (
             <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
               <div className="space-y-1.5">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Description</span>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Description</span>
                 <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">
                   {ticket.description || "No description provided."}
                 </p>
@@ -634,19 +637,19 @@ export function HelpDeskContent({
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Service Dept</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Service Dept</span>
                   <span className="font-medium">{ticket.service_department}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Request Type</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Request Type</span>
                   <span className="font-medium capitalize">{ticket.request_type || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Created</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Created</span>
                   <span className="font-medium">{formatWATDate(ticket.created_at)}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Goal</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Goal</span>
                   <span className="font-medium">{ticket.goal_title || "—"}</span>
                 </div>
               </div>
@@ -676,9 +679,9 @@ export function HelpDeskContent({
           >
             <div className="mb-2 flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground font-mono text-[10px] font-bold">{ticket.ticket_number}</span>
+                <span className="text-muted-foreground font-mono text-xs font-bold">{ticket.ticket_number}</span>
                 {(ticket.comment_count || 0) > 0 && (
-                  <Badge variant="outline" className="gap-1 text-[10px]">
+                  <Badge variant="outline" className="gap-1 text-xs">
                     <MessageSquare className="h-3 w-3" />
                     {ticket.comment_count}
                   </Badge>
@@ -693,7 +696,7 @@ export function HelpDeskContent({
             </p>
             <div className="flex items-center justify-between border-t pt-2">
               <TicketStatusBadge status={ticket.status} />
-              <span className="text-muted-foreground text-[10px]">{formatWATDate(ticket.created_at)}</span>
+              <span className="text-muted-foreground text-xs">{formatWATDate(ticket.created_at)}</span>
             </div>
           </div>
         )}

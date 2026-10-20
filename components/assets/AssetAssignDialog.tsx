@@ -153,7 +153,7 @@ export function AssetAssignDialog({
           {!currentAssignment && selectedAsset?.status !== "assigned" && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
               <p className="text-sm font-medium text-blue-900 dark:text-blue-200">New Assignment</p>
-              <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
+              <p className="text-info-foreground mt-1 text-xs">
                 When you assign this asset, its status will automatically be changed to &quot;assigned&quot;
               </p>
             </div>
@@ -174,9 +174,7 @@ export function AssetAssignDialog({
                   "Unknown"
                 )}
               </p>
-              <p className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
-                This assignment will be marked as handed over
-              </p>
+              <p className="text-warning-foreground mt-1 text-xs">This assignment will be marked as handed over</p>
             </div>
           )}
 

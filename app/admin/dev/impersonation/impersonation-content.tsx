@@ -291,7 +291,7 @@ export function DevImpersonationContent() {
           title: (row) => row.full_name,
           subtitle: (row) => `${row.department} · ${row.role}`,
           trailing: (row) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {row.role}
             </Badge>
           ),

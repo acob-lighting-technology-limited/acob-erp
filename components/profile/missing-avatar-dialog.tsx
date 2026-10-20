@@ -34,6 +34,7 @@ export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
   // Decided once on mount, so client-side navigation doesn't re-open it.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get(PREVIEW_PARAM) === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reads the URL on mount; there is no render-time source for it
       setIsPreview(true)
       setOpen(true)
       return

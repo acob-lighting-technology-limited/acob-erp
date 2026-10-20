@@ -6,6 +6,7 @@ import { sendNotificationEmailWithRetry } from "@/lib/notifications/email-gatewa
 import { escapeHtml } from "@/lib/email-templates/utils"
 import { ORG_EMAIL_SENDERS, ORG_ICT_EMAIL, ORG_MAIL_ROUTING } from "@/lib/org-config"
 import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
+import { createNotification } from "@/lib/notifications/create"
 import { getDeviceHealth } from "@/lib/hr/device-health"
 
 const log = logger("cron-attendance-device-health")
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     let notified = 0
     for (const userId of userIds) {
-      const { error } = await supabase.rpc("create_notification", {
+      const { error } = await createNotification({
         p_user_id: userId,
         p_type: "system",
         p_category: "system",

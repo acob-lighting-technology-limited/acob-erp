@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
+
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import {
@@ -151,23 +153,26 @@ export function KssWorkspace() {
   })
 
   const savedSettings = useMemo(() => ({ ...EMPTY_SETTINGS, ...(data?.settings ?? {}) }), [data?.settings])
-  useEffect(() => {
-    if (data?.settings) setDraft(savedSettings)
-  }, [data?.settings, savedSettings])
+  // Load each fetched settings payload into the draft, during render rather than in an effect.
+  const [syncedSettings, setSyncedSettings] = useState<RotationPayload["settings"] | undefined>(undefined)
+  if (data?.settings && data.settings !== syncedSettings) {
+    setSyncedSettings(data.settings)
+    setDraft(savedSettings)
+  }
 
   const sessions = useMemo(() => {
     const today = toLocalISODate(new Date())
     return (data?.preview ?? []).filter((row) => row.date >= today)
   }, [data?.preview])
 
-  // Default to the next session that has a department.
-  useEffect(() => {
-    if (selectedKey) return
+  // Default to the next session that has a department until the user picks one (derived, not synced).
+  const nextDefaultKey = useMemo(() => {
     const next = sessions.find((row) => row.department)
-    if (next) setSelectedKey(`${next.year}-${next.week}`)
-  }, [sessions, selectedKey])
+    return next ? `${next.year}-${next.week}` : ""
+  }, [sessions])
+  const activeKey = selectedKey || nextDefaultKey
 
-  const selected = sessions.find((row) => `${row.year}-${row.week}` === selectedKey) ?? null
+  const selected = sessions.find((row) => `${row.year}-${row.week}` === activeKey) ?? null
   const isDirty = JSON.stringify(draft) !== JSON.stringify(savedSettings)
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminKssRotation() })
 
@@ -238,7 +243,7 @@ export function KssWorkspace() {
     }
   }
 
-  if (isLoading) return <p className="text-muted-foreground text-sm">Loading…</p>
+  if (isLoading) return <RowsSkeleton rows={6} />
   if (error || !data) {
     return <p className="text-destructive text-sm">{(error as Error | null)?.message || "Failed to load"}</p>
   }
@@ -288,19 +293,19 @@ export function KssWorkspace() {
                     type="button"
                     disabled={isNoSession}
                     onClick={() => setSelectedKey(key)}
-                    className={cn(tileClass(selectedKey === key), isNoSession && "cursor-not-allowed opacity-60")}
+                    className={cn(tileClass(activeKey === key), isNoSession && "cursor-not-allowed opacity-60")}
                   >
                     <Calendar
                       className={cn(
                         "h-5 w-5 shrink-0",
-                        selectedKey === key ? "text-orange-600" : "text-muted-foreground"
+                        activeKey === key ? "text-orange-600" : "text-muted-foreground"
                       )}
                     />
                     <div className="min-w-0 flex-1">
                       <div
                         className={cn(
                           "truncate font-semibold",
-                          selectedKey === key && "text-orange-700 dark:text-orange-400"
+                          activeKey === key && "text-orange-700 dark:text-orange-400"
                         )}
                       >
                         {row.department ?? "No session"}

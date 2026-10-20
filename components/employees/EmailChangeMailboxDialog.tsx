@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { toast } from "sonner"
 import { ArrowRight, Check, Copy, Inbox, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -33,12 +34,16 @@ export function EmailChangeMailboxDialog({
   const [forwardOld, setForwardOld] = useState(true)
   const [suspendOldLogin, setSuspendOldLogin] = useState(false)
 
-  useEffect(() => {
+  // Reset the choices for each new request, during render rather than in an effect.
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [request] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
     if (request) {
       setForwardOld(true)
       setSuspendOldLogin(false)
     }
-  }, [request])
+  }
 
   if (!request) return null
 

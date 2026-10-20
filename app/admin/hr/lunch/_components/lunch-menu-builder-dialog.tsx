@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { apiFetch } from "@/lib/api-client"
 import { menuHeading, type LunchMenu } from "@/lib/hr/lunch-voting"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface DraftOption {
   name: string
@@ -98,21 +99,26 @@ export function LunchMenuBuilderDialog({
   const [overrideDeadline, setOverrideDeadline] = useState(false)
   const [deadline, setDeadline] = useState(defaultDeadline)
 
-  useEffect(() => {
-    if (!open) return
-    if (menu) {
-      setDate(menu.date)
-      const own = deadlineTimeOf(menu)
-      setOverrideDeadline(own !== null)
-      setDeadline(own ?? defaultDeadline)
-      setGroups(toDraftGroups(menu))
-    } else {
-      setDate(defaultDate)
-      setOverrideDeadline(false)
-      setDeadline(defaultDeadline)
-      setGroups(blankGroups(1))
+  // Seed the builder each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [open, menu, defaultDate, defaultDeadline] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (open) {
+      if (menu) {
+        setDate(menu.date)
+        const own = deadlineTimeOf(menu)
+        setOverrideDeadline(own !== null)
+        setDeadline(own ?? defaultDeadline)
+        setGroups(toDraftGroups(menu))
+      } else {
+        setDate(defaultDate)
+        setOverrideDeadline(false)
+        setDeadline(defaultDeadline)
+        setGroups(blankGroups(1))
+      }
     }
-  }, [open, menu, defaultDate, defaultDeadline])
+  }
 
   function updateGroup(index: number, patch: Partial<DraftGroup>) {
     setGroups((prev) => prev.map((group, i) => (i === index ? { ...group, ...patch } : group)))

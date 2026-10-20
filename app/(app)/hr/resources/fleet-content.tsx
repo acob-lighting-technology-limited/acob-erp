@@ -49,6 +49,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
 
+import { layout as tablePageLayout } from "./_layout"
+
 type FleetResource = {
   id: string
   name: string
@@ -355,7 +357,7 @@ export function FleetContent() {
               ? "destructive"
               : "outline"
       }
-      className="text-[10px] whitespace-nowrap capitalize"
+      className="text-xs whitespace-nowrap capitalize"
     >
       {row.status}
     </Badge>
@@ -472,6 +474,7 @@ export function FleetContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Resource Booking Center"
       description="Book shared resources like transport and spaces without time clashes."
       icon={Car}
@@ -629,7 +632,7 @@ export function FleetContent() {
             <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">
                     Booking Reason / Purpose
                   </span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">
@@ -637,7 +640,7 @@ export function FleetContent() {
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">
                     Admin Decision Note
                   </span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">
@@ -648,7 +651,7 @@ export function FleetContent() {
 
               {row.attachments && row.attachments.length > 0 && (
                 <div className="border-t pt-2.5">
-                  <span className="text-muted-foreground mb-1.5 block text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground mb-1.5 block text-xs font-semibold uppercase">
                     Attachments ({row.attachments.length})
                   </span>
                   <div className="flex flex-wrap gap-2">
@@ -668,6 +671,11 @@ export function FleetContent() {
           ),
         }}
         emptyTitle="No bookings"
+        emptyAction={
+          <Button size="sm" onClick={() => setOpen(true)}>
+            Book a resource
+          </Button>
+        }
         emptyDescription="Applications you submit, and those you can see, appear here."
         emptyIcon={Car}
         skeletonRows={6}
@@ -739,7 +747,7 @@ export function FleetContent() {
                     showOutsideDays
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     modifiers={{ resource_busy: (date) => bookedDayKeys.has(toLocalISODate(date)) }}
-                    modifiersClassNames={{ resource_busy: "bg-amber-100 text-amber-900 font-medium" }}
+                    modifiersClassNames={{ resource_busy: "bg-warning-muted text-warning-foreground font-medium" }}
                     className="mx-auto"
                   />
                   <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-4 text-xs">

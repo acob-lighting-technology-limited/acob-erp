@@ -9,6 +9,8 @@ import { getRoleDisplayName, getRoleBadgeColor } from "@/lib/permissions"
 import { formatName } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/patterns"
 import type { UserRole } from "@/types/database"
+import Image from "next/image"
+import { formatDate } from "@/lib/format"
 
 interface Profile {
   id: string
@@ -22,11 +24,6 @@ interface Profile {
   job_description: string | null
   job_description_updated_at: string | null
   created_at: string
-}
-
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Never"
-  return formatWATDate(dateString, { month: "short", day: "numeric", year: "numeric" })
 }
 
 interface JobDescriptionDialogProps {
@@ -72,7 +69,9 @@ export function JobDescriptionDialog({ profile, isOpen, onOpenChange }: JobDescr
               <Badge className={getRoleBadgeColor(profile?.role || "employee")}>
                 {getRoleDisplayName(profile?.role || "employee")}
               </Badge>
-              <span className="text-sm">Last updated: {formatDate(profile?.job_description_updated_at || null)}</span>
+              <span className="text-sm">
+                Last updated: {formatDate(profile?.job_description_updated_at || null, "Never")}
+              </span>
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -81,8 +80,15 @@ export function JobDescriptionDialog({ profile, isOpen, onOpenChange }: JobDescr
         <div className="hidden print:mb-8 print:block print:border-b print:pb-4">
           <div className="flex items-start justify-between">
             <div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/acob-logo.webp" alt="ACOB Lighting" className="h-16 w-auto" />
+              {/* Eager: the letterhead is print-only, so a lazy image would never load before printing. */}
+              <Image
+                src="/acob-logo.webp"
+                alt="ACOB Lighting"
+                width={200}
+                height={64}
+                loading="eager"
+                className="h-16 w-auto"
+              />
             </div>
             <div className="text-right text-sm">
               {profile?.first_name && profile?.last_name && (

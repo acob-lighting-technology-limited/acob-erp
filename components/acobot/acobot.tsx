@@ -186,7 +186,7 @@ export function AcoBot({ userName }: AcoBotProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="bg-background border-border fixed right-5 bottom-5 z-50 flex h-[70dvh] max-h-[620px] w-[calc(100vw-2.5rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl border shadow-2xl"
+            className="bg-background border-border fixed right-5 bottom-5 z-50 flex h-[70dvh] max-h-155 w-[calc(100vw-2.5rem)] max-w-100 flex-col overflow-hidden rounded-2xl border shadow-2xl"
           >
             {/* Header */}
             <div className="bg-primary text-primary-foreground relative flex items-center gap-3 px-4 py-3">

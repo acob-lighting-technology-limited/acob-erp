@@ -17,7 +17,7 @@ export function ColumnHelp({ label, text }: { label: string; text: string }) {
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           aria-label={`What does ${label} mean?`}
-          className="text-muted-foreground/60 hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
         >
           <CircleHelp className="h-3.5 w-3.5" />
         </button>

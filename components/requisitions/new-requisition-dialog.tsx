@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { toast } from "sonner"
 import { ArrowLeft, FileText, Loader2, Plus, Receipt, Trash2, Upload, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -116,19 +117,28 @@ export function NewRequisitionDialog({
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
+  // Reset the form each time the dialog opens, during render rather than in an effect.
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [open, helpDeskTicket] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
+    if (open) {
+      setFormType(null)
+      setProjectName("")
+      setPurpose(helpDeskTicket ? `For help desk ticket ${helpDeskTicket.ticket_number}: ${helpDeskTicket.title}` : "")
+      setSiteLocation("")
+      setAmount("")
+      setLines([
+        { description: helpDeskTicket ? `${helpDeskTicket.ticket_number}: ${helpDeskTicket.title}` : "", amount: "" },
+      ])
+      setBeneficiaries([emptyBeneficiary()])
+      setAttachments([])
+      setFundingId(NO_FUNDING)
+    }
+  }
+
   useEffect(() => {
     if (!open) return
-    setFormType(null)
-    setProjectName("")
-    setPurpose(helpDeskTicket ? `For help desk ticket ${helpDeskTicket.ticket_number}: ${helpDeskTicket.title}` : "")
-    setSiteLocation("")
-    setAmount("")
-    setLines([
-      { description: helpDeskTicket ? `${helpDeskTicket.ticket_number}: ${helpDeskTicket.title}` : "", amount: "" },
-    ])
-    setBeneficiaries([emptyBeneficiary()])
-    setAttachments([])
-    setFundingId(NO_FUNDING)
     apiFetch("/api/requisitions/funding-categories")
       .then((res) => res.json())
       .then((json) => setFundingCategories(json.data || []))

@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { logger } from "@/lib/logger"
 import { CheckCircle2, XCircle, AlertCircle, Loader2, Info } from "lucide-react"
 
-const log = logger("cbt-attempt-detail")
 import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface CbtAttemptDetailProps {
   profileId: string
@@ -36,70 +37,42 @@ type Attempt = {
 }
 
 export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailProps) {
-  const [attempt, setAttempt] = useState<Attempt | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [isGated, setIsGated] = useState(false)
-  const [gatedReason, setGatedReason] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadDetail() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const params = new URLSearchParams({ profile_id: profileId, review_cycle_id: reviewCycleId })
-        const res = await fetch(`/api/admin/hr/performance/cbt/attempts/detail?${params}`, { cache: "no-store" })
-        const payload = await res.json().catch(() => null)
-        if (!res.ok) throw new Error(payload?.error || "Failed to load CBT details")
-
-        const { attempt: attemptData, questions: rawQuestions, gated, gated_reason } = payload?.data ?? {}
-
-        if (!attemptData) {
-          if (isMounted) {
-            setAttempt(null)
-            setIsLoading(false)
-          }
-          return
-        }
-
-        const typedAttempt = attemptData as Attempt
-        const orderedQuestions = (typedAttempt.question_ids || [])
-          .map((qId: string) => (rawQuestions as Question[]).find((q) => q.id === qId))
-          .filter((q): q is Question => !!q)
-
-        if (isMounted) {
-          setAttempt(typedAttempt)
-          setQuestions(orderedQuestions)
-          setIsGated(Boolean(gated))
-          setGatedReason(typeof gated_reason === "string" ? gated_reason : null)
-        }
-      } catch (err) {
-        log.error({ err: String(err) }, "Failed to load CBT attempt details")
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : "Failed to load CBT details")
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
+  const {
+    data,
+    isLoading,
+    error: queryError,
+  } = useQuery({
+    queryKey: QUERY_KEYS.cbtAttemptDetail(profileId, reviewCycleId),
+    queryFn: async () => {
+      const params = new URLSearchParams({ profile_id: profileId, review_cycle_id: reviewCycleId })
+      const payload = await apiJson<{
+        data?: { attempt?: Attempt | null; questions?: Question[]; gated?: boolean; gated_reason?: unknown }
+      }>(`/api/admin/hr/performance/cbt/attempts/detail?${params}`, { cache: "no-store" })
+      const { attempt: typedAttempt, questions: rawQuestions = [], gated, gated_reason } = payload.data ?? {}
+      if (!typedAttempt) return { attempt: null, questions: [], isGated: false, gatedReason: null }
+      // Show questions in the order the candidate saw them.
+      const questions = (typedAttempt.question_ids || [])
+        .map((qId: string) => rawQuestions.find((q) => q.id === qId))
+        .filter((q): q is Question => !!q)
+      return {
+        attempt: typedAttempt,
+        questions,
+        isGated: Boolean(gated),
+        gatedReason: typeof gated_reason === "string" ? gated_reason : null,
       }
-    }
-
-    void loadDetail()
-
-    return () => {
-      isMounted = false
-    }
-  }, [profileId, reviewCycleId])
+    },
+  })
+  const attempt = data?.attempt ?? null
+  const questions = data?.questions ?? []
+  const isGated = data?.isGated ?? false
+  const gatedReason = data?.gatedReason ?? null
+  const error = queryError?.message ?? null
 
   if (isLoading) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 p-8">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Loading CBT detailed response...</span>
+        <LinesSkeleton lines={4} />
       </div>
     )
   }
@@ -128,7 +101,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
         <div>
           <h4 className="text-foreground text-sm font-semibold">CBT Performance Summary</h4>
           {attempt.submitted_at && (
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
+            <p className="text-muted-foreground mt-0.5 text-xs">
               Completed at: {formatWATDateTime(attempt.submitted_at)}
             </p>
           )}
@@ -139,14 +112,14 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
             <span className="text-muted-foreground block text-xs">Score</span>
             <span className="text-foreground text-lg font-bold">{attempt.score}%</span>
           </div>
-          <div className="bg-border h-8 w-[1px]" />
+          <div className="bg-border h-8 w-px" />
           <div className="text-right">
             <span className="text-muted-foreground block text-xs">Correct</span>
             <span className="text-foreground text-lg font-semibold">
               {attempt.correct_answers} / {attempt.total_questions}
             </span>
           </div>
-          <div className="bg-border h-8 w-[1px]" />
+          <div className="bg-border h-8 w-px" />
           <div className="text-right">
             <span className="text-muted-foreground block text-xs">Tab Switches</span>
             {(() => {
@@ -156,7 +129,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                   variant="outline"
                   className={
                     count > 0
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      ? "text-warning-foreground border-amber-500/30 bg-amber-500/10"
                       : "border-border text-foreground"
                   }
                 >
@@ -173,7 +146,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
         <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Detailed Responses</p>
 
         {isGated ? (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400">
+          <div className="text-warning-foreground flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-xs">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               {gatedReason ||
@@ -206,7 +179,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                 <div key={question.id} className="bg-card space-y-3 rounded-xl border p-4 shadow-sm">
                   {/* Question Prompt */}
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-muted-foreground bg-muted flex h-6 min-w-[24px] items-center justify-center rounded-full px-1 text-xs font-semibold">
+                    <span className="text-muted-foreground bg-muted flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-xs font-semibold">
                       {idx + 1}
                     </span>
                     <p className="text-foreground flex-1 text-sm leading-relaxed font-medium">{question.prompt}</p>
@@ -215,23 +188,20 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
                         isCorrect ? (
                           <Badge
                             variant="outline"
-                            className="gap-1 border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-500"
+                            className="gap-1 border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-500"
                           >
                             <CheckCircle2 className="h-3 w-3" /> Correct
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
-                            className="gap-1 border-red-500/20 bg-red-500/10 text-[10px] text-red-500"
+                            className="gap-1 border-red-500/20 bg-red-500/10 text-xs text-red-500"
                           >
                             <XCircle className="h-3 w-3" /> Incorrect
                           </Badge>
                         )
                       ) : (
-                        <Badge
-                          variant="outline"
-                          className="border-amber-500/20 bg-amber-500/10 text-[10px] text-amber-500"
-                        >
+                        <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-xs text-amber-500">
                           Unanswered
                         </Badge>
                       )}
@@ -252,7 +222,7 @@ export function CbtAttemptDetail({ profileId, reviewCycleId }: CbtAttemptDetailP
 
                       return (
                         <div key={letter} className={getOptionStyle(letter)}>
-                          <span className="min-w-[16px] font-bold uppercase">{letter}.</span>
+                          <span className="min-w-4 font-bold uppercase">{letter}.</span>
                           <span className="flex-1">{optionText}</span>
                         </div>
                       )

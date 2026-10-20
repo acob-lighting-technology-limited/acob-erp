@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useConfirm } from "@/providers/confirm-provider"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { CalendarClock, Loader2, Mail, MailX, Pencil, Plus, RefreshCw, Send, Trash2, Users, Video } from "lucide-react"
@@ -13,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { MeetingSourceDialog, type MeetingSource } from "./meeting-source-dialog"
 import { apiFetch } from "@/lib/api-client"
+import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 type SourceRow = MeetingSource & {
   last_synced_at: string | null
@@ -185,6 +187,7 @@ function MeetingSendPanel({ source, occurrences }: { source: SourceRow; occurren
 }
 
 export function MeetingSyncModal({ open, onOpenChange }: Props) {
+  const confirm = useConfirm()
   const queryClient = useQueryClient()
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<MeetingSource | null>(null)
@@ -249,7 +252,13 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
   }
 
   const remove = async (row: SourceRow) => {
-    if (!window.confirm(`Stop watching "${row.label}"? Stored history is kept.`)) return
+    const ok = await confirm({
+      title: `Stop watching "${row.label}"?`,
+      description: "Stored history is kept.",
+      confirmLabel: "Stop watching",
+      destructive: true,
+    })
+    if (!ok) return
     setDeletingId(row.id)
     try {
       const res = await apiFetch(`/api/reports/meeting-artifacts/sources?id=${row.id}`, { method: "DELETE" })
@@ -293,7 +302,7 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
           </div>
 
           {isLoading ? (
-            <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+            <RowsSkeleton rows={4} className="py-4" />
           ) : error ? (
             <div className="text-destructive py-8 text-center text-sm">
               {error instanceof Error ? error.message : "Failed to load"}

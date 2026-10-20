@@ -66,7 +66,8 @@ interface LeaveRequestFormDialogProps {
   }>
   preview: { endDate: string; resumeDate: string }
   leaveCalendar: LeaveCalendarData
-  canSubmit: boolean
+  /** Requirements not yet met; empty when the request can be submitted. */
+  missingRequirements: string[]
   submitting: boolean
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>
 }
@@ -106,7 +107,7 @@ export function LeaveRequestFormDialog({
   approvalRouteStages,
   preview,
   leaveCalendar,
-  canSubmit,
+  missingRequirements,
   submitting,
   onSubmit,
 }: LeaveRequestFormDialogProps) {
@@ -237,7 +238,7 @@ export function LeaveRequestFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[95vw] max-w-[560px] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[95vw] max-w-140 overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5" />
@@ -340,12 +341,13 @@ export function LeaveRequestFormDialog({
                     modifiersClassNames={{
                       blackout: "line-through opacity-40",
                       holiday: "bg-violet-100 text-violet-900 font-medium dark:bg-violet-950/60 dark:text-violet-300",
-                      department_approved: "bg-red-100 text-red-900 font-medium dark:bg-red-950/60 dark:text-red-300",
+                      department_approved:
+                        "bg-danger-muted text-danger-foreground font-medium dark:bg-red-950/60 dark:text-red-300",
                       department_pending:
-                        "bg-amber-100 text-amber-900 font-medium dark:bg-amber-950/60 dark:text-amber-300",
+                        "bg-warning-muted text-warning-foreground font-medium dark:bg-amber-950/60 dark:text-amber-300",
                       committed:
-                        "bg-emerald-100 text-emerald-900 font-medium dark:bg-emerald-950/60 dark:text-emerald-300",
-                      selected_range: "bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300",
+                        "bg-success-muted text-success-foreground font-medium dark:bg-emerald-950/60 dark:text-emerald-300",
+                      selected_range: "bg-info-muted text-info-foreground",
                     }}
                     className="mx-auto"
                   />
@@ -393,7 +395,7 @@ export function LeaveRequestFormDialog({
                       <Label htmlFor="calendar-emergency-override" className="cursor-pointer text-xs font-medium">
                         Emergency leave override
                       </Label>
-                      <p className="text-muted-foreground text-[11px]">
+                      <p className="text-muted-foreground text-xs">
                         Allow selecting dates during the Dec/Jan blocked period
                       </p>
                     </div>
@@ -408,20 +410,20 @@ export function LeaveRequestFormDialog({
                   {selectedDateBooking ? (
                     <div className="bg-muted/30 mt-2.5 space-y-0.5 rounded-md border p-2 text-xs">
                       {selectedDateBooking.approved_employees && selectedDateBooking.approved_employees.length > 0 ? (
-                        <p className="text-red-700 dark:text-red-400">
+                        <p className="text-danger-foreground">
                           <span className="font-semibold">Approved leave:</span>{" "}
                           {selectedDateBooking.approved_employees.join(", ")}
                         </p>
                       ) : null}
                       {selectedDateBooking.pending_employees && selectedDateBooking.pending_employees.length > 0 ? (
-                        <p className="text-amber-700 dark:text-amber-400">
+                        <p className="text-warning-foreground">
                           <span className="font-semibold">Pending review:</span>{" "}
                           {selectedDateBooking.pending_employees.join(", ")}
                         </p>
                       ) : null}
                       {!selectedDateBooking.approved_employees?.length &&
                       !selectedDateBooking.pending_employees?.length ? (
-                        <p className="text-amber-700 dark:text-amber-400">
+                        <p className="text-warning-foreground">
                           {selectedDateBooking.count} teammate(s) already booked this date:{" "}
                           {selectedDateBooking.employees.join(", ")}
                         </p>
@@ -554,11 +556,22 @@ export function LeaveRequestFormDialog({
             </p>
           </div>
 
+          {missingRequirements.length > 0 && (
+            <div className="bg-muted/40 rounded-md border p-3 text-xs">
+              <p className="mb-1 font-medium">Still needed before you can submit:</p>
+              <ul className="text-muted-foreground list-disc space-y-0.5 pl-4">
+                {missingRequirements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSubmit || submitting}>
+            <Button type="submit" disabled={missingRequirements.length > 0 || submitting}>
               {submitting
                 ? editingRequestId
                   ? "Saving..."

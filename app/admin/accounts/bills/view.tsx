@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle, CircleDollarSign, Eye, FileClock, Plus, Receipt, Wallet } from "lucide-react"
@@ -13,6 +12,9 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { BillFormDialog } from "./_components/bill-form-dialog"
+import { formatCurrency, formatDate } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 export interface Bill {
   id: string
@@ -43,17 +45,6 @@ async function fetchBillsList(): Promise<Bill[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load bills")
   const json = await res.json()
   return (json.data || []) as Bill[]
-}
-
-function formatCurrency(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-  }).format(amount)
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getDateBand(bill: Bill) {
@@ -236,6 +227,7 @@ export function BillsPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Bills"
       description="Track supplier bills, payment progress, and upcoming due dates."
       icon={Receipt}
@@ -349,7 +341,7 @@ export function BillsPage({
           title: (bill) => `${bill.bill_number} · ${bill.supplier_name}`,
           subtitle: (bill) => `${formatCurrency(bill.total_amount, bill.currency)} · Due ${formatDate(bill.due_date)}`,
           trailing: (bill) => (
-            <Badge variant={statusColors[bill.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[bill.status]} className="text-xs capitalize">
               {bill.status}
             </Badge>
           ),

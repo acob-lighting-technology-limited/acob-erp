@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Loader2, Plus, Wallet } from "lucide-react"
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
@@ -26,32 +27,24 @@ interface ProcessorRow {
 
 /** Admin tab: who records payments (Processed By). The Accounts lead always can and is not listed. */
 export function usePaymentProcessorsTab(): ExtraTab {
-  const [rows, setRows] = useState<ProcessorRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [picked, setPicked] = useState("")
   const [busy, setBusy] = useState(false)
   const options = useStaffOptions(isAddOpen)
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  const processorsQuery = useQuery({
+    queryKey: ["requisition-payment-processors"],
+    queryFn: async (): Promise<ProcessorRow[]> => {
       const res = await fetch("/api/requisitions/payment-processors")
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load payment processors")
-      setRows(json.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load payment processors")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-  }, [load])
+      return json.data || []
+    },
+  })
+  const rows = processorsQuery.data ?? []
+  const isLoading = processorsQuery.isFetching
+  const error = processorsQuery.error instanceof Error ? processorsQuery.error.message : null
+  const load = () => processorsQuery.refetch()
 
   const add = async () => {
     if (!picked) return

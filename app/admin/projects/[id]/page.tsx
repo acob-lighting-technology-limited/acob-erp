@@ -5,6 +5,9 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { loadAssignableStaff } from "@/lib/projects/staff-options"
 import { ProjectDetail } from "@/components/projects/project-detail"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export const metadata: Metadata = {
   title: "Project | Matrix",
   description: "A project's progress, plans and charts.",
@@ -25,5 +28,9 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
   if (!scope) redirect("/profile")
 
   const profiles = await loadAssignableStaff(supabase as DbClient)
-  return <ProjectDetail projectId={id} isAdmin profiles={profiles} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <ProjectDetail projectId={id} isAdmin profiles={profiles} />
+    </TablePageLayoutProvider>
+  )
 }

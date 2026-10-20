@@ -13,6 +13,8 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 
+import { layout as tablePageLayout } from "./_layout"
+
 interface AssetsContentProps {
   initialAssignments: AssetAssignment[]
   initialError?: string | null
@@ -44,10 +46,10 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
   )
 
   const statusClass = (status: string) => {
-    if (status === "assigned") return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-    if (status === "maintenance") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    if (status === "available") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-    return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+    if (status === "assigned") return "bg-success-muted text-success-foreground"
+    if (status === "maintenance") return "bg-warning-muted text-warning-foreground"
+    if (status === "available") return "bg-info-muted text-info-foreground"
+    return "bg-neutral-muted text-neutral-foreground"
   }
 
   const columns = useMemo<DataTableColumn<AssetRow>[]>(
@@ -154,6 +156,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="My Assets"
       description="View your currently assigned personal assets and equipment."
       icon={Package}
@@ -242,13 +245,13 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
           title: (row) => row.assetTypeLabel,
           subtitle: (row) =>
             [row.asset?.unique_code, row.asset?.asset_model].filter(Boolean).join(" · ") || "No code recorded",
-          trailing: (row) => <Badge className={`${statusClass(row.statusLabel)} text-[10px]`}>{row.statusLabel}</Badge>,
+          trailing: (row) => <Badge className={`${statusClass(row.statusLabel)} text-xs`}>{row.statusLabel}</Badge>,
           detail: {
             title: (row) => row.assetTypeLabel,
             subtitle: (row) => (
               <span className="text-muted-foreground font-mono text-xs">{row.asset?.unique_code || "No code"}</span>
             ),
-            badges: (row) => <Badge className={`${statusClass(row.statusLabel)} text-[10px]`}>{row.statusLabel}</Badge>,
+            badges: (row) => <Badge className={`${statusClass(row.statusLabel)} text-xs`}>{row.statusLabel}</Badge>,
             // Everything the removed expandable row carried. The serial and code
             // are the values you are asked for when reporting a fault, so they
             // are tap-to-copy rather than something to read out.
@@ -306,33 +309,31 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
             <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Unique Code</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Unique Code</span>
                   <span className="font-mono font-medium">{row.asset?.unique_code || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Model</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Model</span>
                   <span className="font-medium">{row.asset?.asset_model || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Serial Number</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Serial Number</span>
                   <span className="font-mono font-medium">{row.asset?.serial_number || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Acquisition Year
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Acquisition Year</span>
                   <span className="font-medium">{row.asset?.acquisition_year || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Assigned Date</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Assigned Date</span>
                   <span className="font-medium">{formatWATDateTime(row.assigned_at)}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Department</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Department</span>
                   <span className="font-medium">{row.department || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Assigned By</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Assigned By</span>
                   <span className="font-medium">
                     {row.assigner
                       ? `${formatName(row.assigner.first_name)} ${formatName(row.assigner.last_name)}`
@@ -343,9 +344,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
 
               {row.assignment_notes && (
                 <div className="space-y-1 border-t pt-3">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Assignment Notes
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Assignment Notes</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">{row.assignment_notes}</p>
                 </div>
               )}

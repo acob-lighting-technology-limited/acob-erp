@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useNow } from "@/hooks/use-now"
 import { useQueryClient } from "@tanstack/react-query"
 import { Building2, ClipboardCheck, Clock, Scale } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +36,7 @@ function submittedAt(t: Task): string {
  * Admin › Tasks, so the rules and the rating scale are identical.
  */
 export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
+  const now = useNow()
   const queryClient = useQueryClient()
   const { data, isLoading, error, refetch } = useMdTaskReviews()
   const tasks = useMemo(() => data?.tasks ?? [], [data])
@@ -47,7 +49,6 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
     ])
   }
 
-  const now = Date.now()
   const waitingLong = tasks.filter((t) => now - new Date(submittedAt(t)).getTime() > 3 * DAY_MS).length
   const departments = Array.from(new Set(tasks.map((t) => t.department).filter((v): v is string => Boolean(v))))
   const totalWeight = tasks.reduce((sum, t) => sum + (t.weight || TASK_WEIGHT_DEFAULT), 0)
@@ -63,7 +64,7 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
   )
 
   const weightBadge = (t: Task) => (
-    <Badge variant="outline" className={cn("font-mono text-[11px] font-medium", getTaskWeightBadgeClass(t.weight))}>
+    <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}>
       W{t.weight || TASK_WEIGHT_DEFAULT}
     </Badge>
   )

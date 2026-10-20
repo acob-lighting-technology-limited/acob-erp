@@ -65,7 +65,7 @@ interface PersonalRecentActivityFeedProps {
 
 export function PersonalRecentActivityFeed({ activity, className }: PersonalRecentActivityFeedProps) {
   return (
-    <Card className={cn("flex h-[480px] flex-col", className)}>
+    <Card className={cn("flex h-120 flex-col", className)}>
       <CardHeader className="shrink-0 px-4 py-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -87,10 +87,10 @@ export function PersonalRecentActivityFeed({ activity, className }: PersonalRece
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 text-sm leading-snug">{item.actionLabel}</p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                      <Badge variant="secondary" className="px-1.5 py-0 text-xs">
                         {item.moduleLabel}
                       </Badge>
-                      <span className="text-muted-foreground text-[10px]" suppressHydrationWarning>
+                      <span className="text-muted-foreground text-xs" suppressHydrationWarning>
                         {formatDate(item.createdAt)}
                       </span>
                     </div>

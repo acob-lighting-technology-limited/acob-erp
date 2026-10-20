@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useNow } from "@/hooks/use-now"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -77,6 +78,7 @@ export function TicketDetailContent({
   }>
   comments: Array<{ id: string; comment?: string | null; body?: string | null; created_at?: string | null }>
 }) {
+  const now = useNow()
   const staffAvatars = useStaffAvatars()
   const [newComment, setNewComment] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -129,7 +131,7 @@ export function TicketDetailContent({
 
   if (!ticket) return <div className="p-6">Ticket not found.</div>
 
-  const slaRemaining = ticket.sla_target_at ? new Date(ticket.sla_target_at).getTime() - Date.now() : null
+  const slaRemaining = ticket.sla_target_at ? new Date(ticket.sla_target_at).getTime() - now : null
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">

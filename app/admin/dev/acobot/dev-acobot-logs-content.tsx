@@ -1,5 +1,7 @@
 "use client"
 
+import { toCsv } from "@/lib/export/csv"
+
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDate, formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
@@ -10,6 +12,8 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Bot, Database, Download, Globe, MessageSquare, RefreshCw, Users } from "lucide-react"
+
+import { layout as tablePageLayout } from "./_layout"
 
 type AcobotSource = "erp" | "website"
 
@@ -40,7 +44,7 @@ function truncate(value: string | null, max: number): string {
   return value.length > max ? `${value.slice(0, max).trimEnd()}…` : value
 }
 
-function toCsv(rows: AcobotLogRow[]) {
+function buildAcobotCsv(rows: AcobotLogRow[]) {
   const headers = ["time", "source", "person", "email", "department", "question", "answer", "had_context", "model"]
   const body = rows.map((row) => [
     row.created_at,
@@ -53,9 +57,7 @@ function toCsv(rows: AcobotLogRow[]) {
     row.had_context ? "yes" : "no",
     row.model || "",
   ])
-  return [headers, ...body]
-    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-    .join("\n")
+  return toCsv([headers, ...body])
 }
 
 async function fetchAcobotLogs(source: AcobotSource): Promise<AcobotLogRow[]> {
@@ -133,7 +135,7 @@ export function DevAcobotLogsContent() {
           accessor: (row) => row.question,
           resizable: true,
           initialWidth: 360,
-          render: (row) => <p className="max-w-[420px] text-sm">{truncate(row.question, 160)}</p>,
+          render: (row) => <p className="max-w-105 text-sm">{truncate(row.question, 160)}</p>,
         },
         {
           key: "ip_address",
@@ -171,7 +173,7 @@ export function DevAcobotLogsContent() {
           accessor: (row) => row.question,
           resizable: true,
           initialWidth: 320,
-          render: (row) => <p className="max-w-[360px] text-sm">{truncate(row.question, 140)}</p>,
+          render: (row) => <p className="max-w-90 text-sm">{truncate(row.question, 140)}</p>,
         }
       )
     }
@@ -220,7 +222,7 @@ export function DevAcobotLogsContent() {
   }, [dateOptions, departmentOptions, isWebsite])
 
   const exportCsv = () => {
-    const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8;" })
+    const blob = new Blob([buildAcobotCsv(rows)], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
@@ -286,6 +288,7 @@ export function DevAcobotLogsContent() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="ACOBot Conversations"
       description="Every question staff and website visitors asked ACOBot, its answer, and who asked it."
       backLink={{ href: "/admin/dev", label: "Back to DEV" }}
@@ -359,7 +362,7 @@ export function DevAcobotLogsContent() {
           subtitle: (row) => `${isWebsite ? "Visitor" : row.full_name || "Unknown"} · ${formatWATDate(row.created_at)}`,
           trailing: (row) =>
             row.had_context ? (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 Live data
               </Badge>
             ) : null,

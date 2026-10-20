@@ -173,7 +173,7 @@ export function AttendancePrintSheetDialog({
 
             <div className="mt-3.5 flex items-center gap-2">
               <div className="bg-border h-px w-10 sm:w-16" />
-              <span className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
+              <span className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
                 OR ENTER CODE IN MATRIX
               </span>
               <div className="bg-border h-px w-10 sm:w-16" />
@@ -187,10 +187,9 @@ export function AttendancePrintSheetDialog({
             <div className="mt-3 flex items-center gap-1.5">
               <Badge
                 variant="outline"
-                className="border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-700 dark:text-emerald-300"
+                className="text-success-foreground border-emerald-500/30 bg-emerald-500/10 text-xs"
               >
-                <ShieldCheck className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Biometric Entrance
-                Punch Required
+                <ShieldCheck className="text-success-foreground mr-1 h-3.5 w-3.5" /> Biometric Entrance Punch Required
               </Badge>
             </div>
           </div>

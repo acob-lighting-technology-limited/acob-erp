@@ -6,6 +6,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 import { logger } from "@/lib/logger"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 const log = logger("finance-payments")
 
 interface Payment {
@@ -118,11 +121,13 @@ export default async function AdminPaymentsPage() {
   >
 
   return (
-    <PaymentsTable
-      initialPayments={paymentsData.payments}
-      initialDepartments={paymentsData.departments}
-      currentUser={paymentsData.currentUser}
-      basePath="/admin/accounts/payments"
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PaymentsTable
+        initialPayments={paymentsData.payments}
+        initialDepartments={paymentsData.departments}
+        currentUser={paymentsData.currentUser}
+        basePath="/admin/accounts/payments"
+      />
+    </TablePageLayoutProvider>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Clock, Download, FileCheck2, Inbox, PenLine, Plus, RefreshCw, Wallet, CheckCircle2 } from "lucide-react"
@@ -32,6 +33,8 @@ interface ViewerFlags {
   is_admin: boolean
   is_payment_processor: boolean
 }
+
+const DEFAULT_VIEWER: ViewerFlags = { is_admin: false, is_payment_processor: false }
 
 export interface ExtraTab {
   tab: DataTableTab
@@ -66,7 +69,33 @@ export function RequisitionsListPage({
   extraTabs?: ExtraTab[]
 }) {
   const router = useRouter()
-  const [viewer, setViewer] = useState<ViewerFlags>({ is_admin: false, is_payment_processor: false })
+  const [tab, setTab] = useState<string>(surface === "dept" ? "department" : surface === "admin" ? "all" : "mine")
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isExportOpen, setIsExportOpen] = useState(false)
+
+  const extra = extraTabs.find((t) => t.tab.key === tab)
+  const view = (extra ? null : (tab as View)) as View | null
+
+  // Previous data stays while another view loads, so the viewer flags (and tabs) don't flicker.
+  const listQuery = useQuery({
+    queryKey: ["requisitions-list", view, deptName],
+    queryFn: async (): Promise<{ rows: Requisition[]; viewer: ViewerFlags | null }> => {
+      if (!view) return { rows: [], viewer: null }
+      const params = new URLSearchParams({ view })
+      if (view === "department" && deptName) params.set("department", deptName)
+      const res = await fetch(`/api/requisitions?${params}`)
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(json?.error || "Could not load requisitions")
+      return { rows: json.data || [], viewer: json.viewer ?? null }
+    },
+    enabled: Boolean(view),
+    placeholderData: keepPreviousData,
+  })
+  const rows = listQuery.data?.rows ?? []
+  const viewer = listQuery.data?.viewer ?? DEFAULT_VIEWER
+  const isLoading = listQuery.isFetching
+  const error = listQuery.error instanceof Error ? listQuery.error.message : null
+  const refetchRows = () => void listQuery.refetch()
 
   const views: View[] = useMemo(() => {
     if (surface === "dept") return ["department", "action"]
@@ -76,39 +105,6 @@ export function RequisitionsListPage({
     if (viewer.is_admin || viewer.is_payment_processor) list.push("all")
     return list
   }, [surface, viewer])
-
-  const [tab, setTab] = useState<string>(surface === "dept" ? "department" : surface === "admin" ? "all" : "mine")
-  const [rows, setRows] = useState<Requisition[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [isExportOpen, setIsExportOpen] = useState(false)
-
-  const extra = extraTabs.find((t) => t.tab.key === tab)
-  const view = (extra ? null : (tab as View)) as View | null
-
-  const fetchRows = useCallback(async () => {
-    if (!view) return
-    setIsLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({ view })
-      if (view === "department" && deptName) params.set("department", deptName)
-      const res = await fetch(`/api/requisitions?${params}`)
-      const json = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(json?.error || "Could not load requisitions")
-      setRows(json.data || [])
-      if (json.viewer) setViewer(json.viewer)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load requisitions")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [view, deptName])
-
-  useEffect(() => {
-    fetchRows()
-  }, [fetchRows])
 
   const detailHref = (r: Requisition) => `/accounts/requisitions/${r.id}`
   const count = (status: RequisitionStatus) => rows.filter((r) => r.status === status).length
@@ -281,7 +277,7 @@ export function RequisitionsListPage({
           extra.actions
         ) : (
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={fetchRows} aria-label="Refresh">
+            <Button variant="outline" size="sm" onClick={refetchRows} aria-label="Refresh">
               <RefreshCw className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Refresh</span>
             </Button>
@@ -319,7 +315,7 @@ export function RequisitionsListPage({
           filters={filters}
           isLoading={isLoading}
           error={error}
-          onRetry={fetchRows}
+          onRetry={refetchRows}
           pagination={{ pageSize: 25 }}
           stickyToolbar
           viewToggle

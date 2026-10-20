@@ -33,6 +33,9 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
+import { formatTime as formatClockTime } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 function formatTime(value: string | null): string {
   if (!value) return "—"
@@ -50,13 +53,13 @@ function formatTime(value: string | null): string {
 
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
+  return formatClockTime(date)
 }
 
 function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
   if (item.is_on_leave) {
     return (
-      <Badge variant="secondary" className="text-muted-foreground gap-1 text-[11px]">
+      <Badge variant="secondary" className="text-muted-foreground gap-1 text-xs">
         <Palmtree className="h-3 w-3" /> On Leave
       </Badge>
     )
@@ -70,14 +73,14 @@ function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
         return (
           <Badge
             variant="outline"
-            className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] font-medium text-emerald-800 dark:text-emerald-300"
+            className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-800 dark:text-emerald-300"
           >
             <Laptop className="h-3 w-3" /> Present (Virtual)
           </Badge>
         )
       }
       return (
-        <Badge className="gap-1 bg-emerald-600 text-[11px] text-white hover:bg-emerald-600">
+        <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
           <Building2 className="h-3 w-3" /> Present (In-Room)
         </Badge>
       )
@@ -86,32 +89,32 @@ function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
         return (
           <Badge
             variant="outline"
-            className="gap-1 border-amber-500/40 bg-amber-500/10 text-[11px] font-medium text-amber-800 dark:text-amber-300"
+            className="gap-1 border-amber-500/40 bg-amber-500/10 text-xs font-medium text-amber-800 dark:text-amber-300"
           >
             <Laptop className="h-3 w-3" /> Late (Virtual)
           </Badge>
         )
       }
       return (
-        <Badge className="gap-1 bg-amber-600 text-[11px] text-white hover:bg-amber-600">
+        <Badge className="gap-1 bg-amber-600 text-xs text-white hover:bg-amber-600">
           <Clock className="h-3 w-3" /> Late (In-Room)
         </Badge>
       )
     case "excused":
       return (
-        <Badge variant="secondary" className="gap-1 text-[11px]">
+        <Badge variant="secondary" className="gap-1 text-xs">
           <ShieldCheck className="h-3 w-3" /> Excused
         </Badge>
       )
     case "absent":
       return (
-        <Badge variant="destructive" className="gap-1 text-[11px]">
+        <Badge variant="destructive" className="gap-1 text-xs">
           <XCircle className="h-3 w-3" /> Absent
         </Badge>
       )
     default:
       return (
-        <Badge variant="outline" className="text-muted-foreground text-[11px]">
+        <Badge variant="outline" className="text-muted-foreground text-xs">
           Unrecorded
         </Badge>
       )
@@ -286,7 +289,7 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                  className="text-warning-foreground gap-1 border-amber-400/50 bg-amber-500/10 text-xs"
                 >
                   <AlertTriangle className="h-3 w-3" /> Missed scan
                 </Badge>
@@ -315,7 +318,7 @@ export default function AdminMeetingAttendancePage() {
         key: "actions",
         label: "Actions",
         render: (r) => (
-          <div className="flex min-w-[170px] items-center gap-1.5">
+          <div className="flex min-w-42.5 items-center gap-1.5">
             <Button
               size="sm"
               variant="ghost"
@@ -412,6 +415,7 @@ export default function AdminMeetingAttendancePage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="General Meeting Attendance"
       description="Real-time biometric-verified attendance tracking for General Meeting & KSS."
       icon={UserCheck}
@@ -445,7 +449,7 @@ export default function AdminMeetingAttendancePage() {
         <div className="space-y-3">
           {holidayInfo?.isMondayHoliday && (
             <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+              <AlertTriangle className="text-warning-foreground h-4 w-4 shrink-0" />
               <div className="flex-1">
                 <span className="font-semibold">Public Holiday Notice: </span>
                 <span>{holidayInfo.mondayHolidayName} falls on Monday of this week.</span>
@@ -507,17 +511,14 @@ export default function AdminMeetingAttendancePage() {
           trailing: (r) => {
             if (r.is_on_leave) {
               return (
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-sky-400/50 bg-sky-500/10 text-[10px] text-sky-700 dark:text-sky-400"
-                >
+                <Badge variant="outline" className="text-info-foreground gap-1 border-sky-400/50 bg-sky-500/10 text-xs">
                   <Palmtree className="h-2.5 w-2.5" /> Leave
                 </Badge>
               )
             }
             if (r.meeting_clock_in) {
               return (
-                <Badge className="gap-1 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
+                <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
                   <CheckCircle2 className="h-2.5 w-2.5" /> In Room
                 </Badge>
               )
@@ -526,14 +527,14 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-400"
+                  className="text-warning-foreground gap-1 border-amber-400/50 bg-amber-500/10 text-xs"
                 >
                   <AlertTriangle className="h-2.5 w-2.5" /> Missed
                 </Badge>
               )
             }
             return (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
+              <Badge variant="outline" className="text-muted-foreground text-xs">
                 Unrecorded
               </Badge>
             )
@@ -614,13 +615,11 @@ export default function AdminMeetingAttendancePage() {
                   Meeting Check-In:
                 </span>
                 {r.meeting_clock_in ? (
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {formatTime(r.meeting_clock_in)}
-                  </span>
+                  <span className="text-success-foreground font-semibold">{formatTime(r.meeting_clock_in)}</span>
                 ) : r.office_clock_in && !r.is_on_leave ? (
                   <Badge
                     variant="outline"
-                    className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                    className="text-warning-foreground gap-1 border-amber-400/50 bg-amber-500/10 text-xs"
                   >
                     <AlertTriangle className="h-3 w-3" /> Missed scan
                   </Badge>

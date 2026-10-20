@@ -71,13 +71,13 @@ export function ScheduleList({
 
   return (
     <div className="divide-y rounded-md border">
-      {items.map((item, index) => {
+      {items.map((item) => {
         const invoiceDoc = item.documents.find((d) => d.document_type === "invoice")
         const receiptDoc = item.documents.find((d) => d.document_type === "receipt")
 
         return (
           <div
-            key={index}
+            key={item.date.toISOString()}
             className={cn(
               "flex flex-col justify-between gap-3 p-3 sm:flex-row sm:items-center",
               item.status === "overdue" && "bg-red-50 dark:bg-red-950/20"
@@ -88,12 +88,12 @@ export function ScheduleList({
                 className={cn(
                   "rounded-full p-2",
                   item.status === "paid"
-                    ? "bg-green-100 text-green-600 dark:bg-green-900/30"
+                    ? "bg-success-muted text-success-foreground"
                     : item.status === "overdue"
-                      ? "bg-red-100 text-red-600 dark:bg-red-900/30"
+                      ? "bg-danger-muted text-danger-foreground"
                       : item.status === "due"
-                        ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30"
-                        : "bg-gray-100 text-gray-600 dark:bg-gray-800"
+                        ? "bg-warning-muted text-warning-foreground"
+                        : "bg-neutral-muted text-neutral-foreground"
                 )}
               >
                 {item.status === "paid" ? (

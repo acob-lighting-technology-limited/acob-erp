@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 export const PERSPECTIVES = ["Financial", "Customer", "Internal Process", "Organizational Capacity"] as const
 
@@ -171,7 +172,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
         onOpenChange(next)
       }}
     >
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[620px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-155">
         <DialogHeader>
           <DialogTitle>Add Corporate KPI</DialogTitle>
           <DialogDescription>
@@ -243,7 +244,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
               placeholder="e.g. Number of solicited portfolio projects awarded (Mini Grids)"
               value={measure}
               onChange={(e) => setMeasure(e.target.value)}
-              className="min-h-[64px] resize-none"
+              className="min-h-16 resize-none"
             />
           </div>
 
@@ -290,7 +291,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
           {/* Department Ownership */}
           <div className="space-y-2 border-t pt-3">
             <Label className="text-xs font-semibold">Department Ownership (RACI)</Label>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Click a department to assign as <strong className="text-emerald-600">CORE</strong> (scored owner). Click
               again to switch to <strong className="text-foreground">SUPPORT</strong> (collaborator), or remove.
             </p>
@@ -306,7 +307,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
                     <button
                       type="button"
                       onClick={() => toggleCoreDept(dept)}
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                      className={`rounded px-1.5 py-0.5 text-xs font-semibold transition-colors ${
                         isCore
                           ? "bg-emerald-600 text-white"
                           : "bg-muted text-muted-foreground hover:bg-emerald-500/20 hover:text-emerald-600"
@@ -317,7 +318,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
                     <button
                       type="button"
                       onClick={() => toggleSupportDept(dept)}
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                      className={`rounded px-1.5 py-0.5 text-xs font-semibold transition-colors ${
                         isSupport
                           ? "bg-blue-600 text-white"
                           : "bg-muted text-muted-foreground hover:bg-blue-500/20 hover:text-blue-600"
@@ -381,7 +382,11 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
     return (deptData?.data ?? []).map((d) => d.name).sort((a, b) => a.localeCompare(b))
   }, [deptData])
 
-  useEffect(() => {
+  // Seed the editor from the row being edited — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [row] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
     if (row) {
       setPerspective(row.perspective)
       if (STANDARD_PILLARS.includes(row.strategic_priority as any)) {
@@ -433,7 +438,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
         setAssignments(fallback)
       }
     }
-  }, [row])
+  }
 
   const unassignedDepartments = useMemo(() => {
     const assignedSet = new Set(assignments.map((a) => a.department.toLowerCase()))
@@ -518,7 +523,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
   return (
     <Dialog open={row !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[680px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-170">
         <DialogHeader>
           <DialogTitle>Edit Corporate KPI #{row?.source_sn}</DialogTitle>
           <DialogDescription>
@@ -581,11 +586,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">KPI Measure Name *</Label>
-            <Textarea
-              value={measure}
-              onChange={(e) => setMeasure(e.target.value)}
-              className="min-h-[64px] resize-none"
-            />
+            <Textarea value={measure} onChange={(e) => setMeasure(e.target.value)} className="min-h-16 resize-none" />
           </div>
 
           <div className="space-y-1.5">
@@ -633,15 +634,15 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-xs font-semibold">Department Quotas & Accountability (RACI)</Label>
-                <p className="text-muted-foreground text-[11px]">
+                <p className="text-muted-foreground text-xs">
                   Assign Core owners and Support contributors. Define explicit numerical quotas and action commitments.
                 </p>
               </div>
               <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40">
+                <Badge variant="outline" className="bg-success-muted text-success-foreground">
                   {assignments.filter((a) => a.role === "core").length} Core
                 </Badge>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950/40">
+                <Badge variant="outline" className="bg-info-muted text-info-foreground">
                   {assignments.filter((a) => a.role === "support").length} Support
                 </Badge>
               </div>
@@ -668,10 +669,8 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                         <div className="flex items-center gap-2">
                           <span className="text-foreground text-xs font-semibold">{assignment.department}</span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
-                              isCore
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
-                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300"
+                            className={`rounded-full px-2 py-0.5 text-xs font-bold tracking-wider uppercase ${
+                              isCore ? "bg-success-muted text-success-foreground" : "bg-info-muted text-info-foreground"
                             }`}
                           >
                             {isCore ? "Core Owner" : "Support"}
@@ -682,7 +681,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className={`h-7 px-2 text-[11px] ${
+                            className={`h-7 px-2 text-xs ${
                               isCore
                                 ? "bg-emerald-100/50 font-bold text-emerald-700 dark:bg-emerald-900/40"
                                 : "text-muted-foreground"
@@ -695,7 +694,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className={`h-7 px-2 text-[11px] ${
+                            className={`h-7 px-2 text-xs ${
                               !isCore
                                 ? "bg-blue-100/50 font-bold text-blue-700 dark:bg-blue-900/40"
                                 : "text-muted-foreground"
@@ -719,7 +718,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">
+                          <Label className="text-muted-foreground text-xs font-medium">
                             Department Quota / Target Value
                           </Label>
                           <Input
@@ -736,7 +735,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">Target Unit</Label>
+                          <Label className="text-muted-foreground text-xs font-medium">Target Unit</Label>
                           <Input
                             placeholder="e.g. Projects, %, ₦"
                             className="h-8 text-xs"
@@ -747,7 +746,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-muted-foreground text-[11px] font-medium">
+                        <Label className="text-muted-foreground text-xs font-medium">
                           Action Commitment / Deliverable Plan
                         </Label>
                         <Input
@@ -767,7 +766,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
             {unassignedDepartments.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-2">
                 <Select value={newDept} onValueChange={setNewDept}>
-                  <SelectTrigger className="h-8 min-w-[180px] flex-1 text-xs">
+                  <SelectTrigger className="h-8 min-w-45 flex-1 text-xs">
                     <SelectValue placeholder="Select department to add..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -851,7 +850,7 @@ export function ArchiveKpiDialog({ row, onOpenChange, onChanged }: ArchiveKpiDia
 
   return (
     <Dialog open={row !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent className="sm:max-w-105">
         <DialogHeader>
           <DialogTitle>Archive Corporate KPI</DialogTitle>
           <DialogDescription>

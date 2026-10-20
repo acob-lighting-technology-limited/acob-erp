@@ -1,12 +1,8 @@
-import Link from "next/link"
-import { Calendar, CheckCircle2, ChevronRight, Clock, Car, UserCheck, Utensils } from "lucide-react"
-import { PageHeader, PageWrapper, Section } from "@/components/layout"
+import { Calendar, CheckCircle2, Clock, Car, UserCheck, Utensils } from "lucide-react"
+import { PageHeader, PageWrapper, Section, ModuleHubGrid } from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { IconFill } from "@/components/ui/icon-fill"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { cn } from "@/lib/utils"
 import { getCurrentUserHrData } from "./_lib"
 
 export default async function HrPage() {
@@ -22,7 +18,7 @@ export default async function HrPage() {
       subLabel: todayAttendance.totalHours
         ? `${todayAttendance.totalHours.toFixed(1)} hrs today`
         : "Timesheets & Hours",
-      color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      color: "bg-amber-500/10 text-warning-foreground border-amber-500/20",
       fill: "bg-amber-500",
       hoverBorder: "hover:border-amber-500/60 dark:hover:border-amber-400/60",
       hoverText: "group-hover:text-amber-500",
@@ -37,7 +33,7 @@ export default async function HrPage() {
         leave.pendingRequestsCount > 0
           ? `${leave.pendingRequestsCount} in review`
           : `${leave.casualRemainingDays} casual days also available`,
-      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      color: "bg-emerald-500/10 text-success-foreground border-emerald-500/20",
       fill: "bg-emerald-500",
       hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
       hoverText: "group-hover:text-emerald-500",
@@ -49,7 +45,7 @@ export default async function HrPage() {
       icon: Utensils,
       badge: lunch.hasVoted ? "Submitted" : lunch.hasMenuToday ? "Menu Available" : "No Menu Today",
       subLabel: lunch.hasVoted ? "Choice recorded" : "Daily Menu & Voting",
-      color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+      color: "bg-orange-500/10 text-warning-foreground border-orange-500/20",
       fill: "bg-orange-500",
       hoverBorder: "hover:border-orange-500/60 dark:hover:border-orange-400/60",
       hoverText: "group-hover:text-orange-500",
@@ -61,7 +57,7 @@ export default async function HrPage() {
       icon: Car,
       badge: bookings.activeCount > 0 ? `${bookings.activeCount} Active` : "Available",
       subLabel: "Vehicles & Meeting Rooms",
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      color: "bg-blue-500/10 text-info-foreground border-blue-500/20",
       fill: "bg-blue-500",
       hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
       hoverText: "group-hover:text-blue-500",
@@ -132,58 +128,21 @@ export default async function HrPage() {
       </StatGrid>
 
       <Section title="HR Areas" description="Select an area below to view your records or submit new requests.">
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-2">
-          {hrAreaCards.map((item) => (
-            <Link key={item.href} href={item.href} className="group block">
-              <div
-                className={cn(
-                  "bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl",
-                  item.hoverBorder
-                )}
-              >
-                <div className="space-y-2.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <IconFill
-                        icon={item.icon}
-                        fillColor={item.fill}
-                        className={cn(
-                          "h-9 w-9 rounded-lg border transition-transform duration-200 group-hover:scale-105",
-                          item.color
-                        )}
-                        iconClassName="h-5 w-5"
-                      />
-                      <h3 className={cn("text-foreground text-base font-semibold transition-colors", item.hoverText)}>
-                        {item.title}
-                      </h3>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold", item.color)}
-                    >
-                      {item.badge}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground text-xs leading-relaxed">{item.description}</p>
-                </div>
-                <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">{item.subLabel}</span>
-                  <IconFill
-                    icon={ChevronRight}
-                    fillColor={item.fill}
-                    hoverTextClassName="group-hover:text-white"
-                    className={cn(
-                      "border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5",
-                      item.hoverBorder
-                    )}
-                    iconClassName="text-muted-foreground h-3.5 w-3.5"
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <ModuleHubGrid
+          className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-2"
+          cards={hrAreaCards.map((c) => ({
+            title: c.title,
+            description: c.description,
+            href: c.href,
+            icon: c.icon,
+            tag: c.badge,
+            footer: c.subLabel,
+            color: c.color,
+            fill: c.fill,
+            hoverBorder: c.hoverBorder,
+            hoverText: c.hoverText,
+          }))}
+        />
       </Section>
 
       <Section title="How HR Works" description="Learn how your HR records sync across the ERP.">

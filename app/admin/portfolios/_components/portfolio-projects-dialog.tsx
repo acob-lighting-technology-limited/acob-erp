@@ -45,11 +45,15 @@ export function PortfolioProjectsDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    setSearch("")
-    setSelected(new Set())
-  }, [open, portfolio?.id])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setSearch("")
+      setSelected(new Set())
+    }
+  }
 
   // Every project outside this portfolio can be added. Unassigned ones come
   // first, since they are the usual target; the rest would be moved.
@@ -126,7 +130,7 @@ export function PortfolioProjectsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-[600px]">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-150">
         <DialogHeader>
           <DialogTitle>Manage Projects</DialogTitle>
           <DialogDescription>
@@ -215,11 +219,11 @@ export function PortfolioProjectsDialog({
                         />
                         <span className="min-w-0 flex-1 truncate text-sm">{project.project_name}</span>
                         {project.currentPortfolio ? (
-                          <Badge variant="outline" className="shrink-0 text-[10px]">
+                          <Badge variant="outline" className="shrink-0 text-xs">
                             In {portfolioLabel(project.currentPortfolio)}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground shrink-0 text-[11px]">Unassigned</span>
+                          <span className="text-muted-foreground shrink-0 text-xs">Unassigned</span>
                         )}
                       </label>
                     </li>
@@ -228,7 +232,7 @@ export function PortfolioProjectsDialog({
               </ul>
             )}
             {movingCount > 0 && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-warning-foreground text-xs">
                 {movingCount} selected project{movingCount === 1 ? " is" : "s are"} in another portfolio and will be
                 moved here.
               </p>

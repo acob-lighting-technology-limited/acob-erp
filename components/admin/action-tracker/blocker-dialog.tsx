@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useConfirm } from "@/providers/confirm-provider"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { AlertTriangle, FileText, Loader2, Paperclip, Play, Save, Trash2, Upload } from "lucide-react"
@@ -19,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const log = logger("action-tracker-blocker-dialog")
 
@@ -58,6 +60,7 @@ function formatSize(bytes: number) {
 }
 
 export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: BlockerDialogProps) {
+  const confirm = useConfirm()
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [note, setNote] = useState("")
@@ -67,11 +70,15 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
 
   const targetId = target?.id || ""
 
-  useEffect(() => {
-    if (!isOpen) return
-    setNote(target?.blocker_note || "")
-    setPendingFiles([])
-  }, [isOpen, target?.blocker_note])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (isOpen !== syncedOpen) {
+    setSyncedOpen(isOpen)
+    if (isOpen) {
+      setNote(target?.blocker_note || "")
+      setPendingFiles([])
+    }
+  }
 
   const {
     data: evidence = [],
@@ -150,7 +157,8 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
   }
 
   const handleDeleteEvidence = async (row: EvidenceRow) => {
-    if (!window.confirm(`Remove ${row.file_name}?`)) return
+    const ok = await confirm({ title: `Remove ${row.file_name}?`, confirmLabel: "Remove", destructive: true })
+    if (!ok) return
     try {
       const response = await apiFetch(
         `/api/reports/action-tracker/${targetId}/evidence?evidence_id=${encodeURIComponent(row.id)}`,
@@ -170,7 +178,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[640px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-160">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
@@ -184,7 +192,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
 
         <div className="grid gap-5 py-2">
           <div className="bg-muted/30 rounded-lg border p-3">
-            <p className="text-muted-foreground text-[10px] font-bold uppercase">Action Point</p>
+            <p className="text-muted-foreground text-xs font-bold uppercase">Action Point</p>
             <p className="text-sm font-medium">{target?.title}</p>
           </div>
 
@@ -245,6 +253,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground text-xs">{formatSize(file.size)}</span>
                       <Button
+                        aria-label="Delete"
                         size="icon"
                         variant="ghost"
                         className="text-destructive h-6 w-6"
@@ -259,7 +268,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
             ) : null}
 
             {isLoadingEvidence ? (
-              <p className="text-muted-foreground text-sm">Loading evidence…</p>
+              <LinesSkeleton lines={2} />
             ) : evidence.length === 0 && pendingFiles.length === 0 ? (
               <p className="text-muted-foreground text-sm italic">No evidence attached.</p>
             ) : (
@@ -288,13 +297,14 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-xs font-medium">{row.file_name}</p>
-                        <p className="text-muted-foreground text-[11px]">
+                        <p className="text-muted-foreground text-xs">
                           {formatSize(row.file_size)} ·{" "}
                           {formatWATDateTime(new Date(row.created_at), { day: "2-digit", month: "short" })}
                         </p>
                       </div>
                       {canEdit ? (
                         <Button
+                          aria-label="Delete"
                           size="icon"
                           variant="ghost"
                           className="text-destructive h-6 w-6 shrink-0"
@@ -309,12 +319,12 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                         href={row.signed_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary text-[11px] underline"
+                        className="text-primary text-xs underline"
                       >
                         Open original
                       </a>
                     ) : (
-                      <Badge variant="secondary" className="text-[10px]">
+                      <Badge variant="secondary" className="text-xs">
                         Link unavailable
                       </Badge>
                     )}

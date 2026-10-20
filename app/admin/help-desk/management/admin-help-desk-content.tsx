@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
+import { useNow } from "@/hooks/use-now"
 import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
@@ -25,9 +26,11 @@ import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-de
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
-import type { HelpDeskTicket, EmployeeOption, LeadDirectoryMember } from "@/components/help-desk/ticket-queue-table"
-import { resolveCurrentStage, resolveApproverName } from "@/components/help-desk/ticket-queue-table"
+import type { HelpDeskTicket, EmployeeOption, LeadDirectoryMember } from "@/lib/help-desk/ticket-display"
+import { resolveCurrentStage, resolveApproverName } from "@/lib/help-desk/ticket-display"
 import { apiFetch } from "@/lib/api-client"
+
+import { layout as tablePageLayout } from "../_layout"
 
 interface AdminHelpDeskContentProps {
   initialTickets: HelpDeskTicket[]
@@ -65,6 +68,7 @@ export function AdminHelpDeskContent({
   lockedDepartment,
   backLinkHref = "/admin",
 }: AdminHelpDeskContentProps) {
+  const now = useNow()
   const [tickets, setTickets] = useState(initialTickets)
   const [activeTab, setActiveTab] = useState("my-actions")
   const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({})
@@ -73,7 +77,6 @@ export function AdminHelpDeskContent({
   const [requisitionTicket, setRequisitionTicket] = useState<HelpDeskTicket | null>(null)
 
   const stats = useMemo(() => {
-    const now = Date.now()
     const breached = tickets.filter(
       (t) => t.sla_target_at && new Date(t.sla_target_at).getTime() < now && !["resolved", "closed"].includes(t.status)
     ).length
@@ -83,7 +86,7 @@ export function AdminHelpDeskContent({
       inProgress: tickets.filter((t) => t.status === "in_progress").length,
       breached,
     }
-  }, [tickets])
+  }, [tickets, now])
 
   const managedDepartments = useMemo(
     () =>
@@ -266,9 +269,9 @@ export function AdminHelpDeskContent({
         initialWidth: 300,
         accessor: (r) => r.title,
         render: (r) => (
-          <div className="flex max-w-[300px] flex-col">
+          <div className="flex max-w-75 flex-col">
             <span className="truncate font-medium">{r.title}</span>
-            <span className="text-muted-foreground text-[10px] tracking-widest uppercase">{r.request_type}</span>
+            <span className="text-muted-foreground text-xs tracking-widest uppercase">{r.request_type}</span>
           </div>
         ),
       },
@@ -326,7 +329,7 @@ export function AdminHelpDeskContent({
         label: "Assign Staff",
         render: (r) => {
           if (!canAssignTicket(r)) {
-            return <span className="text-muted-foreground text-[10px] italic">Restricted stage</span>
+            return <span className="text-muted-foreground text-xs italic">Restricted stage</span>
           }
           return (
             <div className="flex items-center gap-2">
@@ -334,7 +337,7 @@ export function AdminHelpDeskContent({
                 value={assignmentMap[r.id] || ""}
                 onValueChange={(val) => setAssignmentMap((prev) => ({ ...prev, [r.id]: val }))}
               >
-                <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectTrigger className="h-8 w-40 text-xs">
                   <SelectValue placeholder="Staff..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -364,6 +367,7 @@ export function AdminHelpDeskContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Help Desk Workflow"
       description="Manage ticket routing, department approvals, and technical escalations."
       icon={Headset}
@@ -457,7 +461,7 @@ export function AdminHelpDeskContent({
           render: (r) => (
             <div className="bg-muted/20 space-y-4 border-t p-6">
               <div>
-                <h4 className="text-muted-foreground mb-2 text-[10px] font-black tracking-widest uppercase">
+                <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
                   Requester Info
                 </h4>
                 <div className="flex gap-4 text-sm">
@@ -473,7 +477,7 @@ export function AdminHelpDeskContent({
               </div>
               {r.sla_target_at && (
                 <div>
-                  <h4 className="text-muted-foreground mb-2 text-[10px] font-black tracking-widest uppercase">
+                  <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
                     SLA Status
                   </h4>
                   <p className="text-sm">
@@ -546,16 +550,16 @@ export function AdminHelpDeskContent({
         cardRenderer={(r) => (
           <div className="bg-card space-y-4 rounded-xl border p-4 transition-shadow hover:shadow-md">
             <div className="flex items-start justify-between">
-              <span className="text-muted-foreground font-mono text-[10px]">{r.ticket_number}</span>
+              <span className="text-muted-foreground font-mono text-xs">{r.ticket_number}</span>
               <PriorityBadge priority={r.priority} />
             </div>
             <div>
               <h4 className="line-clamp-1 font-semibold">{r.title}</h4>
-              <p className="text-muted-foreground mt-1 text-[10px] uppercase">{r.service_department}</p>
+              <p className="text-muted-foreground mt-1 text-xs uppercase">{r.service_department}</p>
             </div>
             <div className="flex items-center justify-between border-t pt-2">
               <TicketStatusBadge status={r.status} />
-              <Badge variant="outline" className="text-[10px] font-normal">
+              <Badge variant="outline" className="text-xs font-normal">
                 {resolveCurrentStage(r)}
               </Badge>
             </div>

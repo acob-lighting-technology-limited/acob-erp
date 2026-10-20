@@ -60,16 +60,18 @@ export function SearchableSelect({
 
   const selectedOption = options.find((opt) => opt.value === value)
 
-  // Clear search when dropdown closes
+  // Clear the search when the dropdown closes (adjusted during render).
+  const [wasOpen, setWasOpen] = React.useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (!open) setSearchQuery("")
+  }
+
+  // Focus the input once the dropdown has opened (a DOM side effect).
   React.useEffect(() => {
-    if (!open) {
-      setSearchQuery("")
-    } else {
-      // Focus the input when dropdown opens
-      setTimeout(() => {
-        inputRef.current?.focus()
-      }, 100)
-    }
+    if (!open) return
+    const timer = setTimeout(() => inputRef.current?.focus(), 100)
+    return () => clearTimeout(timer)
   }, [open])
 
   React.useEffect(() => {
@@ -105,7 +107,7 @@ export function SearchableSelect({
         </div>
       </div>
       <div
-        className="max-h-[250px] overflow-y-auto overscroll-contain p-1"
+        className="max-h-62.5 overflow-y-auto overscroll-contain p-1"
         onMouseDown={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
       >
@@ -163,7 +165,7 @@ export function SearchableSelect({
   )
 
   const contentClassName =
-    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-[300px] w-[var(--radix-popover-trigger-width)] min-w-[14rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border shadow-md"
+    "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-75 w-[var(--radix-popover-trigger-width)] min-w-[14rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border shadow-md"
 
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>

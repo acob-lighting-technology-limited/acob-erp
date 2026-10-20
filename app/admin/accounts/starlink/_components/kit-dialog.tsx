@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -83,9 +84,12 @@ export function KitDialog({
   const [saving, setSaving] = useState(false)
   const isEdit = target?.mode === "edit"
 
-  useEffect(() => {
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [target] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
     setForm(initialForm(target))
-  }, [target])
+  }
 
   const { data: projects = [] } = useQuery({
     queryKey: PROJECTS_QUERY_KEY,

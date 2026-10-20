@@ -32,11 +32,11 @@ import {
   FileText,
   User,
   Calendar,
-  FileBarChart,
 } from "lucide-react"
 import type { Notification } from "./page"
 
 import { logger } from "@/lib/logger"
+import { notificationTier } from "@/lib/notifications/tiers"
 
 const log = logger("notification-notification-content")
 
@@ -81,10 +81,10 @@ const TYPE_CARD_BG: Record<string, string> = {
 }
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {
-  urgent: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  high: "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  normal: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  low: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  urgent: "border-red-500/40 bg-red-500/10 text-danger-foreground",
+  high: "border-orange-500/40 bg-orange-500/10 text-warning-foreground",
+  normal: "border-blue-500/40 bg-blue-500/10 text-info-foreground",
+  low: "border-emerald-500/40 bg-emerald-500/10 text-success-foreground",
 }
 
 function getPriorityBadgeClass(priority: string | null | undefined): string {
@@ -124,11 +124,15 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   const [supabase] = useState(() => createClient())
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [isLoading, setIsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState("all")
+  // Default to the work waiting on the viewer (audit 2.1).
+  const [activeTab, setActiveTab] = useState("action")
 
-  useEffect(() => {
+  // A fresh server list replaces local edits — adjusted during render, not in an effect.
+  const [syncedInitial, setSyncedInitial] = useState(initialNotifications)
+  if (syncedInitial !== initialNotifications) {
+    setSyncedInitial(initialNotifications)
     setNotifications(initialNotifications)
-  }, [initialNotifications])
+  }
 
   useEffect(() => {
     const subscription = supabase
@@ -223,46 +227,30 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   )
 
   const counts = useMemo(() => {
-    return {
-      all: notifications.length,
-      unread: notifications.filter((n) => !n.read).length,
-      critical: notifications.filter((n) => n.priority === "high" || n.priority === "urgent").length,
-      approvals: notifications.filter((n) => n.category === "approvals").length,
-      tasks: notifications.filter((n) => n.category === "tasks").length,
-      assets: notifications.filter((n) => n.category === "assets").length,
-      feedback: notifications.filter((n) => n.category === "feedback").length,
-      mentions: notifications.filter((n) => n.category === "mentions").length,
-      meetings: notifications.filter((n) => n.category === "meetings").length,
-      communications: notifications.filter((n) => n.category === "communications").length,
-      reports: notifications.filter((n) => n.category === "reports").length,
+    const byTier = { action: 0, actionUnread: 0, fyi: 0, announcement: 0 }
+    for (const n of notifications) {
+      const tier = notificationTier(n)
+      byTier[tier] += 1
+      if (tier === "action" && !n.read) byTier.actionUnread += 1
     }
+    return { ...byTier, all: notifications.length, unread: notifications.filter((n) => !n.read).length }
   }, [notifications])
 
+  // Tiers, not categories: category stays available as a table filter.
   const tabs: DataTableTab[] = useMemo(
     () => [
-      { key: "all", label: `All(${counts.all})`, icon: Bell },
-      { key: "unread", label: `Unread(${counts.unread})`, icon: Clock },
-      { key: "critical", label: `Critical(${counts.critical})`, icon: AlertTriangle },
-      { key: "approvals", label: `Approvals(${counts.approvals})`, icon: CheckCircle },
-      { key: "tasks", label: `Tasks(${counts.tasks})`, icon: User },
-      { key: "meetings", label: `Meetings(${counts.meetings})`, icon: Calendar },
-      { key: "communications", label: `Communications(${counts.communications})`, icon: Mail },
-      { key: "reports", label: `Reports(${counts.reports})`, icon: FileBarChart },
-      { key: "assets", label: `Assets(${counts.assets})`, icon: Package },
-      { key: "feedback", label: `Feedback(${counts.feedback})`, icon: Mail },
-      { key: "mentions", label: `Mentions(${counts.mentions})`, icon: MessageSquare },
+      { key: "action", label: `Needs you (${counts.actionUnread})`, icon: AlertTriangle },
+      { key: "fyi", label: `Updates (${counts.fyi})`, icon: Bell },
+      { key: "announcement", label: `Announcements (${counts.announcement})`, icon: Mail },
+      { key: "all", label: `All (${counts.all})`, icon: Clock },
     ],
     [counts]
   )
 
-  const filteredData = useMemo(() => {
-    return notifications.filter((n) => {
-      if (activeTab === "all") return true
-      if (activeTab === "unread") return !n.read
-      if (activeTab === "critical") return n.priority === "high" || n.priority === "urgent"
-      return n.category === activeTab
-    })
-  }, [activeTab, notifications])
+  const filteredData = useMemo(
+    () => (activeTab === "all" ? notifications : notifications.filter((n) => notificationTier(n) === activeTab)),
+    [activeTab, notifications]
+  )
 
   const columns: DataTableColumn<Notification>[] = useMemo(
     () => [
@@ -459,11 +447,11 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
           subtitle: (n) => n.message,
           trailing: (n) =>
             !n.read ? (
-              <Badge variant="default" className="text-[10px]">
+              <Badge variant="default" className="text-xs">
                 New
               </Badge>
             ) : (
-              <span className="text-muted-foreground text-[10px] whitespace-nowrap">
+              <span className="text-muted-foreground text-xs whitespace-nowrap">
                 {formatRelativeTime(n.created_at)}
               </span>
             ),
@@ -473,14 +461,14 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
             badges: (n) => (
               <>
                 {!n.read && (
-                  <Badge variant="default" className="text-[10px]">
+                  <Badge variant="default" className="text-xs">
                     New
                   </Badge>
                 )}
-                <Badge variant="outline" className={cn("text-[10px] capitalize", getPriorityBadgeClass(n.priority))}>
+                <Badge variant="outline" className={cn("text-xs capitalize", getPriorityBadgeClass(n.priority))}>
                   {n.priority}
                 </Badge>
-                <Badge variant="outline" className="text-[10px] capitalize">
+                <Badge variant="outline" className="text-xs capitalize">
                   {n.category}
                 </Badge>
               </>
@@ -554,16 +542,16 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
               </div>
               <div className="flex items-center justify-between pt-1">
                 <div className="flex gap-2">
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="px-1.5 py-0 text-xs">
                     {n.category}
                   </Badge>
                   {!n.read && (
-                    <Badge variant="default" className="px-1.5 py-0 text-[10px]">
+                    <Badge variant="default" className="px-1.5 py-0 text-xs">
                       New
                     </Badge>
                   )}
                 </div>
-                <span className="text-muted-foreground text-[10px]">{formatRelativeTime(n.created_at)}</span>
+                <span className="text-muted-foreground text-xs">{formatRelativeTime(n.created_at)}</span>
               </div>
             </div>
           )
@@ -572,7 +560,7 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
           render: (n) => (
             <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
               <div className="space-y-1">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">
                   Notification Message
                 </span>
                 <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">{n.message}</p>
@@ -580,21 +568,21 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Category</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Category</span>
                   <span className="font-medium capitalize">{n.category}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Priority</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Priority</span>
                   <span className="font-medium capitalize">{n.priority}</span>
                 </div>
                 {n.actor_name && (
                   <div>
-                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">From</span>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">From</span>
                     <span className="font-medium">{n.actor_name}</span>
                   </div>
                 )}
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Received</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Received</span>
                   <span className="font-medium">{formatWATDate(n.created_at)}</span>
                 </div>
               </div>

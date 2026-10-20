@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { depsChanged } from "@/lib/utils/deps-changed"
 import { toast } from "sonner"
 import { HardDrive } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -34,9 +35,13 @@ export function QuotaDialog({
   const [quotaMb, setQuotaMb] = useState<number>(1024)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
+  // Re-seed the step when the mailbox changes, during render rather than in an effect.
+  const [seeded, setSeeded] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [mailbox] as const
+  if (depsChanged(seeded, seededForNext)) {
+    setSeeded(seededForNext)
     if (mailbox) setQuotaMb(nextQuotaStepMb(mailbox.quotaBytes))
-  }, [mailbox])
+  }
 
   if (!mailbox) return null
 

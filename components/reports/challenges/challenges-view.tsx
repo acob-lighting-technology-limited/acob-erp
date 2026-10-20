@@ -70,14 +70,12 @@ function getStatusBadge(status: ChallengeItem["status"]) {
   switch (status) {
     case "resolved":
     case "closed":
-      return (
-        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Resolved</Badge>
-      )
+      return <Badge className="bg-success-muted text-success-foreground">Resolved</Badge>
     case "mitigating":
-      return <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Mitigating</Badge>
+      return <Badge className="bg-info-muted text-info-foreground">Mitigating</Badge>
     case "open":
     default:
-      return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Open</Badge>
+      return <Badge className="bg-warning-muted text-warning-foreground">Open</Badge>
   }
 }
 
@@ -199,7 +197,7 @@ export function ChallengesView({
         sortable: true,
         accessor: (row) => row.title,
         render: (row) => (
-          <div className="min-w-[260px] space-y-1">
+          <div className="min-w-65 space-y-1">
             <p className="text-foreground text-sm font-medium">{row.title}</p>
             {row.resolution_note && (
               <p className="text-muted-foreground bg-muted/30 border-border/40 rounded border p-1.5 text-xs">
@@ -338,7 +336,7 @@ export function ChallengesView({
             value={totalCount}
             icon={AlertTriangle}
             iconBgColor="bg-slate-500/10"
-            iconColor="text-slate-600 dark:text-slate-400"
+            iconColor="text-neutral-foreground"
           />
           <StatCard
             variant="compact"
@@ -346,7 +344,7 @@ export function ChallengesView({
             value={openCount}
             icon={Flame}
             iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconColor="text-warning-foreground"
           />
           <StatCard
             variant="compact"
@@ -354,7 +352,7 @@ export function ChallengesView({
             value={mitigatingCount}
             icon={Clock}
             iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconColor="text-info-foreground"
           />
           <StatCard
             variant="compact"
@@ -362,7 +360,7 @@ export function ChallengesView({
             value={resolvedCount}
             icon={CheckCircle2}
             iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-600 dark:text-emerald-400"
+            iconColor="text-success-foreground"
           />
         </StatGrid>
       }

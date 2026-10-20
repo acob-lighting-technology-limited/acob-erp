@@ -22,6 +22,7 @@ import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { draftToneClass } from "@/lib/status-tones"
 
 const log = logger("documentation-documentation-content")
 
@@ -203,11 +204,6 @@ export function DocumentationContent({
     draft: docs.filter((d) => d.is_draft).length,
   }
 
-  const getStatusColor = (isDraft: boolean) =>
-    isDraft
-      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-
   const categoryOptions = useMemo(
     () =>
       Array.from(new Set(docs.map((d) => d.category).filter(Boolean))).map((c) => ({
@@ -240,7 +236,7 @@ export function DocumentationContent({
         label: "Status",
         sortable: true,
         accessor: (d) => (d.is_draft ? "draft" : "published"),
-        render: (d) => <Badge className={getStatusColor(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>,
+        render: (d) => <Badge className={draftToneClass(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>,
       },
       {
         key: "updated_at",
@@ -251,7 +247,7 @@ export function DocumentationContent({
         hideOnMobile: true,
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     []
   )
 
@@ -386,7 +382,7 @@ export function DocumentationContent({
               title: (d) => d.title,
               subtitle: (d) => d.category ?? (d.is_draft ? "Draft" : "Published"),
               trailing: (d) => (
-                <Badge className={getStatusColor(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>
+                <Badge className={draftToneClass(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>
               ),
               detail: {
                 title: (d) => d.title,
@@ -419,9 +415,9 @@ export function DocumentationContent({
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <h4 className="line-clamp-1 text-sm font-semibold">{d.title}</h4>
-                  <Badge className={getStatusColor(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>
+                  <Badge className={draftToneClass(d.is_draft)}>{d.is_draft ? "Draft" : "Published"}</Badge>
                 </div>
-                <p className="text-muted-foreground text-[11px]">{d.category ?? "-"}</p>
+                <p className="text-muted-foreground text-xs">{d.category ?? "-"}</p>
                 <p className="text-muted-foreground mt-2 line-clamp-3 text-xs">{d.content}</p>
               </div>
             )}
@@ -435,7 +431,7 @@ export function DocumentationContent({
             open={isViewDialogOpen}
             onOpenChange={setIsViewDialogOpen}
             doc={selectedDoc}
-            getStatusColor={getStatusColor}
+            getStatusColor={draftToneClass}
             formatDate={formatDate}
           />
 

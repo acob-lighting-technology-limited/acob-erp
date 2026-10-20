@@ -8,34 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatName } from "@/lib/utils"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import type { FeedbackRecord } from "@/components/feedback/types"
+import { FEEDBACK_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
 
 function getTypeColor(type: string): string {
   switch (type) {
     case "concern":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning-muted text-warning-foreground"
     case "complaint":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+      return "bg-danger-muted text-danger-foreground"
     case "suggestion":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info-muted text-info-foreground"
     case "required_item":
       return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-  }
-}
-
-function getStatusColor(status: string): string {
-  switch (status) {
-    case "open":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-    case "in_progress":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-    case "resolved":
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
-    case "closed":
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-neutral-muted text-neutral-foreground"
   }
 }
 
@@ -121,7 +107,7 @@ export function FeedbackDetailDialog({
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Current Status</Label>
                 <div>
-                  <Badge className={getStatusColor(feedback.status)}>{feedback.status}</Badge>
+                  <Badge className={statusToneClass(feedback.status, FEEDBACK_STATUS_TONES)}>{feedback.status}</Badge>
                 </div>
               </div>
             </div>
@@ -135,7 +121,7 @@ export function FeedbackDetailDialog({
 
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Description</Label>
-              <div className="bg-muted/50 min-h-[100px] rounded-lg border p-4">
+              <div className="bg-muted/50 min-h-25 rounded-lg border p-4">
                 <p className="whitespace-pre-wrap">{feedback.description || "No description provided."}</p>
               </div>
             </div>

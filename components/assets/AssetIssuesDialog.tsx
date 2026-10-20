@@ -147,7 +147,7 @@ export function AssetIssuesDialog({
           {/* Issues list */}
           <div className="space-y-2">
             <Label>Issues ({assetIssues.length})</Label>
-            <div className="max-h-[400px] space-y-2 overflow-y-auto rounded-lg border p-3">
+            <div className="max-h-100 space-y-2 overflow-y-auto rounded-lg border p-3">
               {assetIssues.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <CheckCircle2 className="text-muted-foreground mb-2 h-12 w-12" />

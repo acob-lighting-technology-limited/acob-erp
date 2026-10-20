@@ -24,13 +24,17 @@ import {
   type WeeklyReport,
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
-import { PptxModeDialog } from "./_components/pptx-mode-dialog"
+import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { downloadWeeklyReportDocx, downloadWeeklyReportPdf } from "@/lib/reports/export-download"
 import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
+import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
+
+import { layout as tablePageLayout } from "./_layout"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -47,12 +51,6 @@ async function fetchAdminWeeklyReports(weekFilter: number, yearFilter: number): 
     reports: sortReportsByDepartment((json.reports || []) as WeeklyReport[]),
     trackingData: (json.trackingData || []) as TrackerStatus[],
   }
-}
-
-async function fetchAdminWeeklyReportLockState(week: number, year: number) {
-  const res = await apiFetch(`/api/admin/reports/weekly-lock-state?week=${week}&year=${year}`, { cache: "no-store" })
-  if (!res.ok) throw new Error("Failed to resolve lock state")
-  return res.json()
 }
 
 interface TrackerStatus {
@@ -73,26 +71,6 @@ interface WeeklyReportsContentProps {
     lead_departments?: string[]
     admin_routes?: string[] | null
   }
-}
-
-function getActionTrackerStatus(department: string, trackingData: TrackerStatus[]) {
-  const normalizedDepartment = normalizeDepartmentName(department)
-  const deptActions = trackingData.filter(
-    (action) => normalizeDepartmentName(action.department) === normalizedDepartment
-  )
-  if (deptActions.length === 0) {
-    return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
-  }
-  if (deptActions.every((action) => action.status === "completed")) {
-    return { label: "Finished", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" }
-  }
-  if (deptActions.some((action) => action.status === "in_progress" || action.status === "completed")) {
-    return { label: "Started", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" }
-  }
-  if (deptActions.some((action) => action.status === "not_started")) {
-    return { label: "Not Started", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" }
-  }
-  return { label: "Pending", color: "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400" }
 }
 
 export function WeeklyReportsContent({
@@ -154,10 +132,7 @@ export function WeeklyReportsContent({
   const reports = useMemo(() => reportsData?.reports ?? [], [reportsData?.reports])
   const trackingData = useMemo(() => reportsData?.trackingData ?? [], [reportsData?.trackingData])
 
-  const { data: lockState } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter),
-    queryFn: () => fetchAdminWeeklyReportLockState(weekFilter, yearFilter),
-  })
+  const { data: lockState } = useAdminWeeklyReportLockState(weekFilter, yearFilter)
 
   const isFilteredWeekLocked = lockState?.isLocked ?? false
   const canMutateFilteredWeek = lockState?.canMutate ?? !isFilteredWeekLocked
@@ -214,11 +189,11 @@ export function WeeklyReportsContent({
   const stats = useMemo(() => {
     const total = reports.length
     const withTrackerStarted = reports.filter((report) => {
-      const status = getActionTrackerStatus(report.department, trackingData)
+      const status = getDepartmentTrackerStatus(report.department, trackingData)
       return status.label === "Started" || status.label === "Finished"
     }).length
     const finished = reports.filter(
-      (report) => getActionTrackerStatus(report.department, trackingData).label === "Finished"
+      (report) => getDepartmentTrackerStatus(report.department, trackingData).label === "Finished"
     ).length
     const locked = isFilteredWeekLocked ? reports.length : 0
 
@@ -299,7 +274,7 @@ export function WeeklyReportsContent({
           return (
             <div className="flex flex-col">
               <span>{created}</span>
-              {wasEdited ? <span className="text-muted-foreground text-[11px]">(edited)</span> : null}
+              {wasEdited ? <span className="text-muted-foreground text-xs">(edited)</span> : null}
             </div>
           )
         },
@@ -307,9 +282,9 @@ export function WeeklyReportsContent({
       {
         key: "tracker_status",
         label: "Action Tracker",
-        accessor: (report) => getActionTrackerStatus(report.department, trackingData).label,
+        accessor: (report) => getDepartmentTrackerStatus(report.department, trackingData).label,
         render: (report) => {
-          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
           return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
         },
       },
@@ -362,6 +337,7 @@ export function WeeklyReportsContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Weekly Reports"
       description="Review and export departmental reports."
       icon={FileBarChart}
@@ -510,7 +486,7 @@ export function WeeklyReportsContent({
           render: (report) => (
             <div className="grid gap-6 md:grid-cols-3">
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
+                <h4 className="text-xs font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
                 <div className="space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm dark:border-blue-900/30">
                   {autoNumberLines(report.work_done)
                     .split("\n")
@@ -520,9 +496,7 @@ export function WeeklyReportsContent({
                 </div>
               </div>
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">
-                  Tasks for New Week
-                </h4>
+                <h4 className="text-xs font-black tracking-widest text-emerald-600 uppercase">Tasks for New Week</h4>
                 <div className="space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm dark:border-emerald-900/30">
                   {autoNumberLines(report.tasks_new_week)
                     .split("\n")
@@ -532,7 +506,7 @@ export function WeeklyReportsContent({
                 </div>
               </div>
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
+                <h4 className="text-xs font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
                 <div className="space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm dark:border-rose-900/30">
                   {autoNumberLines(report.challenges)
                     .split("\n")
@@ -564,7 +538,7 @@ export function WeeklyReportsContent({
             return `${submitterName} (W${report.week_number}) · ${report.year}`
           },
           trailing: (report) => {
-            const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+            const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
             return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
           },
           onSelect: (report) => {
@@ -575,7 +549,7 @@ export function WeeklyReportsContent({
         cardRenderer={(report) => {
           const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
           const submitterName = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
-          const trackerStatus = getActionTrackerStatus(report.department, trackingData)
+          const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
 
           return (
             <div className="space-y-3 rounded-xl border p-4">

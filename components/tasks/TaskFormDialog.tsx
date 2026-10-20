@@ -20,15 +20,7 @@ import {
 import { ItemInfoButton } from "@/components/ui/item-info-button"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/types/task"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
@@ -37,6 +29,10 @@ import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_WEIGHT_DEFAULT, TASK_WEIGHT_MAX, TASK_WEIGHT_MIN } from "@/lib/tasks/scoring"
 import { statusLabel } from "@/components/tasks/TaskStatusControl"
 import { latestTaskDeadline, TASK_MAX_WORKING_DAYS, taskDeadlineWindowError } from "@/lib/tasks/deadline-window"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { fetchProjectRecords, PROJECTS_QUERY_KEY } from "@/lib/projects/records"
 
 interface ProjectOption {
   id: string
@@ -115,6 +111,9 @@ interface TaskFormDialogProps {
   lockedPlanName?: string | null
 }
 
+const NO_HOLIDAYS: ReadonlySet<string> = new Set()
+const NO_KPIS: KpiOption[] = []
+
 export function TaskFormDialog({
   isOpen,
   onOpenChange,
@@ -132,23 +131,8 @@ export function TaskFormDialog({
   lockedPlanId = null,
   lockedPlanName = null,
 }: TaskFormDialogProps) {
-  const [kpiOptions, setKpiOptions] = useState<KpiOption[]>([])
-  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>(() => {
-    const map = new Map<string, ProjectOption>()
-    for (const p of initialProjects) {
-      map.set(p.id, p)
-    }
-    if (selectedTask?.project_id) {
-      map.set(selectedTask.project_id, {
-        id: selectedTask.project_id,
-        project_name: selectedTask.project_name || "Linked Project",
-      })
-    }
-    return Array.from(map.values())
-  })
   const [isMultiAssign, setIsMultiAssign] = useState(false)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
-  const [holidays, setHolidays] = useState<ReadonlySet<string>>(() => new Set())
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -235,26 +219,22 @@ export function TaskFormDialog({
   // start. Holidays extend the window, so they are loaded to match the server;
   // if they fail to load, the window is just weekends and the API has the final say.
   const isCreating = !selectedTask
-  useEffect(() => {
-    if (!isOpen || !isCreating) return
-    fetch("/api/hr/leave/holidays", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((payload) => {
-        const rows = (payload.data ?? []) as Array<{
-          holiday_date: string
-          location?: string
-          is_business_day?: boolean
-        }>
-        setHolidays(
-          new Set(
-            rows
-              .filter((row) => !row.is_business_day && (!row.location || ["all", "global"].includes(row.location)))
-              .map((row) => row.holiday_date.slice(0, 10))
-          )
-        )
-      })
-      .catch(() => setHolidays(new Set()))
-  }, [isOpen, isCreating])
+  // Company-wide non-working days, so a new task's due date skips them.
+  const { data: holidays = NO_HOLIDAYS } = useQuery({
+    queryKey: QUERY_KEYS.leaveHolidays(),
+    queryFn: async (): Promise<ReadonlySet<string>> => {
+      const payload = await apiJson<{
+        data?: Array<{ holiday_date: string; location?: string; is_business_day?: boolean }>
+      }>("/api/hr/leave/holidays", { cache: "no-store" })
+      return new Set(
+        (payload.data ?? [])
+          .filter((row) => !row.is_business_day && (!row.location || ["all", "global"].includes(row.location)))
+          .map((row) => row.holiday_date.slice(0, 10))
+      )
+    },
+    enabled: isOpen && isCreating,
+    staleTime: 10 * 60 * 1000,
+  })
 
   const effectiveStartDate = startDateValue || toLocalISODate()
   const maxDueDate = isCreating ? latestTaskDeadline(effectiveStartDate, holidays) : undefined
@@ -266,23 +246,21 @@ export function TaskFormDialog({
 
   // Corporate KPIs a task may be tagged to: only the ones the target
   // department is CORE or SUPPORT on, per the RACI grid — not all 61.
-  useEffect(() => {
-    const targetDepartment =
-      departmentValue ||
-      scopedAssignableEmployees.find((e) => e.id === assignedTo)?.department ||
-      scopedAssignableDepartments[0] ||
-      ""
-
-    if (!targetDepartment) {
-      setKpiOptions([])
-      return
-    }
-
-    fetch(`/api/corporate-scorecard/kpis?department=${encodeURIComponent(targetDepartment)}`)
-      .then((res) => res.json())
-      .then((payload) => setKpiOptions((payload.data ?? []) as KpiOption[]))
-      .catch(() => setKpiOptions([]))
-  }, [assignedTo, departmentValue, scopedAssignableDepartments, scopedAssignableEmployees])
+  const kpiDepartment =
+    departmentValue ||
+    scopedAssignableEmployees.find((e) => e.id === assignedTo)?.department ||
+    scopedAssignableDepartments[0] ||
+    ""
+  const { data: kpiOptions = NO_KPIS } = useQuery({
+    queryKey: QUERY_KEYS.departmentKpis(kpiDepartment),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: KpiOption[] }>(
+          `/api/corporate-scorecard/kpis?department=${encodeURIComponent(kpiDepartment)}`
+        )
+      ).data ?? [],
+    enabled: Boolean(kpiDepartment),
+  })
 
   const selectedKpi = useMemo(() => kpiOptions.find((k) => k.id === kpiId), [kpiOptions, kpiId])
 
@@ -294,58 +272,27 @@ export function TaskFormDialog({
     })
   }, [kpiOptions])
 
-  // Keep project options seeded from props and the selected task so the linked project displays immediately
-  useEffect(() => {
-    if (!isOpen) return
-    setProjectOptions((prev) => {
-      const map = new Map<string, ProjectOption>()
-      for (const p of initialProjects) {
-        map.set(p.id, p)
-      }
-      for (const p of prev) {
-        map.set(p.id, p)
-      }
-      if (selectedTask?.project_id) {
-        const existing = map.get(selectedTask.project_id)
-        map.set(selectedTask.project_id, {
-          id: selectedTask.project_id,
-          project_name: selectedTask.project_name || existing?.project_name || "Linked Project",
-        })
-      }
-      return Array.from(map.values())
-    })
-  }, [isOpen, initialProjects, selectedTask?.project_id, selectedTask?.project_name])
-
   // Projects are optional on a task, so a failed load must never block saving.
-  useEffect(() => {
-    if (!isOpen || lockedProjectId) return
-    fetch("/api/projects", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((payload) => {
-        const fetched = (payload.data ?? []).map((project: { id: string; project_name: string }) => ({
-          id: project.id,
-          project_name: project.project_name,
-        }))
-        setProjectOptions((prev) => {
-          const map = new Map<string, ProjectOption>()
-          for (const p of prev) {
-            map.set(p.id, p)
-          }
-          for (const p of fetched) {
-            map.set(p.id, p)
-          }
-          if (selectedTask?.project_id) {
-            const existing = map.get(selectedTask.project_id)
-            map.set(selectedTask.project_id, {
-              id: selectedTask.project_id,
-              project_name: selectedTask.project_name || existing?.project_name || "Linked Project",
-            })
-          }
-          return Array.from(map.values())
-        })
+  const { data: fetchedProjects } = useQuery({
+    queryKey: PROJECTS_QUERY_KEY,
+    queryFn: fetchProjectRecords,
+    enabled: isOpen && !lockedProjectId,
+  })
+  // Props, then every project the caller can see, then the selected task's own
+  // project — so a linked project always displays, even before the list loads.
+  const projectOptions = useMemo(() => {
+    const map = new Map<string, ProjectOption>()
+    for (const p of initialProjects) map.set(p.id, p)
+    for (const p of fetchedProjects ?? []) map.set(p.id, { id: p.id, project_name: p.project_name })
+    if (selectedTask?.project_id) {
+      const existing = map.get(selectedTask.project_id)
+      map.set(selectedTask.project_id, {
+        id: selectedTask.project_id,
+        project_name: selectedTask.project_name || existing?.project_name || "Linked Project",
       })
-      .catch(() => {})
-  }, [isOpen, lockedProjectId, selectedTask?.project_id, selectedTask?.project_name])
+    }
+    return Array.from(map.values())
+  }, [initialProjects, fetchedProjects, selectedTask?.project_id, selectedTask?.project_name])
 
   const employeeSelectOptions = useMemo(() => {
     return scopedAssignableEmployees.map((member) => ({
@@ -568,7 +515,7 @@ export function TaskFormDialog({
                 <Scale className="text-primary h-3.5 w-3.5" />
                 Task Weight
               </Label>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 Required
               </Badge>
             </div>
@@ -590,7 +537,7 @@ export function TaskFormDialog({
                 )}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
               much as a weight-2 one. Weights do not need to add up to anything.
             </p>
@@ -631,7 +578,7 @@ export function TaskFormDialog({
                     <Target className="text-primary h-3.5 w-3.5" />
                     Department Goal
                   </Label>
-                  <Badge variant="secondary" className="text-[10px] font-normal">
+                  <Badge variant="secondary" className="text-xs font-normal">
                     Auto-selected from KPI
                   </Badge>
                 </div>
@@ -642,14 +589,14 @@ export function TaskFormDialog({
                   className="bg-background/80 text-foreground h-8 cursor-not-allowed text-xs font-medium"
                 />
                 {selectedKpi.strategic_priority && (
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-muted-foreground text-xs">
                     🎯 Strategic Pillar:{" "}
                     <span className="text-foreground font-medium">{selectedKpi.strategic_priority}</span>
                   </p>
                 )}
               </div>
             )}
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Which corporate target this work serves. Every task must link to an approved Corporate KPI.
             </p>
           </div>
@@ -661,7 +608,7 @@ export function TaskFormDialog({
                 <FolderKanban className="text-primary h-3.5 w-3.5" />
                 Project
               </Label>
-              <Badge variant="secondary" className="text-[10px]">
+              <Badge variant="secondary" className="text-xs">
                 {lockedProjectId ? "Fixed" : "Optional"}
               </Badge>
             </div>
@@ -690,7 +637,7 @@ export function TaskFormDialog({
                 </SelectContent>
               </Select>
             )}
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
             </p>
           </div>
@@ -732,9 +679,7 @@ export function TaskFormDialog({
               {isCreating && (
                 <p
                   id="due_date_hint"
-                  className={
-                    deadlineError ? "text-destructive mt-1 text-[11px]" : "text-muted-foreground mt-1 text-[11px]"
-                  }
+                  className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
                 >
                   {deadlineError ??
                     `Within ${TASK_MAX_WORKING_DAYS} working days of the start date — latest ${formatWATDate(maxDueDate!)}.`}

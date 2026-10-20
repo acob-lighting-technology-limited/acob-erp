@@ -32,7 +32,8 @@ import {
 } from "lucide-react"
 import type { HelpDeskTicketDetailResponse } from "@/components/help-desk/help-desk-types"
 import type { HelpDeskStatus } from "@/lib/help-desk/server"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatDateTime } from "@/lib/format"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
   new: ["assigned", "department_queue", "cancelled"],
@@ -53,11 +54,6 @@ const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
 
 function formatLabel(value: string | null | undefined) {
   return String(value || "unknown").replaceAll("_", " ")
-}
-
-function formatDateTime(dateString: string | null | undefined) {
-  if (!dateString) return "—"
-  return formatWATDateTime(dateString)
 }
 
 interface UserHelpDeskTicketDetailsDialogProps {
@@ -157,7 +153,7 @@ export function UserHelpDeskTicketDetailsDialog({
         <DialogHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
           <div className="flex flex-wrap items-center gap-1.5">
             {ticket?.ticket_number && (
-              <Badge variant="outline" className="font-mono text-[11px]">
+              <Badge variant="outline" className="font-mono text-xs">
                 {ticket.ticket_number}
               </Badge>
             )}
@@ -214,7 +210,7 @@ export function UserHelpDeskTicketDetailsDialog({
           {isLoading ? (
             <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center text-sm">
               <Clock className="text-primary/60 mb-2 h-8 w-8 animate-spin" />
-              <p>Loading ticket details…</p>
+              <LinesSkeleton lines={6} />
             </div>
           ) : loadError ? (
             <div className="space-y-3 py-6 text-center">
@@ -239,7 +235,7 @@ export function UserHelpDeskTicketDetailsDialog({
                   <TabsTrigger value="activity" className="gap-1.5">
                     <span>Activity</span>
                     {activity.length > 0 && (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs font-normal">
                         {activity.length}
                       </Badge>
                     )}
@@ -344,7 +340,7 @@ export function UserHelpDeskTicketDetailsDialog({
                         value={newComment}
                         onChange={(event) => setNewComment(event.target.value)}
                         placeholder="Post an activity note or progress update…"
-                        className="min-h-[72px] text-sm"
+                        className="min-h-18 text-sm"
                         aria-label="Add an activity"
                       />
                       <div className="flex justify-end">

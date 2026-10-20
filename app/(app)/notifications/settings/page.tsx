@@ -11,6 +11,7 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { Bell } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type ModuleSetting = {
   notification_key: string
@@ -80,14 +81,14 @@ export default function NotificationSettingsPage() {
     queryFn: fetchNotificationSettings,
   })
 
-  // Sync local state when data loads
-  useEffect(() => {
-    if (data) {
-      setGlobalInApp(data.global.in_app_enabled)
-      setGlobalEmail(data.global.email_enabled)
-      setModules(data.modules)
-    }
-  }, [data])
+  // Seed local state when data loads — adjusted during render, not in an effect.
+  const [seededFrom, setSeededFrom] = useState<typeof data>(undefined)
+  if (data && seededFrom !== data) {
+    setSeededFrom(data)
+    setGlobalInApp(data.global.in_app_enabled)
+    setGlobalEmail(data.global.email_enabled)
+    setModules(data.modules)
+  }
 
   const { mutate: saveSettingsMutate, isPending: saving } = useMutation({
     mutationFn: async (body: {
@@ -142,7 +143,7 @@ export default function NotificationSettingsPage() {
     [modules]
   )
 
-  if (loading) return <PageLoader />
+  if (loading) return <PageLoader variant="form" />
   if (isError) return <QueryError message="Could not load notification settings." onRetry={refetch} />
 
   return (

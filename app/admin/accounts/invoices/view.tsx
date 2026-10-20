@@ -1,10 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
-import { CircleDollarSign, Download, Eye, FileClock, FileText, Pencil, Plus, Send, Wallet } from "lucide-react"
+import { CircleDollarSign, Eye, FileClock, FileText, Pencil, Plus, Wallet } from "lucide-react"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +12,9 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
+import { formatCurrency, formatDate } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 export interface Invoice {
   id: string
@@ -44,17 +46,6 @@ async function fetchInvoicesList(): Promise<Invoice[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load invoices")
   const json = await res.json()
   return (json.data || []) as Invoice[]
-}
-
-function formatCurrency(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency,
-  }).format(amount)
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getDueWindow(invoice: Invoice) {
@@ -247,6 +238,7 @@ export function InvoicesPage({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Invoices"
       description="Create and manage customer invoices, collections, and overdue balances."
       icon={FileText}
@@ -362,7 +354,7 @@ export function InvoicesPage({
           subtitle: (invoice) =>
             `${formatCurrency(invoice.total_amount, invoice.currency)} · Due ${formatDate(invoice.due_date)}`,
           trailing: (invoice) => (
-            <Badge variant={statusColors[invoice.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[invoice.status]} className="text-xs capitalize">
               {invoice.status}
             </Badge>
           ),

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Calendar, CheckCircle2, Loader2, Lock, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
@@ -32,6 +32,9 @@ import {
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+
+import { layout as tablePageLayout } from "./_layout"
 
 type CycleStatus = "planned" | "active" | "closed" | "locked"
 
@@ -128,9 +131,9 @@ function CycleCard({
 }
 
 export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {}) {
-  const [cycles, setCycles] = useState<ReviewCycle[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { cycles, isLoading, error: cyclesError, refetch } = usePerformanceCycles<ReviewCycle>()
+  const error = cyclesError?.message ?? null
+  const loadCycles = () => refetch()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<ReviewCycle | null>(null)
@@ -141,25 +144,6 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [status, setStatus] = useState<CycleStatus>("planned")
-
-  const loadCycles = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await apiFetch("/api/hr/performance/cycles")
-      const data = (await res.json().catch(() => ({}))) as { data?: ReviewCycle[]; error?: string }
-      if (!res.ok) throw new Error(data.error || "Failed to load cycles")
-      setCycles(data.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadCycles()
-  }, [loadCycles])
 
   function resetForm() {
     setName("")
@@ -338,6 +322,7 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Review Cycles"
       description="Create and manage performance review cycles. Only one cycle can be active at a time."
       icon={RefreshCw}

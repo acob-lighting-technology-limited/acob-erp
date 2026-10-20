@@ -3,6 +3,12 @@ import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { PortfoliosContent } from "@/app/admin/portfolios/_components/portfolios-content"
+import { logger } from "@/lib/logger"
+
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
+const log = logger("app-app-portfolios")
 
 export const metadata: Metadata = {
   title: "Project Portfolios | Matrix",
@@ -27,7 +33,7 @@ export default async function AppPortfoliosPage() {
     .order("first_name", { ascending: true })
 
   if (profilesError) {
-    console.error("Error loading profiles for project manager assignment:", profilesError)
+    log.error("Error loading profiles for project manager assignment:", profilesError)
   }
 
   const managerOptions = (profiles || []).map((p) => ({
@@ -38,5 +44,9 @@ export default async function AppPortfoliosPage() {
     department: p.department || "",
   }))
 
-  return <PortfoliosContent isAdmin={false} profiles={managerOptions} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PortfoliosContent isAdmin={false} profiles={managerOptions} />
+    </TablePageLayoutProvider>
+  )
 }

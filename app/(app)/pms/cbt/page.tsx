@@ -5,6 +5,9 @@ import { formatCycleLabel } from "@/lib/pms/cadence"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { getCurrentUserPmsData } from "../_lib"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 type ReviewQueryRow = {
   cbt_score: number | null
   review_cycle_id: string | null
@@ -148,29 +151,31 @@ export default async function PmsCbtPage({ searchParams }: { searchParams: Promi
   ]
 
   return (
-    <PmsTablePage
-      title="PMS CBT"
-      description="Your CBT score history by quarter. Use the standalone /cbt page only when you are starting a live test."
-      backHref="/pms"
-      backLabel="Back to PMS"
-      icon="cbt"
-      cycles={cycles}
-      activeCycleId={activeCycleId}
-      summaryCards={summaryCards}
-      tableTitle="CBT Score History"
-      tableDescription="Recorded CBT scores for your quarters. Expand any row to review questions and answers."
-      rows={rows}
-      columns={[
-        { key: "cycle", label: "Quarter" },
-        { key: "date_taken", label: "Date & Time Taken" },
-        { key: "cbt_score", label: "Score" },
-        { key: "questions", label: "Questions" },
-        { key: "status", label: "Result" },
-        { key: "proctoring", label: "Focus / Proctoring" },
-      ]}
-      searchPlaceholder="Search quarter or results..."
-      hideSecondaryFilter
-      cbtExpandable
-    />
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PmsTablePage
+        title="PMS CBT"
+        description="Your CBT score history by quarter. Use the standalone /cbt page only when you are starting a live test."
+        backHref="/pms"
+        backLabel="Back to PMS"
+        icon="cbt"
+        cycles={cycles}
+        activeCycleId={activeCycleId}
+        summaryCards={summaryCards}
+        tableTitle="CBT Score History"
+        tableDescription="Recorded CBT scores for your quarters. Expand any row to review questions and answers."
+        rows={rows}
+        columns={[
+          { key: "cycle", label: "Quarter" },
+          { key: "date_taken", label: "Date & Time Taken" },
+          { key: "cbt_score", label: "Score" },
+          { key: "questions", label: "Questions" },
+          { key: "status", label: "Result" },
+          { key: "proctoring", label: "Focus / Proctoring" },
+        ]}
+        searchPlaceholder="Search quarter or results..."
+        hideSecondaryFilter
+        cbtExpandable
+      />
+    </TablePageLayoutProvider>
   )
 }

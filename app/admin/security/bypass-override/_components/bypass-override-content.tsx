@@ -1,5 +1,7 @@
 "use client"
 
+import { toCsv } from "@/lib/export/csv"
+
 import { useMemo } from "react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -10,6 +12,9 @@ import { ShieldAlert, AlertCircle, FileText, CalendarRange, Download, RefreshCw 
 import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { formatCurrency } from "@/lib/format"
+
+import { layout as tablePageLayout } from "../_layout"
 
 export type AuditLogRow = {
   id: string
@@ -165,7 +170,7 @@ function getDetailedChanges(row: EnrichedBypassLog) {
   if (entityType.includes("requisition")) {
     const amount = newVals.amount || oldVals.amount
     if (amount) {
-      details.push({ label: "Amount", value: `₦${Number(amount).toLocaleString()}` })
+      details.push({ label: "Amount", value: `${formatCurrency(Number(amount), { whole: true })}` })
     }
     const dept = newVals.department_name || oldVals.department_name || row.department
     if (dept) {
@@ -222,7 +227,7 @@ function getRequestedBy(row: EnrichedBypassLog): string {
   return "System / N/A"
 }
 
-function toCsv(rows: EnrichedBypassLog[]) {
+function buildBypassCsv(rows: EnrichedBypassLog[]) {
   const headers = [
     "Time",
     "Performed By",
@@ -255,10 +260,7 @@ function toCsv(rows: EnrichedBypassLog[]) {
       ip,
     ]
   })
-  const escaped = [headers, ...body].map((line) =>
-    line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-  )
-  return escaped.join("\n")
+  return toCsv([headers, ...body])
 }
 
 export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog[]; error: string | null }) {
@@ -422,7 +424,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
   )
 
   const exportCsv = () => {
-    const csv = toCsv(rows)
+    const csv = buildBypassCsv(rows)
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -434,6 +436,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Bypass & Override Audit Logs"
       description="Centralized audit trail of manual policy alterations, emergency bypasses, and validation overrides."
       icon={ShieldAlert}
@@ -551,7 +554,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
                     <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                       {details.map((d, i) => (
                         <div key={i} className="bg-background rounded border p-2">
-                          <span className="text-muted-foreground block text-[10px]">{d.label}</span>
+                          <span className="text-muted-foreground block text-xs">{d.label}</span>
                           <span className="font-semibold">{d.value}</span>
                         </div>
                       ))}
@@ -571,7 +574,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
           subtitle: (row) =>
             `${formatWATDateTime(row.created_at)} · By: ${row.actor ? `${row.actor.first_name} ${row.actor.last_name}` : "System"}`,
           trailing: (row) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {getBypassType(row)}
             </Badge>
           ),

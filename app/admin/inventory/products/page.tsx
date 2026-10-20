@@ -13,6 +13,9 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import type { BadgeProps } from "@/components/ui/badge"
 import { ProductFormDialog } from "./_components/product-form-dialog"
+import { formatCurrency } from "@/lib/format"
+
+import { layout as tablePageLayout } from "./_layout"
 
 interface Product {
   id: string
@@ -40,13 +43,6 @@ async function fetchProductsList(): Promise<Product[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load products")
   const json = await res.json()
   return (json.data || []) as Product[]
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-  }).format(amount)
 }
 
 function getStockBand(product: Product) {
@@ -225,6 +221,7 @@ export default function ProductsPage() {
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Products"
       description="Manage the product catalog, pricing, and stock posture across inventory."
       icon={Package}
@@ -336,7 +333,7 @@ export default function ProductsPage() {
           subtitle: (product) =>
             `${product.sku} · ${product.category_name || "Uncategorized"} · Stock: ${product.quantity_on_hand}`,
           trailing: (product) => (
-            <Badge variant={statusColors[product.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[product.status]} className="text-xs capitalize">
               {product.status}
             </Badge>
           ),

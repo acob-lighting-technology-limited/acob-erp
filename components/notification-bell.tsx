@@ -53,6 +53,7 @@ import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { isStaleFyi, notificationTier } from "@/lib/notifications/tiers"
 
 interface Notification {
   id: string
@@ -148,7 +149,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
 
   // State
   const [isOpen, setIsOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("all")
+  const [activeTab, setActiveTab] = useState<"action" | "fyi">("action")
   const [searchQuery, setSearchQuery] = useState("")
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [isDeletingNotification, setIsDeletingNotification] = useState(false)
@@ -227,12 +228,20 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
     }
   }, [queryClient, router, supabase])
 
-  // Refresh when dropdown opens
-  useEffect(() => {
-    if (isOpen) {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
+  // Refresh when the list opens, and mark unread FYI as seen — updates are
+  // informational, so opening the list is enough. Action items stay unread
+  // until someone deals with them.
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) return
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() })
+    const unreadFyi = notifications.filter((n) => !n.read && notificationTier(n) === "fyi").map((n) => n.id)
+    if (unreadFyi.length > 0) {
+      void setNotificationsRead(unreadFyi, true)
+        .then(() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.notificationBell() }))
+        .catch((error: unknown) => log.error("Error marking updates as read:", error))
     }
-  }, [isOpen, queryClient])
+  }
 
   // Mark as read
   const markAsRead = async (notificationId: string) => {
@@ -281,37 +290,29 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
     }
   }
 
-  // Filter notifications
-  const filteredNotifications = notifications.filter((n) => {
-    // Tab filter
-    if (activeTab === "unread" && n.read) return false
-    if (activeTab !== "all" && activeTab !== "unread" && n.category !== activeTab) return false
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      return (
-        n.title.toLowerCase().includes(query) ||
-        n.message.toLowerCase().includes(query) ||
-        n.actor_name?.toLowerCase().includes(query)
-      )
-    }
-
+  // The bell holds action items and recent updates; announcements live on the
+  // notifications page, and updates older than two weeks drop off.
+  const bellNotifications = notifications.filter((n) => {
+    const tier = notificationTier(n)
+    if (tier === "announcement") return false
+    if (tier === "fyi" && isStaleFyi(n)) return false
     return true
   })
+  const actionItems = bellNotifications.filter((n) => notificationTier(n) === "action")
+  const updates = bellNotifications.filter((n) => notificationTier(n) === "fyi")
+  const unreadActionCount = actionItems.filter((n) => !n.read).length
+  const unreadUpdateCount = updates.filter((n) => !n.read).length
+  const unreadCount = unreadActionCount + unreadUpdateCount
 
-  // Calculate counts
-  const unreadCount = notifications.filter((n) => !n.read).length
-  const categoryCounts = {
-    all: notifications.length,
-    unread: unreadCount,
-    tasks: notifications.filter((n) => n.category === "tasks").length,
-    assets: notifications.filter((n) => n.category === "assets").length,
-    feedback: notifications.filter((n) => n.category === "feedback").length,
-    approvals: notifications.filter((n) => n.category === "approvals").length,
-    mentions: notifications.filter((n) => n.category === "mentions").length,
-    system: notifications.filter((n) => n.category === "system").length,
-  }
+  const filteredNotifications = (activeTab === "action" ? actionItems : updates).filter((n) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      n.title.toLowerCase().includes(query) ||
+      n.message.toLowerCase().includes(query) ||
+      n.actor_name?.toLowerCase().includes(query)
+    )
+  })
 
   if (isLoading) {
     return null
@@ -319,29 +320,32 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
 
   return (
     <>
-      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Notifications"
+            aria-label={unreadActionCount > 0 ? `Notifications, ${unreadActionCount} need you` : "Notifications"}
             className="hover:bg-muted relative h-10 w-10 rounded-full transition-colors"
           >
             <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
+            {unreadActionCount > 0 ? (
               <Badge
                 variant="destructive"
-                className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center p-0 text-[10px] font-bold"
+                className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center p-0 text-xs font-bold"
               >
-                {unreadCount > 99 ? "99+" : unreadCount}
+                {unreadActionCount > 99 ? "99+" : unreadActionCount}
               </Badge>
-            )}
+            ) : unreadUpdateCount > 0 ? (
+              // Updates only: a quiet dot, not a number competing with real work.
+              <span className="bg-primary absolute top-1.5 right-1.5 h-2 w-2 rounded-full" aria-hidden />
+            ) : null}
           </Button>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent
           align="end"
-          className="w-[calc(100vw-2rem)] border-2 p-0 shadow-xl sm:w-[460px]"
+          className="w-[calc(100vw-2rem)] border-2 p-0 shadow-xl sm:w-115"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {/* Header */}
@@ -349,9 +353,9 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
             <div className="flex items-center gap-2">
               <Bell className="text-foreground h-5 w-5" />
               <h3 className="text-base font-semibold">Notifications</h3>
-              {unreadCount > 0 && (
-                <Badge variant="secondary" className="px-2 text-xs font-semibold">
-                  {unreadCount} new
+              {unreadActionCount > 0 && (
+                <Badge variant="destructive" className="px-2 text-xs font-semibold">
+                  {unreadActionCount} need you
                 </Badge>
               )}
             </div>
@@ -392,50 +396,34 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "action" | "fyi")} className="w-full">
             <TabsList className="h-auto w-full justify-start rounded-none border-b bg-transparent p-0">
               <TabsTrigger
-                value="all"
+                value="action"
                 className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
               >
-                All{" "}
-                {categoryCounts.all > 0 && (
-                  <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
-                    {categoryCounts.all}
-                  </Badge>
-                )}
-              </TabsTrigger>
-
-              <TabsTrigger
-                value="unread"
-                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-              >
-                Unread{" "}
-                {categoryCounts.unread > 0 && (
+                Needs you{" "}
+                {unreadActionCount > 0 && (
                   <Badge variant="destructive" className="ml-2 px-1.5 text-xs">
-                    {categoryCounts.unread}
+                    {unreadActionCount}
                   </Badge>
                 )}
               </TabsTrigger>
-
-              {categoryCounts.mentions > 0 && (
-                <TabsTrigger
-                  value="mentions"
-                  className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-                >
-                  <MessageSquare className="mr-1 h-4 w-4" />
-                  Mentions{" "}
-                  {categoryCounts.mentions > 0 && (
-                    <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
-                      {categoryCounts.mentions}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              )}
+              <TabsTrigger
+                value="fyi"
+                className="data-[state=active]:border-primary rounded-none border-b-2 border-transparent px-3 py-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              >
+                Updates{" "}
+                {unreadUpdateCount > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 text-xs">
+                    {unreadUpdateCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value={activeTab} className="mt-0">
-              <ScrollArea className="h-[430px]">
+              <ScrollArea className="h-107.5">
                 {filteredNotifications.length > 0 ? (
                   <div className="divide-y">
                     {filteredNotifications.map((notification) => {
@@ -506,7 +494,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 px-2 text-[11px]"
+                                    className="h-6 px-2 text-xs"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       markAsRead(notification.id)
@@ -520,7 +508,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-[11px]"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-xs"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setPendingDeleteId(notification.id)
@@ -541,7 +529,11 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
                       <Bell className="text-muted-foreground h-12 w-12 opacity-50" />
                     </div>
                     <p className="text-foreground mb-1 text-sm font-semibold">
-                      {searchQuery ? "No matching notifications" : "No notifications"}
+                      {searchQuery
+                        ? "No matching notifications"
+                        : activeTab === "action"
+                          ? "Nothing needs you"
+                          : "No recent updates"}
                     </p>
                     <p className="text-muted-foreground max-w-sm text-center text-xs">
                       {searchQuery
@@ -562,7 +554,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
               onClick={() => setIsOpen(false)}
               className="text-primary block w-full py-1 text-center text-xs font-medium hover:underline"
             >
-              View all notifications →
+              All notifications and announcements →
             </Link>
           </div>
         </DropdownMenuContent>

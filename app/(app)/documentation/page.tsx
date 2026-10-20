@@ -54,7 +54,7 @@ export default async function DocumentationPage() {
       enabled: true,
       color:
         pendingPolicies > 0
-          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+          ? "bg-amber-500/10 text-warning-foreground border-amber-500/20"
           : "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
       fill: pendingPolicies > 0 ? "bg-amber-500" : "bg-violet-500",
       hoverBorder:
@@ -71,7 +71,7 @@ export default async function DocumentationPage() {
       tag: `${summary.sops} SOPs`,
       subLabel: "How we do things",
       enabled: true,
-      color: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+      color: "bg-sky-500/10 text-info-foreground border-sky-500/20",
       fill: "bg-sky-500",
       hoverBorder: "hover:border-sky-500/60 dark:hover:border-sky-400/60",
       hoverText: "group-hover:text-sky-500",
@@ -84,7 +84,7 @@ export default async function DocumentationPage() {
       tag: `${docsData.docs.length} Docs`,
       subLabel: "Your work docs",
       enabled: true,
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      color: "bg-blue-500/10 text-info-foreground border-blue-500/20",
       fill: "bg-blue-500",
       hoverBorder: "hover:border-blue-500/60 dark:hover:border-blue-400/60",
       hoverText: "group-hover:text-blue-500",
@@ -98,7 +98,7 @@ export default async function DocumentationPage() {
       subLabel: docsData.departmentDocs.enabled ? "OneDrive repository" : "Access disabled",
       enabled: docsData.departmentDocs.enabled,
       color: docsData.departmentDocs.enabled
-        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+        ? "bg-emerald-500/10 text-success-foreground border-emerald-500/20"
         : "bg-muted text-muted-foreground border-muted-foreground/20",
       fill: "bg-emerald-500",
       hoverBorder: docsData.departmentDocs.enabled
@@ -157,7 +157,7 @@ export default async function DocumentationPage() {
                   <p className="text-muted-foreground text-xs leading-relaxed">{item.description}</p>
                 </div>
                 <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                  <span className="text-muted-foreground text-[11px] font-medium">{item.subLabel}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{item.subLabel}</span>
                   {item.enabled ? (
                     <IconFill
                       icon={ChevronRight}

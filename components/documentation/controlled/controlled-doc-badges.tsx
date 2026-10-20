@@ -3,14 +3,15 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
   CONTROLLED_DOC_STATUS_LABELS,
+  formatDocDate,
   getReviewState,
   type ControlledDocRow,
   type ControlledDocStatus,
 } from "@/lib/documentation/controlled"
 
 const STATUS_CLASSES: Record<ControlledDocStatus, string> = {
-  draft: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  published: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  draft: "border-amber-500/30 bg-amber-500/10 text-warning-foreground",
+  published: "border-emerald-500/30 bg-emerald-500/10 text-success-foreground",
   retired: "border-muted-foreground/30 bg-muted text-muted-foreground",
 }
 
@@ -26,11 +27,7 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
   const state = getReviewState(date)
   if (state === "none" || !date) return <span className="text-muted-foreground text-xs">—</span>
 
-  const label = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
+  const label = formatDocDate(date)
 
   if (state === "ok") return <span className="text-xs">{label}</span>
 
@@ -40,8 +37,8 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
       className={cn(
         "text-xs",
         state === "overdue"
-          ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400"
-          : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+          ? "text-danger-foreground border-red-500/30 bg-red-500/10"
+          : "text-warning-foreground border-amber-500/30 bg-amber-500/10"
       )}
     >
       {state === "overdue" ? "Overdue" : "Due"} · {label}
@@ -53,17 +50,14 @@ export function ReviewDateBadge({ date }: { date: string | null }) {
 export function MyAcknowledgementBadge({ doc }: { doc: Pick<ControlledDocRow, "my_acknowledged_at"> }) {
   if (doc.my_acknowledged_at) {
     return (
-      <Badge
-        variant="outline"
-        className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-700 dark:text-emerald-400"
-      >
+      <Badge variant="outline" className="text-success-foreground border-emerald-500/30 bg-emerald-500/10 text-xs">
         <CheckCircle2 className="mr-1 h-3 w-3" />
         Acknowledged
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400">
+    <Badge variant="outline" className="text-warning-foreground border-amber-500/30 bg-amber-500/10 text-xs">
       <CircleAlert className="mr-1 h-3 w-3" />
       Action needed
     </Badge>
@@ -76,7 +70,7 @@ export function AcknowledgementProgress({ progress }: { progress: ControlledDocR
   const percent = progress.total > 0 ? Math.round((progress.acknowledged / progress.total) * 100) : 0
   const complete = progress.total > 0 && progress.acknowledged >= progress.total
   return (
-    <div className="flex min-w-[120px] flex-col gap-1">
+    <div className="flex min-w-30 flex-col gap-1">
       <div className="flex items-center gap-1.5 text-xs">
         {complete ? (
           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />

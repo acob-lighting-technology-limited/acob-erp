@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
+import type { TableExportOptions } from "@/lib/export/table-export"
 
 /** The three renderings a `DataTable` can show. */
 export type DataTableViewMode = "list" | "card" | "contacts"
@@ -174,6 +175,8 @@ export interface BulkAction<TData> {
 // ─── Main DataTable Props ────────────────────────────────────────────────────
 
 export interface DataTableProps<TData> {
+  /** Opt-in export of visible accessor columns and all filtered, sorted rows. */
+  export?: TableExportOptions | false
   // ── Core ─────────────────────────────────────────────────────────────────
   data: TData[]
   columns: DataTableColumn<TData>[]
@@ -347,11 +350,35 @@ export interface DataTableProps<TData> {
   emptyIcon?: LucideIcon
   emptyTitle?: string
   emptyDescription?: string
+  /** The one next step when the list is empty and unfiltered, e.g. "Create your first requisition". */
+  emptyAction?: React.ReactNode
+}
+
+// ─── TablePageLayout (Skeleton & Page Config Sharing) ─────────────────────────
+
+export type TablePageLayout = {
+  tabs?: number
+  statCards?: number
+  statBadges?: number
+  filters?: number
+  columns?: number
+  rows?: number
+  actions?: number
+  showBackLink?: boolean
+  showStats?: boolean
+  spacing?: "standard" | "tight"
+  inlineActions?: boolean
+  list?: "table" | "contacts" | "responsive"
+  groups?: number
 }
 
 // ─── DataTablePage Props ─────────────────────────────────────────────────────
 
 export interface DataTablePageProps {
+  /** Optional layout metadata shared with the route's loading.tsx skeleton */
+  layout?: TablePageLayout
+  /** Default export configuration for tables inside this page. */
+  export?: TableExportOptions | false
   title: string
   description?: string
   icon?: LucideIcon

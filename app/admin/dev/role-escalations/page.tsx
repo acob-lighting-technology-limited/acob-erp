@@ -3,6 +3,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 import { RoleEscalationsContent, type AuditLogRow } from "./role-escalations-content"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 function isEscalation(log: AuditLogRow): boolean {
   const text =
     `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${JSON.stringify(log.new_values || {})} ${JSON.stringify(log.old_values || {})} ${JSON.stringify(log.metadata || {})}`.toLowerCase()
@@ -29,5 +32,9 @@ export default async function DevRoleEscalationsPage() {
 
   const rows = (data || []).filter(isEscalation)
 
-  return <RoleEscalationsContent rows={rows} error={error?.message || null} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <RoleEscalationsContent rows={rows} error={error?.message || null} />
+    </TablePageLayoutProvider>
+  )
 }

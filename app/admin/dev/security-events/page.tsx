@@ -3,6 +3,9 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 import { SecurityEventsContent, type AuditLogRow } from "./security-events-content"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 function isSecurityEvent(log: AuditLogRow): boolean {
   const text =
     `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${log.status || ""} ` +
@@ -48,5 +51,9 @@ export default async function DevSecurityEventsPage() {
 
   const rows = (data || []).filter(isSecurityEvent)
 
-  return <SecurityEventsContent rows={rows} error={error?.message || null} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <SecurityEventsContent rows={rows} error={error?.message || null} />
+    </TablePageLayoutProvider>
+  )
 }

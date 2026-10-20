@@ -1,0 +1,790 @@
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Clock, Pencil, Info } from "lucide-react"
+import { toast } from "sonner"
+import { toLocalISODate, toLocalYearMonth } from "@/lib/hr/attendance-utils"
+import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
+import {
+  ATTENDANCE_STATUS_LABELS,
+  getManualStatusEditOptions,
+  isPermissionAttendanceStatus,
+} from "@/lib/hr/attendance-status"
+import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
+import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
+import { StatusBadge, labelSource } from "./status-badge"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
+
+/** The per-employee expand panel of the attendance report (day calendar, hours breakdown, timeline) and its helpers. Split from attendance/view.tsx (audit 6.1). */
+export interface AttendanceReport {
+  user_id: string
+  employee_no?: string
+  user_name: string
+  department: string
+  total_days: number
+  early_days?: number
+  present_days: number
+  late_days: number
+  incomplete_days?: number
+  lateness_with_permission_days?: number
+  incomplete_with_permission_days?: number
+  absent_with_permission_days?: number
+  out_of_station_days?: number
+  exempted_days?: number
+  waived_days: number
+  absent_days: number
+  leave_days?: number
+  holiday_days?: number
+  attendance_credits?: number
+  total_hours: number
+  total_missed_hours?: number
+  attendance_rate: number
+  overtime_hours?: number
+  avg_clock_in_minutes?: number | null
+  avg_clock_out_minutes?: number | null
+  appeal_count?: number
+  attendance_exempt?: boolean
+  attendance_exempt_until?: string | null
+  period_label?: string
+  cycle_label?: string
+}
+
+export interface DayRecord {
+  id: string
+  date: string
+  clock_in: string | null
+  clock_out: string | null
+  total_hours: number | null
+  status: string
+  source: string | null
+  clock_in_source?: string | null
+  clock_out_source?: string | null
+  waived: boolean
+  manual_comment?: string | null
+  updated_at?: string | null
+  editor_first_name?: string | null
+}
+
+export type DayStatus =
+  | "present"
+  | "late"
+  | "lateness_with_permission"
+  | "incomplete_with_permission"
+  | "absent"
+  | "absent_with_permission"
+  | "out_of_station"
+  | "incomplete"
+  | "waiver"
+  | "exempted"
+  | "on_leave"
+  | "holiday"
+  | "weekend"
+  | "early_closure"
+  | "late_resumption"
+
+export interface CalendarDay {
+  date: string
+  dayName: string
+  record: DayRecord | null
+  isOnLeave: boolean
+  status: DayStatus
+  manualBy: string | null
+  earlyClosureTime?: string | null
+  lateResumptionTime?: string | null
+}
+
+/**
+ * Source label for a day row. Real punch records use the device/manual/mixed label;
+ * any manually-set day (holiday/leave/exemption, or a manual override) shows the
+ * responsible person as "Manual (Name)"; a plain absence shows "—".
+ */
+export function daySourceLabel(day: CalendarDay): string {
+  if (day.status === "absent") return "—"
+  const editor = day.manualBy || day.record?.editor_first_name
+  if (day.record) {
+    const s = labelSource(day.record)
+    // A manually-set record (e.g. on_leave/OOS/waiver/AWP/LWP) reports as "Manual" or "Mixed" —
+    // attach who set/approved it when known.
+    if ((s === "Manual" || s === "Mixed" || s.startsWith("Manual")) && editor) {
+      return `Manual (${editor})`
+    }
+    if (s && s !== "—") return s
+  }
+  // Derived manual status (holiday/leave/exempt/manual override)
+  if (editor) return `Manual (${editor})`
+  switch (day.status) {
+    case "holiday":
+    case "on_leave":
+    case "exempted":
+      return "Manual"
+    default:
+      return "—"
+  }
+}
+
+export type TimelineEvent = {
+  id: string
+  event_type: string
+  from_status: string | null
+  to_status: string | null
+  source: string | null
+  comment: string | null
+  created_at: string
+  actor_name: string | null
+  metadata?: Record<string, unknown> | null
+}
+
+export type TimelineContext = {
+  holiday: string | null
+  holiday_added_by: string | null
+  on_leave: string | null
+  exempt: boolean
+  exempt_reason: string | null
+}
+
+export const EVENT_LABELS: Record<string, string> = {
+  device_punch_in: "Clocked in (device)",
+  device_punch_out: "Clocked out (device)",
+  self_clock_in: "Clocked in",
+  self_clock_out: "Clocked out",
+  remote_clock_in: "Remote clock-in",
+  remote_clock_out: "Remote clock-out",
+  manual_create: "Manual record created",
+  manual_update: "Manual edit",
+  manual_delete: "Record deleted",
+  bulk_grant: "Bulk grant",
+  bulk_delete: "Bulk removal",
+  appeal_requested: "Appeal requested",
+  appeal_rejected: "Appeal rejected",
+  appeal_approved: "Appeal approved",
+  appeal_auto_resolved: "Appeal auto-approved",
+  leave_granted: "Leave granted",
+  leave_revoked: "Leave revoked",
+  exemption_added: "Exemption added",
+  exemption_removed: "Exemption removed",
+  marked_incomplete: "Auto-marked incomplete",
+}
+
+export function eventBadgeClass(eventType: string): string {
+  if (eventType.startsWith("appeal_")) {
+    if (eventType === "appeal_rejected") return "bg-danger-muted text-danger-foreground"
+    if (eventType.includes("approved") || eventType.includes("resolved"))
+      return "bg-success-muted text-success-foreground"
+    return "bg-warning-muted text-warning-foreground"
+  }
+  if (eventType.startsWith("device_")) return "bg-info-muted text-info-foreground"
+  if (eventType.startsWith("manual_") || eventType.startsWith("bulk_")) return "bg-violet-100 text-violet-800"
+  if (eventType === "marked_incomplete") return "bg-cyan-100 text-cyan-800"
+  return "bg-neutral-muted text-neutral-foreground"
+}
+
+export type ExemptionsPayload = {
+  data?: {
+    attendance_exempt?: boolean
+    periods?: Array<{ start_date: string; end_date: string }>
+  }
+}
+
+export type UnifiedDayPayload = {
+  data?: Array<{
+    date: string
+    record: DayRecord | null
+    status: DayStatus
+    manual_by?: string | null
+  }>
+}
+
+export function currentYearMonth() {
+  return toLocalYearMonth()
+}
+
+export function formatDayShort(dateString: string) {
+  return formatWATDate(dateString, { weekday: "short", month: "short", day: "numeric" })
+}
+
+export function formatTime(t: string | null) {
+  if (!t) return "—"
+  return t.substring(0, 5)
+}
+
+export function parseTimeToMinutes(value: string | null | undefined): number | null {
+  if (!value) return null
+  const [h, m] = value.split(":").map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+  return h * 60 + m
+}
+
+export function formatHours(hours: number | null) {
+  if (hours === null) return "—"
+  return `${hours.toFixed(1)}h`
+}
+
+export function getHourBreakdown(
+  record: DayRecord | null,
+  status?: string,
+  lateResumptionTime?: string | null,
+  earlyClosureTime?: string | null,
+  policy: AttendancePolicy = DEFAULT_ATTENDANCE_POLICY,
+  recordDate?: string
+) {
+  const covered =
+    status === "waiver" ||
+    status === "on_leave" ||
+    status === "holiday" ||
+    status === "exempted" ||
+    status === "out_of_station" ||
+    status === "absent_with_permission" ||
+    status === "lateness_with_permission" ||
+    status === "cds"
+  if (covered) {
+    const inMin = parseTimeToMinutes(record?.clock_in)
+    const outMin = parseTimeToMinutes(record?.clock_out)
+    const total = inMin !== null && outMin !== null && outMin > inMin ? (outMin - inMin) / 60 : null
+    return { total, work: null, overtime: null, missed: null }
+  }
+  if (!record || (!record.clock_in && !record.clock_out)) {
+    // An absent day or LWOP day costs the net shift (8.5h), not the gross 9h — lunch is never worked.
+    if (status === "absent" || status === "lwop" || status === "leave_without_pay") {
+      return { total: null, work: 0, overtime: null, missed: netDayHoursFor(policy) }
+    }
+    return { total: null, work: null, overtime: null, missed: null }
+  }
+  // One punch only — surface what the day actually costs (the recorded side's
+  // bracket plus the incomplete penalty) instead of a dash. Work stays blank
+  // because the missing half of the day is unverifiable.
+  // If the day is still in progress suppress the incomplete penalty.
+  if (Boolean(record.clock_in) !== Boolean(record.clock_out)) {
+    const today = toLocalISODate()
+    const isInProgress = Boolean(recordDate && recordDate >= today) && Boolean(record.clock_in) && !record.clock_out
+    const { hoursLost } = computeAttendanceDay({
+      status: status ?? record.status ?? "incomplete",
+      clockIn: record.clock_in,
+      clockOut: record.clock_out,
+      policy,
+      earlyCloseTime: earlyClosureTime ?? null,
+      lateResumptionTime: lateResumptionTime ?? null,
+      inProgress: isInProgress,
+    })
+    return { total: null, work: null, overtime: null, missed: hoursLost }
+  }
+  const inMin = parseTimeToMinutes(record.clock_in)
+  const outMin = parseTimeToMinutes(record.clock_out)
+  if (inMin === null || outMin === null || outMin <= inMin) {
+    return { total: null, work: null, overtime: null, missed: null }
+  }
+  const total = (outMin - inMin) / 60
+
+  // Work, missed and overtime all come from the SSOT. Work and missed sit on the
+  // bracketed 8.5-hour scale and always add up to the net day; overtime is strictly
+  // time past the configured shift end, so arriving early is not overtime.
+  // Only "total" is raw clock time.
+  const {
+    hoursLost: missed,
+    hoursWorked: work,
+    overtimeHours: overtime,
+  } = computeAttendanceDay({
+    status: "present",
+    clockIn: record.clock_in,
+    clockOut: record.clock_out,
+    policy,
+    earlyCloseTime: earlyClosureTime ?? null,
+    lateResumptionTime: lateResumptionTime ?? null,
+  })
+
+  return { total, work, overtime, missed }
+}
+
+export interface EmployeeExpandProps {
+  report: AttendanceReport
+  yearMonth: string
+  policy: AttendancePolicy
+  onRecordChanged?: (userId: string) => void
+}
+
+export function toCalendarDays(rows: NonNullable<UnifiedDayPayload["data"]>): CalendarDay[] {
+  return rows.map((row) => ({
+    date: row.date,
+    dayName: formatDayShort(row.date),
+    record: row.record,
+    isOnLeave: row.status === "on_leave",
+    status: row.status as DayStatus,
+    manualBy: row.manual_by ?? row.record?.editor_first_name ?? null,
+    earlyClosureTime: (row as any).early_closure_time ?? null,
+    lateResumptionTime: (row as any).late_resumption_time ?? null,
+  }))
+}
+
+export type AttendanceReportData = { reports: AttendanceReport[]; departments: string[]; policy: AttendancePolicy }
+
+export const NO_REPORTS: AttendanceReport[] = []
+export const NO_DEPARTMENTS: string[] = []
+export const NO_HOLIDAYS: Array<{ holiday_date: string; name?: string | null }> = []
+
+export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged }: EmployeeExpandProps) {
+  const daysQuery = useQuery({
+    queryKey: QUERY_KEYS.employeeAttendanceDays(report.user_id, yearMonth, Boolean(report.attendance_exempt)),
+    queryFn: async () => {
+      const qs = new URLSearchParams({
+        user_id: report.user_id,
+        year_month: yearMonth,
+        exempt_hint: report.attendance_exempt ? "1" : "0",
+      })
+      const payload = await apiJson<UnifiedDayPayload>(`/api/admin/hr/attendance/employee-days?${qs.toString()}`, {
+        cache: "no-store",
+      })
+      return payload?.data ?? []
+    },
+    select: toCalendarDays,
+  })
+  const days: CalendarDay[] | null = daysQuery.isError ? [] : (daysQuery.data ?? null)
+  const loadDays = () => void daysQuery.refetch()
+  const [editTarget, setEditTarget] = useState<{ date: string; record: DayRecord | null } | null>(null)
+  const [editForm, setEditForm] = useState({
+    status: "",
+    manual_comment: "",
+  })
+  const [saving, setSaving] = useState(false)
+  const [reverting, setReverting] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyItems, setHistoryItems] = useState<TimelineEvent[]>([])
+  const [historyContext, setHistoryContext] = useState<TimelineContext | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<{ date: string } | null>(null)
+
+  function openEdit(date: string, record: DayRecord | null) {
+    const { initialStatus } = getManualStatusEditOptions(record)
+    setEditTarget({ date, record })
+    setEditForm({
+      status:
+        record?.status && ["lateness_with_permission", "absent_with_permission"].includes(record.status)
+          ? record.status
+          : initialStatus,
+      manual_comment: record?.manual_comment ?? "",
+    })
+  }
+
+  async function saveEdit() {
+    if (!editTarget) return
+    setSaving(true)
+    try {
+      let res: Response
+      if (editTarget.record) {
+        // Update existing record
+        const body: Record<string, unknown> = {
+          waived: false,
+          manual_comment: editForm.manual_comment,
+          status: editForm.status,
+        }
+        res = await apiFetch(`/api/admin/hr/attendance/records/${editTarget.record.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+      } else {
+        // Create new record
+        const body: Record<string, unknown> = {
+          user_id: report.user_id,
+          date: editTarget.date,
+          waived: false,
+          manual_comment: editForm.manual_comment,
+          status: editForm.status,
+          clock_in: null,
+          clock_out: null,
+        }
+        res = await apiFetch("/api/admin/hr/attendance/records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+      }
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) throw new Error(payload?.error ?? "Failed to save")
+      toast.success(editTarget.record ? "Record updated" : "Record created")
+      setEditTarget(null)
+      loadDays()
+      onRecordChanged?.(report.user_id)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRevert() {
+    if (!editTarget?.record) return
+    setReverting(true)
+    try {
+      const res = await apiFetch(`/api/admin/hr/attendance/records/${editTarget.record.id}`, {
+        method: "DELETE",
+      })
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) throw new Error(payload?.error ?? "Failed to revert record")
+      toast.success("Manual override removed — reverted to auto-derived attendance")
+      setEditTarget(null)
+      loadDays()
+      onRecordChanged?.(report.user_id)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to revert record")
+    } finally {
+      setReverting(false)
+    }
+  }
+
+  async function openHistory(day: CalendarDay) {
+    setHistoryTarget({ date: day.date })
+    setHistoryOpen(true)
+    setHistoryItems([])
+    setHistoryContext(null)
+    setHistoryLoading(true)
+    try {
+      const qs = new URLSearchParams({ user_id: report.user_id, date: day.date })
+      const res = await apiFetch(`/api/admin/hr/attendance/timeline?${qs.toString()}`, { cache: "no-store" })
+      const payload = (await res.json().catch(() => null)) as {
+        data?: { events?: TimelineEvent[]; context?: TimelineContext }
+      } | null
+      if (!res.ok) throw new Error("Failed to load timeline")
+      setHistoryItems(payload?.data?.events || [])
+      setHistoryContext(payload?.data?.context || null)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load timeline")
+      setHistoryItems([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  if (!days) {
+    return <LinesSkeleton lines={4} className="py-4" />
+  }
+
+  const today = toLocalISODate()
+  const visibleDays = days.filter((d) => d.date <= today)
+  const isCreating = editTarget !== null && editTarget.record === null
+  const { isOnTimePresent, options: statusOptions } = getManualStatusEditOptions(editTarget?.record ?? null)
+  const isOverridden = Boolean(
+    editTarget?.record &&
+      (editTarget.record.source === "manual" ||
+        Boolean(editTarget.record.manual_comment) ||
+        editTarget.record.waived ||
+        isPermissionAttendanceStatus(editTarget.record.status))
+  )
+
+  const hasManualComment = editForm.manual_comment.trim().length >= 3
+  const cannotSave = saving || !editForm.status || !hasManualComment || isOnTimePresent
+
+  return (
+    <>
+      <div className="bg-muted/40 mb-4 grid max-w-4xl grid-cols-3 gap-2 rounded-lg border p-3 sm:grid-cols-5 lg:grid-cols-9">
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">Late</span>
+          <span className="mt-1 text-sm font-semibold text-yellow-600">{report.late_days}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">Incomplete</span>
+          <span className="mt-1 text-sm font-semibold text-cyan-600">{report.incomplete_days || 0}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">Exempted</span>
+          <span className="mt-1 text-sm font-semibold text-violet-600">{report.exempted_days || 0}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">LWP</span>
+          <span className="mt-1 text-sm font-semibold text-amber-600">{report.lateness_with_permission_days || 0}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">OOS</span>
+          <span className="mt-1 text-sm font-semibold text-indigo-600">{report.out_of_station_days || 0}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">AWP</span>
+          <span className="mt-1 text-sm font-semibold text-teal-600">{report.absent_with_permission_days || 0}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">Leave</span>
+          <span className="mt-1 text-sm font-semibold text-purple-600">{report.leave_days || 0}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">Holiday</span>
+          <span className="mt-1 text-sm font-semibold text-sky-600">{report.holiday_days || 0}</span>
+        </div>
+        <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
+          <span className="text-muted-foreground text-xs font-bold uppercase">Waiver</span>
+          <span className="mt-1 text-sm font-semibold text-blue-600">{report.waived_days || 0}</span>
+        </div>
+      </div>
+
+      <div className="space-y-1 py-2">
+        <div className="text-muted-foreground grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 px-2 text-xs font-semibold uppercase">
+          <span>Day</span>
+          <span>Status</span>
+          <span>In</span>
+          <span>Out</span>
+          <span>Work</span>
+          <span>Missed</span>
+          <span>Total</span>
+          <span>Overtime</span>
+          <span>Source</span>
+          <span></span>
+        </div>
+        {visibleDays.map((day) => {
+          const hours = getHourBreakdown(
+            day.record,
+            day.status,
+            day.lateResumptionTime,
+            day.earlyClosureTime,
+            policy,
+            day.date
+          )
+          return (
+            <div
+              key={day.date}
+              className="hover:bg-muted/30 grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 rounded px-2 py-1.5 text-sm"
+            >
+              <span className="text-xs font-medium">{day.dayName}</span>
+              <div>
+                <StatusBadge
+                  status={day.status}
+                  waived={day.record?.waived}
+                  record={day.record}
+                  earlyClosure={day.earlyClosureTime ? { closeTime: day.earlyClosureTime } : null}
+                  recordDate={day.date}
+                />
+              </div>
+              <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                {day.record?.clock_in ? (
+                  <>
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                    <span>{formatTime(day.record.clock_in)}</span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+              <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                {day.record?.clock_out ? (
+                  <>
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                    <span>{formatTime(day.record.clock_out)}</span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+              <span className="text-xs">{formatHours(hours.work)}</span>
+              <span
+                className={`text-xs ${hours.missed !== null && hours.missed > 0 ? "text-orange-500" : "text-muted-foreground"}`}
+              >
+                {hours.missed !== null ? formatHours(hours.missed) : "—"}
+              </span>
+              <span className="text-xs">{formatHours(hours.total ?? day.record?.total_hours ?? null)}</span>
+              <span className="text-xs">
+                {hours.overtime != null && hours.overtime >= 0.05 ? formatHours(hours.overtime) : "—"}
+              </span>
+              <span className="text-xs">{daySourceLabel(day)}</span>
+              <div className="flex items-center justify-end gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => openHistory(day)}
+                      aria-label="View edit history"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">View edit history</TooltipContent>
+                </Tooltip>
+                {!day.isOnLeave && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={() => openEdit(day.date, day.record)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <Dialog open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{isCreating ? "Add Attendance Record" : "Edit Attendance Record"}</DialogTitle>
+            <DialogDescription>
+              {editTarget && `${report.user_name} — ${formatDayShort(editTarget.date)}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {isOnTimePresent && !isOverridden ? (
+              <p className="text-muted-foreground text-sm">
+                This record is fully present and on-time. No overrides (LWP/AWP) are applicable.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select
+                    value={editForm.status}
+                    onValueChange={(value) => setEditForm((f) => ({ ...f, status: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    Comment (required) <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    required
+                    placeholder="Reason for this manual attendance change"
+                    value={editForm.manual_comment}
+                    onChange={(e) => setEditForm((f) => ({ ...f, manual_comment: e.target.value }))}
+                  />
+                  {!hasManualComment && (
+                    <p className="text-xs font-medium text-red-500">
+                      A comment is required for all manual attendance alterations.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {isOverridden ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleRevert}
+                disabled={reverting || saving}
+              >
+                {reverting ? "Reverting…" : "Revert Override"}
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditTarget(null)} disabled={saving || reverting}>
+                Cancel
+              </Button>
+              {(!isOnTimePresent || !isOverridden) && (
+                <Button onClick={saveEdit} disabled={cannotSave || reverting}>
+                  {saving ? "Saving…" : isCreating ? "Create" : "Save"}
+                </Button>
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Day Timeline</DialogTitle>
+            <DialogDescription>
+              {historyTarget ? `${report.user_name} — ${formatDayShort(historyTarget.date)}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {historyContext && (historyContext.holiday || historyContext.on_leave || historyContext.exempt) && (
+            <div className="flex flex-wrap gap-2">
+              {historyContext.holiday && (
+                <Badge className="bg-sky-100 text-xs text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+                  Holiday — {historyContext.holiday}
+                  {historyContext.holiday_added_by ? ` · added by ${historyContext.holiday_added_by}` : ""}
+                </Badge>
+              )}
+              {historyContext.on_leave && (
+                <Badge className="bg-purple-100 text-xs text-purple-800 dark:bg-purple-950/40 dark:text-purple-300">
+                  On leave — {historyContext.on_leave}
+                </Badge>
+              )}
+              {historyContext.exempt && (
+                <Badge className="bg-violet-100 text-xs text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
+                  Exempt{historyContext.exempt_reason ? ` — ${historyContext.exempt_reason}` : ""}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <div className="max-h-105 space-y-3 overflow-y-auto">
+            {historyLoading ? (
+              <LinesSkeleton lines={3} />
+            ) : historyItems.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No recorded events for this day.</p>
+            ) : (
+              historyItems.map((item) => {
+                const label = EVENT_LABELS[item.event_type] ?? item.event_type.replaceAll("_", " ")
+                const fromLabel = item.from_status
+                  ? (ATTENDANCE_STATUS_LABELS[item.from_status as keyof typeof ATTENDANCE_STATUS_LABELS] ??
+                    item.from_status)
+                  : null
+                const toLabel = item.to_status
+                  ? (ATTENDANCE_STATUS_LABELS[item.to_status as keyof typeof ATTENDANCE_STATUS_LABELS] ??
+                    item.to_status)
+                  : null
+                const isAutomated = item.actor_name === null
+                return (
+                  <div key={item.id} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={`text-xs ${eventBadgeClass(item.event_type)}`}>{label}</Badge>
+                      <p className="text-sm font-medium">{isAutomated ? "System / Device" : item.actor_name}</p>
+                    </div>
+                    <p className="text-muted-foreground text-xs">{formatWATDateTime(item.created_at)}</p>
+                    {(fromLabel || toLabel) && (
+                      <p className="mt-1 text-xs">
+                        <span className="font-medium">Status:</span>{" "}
+                        <span className="text-muted-foreground">
+                          {fromLabel ? `${fromLabel} → ` : ""}
+                          {toLabel ?? "—"}
+                        </span>
+                      </p>
+                    )}
+                    {item.comment && (
+                      <p className="mt-1 text-xs">
+                        <span className="font-medium">Comment:</span>{" "}
+                        <span className="text-muted-foreground">{item.comment}</span>
+                      </p>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}

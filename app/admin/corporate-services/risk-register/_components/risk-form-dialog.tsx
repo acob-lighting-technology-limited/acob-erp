@@ -29,6 +29,7 @@ import {
   type RiskTimelineType,
 } from "@/lib/risk-register/model"
 import { RatingBadge } from "./risk-badges"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 export interface StaffOption {
   id: string
@@ -107,7 +108,7 @@ function Field({
     <div className="space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint && <p className="text-muted-foreground text-[11px]">{hint}</p>}
+      {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
     </div>
   )
 }
@@ -125,9 +126,13 @@ export function RiskFormDialog({
   const [form, setForm] = useState<FormState>(() => initialState(risk, raisableDepartments))
   const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
+  // Seed the form each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [open, risk, raisableDepartments] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
     if (open) setForm(initialState(risk, raisableDepartments))
-  }, [open, risk, raisableDepartments])
+  }
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
 

@@ -46,7 +46,7 @@ import { AssetAssignDialog } from "@/components/assets/AssetAssignDialog"
 import { AssetHistoryDialog } from "@/components/assets/AssetHistoryDialog"
 import { AssetIssuesDialog } from "@/components/assets/AssetIssuesDialog"
 import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
-import { AssetExportDialog } from "@/components/assets/AssetExportDialog"
+import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
 import { EmployeeAssetsReportDialog } from "@/components/assets/EmployeeAssetsReportDialog"
 import { AssetHandoverDialog } from "@/components/assets/AssetHandoverDialog"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -61,6 +61,10 @@ import {
 } from "@/lib/assets/asset-export"
 import { toLocalDateTimeInput, toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { ASSET_STATUS_TONES, statusToneClass } from "@/lib/status-tones"
+
+import { layout as tablePageLayout } from "./_layout"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("assets-admin-assets-content")
 
@@ -395,12 +399,13 @@ export function AdminAssetsContent({
     initialData: ASSET_TYPES,
   })
 
-  // Keep assetTypes in sync with query result
-  useEffect(() => {
-    if (fetchedAssetTypes) {
-      setAssetTypes(fetchedAssetTypes)
-    }
-  }, [fetchedAssetTypes])
+  // Keep assetTypes in step with the query result — adjusted during render, not in an effect.
+  const [syncedTypes, setSyncedTypes] = useState<readonly unknown[] | null>(null)
+  const syncedTypesNext = [fetchedAssetTypes] as const
+  if (depsChanged(syncedTypes, syncedTypesNext)) {
+    setSyncedTypes(syncedTypesNext)
+    if (fetchedAssetTypes) setAssetTypes(fetchedAssetTypes)
+  }
 
   useEffect(() => {
     if (initialError) {
@@ -1166,9 +1171,13 @@ export function AdminAssetsContent({
     })
   }, [assets, employees, userProfile, scopedDepartments, scopedOffices])
 
-  useEffect(() => {
+  // Export defaults to every asset in scope until the table narrows it — adjusted during render, not in an effect.
+  const [syncedExport, setSyncedExport] = useState<readonly unknown[] | null>(null)
+  const syncedExportNext = [scopedAssets] as const
+  if (depsChanged(syncedExport, syncedExportNext)) {
+    setSyncedExport(syncedExportNext)
     setFilteredAssetsForExport(scopedAssets)
-  }, [scopedAssets])
+  }
 
   const stats = {
     total: scopedAssets.filter((d) => !d.deleted_at).length,
@@ -1181,22 +1190,7 @@ export function AdminAssetsContent({
       .reduce((sum, asset) => sum + (asset.unresolved_issues_count || 0), 0),
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "assigned":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      case "available":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
-      case "maintenance":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-      case "retired":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-      case "archived":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-    }
-  }
+  const getStatusColor = (status: string) => statusToneClass(status, ASSET_STATUS_TONES)
 
   const assetTypeOptions = assetTypes.map((type) => ({ value: type.code, label: type.label }))
   const departmentOptions = departments.map((department) => ({ value: department, label: department }))
@@ -1450,6 +1444,7 @@ export function AdminAssetsContent({
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Asset Management"
       description="Manage asset inventory, assignments, history, and issue tracking."
       icon={Package}
@@ -1791,13 +1786,13 @@ export function AdminAssetsContent({
       />
 
       {/* Export Column Selection Dialog */}
-      <AssetExportDialog
+      <ExportColumnsDialog
         isOpen={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         exportType={exportType}
         selectedColumns={selectedColumns}
         setSelectedColumns={setSelectedColumns}
-        onExportConfirm={handleExportConfirm}
+        onConfirm={handleExportConfirm}
       />
 
       {/* Employee Assets Report Confirmation Dialog */}

@@ -129,7 +129,7 @@ export function ScorecardSummaryContent({
           ) : (
             <div className="w-32 space-y-1">
               <Progress value={r.attainmentPct} />
-              <span className="text-muted-foreground text-[11px]">{r.attainmentPct}%</span>
+              <span className="text-muted-foreground text-xs">{r.attainmentPct}%</span>
             </div>
           ),
       },

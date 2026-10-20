@@ -1,12 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -21,12 +20,15 @@ import { toLocalISODate, toLocalYearMonth, isLate } from "@/lib/hr/attendance-ut
 import {
   ATTENDANCE_STATUS_COLORS,
   ATTENDANCE_STATUS_LABELS,
-  MANUAL_ATTENDANCE_STATUS_OPTIONS,
   isEarlyDeparture,
   getManualStatusEditOptions,
 } from "@/lib/hr/attendance-status"
 import { formatTime } from "./status-badge"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { buildCalendarCells, formatMonthLabel, navigateMonth } from "@/lib/utils/calendar-grid"
+import { CalendarGridSkeleton } from "@/components/skeletons/section-skeletons"
 
 type DayStatus =
   | "present"
@@ -73,37 +75,6 @@ interface CalendarViewProps {
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-function monBasedDay(jsDay: number) {
-  return jsDay === 0 ? 6 : jsDay - 1
-}
-
-function formatMonthLabel(yearMonth: string) {
-  const [year, month] = yearMonth.split("-").map(Number)
-  return new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-}
-
-function navigateMonth(yearMonth: string, delta: number): string {
-  const [year, month] = yearMonth.split("-").map(Number)
-  const d = new Date(year, month - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-}
-
-function buildCalendarCells(yearMonth: string): (string | null)[] {
-  const [year, month] = yearMonth.split("-").map(Number)
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const firstDayOfWeek = new Date(year, month - 1, 1).getDay()
-  const offset = monBasedDay(firstDayOfWeek)
-  const cells: (string | null)[] = [
-    ...Array(offset).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => {
-      const d = i + 1
-      return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-    }),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
-  return cells
-}
-
 export const CELL_BG: Record<string, string> = {
   early: "bg-green-50/80 border-green-200 dark:bg-green-950/30 dark:border-green-800",
   present: "bg-blue-50/80 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
@@ -130,8 +101,6 @@ export const CELL_BG: Record<string, string> = {
 export function CalendarView({ employees }: CalendarViewProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>(employees[0]?.user_id ?? "")
   const [calendarMonth, setCalendarMonth] = useState(toLocalYearMonth())
-  const [days, setDays] = useState<UnifiedDay[] | null>(null)
-  const [loading, setLoading] = useState(false)
 
   const [editTarget, setEditTarget] = useState<{ date: string; record: DayRecord | null } | null>(null)
   const [editForm, setEditForm] = useState({
@@ -142,31 +111,33 @@ export function CalendarView({ employees }: CalendarViewProps) {
 
   const selectedEmployee = employees.find((e) => e.user_id === selectedUserId)
 
-  const load = useCallback(async () => {
-    if (!selectedUserId) return
-    setLoading(true)
-    setDays(null)
-    try {
+  const {
+    data: days = null,
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.employeeAttendanceDays(
+      selectedUserId,
+      calendarMonth,
+      Boolean(selectedEmployee?.attendance_exempt)
+    ),
+    enabled: Boolean(selectedUserId),
+    queryFn: async () => {
       const qs = new URLSearchParams({
         user_id: selectedUserId,
         year_month: calendarMonth,
         exempt_hint: selectedEmployee?.attendance_exempt ? "1" : "0",
       })
-      const res = await apiFetch(`/api/admin/hr/attendance/employee-days?${qs}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || "Failed to load")
-      setDays(payload?.data ?? [])
-    } catch {
-      toast.error("Failed to load calendar data")
-      setDays([])
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedUserId, calendarMonth, selectedEmployee?.attendance_exempt])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ data?: UnifiedDay[] }>(`/api/admin/hr/attendance/employee-days?${qs}`, {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load calendar data" },
+  })
+  const load = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   function openEdit(day: UnifiedDay) {
     if (day.status === "on_leave") return
@@ -273,6 +244,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
         </div>
         <div className="flex items-center gap-1">
           <Button
+            aria-label="Previous"
             variant="outline"
             size="icon"
             className="h-8 w-8"
@@ -282,6 +254,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
           </Button>
           <span className="min-w-36 text-center text-sm font-medium">{formatMonthLabel(calendarMonth)}</span>
           <Button
+            aria-label="Next"
             variant="outline"
             size="icon"
             className="h-8 w-8"
@@ -298,7 +271,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
           Select an employee to view their attendance calendar.
         </div>
       ) : loading ? (
-        <div className="text-muted-foreground py-16 text-center text-sm">Loading calendar…</div>
+        <CalendarGridSkeleton />
       ) : (
         <div className="bg-card text-card-foreground overflow-hidden rounded-lg border shadow-xs">
           {/* Day-of-week headers */}
@@ -341,9 +314,9 @@ export function CalendarView({ employees }: CalendarViewProps) {
                   {!isFuture && day && status && status !== "weekend" && (
                     <>
                       <Badge
-                        className={`max-w-full truncate px-1 py-0 text-[10px] font-medium ${
+                        className={`max-w-full truncate px-1 py-0 text-xs font-medium ${
                           ATTENDANCE_STATUS_COLORS[status as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-                          "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+                          "bg-neutral-muted text-neutral-foreground"
                         }`}
                       >
                         {ATTENDANCE_STATUS_LABELS[status as keyof typeof ATTENDANCE_STATUS_LABELS] ?? status}
@@ -370,7 +343,7 @@ export function CalendarView({ employees }: CalendarViewProps) {
           .map(([key, label]) => (
             <Badge
               key={key}
-              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-gray-100 text-gray-800"}`}
+              className={`text-xs ${ATTENDANCE_STATUS_COLORS[key as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-neutral-muted text-neutral-foreground"}`}
             >
               {label}
             </Badge>

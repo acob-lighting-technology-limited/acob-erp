@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
 import { Receipt } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,19 +33,17 @@ export function TicketRequisitionsCard({
   ticket: { id: string; ticket_number: string; title: string }
   canRaise: boolean
 }) {
-  const [rows, setRows] = useState<LinkedRequisition[]>([])
   const [open, setOpen] = useState(false)
 
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/help-desk/tickets/${ticket.id}/requisitions`)
-    if (!res.ok) return
-    const json = await res.json()
-    setRows(json.data || [])
-  }, [ticket.id])
-
-  useEffect(() => {
-    load()
-  }, [load])
+  const { data: rows = [], refetch } = useQuery({
+    queryKey: ["help-desk-ticket-requisitions", ticket.id],
+    queryFn: async (): Promise<LinkedRequisition[]> => {
+      const res = await fetch(`/api/help-desk/tickets/${ticket.id}/requisitions`)
+      if (!res.ok) return []
+      const json = await res.json()
+      return json.data || []
+    },
+  })
 
   if (!rows.length && !canRaise) return null
 
@@ -84,7 +83,7 @@ export function TicketRequisitionsCard({
           </p>
         )}
       </CardContent>
-      <NewRequisitionDialog open={open} onOpenChange={setOpen} helpDeskTicket={ticket} onSuccess={load} />
+      <NewRequisitionDialog open={open} onOpenChange={setOpen} helpDeskTicket={ticket} onSuccess={() => refetch()} />
     </Card>
   )
 }

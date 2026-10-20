@@ -213,7 +213,7 @@ export function MediaCompressor() {
                     onChange={(e) => setTargetSize(e.target.value)}
                   />
                   <Select value={sizeUnit} onValueChange={(v: any) => setSizeUnit(v)}>
-                    <SelectTrigger className="w-[100px]">
+                    <SelectTrigger className="w-25">
                       <SelectValue placeholder="Unit" />
                     </SelectTrigger>
                     <SelectContent>

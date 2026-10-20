@@ -19,6 +19,7 @@ import { PageLoader } from "@/components/ui/query-states"
 import Image from "next/image"
 
 import { logger } from "@/lib/logger"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 const log = logger("tools-job-description")
 
@@ -74,15 +75,15 @@ export default function JobDescriptionPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Sync local state when data loads
-  useEffect(() => {
-    if (profileData) {
-      setJobDescription(profileData.job_description)
-      setIsEditing(!profileData.job_description) // Auto-edit if empty
-    }
-  }, [profileData])
+  // Seed local state when data loads — adjusted during render, not in an effect.
+  const [seededFrom, setSeededFrom] = useState<typeof profileData>(undefined)
+  if (profileData && seededFrom !== profileData) {
+    setSeededFrom(profileData)
+    setJobDescription(profileData.job_description)
+    setIsEditing(!profileData.job_description) // Auto-edit if empty
+  }
 
-  if (isLoading) return <PageLoader />
+  if (isLoading) return <PageLoader variant="form" />
 
   const lastUpdated = profileData?.job_description_updated_at ?? null
   const profile = profileData
@@ -204,7 +205,7 @@ export default function JobDescriptionPage() {
                 <span className="print:hidden">Job Description</span>
                 <span className="hidden print:block">Job Description</span>
                 {!jobDescription && (
-                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 print:hidden">
+                  <Badge variant="outline" className="bg-warning-muted text-warning-foreground print:hidden">
                     Not Set
                   </Badge>
                 )}
@@ -220,7 +221,7 @@ export default function JobDescriptionPage() {
                     value={jobDescription}
                     onChange={(e) => setJobDescription(e.target.value)}
                     placeholder="Enter your job description here...&#10;&#10;Example:&#10;• Manage daily operations of the department&#10;• Coordinate with team members on project deliverables&#10;• Review and approve departmental reports&#10;• Ensure compliance with company policies"
-                    className="min-h-[400px] text-base"
+                    className="min-h-100 text-base"
                   />
                   <p className="text-muted-foreground text-sm">
                     Tip: Use bullet points or paragraphs to clearly outline your responsibilities
@@ -271,7 +272,7 @@ export default function JobDescriptionPage() {
           <Card className="no-print border bg-blue-50 dark:bg-blue-950/20">
             <CardContent className="p-4">
               <div className="flex gap-3">
-                <div className="mt-0.5 text-blue-600 dark:text-blue-400">
+                <div className="text-info-foreground mt-0.5">
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                     <path
                       fillRule="evenodd"

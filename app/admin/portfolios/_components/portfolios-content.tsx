@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -24,7 +24,6 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch } from "@/lib/api-client"
-import { cn } from "@/lib/utils"
 import {
   PROJECT_HEALTH_LABELS,
   PROJECT_METRIC_HELP,
@@ -52,11 +51,15 @@ import type { ChartsProject } from "@/components/projects/project-charts"
 // rather than on page load. ssr:false because recharts measures the DOM.
 const ProjectCharts = dynamic(() => import("@/components/projects/project-charts").then((m) => m.ProjectCharts), {
   ssr: false,
-  loading: () => <div className="bg-muted/40 h-[320px] w-full animate-pulse rounded-lg" />,
+  loading: () => <div className="bg-muted/40 h-80 w-full animate-pulse rounded-lg" />,
 })
 import type { ProjectHealthTask } from "@/lib/projects/health"
 import { portfolioHref, projectHref } from "@/lib/projects/links"
 import { useRouter } from "next/navigation"
+import { usePortfolios } from "@/hooks/use-portfolios"
+import { QUERY_KEYS } from "@/lib/query-keys"
+
+import { layout as tablePageLayout } from "../_layout"
 
 export type ProjectHealthRow = ProjectHealth & {
   id: string
@@ -178,18 +181,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
     []
   )
 
-  const { data, isLoading, error, refetch } = useQuery<{
-    data: Portfolio[]
-    unassigned: { projects: ProjectHealthRow[]; rollup: PortfolioHealth }
-  }>({
-    queryKey: ["portfolios"],
-    queryFn: async () => {
-      const res = await apiFetch("/api/portfolios", { cache: "no-store" })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to load portfolios")
-      return payload
-    },
-  })
+  const { data, isLoading, error, refetch } = usePortfolios()
 
   const rows = useMemo(() => data?.data ?? [], [data])
 
@@ -224,7 +216,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   })
   // Read from the live rows so the dialog reflects each add/remove once refetched.
   const managing = useMemo(() => rows.find((row) => row.id === managingId) ?? null, [rows, managingId])
-  const refreshPortfolios = () => queryClient.invalidateQueries({ queryKey: ["portfolios"] })
+  const refreshPortfolios = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })
 
   // Counted across unassigned projects too, so the numbers match the Overview tab.
   const stats = useMemo(() => {
@@ -295,9 +287,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
         accessor: (r) => r.rollup.overdueCount,
         render: (r) =>
           r.rollup.overdueCount > 0 ? (
-            <Badge className="border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400">
-              {r.rollup.overdueCount}
-            </Badge>
+            <Badge className="text-danger-foreground border-red-500/20 bg-red-500/10">{r.rollup.overdueCount}</Badge>
           ) : (
             <span className="text-muted-foreground text-xs">None</span>
           ),
@@ -345,6 +335,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
 
   return (
     <DataTablePage
+      layout={tablePageLayout}
       title="Project Portfolios"
       description="Groups of related projects. Progress is counted from each project's tasks."
       icon={Layers}
@@ -357,7 +348,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
           <Button
             variant="outline"
             size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ["portfolios"] })}
+            onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })}
             disabled={isLoading}
           >
             <RefreshCw className="h-4 w-4 sm:mr-2" />

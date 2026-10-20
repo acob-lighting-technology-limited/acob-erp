@@ -3,6 +3,9 @@ import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { PortfolioDetail } from "@/components/projects/portfolio-detail"
 
+import { TablePageLayoutProvider } from "@/components/ui/data-table"
+import { layout as tablePageLayout } from "./_layout"
+
 export const metadata: Metadata = {
   title: "Portfolio | Matrix",
   description: "A portfolio's projects, ranked by what needs attention, and its charts.",
@@ -18,5 +21,9 @@ export default async function PortfolioDetailPage({ params }: { params: Promise<
   } = await supabase.auth.getUser()
   if (error || !user) redirect("/auth/login")
 
-  return <PortfolioDetail portfolioId={id} isAdmin={false} />
+  return (
+    <TablePageLayoutProvider value={tablePageLayout}>
+      <PortfolioDetail portfolioId={id} isAdmin={false} />
+    </TablePageLayoutProvider>
+  )
 }

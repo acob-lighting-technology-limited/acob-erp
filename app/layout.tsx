@@ -1,4 +1,5 @@
 import type React from "react"
+import { ConfirmProvider } from "@/providers/confirm-provider"
 import type { Metadata, Viewport } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
@@ -17,6 +18,8 @@ import { QueryProvider } from "@/providers/query-provider"
 import { SeasonalFaviconSwitcher } from "@/components/seasonal-favicon-switcher"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getAvatarSignedUrl } from "@/lib/profile-photos"
+import { headers } from "next/headers"
+import { isNonceCspEnabled } from "@/lib/security/csp"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -89,6 +92,20 @@ async function HeaderWrapperWithData() {
   return <HeaderWrapper user={userData} canAccessAdmin={canAccessAdmin} avatarUrl={avatarUrl} />
 }
 
+/**
+ * next-themes injects an inline script; under the nonce CSP it must carry the
+ * request's nonce. headers() is only read when that CSP is on, so pages stay
+ * statically renderable while it is off.
+ */
+async function NonceThemeProvider({ children }: { children: React.ReactNode }) {
+  const nonce = isNonceCspEnabled() ? ((await headers()).get("x-nonce") ?? undefined) : undefined
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="acob-theme" nonce={nonce}>
+      {children}
+    </ThemeProvider>
+  )
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -99,20 +116,22 @@ export default function RootLayout({
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} overflow-x-clip`}>
         <Suspense fallback={null}>
           {/* Theme follows system preference automatically (light/dark mode) */}
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="acob-theme">
+          <NonceThemeProvider>
             <QueryProvider>
-              <SeasonalFaviconSwitcher />
-              <SidebarProvider>
-                <NProgressProvider />
-                <NProgressHandler />
-                <ClientErrorMonitor />
-                <HeaderWrapperWithData />
-                {/* Intentionally public routes outside (app): /employee/new, /maintenance */}
-                {children}
-                <Toaster />
-              </SidebarProvider>
+              <ConfirmProvider>
+                <SeasonalFaviconSwitcher />
+                <SidebarProvider>
+                  <NProgressProvider />
+                  <NProgressHandler />
+                  <ClientErrorMonitor />
+                  <HeaderWrapperWithData />
+                  {/* Intentionally public routes outside (app): /employee/new, /maintenance */}
+                  {children}
+                  <Toaster />
+                </SidebarProvider>
+              </ConfirmProvider>
             </QueryProvider>
-          </ThemeProvider>
+          </NonceThemeProvider>
         </Suspense>
         <Analytics />
       </body>

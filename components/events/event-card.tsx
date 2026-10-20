@@ -45,7 +45,7 @@ export function EventCard({ event, onSelect, onEdit }: EventCardProps) {
             <EventStatusBadge status={event.status} />
             <MdInvolvementBadge value={event.md_involvement} />
           </div>
-          <Badge variant="secondary" className="text-[11px] font-normal">
+          <Badge variant="secondary" className="text-xs font-normal">
             {event.visibility === "department" && event.department_name
               ? event.department_name
               : EVENT_VISIBILITY_LABELS[event.visibility]}
@@ -76,13 +76,13 @@ export function EventCard({ event, onSelect, onEdit }: EventCardProps) {
         </div>
 
         {/* Attendees / RSVP info */}
-        <div className="bg-muted/40 border-muted flex items-center justify-between rounded-md border p-2 text-[11px]">
+        <div className="bg-muted/40 border-muted flex items-center justify-between rounded-md border p-2 text-xs">
           <div className="text-muted-foreground flex items-center gap-1.5">
-            <Users className="text-muted-foreground/70 h-3.5 w-3.5 shrink-0" />
+            <Users className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
             <span>{totalCount > 0 ? `${goingCount} of ${totalCount} attending` : "Open attendance"}</span>
           </div>
           {event.my_rsvp && (
-            <Badge variant="outline" className="text-[10px] capitalize">
+            <Badge variant="outline" className="text-xs capitalize">
               Your reply: {EVENT_RSVP_LABELS[event.my_rsvp]}
             </Badge>
           )}
@@ -90,7 +90,7 @@ export function EventCard({ event, onSelect, onEdit }: EventCardProps) {
       </CardContent>
 
       <CardFooter className="border-border/40 mt-auto flex items-center justify-between border-t p-4 pt-2.5">
-        <span className="text-muted-foreground max-w-[140px] truncate text-[11px]">
+        <span className="text-muted-foreground max-w-35 truncate text-xs">
           {event.organizer_name ? `By ${event.organizer_name}` : "ACOB Calendar"}
         </span>
         <div className="flex items-center gap-1.5">

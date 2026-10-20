@@ -35,7 +35,8 @@ const securityHeaders = [
   //   - style-src: Tailwind CSS + Radix UI inject inline styles at runtime.
   //     Remove once CSS-in-JS is eliminated or a nonce/hash approach is used.
   //   - script-src 'unsafe-inline': Next.js inlines small hydration scripts.
-  //     Remove once Next.js supports nonce-based CSP (tracked roadmap item).
+  //     A stricter nonce policy is layered on top by proxy.ts when CSP_NONCE=on
+  //     (see lib/security/csp.ts); this baseline stays as the fallback.
   //   - script-src 'unsafe-eval': Required by xlsx, jspdf, and docx packages
   //     which use eval() internally for formula parsing / rendering. Cannot be
   //     removed until those libs ship eval-free builds or are replaced.
@@ -73,6 +74,12 @@ const securityHeaders = [
 ]
 
 const nextConfig = {
+  // React Compiler in opt-in mode (audit 6.4): only components marked with a
+  // "use memo" directive are compiled. Mark a component once it passes the
+  // React-19 hook rules, verify it, then drop its manual useMemo/useCallback.
+  // Switch to the default "infer" mode once most of the app is opted in.
+  reactCompiler: { compilationMode: "annotation" },
+
   transpilePackages: ["xlsx", "jspdf", "jspdf-autotable", "docx", "file-saver"],
 
   images: {
@@ -126,6 +133,34 @@ const nextConfig = {
 
   async redirects() {
     return [
+      // Moved/retired routes (previously redirect-only page.tsx files).
+      { source: "/goals", destination: "/pms/kpi?tab=goals", permanent: true },
+      { source: "/pms/goals", destination: "/pms/kpi?tab=goals", permanent: true },
+      { source: "/admin-setup", destination: "/profile", permanent: true },
+      { source: "/tools/reference-generator", destination: "/correspondence", permanent: true },
+      { source: "/admin/accounts/payments/departments", destination: "/admin/accounts/payments", permanent: true },
+      { source: "/admin/payments/departments", destination: "/admin/accounts/payments", permanent: true },
+      {
+        source: "/admin/corporate-scorecard/summary",
+        destination: "/admin/corporate-services/scorecard?tab=summary",
+        permanent: true,
+      },
+      { source: "/admin/hr/attendance/reports", destination: "/admin/hr/attendance", permanent: true },
+      { source: "/admin/hr/employees/payroll", destination: "/admin/payroll", permanent: true },
+      { source: "/admin/hr/payroll", destination: "/admin/payroll", permanent: true },
+      { source: "/admin/hr/payroll/dummy", destination: "/admin/payroll/calculator", permanent: true },
+      { source: "/admin/hr/payroll/:id", destination: "/admin/payroll/:id", permanent: true },
+      { source: "/admin/payroll/dummy", destination: "/admin/payroll/calculator", permanent: true },
+      { source: "/admin/pms/cbt/question", destination: "/admin/pms/cbt", permanent: true },
+      { source: "/admin/pms/goals", destination: "/admin/pms/kpi?tab=goals", permanent: true },
+      {
+        source: "/admin/reports/meeting-documents",
+        destination: "/admin/reports/general-meeting/kss",
+        permanent: true,
+      },
+      { source: "/admin/reports/mail", destination: "/admin/communications/meetings/mail", permanent: true },
+      { source: "/admin/tools/reference-generator", destination: "/admin/correspondence", permanent: true },
+      { source: "/dept/:dept_id/pms/goals", destination: "/dept/:dept_id/pms/kpi?tab=goals", permanent: true },
       {
         source: "/project",
         destination: "/projects",

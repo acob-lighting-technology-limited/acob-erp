@@ -1,44 +1,14 @@
 import { cn } from "@/lib/utils"
 import { StatGridSkeleton } from "./stat-card-skeleton"
+import { TableGridSkeleton } from "./table-grid-skeleton"
 
 function SkeletonLine({ className }: { className: string }) {
   return <div className={`bg-muted animate-pulse rounded-md ${className}`} />
 }
 
-export type TablePageSkeletonProps = {
-  filters?: number
-  columns?: number
-  rows?: number
-  showStats?: boolean
-  statCards?: number
-  /** Number of tab items to render (omit = no tabs row) */
-  tabs?: number
-  /** Number of action buttons to render on the right of the header */
-  actions?: number
-  /** Whether to show the back-link row above the title */
-  showBackLink?: boolean
-  /**
-   * Number of compact metric pills under the header. Only for pages that still
-   * pass `statBadges` to DataTablePage — mirror it here or the page visibly
-   * reflows on mount.
-   */
-  statBadges?: number
-  /** `tight` matches DataTablePage's `spacing="tight"` (space-y-3). */
-  spacing?: "standard" | "tight"
-  /** Matches `actionsPlacement="inline-always"`: actions beside the title at every width. */
-  inlineActions?: boolean
-  /**
-   * Which rendering the page opens in.
-   * - `table`      the data table
-   * - `contacts`   the row list at every width (a page whose `defaultViewMode`
-   *                is a plain "contacts")
-   * - `responsive` the row list below `md` and the table from `md` up, mirroring
-   *                `defaultViewMode={{ mobile: "contacts", desktop: "list" }}`
-   */
-  list?: "table" | "contacts" | "responsive"
-  /** Section headings in the contacts list (ignored for `list="table"`). */
-  groups?: number
-}
+import type { TablePageLayout } from "@/components/ui/data-table/types"
+
+export type TablePageSkeletonProps = TablePageLayout
 
 /**
  * TablePageSkeleton — mirrors the exact layout of DataTablePage + DataTable so
@@ -186,36 +156,11 @@ export function TablePageSkeleton({
           )}
           {list !== "contacts" && (
             /* Table — bg-muted/80 header + shimmer rows (matches DataTable exactly) */
-            <div
-              className={
-                list === "responsive" ? "hidden overflow-x-auto border-t md:block" : "overflow-x-auto border-t"
-              }
-            >
-              <table className="w-full caption-bottom text-sm">
-                <thead className="bg-muted/80 sticky top-0 z-10 [&_tr]:border-b">
-                  <tr className="border-b transition-colors">
-                    {Array.from({ length: columns }).map((_, i) => (
-                      <th key={`head-${i}`} className="h-12 px-4 text-left align-middle font-medium">
-                        <SkeletonLine className="h-4 w-24" />
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="[&_tr:last-child]:border-0">
-                  {Array.from({ length: rows }).map((_, r) => (
-                    <tr key={`row-${r}`} className="border-b transition-colors">
-                      {Array.from({ length: columns }).map((__, c) => (
-                        <td key={`cell-${r}-${c}`} className="p-4 align-middle">
-                          <SkeletonLine
-                            className={`h-4 ${c === 0 ? "w-8" : c === 1 ? "w-32" : c === columns - 1 ? "w-16" : "w-24"}`}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TableGridSkeleton
+              columns={columns}
+              rows={rows}
+              className={list === "responsive" ? "hidden border-t md:block" : "border-t"}
+            />
           )}
 
           {/* Pagination footer — only a *grouped* contacts list renders whole and
