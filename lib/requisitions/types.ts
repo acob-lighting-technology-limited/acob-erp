@@ -99,6 +99,8 @@ export interface RequisitionPayment {
 }
 
 export interface Requisition {
+  /** Set on list rows: the pending stage the signed-in user can sign now, else null. */
+  sign_stage_id?: string | null
   id: string
   requisition_number: string
   form_type: RequisitionFormType

@@ -13,7 +13,7 @@ import { apiFetch } from "@/lib/api-client"
 import { PinInput } from "./pin-input"
 import { SignaturePad } from "./signature-pad"
 
-interface SigningStatus {
+export interface SigningStatus {
   has_signature: boolean
   has_pin: boolean
   signature_url: string | null
@@ -40,7 +40,7 @@ function StatusLine({ done, text }: { done: boolean; text: string }) {
   )
 }
 
-function SignatureSection({ status, onSaved }: { status: SigningStatus; onSaved: (s: SigningStatus) => void }) {
+export function SignatureSection({ status, onSaved }: { status: SigningStatus; onSaved: (s: SigningStatus) => void }) {
   const [drawn, setDrawn] = useState<Blob | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState("draw")
@@ -121,7 +121,7 @@ function SignatureSection({ status, onSaved }: { status: SigningStatus; onSaved:
   )
 }
 
-function PinSection({ status, onSaved }: { status: SigningStatus; onSaved: (s: SigningStatus) => void }) {
+export function PinSection({ status, onSaved }: { status: SigningStatus; onSaved: (s: SigningStatus) => void }) {
   const [currentPin, setCurrentPin] = useState("")
   const [pin, setPin] = useState("")
   const [confirm, setConfirm] = useState("")

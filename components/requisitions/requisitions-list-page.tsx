@@ -4,7 +4,19 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useQueries } from "@tanstack/react-query"
-import { Clock, Download, FileCheck2, Inbox, PenLine, Plus, RefreshCw, Wallet, CheckCircle2 } from "lucide-react"
+import {
+  Clock,
+  Download,
+  Eye,
+  FileCheck2,
+  Inbox,
+  PenLine,
+  Plus,
+  RefreshCw,
+  Wallet,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react"
 import {
   DataTable,
   DataTablePage,
@@ -18,12 +30,19 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { apiJson } from "@/lib/api-client"
+import { toast } from "sonner"
 import { formatWATDate } from "@/lib/utils/date"
 import { exportRequisitionsToExcel, exportRequisitionsToPDF } from "@/lib/requisitions/export"
 import { STATUS_LABELS, formatNaira, progressLabel, requisitionSummary } from "@/lib/requisitions/format"
 import { FORM_LABELS } from "@/lib/requisitions/limits"
-import type { Requisition, RequisitionFormType, RequisitionStatus } from "@/lib/requisitions/types"
+import type {
+  Requisition,
+  RequisitionFormType,
+  RequisitionStatus,
+  RequisitionViewerActions,
+} from "@/lib/requisitions/types"
 import { NewRequisitionDialog } from "./new-requisition-dialog"
+import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeVariant } from "./requisition-detail"
 
 export type RequisitionsSurface = "staff" | "admin" | "dept"
@@ -85,6 +104,22 @@ export function RequisitionsListPage({
   const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [signing, setSigning] = useState<{
+    requisition: Requisition
+    viewer: RequisitionViewerActions
+    mode: SignMode
+  } | null>(null)
+
+  // Opens the sign or reject dialog for a row. The detail record carries the
+  // viewer's signing state, which the dialog needs.
+  async function openSign(row: Requisition, mode: SignMode) {
+    try {
+      const json = await apiJson<{ data: Requisition; viewer: RequisitionViewerActions }>(`/api/requisitions/${row.id}`)
+      setSigning({ requisition: json.data, viewer: json.viewer, mode })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not open this requisition")
+    }
+  }
 
   const extra = extraTabs.find((t) => t.tab.key === tab)
   const view = (extra ? null : (tab as View)) as View | null
@@ -340,6 +375,17 @@ export function RequisitionsListPage({
               .some((v) => String(v).toLowerCase().includes(q))
           }
           filters={filters}
+          rowActions={[
+            { label: "Sign", icon: PenLine, onClick: (r) => void openSign(r, "sign"), hidden: (r) => !r.sign_stage_id },
+            {
+              label: "Reject",
+              icon: XCircle,
+              variant: "destructive",
+              onClick: (r) => void openSign(r, "reject"),
+              hidden: (r) => !r.sign_stage_id,
+            },
+            { label: "View", icon: Eye, onClick: (r) => router.push(detailHref(r)) },
+          ]}
           isLoading={isLoading}
           error={error}
           onRetry={fetchRows}
@@ -396,6 +442,20 @@ export function RequisitionsListPage({
           )}
         />
       )}
+
+      {signing ? (
+        <SignDialog
+          open
+          onOpenChange={(open) => !open && setSigning(null)}
+          mode={signing.mode}
+          requisition={signing.requisition}
+          viewer={signing.viewer}
+          onDone={() => {
+            setSigning(null)
+            void fetchRows()
+          }}
+        />
+      ) : null}
 
       <NewRequisitionDialog
         open={isCreateOpen}
