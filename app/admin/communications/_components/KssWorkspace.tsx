@@ -173,6 +173,14 @@ export function KssWorkspace() {
   const isDirty = JSON.stringify(draft) !== JSON.stringify(savedSettings)
   const refresh = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminKssRotation() })
 
+  // Reloading or closing the tab with an unsaved rotation would silently drop it.
+  useEffect(() => {
+    if (!isDirty) return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [isDirty])
+
   const saveSettings = async () => {
     setIsSaving(true)
     try {
@@ -278,6 +286,12 @@ export function KssWorkspace() {
               Session
             </CardTitle>
             <CardDescription>Choose the session to send the heads-up for</CardDescription>
+            {isDirty && (
+              <p className="text-xs text-amber-600">
+                <AlertCircle className="mr-1 inline h-3 w-3" />
+                These dates use the saved rotation. Save your changes to update them.
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -438,6 +452,21 @@ export function KssWorkspace() {
               Rotation
             </CardTitle>
             <CardDescription>The order departments present in, and weeks with no session</CardDescription>
+            {/* Reordering only edits the draft; without a save here it was easy to reload and lose it. */}
+            {isDirty && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Unsaved changes</span>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => setDraft(savedSettings)}>
+                    Discard
+                  </Button>
+                  <Button size="sm" disabled={isSaving} onClick={saveSettings}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Save changes
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="divide-y rounded-md border">

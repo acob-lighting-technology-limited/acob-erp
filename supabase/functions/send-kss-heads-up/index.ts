@@ -126,7 +126,7 @@ serve(async (req) => {
     // Preview: one email to a single address, no notifications, nothing marked sent.
     // Service-role callers only, so the public anon key cannot use it as a relay.
     const previewTo = typeof body.previewTo === "string" ? body.previewTo.trim() : ""
-    const bearer = (req.headers.get("Authorization") || "").replace(/^Bearers+/i, "").trim()
+    const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim()
     if (previewTo && !isServiceRoleBearer(bearer)) {
       return json({ error: "Preview requires the service role" }, 403)
     }
@@ -197,7 +197,7 @@ serve(async (req) => {
           email,
           name: profile.full_name || "",
           // Greet by first name; fall back to the first word of the full name.
-          firstName: (profile.first_name || "").trim() || (profile.full_name || "").trim().split(/s+/)[0] || "",
+          firstName: (profile.first_name || "").trim() || (profile.full_name || "").trim().split(/\s+/)[0] || "",
         })
       }
     }
