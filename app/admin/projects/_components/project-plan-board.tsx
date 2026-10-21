@@ -58,7 +58,7 @@ import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import { countWork } from "@/lib/projects/health"
-import { TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
+import { EMPTY_TASK_FORM, TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task } from "@/types/task"
 import type { Project } from "@/components/projects/project-list-content"
@@ -73,26 +73,6 @@ type Plan = {
 }
 
 type ProjectTask = WorkTask
-
-const EMPTY_TASK_FORM: TaskFormState = {
-  title: "",
-  description: "",
-  priority: "medium",
-  status: "pending",
-  assigned_to: "",
-  department: "",
-  due_date: "",
-  assignment_type: "individual",
-  assigned_users: [],
-  project_id: "",
-  portfolio_id: "",
-  plan_id: "",
-  goal_id: "",
-  kpi_id: "",
-  weight: TASK_WEIGHT_DEFAULT,
-  task_start_date: "",
-  task_end_date: "",
-}
 
 export type ProjectPlanStaffOption = {
   id: string

@@ -39,6 +39,7 @@ import { useSites } from "@/hooks/use-sites"
 import type { SiteRecord } from "@/lib/sites/records"
 import { SitesTable, type SiteDialogState } from "@/components/sites/sites-table"
 import { WorkTasksTable } from "@/components/projects/work-tasks-table"
+import { PortfolioTaskDialog } from "@/components/projects/portfolio-task-dialog"
 import { fetchPortfolioTasks, portfolioTasksKey } from "@/lib/projects/work-tasks"
 
 type ManagerOption = {
@@ -68,6 +69,7 @@ export function PortfolioDetail({
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isManageOpen, setIsManageOpen] = useState(false)
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
   const [siteDialog, setSiteDialog] = useState<SiteDialogState>({ mode: "closed" })
   const [deletingSite, setDeletingSite] = useState<SiteRecord | null>(null)
   // Only `canEdit` is read here; the Sites tab shares this query's cache entry.
@@ -195,9 +197,9 @@ export function PortfolioDetail({
                 <FolderCog className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Manage Projects</span>
               </Button>
-              <Button size="sm" onClick={() => setIsAddProjectOpen(true)} aria-label="New project">
+              <Button size="sm" onClick={() => setIsAddProjectOpen(true)} aria-label="Add project">
                 <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">New Project</span>
+                <span className="hidden sm:inline">Add Project</span>
               </Button>
             </>
           )}
@@ -205,6 +207,12 @@ export function PortfolioDetail({
             <Button size="sm" onClick={() => setSiteDialog({ mode: "add" })} aria-label="Add site">
               <Plus className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Add Site</span>
+            </Button>
+          )}
+          {activeTab === "tasks" && isAdmin && (
+            <Button size="sm" onClick={() => setIsAddTaskOpen(true)} aria-label="Add task">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Task</span>
             </Button>
           )}
         </div>
@@ -293,6 +301,12 @@ export function PortfolioDetail({
               setIsManageOpen(false)
               setIsAddProjectOpen(true)
             }}
+          />
+          <PortfolioTaskDialog
+            open={isAddTaskOpen}
+            onOpenChange={setIsAddTaskOpen}
+            portfolio={portfolio}
+            profiles={profiles}
           />
           <ProjectDialogs
             profiles={profiles}
