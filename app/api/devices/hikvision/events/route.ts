@@ -25,24 +25,36 @@ const HikvisionEventSchema = z.object({
 
 type ParsedEvent = z.infer<typeof HikvisionEventSchema>
 
+/**
+ * The punch could not be read or saved. The device must not get a 200 for it:
+ * a 200 tells the terminal the punch was delivered and it drops it, so on a
+ * database outage every swipe was lost (21 Oct 2026). Any other status makes
+ * it keep the punch and resend it with its backlog.
+ */
+class PunchNotStoredError extends Error {}
+
+/** A stalled database must fail fast so the device retries, not hang the request for minutes. */
+const DB_REQUEST_TIMEOUT_MS = 15_000
+
 async function processHikvisionEvent(event: ParsedEvent) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !supabaseServiceKey) {
-    log.error({}, "Missing Supabase env vars — cannot process Hikvision event")
-    return
+    throw new PunchNotStoredError("Missing Supabase env vars")
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(DB_REQUEST_TIMEOUT_MS) }) },
   })
 
   // Load attendance policy configuration
-  const { data: settingRow } = await supabase
+  const { data: settingRow, error: settingError } = await supabase
     .from("system_settings")
     .select("value")
     .eq("key", "attendance_policy")
     .maybeSingle()
+  if (settingError) throw new PunchNotStoredError(`attendance policy: ${settingError.message}`)
   // Merged over the defaults so a policy row saved before a field existed still
   // resolves that field rather than coming back undefined.
   const policy = { ...DEFAULT_ATTENDANCE_POLICY, ...((settingRow?.value as Partial<AttendancePolicy>) ?? {}) }
@@ -61,12 +73,14 @@ async function processHikvisionEvent(event: ParsedEvent) {
   // contract/part-time = CODE + suffix (e.g. "SIWES001"). Uppercased so casing on the
   // device (e.g. "siwes001") still matches. This is unique per person, unlike the old
   // suffix match which collided across namespaced ID series.
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
     .eq("device_key", employeeNoString.toUpperCase())
     .eq("employment_status", "active")
     .maybeSingle()
+  // Without this check a database failure read as "unknown employee" and the punch was skipped.
+  if (profileError) throw new PunchNotStoredError(`profile lookup: ${profileError.message}`)
 
   if (!profile) {
     log.info({ employeeNoString }, "No active profile found for device employee ID — skipping")
@@ -81,12 +95,13 @@ async function processHikvisionEvent(event: ParsedEvent) {
   const time = timeFull ? timeFull.substring(0, 8) : "00:00:00"
 
   // Fetch today's record
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("attendance_records")
     .select("id, clock_in, clock_out, status, source, manual_comment, waived")
     .eq("user_id", userId)
     .eq("date", date)
     .maybeSingle()
+  if (existingError) throw new PunchNotStoredError(`attendance record: ${existingError.message}`)
 
   // ── After-midnight exit rollback ─────────────────────────────────────────────
   // A swipe in the small hours from someone who has no record yet for the new day
@@ -101,12 +116,13 @@ async function processHikvisionEvent(event: ParsedEvent) {
     // eslint-disable-next-line no-restricted-syntax
     const prevDate = prevDateObj.toISOString().slice(0, 10)
 
-    const { data: prev } = await supabase
+    const { data: prev, error: prevError } = await supabase
       .from("attendance_records")
       .select("id, clock_in, clock_out, status, source, manual_comment, waived")
       .eq("user_id", userId)
       .eq("date", prevDate)
       .maybeSingle()
+    if (prevError) throw new PunchNotStoredError(`prior-day record: ${prevError.message}`)
 
     if (prev?.clock_in && !prev.clock_out) {
       // The exit crossed midnight; the schema stores clock_out as a same-day time,
@@ -149,7 +165,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
           { err: String(error), userId, prevDate },
           "Failed to close out prior-day record from after-midnight exit"
         )
-        return
+        throw new PunchNotStoredError("prior-day close-out failed")
       }
 
       await writeAuditLog(
@@ -234,7 +250,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
 
     if (error) {
       log.error({ err: String(error), userId, date }, "Failed to upsert clock-in")
-      return
+      throw new PunchNotStoredError("clock-in upsert failed")
     }
 
     await writeAuditLog(
@@ -300,7 +316,7 @@ async function processHikvisionEvent(event: ParsedEvent) {
 
     if (error) {
       log.error({ err: String(error), userId, date }, "Failed to update clock-out")
-      return
+      throw new PunchNotStoredError("clock-out update failed")
     }
 
     await writeAuditLog(
@@ -382,11 +398,14 @@ export async function POST(request: NextRequest) {
   // The DB write MUST complete before we return. Deferring it to after() caused
   // the device to receive 200 while the record was silently never written.
   // Hikvision tolerates the ~1-2s wait for Supabase to finish.
+  // Only a stored (or deliberately skipped) punch gets a 200. Anything else is a
+  // 503 so the device keeps the punch and resends it; a retry is harmless because
+  // a repeat of the same punch lands inside the 3-minute duplicate window.
   try {
     await processHikvisionEvent(result.data)
   } catch (err) {
-    log.error({ err: String(err) }, "Failed to process Hikvision event")
-    // Still return 200 so the device doesn't spam retries; the error is logged.
+    log.error({ err: String(err) }, "Failed to process Hikvision event; asking the device to retry")
+    return NextResponse.json({ error: "Punch not stored, retry later" }, { status: 503 })
   }
 
   return NextResponse.json({ success: true })
