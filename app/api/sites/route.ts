@@ -77,13 +77,20 @@ export async function POST(request: NextRequest) {
   try {
     await syncSiteDocuments(dataClient, created.id, parsed.data.documents, userId)
   } catch (docError) {
-    // The site exists without its paperwork; say so rather than pretend it failed.
-    log.error({ err: String(docError), siteId: created.id }, "Site added but its documents failed to save")
-    return apiError(
-      "The site was added, but its documents could not be saved. Open it and add them again.",
-      ApiErrorCode.DATABASE_ERROR,
-      500
-    )
+    // Undo the create so a failed save leaves nothing behind — otherwise a
+    // retry with the same name hits the unique index (409) while the first
+    // attempt sits in the register without its paperwork. Documents cascade.
+    log.error({ err: String(docError), siteId: created.id }, "Site documents failed to save; removing the new site")
+    const { error: rollbackError } = await dataClient.from("sites").delete().eq("id", created.id)
+    if (rollbackError) {
+      log.error({ err: rollbackError.message, siteId: created.id }, "Failed to remove site after document failure")
+      return apiError(
+        "The site was added, but its documents could not be saved. Open it and add them again.",
+        ApiErrorCode.DATABASE_ERROR,
+        500
+      )
+    }
+    return apiError("The site could not be saved. Please try again.", ApiErrorCode.DATABASE_ERROR, 500)
   }
 
   await writeAuditLog(
