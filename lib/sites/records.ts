@@ -93,28 +93,10 @@ export function siteRow(input: SiteFields) {
   }
 }
 
-/**
- * Make the site's documents match `documents`: update the ones that carry an
- * id, insert the new ones, then delete whatever the form no longer lists.
- * Deleting last means a failed write leaves the old documents in place rather
- * than an empty list.
- */
-export async function syncSiteDocuments(
-  client: SupabaseClient,
-  siteId: string,
-  documents: SiteFields["documents"],
-  userId: string
-) {
-  const { data: existing, error: existingError } = await client
-    .from("site_documents")
-    .select("id")
-    .eq("site_id", siteId)
-  if (existingError) throw existingError
-  const existingIds = new Set((existing || []).map((row: { id: string }) => row.id))
-
-  const now = new Date().toISOString()
-  const rows = documents.map((doc) => ({
-    site_id: siteId,
+/** A document as save_site takes it: blanks are null, and a label only for "other". */
+function documentRow(doc: SiteFields["documents"][number]) {
+  return {
+    id: doc.id ?? null,
     document_type: doc.document_type,
     label: doc.document_type === "other" ? blankToNull(doc.label) : null,
     status: doc.status,
@@ -122,33 +104,23 @@ export async function syncSiteDocuments(
     issued_on: blankToNull(doc.issued_on),
     expires_on: blankToNull(doc.expires_on),
     notes: blankToNull(doc.notes),
-    updated_by: userId,
-    updated_at: now,
-  }))
-
-  const keptIds = new Set<string>()
-  for (const [index, doc] of documents.entries()) {
-    // An id that is not this site's is treated as a new document, never as a
-    // way to edit another site's paperwork.
-    if (doc.id && existingIds.has(doc.id)) {
-      keptIds.add(doc.id)
-      const { error } = await client.from("site_documents").update(rows[index]).eq("id", doc.id).eq("site_id", siteId)
-      if (error) throw error
-    }
   }
+}
 
-  const inserts = documents
-    .map((doc, index) => ({ doc, row: rows[index] }))
-    .filter(({ doc }) => !(doc.id && existingIds.has(doc.id)))
-    .map(({ row }) => ({ ...row, created_by: userId }))
-  if (inserts.length > 0) {
-    const { error } = await client.from("site_documents").insert(inserts)
-    if (error) throw error
-  }
-
-  const removed = [...existingIds].filter((id) => !keptIds.has(id))
-  if (removed.length > 0) {
-    const { error } = await client.from("site_documents").delete().in("id", removed).eq("site_id", siteId)
-    if (error) throw error
-  }
+/**
+ * Create (`siteId` null) or update a site and make its documents exactly
+ * `input.documents` — in one transaction, via the save_site function, so a
+ * failure part way leaves the site and its documents as they were. Returns
+ * the site's id. Errors carry the Postgres code (23505 duplicate name,
+ * P0002 site not found).
+ */
+export async function saveSite(client: SupabaseClient, siteId: string | null, input: SiteFields, userId: string) {
+  const { data, error } = await client.rpc("save_site", {
+    p_site_id: siteId,
+    p_site: siteRow(input),
+    p_documents: input.documents.map(documentRow),
+    p_actor: userId,
+  })
+  if (error) throw error
+  return data as string
 }

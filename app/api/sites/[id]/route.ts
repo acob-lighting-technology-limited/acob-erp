@@ -5,7 +5,8 @@ import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode, serverError, validationError } from "@/lib/api/errors"
 import { resolveSiteAccess } from "@/lib/sites/access"
-import { loadSite, siteRow, syncSiteDocuments } from "@/lib/sites/records"
+import { loadSite, saveSite, siteRow } from "@/lib/sites/records"
+import { siteSaveErrorResponse } from "@/lib/sites/save-error"
 import { SiteFieldsSchema } from "@/lib/sites/schemas"
 
 export const dynamic = "force-dynamic"
@@ -44,26 +45,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   }
   if (!before) return apiError("Site not found", ApiErrorCode.NOT_FOUND, 404)
 
-  const row = siteRow(parsed.data)
-  const { error } = await dataClient
-    .from("sites")
-    .update({ ...row, updated_by: userId, updated_at: new Date().toISOString() })
-    .eq("id", id)
-  if (error) {
-    if (error.code === "23505") {
-      return apiError(
-        "A site with this name is already registered in that LGA and state.",
-        ApiErrorCode.ALREADY_EXISTS,
-        409
-      )
-    }
-    return serverError(log, error, "Failed to update the site")
-  }
-
   try {
-    await syncSiteDocuments(dataClient, id, parsed.data.documents, userId)
-  } catch (docError) {
-    return serverError(log, docError, "The site was updated, but its documents could not be saved")
+    await saveSite(dataClient, id, parsed.data, userId)
+  } catch (error) {
+    return siteSaveErrorResponse(log, error, "Failed to update the site")
   }
 
   await writeAuditLog(
@@ -73,7 +58,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       entityType: "site",
       entityId: id,
       oldValues: { ...siteRow({ ...before, documents: [] }), documents: before.documents.length },
-      newValues: { ...row, documents: parsed.data.documents.length },
+      newValues: { ...siteRow(parsed.data), documents: parsed.data.documents.length },
       context: { actorId: userId, source: "api", route: "/api/sites/[id]" },
     },
     { failOpen: true }

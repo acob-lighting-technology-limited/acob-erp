@@ -5,7 +5,8 @@ import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode, serverError, validationError } from "@/lib/api/errors"
 import { resolveSiteAccess } from "@/lib/sites/access"
-import { loadSite, loadSites, siteRow, syncSiteDocuments } from "@/lib/sites/records"
+import { loadSite, loadSites, saveSite, siteRow } from "@/lib/sites/records"
+import { siteSaveErrorResponse } from "@/lib/sites/save-error"
 import { SiteFieldsSchema } from "@/lib/sites/schemas"
 
 export const dynamic = "force-dynamic"
@@ -58,39 +59,11 @@ export async function POST(request: NextRequest) {
   const parsed = SiteFieldsSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return validationError(parsed.error.issues)
 
-  const { data: created, error } = await dataClient
-    .from("sites")
-    .insert({ ...siteRow(parsed.data), created_by: userId, updated_by: userId })
-    .select("id")
-    .single()
-  if (error || !created) {
-    if (error?.code === "23505") {
-      return apiError(
-        "A site with this name is already registered in that LGA and state.",
-        ApiErrorCode.ALREADY_EXISTS,
-        409
-      )
-    }
-    return serverError(log, error, "Failed to add the site")
-  }
-
+  let siteId: string
   try {
-    await syncSiteDocuments(dataClient, created.id, parsed.data.documents, userId)
-  } catch (docError) {
-    // Undo the create so a failed save leaves nothing behind — otherwise a
-    // retry with the same name hits the unique index (409) while the first
-    // attempt sits in the register without its paperwork. Documents cascade.
-    log.error({ err: String(docError), siteId: created.id }, "Site documents failed to save; removing the new site")
-    const { error: rollbackError } = await dataClient.from("sites").delete().eq("id", created.id)
-    if (rollbackError) {
-      log.error({ err: rollbackError.message, siteId: created.id }, "Failed to remove site after document failure")
-      return apiError(
-        "The site was added, but its documents could not be saved. Open it and add them again.",
-        ApiErrorCode.DATABASE_ERROR,
-        500
-      )
-    }
-    return apiError("The site could not be saved. Please try again.", ApiErrorCode.DATABASE_ERROR, 500)
+    siteId = await saveSite(dataClient, null, parsed.data, userId)
+  } catch (error) {
+    return siteSaveErrorResponse(log, error, "Failed to add the site")
   }
 
   await writeAuditLog(
@@ -98,7 +71,7 @@ export async function POST(request: NextRequest) {
     {
       action: "site.create",
       entityType: "site",
-      entityId: created.id,
+      entityId: siteId,
       newValues: { ...siteRow(parsed.data), documents: parsed.data.documents.length },
       context: { actorId: userId, source: "api", route: "/api/sites" },
     },
@@ -106,7 +79,7 @@ export async function POST(request: NextRequest) {
   )
 
   try {
-    return NextResponse.json({ data: await loadSite(dataClient, created.id) }, { status: 201 })
+    return NextResponse.json({ data: await loadSite(dataClient, siteId) }, { status: 201 })
   } catch (loadError) {
     return serverError(log, loadError, "The site was added but could not be reloaded")
   }
