@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   BarChart3,
+  ClipboardList,
   Clock,
   FolderCog,
   FolderKanban,
@@ -37,6 +38,8 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { useSites } from "@/hooks/use-sites"
 import type { SiteRecord } from "@/lib/sites/records"
 import { SitesTable, type SiteDialogState } from "@/components/sites/sites-table"
+import { WorkTasksTable } from "@/components/projects/work-tasks-table"
+import { fetchPortfolioTasks, portfolioTasksKey } from "@/lib/projects/work-tasks"
 
 type ManagerOption = {
   id: string
@@ -46,7 +49,7 @@ type ManagerOption = {
   department: string
 }
 
-/** One portfolio's own page: its projects ranked by what needs attention, its sites, and its charts. */
+/** One portfolio's own page: its projects ranked by what needs attention, its sites, its tasks, and its charts. */
 export function PortfolioDetail({
   portfolioId,
   isAdmin,
@@ -61,7 +64,7 @@ export function PortfolioDetail({
   const router = useRouter()
   const pathname = usePathname()
   const tabParam = searchParams.get("tab")
-  const activeTab = tabParam === "charts" || tabParam === "sites" ? tabParam : "projects"
+  const activeTab = tabParam === "charts" || tabParam === "sites" || tabParam === "tasks" ? tabParam : "projects"
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isManageOpen, setIsManageOpen] = useState(false)
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
@@ -69,6 +72,12 @@ export function PortfolioDetail({
   const [deletingSite, setDeletingSite] = useState<SiteRecord | null>(null)
   // Only `canEdit` is read here; the Sites tab shares this query's cache entry.
   const canEditSites = useSites(portfolioId).data?.canEdit ?? false
+  // The portfolio's own tasks plus every task on its projects.
+  const tasksQuery = useQuery({
+    queryKey: portfolioTasksKey(portfolioId),
+    queryFn: () => fetchPortfolioTasks(portfolioId),
+    enabled: activeTab === "tasks",
+  })
 
   // Same key and shape as the portfolios list, so the two pages share a cache.
   const portfoliosQuery = usePortfolios()
@@ -115,6 +124,7 @@ export function PortfolioDetail({
     () => [
       { key: "projects", label: "Projects", icon: FolderKanban },
       { key: "sites", label: "Sites", icon: MapPin },
+      { key: "tasks", label: "Tasks", icon: ClipboardList },
       { key: "charts", label: "Charts", icon: BarChart3 },
     ],
     []
@@ -124,6 +134,7 @@ export function PortfolioDetail({
     void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })
     void queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
     void queryClient.invalidateQueries({ queryKey: ["sites"] })
+    void queryClient.invalidateQueries({ queryKey: portfolioTasksKey(portfolioId) })
   }
 
   const backLink = { href: portfoliosListHref(isAdmin), label: "Back to Portfolios" }
@@ -140,7 +151,7 @@ export function PortfolioDetail({
             title="Couldn't load this portfolio"
             description={error instanceof Error ? error.message : "Something went wrong."}
             action={
-              <Button variant="outline" size="sm" onClick={refresh}>
+              <Button variant="outline" size="sm" onClick={refresh} aria-label="Refresh">
                 Try again
               </Button>
             }
@@ -167,31 +178,34 @@ export function PortfolioDetail({
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <PortfolioStatusBadge status={portfolio.status} />
-          <Button variant="outline" size="sm" onClick={refresh}>
+          <Button variant="outline" size="sm" onClick={refresh} aria-label="Refresh">
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          {activeTab === "sites" && canEditSites && (
-            <Button size="sm" onClick={() => setSiteDialog({ mode: "add" })}>
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Site</span>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)} aria-label="Edit portfolio">
+              <Pencil className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Edit</span>
             </Button>
           )}
-          {isAdmin && (
+          {/* One primary action per tab: the header follows what the tab shows. */}
+          {activeTab === "projects" && isAdmin && (
             <>
-              <Button variant="outline" size="sm" onClick={() => setIsManageOpen(true)}>
+              <Button variant="outline" size="sm" onClick={() => setIsManageOpen(true)} aria-label="Manage projects">
                 <FolderCog className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Manage Projects</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
-                <Pencil className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Edit</span>
-              </Button>
-              <Button size="sm" onClick={() => setIsAddProjectOpen(true)}>
+              <Button size="sm" onClick={() => setIsAddProjectOpen(true)} aria-label="New project">
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">New Project</span>
               </Button>
             </>
+          )}
+          {activeTab === "sites" && canEditSites && (
+            <Button size="sm" onClick={() => setSiteDialog({ mode: "add" })} aria-label="Add site">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Site</span>
+            </Button>
           )}
         </div>
       }
@@ -235,6 +249,15 @@ export function PortfolioDetail({
     >
       {activeTab === "charts" ? (
         <ProjectCharts projects={chartProjects} filterBy="project" />
+      ) : activeTab === "tasks" ? (
+        <WorkTasksTable
+          tasks={tasksQuery.data ?? []}
+          isLoading={tasksQuery.isLoading}
+          error={tasksQuery.error}
+          onRetry={() => void tasksQuery.refetch()}
+          showProject
+          emptyDescription="No tasks in this portfolio yet. Tasks on its projects, and tasks assigned to the whole portfolio from Task Management, show here."
+        />
       ) : activeTab === "sites" ? (
         <SitesTable
           portfolioId={portfolio.id}

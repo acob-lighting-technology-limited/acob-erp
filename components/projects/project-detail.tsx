@@ -7,9 +7,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   BarChart3,
+  Banknote,
   Briefcase,
   Calendar,
   CheckCircle2,
+  ClipboardList,
   Clock,
   FolderKanban,
   FolderTree,
@@ -51,10 +53,13 @@ import {
   toChartProject,
 } from "@/lib/projects/records"
 import { toLocalISODate } from "@/lib/utils/date"
+import { apiJson } from "@/lib/api-client"
+import { fetchProjectTasks, projectTasksKey } from "@/lib/projects/work-tasks"
+import { WorkTasksTable } from "@/components/projects/work-tasks-table"
 
 /**
- * One project's own page: what it is, how it is going, and its plans — the
- * one place plans are managed.
+ * One project's own page: what it is, how it is going, its plans (the one
+ * place plans are managed), payments, tasks and charts.
  */
 export function ProjectDetail({
   projectId,
@@ -70,7 +75,10 @@ export function ProjectDetail({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const activeTab = searchParams.get("tab") === "charts" ? "charts" : "plans"
+  const tabParam = searchParams.get("tab")
+  // Payments are finance records, shown on admin pages only.
+  const activeTab =
+    tabParam === "charts" || tabParam === "tasks" || (tabParam === "payments" && isAdmin) ? tabParam : "plans"
 
   const {
     data: projects = [],
@@ -86,12 +94,27 @@ export function ProjectDetail({
   const health = useMemo(() => (project ? projectHealth(project, toLocalISODate()) : null), [project])
   const chartProjects = useMemo(() => (project ? [toChartProject(project)] : []), [project])
 
+  // Same keys as the plan board, so a task saved there shows here without a reload.
+  const tasksQuery = useQuery({
+    queryKey: projectTasksKey(projectId),
+    queryFn: () => fetchProjectTasks(projectId),
+    enabled: activeTab === "tasks",
+  })
+  const plansQuery = useQuery({
+    queryKey: ["project-plans", projectId],
+    queryFn: async () =>
+      (await apiJson<{ data: Array<{ id: string; name: string }> }>(`/api/projects/${projectId}/plans`)).data,
+    enabled: activeTab === "tasks",
+  })
+
   const tabs = useMemo<DataTableTab[]>(
     () => [
       { key: "plans", label: "Plans", icon: FolderTree },
+      ...(isAdmin ? [{ key: "payments", label: "Payments", icon: Banknote }] : []),
+      { key: "tasks", label: "Tasks", icon: ClipboardList },
       { key: "charts", label: "Charts", icon: BarChart3 },
     ],
-    []
+    [isAdmin]
   )
 
   const backLink = { href: projectsListHref(isAdmin), label: "Back to Projects" }
@@ -279,9 +302,18 @@ export function ProjectDetail({
           </CardContent>
         </Card>
 
-        {isAdmin && <ProjectPaymentsCard projectId={project.id} />}
-
-        {activeTab === "charts" ? (
+        {activeTab === "payments" ? (
+          <ProjectPaymentsCard projectId={project.id} />
+        ) : activeTab === "tasks" ? (
+          <WorkTasksTable
+            tasks={tasksQuery.data ?? []}
+            isLoading={tasksQuery.isLoading || plansQuery.isLoading}
+            error={tasksQuery.error}
+            onRetry={() => void tasksQuery.refetch()}
+            plans={plansQuery.data ?? []}
+            emptyDescription="No tasks on this project yet. Add them to a plan on the Plans tab."
+          />
+        ) : activeTab === "charts" ? (
           <ProjectCharts projects={chartProjects} filterBy="none" />
         ) : (
           <Card>
