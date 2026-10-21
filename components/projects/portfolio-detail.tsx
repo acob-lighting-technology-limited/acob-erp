@@ -11,6 +11,7 @@ import {
   FolderKanban,
   FolderTree,
   Layers,
+  MapPin,
   Pencil,
   Plus,
   RefreshCw,
@@ -33,6 +34,9 @@ import { PROJECTS_QUERY_KEY, fetchProjectRecords, projectHealth, toChartProject 
 import { toLocalISODate } from "@/lib/utils/date"
 import { usePortfolios } from "@/hooks/use-portfolios"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { useSites } from "@/hooks/use-sites"
+import type { SiteRecord } from "@/lib/sites/records"
+import { SitesTable, type SiteDialogState } from "@/components/sites/sites-table"
 
 type ManagerOption = {
   id: string
@@ -42,7 +46,7 @@ type ManagerOption = {
   department: string
 }
 
-/** One portfolio's own page: its projects ranked by what needs attention, and its charts. */
+/** One portfolio's own page: its projects ranked by what needs attention, its sites, and its charts. */
 export function PortfolioDetail({
   portfolioId,
   isAdmin,
@@ -56,10 +60,15 @@ export function PortfolioDetail({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const activeTab = searchParams.get("tab") === "charts" ? "charts" : "projects"
+  const tabParam = searchParams.get("tab")
+  const activeTab = tabParam === "charts" || tabParam === "sites" ? tabParam : "projects"
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isManageOpen, setIsManageOpen] = useState(false)
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
+  const [siteDialog, setSiteDialog] = useState<SiteDialogState>({ mode: "closed" })
+  const [deletingSite, setDeletingSite] = useState<SiteRecord | null>(null)
+  // Only `canEdit` is read here; the Sites tab shares this query's cache entry.
+  const canEditSites = useSites(portfolioId).data?.canEdit ?? false
 
   // Same key and shape as the portfolios list, so the two pages share a cache.
   const portfoliosQuery = usePortfolios()
@@ -105,6 +114,7 @@ export function PortfolioDetail({
   const tabs = useMemo<DataTableTab[]>(
     () => [
       { key: "projects", label: "Projects", icon: FolderKanban },
+      { key: "sites", label: "Sites", icon: MapPin },
       { key: "charts", label: "Charts", icon: BarChart3 },
     ],
     []
@@ -113,6 +123,7 @@ export function PortfolioDetail({
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })
     void queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
+    void queryClient.invalidateQueries({ queryKey: ["sites"] })
   }
 
   const backLink = { href: portfoliosListHref(isAdmin), label: "Back to Portfolios" }
@@ -160,6 +171,12 @@ export function PortfolioDetail({
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
+          {activeTab === "sites" && canEditSites && (
+            <Button size="sm" onClick={() => setSiteDialog({ mode: "add" })}>
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Site</span>
+            </Button>
+          )}
           {isAdmin && (
             <>
               <Button variant="outline" size="sm" onClick={() => setIsManageOpen(true)}>
@@ -218,6 +235,14 @@ export function PortfolioDetail({
     >
       {activeTab === "charts" ? (
         <ProjectCharts projects={chartProjects} filterBy="project" />
+      ) : activeTab === "sites" ? (
+        <SitesTable
+          portfolioId={portfolio.id}
+          dialog={siteDialog}
+          setDialog={setSiteDialog}
+          deleting={deletingSite}
+          setDeleting={setDeletingSite}
+        />
       ) : (
         <ProjectsOverview projects={overviewItems} hrefFor={(project) => projectHref(project.id, isAdmin)} />
       )}
