@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useQueries } from "@tanstack/react-query"
 import { Clock, Download, FileCheck2, Inbox, PenLine, Plus, RefreshCw, Wallet, CheckCircle2 } from "lucide-react"
 import {
   DataTable,
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { apiJson } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
 import { exportRequisitionsToExcel, exportRequisitionsToPDF } from "@/lib/requisitions/export"
 import { STATUS_LABELS, formatNaira, progressLabel, requisitionSummary } from "@/lib/requisitions/format"
@@ -219,7 +221,28 @@ export function RequisitionsListPage({
         ? `Payment Requests and Petty Cash raised in ${deptName}.`
         : "Raise a Payment Request or Petty Cash, sign what is waiting on you, and follow your own."
 
-  const tabs = [...views.map((v) => VIEW_TABS[v]), ...extraTabs.map((t) => t.tab)]
+  // Each tab shows how many requisitions it holds. The list endpoint returns the
+  // rows for one view, so the count is the length of that view's list.
+  const countQueries = useQueries({
+    queries: views.map((v) => ({
+      queryKey: ["requisition-tab-count", v, v === "department" ? deptName : null],
+      queryFn: async () => {
+        const params = new URLSearchParams({ view: v })
+        if (v === "department" && deptName) params.set("department", deptName)
+        const json = await apiJson<{ data?: unknown[] }>(`/api/requisitions?${params}`)
+        return json.data?.length ?? 0
+      },
+      staleTime: 30_000,
+    })),
+  })
+  const tabs = [
+    ...views.map((v, i) => {
+      const base = VIEW_TABS[v]
+      const count = countQueries[i]?.data
+      return count === undefined ? base : { ...base, label: `${base.label} (${count})` }
+    }),
+    ...extraTabs.map((t) => t.tab),
+  ]
 
   return (
     <DataTablePage
