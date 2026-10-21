@@ -4,6 +4,8 @@
  * plan board shows on the Tasks tab without a reload.
  */
 
+import { apiJson } from "@/lib/api-client"
+
 export type WorkTask = {
   id: string
   title: string
@@ -33,10 +35,8 @@ export const projectTasksKey = (projectId: string) => ["project-tasks", projectI
 export const portfolioTasksKey = (portfolioId: string) => ["portfolio-tasks", portfolioId] as const
 
 async function fetchTasks(url: string): Promise<WorkTask[]> {
-  const res = await fetch(url, { cache: "no-store" })
-  const payload = await res.json()
-  if (!res.ok) throw new Error(payload?.error || "Failed to load tasks")
-  return (payload?.data || []) as WorkTask[]
+  const payload = await apiJson<{ data?: WorkTask[] }>(url, { cache: "no-store" })
+  return payload?.data ?? []
 }
 
 export const fetchProjectTasks = (projectId: string) => fetchTasks(`/api/projects/${projectId}/tasks`)
