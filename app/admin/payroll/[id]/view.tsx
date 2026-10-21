@@ -491,7 +491,13 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
       align: "center",
       render: (r) => (
         <div className="flex items-center justify-center gap-1">
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewRow(r)}>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            aria-label="View payslip"
+            onClick={() => setViewRow(r)}
+          >
             <Eye className="h-3.5 w-3.5" />
           </Button>
           {status === "completed" &&

@@ -2108,7 +2108,13 @@ export function LunchRegisterPage({
                 </Select>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => adjustCalendarMonth(-1)}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="Previous month"
+                  onClick={() => adjustCalendarMonth(-1)}
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="min-w-36 text-center text-sm font-medium">
@@ -2118,6 +2124,7 @@ export function LunchRegisterPage({
                   variant="outline"
                   size="icon"
                   className="h-8 w-8"
+                  aria-label="Next month"
                   onClick={() => adjustCalendarMonth(1)}
                   disabled={selectedMonth >= todayDate.substring(0, 7)}
                 >
