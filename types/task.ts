@@ -39,6 +39,9 @@ export interface Task {
   project_id?: string | null
   project_name?: string | null
   plan_id?: string | null
+  /** Portfolio-wide work not tied to one project. Never set together with project_id. */
+  portfolio_id?: string | null
+  portfolio_name?: string | null
   /** Shared by every row of one multi-assign fan-out. */
   group_id?: string | null
   weight: number

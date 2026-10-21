@@ -23,6 +23,7 @@ import {
   Send,
   Users,
   FolderKanban,
+  Layers,
   Download,
 } from "lucide-react"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
@@ -121,6 +122,7 @@ const INITIAL_TASK_FORM: TaskFormState = {
   assignment_type: "individual",
   assigned_users: [],
   project_id: "",
+  portfolio_id: "",
   plan_id: "",
   goal_id: "",
   kpi_id: "",
@@ -249,6 +251,7 @@ export function AdminTasksContent({
         assignment_type: task.assignment_type || "individual",
         assigned_users: [],
         project_id: task.project_id || "",
+        portfolio_id: task.portfolio_id || "",
         plan_id: task.plan_id || "",
         goal_id: task.goal_id || "",
         kpi_id: task.kpi_id || "",
@@ -305,6 +308,7 @@ export function AdminTasksContent({
         goal_id: activeTaskForm.goal_id || null,
         kpi_id: activeTaskForm.kpi_id || null,
         project_id: activeTaskForm.project_id || null,
+        portfolio_id: activeTaskForm.portfolio_id || null,
         plan_id: activeTaskForm.plan_id || null,
         weight: activeTaskForm.weight,
         task_start_date: activeTaskForm.task_start_date || null,
@@ -411,9 +415,15 @@ export function AdminTasksContent({
           <div className="flex flex-col gap-0.5">
             <span className="text-foreground font-medium">{r.title}</span>
             {r.project_name && (
-              <span className="text-primary/80 inline-flex items-center gap-1 text-[10px] font-medium">
+              <span className="text-primary/80 inline-flex items-center gap-1 text-xs font-medium">
                 <FolderKanban className="h-3 w-3 shrink-0" />
                 <span className="line-clamp-1">{r.project_name}</span>
+              </span>
+            )}
+            {r.portfolio_name && (
+              <span className="text-primary/80 inline-flex items-center gap-1 text-xs font-medium">
+                <Layers className="h-3 w-3 shrink-0" />
+                <span className="line-clamp-1">{r.portfolio_name}</span>
               </span>
             )}
           </div>
@@ -871,6 +881,7 @@ export function AdminTasksContent({
                 },
                 { label: "Strategic Goal", value: r.goal_title || "—" },
                 { label: "Project", value: r.project_name || "—" },
+                { label: "Portfolio", value: r.portfolio_name || "—" },
                 { label: "Start Date", value: r.task_start_date ? formatWATDate(r.task_start_date) : "—" },
                 { label: "Due Date", value: r.due_date ? formatWATDate(r.due_date) : "No deadline" },
                 { label: "Description", value: r.description || null, fullWidth: true },

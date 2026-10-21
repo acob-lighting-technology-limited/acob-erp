@@ -19,6 +19,7 @@ import { toLocalISODate } from "@/lib/utils/date"
 import type { Task, TaskPersonSummary } from "@/types/task"
 import { createNotification } from "@/lib/notifications/create"
 import { TaskBodySchema } from "@/lib/tasks/schemas"
+import { hasWorkLinkConflict, loadWorkLinkNames, WORK_LINK_CONFLICT } from "@/lib/tasks/work-links"
 
 const log = logger("tasks-route")
 
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
         kpi_id,
         project_id,
         plan_id,
+        portfolio_id,
         weight,
         rating,
         rated_by,
@@ -130,7 +132,6 @@ export async function GET(request: NextRequest) {
     const profileIds = new Set<string>()
     const goalIds = new Set<string>()
     const kpiIds = new Set<string>()
-    const projectIds = new Set<string>()
     const multipleTaskIds: string[] = []
 
     tasks.forEach((t) => {
@@ -142,13 +143,12 @@ export async function GET(request: NextRequest) {
       if (t.reassigned_to) profileIds.add(t.reassigned_to)
       if (t.goal_id) goalIds.add(t.goal_id)
       if (t.kpi_id) kpiIds.add(t.kpi_id)
-      if (t.project_id) projectIds.add(t.project_id)
       if (t.assignment_type === "multiple") multipleTaskIds.push(t.id)
     })
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
 
-    const [profilesRes, goalsRes, kpisRes, assignmentsRes, projectsRes] = await Promise.all([
+    const [profilesRes, goalsRes, kpisRes, assignmentsRes, { projectNames, portfolioNames }] = await Promise.all([
       profileIds.size > 0
         ? supabase.from("profiles").select("id, first_name, last_name, department").in("id", Array.from(profileIds))
         : { data: [] },
@@ -164,9 +164,7 @@ export async function GET(request: NextRequest) {
       multipleTaskIds.length > 0
         ? supabase.from("task_assignments").select("task_id, user_id").in("task_id", multipleTaskIds)
         : { data: [] },
-      projectIds.size > 0
-        ? dataClient.from("projects").select("id, project_name").in("id", Array.from(projectIds))
-        : { data: [] },
+      loadWorkLinkNames(dataClient, tasks),
     ])
 
     const profileMap = new Map<string, TaskPersonSummary>(
@@ -177,9 +175,6 @@ export async function GET(request: NextRequest) {
     )
     type KpiInfo = { id: string; measure: string; strategic_objective: string; strategic_priority: string }
     const kpiMap = new Map<string, KpiInfo>(((kpisRes.data || []) as KpiInfo[]).map((k) => [k.id, k]))
-    const projectMap = new Map<string, string>(
-      ((projectsRes.data || []) as Array<{ id: string; project_name: string }>).map((p) => [p.id, p.project_name])
-    )
 
     // Check if assignments referenced additional users
     const assignmentRows = (assignmentsRes.data || []) as Array<{ task_id: string; user_id: string }>
@@ -212,7 +207,8 @@ export async function GET(request: NextRequest) {
       if (t.reviewed_by) copy.reviewed_by_user = profileMap.get(t.reviewed_by)
       if (t.reassigned_to) copy.reassigned_to_user = profileMap.get(t.reassigned_to)
       if (t.goal_id) copy.goal_title = goalMap.get(t.goal_id) || null
-      if (t.project_id) copy.project_name = projectMap.get(t.project_id) || null
+      if (t.project_id) copy.project_name = projectNames.get(t.project_id) || null
+      if (t.portfolio_id) copy.portfolio_name = portfolioNames.get(t.portfolio_id) || null
       if (t.kpi_id) {
         const kpi = kpiMap.get(t.kpi_id)
         if (kpi) {
@@ -283,6 +279,9 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = parsed.data
+    if (hasWorkLinkConflict(payload.project_id, payload.portfolio_id)) {
+      return apiError(WORK_LINK_CONFLICT, ApiErrorCode.VALIDATION_ERROR, 400)
+    }
     const resolvedDepartment = payload.department || profile?.department || null
 
     // Determine target users to assign
@@ -374,6 +373,7 @@ export async function POST(request: NextRequest) {
         kpi_id: payload.kpi_id || null,
         project_id: payload.project_id || null,
         plan_id: payload.plan_id || null,
+        portfolio_id: payload.portfolio_id || null,
         weight: payload.weight,
         task_start_date: payload.task_start_date || null,
         task_end_date: payload.task_end_date || null,
@@ -466,6 +466,7 @@ export async function POST(request: NextRequest) {
       kpi_id: payload.kpi_id || null,
       project_id: payload.project_id || null,
       plan_id: payload.plan_id || null,
+      portfolio_id: payload.portfolio_id || null,
       weight: payload.weight,
       task_start_date: payload.task_start_date || null,
       task_end_date: payload.task_end_date || null,

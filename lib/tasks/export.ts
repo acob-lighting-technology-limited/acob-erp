@@ -105,6 +105,7 @@ function userPlanTaskRow(r: UserPlanExportRow, task: Task, today: string): Expor
     Goal: task.goal_title || "-",
     KPI: task.kpi_measure || "-",
     Project: task.project_name || "-",
+    Portfolio: task.portfolio_name || "-",
   }
 }
 
@@ -123,6 +124,7 @@ function taskListRow(task: Task, ownerLabel: (task: Task) => string, today: stri
     Goal: task.goal_title || "-",
     KPI: task.kpi_measure || "-",
     Project: task.project_name || "-",
+    Portfolio: task.portfolio_name || "-",
     Created: dateOrDash(task.created_at),
     "Completed Date": dateOrDash(task.completed_at),
   }
