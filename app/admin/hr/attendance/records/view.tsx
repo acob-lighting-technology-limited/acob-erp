@@ -395,6 +395,7 @@ export function AdminAttendanceRecordsPage({
         </div>
 
         <DataTable<AttendanceRecord>
+          export={{ filename: "attendance-records", title: "Attendance Records" }}
           data={records}
           columns={columns}
           onProcessedDataChange={setProcessedRecords}
