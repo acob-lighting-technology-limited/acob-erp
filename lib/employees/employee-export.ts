@@ -154,7 +154,6 @@ export async function exportEmployeesToPDF(
     doc.text(`Total Employees: ${employees.length}`, 14, 28)
 
     const dataToExport = employees.map((member, index) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row: any[] = []
       const headers: string[] = []
 
@@ -294,7 +293,7 @@ export async function exportEmployeesToWord(rows: Record<string, unknown>[], fil
       Document,
       Packer,
       Paragraph,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       Table,
       TableCell,
       TableRow,
@@ -308,7 +307,7 @@ export async function exportEmployeesToWord(rows: Record<string, unknown>[], fil
     const columnKeys = Object.keys(rows[0] || {})
 
     // Build header row
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const headerCells: any[] = columnKeys.map(
       (column) =>
         new TableCell({
@@ -319,7 +318,6 @@ export async function exportEmployeesToWord(rows: Record<string, unknown>[], fil
     const tableRows = [
       new TableRow({ children: headerCells }),
       ...rows.map((row) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rowCells: any[] = columnKeys.map(
           (column) => new TableCell({ children: [new Paragraph(String(row[column] ?? "-"))] })
         )

@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { formatWATDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter, useSearchParams } from "next/navigation"
 import { BadgeCheck, CalendarClock, Eye, Plus, ShoppingCart, Wallet } from "lucide-react"
@@ -13,6 +12,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { PurchaseOrderFormDialog } from "./_components/purchase-order-form-dialog"
+import { formatCurrency, formatDate } from "@/lib/format"
 
 interface PurchaseOrder {
   id: string
@@ -42,14 +42,6 @@ async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load purchase orders")
   const json = await res.json()
   return (json.data || []) as PurchaseOrder[]
-}
-
-function formatCurrency(amount: number, currency = "NGN") {
-  return new Intl.NumberFormat("en-NG", { style: "currency", currency }).format(amount)
-}
-
-function formatDate(date: string) {
-  return formatWATDate(date, { year: "numeric", month: "short", day: "numeric" })
 }
 
 function getDeliveryWindow(order: PurchaseOrder) {

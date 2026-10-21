@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["scripts/**/*.{ts,mjs,js}", "e2e/**/*.ts", "lib/__tests__/**/*.test.ts"],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "components/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "hooks/**/*.{ts,tsx}",
+    "providers/**/*.{ts,tsx}"
+  ],
+  "ignore": ["supabase/functions/**", "services/**", "templates/**"]
+}

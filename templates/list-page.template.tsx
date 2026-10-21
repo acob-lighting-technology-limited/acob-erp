@@ -1,220 +1,136 @@
 /**
- * LIST PAGE TEMPLATE
+ * LIST PAGE TEMPLATE — follows AGENTS.md "Table Page Standard".
  *
- * Use this template for pages that display lists of items with:
- * - Stats cards at the top
- * - Filters section
- * - Table or grid of items
+ * Copy into app/<area>/<page>/ as two files:
+ *   page.tsx            → the server part (auth + data, bottom of this file)
+ *   <page>-content.tsx  → the client part (DataTablePage + DataTable)
+ * and add a loading.tsx that renders <TablePageSkeleton> with the same
+ * stats/filters/tabs counts.
  *
- * Examples: employee list, Tasks list, Products list, Projects list
+ * Never hand-build a list with raw <Table>/<TableHeader>: DataTable already gives
+ * search, filters + pills, sorting, column toggle, pagination, mobile list,
+ * skeleton, error and empty states.
  */
+"use client"
 
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { PageWrapper, PageHeader } from "@/components/layout"
+import { Package, Plus, CheckCircle2, Clock } from "lucide-react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { DataTable, DataTablePage } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { EmptyState } from "@/components/ui/empty-state"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, Package } from "lucide-react"
-import Link from "next/link"
+import { StatusBadge } from "@/components/ui/patterns"
+import { formatDate } from "@/lib/format"
 
-// ============================================
-// TYPES
-// ============================================
-
-interface Item {
+export interface ItemRow {
   id: string
   name: string
-  status: string
+  department: string
+  status: "active" | "pending" | "archived"
   created_at: string
 }
 
-interface Stats {
-  total: number
-  active: number
-  // Add more stats as needed
+const columns: DataTableColumn<ItemRow>[] = [
+  {
+    key: "name",
+    label: "Name",
+    sortable: true,
+    accessor: (row) => row.name,
+    render: (row) => <span className="font-medium">{row.name}</span>,
+  },
+  { key: "department", label: "Department", sortable: true, accessor: (row) => row.department },
+  {
+    key: "status",
+    label: "Status",
+    accessor: (row) => row.status,
+    render: (row) => <StatusBadge status={row.status} />,
+  },
+  {
+    key: "created_at",
+    label: "Created",
+    sortable: true,
+    hideOnMobile: true,
+    accessor: (row) => row.created_at,
+    render: (row) => formatDate(row.created_at),
+  },
+]
+
+function buildFilters(departments: string[]): DataTableFilter<ItemRow>[] {
+  return [
+    { key: "department", label: "Department", options: departments.map((d) => ({ value: d, label: d })) },
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "active", label: "Active" },
+        { value: "pending", label: "Pending" },
+        { value: "archived", label: "Archived" },
+      ],
+    },
+  ]
 }
 
-// ============================================
-// DATA FETCHING (Server-side)
-// ============================================
-
-async function getPageData() {
-  const supabase = await createClient()
-
-  // 1. Check authentication
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    return { redirect: "/auth/login" as const }
-  }
-
-  // 2. Check authorization (optional)
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (profileError) {
-    throw profileError
-  }
-
-  if (!profile || !["super_admin", "admin", "lead"].includes(profile.role)) {
-    return { redirect: "/dashboard" as const }
-  }
-
-  // 3. Fetch data
-  const [
-    { data: items, error: itemsError },
-    { count: total, error: totalError },
-    { count: active, error: activeError },
-  ] = await Promise.all([
-    supabase.from("items").select("*").order("created_at", { ascending: false }),
-    supabase.from("items").select("*", { count: "exact", head: true }),
-    supabase.from("items").select("*", { count: "exact", head: true }).eq("status", "active"),
-  ])
-
-  if (itemsError || totalError || activeError) {
-    throw itemsError ?? totalError ?? activeError
-  }
-
-  return {
-    items: (items || []) as Item[],
-    stats: {
-      total: total || 0,
-      active: active || 0,
-    } as Stats,
-    userRole: profile?.role,
-  }
-}
-
-// ============================================
-// PAGE COMPONENT
-// ============================================
-
-export default async function ListPage() {
-  const data = await getPageData()
-
-  // Handle redirects
-  if ("redirect" in data && data.redirect) {
-    redirect(data.redirect)
-  }
-
-  const pageData = data as {
-    items: Item[]
-    stats: Stats
-    userRole: string
-  }
+export function ItemsContent({ items, departments }: { items: ItemRow[]; departments: string[] }) {
+  const active = items.filter((item) => item.status === "active").length
+  const pending = items.filter((item) => item.status === "pending").length
 
   return (
-    <PageWrapper maxWidth="full" background="gradient">
-      {/* Page Header */}
-      <PageHeader
-        title="Items"
-        description="Manage your items"
-        icon={Package}
-        actions={
-          <Button asChild>
-            <Link href="/admin/items/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Link>
-          </Button>
-        }
+    <DataTablePage
+      title="Items"
+      description="Everything the team tracks, in one list."
+      icon={Package}
+      backLink={{ href: "/admin", label: "Back to Admin" }}
+      actions={
+        <Button size="sm" asChild>
+          <Link href="/admin/items/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Link>
+        </Button>
+      }
+      stats={
+        <StatGrid>
+          {/* Put the card people open the page to check among the first three. */}
+          <StatCard title="Pending" value={pending} icon={Clock} />
+          <StatCard title="Active" value={active} icon={CheckCircle2} />
+          <StatCard title="Total" value={items.length} icon={Package} />
+        </StatGrid>
+      }
+    >
+      <DataTable<ItemRow>
+        data={items}
+        columns={columns}
+        filters={buildFilters(departments)}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search name or department…"
+        searchFn={(row, q) => `${row.name} ${row.department}`.toLowerCase().includes(q)}
+        pagination={{ pageSize: 50 }}
+        urlSync
+        emptyTitle="No items yet"
+        emptyDescription="Add your first item to get started."
+        emptyIcon={Package}
       />
-
-      {/* Stats Section */}
-      <StatGrid>
-        <StatCard
-          variant="compact"
-          title="Total Items"
-          value={pageData.stats.total}
-          icon={Package}
-          iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-          iconColor="text-blue-600 dark:text-blue-400"
-        />
-        <StatCard
-          variant="compact"
-          title="Active"
-          value={pageData.stats.active}
-          icon={Package}
-          iconBgColor="bg-green-100 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
-        />
-      </StatGrid>
-
-      {/* Filters Section */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input placeholder="Search items..." className="pl-9" />
-            </div>
-            {/* Add more filters as needed */}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Items Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pageData.items.length === 0 ? (
-            <EmptyState
-              icon={Package}
-              title="No items yet"
-              description="Get started by adding your first item."
-              action={{ label: "Add Item", href: "/admin/items/new", icon: Plus }}
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageData.items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{item.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Intl.DateTimeFormat("en-US", {
-                        timeZone: "UTC",
-                        year: "numeric",
-                        month: "short",
-                        day: "2-digit",
-                      }).format(new Date(item.created_at))}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/admin/items/${item.id}`}>View</Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </PageWrapper>
+    </DataTablePage>
   )
 }
+
+/*
+ * page.tsx (server component):
+ *
+ *   import { redirect } from "next/navigation"
+ *   import { createClient } from "@/lib/supabase/server"
+ *   import { ItemsContent } from "./items-content"
+ *
+ *   export default async function ItemsPage() {
+ *     const supabase = await createClient()
+ *     const { data: { user } } = await supabase.auth.getUser()
+ *     if (!user) redirect("/auth/login")
+ *     const { data } = await supabase
+ *       .from("items")
+ *       .select("id, name, department, status, created_at")   // explicit columns
+ *       .order("created_at", { ascending: false })
+ *       .limit(500)                                            // always bounded
+ *     return <ItemsContent items={data ?? []} departments={[]} />
+ *   }
+ */

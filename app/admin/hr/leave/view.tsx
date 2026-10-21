@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useRef, useState, useEffect } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMemo, useRef, useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import {
   Clock,
@@ -26,7 +26,7 @@ import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
@@ -36,7 +36,7 @@ import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { LeaveCalendarView } from "./_components/leave-calendar-view"
 import { formatName } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
@@ -313,7 +313,13 @@ export function LeaveApprovePage({
   const overrideEvidenceRef = useRef(false)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const [selectedLeaveDetail, setSelectedLeaveDetail] = useState<LeaveItem | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  // Admin screens read identity through the scoped API, not the browser Supabase client.
+  const { data: currentUserId = null } = useQuery({
+    queryKey: QUERY_KEYS.adminCurrentUser(),
+    queryFn: async () =>
+      (await apiJson<{ userId?: string }>("/api/admin/current-user", { cache: "no-store" })).userId ?? null,
+    staleTime: 10 * 60 * 1000,
+  })
   const [addLeaveOpen, setAddLeaveOpen] = useState(false)
   // Adding leave here creates it already approved, skipping the workflow, so it is
   // Admin & HR only - the server refuses leads too (requireAttendanceAdmin).
@@ -329,15 +335,6 @@ export function LeaveApprovePage({
     approved_count: 0,
     pending_count: 0,
   })
-
-  useEffect(() => {
-    apiFetch("/api/admin/current-user", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (json?.userId) setCurrentUserId(json.userId)
-      })
-      .catch(() => {})
-  }, [])
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.leaveRequests({ scope: "approve", apiBasePath: normalizedApiBasePath }),

@@ -7,7 +7,13 @@ import { numberToNairaWords } from "@/lib/requisitions/number-to-words"
 import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
 import { resolveRequisitionStages } from "@/lib/requisitions/routing"
 import { parseCreateRequisition } from "@/lib/requisitions/schemas"
-import { REQUISITION_LIST_SELECT, getViewerContext, loadRequisition, loadRoutingLeads } from "@/lib/requisitions/server"
+import {
+  REQUISITION_LIST_SELECT,
+  findSignableStage,
+  getViewerContext,
+  loadRequisition,
+  loadRoutingLeads,
+} from "@/lib/requisitions/server"
 import { isOwnUploadPath, requireRequisitionUser, requisitionErrorResponse } from "@/lib/requisitions/route-helpers"
 import type { Requisition } from "@/lib/requisitions/types"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -71,9 +77,11 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query.returns<Requisition[]>()
     if (error) throw error
+    // sign_stage_id lets the table offer Sign and Reject on the rows she can act on.
     const rows = (data || []).map((req) => ({
       ...req,
       stages: [...(req.stages || [])].sort((a, b) => a.position - b.position),
+      sign_stage_id: findSignableStage(req, user.id)?.stage.id ?? null,
     }))
     return NextResponse.json({ data: rows, viewer: viewerFlags })
   } catch (err) {

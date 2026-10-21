@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
-import { apiError, ApiErrorCode } from "@/lib/api/errors"
+import { apiError, ApiErrorCode, validationError } from "@/lib/api/errors"
+import { CreatePortfolioSchema } from "@/lib/projects/schemas"
 import { computePortfolioHealth, computeProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
 import { toLocalISODate } from "@/lib/utils/date"
 
 export const dynamic = "force-dynamic"
 const log = logger("portfolios-api")
-
-const PortfolioSchema = z.object({
-  name: z.string().trim().min(1, "Portfolio name is required"),
-  code: z.string().trim().max(32).optional().nullable(),
-  description: z.string().trim().max(5000).optional().nullable(),
-  status: z.enum(["active", "on_hold", "closed"]).default("active"),
-})
 
 type ProjectRow = {
   id: string
@@ -113,9 +106,9 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser()
   if (!user) return apiError("Unauthorized", ApiErrorCode.UNAUTHORIZED, 401)
 
-  const parsed = PortfolioSchema.safeParse(await request.json())
+  const parsed = CreatePortfolioSchema.safeParse(await request.json())
   if (!parsed.success) {
-    return apiError(parsed.error.issues[0]?.message ?? "Validation failed", ApiErrorCode.VALIDATION_ERROR, 400)
+    return validationError(parsed.error.issues)
   }
 
   const { data, error } = await supabase

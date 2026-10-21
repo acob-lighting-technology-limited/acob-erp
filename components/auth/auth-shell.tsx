@@ -8,6 +8,7 @@ import WireframeForms from "@/components/ui/wireframe-forms"
 import GridTraces from "@/components/ui/grid-traces"
 import { getSeasonalLogoPaths } from "@/lib/seasonal-branding"
 import { cn } from "@/lib/utils"
+import { useMounted } from "@/hooks/use-mounted"
 
 /** Card styling shared by every `/auth/*` page so they sit on the shell consistently. */
 export const authCardClassName =
@@ -33,11 +34,7 @@ const DEFAULT_TAGLINE =
 
 export function AuthShell({ children, highlights, tagline = DEFAULT_TAGLINE, className }: AuthShellProps) {
   const { resolvedTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useMounted()
 
   // Light until mounted so SSR and first client render match.
   const mode = mounted && resolvedTheme === "dark" ? "dark" : "light"

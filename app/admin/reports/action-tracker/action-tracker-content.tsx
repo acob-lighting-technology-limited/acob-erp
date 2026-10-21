@@ -1,10 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useConfirm } from "@/providers/confirm-provider"
 import { useSearchParams } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDateTime } from "@/lib/utils/date"
-import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
+import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { toast } from "sonner"
 import {
   CheckCircle2,
@@ -36,6 +37,15 @@ import { apiFetch } from "@/lib/api-client"
 import { DirectiveFormDialog, type EditableDirective } from "@/components/admin/action-tracker/directive-form-dialog"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
+import {
+  formatDueDate,
+  getDeptSummaryStatus,
+  getDueDateClassName,
+  getItemStatusBadgeClass,
+  getSummaryBadgeClass,
+  type DepartmentSummaryStatus,
+} from "@/lib/reports/action-tracker-display"
 
 const log = logger("reports-action-tracker-action-tracker-co")
 
@@ -78,7 +88,7 @@ interface DepartmentActionRow {
   notStartedPoints: number
   inProgressPoints: number
   pendingPoints: number
-  summaryStatus: "Finished" | "Started" | "Not Started" | "Pending"
+  summaryStatus: DepartmentSummaryStatus
 }
 
 interface ExportScope {
@@ -114,65 +124,13 @@ async function fetchAdminActionTrackerTasks(
   return payload?.data || []
 }
 
-function resolveDueDate(task: ActionTask) {
-  if (task.due_date) {
-    const explicitDueDate = new Date(task.due_date)
-    if (!Number.isNaN(explicitDueDate.getTime())) {
-      return explicitDueDate
-    }
-  }
-  const sunday = getOfficeWeekMonday(task.week_number, task.year)
-  sunday.setDate(sunday.getDate() + 6)
-  sunday.setHours(23, 59, 0, 0)
-  return sunday
-}
-
-function formatDueDate(task: ActionTask) {
-  return formatWATDateTime(resolveDueDate(task), { day: "2-digit", month: "short", year: "numeric" })
-}
-
-function getDueDateClassName(task: ActionTask) {
-  const status = task.status.toLowerCase()
-  if (status === "completed") {
-    return "font-medium text-green-600 dark:text-green-400"
-  }
-
-  const dueDate = resolveDueDate(task)
-  if (dueDate.getTime() < Date.now()) {
-    return "font-semibold text-red-600 dark:text-red-400"
-  }
-
-  return "font-semibold text-yellow-600 dark:text-yellow-400"
-}
-
-function getDeptSummaryStatus(tasks: ActionTask[]): DepartmentActionRow["summaryStatus"] {
-  if (tasks.length === 0) return "Pending"
-  if (tasks.every((task) => task.status === "completed")) return "Finished"
-  if (tasks.some((task) => task.status === "in_progress" || task.status === "completed")) return "Started"
-  if (tasks.some((task) => task.status === "not_started")) return "Not Started"
-  return "Pending"
-}
-
-function getItemStatusBadgeClass(status: string) {
-  if (status === "completed") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "in_progress") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "not_started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
-}
-
-function getSummaryBadgeClass(status: DepartmentActionRow["summaryStatus"]) {
-  if (status === "Finished") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "Started") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "Not Started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
-}
-
 export function ActionTrackerContent({
   initialDepartments,
   scopedDepartments = [],
   editableDepartments = [],
   canGlobalEdit = false,
 }: ActionTrackerContentProps) {
+  const confirm = useConfirm()
   const currentOfficeWeek = getCurrentOfficeWeek()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
@@ -223,16 +181,7 @@ export function ActionTrackerContent({
     queryFn: () => fetchAdminActionTrackerTasks(weekFilter, yearFilter, deptFilter, scopedDepartments),
   })
 
-  const { data: lockState } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekFilter, yearFilter),
-    queryFn: async () => {
-      const res = await apiFetch(`/api/admin/reports/weekly-lock-state?week=${weekFilter}&year=${yearFilter}`, {
-        cache: "no-store",
-      })
-      if (!res.ok) throw new Error("Failed to resolve lock state")
-      return res.json()
-    },
-  })
+  const { data: lockState } = useAdminWeeklyReportLockState(weekFilter, yearFilter)
 
   const tasksQueryKey = QUERY_KEYS.adminActionTrackerTasks({ weekFilter, yearFilter, deptFilter, scopedDepartments })
 
@@ -295,7 +244,13 @@ export function ActionTrackerContent({
       toast.error("You can only edit actions in your departments")
       return
     }
-    if (!window.confirm(`Delete this directive?\n\n${directive.title}`)) return
+    const ok = await confirm({
+      title: "Delete this directive?",
+      description: directive.title,
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const response = await apiFetch(`/api/reports/action-tracker/${directive.id}`, { method: "DELETE" })
       const payload = (await response.json().catch(() => null)) as { error?: string } | null

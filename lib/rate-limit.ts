@@ -1,6 +1,9 @@
 import { Ratelimit } from "@upstash/ratelimit"
 import { Redis } from "@upstash/redis"
 import { createClient as createServiceClient } from "@supabase/supabase-js"
+import { logger } from "@/lib/logger"
+
+const log = logger("lib-rate-limit")
 
 interface Window {
   count: number
@@ -71,7 +74,7 @@ async function getPostgresRateLimitResult(key: string, opts: RateLimitOptions): 
     .single<{ allowed: boolean; remaining: number; reset_at: string }>()
 
   if (error || !data) {
-    console.error("Postgres rate limit check failed, failing open", error)
+    log.error("Postgres rate limit check failed, failing open", error)
     return null
   }
 
@@ -84,7 +87,7 @@ async function getPostgresRateLimitResult(key: string, opts: RateLimitOptions): 
 
 function getMemoryRateLimitResult(key: string, opts: RateLimitOptions): RateLimitResult {
   if (!hasWarnedAboutMemoryFallback) {
-    console.warn("Rate limiting falling back to in-memory — not suitable for production")
+    log.warn("Rate limiting falling back to in-memory — not suitable for production")
     hasWarnedAboutMemoryFallback = true
   }
 

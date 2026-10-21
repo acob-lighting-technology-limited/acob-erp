@@ -2,6 +2,9 @@ import "server-only"
 
 import type { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { logger } from "@/lib/logger"
+
+const log = logger("lib-projects-staff-options")
 
 type DbClient = Awaited<ReturnType<typeof createClient>>
 
@@ -18,7 +21,7 @@ export async function loadAssignableStaff(supabase: DbClient) {
     .order("first_name", { ascending: true })
 
   if (error) {
-    console.error("Error loading staff for project pages:", error)
+    log.error("Error loading staff for project pages:", error)
   }
 
   return (data || []).map((profile) => ({

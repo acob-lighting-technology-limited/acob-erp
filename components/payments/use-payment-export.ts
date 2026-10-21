@@ -38,10 +38,8 @@ export function usePaymentExport(
     return format(date, "dd-MM-yyyy")
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getExportData = () => {
     return payments.map((p, index) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const row: Record<string, any> = {}
       const receipts = p.documents?.filter((d) => d.document_type === "receipt" && d.applicable_date) || []
 
@@ -138,16 +136,16 @@ export function usePaymentExport(
       if (selectedColumns["Reference"]) headers.push("Ref")
 
       const dataToExport = getExportData()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const body = dataToExport.map((row) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rowData: any[] = []
         if (selectedColumns["#"]) rowData.push(row["#"])
         if (selectedColumns["Title"]) rowData.push(row["Title"])
         if (selectedColumns["Issuer"]) rowData.push(row["Issuer"])
         if (selectedColumns["Department"]) rowData.push(row["Department"])
-        if (selectedColumns["Amount"]) rowData.push(`${row["Currency"]} ${row["Amount"].toLocaleString()}`)
-        if (selectedColumns["Amount Due"]) rowData.push(`${row["Currency"]} ${row["Amount Due"].toLocaleString()}`)
+        if (selectedColumns["Amount"]) rowData.push(`${row["Currency"]} ${row["Amount"].toLocaleString("en-NG")}`)
+        if (selectedColumns["Amount Due"])
+          rowData.push(`${row["Currency"]} ${row["Amount Due"].toLocaleString("en-NG")}`)
         if (selectedColumns["Currency"]) rowData.push(row["Currency"])
         if (selectedColumns["Type"]) rowData.push(row["Type"])
         if (selectedColumns["Status"]) rowData.push(row["Status"])

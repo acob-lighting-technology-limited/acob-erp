@@ -122,7 +122,6 @@ function resolveAssetDepartment(asset: AssetForExport, employees: { id: string; 
  * The caller must pass the assets already sorted and filtered.
  */
 export function buildAssetExportRows(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   assets: any[],
   opts: AssetExportOptions,
   getAssignedToLabelFn?: (asset: AssetForExport, withStatus: boolean) => string

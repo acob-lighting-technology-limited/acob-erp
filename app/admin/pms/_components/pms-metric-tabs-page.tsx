@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { BarChart3, CheckCircle2, Clock3, Download, Loader2, Plus, ShieldCheck, Target, Users } from "lucide-react"
 import { toast } from "sonner"
@@ -27,7 +27,9 @@ import {
 import { toLocalISODate } from "@/lib/utils/date"
 import { usePmsCadence } from "@/components/pms/use-pms-cadence"
 import { IndividualAttendanceExpandedRow } from "./individual-attendance-expanded-row"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type MetricKey = "kpi" | "goals" | "attendance" | "behaviour"
 type TabKey = "individual" | "department" | "cycle"
@@ -90,120 +92,156 @@ function MetricAddDialog({
   initialUserId?: string
   initialCycleId?: string
 }) {
-  const [userId, setUserId] = useState("")
-  const [cycleId, setCycleId] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [goalId, setGoalId] = useState("")
-  const [department, setDepartment] = useState("")
-  const [scoreValue] = useState("")
-  const [strengths, setStrengths] = useState("")
-  const [areasForImprovement, setAreasForImprovement] = useState("")
-  const [managerComments, setManagerComments] = useState("")
-  // Whatever the admin Competencies page has configured, not a fixed set of
-  // six keys — a competency added or renamed there used to never appear here.
-  const [competencies, setCompetencies] = useState<Record<string, string>>({})
-  const [competencyFrameworks, setCompetencyFrameworks] = useState<Array<{ key: string; label: string }>>([])
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        {/* Mounted only while open, so every open starts from the initial selection. */}
+        {open ? (
+          <MetricAddForm
+            metric={metric}
+            onOpenChange={onOpenChange}
+            users={users}
+            cycles={cycles}
+            onSaved={onSaved}
+            initialUserId={initialUserId}
+            initialCycleId={initialCycleId}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
 
+type MetricAddSeed = {
+  goalId: string
+  competencies: Record<string, unknown>
+  strengths: string
+  areasForImprovement: string
+  managerComments: string
+}
+
+async function fetchMetricAddSeed(metric: MetricKey, userId: string, cycleId: string, department: string) {
+  const seed: MetricAddSeed = {
+    goalId: "",
+    competencies: {},
+    strengths: "",
+    areasForImprovement: "",
+    managerComments: "",
+  }
+  if (metric === "goals") {
+    const payload = await apiJson<{ data?: Record<string, unknown>[] }>(
+      `/api/hr/performance/goals?department=${encodeURIComponent(department)}&cycle_id=${encodeURIComponent(cycleId)}`,
+      { cache: "no-store" }
+    )
+    const id = asString(payload.data?.[0]?.id)
+    seed.goalId = id === "-" ? "" : id
+  }
+  if (metric === "behaviour") {
+    const payload = await apiJson<{
+      data?: {
+        existing_review?: {
+          behaviour_competencies?: Record<string, unknown> | null
+          strengths?: string | null
+          areas_for_improvement?: string | null
+          manager_comments?: string | null
+        } | null
+      }
+    }>(`/api/hr/performance/score?user_id=${encodeURIComponent(userId)}&cycle_id=${encodeURIComponent(cycleId)}`, {
+      cache: "no-store",
+    })
+    const review = payload.data?.existing_review
+    seed.competencies = review?.behaviour_competencies || {}
+    seed.strengths = String(review?.strengths || "")
+    seed.areasForImprovement = String(review?.areas_for_improvement || "")
+    seed.managerComments = String(review?.manager_comments || "")
+  }
+  return seed
+}
+
+function MetricAddForm({
+  metric,
+  onOpenChange,
+  users,
+  cycles,
+  onSaved,
+  initialUserId,
+  initialCycleId,
+}: {
+  metric: MetricKey
+  onOpenChange: (open: boolean) => void
+  users: { id: string; name: string; department: string }[]
+  cycles: { id: string; name: string; review_type: string | null; status?: string | null }[]
+  onSaved: () => void
+  initialUserId?: string
+  initialCycleId?: string
+}) {
   const addableCycles = useMemo(() => {
     return cycles.filter((c) => matchesCadenceFor("quarterly", c.review_type, c.name))
   }, [cycles])
 
-  useEffect(() => {
-    if (!open) return
-    setUserId(initialUserId || "")
-    const validInitial = addableCycles.find((c) => c.id === initialCycleId)
-    setCycleId(validInitial?.id || addableCycles[0]?.id || "")
-    setStrengths("")
-    setAreasForImprovement("")
-    setManagerComments("")
-    setCompetencies({})
-  }, [open, users, cycles, addableCycles, initialUserId, initialCycleId])
+  const [userId, setUserId] = useState(initialUserId || "")
+  const [chosenCycleId, setCycleId] = useState(() => addableCycles.find((c) => c.id === initialCycleId)?.id || "")
+  const cycleId = chosenCycleId || addableCycles[0]?.id || ""
+  const [saving, setSaving] = useState(false)
+  const [scoreValue] = useState("")
+  const department = users.find((user) => user.id === userId)?.department || ""
 
-  useEffect(() => {
-    if (!open || metric !== "behaviour") return
-    let active = true
-    void (async () => {
-      const response = await apiFetch("/api/hr/performance/competencies", { cache: "no-store" })
-      const payload = (await response.json().catch(() => null)) as {
-        data?: Array<{ key: string; label: string; category: string; is_active: boolean }>
-      } | null
-      if (!active) return
-      const activeCompetencies = (payload?.data || []).filter(
-        (entry) => entry.is_active && entry.category === "behaviour"
-      )
-      setCompetencyFrameworks(activeCompetencies.map((entry) => ({ key: entry.key, label: entry.label })))
-      setCompetencies((prev) => {
-        const next = { ...prev }
-        for (const entry of activeCompetencies) if (!(entry.key in next)) next[entry.key] = ""
-        return next
-      })
-    })()
-    return () => {
-      active = false
-    }
-  }, [open, metric])
+  // Whatever the admin Competencies page has configured, not a fixed set of
+  // six keys — a competency added or renamed there used to never appear here.
+  const { data: competencyFrameworks = [] } = useQuery({
+    queryKey: QUERY_KEYS.competencies(),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: Array<{ key: string; label: string; category: string; is_active: boolean }> }>(
+          "/api/hr/performance/competencies",
+          { cache: "no-store" }
+        )
+      ).data ?? [],
+    enabled: metric === "behaviour",
+    select: (rows) =>
+      rows
+        .filter((entry) => entry.is_active && entry.category === "behaviour")
+        .map((entry) => ({ key: entry.key, label: entry.label })),
+  })
 
-  useEffect(() => {
-    if (!open || !userId || !cycleId) return
-    let active = true
-    setLoading(true)
+  // Existing data for the chosen employee + cycle.
+  const selectionKey = userId && cycleId ? `${userId}:${cycleId}` : ""
+  const seedQuery = useQuery({
+    queryKey: QUERY_KEYS.metricAddSeed(metric, userId, cycleId),
+    queryFn: () => fetchMetricAddSeed(metric, userId, cycleId, department),
+    enabled: Boolean(selectionKey),
+    staleTime: 0,
+  })
+  const loading = seedQuery.isFetching
+  const seed = seedQuery.data
 
-    void (async () => {
-      try {
-        const selectedUser = users.find((user) => user.id === userId)
-        setDepartment(selectedUser?.department || "")
-
-        if (metric === "goals") {
-          const response = await apiFetch(
-            `/api/hr/performance/goals?department=${encodeURIComponent(selectedUser?.department || "")}&cycle_id=${encodeURIComponent(cycleId)}`,
-            { cache: "no-store" }
-          )
-          const payload = (await response.json().catch(() => null)) as { data?: Record<string, unknown>[] } | null
-          const item = payload?.data?.[0]
-          if (!active) return
-          setGoalId(asString(item?.id) === "-" ? "" : asString(item?.id))
-        }
-
-        if (metric === "behaviour") {
-          const response = await apiFetch(
-            `/api/hr/performance/score?user_id=${encodeURIComponent(userId)}&cycle_id=${encodeURIComponent(cycleId)}`,
-            { cache: "no-store" }
-          )
-          const payload = (await response.json().catch(() => null)) as {
-            data?: {
-              existing_review?: {
-                behaviour_competencies?: Record<string, unknown> | null
-                strengths?: string | null
-                areas_for_improvement?: string | null
-                manager_comments?: string | null
-              } | null
-            }
-          } | null
-          const entry = payload?.data?.existing_review?.behaviour_competencies || {}
-          if (!active) return
-          setCompetencies((prev) => {
-            const keys = competencyFrameworks.length > 0 ? competencyFrameworks.map((f) => f.key) : Object.keys(prev)
-            const next: Record<string, string> = {}
-            for (const key of keys) {
-              const raw = entry[key]
-              next[key] = raw !== undefined && raw !== null ? asString(raw) : ""
-            }
-            return next
-          })
-          setStrengths(String(payload?.data?.existing_review?.strengths || ""))
-          setAreasForImprovement(String(payload?.data?.existing_review?.areas_for_improvement || ""))
-          setManagerComments(String(payload?.data?.existing_review?.manager_comments || ""))
-        }
-      } finally {
-        if (active) setLoading(false)
-      }
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [open, metric, userId, cycleId, users, competencyFrameworks])
+  type Draft = {
+    key: string
+    competencies: Record<string, string>
+    strengths: string
+    areasForImprovement: string
+    managerComments: string
+  }
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const activeDraft = draft && draft.key === selectionKey ? draft : null
+  const goalId = seed?.goalId ?? ""
+  const seededCompetencies = Object.fromEntries(
+    competencyFrameworks.map(({ key }) => {
+      const raw = seed?.competencies[key]
+      return [key, raw !== undefined && raw !== null ? asString(raw) : ""]
+    })
+  )
+  const competencies = activeDraft?.competencies ?? seededCompetencies
+  const strengths = activeDraft?.strengths ?? seed?.strengths ?? ""
+  const areasForImprovement = activeDraft?.areasForImprovement ?? seed?.areasForImprovement ?? ""
+  const managerComments = activeDraft?.managerComments ?? seed?.managerComments ?? ""
+  const edit = (patch: Partial<Omit<Draft, "key">>) =>
+    setDraft({ key: selectionKey, competencies, strengths, areasForImprovement, managerComments, ...patch })
+  const setCompetencies = (update: (prev: Record<string, string>) => Record<string, string>) =>
+    edit({ competencies: update(competencies) })
+  const setStrengths = (value: string) => edit({ strengths: value })
+  const setAreasForImprovement = (value: string) => edit({ areasForImprovement: value })
+  const setManagerComments = (value: string) => edit({ managerComments: value })
 
   async function handleSave() {
     setSaving(true)
@@ -253,106 +291,108 @@ function MetricAddDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add {metric.charAt(0).toUpperCase() + metric.slice(1)}</DialogTitle>
-          <DialogDescription>
-            Select employee and cycle first. Existing data auto-loads when available.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>Add {metric.charAt(0).toUpperCase() + metric.slice(1)}</DialogTitle>
+        <DialogDescription>Select employee and cycle first. Existing data auto-loads when available.</DialogDescription>
+      </DialogHeader>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Employee</Label>
-            <Select value={userId} onValueChange={setUserId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select employee" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Cycle</Label>
-            <Select value={cycleId} onValueChange={setCycleId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select cycle" />
-              </SelectTrigger>
-              <SelectContent>
-                {addableCycles.map((cycle) => (
-                  <SelectItem key={cycle.id} value={cycle.id}>
-                    {cycleOptionLabel(cycle, addableCycles)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading existing data...
-          </div>
-        ) : null}
-
-        {metric === "behaviour" ? (
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {Object.entries(competencies).map(([key, value]) => (
-                <div key={key} className="space-y-2">
-                  <Label>{competencyFrameworks.find((f) => f.key === key)?.label ?? key}</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={value}
-                    onChange={(e) => setCompetencies((prev) => ({ ...prev, [key]: clampMetricValue(e.target.value) }))}
-                  />
-                </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Employee</Label>
+          <Select value={userId} onValueChange={setUserId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select employee" />
+            </SelectTrigger>
+            <SelectContent>
+              {users.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.name}
+                </SelectItem>
               ))}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Strengths</Label>
-                <Textarea value={strengths} onChange={(e) => setStrengths(e.target.value)} rows={3} />
-              </div>
-              <div className="space-y-2">
-                <Label>Areas for Improvement</Label>
-                <Textarea
-                  value={areasForImprovement}
-                  onChange={(e) => setAreasForImprovement(e.target.value)}
-                  rows={3}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Cycle</Label>
+          <Select value={cycleId} onValueChange={setCycleId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select cycle" />
+            </SelectTrigger>
+            <SelectContent>
+              {addableCycles.map((cycle) => (
+                <SelectItem key={cycle.id} value={cycle.id}>
+                  {cycleOptionLabel(cycle, addableCycles)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading existing data...
+        </div>
+      ) : null}
+
+      {metric === "behaviour" ? (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {Object.entries(competencies).map(([key, value]) => (
+              <div key={key} className="space-y-2">
+                <Label>{competencyFrameworks.find((f) => f.key === key)?.label ?? key}</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={value}
+                  onChange={(e) => setCompetencies((prev) => ({ ...prev, [key]: clampMetricValue(e.target.value) }))}
                 />
               </div>
+            ))}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Strengths</Label>
+              <Textarea value={strengths} onChange={(e) => setStrengths(e.target.value)} rows={3} />
             </div>
             <div className="space-y-2">
-              <Label>Manager Comments</Label>
-              <Textarea value={managerComments} onChange={(e) => setManagerComments(e.target.value)} rows={4} />
+              <Label>Areas for Improvement</Label>
+              <Textarea value={areasForImprovement} onChange={(e) => setAreasForImprovement(e.target.value)} rows={3} />
             </div>
           </div>
-        ) : null}
-
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleSave()} loading={saving}>
-            Save
-          </Button>
+          <div className="space-y-2">
+            <Label>Manager Comments</Label>
+            <Textarea value={managerComments} onChange={(e) => setManagerComments(e.target.value)} rows={4} />
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      ) : null}
+
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button onClick={() => void handleSave()} loading={saving}>
+          Save
+        </Button>
+      </div>
+    </>
   )
 }
 
 // ─── PmsMetricTabsPage ────────────────────────────────────────────────────────
+
+async function fetchMetricSnapshot(metric: MetricKey, cycleId: string): Promise<MetricSnapshotPayload> {
+  const query = cycleId ? `&cycle_id=${encodeURIComponent(cycleId)}` : ""
+  const payload = await apiJson<{ data?: MetricSnapshotPayload }>(
+    `/api/hr/performance/metric-snapshot?metric=${metric}${query}`,
+    { cache: "no-store" }
+  )
+  if (!payload.data) throw new Error("Failed to fetch data")
+  return payload.data
+}
 
 export function PmsMetricTabsPage({
   metric,
@@ -370,74 +410,53 @@ export function PmsMetricTabsPage({
   attendanceBasePath?: string
 }) {
   const [tab, setTab] = useState<TabKey>("individual")
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const queryClient = useQueryClient()
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRawRows, setProcessedRawRows] = useState<Record<string, unknown>[]>([])
-  const [data, setData] = useState<MetricSnapshotPayload | null>(null)
-  const [cycleId, setCycleId] = useState("")
+  // The cycle the user picked; empty means "the current one" (adopted below).
+  const [chosenCycleId, setCycleId] = useState("")
   // Single Source of Truth for cadence across all PMS routes
   const [cycleType, setCycleType] = usePmsCadence()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null)
-  const hasLoadedSnapshotRef = useRef(false)
-  const cycleTypeRef = useRef(cycleType)
-  useEffect(() => {
-    cycleTypeRef.current = cycleType
-  }, [cycleType])
   const router = useRouter()
 
-  useEffect(() => {
-    let active = true
-    if (hasLoadedSnapshotRef.current) {
-      setIsRefreshing(true)
-    } else {
-      setIsInitialLoading(true)
-    }
+  // With no cycle picked the API chooses one by date window alone, which can be a
+  // mid-year or annual cycle while the Quarterly cadence is on screen — so adopt
+  // its pick only when it matches the cadence, else the cadence's current cycle.
+  const defaultSnapshot = useQuery({
+    queryKey: QUERY_KEYS.metricSnapshot(metric, ""),
+    queryFn: () => fetchMetricSnapshot(metric, ""),
+    enabled: !chosenCycleId,
+    meta: { errorMessage: "Failed to fetch data" },
+  })
+  const adoptedCycleId = useMemo(() => {
+    const payload = defaultSnapshot.data
+    if (!payload) return ""
+    const available = payload.cycles || []
+    const suggested = available.find((c) => c.id === payload.selected_cycle_id)
+    const next =
+      suggested && matchesCadenceFor(cycleType, suggested.review_type, suggested.name)
+        ? suggested
+        : pickCurrentCycle(available, toLocalISODate(), cycleType)
+    return next?.id ?? ""
+  }, [defaultSnapshot.data, cycleType])
+  const cycleId = chosenCycleId || adoptedCycleId
 
-    void (async () => {
-      try {
-        const query = cycleId ? `&cycle_id=${encodeURIComponent(cycleId)}` : ""
-        const response = await apiFetch(`/api/hr/performance/metric-snapshot?metric=${metric}${query}`, {
-          cache: "no-store",
-        })
-        const payload = (await response.json().catch(() => null)) as {
-          data?: MetricSnapshotPayload
-          error?: string
-        } | null
-        if (!response.ok) throw new Error(payload?.error || "Failed to fetch data")
-        if (!active || !payload?.data) return
-        setData(payload.data)
-        hasLoadedSnapshotRef.current = true
-        if (!cycleId) {
-          // The API picks its default cycle purely by date window, so it can hand
-          // back a mid-year or annual cycle while the Quarterly cadence is active.
-          // Only adopt it when it belongs to the cadence on screen.
-          const cadence = cycleTypeRef.current
-          const available = payload.data.cycles || []
-          const suggested = available.find((c) => c.id === payload.data?.selected_cycle_id)
-          const next =
-            suggested && matchesCadenceFor(cadence, suggested.review_type, suggested.name)
-              ? suggested
-              : pickCurrentCycle(available, toLocalISODate(), cadence)
-          if (next) setCycleId(next.id)
-        }
-      } catch (error) {
-        if (active) toast.error(error instanceof Error ? error.message : "Failed to fetch data")
-      } finally {
-        if (active) {
-          setIsInitialLoading(false)
-          setIsRefreshing(false)
-        }
-      }
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [metric, cycleId, refreshKey])
+  const cycleSnapshot = useQuery({
+    queryKey: QUERY_KEYS.metricSnapshot(metric, cycleId),
+    queryFn: () => fetchMetricSnapshot(metric, cycleId),
+    enabled: Boolean(cycleId),
+    // The default request already returned this cycle's rows when the API's pick was adopted.
+    initialData: () =>
+      defaultSnapshot.data && defaultSnapshot.data.selected_cycle_id === cycleId ? defaultSnapshot.data : undefined,
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to fetch data" },
+  })
+  const data: MetricSnapshotPayload | null = (cycleId ? cycleSnapshot.data : null) ?? defaultSnapshot.data ?? null
+  const isInitialLoading = !data && (defaultSnapshot.isLoading || cycleSnapshot.isLoading)
+  const isRefreshing = Boolean(data) && (defaultSnapshot.isFetching || cycleSnapshot.isFetching)
 
   // Rows are computed server-side over whichever cycle the API resolved. If that
   // cycle is outside the selected cadence (no quarterly cycle exists yet, say),
@@ -855,7 +874,9 @@ export function PmsMetricTabsPage({
           }}
           users={data?.users || []}
           cycles={data?.cycles || []}
-          onSaved={() => setRefreshKey((v) => v + 1)}
+          onSaved={() =>
+            void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.metricSnapshot(metric, "").slice(0, 2) })
+          }
           initialUserId={asString(editingRow?.user_id) === "-" ? "" : asString(editingRow?.user_id)}
           initialCycleId={cycleId}
         />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { BookOpen, Eye, Pencil, Plus, Target, TrendingUp, Users } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { toast } from "sonner"
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { useHrProfiles } from "@/hooks/use-hr-profiles"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { personName } from "@/lib/format"
 
 type Profile = {
   id: string
@@ -90,10 +95,6 @@ const PRIORITY_VARIANTS: Record<string, "default" | "secondary" | "outline" | "d
   low: "secondary",
 }
 
-function formatName(profile: Profile | null | undefined) {
-  return `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Unknown"
-}
-
 function formatDate(date: string | null | undefined) {
   if (!date) return "-"
   return formatWATDate(date, { day: "2-digit", month: "short", year: "numeric" })
@@ -119,7 +120,7 @@ function PlanCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold">{plan.title}</p>
-          <p className="text-muted-foreground text-xs">{formatName(plan.user)}</p>
+          <p className="text-muted-foreground text-xs">{personName(plan.user)}</p>
         </div>
         <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="capitalize">
           {plan.status.replace("_", " ")}
@@ -155,11 +156,8 @@ function PlanCard({
 }
 
 export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: string } = {}) {
-  const [plans, setPlans] = useState<DevelopmentPlan[]>([])
-  const [employees, setEmployees] = useState<Profile[]>([])
-  const [cycles, setCycles] = useState<Cycle[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { profiles: employees } = useHrProfiles<Profile>()
+  const { cycles } = usePerformanceCycles<Cycle>()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [viewingPlan, setViewingPlan] = useState<DevelopmentPlan | null>(null)
@@ -177,38 +175,26 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
   const [progressPct, setProgressPct] = useState("0")
   const [actionLines, setActionLines] = useState("")
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const [plansRes, profilesRes, cyclesRes] = await Promise.all([
-        apiFetch("/api/hr/performance/development-plans?user_id=all_admin"),
-        apiFetch("/api/hr/profiles?all=true"),
-        apiFetch("/api/hr/performance/cycles"),
-      ])
-      const [plansData, profilesData, cyclesData] = await Promise.all([
-        plansRes.json().catch(() => ({})),
-        profilesRes.json().catch(() => ({})),
-        cyclesRes.json().catch(() => ({})),
-      ])
-      if (!plansRes.ok) {
-        throw new Error(plansData?.error || "Failed to load development plans")
-      }
-      setPlans(plansData?.data || [])
-      setEmployees(profilesData?.data || [])
-      setCycles(cyclesData?.data || [])
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load development plans"
-      setError(message)
-      toast.error(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
+  const {
+    data: plans = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.adminDevelopmentPlans(),
+    queryFn: async () => {
+      const payload = await apiJson<{ data?: DevelopmentPlan[] }>(
+        "/api/hr/performance/development-plans?user_id=all_admin",
+        { cache: "no-store" }
+      )
+      return payload.data ?? []
+    },
+    meta: { errorMessage: "Failed to load development plans" },
+  })
+  const error = queryError?.message ?? null
+  const loadData = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const cycleNameMap = useMemo(() => new Map(cycles.map((cycle) => [cycle.id, cycle.name])), [cycles])
 
@@ -353,8 +339,8 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         key: "employee",
         label: "Employee",
         sortable: true,
-        accessor: (plan) => formatName(plan.user),
-        render: (plan) => <span className="font-medium">{formatName(plan.user)}</span>,
+        accessor: (plan) => personName(plan.user),
+        render: (plan) => <span className="font-medium">{personName(plan.user)}</span>,
         resizable: true,
         initialWidth: 180,
       },
@@ -533,7 +519,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         searchPlaceholder="Search employee, department, plan title, or focus area…"
         searchFn={(plan, query) =>
           [
-            formatName(plan.user),
+            personName(plan.user),
             plan.user?.department || "",
             plan.title,
             plan.description || "",
@@ -553,7 +539,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
             <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <p className="text-muted-foreground text-xs">Employee</p>
-                <p className="mt-1 font-medium">{formatName(plan.user)}</p>
+                <p className="mt-1 font-medium">{personName(plan.user)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Quarter</p>
@@ -575,7 +561,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          title: (plan) => `${formatName(plan.user)} · ${plan.title}`,
+          title: (plan) => `${personName(plan.user)} · ${plan.title}`,
           subtitle: (plan) =>
             `${plan.user?.department || "No dept"} · ${FOCUS_LABELS[plan.focus_area] || plan.focus_area} · Progress: ${plan.progress_pct}%`,
           trailing: (plan) => (
@@ -618,7 +604,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
                   <SelectContent>
                     {employees.map((employee) => (
                       <SelectItem key={employee.id} value={employee.id}>
-                        {formatName(employee)} {employee.department ? `(${employee.department})` : ""}
+                        {personName(employee)} {employee.department ? `(${employee.department})` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -792,7 +778,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
           <DialogHeader>
             <DialogTitle>{viewingPlan?.title || "Plan Details"}</DialogTitle>
             <DialogDescription>
-              {viewingPlan ? `${formatName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
+              {viewingPlan ? `${personName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
             </DialogDescription>
           </DialogHeader>
           {viewingPlan ? (

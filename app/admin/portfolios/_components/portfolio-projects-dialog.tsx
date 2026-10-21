@@ -45,11 +45,15 @@ export function PortfolioProjectsDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    setSearch("")
-    setSelected(new Set())
-  }, [open, portfolio?.id])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setSearch("")
+      setSelected(new Set())
+    }
+  }
 
   // Every project outside this portfolio can be added. Unassigned ones come
   // first, since they are the usual target; the rest would be moved.

@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         videoTitle = info.title
       }
     } catch (err) {
-      console.log("Could not fetch video title, using default")
+      log.info("Could not fetch video title, using default")
     }
 
     // Sanitize title for filename
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
           await unlink(tempFile)
         }
       } catch (err) {
-        console.error("Error cleaning up temp file:", err)
+        log.error("Error cleaning up temp file:", err)
       }
     }, 1000)
 
@@ -161,13 +161,13 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error downloading video:", error)
+    log.error("Error downloading video:", error)
 
     if (tempFile && existsSync(tempFile)) {
       try {
         await unlink(tempFile)
       } catch (err) {
-        console.error("Error cleaning up temp file:", err)
+        log.error("Error cleaning up temp file:", err)
       }
     }
 

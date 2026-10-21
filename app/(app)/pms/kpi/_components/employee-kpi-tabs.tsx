@@ -8,6 +8,7 @@ import type { DataTableTab } from "@/components/ui/data-table"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
 import { StrategicGoalsView } from "@/app/admin/corporate-scorecard/_components/strategic-goals-view"
 import type { ReviewCycleOption } from "@/app/(app)/pms/_lib"
+import { formatScore } from "@/lib/format"
 
 const KPI_TABS: DataTableTab[] = [
   { key: "appraisal", label: "My Scored Work & Appraisal", icon: BarChart2 },
@@ -23,10 +24,6 @@ interface EmployeeKpiTabsProps {
   kpiScore: number | null
   cycleName: string
   rows: Array<Record<string, unknown>>
-}
-
-function formatPercent(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value}%` : "-"
 }
 
 export function EmployeeKpiTabs({
@@ -115,7 +112,7 @@ export function EmployeeKpiTabs({
       onTabChange={handleTabChange}
       cycles={cycles}
       activeCycleId={activeCycleId}
-      summaryCards={[{ label: "KPI Score", value: formatPercent(kpiScore) }]}
+      summaryCards={[{ label: "KPI Score", value: formatScore(kpiScore) }]}
       tableTitle="KPI Task Breakdown"
       tableDescription={`Your scored tasks in ${cycleName}, grouped by quarter. Each task earns its weight multiplied by its rating out of 5; tasks with no goal are grouped as ad-hoc.`}
       rows={rows}

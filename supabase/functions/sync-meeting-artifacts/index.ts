@@ -263,9 +263,43 @@ async function loadOccurrenceAttachments(
   return attachments
 }
 
+type OfficeWeek = { week: number; year: number }
+
+function isPastWeek(target: OfficeWeek, current: OfficeWeek): boolean {
+  return target.year < current.year || (target.year === current.year && target.week < current.week)
+}
+
+/**
+ * The ledger row of an artifact already stored for this source/type/week, if any.
+ *
+ * The ledger dedupes on Graph ids, but Graph re-keys them: on 2026-09-28 every
+ * transcript of the recurring General Meeting came back under a new id, so 18
+ * past weeks were re-imported and re-emailed in one run. A past week that already
+ * has a stored artifact is settled — new ids for it are re-keys, not new content.
+ */
+async function findStoredWeekArtifact(
+  supabase: Supa,
+  sourceId: string,
+  type: ArtifactType,
+  target: OfficeWeek
+): Promise<{ document_id: string; emailed_at: string | null } | null> {
+  const { data } = await supabase
+    .from("meeting_artifact_ledger")
+    .select("document_id, emailed_at")
+    .eq("source_id", sourceId)
+    .eq("artifact_type", type)
+    .eq("meeting_week", target.week)
+    .eq("meeting_year", target.year)
+    .not("document_id", "is", null)
+    .order("processed_at", { ascending: false })
+    .limit(1)
+  return data?.[0] ?? null
+}
+
 async function processSource(
   supabase: Supa,
-  source: SourceRow
+  source: SourceRow,
+  currentWeek: OfficeWeek
 ): Promise<{ id: string; label: string; imported: number; emailed: boolean; error?: string }> {
   const newArtifacts: NewArtifact[] = []
   let imported = 0
@@ -320,6 +354,31 @@ async function processSource(
       const seenIds = new Set((seenRows ?? []).map((r: { artifact_graph_id: string }) => r.artifact_graph_id))
       // Every session for this week already merged — nothing new to do.
       if (reportIds.every((id) => seenIds.has(id))) continue
+
+      // A past week that already has a sheet: the unseen ids are Graph re-keys.
+      // Ledger them against the existing doc instead of re-importing.
+      const storedAttendance = isPastWeek(grp, currentWeek)
+        ? await findStoredWeekArtifact(supabase, source.id, "attendance", grp)
+        : null
+      if (storedAttendance) {
+        for (const id of reportIds) {
+          if (seenIds.has(id)) continue
+          await supabase
+            .from("meeting_artifact_ledger")
+            .insert({
+              source_id: source.id,
+              graph_online_meeting_id: meetingId,
+              artifact_type: "attendance",
+              artifact_graph_id: id,
+              meeting_week: grp.week,
+              meeting_year: grp.year,
+              document_id: storedAttendance.document_id,
+              emailed_at: storedAttendance.emailed_at,
+            })
+            .then(undefined, () => {})
+        }
+        continue
+      }
 
       try {
         // Union participants across the week's sessions: dedupe by email keeping the
@@ -414,10 +473,32 @@ async function processSource(
         .maybeSingle()
       if (seen) continue
 
+      const dateIso = toIsoDateString(transcript.createdDateTime || new Date().toISOString())
+      const { week, year } = getOfficeWeekFromDate(new Date(dateIso))
+
+      // Same re-key guard as attendance: a past week with a stored transcript is settled.
+      const storedTranscript = isPastWeek({ week, year }, currentWeek)
+        ? await findStoredWeekArtifact(supabase, source.id, "transcript", { week, year })
+        : null
+      if (storedTranscript) {
+        await supabase
+          .from("meeting_artifact_ledger")
+          .insert({
+            source_id: source.id,
+            graph_online_meeting_id: meetingId,
+            artifact_type: "transcript",
+            artifact_graph_id: transcript.id,
+            meeting_week: week,
+            meeting_year: year,
+            document_id: storedTranscript.document_id,
+            emailed_at: storedTranscript.emailed_at,
+          })
+          .then(undefined, () => {})
+        continue
+      }
+
       try {
         const vtt = await getTranscriptVtt(userId, meetingId, transcript.id)
-        const dateIso = toIsoDateString(transcript.createdDateTime || new Date().toISOString())
-        const { week, year } = getOfficeWeekFromDate(new Date(dateIso))
         const fileName = `ACOB Transcript - ${formatMeetingDateLabel(dateIso)} - W${week}.docx`
         const bytes = await vttToDocx(vtt, `${source.label} — Transcript — ${formatMeetingDateLabel(dateIso)}`)
 
@@ -502,6 +583,11 @@ async function processSource(
         }
 
         for (const [key, occ] of pendingByOcc) {
+          // Auto-email only the current week's meeting. A backlog of older weeks
+          // (Graph re-keys, a late-enabled source) is never mass-mailed; send those
+          // deliberately via the manual send instead.
+          if (isPastWeek(occ, currentWeek)) continue
+
           const present = typesPresent.get(key) ?? new Set<ArtifactType>()
           const hasBoth = present.has("attendance") && present.has("transcript")
           const aged = Date.now() - occ.oldest >= ARTIFACT_HOLD_MS
@@ -717,7 +803,7 @@ serve(async (req) => {
 
     const results = []
     for (const source of (sources || []) as SourceRow[]) {
-      results.push(await processSource(supabase, source))
+      results.push(await processSource(supabase, source, { week, year }))
     }
 
     return json({ processed: results.length, effectiveDate, today, results })

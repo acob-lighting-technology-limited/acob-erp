@@ -41,6 +41,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
+import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
@@ -646,6 +647,13 @@ export function LeaveContent({
       if (!response.ok) throw new Error(payload.error || "Failed to submit request")
 
       const createdOrUpdatedId = String(payload?.data?.id || editingRequestId || "")
+      if (!isEditing && createdOrUpdatedId) {
+        // The request now exists. If an upload below fails, a retry must update
+        // this request, not create a second one, and must not re-upload the handover.
+        setEditingRequestId(createdOrUpdatedId)
+        setFormData((prev) => ({ ...prev, handover_file: null, handover_checklist_url: handoverChecklistUrl || null }))
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.leaveRequests({ userId: currentUserId }) })
+      }
       let successMessage = String(payload?.message || "")
       if (attachment && createdOrUpdatedId) {
         const requiredDocumentsFromResponse = Array.isArray(payload?.data?.required_documents)
@@ -1094,6 +1102,13 @@ export function LeaveContent({
           ),
         }}
         emptyTitle={isReviewTab ? "Nothing waiting on you" : "No leave requests"}
+        emptyAction={
+          isReviewTab ? undefined : (
+            <Button size="sm" onClick={openCreateDialog}>
+              Request leave
+            </Button>
+          )
+        }
         emptyDescription={
           isReviewTab
             ? "Requests reach you here when you are the reliever, the department lead, or the next approver in the route."
@@ -1206,16 +1221,22 @@ export function LeaveContent({
         approvalRouteStages={leaveRoutePreview?.stages || []}
         preview={segmentsPreview(formData.segments, holidaySet)}
         leaveCalendar={leaveCalendar}
-        canSubmit={
-          !!formData.leave_type_id &&
-          formData.segments.length > 0 &&
-          !!formData.reason &&
-          !!formData.reliever_identifier &&
-          (Boolean(formData.handover_file) || Boolean(formData.handover_checklist_url)) &&
-          segmentsTotalDays(formData.segments, holidaySet) > 0 &&
-          segmentsTotalDays(formData.segments, holidaySet) <= selectedAvailableDays &&
-          (!requiresAttachmentOnCreate || Boolean(formData.attachment))
-        }
+        missingRequirements={leaveRequestMissing(
+          {
+            leave_type_id: formData.leave_type_id,
+            segments: formData.segments,
+            reason: formData.reason,
+            reliever_identifier: formData.reliever_identifier,
+            handover_file: formData.handover_file,
+            handover_checklist_url: formData.handover_checklist_url,
+            attachment: formData.attachment,
+          },
+          {
+            totalDays: segmentsTotalDays(formData.segments, holidaySet),
+            availableDays: selectedAvailableDays,
+            requiresAttachment: requiresAttachmentOnCreate,
+          }
+        )}
         submitting={submitting}
         onSubmit={handleSubmitRequest}
       />

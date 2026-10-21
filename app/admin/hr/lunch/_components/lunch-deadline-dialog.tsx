@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { apiFetch } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface LunchDeadlineDialogProps {
   open: boolean
@@ -46,10 +47,13 @@ export function LunchDeadlineDialog({ open, onOpenChange, menu, defaultDeadline,
   const [saving, setSaving] = useState(false)
   const [time, setTime] = useState(defaultDeadline)
 
-  useEffect(() => {
-    if (!open || !menu) return
-    setTime(deadlineTimeOf(menu.voting_deadline) ?? defaultDeadline)
-  }, [open, menu, defaultDeadline])
+  // Seed the time each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [open, menu, defaultDeadline] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (open && menu) setTime(deadlineTimeOf(menu.voting_deadline) ?? defaultDeadline)
+  }
 
   async function save(clear: boolean) {
     if (!menu) return

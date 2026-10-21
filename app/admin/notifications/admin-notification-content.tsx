@@ -81,10 +81,13 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
     () => new Set(initialNotifications.filter((n) => n.read).map((n) => n.id))
   )
 
-  useEffect(() => {
+  // A fresh server list replaces local edits — adjusted during render, not in an effect.
+  const [syncedInitial, setSyncedInitial] = useState(initialNotifications)
+  if (syncedInitial !== initialNotifications) {
+    setSyncedInitial(initialNotifications)
     setNotifications(initialNotifications)
     setReadIds(new Set(initialNotifications.filter((n) => n.read).map((n) => n.id)))
-  }, [initialNotifications])
+  }
 
   const categoryCounts = useMemo(() => {
     return {

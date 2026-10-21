@@ -1,6 +1,8 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertCircle, RefreshCw } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { DetailPageSkeleton } from "@/components/skeletons/detail-page-skeleton"
+import { FormPageSkeleton } from "@/components/skeletons/form-page-skeleton"
 
 /** Generic table/list skeleton — use when loading tabular data */
 export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
@@ -28,13 +30,13 @@ export function CardSkeleton({ count = 3 }: { count?: number }) {
   )
 }
 
-/** Full-page centred spinner for initial page loads */
-export function PageLoader() {
-  return (
-    <div className="flex min-h-[400px] items-center justify-center">
-      <RefreshCw className="text-muted-foreground h-6 w-6 animate-spin" />
-    </div>
-  )
+/**
+ * Initial load of a whole page: the page's skeleton, not a spinner (audit 8.3),
+ * so the layout does not jump when the data arrives. `form` for settings and
+ * edit pages, `detail` (default) for record pages.
+ */
+export function PageLoader({ variant = "detail" }: { variant?: "detail" | "form" } = {}) {
+  return variant === "form" ? <FormPageSkeleton /> : <DetailPageSkeleton />
 }
 
 /** Inline error state with optional retry button */
@@ -48,15 +50,6 @@ export function QueryError({ message = "Something went wrong.", onRetry }: { mes
           Try again
         </Button>
       )}
-    </div>
-  )
-}
-
-/** Empty state — for when query succeeds but returns no data */
-export function EmptyState({ message = "No data found." }: { message?: string }) {
-  return (
-    <div className="flex min-h-[200px] items-center justify-center text-center">
-      <p className="text-muted-foreground text-sm">{message}</p>
     </div>
   )
 }

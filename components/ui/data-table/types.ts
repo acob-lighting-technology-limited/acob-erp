@@ -1,3 +1,4 @@
+import type { TableExportOptions } from "@/lib/export/table-export"
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 
@@ -178,6 +179,8 @@ export interface DataTableProps<TData> {
   data: TData[]
   columns: DataTableColumn<TData>[]
   getRowId: (row: TData) => string
+  /** Opt-in export of visible accessor columns and all filtered, sorted rows. */
+  export?: TableExportOptions | false
 
   // ── Search ───────────────────────────────────────────────────────────────
   searchPlaceholder?: string
@@ -347,6 +350,8 @@ export interface DataTableProps<TData> {
   emptyIcon?: LucideIcon
   emptyTitle?: string
   emptyDescription?: string
+  /** The one next step when the list is empty and unfiltered, e.g. "Create your first requisition". */
+  emptyAction?: React.ReactNode
 }
 
 // ─── DataTablePage Props ─────────────────────────────────────────────────────

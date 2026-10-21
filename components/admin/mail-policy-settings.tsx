@@ -2,12 +2,13 @@
 
 import { useMemo, useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { PageLoader, QueryError } from "@/components/ui/query-states"
+import { QueryError, TableSkeleton } from "@/components/ui/query-states"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 type PolicyRow = {
   notification_key: string
@@ -61,10 +62,12 @@ export function MailPolicySettings() {
     queryFn: fetchMailPolicies,
   })
 
-  // Sync local state when data loads
-  useEffect(() => {
-    if (data) setPolicies(data)
-  }, [data])
+  // Seed local state when data loads — adjusted during render, not in an effect.
+  const [seededFrom, setSeededFrom] = useState<typeof data>(undefined)
+  if (data && seededFrom !== data) {
+    setSeededFrom(data)
+    setPolicies(data)
+  }
 
   const { mutate: savePoliciesMutate, isPending: saving } = useMutation({
     mutationFn: async (body: { policies: PolicyRow[] }) => {
@@ -127,7 +130,8 @@ export function MailPolicySettings() {
     [policies]
   )
 
-  if (isLoading) return <PageLoader />
+  // Rendered inside a settings page, so an inline skeleton rather than a page one.
+  if (isLoading) return <TableSkeleton rows={6} cols={4} />
   if (isError) return <QueryError message="Could not load mail policies." onRetry={refetch} />
 
   return (

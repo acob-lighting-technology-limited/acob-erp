@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn, getInitials } from "@/lib/utils"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { formatWATDate, formatWATTime, toLocalISODate, toLocalYearMonth } from "@/lib/utils/date"
 import { LunchReviewDialog } from "./_components/lunch-review-dialog"
 import {
@@ -38,6 +38,8 @@ import {
   type LunchVoter,
 } from "@/lib/hr/lunch-voting"
 import { logger } from "@/lib/logger"
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("lunch-content")
 
@@ -190,33 +192,29 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
 
   // ── History tab ───────────────────────────────────────────────────────────
   const [historyMonth, setHistoryMonth] = useState<string>(() => toLocalYearMonth())
-  const [historyRows, setHistoryRows] = useState<HistoryRow[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyError, setHistoryError] = useState<string | null>(null)
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
   const [selectedReviewMenuId, setSelectedReviewMenuId] = useState<string | null>(null)
   const [selectedReviewDate, setSelectedReviewDate] = useState<string | null>(null)
 
-  const loadHistory = useCallback(async (yearMonth: string) => {
-    setHistoryLoading(true)
-    setHistoryError(null)
-    try {
-      const res = await fetch(`/api/hr/lunch/history?year_month=${yearMonth}`)
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to load your lunch history")
-      setHistoryRows((payload.rows || []) as HistoryRow[])
-    } catch (err) {
-      log.error({ err: String(err) }, "lunch history load failed")
-      setHistoryError(err instanceof Error ? err.message : "Failed to load your lunch history")
-    } finally {
-      setHistoryLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (activeTab !== "history") return
-    void loadHistory(historyMonth)
-  }, [activeTab, historyMonth, loadHistory])
+  const {
+    data: historyRows = [],
+    isLoading: historyLoading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.myLunchHistory(historyMonth),
+    enabled: activeTab === "history",
+    queryFn: async () => {
+      const payload = await apiJson<{ rows?: HistoryRow[] }>(`/api/hr/lunch/history?year_month=${historyMonth}`, {
+        cache: "no-store",
+      })
+      return payload.rows ?? []
+    },
+  })
+  const historyError = queryError?.message ?? null
+  const loadHistory = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = []

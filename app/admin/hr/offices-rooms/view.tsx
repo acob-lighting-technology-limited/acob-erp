@@ -38,6 +38,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { personName } from "@/lib/format"
 
 const log = logger("hr-office-locations")
 
@@ -84,10 +85,6 @@ async function fetchOfficeLocationsData(): Promise<OfficeLocationsData> {
   const res = await apiFetch("/api/admin/hr/office-locations", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load office locations")
   return res.json()
-}
-
-function employeeName(employee: LocationEmployee) {
-  return [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Unknown"
 }
 
 function LocationCard({
@@ -148,6 +145,8 @@ export function OfficeLocationsPage({
   const [editingLocation, setEditingLocation] = useState<OfficeLocation | null>(null)
   const [deletingLocation, setDeletingLocation] = useState<OfficeLocation | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Blocks a second submit while one is in flight (a double click created duplicates and re-ran the rename cascade).
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     type: "office",
@@ -188,6 +187,9 @@ export function OfficeLocationsPage({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    if (saving) return
+
+    setSaving(true)
     try {
       if (!canManageLocations) {
         toast.error("You can view office locations but cannot modify them")
@@ -231,6 +233,8 @@ export function OfficeLocationsPage({
       log.error("Error saving office location:", err)
       const message = err instanceof Error ? err.message : "Failed to save room / office"
       toast.error(message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -472,7 +476,9 @@ export function OfficeLocationsPage({
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">{editingLocation ? "Update" : "Create"}</Button>
+                  <Button type="submit" loading={saving}>
+                    {editingLocation ? "Update" : "Create"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -560,7 +566,7 @@ export function OfficeLocationsPage({
                     <tbody>
                       {members.map((member) => (
                         <tr key={member.id} className="border-t">
-                          <td className="px-3 py-2 font-medium">{employeeName(member)}</td>
+                          <td className="px-3 py-2 font-medium">{personName(member)}</td>
                           <td className="text-muted-foreground px-3 py-2">
                             <div className="flex items-center gap-2">
                               <Mail className="h-3 w-3" />
@@ -574,7 +580,7 @@ export function OfficeLocationsPage({
                           </td>
                           <td className="px-3 py-2 text-right">
                             <Link href={`${employeesBasePath ?? "/admin/hr/employees"}?userId=${member.id}`}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button aria-label="Edit" variant="ghost" size="icon" className="h-8 w-8">
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             </Link>

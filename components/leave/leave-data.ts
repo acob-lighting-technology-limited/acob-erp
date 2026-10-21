@@ -10,6 +10,9 @@ import {
   type HolidaySet,
   type LeaveRangeBreakdown,
 } from "@/lib/hr/leave-days"
+import { logger } from "@/lib/logger"
+
+const log = logger("components-leave-leave-data")
 
 export type LeaveDepartmentBookedDate = {
   date: string
@@ -103,8 +106,7 @@ export async function fetchLeaveData(currentUserId: string) {
     warnings.push(`calendar: ${calendarPayload.error || calendarRes?.statusText || "network error"}`)
 
   if (warnings.length > 0) {
-    // eslint-disable-next-line no-console
-    console.warn(`[leave-data] Partial fetch warnings: ${warnings.join(" | ")}`)
+    log.warn(`[leave-data] Partial fetch warnings: ${warnings.join(" | ")}`)
   }
 
   // Only throw if the critical requests endpoint fails — everything else degrades gracefully

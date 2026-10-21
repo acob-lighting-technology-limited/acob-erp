@@ -66,7 +66,8 @@ interface LeaveRequestFormDialogProps {
   }>
   preview: { endDate: string; resumeDate: string }
   leaveCalendar: LeaveCalendarData
-  canSubmit: boolean
+  /** Requirements not yet met; empty when the request can be submitted. */
+  missingRequirements: string[]
   submitting: boolean
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>
 }
@@ -106,7 +107,7 @@ export function LeaveRequestFormDialog({
   approvalRouteStages,
   preview,
   leaveCalendar,
-  canSubmit,
+  missingRequirements,
   submitting,
   onSubmit,
 }: LeaveRequestFormDialogProps) {
@@ -554,11 +555,22 @@ export function LeaveRequestFormDialog({
             </p>
           </div>
 
+          {missingRequirements.length > 0 && (
+            <div className="bg-muted/40 rounded-md border p-3 text-xs">
+              <p className="mb-1 font-medium">Still needed before you can submit:</p>
+              <ul className="text-muted-foreground list-disc space-y-0.5 pl-4">
+                {missingRequirements.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSubmit || submitting}>
+            <Button type="submit" disabled={missingRequirements.length > 0 || submitting}>
               {submitting
                 ? editingRequestId
                   ? "Saving..."

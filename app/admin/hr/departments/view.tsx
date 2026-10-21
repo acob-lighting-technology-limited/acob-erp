@@ -38,6 +38,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { logger } from "@/lib/logger"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { personName } from "@/lib/format"
 
 const log = logger("hr-departments")
 
@@ -109,10 +110,6 @@ async function fetchDepartmentsData(): Promise<DepartmentsData> {
   return res.json()
 }
 
-function employeeName(employee: DepartmentEmployee) {
-  return [employee.first_name, employee.last_name].filter(Boolean).join(" ") || "Unknown"
-}
-
 function DepartmentCard({
   department,
   onEdit,
@@ -172,6 +169,8 @@ export function DepartmentsPage({
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
   const [deletingDepartment, setDeletingDepartment] = useState<Department | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Blocks a second submit while one is in flight (a double click created duplicates and re-ran the rename cascade).
+  const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -242,7 +241,9 @@ export function DepartmentsPage({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    if (saving) return
 
+    setSaving(true)
     try {
       if (!canManageDepartments) {
         toast.error("You can view departments but cannot modify them")
@@ -315,6 +316,8 @@ export function DepartmentsPage({
       log.error("Error saving department:", err)
       const message = err instanceof Error ? err.message : "Failed to save department"
       toast.error(message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -631,7 +634,9 @@ export function DepartmentsPage({
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">{editingDepartment ? "Update" : "Create"}</Button>
+                  <Button type="submit" loading={saving}>
+                    {editingDepartment ? "Update" : "Create"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -717,7 +722,7 @@ export function DepartmentsPage({
                     {members.map((member, index) => (
                       <tr key={member.id} className="border-t">
                         <td className="text-muted-foreground w-12 px-3 py-2 font-mono text-xs">{index + 1}</td>
-                        <td className="px-3 py-2 font-medium">{employeeName(member)}</td>
+                        <td className="px-3 py-2 font-medium">{personName(member)}</td>
                         <td className="text-muted-foreground px-3 py-2">
                           <div className="flex items-center gap-2">
                             <Mail className="h-3 w-3" />
@@ -731,7 +736,7 @@ export function DepartmentsPage({
                         </td>
                         <td className="px-3 py-2 text-right">
                           <Link href={`${employeesBasePath ?? "/admin/hr/employees"}?userId=${member.id}`}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button aria-label="Edit" variant="ghost" size="icon" className="h-8 w-8">
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </Link>

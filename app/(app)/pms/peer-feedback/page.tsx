@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { CheckCircle2, Loader2, MessageSquare, Send, Users } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useCycleFilters, type CycleFilterCycle } from "@/components/pms/use-cycle-filters"
+import { useQuery } from "@tanstack/react-query"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
+import { useHrProfiles } from "@/hooks/use-hr-profiles"
+import { formatDate, personName } from "@/lib/format"
 
 type Profile = {
   id: string
@@ -49,17 +55,26 @@ type PeerFeedbackRow = {
   reviewer?: Profile | null
 }
 
-function formatName(profile: Profile | null | undefined) {
-  if (!profile) return "Unknown"
-  return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Unknown"
-}
-
 export default function PeerFeedbackPage() {
-  const [colleagues, setColleagues] = useState<Profile[]>([])
-  const [cycles, setCycles] = useState<Cycle[]>([])
-  const [myFeedback, setMyFeedback] = useState<PeerFeedbackRow[]>([])
-  const [receivedFeedback, setReceivedFeedback] = useState<PeerFeedbackRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { cycles } = usePerformanceCycles<Cycle>()
+  const {
+    data,
+    isLoading,
+    refetch: loadData,
+  } = useQuery({
+    queryKey: QUERY_KEYS.myPeerFeedback(),
+    queryFn: async () => {
+      const [given, received] = await Promise.all([
+        apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback?as_reviewer=true"),
+        apiJson<{ data?: PeerFeedbackRow[] }>("/api/hr/performance/peer-feedback"),
+      ])
+      return { myFeedback: given.data ?? [], receivedFeedback: received.data ?? [] }
+    },
+    meta: { errorMessage: "Failed to load data" },
+  })
+  const { profiles: colleagues } = useHrProfiles<Profile>()
+  const myFeedback = useMemo(() => data?.myFeedback ?? [], [data])
+  const receivedFeedback = useMemo(() => data?.receivedFeedback ?? [], [data])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<"received" | "given">("received")
@@ -73,36 +88,6 @@ export default function PeerFeedbackPage() {
   const [teamwork, setTeamwork] = useState("")
   const [professionalism, setProfessionalism] = useState("")
   const [comments, setComments] = useState("")
-
-  const loadData = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const [profilesRes, cyclesRes, myFeedbackRes, receivedRes] = await Promise.all([
-        apiFetch("/api/hr/profiles?all=true"),
-        apiFetch("/api/hr/performance/cycles"),
-        apiFetch("/api/hr/performance/peer-feedback?as_reviewer=true"),
-        apiFetch("/api/hr/performance/peer-feedback"),
-      ])
-      const [profilesData, cyclesData, myFeedbackData, receivedData] = await Promise.all([
-        profilesRes.json().catch(() => ({})),
-        cyclesRes.json().catch(() => ({})),
-        myFeedbackRes.json().catch(() => ({})),
-        receivedRes.json().catch(() => ({})),
-      ])
-      setColleagues((profilesData?.data || []) as Profile[])
-      setCycles((cyclesData?.data || []) as Cycle[])
-      setMyFeedback((myFeedbackData?.data || []) as PeerFeedbackRow[])
-      setReceivedFeedback((receivedData?.data || []) as PeerFeedbackRow[])
-    } catch {
-      toast.error("Failed to load data")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadData()
-  }, [loadData])
 
   const alreadySubmittedKeys = useMemo(
     () => new Set(myFeedback.map((f) => `${f.subject_user_id}:${f.review_cycle_id}`)),
@@ -179,8 +164,8 @@ export default function PeerFeedbackPage() {
         key: "subject",
         label: "Colleague",
         sortable: true,
-        accessor: (f) => formatName(f.subject),
-        render: (f) => <span className="font-medium">{formatName(f.subject)}</span>,
+        accessor: (f) => personName(f.subject),
+        render: (f) => <span className="font-medium">{personName(f.subject)}</span>,
       },
       {
         key: "score",
@@ -194,9 +179,7 @@ export default function PeerFeedbackPage() {
         label: "Submitted",
         sortable: true,
         accessor: (f) => f.created_at,
-        render: (f) => (
-          <span className="text-muted-foreground text-xs">{new Date(f.created_at).toLocaleDateString()}</span>
-        ),
+        render: (f) => <span className="text-muted-foreground text-xs">{formatDate(f.created_at)}</span>,
         hideOnMobile: true,
       },
     ],
@@ -236,9 +219,7 @@ export default function PeerFeedbackPage() {
         label: "Received",
         sortable: true,
         accessor: (f) => f.created_at,
-        render: (f) => (
-          <span className="text-muted-foreground text-xs">{new Date(f.created_at).toLocaleDateString()}</span>
-        ),
+        render: (f) => <span className="text-muted-foreground text-xs">{formatDate(f.created_at)}</span>,
         hideOnMobile: true,
       },
     ],
@@ -287,10 +268,15 @@ export default function PeerFeedbackPage() {
           filters={cycleFilters}
           getRowId={(f) => f.id}
           searchPlaceholder="Search colleague name..."
-          searchFn={(f, query) => formatName(f.subject).toLowerCase().includes(query.toLowerCase())}
+          searchFn={(f, query) => personName(f.subject).toLowerCase().includes(query.toLowerCase())}
           isLoading={isLoading}
           onRetry={() => void loadData()}
           emptyTitle="No Feedback Given Yet"
+          emptyAction={
+            <Button size="sm" onClick={() => setIsDialogOpen(true)}>
+              Give feedback
+            </Button>
+          }
           emptyDescription={'No peer feedback submitted yet. Use the "Give Feedback" button to start.'}
           emptyIcon={Send}
           viewToggle
@@ -298,29 +284,28 @@ export default function PeerFeedbackPage() {
           contactsView
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (f) => formatName(f.subject),
-            subtitle: (f) =>
-              [f.subject?.department, new Date(f.created_at).toLocaleDateString()].filter(Boolean).join(" · "),
+            title: (f) => personName(f.subject),
+            subtitle: (f) => [f.subject?.department, formatDate(f.created_at)].filter(Boolean).join(" · "),
             trailing: (f) => <Badge variant="secondary">{f.score}%</Badge>,
             detail: {
-              title: (f) => formatName(f.subject),
+              title: (f) => personName(f.subject),
               fields: (f) => [
                 { label: "Overall score", value: `${f.score}%` },
                 { label: "Comments", value: f.comments || "No comments left." },
-                { label: "Submitted", value: new Date(f.created_at).toLocaleDateString() },
+                { label: "Submitted", value: formatDate(f.created_at) },
               ],
             },
           }}
           cardRenderer={(f) => (
             <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-semibold">{formatName(f.subject)}</span>
+                <span className="text-sm font-semibold">{personName(f.subject)}</span>
                 <Badge variant="secondary">{f.score}%</Badge>
               </div>
               {f.comments && <p className="text-muted-foreground line-clamp-2 text-xs">{f.comments}</p>}
               <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
                 <span>Submitted</span>
-                <span>{new Date(f.created_at).toLocaleDateString()}</span>
+                <span>{formatDate(f.created_at)}</span>
               </div>
             </div>
           )}
@@ -337,9 +322,9 @@ export default function PeerFeedbackPage() {
                 </div>
                 <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[10px]">
                   <span>
-                    Submitted to {formatName(f.subject)} ({f.subject?.department || "—"})
+                    Submitted to {personName(f.subject)} ({f.subject?.department || "—"})
                   </span>
-                  <span>{new Date(f.created_at).toLocaleDateString()}</span>
+                  <span>{formatDate(f.created_at)}</span>
                 </div>
               </div>
             ),
@@ -365,7 +350,7 @@ export default function PeerFeedbackPage() {
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
             title: () => "Anonymous Peer",
-            subtitle: (f) => `Received ${new Date(f.created_at).toLocaleDateString()}`,
+            subtitle: (f) => `Received ${formatDate(f.created_at)}`,
             trailing: (f) => <Badge variant="secondary">{f.score}%</Badge>,
             detail: {
               title: () => "Anonymous Peer",
@@ -376,7 +361,7 @@ export default function PeerFeedbackPage() {
                 { label: "Communication", value: f.communication !== null ? `${f.communication}%` : null },
                 { label: "Professionalism", value: f.professionalism !== null ? `${f.professionalism}%` : null },
                 { label: "Comments", value: f.comments || null },
-                { label: "Received", value: new Date(f.created_at).toLocaleDateString() },
+                { label: "Received", value: formatDate(f.created_at) },
               ],
             },
           }}
@@ -402,7 +387,7 @@ export default function PeerFeedbackPage() {
               </div>
               <div className="border-border/40 text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
                 <span>Received</span>
-                <span>{new Date(f.created_at).toLocaleDateString()}</span>
+                <span>{formatDate(f.created_at)}</span>
               </div>
             </div>
           )}
@@ -468,7 +453,7 @@ export default function PeerFeedbackPage() {
                 <SelectContent>
                   {colleagues.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {formatName(c)} {c.department ? `(${c.department})` : ""}
+                      {personName(c)} {c.department ? `(${c.department})` : ""}
                       {alreadySubmittedKeys.has(`${c.id}:${selectedCycle}`) ? " ✓" : ""}
                     </SelectItem>
                   ))}

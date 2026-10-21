@@ -1,0 +1,14 @@
+# Code owners — GitHub requests a review from these users on matching changes.
+# With branch protection's "Require review from Code Owners", they must approve.
+# Later rules win, so the sensitive paths below override the catch-all.
+
+*                         @CMI-James
+
+# Security-sensitive: schema/RLS, auth, request scoping and secrets handling.
+/supabase/migrations/     @CMI-James
+/proxy.ts                 @CMI-James
+/lib/supabase/            @CMI-James
+/lib/security/            @CMI-James
+/lib/admin/               @CMI-James
+/app/api/auth/            @CMI-James
+/.github/                 @CMI-James

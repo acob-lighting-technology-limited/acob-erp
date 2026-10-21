@@ -43,9 +43,7 @@ export function formatDateNice(dateStr: string): string {
   return `${weekday} ${day}${suffix} ${month} ${year}`
 }
 
-export function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
+export { capitalize } from "@/lib/format"
 
 export function stripHtmlToText(html: string): string {
   return html

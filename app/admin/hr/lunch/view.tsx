@@ -77,6 +77,7 @@ import {
   type LunchMenuViewRecord,
 } from "@/lib/hr/lunch-voting"
 import { formatWATDate, formatWATTime } from "@/lib/utils/date"
+import { CalendarGridSkeleton, RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 export interface LunchEmployee {
   id: string
@@ -1715,9 +1716,8 @@ export function LunchRegisterPage({
 
           {/* Content Block */}
           {fetchingLogs ? (
-            <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 p-12">
-              <Loader2 className="text-primary h-8 w-8 animate-spin" />
-              <span>Loading daily lunch register...</span>
+            <div className="p-4">
+              <RowsSkeleton rows={6} />
             </div>
           ) : !isEatingDay ? (
             <div className="bg-muted/10 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-16 text-center">
@@ -1816,9 +1816,8 @@ export function LunchRegisterPage({
 
       {activeTab === "summary" &&
         (fetchingSummary ? (
-          <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 p-12">
-            <Loader2 className="text-primary h-8 w-8 animate-spin" />
-            <span>Loading summary report...</span>
+          <div className="p-4">
+            <RowsSkeleton rows={6} />
           </div>
         ) : (
           <DataTable
@@ -1945,9 +1944,8 @@ export function LunchRegisterPage({
           </div>
 
           {fetchingLeaderboard ? (
-            <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 p-12">
-              <Loader2 className="text-primary h-8 w-8 animate-spin" />
-              <span>Loading leaderboard...</span>
+            <div className="p-4">
+              <RowsSkeleton rows={5} />
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -2087,9 +2085,8 @@ export function LunchRegisterPage({
 
       {activeTab === "calendar" &&
         (fetchingSummary ? (
-          <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 p-12">
-            <Loader2 className="text-primary h-8 w-8 animate-spin" />
-            <span>Loading calendar view...</span>
+          <div className="p-4">
+            <CalendarGridSkeleton />
           </div>
         ) : (
           <div className="space-y-4">
@@ -2111,7 +2108,13 @@ export function LunchRegisterPage({
                 </Select>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => adjustCalendarMonth(-1)}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="Previous month"
+                  onClick={() => adjustCalendarMonth(-1)}
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="min-w-36 text-center text-sm font-medium">
@@ -2121,6 +2124,7 @@ export function LunchRegisterPage({
                   variant="outline"
                   size="icon"
                   className="h-8 w-8"
+                  aria-label="Next month"
                   onClick={() => adjustCalendarMonth(1)}
                   disabled={selectedMonth >= todayDate.substring(0, 7)}
                 >

@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowRight } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
+import { formatNumber } from "@/lib/format"
 
 export interface AdminAssetActivityRow {
   id: string
@@ -409,8 +410,8 @@ export function AdminActivityTabs({
                       </Badge>
                       <Badge className={`px-1.5 py-0 text-[10px] ${statusColor(p.status)}`}>{p.status}</Badge>
                       {p.amount != null && (
-                        <span className="text-muted-foreground text-[10px]">
-                          {p.currency || "NGN"} {Number(p.amount).toLocaleString()}
+                        <span className="text-muted-foreground text-xs">
+                          {p.currency || "NGN"} {formatNumber(Number(p.amount))}
                         </span>
                       )}
                     </div>

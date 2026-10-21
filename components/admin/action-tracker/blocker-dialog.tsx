@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useConfirm } from "@/providers/confirm-provider"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { AlertTriangle, FileText, Loader2, Paperclip, Play, Save, Trash2, Upload } from "lucide-react"
@@ -19,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const log = logger("action-tracker-blocker-dialog")
 
@@ -58,6 +60,7 @@ function formatSize(bytes: number) {
 }
 
 export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: BlockerDialogProps) {
+  const confirm = useConfirm()
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [note, setNote] = useState("")
@@ -67,11 +70,15 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
 
   const targetId = target?.id || ""
 
-  useEffect(() => {
-    if (!isOpen) return
-    setNote(target?.blocker_note || "")
-    setPendingFiles([])
-  }, [isOpen, target?.blocker_note])
+  // Reset the form each time the dialog opens — adjusted during render, not in an effect.
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (isOpen !== syncedOpen) {
+    setSyncedOpen(isOpen)
+    if (isOpen) {
+      setNote(target?.blocker_note || "")
+      setPendingFiles([])
+    }
+  }
 
   const {
     data: evidence = [],
@@ -150,7 +157,8 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
   }
 
   const handleDeleteEvidence = async (row: EvidenceRow) => {
-    if (!window.confirm(`Remove ${row.file_name}?`)) return
+    const ok = await confirm({ title: `Remove ${row.file_name}?`, confirmLabel: "Remove", destructive: true })
+    if (!ok) return
     try {
       const response = await apiFetch(
         `/api/reports/action-tracker/${targetId}/evidence?evidence_id=${encodeURIComponent(row.id)}`,
@@ -245,6 +253,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground text-xs">{formatSize(file.size)}</span>
                       <Button
+                        aria-label="Delete"
                         size="icon"
                         variant="ghost"
                         className="text-destructive h-6 w-6"
@@ -259,7 +268,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
             ) : null}
 
             {isLoadingEvidence ? (
-              <p className="text-muted-foreground text-sm">Loading evidence…</p>
+              <LinesSkeleton lines={2} />
             ) : evidence.length === 0 && pendingFiles.length === 0 ? (
               <p className="text-muted-foreground text-sm italic">No evidence attached.</p>
             ) : (
@@ -295,6 +304,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
                       </div>
                       {canEdit ? (
                         <Button
+                          aria-label="Delete"
                           size="icon"
                           variant="ghost"
                           className="text-destructive h-6 w-6 shrink-0"

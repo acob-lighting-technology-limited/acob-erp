@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { z } from "zod"
 import { parseJsonBody } from "@/lib/api/parse-body"
+import { ChangePasswordSchema } from "@/lib/auth/schemas"
 import { createClient } from "@/lib/supabase/server"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { logger } from "@/lib/logger"
@@ -13,14 +13,6 @@ import { writeLoginLog, REAUTH_SOURCE } from "@/lib/auth/login-log"
 import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("change-password")
-
-const ChangePasswordSchema = z.object({
-  currentPassword: z.string().max(200).optional(),
-  newPassword: z
-    .string({ required_error: "New password is required" })
-    .min(6, "New password must be at least 6 characters long")
-    .max(200),
-})
 
 export async function POST(req: Request) {
   const ipAddress =

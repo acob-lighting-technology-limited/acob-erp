@@ -11,7 +11,6 @@ import { toLocalISODate, formatWATDateTime } from "@/lib/utils/date"
 
 type SendTiming = "now" | "scheduled" | "recurring"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Schedule = any
 
 interface SchedulingOptionsProps {

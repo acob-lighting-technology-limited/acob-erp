@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 function prettyDocName(name: string) {
   return name.replaceAll("_", " ")
@@ -84,10 +85,19 @@ export function LeaveEvidencePromptDialog({ evidencePrompt, onOpenChange, onConf
   const [submitting, setSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
+  // Each new prompt starts empty — adjusted during render, not in an effect.
+  const [promptFor, setPromptFor] = useState(evidencePrompt)
+  if (promptFor !== evidencePrompt) {
+    setPromptFor(evidencePrompt)
+    if (evidencePrompt) {
+      setFile(null)
+      setSubmitting(false)
+    }
+  }
+
+  // Focusing the input after the open animation is a DOM side effect, so it stays an effect.
   useEffect(() => {
     if (!evidencePrompt) return
-    setFile(null)
-    setSubmitting(false)
     const timer = setTimeout(() => inputRef.current?.focus(), 80)
     return () => clearTimeout(timer)
   }, [evidencePrompt])

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
@@ -18,27 +18,20 @@ import {
 } from "@/components/ui/dialog"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { Clock, Calendar, Pencil, AlertCircle, Download, Building, FileText, MessageSquare } from "lucide-react"
+import { Clock, Calendar, Pencil, AlertCircle, Download, Building, FileText } from "lucide-react"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { toast } from "sonner"
-import { logger } from "@/lib/logger"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
-import {
-  ATTENDANCE_STATUS_COLORS,
-  ATTENDANCE_STATUS_LABELS,
-  isEarlyDeparture,
-  normalizeStoredAttendanceStatus,
-  getManualStatusEditOptions,
-  isPermissionAttendanceStatus,
-} from "@/lib/hr/attendance-status"
+import { isEarlyDeparture, getManualStatusEditOptions, isPermissionAttendanceStatus } from "@/lib/hr/attendance-status"
 import { isLate } from "@/lib/hr/attendance-utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { StatusBadge, labelSource } from "../_components/status-badge"
 import { ClockTimes, NameWithDept } from "../_components/clock-times"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
 
-const log = logger("admin-attendance-records")
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface AttendanceRecord {
   id: string
@@ -69,14 +62,12 @@ export function AdminAttendanceRecordsPage({
   lockedDepartment,
 }: { backLinkHref?: string; lockedDepartment?: string } = {}) {
   const deptCode = useDepartmentCodes()
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRecords, setProcessedRecords] = useState<AttendanceRecord[]>([])
-  const [loading, setLoading] = useState(false)
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState(() => ({
     start_date: toLocalISODate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
     end_date: toLocalISODate(),
-  })
+  }))
 
   const [exportOpen, setExportOpen] = useState(false)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
@@ -84,26 +75,26 @@ export function AdminAttendanceRecordsPage({
   const [saving, setSaving] = useState(false)
   const [reverting, setReverting] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
+  const {
+    data: records = [],
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.attendanceRecords({ ...filters, lockedDepartment }),
+    queryFn: async () => {
       const params = new URLSearchParams({ start_date: filters.start_date, end_date: filters.end_date })
       if (lockedDepartment) params.set("department", lockedDepartment)
-      const res = await apiFetch(`/api/admin/hr/attendance/records?${params}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || "Failed to load records")
-      setRecords(payload.records || [])
-    } catch (err) {
-      log.error("Failed to load attendance records", err)
-      toast.error("Failed to load records")
-    } finally {
-      setLoading(false)
-    }
-  }, [filters.start_date, filters.end_date, lockedDepartment])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ records?: AttendanceRecord[] }>(`/api/admin/hr/attendance/records?${params}`, {
+        cache: "no-store",
+      })
+      return payload.records ?? []
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load records" },
+  })
+  const load = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   function openEdit(record: AttendanceRecord) {
     const clockIn = record.clock_in ?? null
@@ -404,6 +395,7 @@ export function AdminAttendanceRecordsPage({
         </div>
 
         <DataTable<AttendanceRecord>
+          export={{ filename: "attendance-records", title: "Attendance Records" }}
           data={records}
           columns={columns}
           onProcessedDataChange={setProcessedRecords}

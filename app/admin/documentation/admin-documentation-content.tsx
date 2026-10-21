@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileText, List, Eye, User, FolderOpen, Calendar } from "lucide-react"
-import { formatWATDate } from "@/lib/utils/date"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -15,6 +14,7 @@ import { DepartmentDocumentsBrowser } from "@/components/documentation/departmen
 import { AdminDocViewDialog } from "@/components/documentation/admin-doc-view-dialog"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { AdminDocumentation, UserProfile, employeeMember } from "@/components/documentation/admin-doc-types"
+import { formatDate } from "@/lib/format"
 
 // Re-export types for consumers of this module
 export type { UserProfile, employeeMember }
@@ -37,9 +37,6 @@ interface AdminDocumentationContentProps {
   backLinkHref?: string
   backLinkLabel?: string
 }
-
-const formatDate = (dateString: string) =>
-  formatWATDate(dateString, { month: "short", day: "numeric", year: "numeric" })
 
 const getStatusColor = (isDraft: boolean) =>
   isDraft
@@ -200,6 +197,21 @@ export function AdminDocumentationContent({
     ],
     []
   )
+
+  // The department-only page: the browser has its own header, so skip the outer
+  // "Employee Documentation" page header that would sit above it.
+  if (hideTabList && activeTab === "department-documents" && departmentDocs.enabled) {
+    return (
+      <DepartmentDocumentsBrowser
+        initialPath={departmentDocs.initialPath}
+        rootLabel={departmentDocs.rootLabel}
+        lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
+        accessMode={departmentDocs.accessMode ?? "admin"}
+        lockedDepartment={departmentDocs.lockedDepartment}
+        backLink={{ href: "/admin/documentation", label: "Back to Documentation" }}
+      />
+    )
+  }
 
   return (
     <DataTablePage

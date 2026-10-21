@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Wrench, ArrowRight, FileSignature, Droplet, Video } from "lucide-react"
-import { AdminTablePage } from "@/components/admin/admin-table-page"
+import { PageHeader, PageWrapper } from "@/components/layout"
 
 const tools = [
   {
@@ -40,13 +40,13 @@ const tools = [
 
 export default function AdminToolsPage() {
   return (
-    <AdminTablePage
-      title="Tools"
-      description="Administrative tools and utilities"
-      icon={Wrench}
-      backLinkHref="/admin"
-      backLinkLabel="Back to Dashboard"
-    >
+    <PageWrapper maxWidth="full" background="gradient">
+      <PageHeader
+        title="Tools"
+        description="Administrative tools and utilities"
+        icon={Wrench}
+        backLink={{ href: "/admin", label: "Back to Dashboard" }}
+      />
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {tools.map((tool) => (
           <Link key={tool.name} href={tool.href}>
@@ -66,6 +66,6 @@ export default function AdminToolsPage() {
           </Link>
         ))}
       </div>
-    </AdminTablePage>
+    </PageWrapper>
   )
 }

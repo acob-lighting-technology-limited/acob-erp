@@ -18,6 +18,7 @@ import { toast } from "sonner"
 import { CheckCircle2, Clock, Laptop, Loader2 } from "lucide-react"
 import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 interface Props {
   open: boolean
@@ -60,11 +61,13 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
   const isPhysical = Boolean(item?.office_clock_in)
   const defaultMode = isPhysical ? "physical" : "virtual"
 
-  useEffect(() => {
-    if (open) {
-      setMeetingTime(getNowTimeString())
-    }
-  }, [open, item])
+  // Start at the current time each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [open, item] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (open) setMeetingTime(getNowTimeString())
+  }
 
   if (!item) return null
 

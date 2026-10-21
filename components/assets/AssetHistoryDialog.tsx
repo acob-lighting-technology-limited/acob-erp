@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { UserPlus, History, ArrowUpDown, AlertCircle, CheckCircle2, Calendar, FileText } from "lucide-react"
 import type { Asset } from "@/app/admin/assets/admin-assets-content"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatDateTime } from "@/lib/format"
 
 interface AssetActivity {
   id: string
@@ -49,13 +49,6 @@ function getStatusColor(status: string) {
   }
 }
 
-function formatDate(dateString?: string | null) {
-  if (!dateString) return "-"
-  const date = new Date(dateString)
-  if (isNaN(date.getTime())) return "-"
-  return formatWATDateTime(date)
-}
-
 export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetHistory }: AssetHistoryDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -91,7 +84,7 @@ export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetH
                   </div>
                   <div className="text-muted-foreground flex items-center gap-2 text-sm">
                     <Calendar className="h-3 w-3" />
-                    {formatDate(activity.timestamp)}
+                    {formatDateTime(activity.timestamp, "-")}
                   </div>
                 </div>
 

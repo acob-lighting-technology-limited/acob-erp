@@ -32,11 +32,11 @@ import {
   FileText,
   User,
   Calendar,
-  FileBarChart,
 } from "lucide-react"
 import type { Notification } from "./page"
 
 import { logger } from "@/lib/logger"
+import { notificationTier } from "@/lib/notifications/tiers"
 
 const log = logger("notification-notification-content")
 
@@ -124,11 +124,15 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   const [supabase] = useState(() => createClient())
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [isLoading, setIsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState("all")
+  // Default to the work waiting on the viewer (audit 2.1).
+  const [activeTab, setActiveTab] = useState("action")
 
-  useEffect(() => {
+  // A fresh server list replaces local edits — adjusted during render, not in an effect.
+  const [syncedInitial, setSyncedInitial] = useState(initialNotifications)
+  if (syncedInitial !== initialNotifications) {
+    setSyncedInitial(initialNotifications)
     setNotifications(initialNotifications)
-  }, [initialNotifications])
+  }
 
   useEffect(() => {
     const subscription = supabase
@@ -223,46 +227,30 @@ export function NotificationContent({ initialNotifications, userId }: Notificati
   )
 
   const counts = useMemo(() => {
-    return {
-      all: notifications.length,
-      unread: notifications.filter((n) => !n.read).length,
-      critical: notifications.filter((n) => n.priority === "high" || n.priority === "urgent").length,
-      approvals: notifications.filter((n) => n.category === "approvals").length,
-      tasks: notifications.filter((n) => n.category === "tasks").length,
-      assets: notifications.filter((n) => n.category === "assets").length,
-      feedback: notifications.filter((n) => n.category === "feedback").length,
-      mentions: notifications.filter((n) => n.category === "mentions").length,
-      meetings: notifications.filter((n) => n.category === "meetings").length,
-      communications: notifications.filter((n) => n.category === "communications").length,
-      reports: notifications.filter((n) => n.category === "reports").length,
+    const byTier = { action: 0, actionUnread: 0, fyi: 0, announcement: 0 }
+    for (const n of notifications) {
+      const tier = notificationTier(n)
+      byTier[tier] += 1
+      if (tier === "action" && !n.read) byTier.actionUnread += 1
     }
+    return { ...byTier, all: notifications.length, unread: notifications.filter((n) => !n.read).length }
   }, [notifications])
 
+  // Tiers, not categories: category stays available as a table filter.
   const tabs: DataTableTab[] = useMemo(
     () => [
-      { key: "all", label: `All(${counts.all})`, icon: Bell },
-      { key: "unread", label: `Unread(${counts.unread})`, icon: Clock },
-      { key: "critical", label: `Critical(${counts.critical})`, icon: AlertTriangle },
-      { key: "approvals", label: `Approvals(${counts.approvals})`, icon: CheckCircle },
-      { key: "tasks", label: `Tasks(${counts.tasks})`, icon: User },
-      { key: "meetings", label: `Meetings(${counts.meetings})`, icon: Calendar },
-      { key: "communications", label: `Communications(${counts.communications})`, icon: Mail },
-      { key: "reports", label: `Reports(${counts.reports})`, icon: FileBarChart },
-      { key: "assets", label: `Assets(${counts.assets})`, icon: Package },
-      { key: "feedback", label: `Feedback(${counts.feedback})`, icon: Mail },
-      { key: "mentions", label: `Mentions(${counts.mentions})`, icon: MessageSquare },
+      { key: "action", label: `Needs you (${counts.actionUnread})`, icon: AlertTriangle },
+      { key: "fyi", label: `Updates (${counts.fyi})`, icon: Bell },
+      { key: "announcement", label: `Announcements (${counts.announcement})`, icon: Mail },
+      { key: "all", label: `All (${counts.all})`, icon: Clock },
     ],
     [counts]
   )
 
-  const filteredData = useMemo(() => {
-    return notifications.filter((n) => {
-      if (activeTab === "all") return true
-      if (activeTab === "unread") return !n.read
-      if (activeTab === "critical") return n.priority === "high" || n.priority === "urgent"
-      return n.category === activeTab
-    })
-  }, [activeTab, notifications])
+  const filteredData = useMemo(
+    () => (activeTab === "all" ? notifications : notifications.filter((n) => notificationTier(n) === activeTab)),
+    [activeTab, notifications]
+  )
 
   const columns: DataTableColumn<Notification>[] = useMemo(
     () => [

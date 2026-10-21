@@ -89,35 +89,38 @@ async function getAdminAssetsData() {
     return { assets: [], employees: [], departments: [], userProfile, loadError: "Failed to load admin assets" }
   }
 
-  // Fetch current assignments for all assets
-  const { data: assignmentsData } = await dataClient
-    .from("asset_assignments")
-    .select("asset_id, assigned_to, department, office_location, assignment_type")
-    .eq("is_current", true)
-
-  // Fetch user details for assignments
-  const assignedUserIds = ((assignmentsData || []) as AssetAssignmentRow[]).map((a) => a.assigned_to).filter(Boolean)
-
-  let assignmentUsersMap = new Map<string, AssignmentUserRow>()
-  if (assignedUserIds.length > 0) {
-    const { data: usersData } = await dataClient
-      .from("profiles")
-      .select("id, first_name, last_name, department, designation, residential_address")
-      .in("id", assignedUserIds)
-
-    assignmentUsersMap = new Map(usersData?.map((u) => [u.id, u]))
+  // Assignments (with their users), assignable employees and issue counts are
+  // independent, so they load together rather than one after another.
+  const loadAssignmentUsers = async () => {
+    const { data: assignmentsData } = await dataClient
+      .from("asset_assignments")
+      .select("asset_id, assigned_to, department, office_location, assignment_type")
+      .eq("is_current", true)
+    const assignedUserIds = ((assignmentsData || []) as AssetAssignmentRow[]).map((a) => a.assigned_to).filter(Boolean)
+    let usersById = new Map<string, AssignmentUserRow>()
+    if (assignedUserIds.length > 0) {
+      const { data: usersData } = await dataClient
+        .from("profiles")
+        .select("id, first_name, last_name, department, designation, residential_address")
+        .in("id", assignedUserIds)
+      usersById = new Map(usersData?.map((u) => [u.id, u]))
+    }
+    return { assignmentsData, usersById }
   }
 
-  // Fetch employees - leads can only see employees in their departments
-  const { data: employeeData } = await listAssignableProfiles(dataClient, {
-    select: "id, first_name, last_name, company_email, department, employment_status, designation, residential_address",
-    departmentScope,
-    allowLegacyNullStatus: false,
-  })
+  const [{ assignmentsData, usersById: assignmentUsersMap }, { data: employeeData }, { data: issuesData }] =
+    await Promise.all([
+      loadAssignmentUsers(),
+      // Leads can only see employees in their departments
+      listAssignableProfiles(dataClient, {
+        select:
+          "id, first_name, last_name, company_email, department, employment_status, designation, residential_address",
+        departmentScope,
+        allowLegacyNullStatus: false,
+      }),
+      dataClient.from("asset_issues").select("asset_id, resolved"),
+    ])
   const employees = (employeeData || []) as Employee[]
-
-  // Fetch unresolved issue counts
-  const { data: issuesData } = await dataClient.from("asset_issues").select("asset_id, resolved")
 
   const issueCountsByAsset: Record<string, number> = {}
   ;((issuesData || []) as AssetIssueRow[]).forEach((issue) => {

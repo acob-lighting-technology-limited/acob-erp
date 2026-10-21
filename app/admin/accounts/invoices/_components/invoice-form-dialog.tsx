@@ -16,6 +16,9 @@ import { logger } from "@/lib/logger"
 import type { QueryClient } from "@tanstack/react-query"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { formatCurrency } from "@/lib/format"
+import { depsChanged } from "@/lib/utils/deps-changed"
+import { addIsoDays } from "@/lib/hr/leave-days"
 
 const log = logger("finance-invoice-dialog")
 
@@ -65,7 +68,7 @@ export function InvoiceFormDialog({
   const router = useRouter()
   const isEditing = Boolean(invoice?.id)
   const [saving, setSaving] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     customer_name: "",
     customer_email: "",
     customer_address: "",
@@ -74,12 +77,15 @@ export function InvoiceFormDialog({
     currency: "NGN",
     notes: "",
     terms: "Payment is due within 30 days of invoice date.",
-  })
+  }))
   const [items, setItems] = useState<InvoiceItemFormValue[]>([createDefaultItem()])
 
-  useEffect(() => {
-    if (!open) return
-    if (invoice) {
+  // Seed the form each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [initialItems, invoice, open] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (open && invoice) {
       setFormData({
         customer_name: invoice.customer_name,
         customer_email: invoice.customer_email || "",
@@ -91,21 +97,20 @@ export function InvoiceFormDialog({
         terms: invoice.terms || "Payment is due within 30 days of invoice date.",
       })
       setItems(initialItems.length > 0 ? initialItems : [createDefaultItem()])
-      return
+    } else if (open) {
+      setFormData({
+        customer_name: "",
+        customer_email: "",
+        customer_address: "",
+        issue_date: toLocalISODate(),
+        due_date: addIsoDays(toLocalISODate(), 30),
+        currency: "NGN",
+        notes: "",
+        terms: "Payment is due within 30 days of invoice date.",
+      })
+      setItems([createDefaultItem()])
     }
-
-    setFormData({
-      customer_name: "",
-      customer_email: "",
-      customer_address: "",
-      issue_date: toLocalISODate(),
-      due_date: toLocalISODate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
-      currency: "NGN",
-      notes: "",
-      terms: "Payment is due within 30 days of invoice date.",
-    })
-    setItems([createDefaultItem()])
-  }, [initialItems, invoice, open])
+  }
 
   function addItem() {
     setItems([...items, createDefaultItem()])
@@ -137,10 +142,6 @@ export function InvoiceFormDialog({
       return sum + itemSubtotal * (item.tax_rate / 100)
     }, 0)
     return { subtotal, taxAmount, total: subtotal + taxAmount }
-  }
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: formData.currency }).format(amount)
   }
 
   async function handleSubmit(e: React.FormEvent, status: "draft" | "sent" = "draft") {
@@ -317,10 +318,11 @@ export function InvoiceFormDialog({
                       </div>
                       <div className="space-y-2 text-right sm:col-span-1">
                         <Label>Amount</Label>
-                        <p className="py-2 font-medium">{formatCurrency(item.amount)}</p>
+                        <p className="py-2 font-medium">{formatCurrency(item.amount, formData.currency)}</p>
                       </div>
                       <div className="sm:col-span-1">
                         <Button
+                          aria-label="Delete"
                           type="button"
                           variant="ghost"
                           size="icon"
@@ -401,15 +403,15 @@ export function InvoiceFormDialog({
                 <CardContent className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>{formatCurrency(totals.subtotal)}</span>
+                    <span>{formatCurrency(totals.subtotal, formData.currency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Tax</span>
-                    <span>{formatCurrency(totals.taxAmount)}</span>
+                    <span>{formatCurrency(totals.taxAmount, formData.currency)}</span>
                   </div>
                   <div className="flex justify-between text-base font-semibold">
                     <span>Total</span>
-                    <span>{formatCurrency(totals.total)}</span>
+                    <span>{formatCurrency(totals.total, formData.currency)}</span>
                   </div>
                 </CardContent>
               </Card>

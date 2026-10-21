@@ -17,6 +17,9 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { apiFetch } from "@/lib/api-client"
+import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
+import { depsChanged } from "@/lib/utils/deps-changed"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 type EmployeeOption = {
   id: string
@@ -101,16 +104,7 @@ export function WeekSetupCard() {
     [employees, kssDepartmentInput, kssPresenterIdInput]
   )
 
-  const { data: lockState } = useQuery({
-    queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekNumber, yearNumber),
-    queryFn: async () => {
-      const res = await apiFetch(`/api/admin/reports/weekly-lock-state?week=${weekNumber}&year=${yearNumber}`, {
-        cache: "no-store",
-      })
-      if (!res.ok) throw new Error("Failed to resolve lock state")
-      return res.json()
-    },
-  })
+  const { data: lockState } = useAdminWeeklyReportLockState(weekNumber, yearNumber)
   const computedDeadlineLabel = useMemo(() => {
     if (!lockState?.meetingDate) return null
     const [year, month, day] = lockState.meetingDate.split("-").map(Number)
@@ -136,22 +130,32 @@ export function WeekSetupCard() {
     return !lockState.canMutate
   }, [lockState])
 
-  useEffect(() => {
-    if (!lockState) return
-    setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekNumber, yearNumber))
-    setMeetingGraceHours(lockState.graceHours || 24)
-  }, [lockState, weekNumber, yearNumber])
+  // Seed date and grace hours from the week's lock state — adjusted during render, not in an effect.
+  const [seededLock, setSeededLock] = useState<readonly unknown[] | null>(null)
+  const seededLockNext = [lockState, weekNumber, yearNumber] as const
+  if (depsChanged(seededLock, seededLockNext)) {
+    setSeededLock(seededLockNext)
+    if (lockState) {
+      setMeetingDateInput(lockState.meetingDate || getDefaultMeetingDateIso(weekNumber, yearNumber))
+      setMeetingGraceHours(lockState.graceHours || 24)
+    }
+  }
 
-  useEffect(() => {
-    if (!weekSetupData) return
-    setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
-    setKssDepartmentInput(weekSetupData.kssDepartment || "none")
-    setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
-    setKssPresenterNameInput(weekSetupData.kssPresenterName || "")
-    setKssPresenterType(
-      weekSetupData.kssPresenterId && weekSetupData.kssPresenterId !== "none" ? "employee" : "visitor"
-    )
-  }, [weekSetupData])
+  // Seed the KSS/time inputs from the week's setup — adjusted during render, not in an effect.
+  const [seededSetup, setSeededSetup] = useState<readonly unknown[] | null>(null)
+  const seededSetupNext = [weekSetupData] as const
+  if (depsChanged(seededSetup, seededSetupNext)) {
+    setSeededSetup(seededSetupNext)
+    if (weekSetupData) {
+      setMeetingTimeInput(weekSetupData.meetingTime || "08:30")
+      setKssDepartmentInput(weekSetupData.kssDepartment || "none")
+      setKssPresenterIdInput(weekSetupData.kssPresenterId || "none")
+      setKssPresenterNameInput(weekSetupData.kssPresenterName || "")
+      setKssPresenterType(
+        weekSetupData.kssPresenterId && weekSetupData.kssPresenterId !== "none" ? "employee" : "visitor"
+      )
+    }
+  }
 
   const tuesdayIso = useMemo(() => {
     if (!weekSetupData?.mondayDateIso) return null
@@ -575,7 +579,7 @@ export function WeekSetupCard() {
           {showYearConfig && (
             <div className="mt-4 space-y-4">
               {yearConfigLoading ? (
-                <p className="text-muted-foreground text-sm">Loading...</p>
+                <LinesSkeleton lines={2} />
               ) : (
                 <div className="space-y-2">
                   {yearRows.map((row) => (

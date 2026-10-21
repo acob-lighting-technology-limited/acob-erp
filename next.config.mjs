@@ -18,7 +18,7 @@ const securityHeaders = [
   // Restrict browser feature access
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
   },
 
   // Referrer information limited to same-origin
@@ -126,6 +126,26 @@ const nextConfig = {
 
   async redirects() {
     return [
+      // Moved/retired routes (previously redirect-only page.tsx files).
+      { source: "/goals", destination: "/pms/kpi?tab=goals", permanent: true },
+      { source: "/pms/goals", destination: "/pms/kpi?tab=goals", permanent: true },
+      { source: "/admin-setup", destination: "/profile", permanent: true },
+      { source: "/tools/reference-generator", destination: "/correspondence", permanent: true },
+      { source: "/admin/accounts/payments/departments", destination: "/admin/accounts/payments", permanent: true },
+      { source: "/admin/payments/departments", destination: "/admin/accounts/payments", permanent: true },
+      { source: "/admin/corporate-scorecard/summary", destination: "/admin/corporate-services/scorecard?tab=summary", permanent: true },
+      { source: "/admin/hr/attendance/reports", destination: "/admin/hr/attendance", permanent: true },
+      { source: "/admin/hr/employees/payroll", destination: "/admin/payroll", permanent: true },
+      { source: "/admin/hr/payroll", destination: "/admin/payroll", permanent: true },
+      { source: "/admin/hr/payroll/dummy", destination: "/admin/payroll/calculator", permanent: true },
+      { source: "/admin/hr/payroll/:id", destination: "/admin/payroll/:id", permanent: true },
+      { source: "/admin/payroll/dummy", destination: "/admin/payroll/calculator", permanent: true },
+      { source: "/admin/pms/cbt/question", destination: "/admin/pms/cbt", permanent: true },
+      { source: "/admin/pms/goals", destination: "/admin/pms/kpi?tab=goals", permanent: true },
+      { source: "/admin/reports/meeting-documents", destination: "/admin/reports/general-meeting/kss", permanent: true },
+      { source: "/admin/reports/mail", destination: "/admin/communications/meetings/mail", permanent: true },
+      { source: "/admin/tools/reference-generator", destination: "/admin/correspondence", permanent: true },
+      { source: "/dept/:dept_id/pms/goals", destination: "/dept/:dept_id/pms/kpi?tab=goals", permanent: true },
       {
         source: "/project",
         destination: "/projects",

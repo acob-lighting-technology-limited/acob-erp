@@ -20,7 +20,7 @@ import {
 export function formatCapacity(watts: number | null | undefined) {
   if (watts === null || watts === undefined) return "-"
   const kwp = watts / 1000
-  return `${kwp.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWp`
+  return `${kwp.toLocaleString("en-NG", { maximumFractionDigits: 1 })} kWp`
 }
 
 /** One colour per progress status, shared by badges, dots and bars. */

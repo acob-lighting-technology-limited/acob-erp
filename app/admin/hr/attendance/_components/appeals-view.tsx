@@ -1,22 +1,20 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Clock, CheckCircle2, XCircle, FileQuestion } from "lucide-react"
-import { toast } from "sonner"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { formatWATDate } from "@/lib/utils/date"
-import { logger } from "@/lib/logger"
 import { AppealReviewDialog } from "./appeal-review-dialog"
 import type { AppealRow } from "./appeal-review-dialog"
-
-const log = logger("admin-attendance-appeals-view")
+import { apiJson } from "@/lib/api-client"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface AppealsViewProps {
   lockedDepartment?: string
@@ -36,32 +34,30 @@ function statusBadge(status: AppealRow["status"]) {
 }
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
-  const [appeals, setAppeals] = useState<AppealRow[]>([])
-  const [loading, setLoading] = useState(false)
   const [reviewAppeal, setReviewAppeal] = useState<AppealRow | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
+  const {
+    data: appeals = [],
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.attendanceAppeals({ statusFilter, lockedDepartment }),
+    queryFn: async () => {
       const params = new URLSearchParams()
       if (statusFilter !== "all") params.set("status", statusFilter)
       if (lockedDepartment) params.set("department", lockedDepartment)
-      const res = await fetch(`/api/admin/hr/attendance/appeals?${params.toString()}`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load appeals")
-      setAppeals((payload?.data as AppealRow[]) ?? [])
-    } catch (err) {
-      log.error({ err: String(err) }, "Failed to load appeals")
-      toast.error("Failed to load appeals")
-    } finally {
-      setLoading(false)
-    }
-  }, [statusFilter, lockedDepartment])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+      const payload = await apiJson<{ data?: AppealRow[] }>(`/api/admin/hr/attendance/appeals?${params.toString()}`, {
+        cache: "no-store",
+      })
+      return payload.data ?? []
+    },
+    placeholderData: keepPreviousData,
+    meta: { errorMessage: "Failed to load appeals" },
+  })
+  const load = async (..._args: unknown[]) => {
+    await refetch()
+  }
 
   const stats = useMemo(() => {
     const now = new Date()

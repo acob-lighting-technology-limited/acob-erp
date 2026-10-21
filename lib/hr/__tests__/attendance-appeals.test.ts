@@ -34,7 +34,6 @@ function fakeClient(appeals: Appeal[], records: DayRecord[] = []) {
   const notifications: Array<Record<string, unknown>> = []
 
   const builder = (table: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const filters: Array<(row: any) => boolean> = []
     let patch: Record<string, unknown> | null = null
     let single = false

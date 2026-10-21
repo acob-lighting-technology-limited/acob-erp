@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error converting image:", error)
+    log.error("Error converting image:", error)
 
     if (tempFile && existsSync(tempFile)) {
       try {

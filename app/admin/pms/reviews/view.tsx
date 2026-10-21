@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useCallback, useMemo, useState } from "react"
+import { pickCanonicalReview } from "@/lib/pms/reviews"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import { Download, FileText, Plus, Users, BarChart3, CheckCircle2, RefreshCw, Clock, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -18,6 +19,10 @@ import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { exportPmsRowsToExcel, exportPmsRowsToPdf } from "@/lib/pms/export"
 import { CalibrationView } from "./_components/calibration-view"
 import { toLocalISODate } from "@/lib/utils/date"
+import { apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { personName } from "@/lib/format"
+import { StatusBadge } from "@/components/ui/patterns/status-badge"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,37 +93,9 @@ function isCompletedReview(r: ReviewRow) {
   return String(r.status ?? "").toLowerCase() === "completed"
 }
 
-function reviewStatusPriority(status: string | null | undefined) {
-  const s = String(status ?? "").toLowerCase()
-  if (s === "completed") return 3
-  if (s === "submitted") return 2
-  if (s === "draft") return 1
-  return 0
-}
-
-function pickCanonicalReview(rows: ReviewRow[]): ReviewRow {
-  return [...rows].sort((a, b) => {
-    const diff = reviewStatusPriority(b.status) - reviewStatusPriority(a.status)
-    if (diff !== 0) return diff
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  })[0]
-}
-
-function employeeName(r: ReviewRow) {
-  return `${r.user?.first_name ?? ""} ${r.user?.last_name ?? ""}`.trim() || "Employee"
-}
-
-function StatusBadge({ status }: { status: string | null }) {
-  const s = String(status ?? "").toLowerCase()
-  if (s === "completed")
-    return (
-      <Badge variant="default" className="bg-emerald-600">
-        Completed
-      </Badge>
-    )
-  if (s === "submitted") return <Badge variant="secondary">Submitted</Badge>
-  if (s === "draft") return <Badge variant="outline">Draft</Badge>
-  return <span className="text-muted-foreground text-sm">—</span>
+/** A review's status on the shared badge; no status yet shows a dash. */
+function ReviewStatus({ status }: { status: string | null }) {
+  return status ? <StatusBadge status={status} /> : <span className="text-muted-foreground text-sm">—</span>
 }
 
 function ScoreBar({ label, value }: { label: string; value: number | null }) {
@@ -171,7 +148,7 @@ function ReviewExpandedDetail({ row }: { row: ReviewRow }) {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Status</span>
-            <StatusBadge status={row.status} />
+            <ReviewStatus status={row.status} />
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Cycle</span>
@@ -189,7 +166,7 @@ function ReviewExpandedDetail({ row }: { row: ReviewRow }) {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Name</span>
-            <span className="font-medium">{employeeName(row)}</span>
+            <span className="font-medium">{personName(row.user, "Employee")}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Department</span>
@@ -221,10 +198,10 @@ function ReviewCard({ row, onEdit }: { row: ReviewRow; onEdit: (r: ReviewRow) =>
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="leading-tight font-semibold">{employeeName(row)}</p>
+            <p className="leading-tight font-semibold">{personName(row.user, "Employee")}</p>
             <p className="text-muted-foreground mt-0.5 text-xs">{row.user?.department ?? "—"}</p>
           </div>
-          <StatusBadge status={row.status} />
+          <ReviewStatus status={row.status} />
         </div>
 
         {/* Quarter chip */}
@@ -296,55 +273,42 @@ export function AdminPmsReviewsPage({
   const [tab, setTab] = useState<TabMode>("individual")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [reviews, setReviews] = useState<ReviewRow[]>([])
   // Rows currently visible in the department/cycle tables (after search + filters + sort).
   // The individual tab is server-paginated (search/filters there aren't wired to refetch yet
   // — a separate pre-existing issue — so its export intentionally mirrors canonicalReviews).
   const [processedDeptRows, setProcessedDeptRows] = useState<DeptRow[]>([])
   const [processedCycleRows, setProcessedCycleRows] = useState<CycleRow[]>([])
-  const [totalReviews, setTotalReviews] = useState(0)
   const [serverPage, setServerPage] = useState(0)
-  const hasLoadedRef = useRef(false)
 
   // ─── Data ─────────────────────────────────────────────────────────────────
 
-  const loadReviews = useCallback(async (pageIndex = 0) => {
-    if (hasLoadedRef.current) {
-      setIsRefreshing(true)
-    } else {
-      setIsInitialLoading(true)
-    }
-    setError(null)
-    try {
-      const params = new URLSearchParams({
-        limit: String(PAGE_SIZE),
-        offset: String(pageIndex * PAGE_SIZE),
-      })
-      const res = await fetch(`/api/hr/performance/reviews?${params}`, { cache: "no-store" })
-      const payload = (await res.json().catch(() => null)) as {
-        data?: ReviewRow[]
-        error?: string
-        meta?: { total?: number }
-      } | null
-      if (!res.ok) throw new Error(payload?.error ?? "Failed to load reviews")
-      setReviews(payload?.data ?? [])
-      setTotalReviews(payload?.meta?.total ?? payload?.data?.length ?? 0)
-      setServerPage(pageIndex)
-      hasLoadedRef.current = true
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load reviews")
-    } finally {
-      setIsInitialLoading(false)
-      setIsRefreshing(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadReviews()
-  }, [loadReviews])
+  const {
+    data: reviewsPage,
+    isPending: isInitialLoading,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: QUERY_KEYS.performanceReviews({ page: serverPage }),
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(serverPage * PAGE_SIZE) })
+      const payload = await apiJson<{ data?: ReviewRow[]; meta?: { total?: number } }>(
+        `/api/hr/performance/reviews?${params}`,
+        { cache: "no-store" }
+      )
+      return { rows: payload.data ?? [], total: payload.meta?.total ?? payload.data?.length ?? 0 }
+    },
+    placeholderData: keepPreviousData,
+  })
+  const reviews = useMemo(() => reviewsPage?.rows ?? [], [reviewsPage])
+  const totalReviews = reviewsPage?.total ?? 0
+  const isRefreshing = isFetching && !isInitialLoading
+  const error = queryError?.message ?? null
+  /** Load a page (default: the first). Re-requesting the current page refetches it. */
+  const loadReviews = (pageIndex = 0) => {
+    if (pageIndex === serverPage) void refetch()
+    else setServerPage(pageIndex)
+  }
 
   // ─── Derived: canonical reviews (one per employee per cycle) ─────────────
 
@@ -474,7 +438,7 @@ export function AdminPmsReviewsPage({
     if (tab === "individual")
       return canonicalReviews.map((r, i) => ({
         "S/N": i + 1,
-        Employee: employeeName(r),
+        Employee: personName(r.user, "Employee"),
         Department: r.user?.department ?? "-",
         Quarter: r.cycle?.name ?? "-",
         "Review Type": r.cycle?.review_type ?? "-",
@@ -537,8 +501,8 @@ export function AdminPmsReviewsPage({
         sortable: true,
         resizable: true,
         initialWidth: 180,
-        accessor: (r) => employeeName(r),
-        render: (r) => <span className="font-medium">{employeeName(r)}</span>,
+        accessor: (r) => personName(r.user, "Employee"),
+        render: (r) => <span className="font-medium">{personName(r.user, "Employee")}</span>,
       },
       {
         key: "department",
@@ -599,7 +563,7 @@ export function AdminPmsReviewsPage({
         label: "Status",
         // accessor is required so the "Status" filter can match against it
         accessor: (r) => String(r.status ?? "").toLowerCase(),
-        render: (r) => <StatusBadge status={r.status} />,
+        render: (r) => <ReviewStatus status={r.status} />,
       },
     ],
     []
@@ -881,7 +845,7 @@ export function AdminPmsReviewsPage({
           getRowId={(r) => r.id}
           searchPlaceholder="Search employee, department, quarter…"
           searchFn={(row, q) => {
-            const name = employeeName(row).toLowerCase()
+            const name = personName(row.user, "Employee").toLowerCase()
             const dept = String(row.user?.department ?? "").toLowerCase()
             const cycle = String(row.cycle?.name ?? "").toLowerCase()
             const type = String(row.cycle?.review_type ?? "").toLowerCase()
@@ -913,10 +877,10 @@ export function AdminPmsReviewsPage({
           stickyToolbar
           defaultViewMode={{ mobile: "contacts", desktop: "list" }}
           mobileRow={{
-            title: (r) => employeeName(r),
+            title: (r) => personName(r.user, "Employee"),
             subtitle: (r) =>
               `${r.user?.department ?? "No dept"} · ${r.cycle?.name ?? "No cycle"} · ${r.final_score !== null ? `${r.final_score?.toFixed(1)}%` : "No score"}`,
-            trailing: (r) => <StatusBadge status={r.status} />,
+            trailing: (r) => <ReviewStatus status={r.status} />,
             onSelect: (r) => {
               if (r.review_cycle_id) goToIndividualCycle(r.review_cycle_id)
             },

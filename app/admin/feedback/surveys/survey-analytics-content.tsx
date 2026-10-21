@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { Star, Download, Gauge, Sparkles, Users, Eye, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Star, Download, Gauge, Sparkles, Users, Eye, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
@@ -10,13 +10,12 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { apiFetch } from "@/lib/api-client"
+import { apiJson } from "@/lib/api-client"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
-import { logger } from "@/lib/logger"
 import type { SurveyMetrics } from "@/types/survey"
 import type { AdminSurveyItem } from "@/app/api/admin/feedback/surveys/route"
-
-const log = logger("survey-analytics-content")
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const RATING_OPTIONS = [
   { value: "5", label: "5 Stars (Excellent)" },
@@ -32,32 +31,18 @@ const ANON_OPTIONS = [
 ]
 
 export function SurveyAnalyticsContent() {
-  const [surveys, setSurveys] = useState<AdminSurveyItem[]>([])
-  const [metrics, setMetrics] = useState<SurveyMetrics | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: QUERY_KEYS.adminSurveys(),
+    queryFn: () =>
+      apiJson<{ data?: AdminSurveyItem[]; metrics?: SurveyMetrics | null }>("/api/admin/feedback/surveys", {
+        cache: "no-store",
+      }),
+  })
+  const surveys = useMemo(() => data?.data ?? [], [data])
+  const metrics = data?.metrics ?? null
+  const error = isError ? "Unable to load surveys. Please try again." : null
+  const loadData = () => void refetch()
   const [selectedSurvey, setSelectedSurvey] = useState<AdminSurveyItem | null>(null)
-
-  const loadData = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const res = await apiFetch("/api/admin/feedback/surveys", { cache: "no-store" })
-      if (!res.ok) throw new Error("Failed to load survey data")
-      const json = await res.json()
-      setSurveys(json.data || [])
-      setMetrics(json.metrics || null)
-    } catch (err) {
-      log.error({ err: String(err) }, "Failed to fetch admin surveys")
-      setError("Unable to load surveys. Please try again.")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void loadData()
-  }, [])
 
   const departments = useMemo(() => {
     const set = new Set<string>()

@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { depsChanged } from "@/lib/utils/deps-changed"
 
 export interface EditableDirective {
   id: string
@@ -114,9 +115,12 @@ export function DirectiveFormDialog({
     return toLocalISODate(getOfficeWeekMonday(week, year))
   }, [defaultMeetingDate, week, year])
 
-  useEffect(() => {
-    if (!isOpen) return
-    if (editingDirective) {
+  // Seed the form each time the dialog opens — adjusted during render, not in an effect.
+  const [seededFor, setSeededFor] = useState<readonly unknown[] | null>(null)
+  const seededForNext = [isOpen, editingDirective, departments, defaultWeek, defaultYear] as const
+  if (depsChanged(seededFor, seededForNext)) {
+    setSeededFor(seededForNext)
+    if (isOpen && editingDirective) {
       setTitle(editingDirective.title)
       setDescription(editingDirective.description || "")
       setDepartment(editingDirective.department)
@@ -126,21 +130,19 @@ export function DirectiveFormDialog({
       setWeek(editingDirective.week_number)
       setYear(editingDirective.year)
       setMeetingDate(editingDirective.meeting_date ? editingDirective.meeting_date.slice(0, 10) : "")
-      return
+    } else if (isOpen) {
+      setTitle("")
+      setDescription("")
+      setDepartment(departments[0] || "")
+      setAssigneeIds([])
+      setTimeline("")
+      setStatus("not_started")
+      setWeek(defaultWeek || currentOfficeWeek.week)
+      setYear(defaultYear || currentOfficeWeek.year)
+      // Deliberately not a dependency: it follows week/year, which this block also sets.
+      setMeetingDate(defaultMeetingDateForWeek)
     }
-    setTitle("")
-    setDescription("")
-    setDepartment(departments[0] || "")
-    setAssigneeIds([])
-    setTimeline("")
-    setStatus("not_started")
-    setWeek(defaultWeek || currentOfficeWeek.week)
-    setYear(defaultYear || currentOfficeWeek.year)
-    setMeetingDate(defaultMeetingDateForWeek)
-    // defaultMeetingDateForWeek is derived from week/year, which this effect also
-    // sets — including it would re-run the reset on every week change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editingDirective, departments, defaultWeek, defaultYear])
+  }
 
   const resetForNextEntry = () => {
     setTitle("")

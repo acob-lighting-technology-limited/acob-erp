@@ -32,7 +32,8 @@ import {
 } from "lucide-react"
 import type { HelpDeskTicketDetailResponse } from "@/components/help-desk/help-desk-types"
 import type { HelpDeskStatus } from "@/lib/help-desk/server"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatDateTime } from "@/lib/format"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
   new: ["assigned", "department_queue", "cancelled"],
@@ -53,11 +54,6 @@ const STATUS_TRANSITIONS: Partial<Record<HelpDeskStatus, HelpDeskStatus[]>> = {
 
 function formatLabel(value: string | null | undefined) {
   return String(value || "unknown").replaceAll("_", " ")
-}
-
-function formatDateTime(dateString: string | null | undefined) {
-  if (!dateString) return "—"
-  return formatWATDateTime(dateString)
 }
 
 interface UserHelpDeskTicketDetailsDialogProps {
@@ -214,7 +210,7 @@ export function UserHelpDeskTicketDetailsDialog({
           {isLoading ? (
             <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center text-sm">
               <Clock className="text-primary/60 mb-2 h-8 w-8 animate-spin" />
-              <p>Loading ticket details…</p>
+              <LinesSkeleton lines={6} />
             </div>
           ) : loadError ? (
             <div className="space-y-3 py-6 text-center">

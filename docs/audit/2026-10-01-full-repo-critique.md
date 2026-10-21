@@ -1,233 +1,401 @@
-# Matrix (ACOB ERP): full repo critique, 1 Oct 2026
+# Matrix (ACOB ERP): full repo critique, v2 (1 Oct 2026)
 
-Scope: the whole repo (about 300k lines of TS, 289 pages, 363 API routes, 572 migrations)
-plus the **live** `acob-erp` Supabase project. I checked the live project read-only:
-advisors, policies, grants, function bodies and row counts. Nothing was changed.
+**Scope.** Every folder in the repo (about 300k lines of TypeScript, 289 pages, 363 API routes, 572 migrations, 175 live tables), plus the **live** `acob-erp` Supabase project. I inspected the live project read-only: advisors, RLS policies, column grants, function bodies, cron jobs and row counts. **Nothing was changed. No exploit was run.**
 
-How severe each finding is:
-- 🔴 **Fix this week.** Exploitable, breaks something, or wrong money.
-- 🟠 **Fix this month.** Real cost now.
-- 🟡 **Cleanup.** Debt that slows every future change.
+**Format.** Every finding has three parts: **Problem** (what is wrong), **Why it matters** (the real cost) and **Fix** (exactly what to do).
 
-How I checked: every 🔴 was confirmed against live DB state or by reading the code path.
-I did **not** run any exploit. Anything I could not confirm is marked "verify".
+**Severity**
+- 🔴 **Now.** Exploitable, broken, or wrong money.
+- 🟠 **This month.** Real cost today.
+- 🟡 **Cleanup.** Debt that makes every future change slower or makes the repo look amateur.
+
+**Corrections to v1:** client components that write straight to the DB number **13**, not 28 (v1's grep also matched `Set.delete`). v1 also flagged three `dangerouslySetInnerHTML` uses; they render static print CSS, so they are safe and have been dropped.
+
+## Contents
+- [A. Fix-first list](#a-fix-first-list)
+- [1. UI (visual)](#1-ui-visual)
+- [2. UX (will people understand it)](#2-ux)
+- [3. Database](#3-database)
+- [4. Supabase platform](#4-supabase-platform)
+- [5. Backend / API](#5-backend--api)
+- [6. Frontend / React](#6-frontend--react)
+- [7. Data tables](#7-data-tables)
+- [8. Skeletons and loading states](#8-skeletons-and-loading-states)
+- [9. Reuse and duplicates](#9-reuse-and-duplicates)
+- [10. Use a library instead of hand-rolling](#10-use-a-library-instead-of-hand-rolling)
+- [11. Patches and workarounds](#11-patches-and-workarounds)
+- [12. Modern practices: where you are vs. 2026 standard](#12-modern-practices)
+- [13. Making the repo look professional to outsiders](#13-professional-presentation)
+- [14. What went wrong (process)](#14-what-went-wrong)
+- [15. Things you didn't ask about but should know](#15-recommendations)
+- [16. Order of work](#16-order-of-work)
 
 ---
 
-## 0. The ten things to fix first
+## A. Fix-first list
 
-| # | | Problem | Where |
+| # | Problem | Why it matters | Fix |
 |---|---|---|---|
-| 1 | 🔴 | **Any logged-in employee can approve their own leave.** `atomic_leave_approve_final`, `atomic_leave_approve_transition` and `atomic_leave_reject` are `SECURITY DEFINER`, executable by `authenticated`, and do no role or ownership check. One `supabase.rpc(...)` call from the browser console approves any leave request. | live DB, `/rest/v1/rpc/atomic_leave_*` |
-| 2 | 🔴 | **Any employee can edit any requisition** (amount, status, approver). The RLS policy `users_update_requisitions` is `UPDATE … USING (true)`. | live DB, `requisitions` |
-| 3 | 🔴 | **Any employee can send any other employee a notification with any link.** Both `create_notification` overloads are callable by `authenticated` with a free `p_user_id` and `p_link_url`. That is in-app phishing: *"HR: confirm your bank details → evil link"*. `enqueue_asset_notification` is callable by **anon**, so not even a login is needed. | live DB |
-| 4 | 🔴 | **Remote check-in cannot work.** Your own header `Permissions-Policy: geolocation=()` blocks `navigator.geolocation` for every origin, including yours. `remote-checkin-modal.tsx` and the admin site-locations page both call it. | [next.config.mjs:21](../../next.config.mjs), [remote-checkin-modal.tsx:137](../../components/attendance/remote-checkin-modal.tsx) |
-| 5 | 🔴 | **Payroll PAYE (2026 tax reform) is probably wrong in two places.** (a) Everyone gets a flat ₦500k "static relief". Under the Nigeria Tax Act 2025 this is *rent relief*: 20% of rent actually paid, capped at ₦500k. It is not automatic. (b) `max(tax, 1% of gross)` puts a minimum tax on individuals, which overrides the 0% band. Example: someone on ₦1.2M gross should pay ₦0 but is charged ₦12k. **Verify with your tax adviser.** | [lib/hr/payroll-utils.ts:157-206](../../lib/hr/payroll-utils.ts) |
-| 6 | 🔴 | **The service-role key is still hardcoded in two live DB functions** (`process_notification_queue`, `process_digest_schedules`). Rotation is still deferred. Both functions also have a mutable `search_path`. Separately, the notification webhook secret is a guessable plain string committed to git in `supabase/migrations/_fix_queue_secret.sql`. Rotate it to a random value kept in Vault. | live DB, git |
-| 7 | 🔴 | **Nobody uses MFA**: `auth.mfa_factors` has 0 rows, admins included. Leaked-password protection is also **off**. | Supabase Auth settings |
-| 8 | 🟠 | **The attendance device webhook is weak.** The secret travels in the URL (`?token=`), so it lands in access logs. The comparison is not constant-time (`token !== secret`). There is no replay or timestamp check. The **60/min-per-IP** rate limit sits behind one office NAT, so a busy morning rush can 429 real clock-ins. | [hikvision/events/route.ts:335-350](../../app/api/devices/hikvision/events/route.ts) |
-| 9 | 🟠 | **`requisition_documents` is a public bucket.** Financial documents can be opened by anyone who has the URL. `payment_documents`, `help_desk_documents` and `assets` have **no file-size limit**. | Storage |
-| 10 | 🟠 | **The working tree is a mess**: 59 modified and ~19 untracked files on a branch named `perf/supabase-egress-network-archive`. They include attendance appeals, lunch share, profile and acobot work, none of it egress-related. **4 migrations are not applied live**: `20261001120000` … `150000`. One of them is the destructive network-log move. | git / `supabase_migrations` |
+| A1 🔴 | **Any employee can make themselves super admin.** The `profiles` UPDATE policy allows `id = auth.uid()` with **no `WITH CHECK`**. `authenticated` holds UPDATE on *every* column, including `role`, `is_admin`, `admin_routes`, `admin_domains`, `is_department_lead`, `employment_status` and the bank fields. No trigger blocks role changes; `sync_profile_role_to_user_roles` even copies the new role into `user_roles`. `has_role()` reads `profiles.role`. So `supabase.from('profiles').update({role:'developer'}).eq('id', me)` from the browser console grants full access. | This is total compromise of the ERP by any staff member: payroll, HR records, every document. | Restrict UPDATE to safe columns with column grants (below). Move role, status, lead and admin-route changes to admin-only API routes that use the service role. Add a `BEFORE UPDATE` trigger as a second wall that raises if a non-service caller changes privileged columns. Then search `audit_logs` for past `profiles` updates where `changed_fields` contains `role`, and confirm nobody has already done this. |
+| A2 🔴 | **Employees can change their own bank account** (`profile-form.tsx` writes `bank_account_number` directly) with no approval and no alert. | This is the classic payroll-diversion fraud. A stolen session or a disgruntled employee changes the account before payday. | Turn bank changes into a **change request** that HR approves. Email the employee's *old* address whenever bank details change, and lock bank edits for 48h before a payroll run. |
+| A3 🔴 | **Any employee can approve their own leave.** `atomic_leave_approve_final`, `…_transition` and `…_reject` are `SECURITY DEFINER`, executable by `authenticated`, with no role or ownership check. | Leave approval is meaningless. | These functions are only called through `supabaseAdmin` ([leave/approve/route.ts:257,369](../../app/api/hr/leave/approve/route.ts)), so revoking is safe (SQL below). |
+| A4 🔴 | **Any employee can edit any requisition.** The policy `users_update_requisitions` is `UPDATE … USING (true)`. | People can change amounts or approval status on money requests. | Replace it with an owner-only policy for drafts, and an admin/approver policy via `has_role('admin')` or the approver's id. Move approve/reject to an API route. |
+| A5 🔴 | **Anyone can send any employee a notification with any link.** Both `create_notification` overloads are callable by `authenticated` with a free `p_user_id` and `p_link_url`. `enqueue_asset_notification` is callable by **anon**, so no login is needed at all. | In-app phishing: "HR: re-confirm your bank details → link". Staff trust the bell. | Revoke from `PUBLIC, anon, authenticated` and grant to `service_role`. ⚠️ `create_notification` is called from **42 places** in 20+ API routes, and some use the user's session client. First route them all through one server helper using the service client (e.g. `lib/notifications/notify.ts`), *then* revoke. Otherwise those notifications silently stop. `enqueue_asset_notification` can be revoked from `anon` immediately. |
+| A6 🔴 | **Asset and correspondence RPCs are open.** `atomic_assign_asset`, `release_asset` and `reassign_asset` are executable by any user. `release_asset`'s `COALESCE(…, auth.uid())` is *not* a permission check. `atomic_dispatch_correspondence` is also open. | Anyone can reassign company laptops or mark letters as dispatched. | Revoke the asset RPCs (they are called through the service client). `atomic_dispatch_correspondence` **is called with the user's client** ([dispatch/route.ts:65](../../app/api/correspondence/records/[id]/dispatch/route.ts)): switch that route to the service client first, *then* revoke. |
+| A7 🔴 | **Remote check-in cannot work.** `Permissions-Policy: geolocation=()` blocks geolocation for every origin, including your own. | Field staff cannot clock in remotely, and site-location capture in admin also fails. | [next.config.mjs:21](../../next.config.mjs): change `geolocation=()` to `geolocation=(self)`. |
+| A8 🔴 | **The 2026 PAYE calculation is likely wrong.** (a) It applies a flat ₦500k "static relief" to everyone. NTA 2025 rent relief is 20% of rent *paid*, capped at ₦500k. (b) `max(tax, 1% gross)` re-adds a minimum tax for individuals, overriding the 0% band. | Wrong deductions on every payslip. That is a legal and staff-trust issue. | [payroll-utils.ts:157-206](../../lib/hr/payroll-utils.ts): add a `rent_paid` input, compute `min(0.2*rent, 500000)`, remove the 1% floor for individuals, and move bands into a DB table with `effective_from`. Get a tax adviser to sign off 10 real cases and make them unit tests. |
+| A9 🔴 | **The service-role key is hardcoded** in `process_notification_queue` and `process_digest_schedules`. A guessable webhook secret (`acob_notification_trigger_secret_…`) is committed in `supabase/migrations/_fix_queue_secret.sql`. | Anyone with DB-function or git-history access holds god-mode keys. | Follow `docs/SECURITY_KEY_ROTATION_RUNBOOK.md` now. Store both values in **Vault** (`vault.decrypted_secrets`) and read them in the function. Generate the new webhook secret with `gen_random_bytes(32)`. |
+| A10 🔴 | **Zero MFA enrolments** (`auth.mfa_factors` = 0), and leaked-password protection is **off**. | One phished admin password owns everything. | Dashboard → Auth → enable leaked-password protection. Require TOTP MFA for admin/HR/finance roles: check `aal2` in `requireApiAdminScope`. Better still, use Entra ID SSO (§15). |
+| A11 🟠 | **Credentials are generated with `Math.random()`** ([DispatchCredentialsDialog.tsx:38](../../components/employees/DispatchCredentialsDialog.tsx)). | `Math.random` is predictable and not meant for secrets. | Use `crypto.getRandomValues(new Uint32Array(n))` and map to the charset, or `crypto.randomUUID()`-based. |
+| A12 🟠 | **The device webhook leaks its secret.** The token travels in the query string (it lands in logs), the comparison is not constant-time, there is no replay protection, and the limit is **60/min per IP** behind one office NAT. | Clock-ins can be forged, and in the morning rush real swipes may get a 429. | Accept only the `Authorization` header and use your existing `safeCompare`. Add an event-id dedupe (unique index on device serial + event serial). Key the rate limit by device serial, not IP, and raise it to around 600/min. |
 
-**Fix for #1 and #3:** the leave RPCs are only called from [app/api/hr/leave/approve/route.ts](../../app/api/hr/leave/approve/route.ts) through `supabaseAdmin`, which is the service role. So this is safe:
+**SQL for A1/A3/A5/A6 (review first, then apply as a migration):**
 ```sql
-REVOKE EXECUTE ON FUNCTION public.atomic_leave_approve_final(uuid,uuid,int,text,text,int) FROM PUBLIC, anon, authenticated;
--- same for atomic_leave_approve_transition, atomic_leave_reject, create_notification (both), enqueue_asset_notification, atomic_assign_asset, release_asset
-GRANT EXECUTE ON FUNCTION ... TO service_role;
+-- A1: column-level lockdown (keep only what the profile form legitimately edits)
+REVOKE UPDATE ON public.profiles FROM authenticated;
+GRANT UPDATE (first_name, last_name, other_names, phone_number, additional_phone,
+              residential_address, office_location, email_notifications, birthday,
+              birth_year, job_description, job_description_updated_at, updated_at)
+  ON public.profiles TO authenticated;
+-- department, designation, bank_* move to an HR-approved change-request flow.
+
+CREATE OR REPLACE FUNCTION public.guard_profile_privileged_columns() RETURNS trigger
+LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL AND NOT public.has_role('admin') AND (
+       NEW.role IS DISTINCT FROM OLD.role OR NEW.is_admin IS DISTINCT FROM OLD.is_admin
+    OR NEW.admin_routes IS DISTINCT FROM OLD.admin_routes OR NEW.admin_domains IS DISTINCT FROM OLD.admin_domains
+    OR NEW.is_department_lead IS DISTINCT FROM OLD.is_department_lead
+    OR NEW.employment_status IS DISTINCT FROM OLD.employment_status) THEN
+    RAISE EXCEPTION 'not allowed to change privileged profile fields';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_guard_profile_privileged BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.guard_profile_privileged_columns();
+
+-- A3/A5/A6: lock RPCs to the service role
+DO $$ DECLARE f regprocedure; BEGIN
+  FOR f IN SELECT p.oid::regprocedure FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+    AND p.proname IN ('atomic_leave_approve_final','atomic_leave_approve_transition','atomic_leave_reject',
+                      'create_notification','enqueue_asset_notification',
+                      'atomic_assign_asset','release_asset','reassign_asset')
+  LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', f);
+  END LOOP; END $$;
 ```
-⚠️ `atomic_dispatch_correspondence` is called with the **user's** client ([dispatch/route.ts:65](../../app/api/correspondence/records/[id]/dispatch/route.ts)). Do not revoke that one. Add an internal role check instead, or switch the route to the service client.
-`release_asset` only *looks* guarded: `COALESCE(p_released_by, auth.uid())` is not a permission check.
+⚠️ Before applying: (1) take `create_notification` out of this list until its 42 callers use the service client (see A5); (2) check every *server* caller of the other RPCs uses the service client, not the user's session; (3) confirm what `admin_routes` holds; (4) `profile-form.tsx` currently writes `department`, `designation` and bank fields from the browser, so update it (send those to an API route or change request) **in the same release** as the column grants, or profile saves will fail. Afterwards, verify with `BEGIN; SET LOCAL ROLE authenticated; … ; ROLLBACK;`.
 
 ---
 
 ## 1. UI (visual)
 
-| | Finding | Evidence |
-|---|---|---|
-| 🟠 | **In light mode, muted text is not muted.** `--muted-foreground: oklch(0.25 0 0)` is the same value as `--foreground`. Every description, label and secondary line has the same weight as headings, so there is no visual hierarchy. The last commit (`b1066f66`, placeholder at `/50`) patched one symptom. Fix the token (~`oklch(0.5 0 0)`) and drop the patch. | [globals.css](../../app/globals.css) `:root` |
-| 🟠 | **`--accent` is the brand green.** In shadcn, `accent` is a *subtle hover* background. Here, hovering any ghost or outline button, or highlighting any dropdown or select item, paints it **solid green with white text**. `--secondary` is green too, so you have no neutral secondary button. Set accent to something like `oklch(0.95 0.03 142)` with dark text, and make secondary neutral. | `dropdown-menu.tsx:84`, `select.tsx:247`, `button.tsx:15-17` |
-| 🟠 | **Chart colours collide.** `chart-1`, `chart-4` and `chart-5` are all hue 142 (green), so multi-series charts are unreadable. Use 5 distinct hues. | `globals.css` |
-| 🟠 | **Destructive buttons in dark mode have poor contrast**: `--destructive` at L=0.396 with a *red* foreground. | `.dark` |
-| 🟠 | **5,723 hardcoded palette classes** (`bg-green-100`, `text-amber-700`…) across 268 files, plus 165 raw hex values. They bypass your tokens, which is why you need **1,349 `dark:` overrides**. Add semantic tokens (`--success`, `--warning`, `--info` + `-foreground` and `-muted`) and one `<StatusBadge status=…>`. | grep counts |
-| 🟠 | **998 uses of `text-[10px]`/`text-[11px]`.** That is too small to read on phones and on the 150%-scaled Latitude screens you yourself documented. Make 12px the floor. | |
-| 🟡 | **`tailwind.config.ts` is dead and wrong.** Tailwind v4 never loads it (there is no `@config`), and it wraps oklch variables in `hsl()`. It would break every colour if someone ever wired it up. Delete it, and the `tailwindcss-animate` dependency too (you use `tw-animate-css`). | |
-| 🟡 | 1,548 arbitrary values (`w-[…]`, `text-[…]`). | |
-| 🟡 | 30 raw `<img>` against 12 `next/image`. You lose resizing and lazy-loading, and pay for it in egress. | |
-| 🟡 | 157 Dialogs but only 3 Sheets. `AGENTS.md` says a row tap opens a sheet and never a modal, but the app is modal-heavy. Long forms inside centred dialogs are painful on phones. | |
-
-## 2. UX (will people understand it?)
-
-| | Finding | Evidence |
-|---|---|---|
-| 🔴 | **People have learned to ignore notifications.** 5,898 of 7,193 notifications are unread (82%). In the last 30 days, **`approval_request` was unread 133 of 136 times** and **`task_awaiting_review` 206 of 207 times**. So approvals and reviews are *not* reaching people through the bell. Announcements (816) and "system" (569) drown out the ones that need action. | live `notifications` |
-| 🟠 | **Adoption**: 61 of 119 auth users have not signed in for 60+ days. 47 of 117 profiles have **no `department_id`**, so department scoping, KSS rotation, approval routing and lead dashboards quietly miss those people. | live DB |
-| 🟠 | **The admin sidebar has 81 links.** Nobody scans 81 items. See the recommendations section: role home, command palette, pinning. | [admin-sidebar.tsx](../../components/admin-sidebar.tsx) (1,197 lines) |
-| 🟠 | **Forms behave inconsistently.** About 147 files build forms with `useState`, but only 12 use `react-hook-form`. Validation messages, field errors, disabled states and "lost my input after an error" differ from screen to screen. | |
-| 🟠 | **76 of 98 icon-only buttons have no accessible name** (no `aria-label`, `title` or `sr-only`). Screen readers announce "button". | e.g. `calendar-view.tsx`, `lunch-content.tsx`, `BroadcastForm.tsx` |
-| 🟠 | **Filters do not live in the URL.** You cannot share "this filtered view", and Back drops your filters. | |
-| 🟡 | 9 native `confirm()`/`alert()` calls, even though `AlertDialog` exists (used in 40 places). | |
-| 🟡 | A **"Dummy payroll"** page ships in admin (`/admin/payroll/dummy`). It is an 88% copy of the calculator. Is it a sandbox? Label it or remove it. | |
-| 🟡 | **Dates render differently depending on the browser's locale**: 87 `toLocaleString` and 30 `toLocaleDateString` calls with no fixed locale or timezone, so one person sees `10/1/2026` and another `1/10/2026`. | |
-| 🟡 | **The product has 4 names.** Repo `ACOB-Signature-Creator`, package `matrix`, domain `matrix.acoblighting.com`, Supabase `acob-erp`. New devs and agents get confused. | |
-
-## 3. Database (schema and data)
-
-| | Finding |
-|---|---|
-| 🔴 | The RPC grant holes in §0. In the live linter, 47 `SECURITY DEFINER` functions can be executed by `authenticated` and 3 by `anon`. Most are read-only predicates (`is_md`, `has_role`…), which is fine. The 8 that **write** are listed in §0. |
-| 🟠 | **`customers`: 2,178 records readable by every employee** (`USING true`). Also open to every employee: `employee_department_history`, `payroll_periods`, `salary_components` and `action_items`. Customer PII should be readable by commercial/admin only. |
-| 🟠 | **`staff_directory` is a `SECURITY DEFINER` view** (linter ERROR). It exposes `additional_email` and `additional_phone`, which are *personal* contacts, to all staff. Keep the view, but drop the personal columns or switch to `security_invoker` plus a narrow policy. |
-| 🟠 | **Two sources of truth for department**: `profiles.department` (text, marked DEPRECATED in your own types) and `department_id`, kept in sync by a trigger. 47 rows have no id. Backfill, then drop the text column. |
-| 🟠 | **Performance**: 126 FKs with no index, 3 duplicate indexes (`leave_requests`, `development_plans`, `development_plan_actions`), 46 unused indexes, 88 "multiple permissive policies" warnings (each extra policy runs on every row), and 3 `auth_rls_initplan` on `system_satisfaction_surveys` (wrap `auth.uid()` in `(select auth.uid())`). |
-| 🟠 | `network_activity_logs` is **115 MB of the 268 MB DB (43%)**. The archive migration is written but not applied. |
-| 🟡 | 45 `status`/`role`/`type` columns are free `text`. Use enums or `CHECK`, or typos become data. |
-| 🟡 | Backup tables (`tasks_work_item_number_backup`, `deleted_tasks_archive`) live in `public`, so PostgREST exposes them. Move them to a `private` schema. |
-| 🟡 | `create_notification` has 2 overloads. PostgREST overload resolution is fragile, and callers silently pick the old one. |
-| 🟡 | `migrations/` contains `001-006_remote_baseline.sql`, `_fix_queue_secret.sql` (no timestamp, **holds a secret**), plus a `migrations_backup/` folder. Squash into one baseline. |
-
-## 4. Supabase (platform and config)
-
-| | Finding |
-|---|---|
-| 🔴 | No MFA anywhere; leaked-password check is off (§0). |
-| 🔴 | Service-role key is in DB function source (§0). |
-| 🟠 | **Your types cover 4 of 175 tables.** [types/database.ts](../../types/database.ts) is *hand-written* (profiles, departments, department_payments, office_locations). That is the root cause of the 214 `any`, the 45 `eslint-disable no-explicit-any` and the local row types everywhere. Fix: `supabase gen types typescript --project-id itqegqxeqkeogwrvlzlj > types/supabase.ts`, then fail CI when it drifts. |
-| 🟠 | **There is no staging DB.** Every migration goes straight to prod. Use Supabase Branching or a second project. |
-| 🟠 | **Stale cron jobs are still active.** `weekly-digest-test-840pm` and `weekly-digest-tonight` fire **every 18 February**. Three jobs run **every minute** (notifications, reminders, push) and poll even when there is nothing to do. |
-| 🟡 | 7 functions have a mutable `search_path`. `pg_net` and `btree_gist` sit in `public`. |
-| 🟡 | Background work runs on **three runtimes**: Edge Functions (8), `pg_cron`+`pg_net` calling Next routes, and Next cron routes. When Vault secrets went missing, all 8 jobs no-op'd silently. Pick one. Supabase Queues (`pgmq`) with one worker is the clean option. |
-| 🟡 | The `acob-crm` project is INACTIVE. Delete it, or say what it is for. |
-| 🟡 | Realtime is barely used (2 channels), while 6 `setInterval` pollers exist. |
-
-## 5. Backend (API routes)
-
-| | Finding |
-|---|---|
-| 🟠 | **28 client components write straight to Supabase** (`insert`/`update`/`delete`), skipping your API routes, audit logging and the AGENTS.md rule *"browser code never relies on loose RLS"*. Examples: `admin-employee-content.tsx`, `manage-users-dialog.tsx`, `communications-composer.tsx`, `unified-scorecard-hub.tsx`, `pms/reviews/[cycleId]/view.tsx`, `mail-digest-content.tsx`. Leftover `requisitions` policy holes like #2 exist *because* some screen once needed them. |
-| 🟠 | **Only 144 of 363 routes validate input with zod (40%).** |
-| 🟠 | **177 places send `error.message` back to the client.** That leaks table, column and constraint names to anyone poking the API. Log it server-side and return a generic message plus a code. |
-| 🟠 | **Nothing is cached.** 210 routes/pages are `force-dynamic`, there are 2 `unstable_cache` and 0 server actions. Add **219 `select('*')`** and 119 route files with no `limit`/`range`. This is a direct line to your egress bill. |
-| 🟠 | **Six permission modules**: `lib/permissions.ts`, `lib/role-management.ts`, `lib/admin/rbac.ts` (126 importers), `policy-v2.ts`, `api-guard-v2.ts`, and `access-policy.ts` (**0 importers**). Six ways to ask "can this user do X" means six ways to get it wrong. |
-| 🟡 | **`app/api/admin/accounts/*` is a byte-identical copy of `app/api/admin/finance/*`, with zero callers.** Delete it. |
-| 🟡 | **`lib/csrf.ts` and `hooks/use-csrf.ts` have 0 importers.** Either CSRF protection was never wired, or it was replaced (`apiFetch`) and these are dead. The `SameSite=Lax` cookie mitigates most of it, but delete or wire them. |
-| 🟡 | Several `if (error.code === "42P01") return []` blocks (missing table → empty list) hide real failures. |
-| 🟡 | Giant single files: `export-utils.ts` (3,206 lines), `leave/requests/route.ts` (1,617 lines in one route). |
-| 🟡 | 77 `console.*` calls, although `lib/logger` exists. There is no error tracker (Sentry or similar). Client errors go into a Supabase table nobody watches. |
-| 🟡 | AcoBot does not cap the number or length of messages per request, so a 200-turn history costs you on every call. It logs every Q&A *with IP address*, which needs a line in a privacy notice (see §11). The rest is good: system role stripped, auth, rate limit. |
-
-## 6. Frontend (React / Next)
-
-| | Finding |
-|---|---|
-| 🟠 | **Huge components**: 40 files over 880 lines. Top ones: `admin/hr/lunch/view.tsx` 2,917, `attendance-manager-dialog.tsx` 2,590, `data-table.tsx` 1,952, `admin-assets-content.tsx` 1,847. These are where regressions come from. |
-| 🟠 | **Two data-fetching styles.** TanStack Query is used in 109 files, but 33 files still `fetch` inside `useEffect` with manual loading state. There are 281 `useEffect` calls in total and 18 `exhaustive-deps` disables, and those are stale-closure bugs waiting to happen. |
-| 🟠 | **Helpers redefined everywhere**: `formatCurrency` in **21** files, `formatDate` in **29**, `getStatusColor` in **15**, `getInitials` in 5. |
-| 🟡 | **Two toast systems**: sonner (222 files) plus Radix toast with `hooks/use-toast` (2 files). Remove Radix toast. |
-| 🟡 | **Unused dependencies**: `@neondatabase/serverless`, `react-resizable-panels`, `embla-carousel-react`, `input-otp`, `@ai-sdk/openai`. `@types/*` packages sit in `dependencies` instead of `devDependencies`. Dead code: `hooks/use-async-state.ts`. |
-| 🟡 | 484 `"use client"` files. Many whole pages are client-rendered when only a filter bar needs to be. |
-
-## 7. Industry practice and process
-
-| | Finding |
-|---|---|
-| 🔴 | **The agent rules contradict each other.** `AGENTS.md` (read by Codex, ChatGPT, Cursor) says *"Pre-push must pass `npm run build`. Confirm the build passes locally"*. `CLAUDE.md` and the actual hook say never build. It also says "always commit verified work", yet 78 files sit uncommitted. Agents following AGENTS.md will keep building and fighting your dev server. **Fix AGENTS.md** so it has one truth. |
-| 🟠 | **Testing**: 38 unit-test files for 300k lines, and 4 Playwright specs that are not in CI. `test:risk-register` is missing from the `npm test` chain, so CI never runs it. There are no tests at all for RLS or grants, the class of bug in §0. Add a SQL test file that does `SET ROLE authenticated` and asserts denial. |
-| 🟠 | **No error tracking, no uptime alerting.** You found the dead cron jobs and the 504 meeting-reminder miss by accident. |
-| 🟠 | **CSP allows `unsafe-inline` and `unsafe-eval`.** The comment says *"remove once Next.js supports nonce-based CSP"*, but Next has supported nonces through middleware since 13.4, and you already have `proxy.ts`. `unsafe-eval` is only needed by the export libraries. Lazy-load them on the export pages and drop it everywhere else. |
-| 🟡 | **No `.gitattributes`**, so every file warns `LF will be replaced by CRLF`. Add `* text=auto eol=lf`. |
-| 🟡 | **The repo root is a junk drawer**: PDFs, `spa_birthday_voucher*.html/pdf/png`, `.docx`/`.xlsx` inventories, a `~$…xlsx` Office lock file, `tmp-action-points.docx`, `tsconfig.tsbuildinfo`, `test-results/` (tracked), `deno.lock`. The `.git` folder is 56 MB. Also, `supabase/backups/…auth_email_wipe_rollback.sql` is tracked and **contains staff emails (PII) in git history**. |
-| 🟡 | **Branch hygiene**: one branch carries five unrelated features. Use one branch per feature, which `AGENTS.md` itself asks for. |
-| 🟡 | Dependency version pinning is mixed (exact vs `^`). There is no Renovate or Dependabot. |
-
-## 8. Where you should reuse instead of copying
-
-Pairs I measured with line-level similarity:
-
-| Similarity | File A | File B | Do this |
+| # | Problem | Why it matters | Fix |
 |---|---|---|---|
-| 93% | `(app)/reports/weekly-reports/_components/pptx-mode-dialog.tsx` | `admin/…/pptx-mode-dialog.tsx` | Move to `components/reports/` |
-| 88% | `admin/payroll/calculator/view.tsx` (1,439) | `admin/payroll/dummy/view.tsx` (1,348) | One component with a `mode` prop |
-| 88% | `components/assets/AssetExportDialog.tsx` | `components/employees/EmployeeExportDialog.tsx` | Generic `<ExportDialog<T> columns=…>` |
-| 85% | `(app)/accounts/payments/[id]/page.tsx` | `admin/accounts/payments/[id]/page.tsx` | Shared view + `scope` |
-| 82% | `HelpDeskRouteDiagnosticsPanel.tsx` | `RouteDiagnosticsPanel.tsx` | One panel |
-| 79% | `components/pms/cbt-question-manager.tsx` | `admin/pms/cbt/extra/page.tsx` | The page should render the component |
-| 77% | `dev/role-escalations/…-content.tsx` | `dev/security-events/…-content.tsx` | One log viewer |
-| 77% | `(app)/projects/project-content.tsx` | `admin/projects/_components/project-admin-content.tsx` | Shared |
-| 72% | `dept/[dept_id]/accounts/requisitions/…` | `(app)/accounts/requisitions/page.tsx` | Shared |
-| 70% | `(app)/reports/general-meeting/page.tsx` | `admin/reports/general-meeting/page.tsx` | Shared |
-| 70% | `admin/help-desk/page.tsx` | `dept/[dept_id]/help-desk/page.tsx` | Shared |
-| 65% | `admin/reports/action-tracker/…-content.tsx` (1,271) | `(app)/reports/action-tracker/page.tsx` (1,229) | **~2,500 lines → ~1,300** |
-| 66% | `admin/reports/weekly-reports/…-content.tsx` | `(app)/reports/weekly-reports/page.tsx` | Shared |
+| 1.1 🟠 | **Muted text is the same colour as body text.** Light-mode `--muted-foreground: oklch(0.25 0 0)` equals `--foreground`. | No visual hierarchy: descriptions, labels and captions shout as loudly as headings. The recent placeholder `/50` commit (`b1066f66`) patched one symptom. | In `app/globals.css` `:root`, set `--muted-foreground: oklch(0.52 0.01 75)` (still ≥4.5:1 on white). Revert the per-component `/50` patches. |
+| 1.2 🟠 | **`--accent` is the brand green.** In shadcn, `accent` is the *subtle hover* surface. | Every ghost/outline button hover and every dropdown or select item highlight becomes **solid green with white text**. It reads as "selected" and not "hovered". | Set `--accent: oklch(0.955 0.03 142)` and `--accent-foreground: oklch(0.3 0.08 142)`, plus a dark equivalent (`oklch(0.25 0.03 142)` with light text). |
+| 1.3 🟠 | **`--secondary` is also green.** | There is no neutral secondary button, so everything is green and primary actions don't stand out. | Use `--secondary: oklch(0.95 0.003 75)` and `--secondary-foreground: oklch(0.25 0 0)`. |
+| 1.4 🟠 | **`chart-1`, `chart-4` and `chart-5` are the same hue (142).** | Multi-series charts are unreadable. | Use five distinct hues at similar lightness, e.g. green 142, teal 185, blue 255, amber 70, rose 15. |
+| 1.5 🟠 | **Dark-mode destructive has poor contrast**: `--destructive` L=0.396 with a red foreground. | Delete buttons are hard to read. | `.dark`: `--destructive: oklch(0.58 0.22 27)` with `--destructive-foreground: oklch(0.985 0 0)`. |
+| 1.6 🟠 | **5,723 hardcoded palette classes** (`bg-green-100`, `text-amber-700`…) in 268 files, 165 raw hex values, and **1,349 `dark:` overrides** to compensate. | Changing the brand or fixing dark mode means editing about 7,000 places, and the colours drift across screens. | Add semantic tokens `--success`, `--warning`, `--info`, `--neutral`, each with `-foreground` and `-muted` variants, in `@theme`. You already have `components/ui/patterns/status-badge.tsx` (49 users): give it a status→tone map and make it the *only* way to colour a status. Add an ESLint `no-restricted-syntax` rule banning `/(bg\|text\|border)-(red\|green\|…)-\d{2,3}/` in `className`, then migrate folder by folder. |
+| 1.7 🟠 | **998 uses of `text-[10px]`/`text-[11px]`.** | Unreadable on phones and on the 150%-scaled laptops your own CSS comment describes. External reviewers notice this immediately. | Make `text-xs` (12px) the floor. Find and replace `text-[10px]`/`text-[11px]` with `text-xs`, and ban arbitrary font sizes via lint. |
+| 1.8 🟡 | **1,548 arbitrary values** (`w-[…]`, `h-[…]`, `max-w-[…]`). | Spacing doesn't follow the scale, and layouts feel "off" by a few pixels. | Use scale values. For the ones that repeat, add `@theme` tokens (`--spacing-sidebar`, etc.). |
+| 1.9 🟡 | **`tailwind.config.ts` is dead and wrong.** Tailwind v4 does not load it, and it wraps oklch vars in `hsl()`. | It misleads every contributor and agent, and breaks colours if anyone wires it with `@config`. | Delete the file, and remove the `tailwindcss-animate` dependency (you use `tw-animate-css`). |
+| 1.10 🟡 | **30 raw `<img>` vs 12 `next/image`**, and 16 lint disables for it. | Images are not resized or lazy-loaded, which costs egress and causes layout shift. | Use `next/image` (Supabase storage is already in `images.remotePatterns`). Keep `<img>` only in email or PDF renderers. |
+| 1.11 🟡 | **Modal-heavy**: 157 `DialogContent` vs 3 `SheetContent`, while AGENTS.md says a row tap opens a sheet. | Long forms in centred dialogs are cramped on phones. | You already have `ui/patterns/responsive-modal.tsx` (**1 user**). Make it Dialog ≥ md and **Drawer (vaul) < md**, then switch dialogs to it. |
+| 1.12 🟡 | **Three shell accents** (green user / amber admin / blue lead). | A good idea, but some components hardcode green and ignore the shell. | Make components read `--primary`, and have each shell redefine `--primary` (not a separate `--admin-primary`). |
 
-**The pattern behind it:** staff, admin and dept versions of the same screen were each built by copying. You already have `admin-scope-context` and `dept-scope-context`. One component reading the scope from context would replace all of these. When you fix a bug in one copy, the others stay broken. That is the main source of "it works on admin but not for staff" bugs.
+## 2. UX
 
-Also extract `lib/format.ts` (`formatCurrency`, `formatDate`, `formatDateTime`, `getInitials`, all pinned to `en-NG` and `Africa/Lagos`) and one `StatusBadge` with a status-to-token map. Together they replace about 65 local copies.
+| # | Problem | Why it matters | Fix |
+|---|---|---|---|
+| 2.1 🔴 | **Notifications are ignored.** 82% are unread overall. In the last 30 days, `approval_request` was unread **133 of 136** times and `task_awaiting_review` **206 of 207**. Announcements (816) and system messages (569) bury them. | Approvals stall, people blame the system, and adoption drops. | Introduce **tiers**. *Action* (approvals, reviews, overdue) gets push + email + a dedicated **"Needs you" inbox** with a count badge. *FYI* is bell-only and marked read when the list opens. *Announcements* go to a feed, not the bell. Auto-archive FYI after 14 days. |
+| 2.2 🟠 | **No "home" for a staff member.** Root redirects to `/profile`. | People have to hunt for what to do today. | Build a **"My Day" page** (§15) as the landing route. |
+| 2.3 🟠 | **The admin sidebar has 81 links** ([admin-sidebar.tsx](../../components/admin-sidebar.tsx), 1,197 lines). | Nobody can scan 81 items, so features are effectively invisible. | Show only the links a role needs. Add **⌘K command palette** (cmdk is installed), **pinned favourites**, and "recently visited". Collapse groups by default. |
+| 2.4 🟠 | **Adoption gaps**: 61 of 119 users haven't signed in for 60+ days, and 47 of 117 profiles have no `department_id`. | People without a department fall out of routing, dashboards and KSS. | Build an admin "data health" card listing people with missing department, manager, or no login in 30 days. Make `department_id` NOT NULL once backfilled. |
+| 2.5 🟠 | **Forms behave differently everywhere.** About 147 files hand-roll `useState` forms; 12 use RHF. | Different error messages and disabled states; input is lost after a failed submit; enter-to-submit only works sometimes. | Standardise on **react-hook-form + zod + shadcn `<Form>`** (§10). Share each schema between the client form and the API route. |
+| 2.6 🟠 | **76 of 98 icon-only buttons have no accessible name.** | Screen readers say "button", and there is no tooltip for sighted users either. | Add `aria-label` plus `<Tooltip>`. Better: create `<IconButton label="…" icon={…}>` that *requires* `label`, and lint against raw `size="icon"`. |
+| 2.7 🟡 | **9 native `confirm()`/`alert()` calls.** | They look like 1999 and break the design. | Use `<AlertDialog>`. Add a `useConfirm()` hook that returns a promise, so call sites stay one line. |
+| 2.8 🟡 | **Dates are formatted by browser locale** (117 `toLocale*` calls). | One person sees `10/1/2026`, another sees `1/10/2026`. | Put one `lib/format.ts` behind `Intl.DateTimeFormat('en-NG', { timeZone: 'Africa/Lagos' })` and ban `toLocale*` via lint. |
+| 2.9 🟡 | **A "Dummy payroll" page ships to admins.** | It is confusing, and it looks unfinished to an outsider. | Merge it into the calculator as a "Sandbox" toggle, or delete it. |
+| 2.10 🟡 | **Empty states.** `ui/patterns/empty-state.tsx` is used in 40 files, but many lists still render a bare "No data". | Users don't know what to do next. | Every empty state gets an icon, one sentence and **one primary action** ("Create your first requisition"). |
+| 2.11 🟡 | **Errors are shown as raw DB messages** (177 routes return `error.message`). | Users see `duplicate key value violates unique constraint "…"`. | Map known codes to human text in `lib/api/errors.ts`, which already exists. |
 
-## 9. Use a library instead of hand-rolling
+## 3. Database
 
-| You hand-rolled | Use | Why |
+| # | Problem | Why it matters | Fix |
+|---|---|---|---|
+| 3.1 🔴 | The holes in A1–A6. | | See A. |
+| 3.2 🟠 | **`customers` (2,178 rows) is readable by every employee** (`USING true`). The same applies to `employee_department_history`, `payroll_periods`, `salary_components` and `action_items`. | Customer PII is exposed to all staff via the public anon key. That is an NDPA issue. | Scope SELECT to roles that need it (`has_role('admin')` or a commercial-department check). Config tables like `leave_types` and `holiday_calendar` can stay open. |
+| 3.3 🟠 | **`staff_directory` is a `SECURITY DEFINER` view** (linter ERROR) that exposes `additional_email` and `additional_phone` (personal contacts). | Personal contact data is visible to everyone. | Drop the two personal columns from the view, or recreate it `WITH (security_invoker = true)` over a narrow SECURITY DEFINER function that returns only work fields. |
+| 3.4 🟠 | **Two sources of truth for department**: `profiles.department` (text, "DEPRECATED") and `department_id`, synced by a trigger. 47 rows have no id. | Queries use either column, so results disagree. | Backfill `department_id`, switch all reads to the FK, drop the text column and the sync trigger. |
+| 3.5 🟠 | **Performance debt**: 126 un-indexed FKs, 3 duplicate indexes, 46 unused indexes, 88 "multiple permissive policies", 3 `auth_rls_initplan`. | Slower joins and deletes. Every extra permissive policy is evaluated per row. | One migration: add FK indexes for the tables you actually query, and drop the duplicates (`idx_leave_requests_user` etc.). Merge permissive policies per role/action into one `USING (a OR b)`. Wrap `auth.uid()` as `(select auth.uid())` on `system_satisfaction_surveys`. |
+| 3.6 🟠 | **`network_activity_logs` is 115 MB of the 268 MB DB.** | Backup size, egress and the free-tier ceiling. | Apply the pending SharePoint-archive migration (`20261001120000`) after review, and keep the 10-minute purge job. |
+| 3.7 🟡 | **45 `status`/`role`/`type` columns are free `text`.** | Typos become data, and UI filters miss rows. | Add `CHECK (status IN (…))` or a Postgres enum. Generated types then give you TS unions for free. |
+| 3.8 🟡 | **Backup tables live in `public`** (`tasks_work_item_number_backup`, `deleted_tasks_archive`). | They are exposed through PostgREST and clutter the schema. | Move them to a `private` schema (not exposed), or drop them. |
+| 3.9 🟡 | **`create_notification` has 2 overloads** with different signatures. | PostgREST picks by argument names, so callers silently hit the legacy one. | Rename the old one `create_notification_legacy`, migrate callers, then drop it. |
+| 3.10 🟡 | **Migration folder hygiene**: `001–006_remote_baseline.sql`, `_fix_queue_secret.sql` (no timestamp, holds a secret), a `migrations_backup/` folder, and old numbered SQL in `scripts/001…008`. | Confusing, and a fresh `db reset` may not reproduce prod. | Squash into one dated baseline taken from `supabase db dump`. Move the old files to an archive branch or tag. Prove a fresh local `supabase db reset` works. |
+| 3.11 🟡 | **Cron sprawl**: the test jobs `weekly-digest-test-840pm` and `weekly-digest-tonight` still fire every **18 Feb**, and 3 jobs run **every minute**. | Surprise emails next February, and constant DB load. | Unschedule the two test jobs. Replace the per-minute pollers with a queue (§4.4). |
+
+## 4. Supabase platform
+
+| # | Problem | Why it matters | Fix |
+|---|---|---|---|
+| 4.1 🔴 | No MFA; leaked-password check off. | | See A10. |
+| 4.2 🟠 | **Types cover 4 of 175 tables**, because [types/database.ts](../../types/database.ts) is hand-written. | This is why you have 214 `any`, 63 `as unknown as` and local row types everywhere. Typos in column names only fail at runtime. | `npx supabase gen types typescript --project-id itqegqxeqkeogwrvlzlj > types/supabase.ts`, then `createClient<Database>()`. Add a CI job that regenerates the types and fails on diff. |
+| 4.3 🟠 | **No staging database.** Every migration is a production experiment. | One bad migration hits real staff data. | Turn on **Supabase Branching** (a preview DB per PR), or a second "acob-erp-staging" project. Run migrations there first. |
+| 4.4 🟠 | **Background jobs run on 3 runtimes**: 8 Edge Functions, `pg_cron`+`pg_net` calling Next routes, and Next cron routes. Missing Vault secrets silently killed 8 jobs. | Hard to observe, and failures are silent. | Use **Supabase Queues (pgmq)** with one consumer, or Inngest/Trigger.dev, to get retries, DLQ and a dashboard. At minimum, have `app-reminders-health` alert by email when any job hasn't succeeded in N runs. |
+| 4.5 🟡 | 7 functions have a mutable `search_path`; `pg_net` and `btree_gist` live in `public`. | A search-path hijack vector, and the linter stays noisy. | `ALTER FUNCTION … SET search_path = public, pg_temp;` and `ALTER EXTENSION … SET SCHEMA extensions;` |
+| 4.6 🟡 | **Public buckets**: `requisition_documents` and `assets`. `payment_documents`, `help_desk_documents` and `assets` have **no size limit**. | Financial documents are reachable by URL, and one 2 GB upload eats your quota. | Make `requisition_documents` private and serve it with `createSignedUrl` (60 s). Set `file_size_limit` and `allowed_mime_types` on every bucket. |
+| 4.7 🟡 | **The `acob-crm` project is INACTIVE.** | Clutter and a confusing org. | Delete it, or document why it exists. |
+| 4.8 🟡 | **Realtime is almost unused** (2 channels), alongside 6 `setInterval` pollers. | Pollers waste egress, and data goes stale between polls. | Use Realtime for the notification bell and approval counters. Leave the rest to react-query `refetchOnWindowFocus`. |
+
+## 5. Backend / API
+
+| # | Problem | Why it matters | Fix |
+|---|---|---|---|
+| 5.1 🟠 | **13 client components write directly to Supabase**: `profile-form.tsx` (profiles), `job-description/page.tsx` (profiles), `admin-employee-content.tsx` (profiles), `notification-bell.tsx` and `notification-content.tsx` (notifications), `pending-applications-modal.tsx` and `manage-users-dialog.tsx` (pending_users), `feedback-edit-modal.tsx`, `user-feedback-list.tsx` and `feedback-content.tsx` (feedback), `notification-preferences-form.tsx`, `tasks-content.tsx` (task_updates), `excel-import-dialog.tsx` (action_items). | These writes skip validation, audit logging and rate limits, and they force loose RLS. A1 exists *because* the profile form writes directly. | Route each one through an API route that uses zod and the service client. Then extend the ESLint `no-restricted-imports` rule for `@/lib/supabase/client` from `app/admin/**` to **all** client code (reads can stay where RLS is tight), and delete the "temporary allowlist" in `eslint.config.mjs`. |
+| 5.2 🟠 | **Only 144 of 363 routes validate input with zod.** | Malformed input reaches the DB, and errors appear as 500s. | Add a `parseBody(req, schema)` helper returning a 400 with field errors, and use it in every POST/PATCH/PUT. A grep in CI can enforce it. |
+| 5.3 🟠 | **177 places return `error.message` to the client.** | They leak table, column and constraint names, and users see gibberish. | `return apiError(err)` from `lib/api/errors.ts`: log the detail with a request id and return `{ error: "Could not save", code, requestId }`. |
+| 5.4 🟠 | **Authorization has 6 modules**: `lib/permissions.ts`, `lib/role-management.ts`, `lib/admin/rbac.ts` (126 importers), `policy-v2.ts`, `api-guard-v2.ts`, and `access-policy.ts` (**0 importers**). **11 routes define their own `ensureAdmin()`.** | Six ways to answer "can they?", and they will disagree. | Keep `rbac.ts` + `api-scope.ts`. Delete `access-policy.ts`. Fold `permissions`, `role-management` and `policy-v2` into `rbac`. Replace the local `ensureAdmin` copies with `requireApiAdminScope`. |
+| 5.5 🟠 | **No caching**: 210 `force-dynamic`, 2 `unstable_cache`, 0 server actions, **219 `select('*')`**, 119 route files with unbounded queries. | This is your egress bill and slow pages. | Select explicit columns, add `.range()`/`.limit()` everywhere, and cache reference data (departments, offices, leave types) with `"use cache"` + `cacheTag`, revalidating on write (§12). |
+| 5.6 🟠 | **Cron-auth is copy-pasted.** `safeCompare` is defined in **10** cron/ingest routes. | A security primitive with 10 copies will diverge. | `lib/security/cron-auth.ts`: `export function requireCronAuth(req): Response \| null`, used by all 10. |
+| 5.7 🟡 | **Dead duplicate API**: `app/api/admin/accounts/*` is byte-identical to `app/api/admin/finance/*` and has zero callers. | Dead attack surface that confuses readers. | Delete `app/api/admin/accounts/`. |
+| 5.8 🟡 | **`lib/csrf.ts` and `hooks/use-csrf.ts` have 0 importers.** | It looks like security that isn't there. | Delete them (`apiFetch` + SameSite=Lax covers you), or wire them into `apiFetch`. |
+| 5.9 🟡 | **Schema-drift swallowing**: 21× `if (error.code === '42P01') return []` and 9× `42703` fallbacks. | Hides missing tables/columns, so bugs look like "no data". | Remove them once types are generated (4.2) and staging exists (4.3). Missing tables should fail loudly. |
+| 5.10 🟡 | **Giant files**: `export-utils.ts` 3,206 lines, `leave/requests/route.ts` 1,617, `leave-workflow.ts` 978. | Hard to review and easy to break. | Split them by concern (`export/csv.ts`, `export/pdf.ts`, `export/xlsx.ts`, and leave `create`/`list`/`cancel` handlers delegating to `lib/hr/leave/*`). |
+| 5.11 🟡 | **77 `console.*` calls** although `lib/logger` exists; there is no error tracker. | Prod errors vanish. | Lint `no-console: error` outside scripts, and add Sentry (§10). |
+| 5.12 🟡 | **Biased exam shuffle**: `sort(() => 0.5 - Math.random())` in the CBT session route ([cbt/session/route.ts:405-431](../../app/api/hr/performance/cbt/session/route.ts)). | The shuffle is not uniform, so questions are unevenly likely in a *graded exam*. | Use a Fisher–Yates `shuffle()` in `lib/utils/random.ts`, with `crypto.getRandomValues`. |
+| 5.13 🟡 | **AcoBot has no cap on history length.** | Long chats cost tokens on every call. | Keep the last 12 messages and cap each at 4k characters. |
+
+## 6. Frontend / React
+
+| # | Problem | Why it matters | Fix |
+|---|---|---|---|
+| 6.1 🟠 | **40 files exceed 880 lines.** Top: `admin/hr/lunch/view.tsx` 2,917, `attendance-manager-dialog.tsx` 2,590, `admin-assets-content.tsx` 1,847, `department-documents-browser.tsx` 1,832. | Regressions breed here, and no reviewer can hold them in their head. | Split them into `_components/` + `_hooks/use-…-query.ts` + a pure `lib/` logic module. Target under 400 lines per file. |
+| 6.2 🟠 | **Two data-fetching styles.** React Query is in 109 files; 33 still `fetch` in `useEffect`; 281 `useEffect` calls in total. | Race conditions, no caching, and loading/error handled differently on every screen. | Everything goes through react-query hooks keyed from `lib/query-keys.ts` (which exists). The existing lint rule is a *warn*; make it an *error*. |
+| 6.3 🟠 | **ESLint turns off the React-19 safety rules**: `purity`, `immutability`, `set-state-in-effect`, `static-components`, `error-boundaries`, `preserve-manual-memoization`, and `reportUnusedDisableDirectives: off`. | These rules catch real bugs: impure render, mutated state, effect loops. Turning them off hid the problems instead of fixing them. | Turn them back on as `warn`, fix them folder by folder, then switch to `error`. Set `reportUnusedDisableDirectives: "error"` to clear stale disables. |
+| 6.4 🟠 | **1,150 manual `useMemo`/`useCallback`.** | Noise, and wrong dependency arrays (18 `exhaustive-deps` disables). | Enable the **React Compiler** (`reactCompiler: true` in next.config), then delete most manual memoisation over time. |
+| 6.5 🟡 | **Two toast systems**: sonner (222 files) and Radix toast + `hooks/use-toast` (2 files). | Inconsistent toasts. | Delete `components/ui/toast.tsx`, `toaster.tsx` and `hooks/use-toast.ts`; migrate the 2 callers to sonner. |
+| 6.6 🟡 | **70 `key={index}`** and 18 `Math.random` ids. | List items swap state when rows reorder. | Use stable ids; `crypto.randomUUID()` for temporary ones. |
+| 6.7 🟡 | **Unused dependencies**: `@neondatabase/serverless`, `react-resizable-panels`, `embla-carousel-react`, `input-otp`, `@ai-sdk/openai`. `@types/*` sit in `dependencies`. `hooks/use-async-state.ts` is dead. | Bigger installs, and unused packages still raise security alerts. | `npx knip` and remove what it reports. Move `@types/*` to devDependencies. |
+| 6.8 🟡 | **484 `"use client"` files**, often whole pages. | Larger JS bundles and slower first paint on phones. | Keep pages and layouts as server components that fetch data. Push `"use client"` down to the interactive leaf (filter bar, dialog). |
+| 6.9 🟡 | **No `.gitattributes`.** | Every diff warns about LF/CRLF and mixed endings. | Add `* text=auto eol=lf`. |
+
+## 7. Data tables
+
+What you have: `components/ui/data-table/data-table.tsx` (**1,952 lines**) plus `data-table-page.tsx`, used by **106 pages**. It is genuinely feature-rich (URL sync in 66 pages, mobile card/contacts view, column resize/reorder, row expansion, selection, a mobile detail sheet). The concept is good; the implementation and the edges are not.
+
+| # | Problem | Why it matters | Fix |
+|---|---|---|---|
+| 7.1 🟠 | **A single 1,952-line component** holds filtering, sorting, pagination, column ordering, resizing, selection, mobile grouping, sticky offsets, the detail sheet, its own skeleton and its own empty state. | Every table bug fix risks all 106 pages, and nobody can review it. | Rebuild the internals on **TanStack Table v8** (headless: sorting, filtering, pagination, selection, column order/visibility/sizing are all built in) and keep your public `DataTableColumn`/`DataTableFilter` API as an adapter. Split the UI into `data-table/toolbar.tsx`, `desktop-table.tsx`, `mobile-list.tsx`, `detail-sheet.tsx` and `pagination.tsx`. |
+| 7.2 🟠 | **Everything is client-side.** Only **2** of 106 tables use `serverSide` pagination; the rest download whole tables. | Fine for 117 staff, but bad for audit logs (19.6k rows), notifications, attendance events and customers (2.2k). It drives egress and slow loads. | Any table that can exceed ~500 rows uses server pagination, sort and filter: the API accepts `?page&pageSize&sort&q&filters` and returns `{ data, total }`. TanStack Table supports this with `manualPagination` / `manualSorting`. |
+| 7.3 🟠 | **No virtualisation.** | Rendering 2,000 rows freezes low-end phones. | Add `@tanstack/react-virtual` to the list body when rows exceed 200. |
+| 7.4 🟡 | **Its own `TableSkeleton` (line 122) and `EmptyState` (line 1926)** duplicate `components/skeletons/table-page-skeleton.tsx` and `ui/patterns/empty-state.tsx`. | Two looks for the same state. | Import the shared ones. |
+| 7.5 🟡 | **Dynamic Tailwind class** `min-w-[${minWidth}]` (line 1208). | Tailwind can't see runtime strings, so the class never exists (the inline style happens to cover it). That is a "looks fine, isn't" patch. | Delete the `className`; keep the `style`. |
+| 7.6 🟡 | **Bypassers.** 13 files use raw shadcn `<Table>` primitives and 21 use raw HTML `<table>`, e.g. `payroll/calculator`, `help-desk/ticket-queue-table.tsx`, `EmployeeDetailTabs.tsx`, `admin/hr/departments/view.tsx`, `admin/hr/offices-rooms/view.tsx`, `pms-table-page.tsx`, `action-tracker`. | These lists look and behave differently (no search, export or mobile view). | Lists of records move to `DataTable`. Fixed-shape breakdowns (payslip lines, heat-maps, PDF templates) can stay raw tables. |
+| 7.7 🟡 | **Row-click detection** uses `target.closest("[role='menuitem']")` chains (lines 1288 and 1758, duplicated). | Fragile: every new interactive cell needs another selector. | Stop propagation in interactive cells, or mark them with `data-row-click="ignore"` and check one attribute. |
+| 7.8 🟡 | **`AdminTablePage`** (4 users) is a parallel wrapper beside `DataTablePage` (106). | Two page shells. | Migrate the 4 and delete `components/admin/admin-table-page.tsx`. |
+| 7.9 🟡 | **Export is per-page** via `lib/export-utils.ts` (3,206 lines) plus `AssetExportDialog` and `EmployeeExportDialog` (88% identical). | Every table re-implements export. | Have the table export its own `visibleColumns × filteredRows` to CSV/XLSX/PDF, driven by column `accessor`s. Delete the per-entity dialogs. |
+
+## 8. Skeletons and loading states
+
+What you have: a decent shared skeleton set in `components/skeletons/` (Table ×168, Form ×18, CardGrid ×18, Detail ×15, Dashboard ×12, Auth ×12), plus `ui/query-states.tsx` with `PageLoader` (13 users).
+
+| # | Problem | Why it matters | Fix |
+|---|---|---|---|
+| 8.1 🟠 | **42 pages have no `loading.tsx`**, including `/goals`, `/md-desk`, `/survey`, `/settings/*`, `/tools/media`, `/admin/payroll*`, `/admin/security*`, `/admin/md-desk`, `/admin/pms/goals` and `/lunch/[date]`. (Some are redirect-only, which is fine.) | A blank screen or a frozen previous page while the server renders. | Add `loading.tsx` for every non-redirect page, using the matching shared skeleton. Your `npm run ui:ensure-loading` script exists; run it in CI so it fails the build. |
+| 8.2 🟠 | **Skeletons drift from the real layout.** `TablePageSkeleton` has 12 props (`statCards`, `tabs`, `filters`, `statBadges`, `list`, …) that each page must keep in sync with its `DataTablePage` props by hand. Its own JSDoc warns "mirror it here or the page visibly jumps". | Layout shift when the real page loads, which looks cheap. | **Derive the skeleton from the same config.** Export a `pageConfig` (stats count, tabs, filters, view mode) from the page's `_lib`, and pass it to both `<DataTablePage {...config}>` and `<TablePageSkeleton {...config}>`. Or let `DataTablePage` render its own skeleton when `isLoading`. |
+| 8.3 🟠 | **81 files show `Loader2` spinners**, some full-page. | Spinners feel slower than skeletons and cause layout jump. | Spinners only *inside buttons* while submitting. Content areas use skeletons; full pages use `loading.tsx` or a `<Suspense fallback={<XSkeleton/>}>`. |
+| 8.4 🟡 | **Two barrels**: `components/skeletons.tsx` *and* `components/skeletons/index.ts`, exporting slightly different sets (`StatCardSkeleton` is only in the folder). | `@/components/skeletons` resolves to the *file*, not the folder, which is surprising and a trap for new code. | Delete `components/skeletons.tsx`. The folder's `index.ts` becomes the single barrel. |
+| 8.5 🟡 | **21 `loading.tsx` files hand-roll skeletons** (up to 90 lines, e.g. `(app)/profile/loading.tsx`) and 7 content files use `<Skeleton>` inline. | Duplicate shapes that drift from the page. | Add a `ProfileSkeleton` and `NotificationListSkeleton` to `components/skeletons/` and use them. |
+| 8.6 🟡 | **Many `loading.tsx` files are byte-identical** (34 share one body, 16 another, 10 another). | Not wrong, but it is noise. | Put one `loading.tsx` at the route-group level (e.g. `app/admin/hr/loading.tsx`) where children share the same shape, and delete the copies. |
+| 8.7 🟡 | **No streaming.** Pages await all data before rendering anything. | The slowest query blocks the whole page. | Render the shell immediately, and wrap slow sections (stats, charts) in `<Suspense>` with section skeletons. |
+
+## 9. Reuse and duplicates
+
+### 9a. Near-duplicate files (line-level similarity I measured)
+
+| Sim. | Files | Fix |
 |---|---|---|
-| 1,952-line `DataTable` (sort, paginate, filter, select) | **TanStack Table** (headless) + **TanStack Virtual** | You already use TanStack Query. It gives column visibility, pinning, grouping and virtualised rows. You keep your `DataTablePage` API on top. |
-| `useState` forms ×147 | **react-hook-form + zod + shadcn `<Form>`** (both already installed) | One validation and error UX everywhere. The same zod schema can validate the API route. |
-| Filters in component state | **nuqs** | Typed URL state: shareable links, and Back keeps filters. |
-| `types/database.ts` by hand | **`supabase gen types`** | It is a one-liner and kills most `any`. |
-| HTML-string email templates (`lib/email-templates/*.ts`) | **React Email** (`@react-email/components`) | Made for Resend. Components, preview server, and dark-mode handling built in. |
-| Every-minute cron polling queues | **Supabase Queues (pgmq)**, or Inngest / Trigger.dev | Retries, backoff, a dead-letter queue and visibility. That is what your meeting-reminder retry design is rebuilding by hand. |
-| `toLocaleString` ×117 | `Intl.DateTimeFormat('en-NG', {timeZone:'Africa/Lagos'})` in one helper, or `@date-fns/tz` (date-fns v4 is installed) | Same date format for everyone. |
-| Native `confirm()` | shadcn **AlertDialog** (you have it) | |
-| Ad-hoc mobile modals | shadcn **Drawer** (`vaul` is already installed) | Bottom sheets on phones. |
-| Admin search | shadcn **Command** (`cmdk` is already installed) | ⌘K palette across all 289 pages. |
-| Logging to a DB table | **Sentry** (free tier) | Stack traces, releases, alerts. |
-| Hand-rolled rate limiter fallbacks | You already have Upstash. Make it required in prod and fail closed. | |
-| Password + OTP auth | **Microsoft Entra ID SSO** (Supabase Azure provider) | You already use Graph and SharePoint (`lib/azure`, `lib/graph`, `lib/onedrive`). See §11. |
+| 93% | `(app)/reports/weekly-reports/_components/pptx-mode-dialog.tsx` ↔ `admin/reports/weekly-reports/_components/pptx-mode-dialog.tsx` | Move to `components/reports/pptx-mode-dialog.tsx` |
+| 88% | `admin/payroll/calculator/view.tsx` (1,439) ↔ `admin/payroll/dummy/view.tsx` (1,348) | One `PayrollCalculator` with `mode="live" \| "sandbox"` |
+| 88% | `components/assets/AssetExportDialog.tsx` ↔ `components/employees/EmployeeExportDialog.tsx` | Generic `ExportDialog<T>` (or table-native export, 7.9) |
+| 85% | `(app)/accounts/payments/[id]/page.tsx` ↔ `admin/accounts/payments/[id]/page.tsx` | `components/payments/payment-detail.tsx` + `scope` |
+| 82% | `admin/dev/tests/_components/HelpDeskRouteDiagnosticsPanel.tsx` ↔ `RouteDiagnosticsPanel.tsx` | One panel taking a route list |
+| 79% | `components/pms/cbt-question-manager.tsx` ↔ `admin/pms/cbt/extra/page.tsx` | The page renders the component |
+| 77% | `admin/dev/role-escalations/…-content.tsx` ↔ `admin/dev/security-events/…-content.tsx` | One `SecurityLogViewer` with `source` prop |
+| 77% | `(app)/projects/project-content.tsx` ↔ `admin/projects/_components/project-admin-content.tsx` | Shared + scope |
+| 72% | `dept/[dept_id]/accounts/requisitions/…` ↔ `(app)/accounts/requisitions/page.tsx` | Shared + scope |
+| 71% | `(app)/reports/weekly-reports/_components/weekly-report-filters.tsx` ↔ `admin/reports/action-tracker/_components/action-tracker-filters.tsx` | One `ReportWeekFilters` |
+| 70% | `(app)/reports/general-meeting/page.tsx` ↔ `admin/reports/general-meeting/page.tsx` | Shared + scope |
+| 70% | `admin/help-desk/page.tsx` ↔ `dept/[dept_id]/help-desk/page.tsx` | Shared + scope |
+| 66% | `admin/reports/weekly-reports/…-content.tsx` (691) ↔ `(app)/reports/weekly-reports/page.tsx` (828) | Shared + scope |
+| 65% | `admin/reports/action-tracker/…-content.tsx` (1,271) ↔ `(app)/reports/action-tracker/page.tsx` (1,229) | Shared + scope: **saves about 1,200 lines** |
 
-## 10. What you did wrong (process, not people)
+**Root cause and the one fix for all of these:** each staff, admin and dept screen was built by copying. You already have `admin-scope-context` and `dept-scope-context`. Make one feature component per screen under `components/<feature>/`. Each route file (`app/(app)/…`, `app/admin/…`, `app/dept/…`) becomes about 10 lines that render it inside its scope provider. The API route decides what data that scope may see.
 
-1. **You ran several AI agents with no integration discipline.** Codex, ChatGPT and Claude each followed different rule files (they contradict each other), copied screens instead of sharing them, and left work uncommitted on the wrong branches. Most of §8 and §7 comes from this.
-2. **You built for breadth, not depth.** Nearly 300 pages for 117 staff, but the loops are not closed: approvals go unread, 61 accounts are dormant, and 47 people have no department. A smaller set of modules that everyone uses beats 40 modules half-used.
-3. **You trusted the app layer, then forgot the DB layer.** Routes check roles properly (`requireApiAdminScope` is good). But the same operations were exposed as `SECURITY DEFINER` RPCs and `USING(true)` policies that anyone can call directly. Your own AGENTS.md rules 4–5 say exactly this. It just was not enforced, because nothing tests it.
-4. **You patched symptoms instead of tokens.** Muted text and the green hover show it: patched per-component (`/50`, `dark:` ×1,349, raw palette ×5,723) instead of fixing `globals.css` once.
-5. **You have no staging environment and no RLS tests**, so every migration is a production experiment.
-6. **You put tax law in code.** Bands and reliefs are hardcoded constants with comments. When the rules change you redeploy and hope.
-7. **The repo doubles as a file share**: vouchers, memos, inventories and PII backups are tracked in git.
+### 9b. Helpers redefined across files
 
----
+| Helper | Copies | Fix |
+|---|---|---|
+| `formatDate` | 23 | `lib/format.ts`: `formatDate`, `formatDateTime`, `formatTime`, `formatClockTime`, `formatMeetingDate`, all `en-NG` and `Africa/Lagos` |
+| `formatCurrency` | 8 (+13 inline variants) | `lib/format.ts`: `formatNaira(n, { compact? })` |
+| `ensureAdmin` | 11 | Delete; use `requireApiAdminScope` |
+| `safeCompare` | 10 | `lib/security/cron-auth.ts` |
+| `formatName`/`displayName`/`employeeName` | 6/7/4 | `lib/people/name.ts`: `fullName(profile)` and `initials(profile)` |
+| `getStatusColor`/`statusLabel` | 6/4 (15 incl. variants) | `StatusBadge` + `lib/status.ts` map |
+| `normalizeDepartment` | 6 | `shared/departments.ts`, which already exists, so use it |
+| `hasGlobalReportsWriteAccess` | 6 | `lib/admin/rbac.ts` |
+| `escapeHtml` | 5 | `lib/email-templates/utils.ts` (one copy exists there; import it) |
+| `pickCanonicalReview`/`reviewStatusPriority` | 4/4 | `lib/pms/reviews.ts`. This is **business logic** with 4 copies, so a bug fix will miss 3 of them. |
+| `toCsv` | 4 | Table-native export (7.9) |
+| `buildCalendarCells`/`addDays`/`monBasedDay` | 4/4/4 | `lib/utils/date.ts` (exists), or `date-fns` (installed) |
+| `capitalize`/`formatPercent`/`getInitials` | 5/5/5 | `lib/format.ts` |
 
-## 11. Recommendations: things you may not have thought of
+**Prevent it from coming back:** add `jscpd` (copy-paste detector) to CI with a threshold of about 3%, and `knip` for unused exports.
+
+### 9c. Shared components you built but barely use
+
+| Component | Users | Should be used by |
+|---|---|---|
+| `ui/patterns/responsive-modal.tsx` | 1 | Every form dialog (157) |
+| `ui/patterns/pagination-controls.tsx` | 1 | Every non-DataTable list |
+| `ui/patterns/list-toolbar.tsx` | 1 | Card/grid pages with search |
+| `ui/patterns/error-state.tsx` | 3 | Every query error |
+| `ui/query-states.tsx` | 12 | Every react-query screen |
+| `components/ui/empty-state.tsx` | **0** | Delete; `patterns/empty-state` is the real one |
+
+## 10. Use a library instead of hand-rolling
+
+| Hand-rolled | Use | What you gain |
+|---|---|---|
+| 1,952-line `DataTable` engine | **TanStack Table** + **TanStack Virtual** | Tested sort, filter, pagination, selection and sizing; server mode; virtual rows |
+| ~147 `useState` forms | **react-hook-form + zod + shadcn `Form`** (installed) | One validation UX, shared schemas, a11y wiring |
+| Filter/tab state in components | **nuqs** | Type-safe URL state, shareable links, Back works |
+| Hand-written `types/database.ts` | **`supabase gen types`** | Typed queries; most `any` gone |
+| HTML-string email templates (`lib/email-templates/*.ts`) | **React Email** | Components, preview server, Outlook-safe output |
+| Every-minute cron pollers + custom retry | **Supabase Queues (pgmq)**, Inngest or Trigger.dev | Retries, backoff, DLQ, a dashboard |
+| 117 `toLocale*` calls | **`Intl.DateTimeFormat`** helper or **`@date-fns/tz`** | Consistent dates for everyone |
+| `confirm()`/`alert()` | **AlertDialog** + a `useConfirm()` hook | Consistent and accessible |
+| Centred dialogs on phones | **shadcn Drawer** (vaul installed) | Native-feeling bottom sheets |
+| Searching 81 sidebar links | **shadcn Command** (cmdk installed) | ⌘K palette |
+| A DB table for client errors | **Sentry** | Stack traces, releases, alerts, session replay |
+| `Math.random` passwords/shuffles | **Web Crypto** (`crypto.getRandomValues`) | Secure, unbiased |
+| Charts with ad-hoc colours | **shadcn Chart** (Recharts wrapper with `--chart-*` tokens) | Consistent, themed charts |
+| Password + OTP auth | **Microsoft Entra ID SSO** via Supabase Azure provider | MFA, offboarding and no passwords (§15) |
+| Copy-paste checks by eye | **jscpd** + **knip** in CI | Duplicates and dead code blocked automatically |
+
+## 11. Patches and workarounds
+
+These are places where a symptom was patched instead of fixing the cause. Outsiders read these as "nobody understood the system".
+
+| # | Patch | The real problem underneath | Proper fix |
+|---|---|---|---|
+| 11.1 | Placeholder dimmed with `muted-foreground/50` (`b1066f66`) | `--muted-foreground` token is wrong (1.1) | Fix the token and revert the patch |
+| 11.2 | 1,349 `dark:` overrides | Hardcoded palette instead of tokens (1.6) | Semantic tokens |
+| 11.3 | 7 React-19 lint rules turned **off**, plus `reportUnusedDisableDirectives: off` | The code violates them | Re-enable and fix (6.3) |
+| 11.4 | 89 `eslint-disable` comments (45 for `no-explicit-any`, 18 for `exhaustive-deps`, 16 for `no-img-element`) | Missing generated types, misuse of effects, raw images | 4.2, 6.2, 1.10 |
+| 11.5 | 63 `as unknown as` double-casts (10 in `lib/acobot/context.ts`) | Untyped Supabase results | Generated types (4.2) |
+| 11.6 | 21× `42P01` and 9× `42703` "table/column missing → return empty" | Schema drift between code and prod, no staging | Staging + types, then remove (5.9) |
+| 11.7 | ESLint "**temporary allowlist**" for direct Supabase use in admin | Admin pages were never migrated to API routes | Migrate the 3 files and delete the block (5.1) |
+| 11.8 | `min-w-[${minWidth}]` alongside inline `style` | A dynamic Tailwind class never generates | Delete the className (7.5) |
+| 11.9 | `TablePageSkeleton` "mirror it here or the page visibly jumps" | Skeleton config duplicated by hand | Shared page config (8.2) |
+| 11.10 | **28 redirect-only `page.tsx` files** (`/hr/payroll→/payroll`, `/goals→/pms/kpi`, `/project→/projects`…) | Old routes kept as pages | Move them all into `next.config.mjs` `redirects()` (which exists) and delete the folders |
+| 11.11 | CSP keeps `unsafe-inline` + `unsafe-eval` with "remove once Next supports nonces" | Next has supported nonces since 13.4 | Nonce CSP generated in `proxy.ts`. Lazy-load the export libraries so only export pages need `unsafe-eval`, or switch to eval-free builds |
+| 11.12 | `profiles.department` text plus a sync trigger | Department FK migration was never finished | Finish it (3.4) |
+| 11.13 | Two `create_notification` overloads | A new signature was added without removing the old | Consolidate (3.9) |
+| 11.14 | `security_definer` `staff_directory` view | Profiles RLS too tight for name lookups | A narrow definer function returning work fields only (3.3) |
+| 11.15 | Rate limiter "falling back to in-memory — not suitable for production" | Upstash optional in prod | Make `UPSTASH_*` required in prod and fail closed |
+| 11.16 | Anniversary signature tools ("temporary 10th anniversary") still routed | One-off campaign never removed | Feature-flag it or delete it |
+
+## 12. Modern practices
+
+Where you are vs. what a strong 2026 Next.js + Supabase codebase looks like.
+
+| Area | You today | 2026 standard | How to get there |
+|---|---|---|---|
+| Rendering | 484 client files, 210 `force-dynamic` | Server Components by default, client leaves only | Move data fetching into `page.tsx`; pass data to small client components |
+| Caching | None | Next 16 **Cache Components**: `"use cache"`, `cacheTag`, `cacheLife`, `revalidateTag` on mutation | Enable `cacheComponents: true`; cache reference data and dashboards per scope |
+| Mutations | `fetch('/api/...')` + manual state | **Server Actions** + `useActionState` / `useOptimistic` (React 19) for forms; API routes kept for external callers | Start with simple forms (profile, preferences, feedback) |
+| Memoisation | 1,150 manual `useMemo`/`useCallback` | **React Compiler** | `reactCompiler: true`, then delete over time |
+| Streaming | All-or-nothing pages | `<Suspense>` per section with skeletons | 8.7 |
+| Types | 4/175 tables typed, 214 `any` | Generated DB types + zod at every boundary + `noUncheckedIndexedAccess` | 4.2, 5.2 |
+| Lint | `core-web-vitals` only, hook rules off | `typescript-eslint` `strict-type-checked`, React-19 hook rules on, `no-console`, import sorting | 6.3 |
+| Data access | Mixed browser and server writes | All writes server-side; browser reads only where RLS is airtight | 5.1 |
+| DB security | App-layer checks, loose RLS/grants | RLS + column grants + `REVOKE … FROM PUBLIC` on every definer function, **tested in CI** | A + §14 |
+| Tests | 38 unit files, 4 e2e not in CI | Unit for logic, **pgTAP / SQL tests for RLS**, Playwright smoke tests per module in CI, **axe** a11y checks, visual snapshots | Start with RLS tests and 10 smoke flows |
+| Envs | Prod only | Local Supabase + preview branch DB per PR + prod | 4.3 |
+| Observability | DB-table logging | Sentry + Vercel logs/alerts + cron health alerts | 5.11 |
+| Background jobs | 3 runtimes, cron polling | Queue with retries/DLQ (pgmq, Inngest) | 4.4 |
+| Auth | Password/OTP, 0 MFA | SSO (Entra) + MFA (`aal2`) for privileged roles | A10, §15 |
+| Dependencies | Mixed pinning, no bot | Renovate + `npm audit` in CI + `knip` | §13 |
+| Design system | Tokens partly bypassed | Tokens-only colours, components documented on a `/design` page or Storybook | 1.6 |
+| Accessibility | 76 unlabeled icon buttons, 10px text | WCAG 2.2 AA: labels, focus, 12px floor, contrast checks | 1.7, 2.6 |
+| Commits/PRs | Mostly conventional, long-lived mixed branches | Small PRs, one feature per branch, squash-merge, PR template | §13 |
+
+## 13. Professional presentation
+
+What an outsider sees in the first five minutes, and how to fix it.
+
+| # | What they see | Fix |
+|---|---|---|
+| 13.1 | **The README is the default `create-next-app` text** ("You can start editing… `app/page.tsx`") | Rewrite it: what Matrix is, a screenshot, module list, architecture diagram (Next.js → API routes → Supabase; cron/queues; Microsoft Graph), local setup (`.env.example`, `supabase start`, seed), scripts, deploy, and links to `docs/`. |
+| 13.2 | **The repo is named `ACOB-Signature-Creator`** for a full ERP called "matrix" | Rename the GitHub repo to `matrix` or `acob-matrix`; GitHub redirects old URLs. (Confirm before doing it; it is an account-level change.) |
+| 13.3 | **A junk-drawer root**: `10 years aniversary.jpg`, PDFs, `spa_birthday_voucher*.html/pdf/png`, `*.docx`/`*.xlsx` inventories, a `~$…xlsx` lock file, `tmp-action-points.docx`, `tsconfig.tsbuildinfo`, tracked `test-results/`, `deno.lock`, `launch-video/` | Move business documents to SharePoint. `git rm` the clutter and add `.gitignore` rules (`~$*`, `*.tsbuildinfo`, `test-results/`, `*.docx`, `*.xlsx`, `*.pdf` at the root). |
+| 13.4 | **`docs/` mixes runbooks with AI prompts** (`codex-hardening-prompt.md`, `codex-rate-limit-prompt.md`, `codex-renaming-directions.md`) and status dumps (`COMPLETION_SUMMARY.md`, `*_SUMMARY.md`) | Restructure as `docs/architecture/`, `docs/runbooks/`, `docs/modules/<module>.md` and `docs/adr/` (architecture decision records). Delete agent prompts and old summaries; git history has them. |
+| 13.5 | **`scripts/` holds 74 one-offs**: Python report generators, `fix_constraint.ts`, `fix_assets_constraint_final.js`, `001_create_tables.sql`, `__pycache__` | Keep maintained tooling in `scripts/` with a README. Move one-offs to `scripts/archive/` or delete them. |
+| 13.6 | **`supabase/backups/…email_wipe_rollback.sql` is tracked** (it holds staff emails) | Remove it from the repo and from history (`git filter-repo`), and store backups in private storage. |
+| 13.7 | **Five features in one dirty branch** (`perf/supabase-egress-network-archive`, 78 files) plus 4 unapplied migrations | Split into feature branches/PRs (attendance appeals, lunch share, profile activity, acobot model, egress). Apply or delete the migrations. |
+| 13.8 | **AGENTS.md (976 lines) contradicts CLAUDE.md** on building | Fix it (§14.1). Shorten to under 300 lines: hard rules first, details linked. |
+| 13.9 | No `CODEOWNERS`, PR template, `CONTRIBUTING.md`, `SECURITY.md` or Renovate config | Add them. They are small files and big professionalism signals. |
+| 13.10 | Commit subjects longer than 72 characters (21 of the last 300) and mixed scopes (`style(sidebar)` vs `style(admin-sidebar)`) | Commitlint is already installed; add a `scope-enum` and `header-max-length`. |
+| 13.11 | `test:risk-register` exists but is **not in `npm test`**, so CI never runs it | Add it to the chain; better, glob `lib/**/__tests__/*.test.ts` in one script. |
+| 13.12 | Leftover "temporary" anniversary tools and the "dummy" payroll in the nav | Remove or flag them (2.9, 11.16). |
+
+## 14. What went wrong
+
+This is about process, not blame.
+
+1. **AI agents ran without one source of truth.** AGENTS.md says "Pre-push must pass `npm run build`. Confirm the build passes locally", while CLAUDE.md and the real hook say *never build*. AGENTS.md also says "always commit", yet 78 files are uncommitted. Codex, ChatGPT and Claude each followed different rules and each copied rather than reused. **Fix:** one short AGENTS.md, consistent with CLAUDE.md, enforced by CI (jscpd, knip, lint rules), not by prose.
+2. **Breadth over depth.** Nearly 300 pages for 117 staff, but the core loops are not closed: approvals go unread, 61 accounts are dormant, and 47 people have no department. **Fix:** measure route usage, then merge or delete pages nobody opens. Finish fewer things better.
+3. **Security lived in the app layer.** API routes check roles properly (`requireApiAdminScope` is good). The same powers were left open at the DB layer (A1–A6), which anyone can call directly with the public anon key. Your own AGENTS.md rules 4–5 describe this risk; nothing tested it. **Fix:** RLS and grant tests in CI.
+4. **Symptoms were patched instead of causes** (§11).
+5. **No staging and no generated types**, so drift appears as `42P01` swallows and `as unknown as`.
+6. **Law and money were hardcoded** (tax bands in TypeScript constants).
+7. **The repo doubled as a file share** (§13.3).
+
+## 15. Recommendations
 
 **Security and compliance**
-- **Nigeria Data Protection Act 2023 (NDPA).** You hold staff bank accounts, dates of birth, addresses, AcoBot Q&A with IPs, device swipe logs and 2,178 customer records. You likely need a privacy notice, a retention policy (for example, network logs 90 days and AcoBot logs 180 days), a named data-protection contact, and possibly NDPC registration given your data volume. Get a short legal read.
-- **Turn on Supabase PITR** (point-in-time recovery) and **actually test a restore** once. A backup you have never restored is a hope, not a backup.
-- **Make the audit log tamper-evident.** `log_audit` is callable by every user, though it pins the actor to `auth.uid()`, which is good. Add a hash-chain column so edits to `audit_logs` are detectable.
-- **Add a DB security test suite**: one SQL file run in CI against a branch DB. For every sensitive RPC and table, assert that `SET ROLE authenticated` is denied. It would have caught all of §0.
+- **NDPA 2023 (Nigeria Data Protection Act).** You hold bank details, dates of birth, addresses, customer PII, AcoBot logs with IPs and biometric-device swipe logs. **Fix:** a staff privacy notice, a retention policy (e.g. network logs 90 d, AcoBot 180 d, audit 7 y), a named data-protection contact, and a check on whether NDPC registration applies. Get a short legal review.
+- **Point-in-time recovery + a tested restore.** **Fix:** enable PITR and do one restore into a branch DB each quarter.
+- **A tamper-evident audit log.** **Fix:** add a `prev_hash`/`hash` chain column to `audit_logs`, and revoke UPDATE/DELETE on it from everyone except a break-glass role.
+- **RLS/grant test suite.** **Fix:** `supabase/tests/*.sql` (pgTAP) asserting, for each sensitive table and RPC, that `SET ROLE authenticated` is denied. Run it in CI on a branch DB. It would have caught every item in §A.
 
-**Product and UX**
-- **SSO with Microsoft 365 (Entra ID).** You are already a Microsoft shop. Staff log in with their work account, you get MFA for free via Entra, and offboarding becomes automatic: disable them in M365 and they lose Matrix. This also fixes the 7-day Safari cookie problem you documented, and most password-reset tickets.
-- **A "My Day" home screen** instead of `/profile`. One screen showing clock-in status, *things waiting on me* (leave, requisitions, task reviews, asset handovers), today's tasks, the lunch vote, and who is away. Your data says people miss approvals, so put approvals in their face.
-- **A unified approvals inbox** with **one-tap approve/reject from email and push**, using signed, single-use action links. That is how you move `approval_request` from 2% read to most of them actioned.
-- **WhatsApp Business API notifications.** HR already posts lunch links to WhatsApp, and in Nigeria WhatsApp beats email. Use it for approvals and overdue tasks only.
-- **Notification tiers.** *Action* (push + email + WhatsApp), *FYI* (bell only, auto-read when seen), *Digest* (daily email). Today everything goes to the bell with the same weight.
-- **A ⌘K command palette** plus pinned favourites and a role-based sidebar. The MD sees about 10 links, HR sees HR, and everyone else is behind search.
-- **Offline-first attendance for field and site staff.** As a PWA with background sync, GPS check-ins queue when there is no signal. Fix #4 first.
-- **An org chart page** generated from `department_id` and lead data. Cheap to build, and people love it.
-- **Self-service employee letters** (employment confirmation, embassy or visa letter) generated from profile data with a signature. HR gets asked for these constantly.
+**Product**
+- **Microsoft Entra ID SSO.** You already use Graph, SharePoint and OneDrive. Staff log in with their M365 account, MFA comes from Entra, and disabling someone in M365 locks them out of Matrix. It also fixes the 7-day Safari cookie limit you documented and most password resets.
+- **"My Day" home.** Clock-in status, things waiting on me (leave, requisitions, reviews, asset handovers), today's tasks, the lunch vote and who is away. Make it the landing page.
+- **One approvals inbox** across leave, requisitions, assets and correspondence, with **one-tap approve/reject from email and push** (signed, single-use, expiring links).
+- **WhatsApp Business notifications** for action-tier items only. HR already shares lunch links on WhatsApp.
+- **Offline PWA attendance** for field staff: GPS check-ins queue offline and sync later (after A7).
+- **Org chart** from `department_id` and lead data, and **self-service letters** (employment confirmation, visa or embassy letters) generated from profile data.
+- **Bank-change approval flow** (A2), with a notification to the old email address.
 
-**Payroll** (if it becomes real payroll, not a calculator)
-- Move tax bands, reliefs and their effective dates into a **DB table**, not code.
-- Generate the **pension (PenCom) schedule, NHF schedule and the bank payment file**, plus payslip PDFs (you have `payslip.ts`).
-- Have a payroll professional sign off a test pack of 10 real salary cases. Make them unit tests.
+**Payroll** (if this becomes real payroll)
+- Tax tables in the DB with `effective_from`. Generate the PenCom pension schedule, NHF schedule, bank payment file and payslip PDFs. A signed-off test pack.
 
 **Engineering**
-- **Measure before you build more.** Add per-route usage (Vercel Analytics is in, or PostHog for funnels). Delete or merge pages nobody opens in 60 days. With 289 pages, some are surely dead.
-- **Supabase Branching for staging.** Every PR gets a DB branch and migrations run there first.
-- **Playwright + axe** for accessibility checks, plus screenshot diffs on 10 key pages. That catches the token and contrast regressions in §1 automatically.
-- **Renovate** for dependencies, and `knip` to find unused files, exports and deps on every PR.
-- **One AGENTS.md, under 300 lines.** At 976 lines, agents skim it. Put the hard rules first and link the details.
+- **Usage analytics per route** (Vercel Analytics is in; PostHog if you want funnels). Delete what nobody uses after 60 days.
+- **Playwright + axe** in CI on 10 key flows, plus screenshot diffs.
+- **Renovate + knip + jscpd** on every PR.
+- **A `/design` page** (or Storybook) showing tokens, buttons, badges, the table, skeletons and empty states, so new screens copy the system and not each other.
 
----
+## 16. Order of work
 
-## Suggested order of work
-1. **Today:** run the REVOKE SQL from §0 (leave, notifications, asset RPCs) and fix the `requisitions` UPDATE policy. Change `geolocation=()` to `geolocation=(self)`. Enable leaked-password protection.
-2. **This week:** rotate the service-role key and move it to Vault. Make the `requisition_documents` bucket private and use signed URLs. Get a tax review on the PAYE calc. Commit and split the dirty tree, and apply or abandon the 4 migrations. Fix AGENTS.md.
-3. **This month:** set up `supabase gen types`, Sentry, MFA for admins (or Entra SSO), notification tiers and an approvals inbox. Fix the theme tokens (muted, accent, chart). Add a `StatusBadge` and `lib/format`.
-4. **This quarter:** merge the duplicate screens (§8), move the DataTable onto TanStack Table, move forms to RHF, set up a staging branch DB and an RLS test suite.
+1. **Today (security):** A1 column grants + guard trigger, A3/A5/A6 revokes, the A4 requisitions policy, A7 geolocation, leaked-password protection on. Then check `audit_logs` for past `role` changes on `profiles`.
+2. **This week:** rotate the service key and webhook secret into Vault (A9); MFA for admins (A10); private `requisition_documents` + size limits; the bank-change approval flow (A2); tax review (A8); `crypto` passwords (A11); webhook hardening (A12); split the dirty tree into PRs and resolve the 4 pending migrations; fix AGENTS.md.
+3. **Next 2 weeks (foundations):** `supabase gen types` + CI drift check; staging branch DB; Sentry; theme token fixes (1.1–1.5); `lib/format.ts`, `StatusBadge` map, `cron-auth`; delete the dead code (accounts API, csrf, access-policy, toast, `tailwind.config.ts`, the unused `empty-state`, the skeleton barrel, unused deps); a README rewrite; root cleanup.
+4. **This month (UX):** notification tiers + "Needs you" inbox; "My Day" home; role-based sidebar + ⌘K; `loading.tsx` for the 42 pages; skeleton-from-config; `IconButton` with a required label; `ResponsiveModal` everywhere.
+5. **This quarter (structure):** merge the duplicate screens (§9a) behind scope; TanStack Table internals + server pagination for large tables; RHF everywhere; React Compiler + re-enable the hook rules; move 13 browser writes to the server; RLS test suite; Entra SSO.

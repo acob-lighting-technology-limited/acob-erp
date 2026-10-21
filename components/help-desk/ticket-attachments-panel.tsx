@@ -1,15 +1,15 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { Download, Loader2, Paperclip, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
 import { formatWATDateTime } from "@/lib/utils/date"
-import { logger } from "@/lib/logger"
-
-const log = logger("ticket-attachments-panel")
+import { useQuery } from "@tanstack/react-query"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
 
 interface TicketAttachment {
   id: string
@@ -38,29 +38,23 @@ function formatSize(bytes: number) {
  * download its attachments; only the uploader can remove their own.
  */
 export function TicketAttachmentsPanel({ ticketId, currentUserId }: TicketAttachmentsPanelProps) {
-  const [attachments, setAttachments] = useState<TicketAttachment[]>([])
-  const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
-  const load = useCallback(async () => {
-    if (!ticketId) return
-    setLoading(true)
-    try {
-      const res = await apiFetch(`/api/help-desk/tickets/${ticketId}/attachments`, { cache: "no-store" })
-      const payload = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(payload?.error || "Failed to load attachments")
-      setAttachments(payload?.data || [])
-    } catch (error) {
-      log.error({ err: String(error) }, "load attachments failed")
-    } finally {
-      setLoading(false)
-    }
-  }, [ticketId])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  const {
+    data: attachments = [],
+    isLoading: loading,
+    refetch: load,
+  } = useQuery({
+    queryKey: QUERY_KEYS.ticketAttachments(ticketId ?? ""),
+    enabled: Boolean(ticketId),
+    queryFn: async () =>
+      (
+        await apiJson<{ data?: TicketAttachment[] }>(`/api/help-desk/tickets/${ticketId}/attachments`, {
+          cache: "no-store",
+        })
+      ).data ?? [],
+  })
 
   async function handleUpload(fileList: FileList | null) {
     if (!ticketId || !fileList || fileList.length === 0) return
@@ -130,7 +124,7 @@ export function TicketAttachmentsPanel({ ticketId, currentUserId }: TicketAttach
       />
 
       {loading ? (
-        <p className="text-muted-foreground text-xs">Loading attachments…</p>
+        <LinesSkeleton lines={2} />
       ) : attachments.length === 0 ? (
         <p className="text-muted-foreground text-xs">
           No files yet. Attach a screenshot, invoice or document to help whoever picks this up.

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { normalizeDepartmentName } from "@/shared/departments"
-import { AdminReferenceGeneratorContent } from "@/app/admin/tools/reference-generator/admin-reference-generator-content"
+import { AdminReferenceGeneratorContent } from "@/app/admin/correspondence/admin-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
 interface DeptCorrespondencePageProps {

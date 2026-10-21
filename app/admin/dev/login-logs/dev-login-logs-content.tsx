@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { formatWATDate, formatWATDateTime, formatWATRelative } from "@/lib/utils/date"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { apiJson } from "@/lib/api-client"
+import { formatNumber } from "@/lib/format"
 
 type DevLoginLogRow = {
   id: string
@@ -102,13 +104,8 @@ async function fetchDashboardAuditLogs(department: string, userId: string | null
   return (payload?.data || []) as any[]
 }
 
-const CHART_COLORS = [
-  "var(--primary)",
-  "oklch(0.65 0.15 250)",
-  "oklch(0.7 0.12 85)",
-  "oklch(0.6 0.18 300)",
-  "oklch(0.65 0.15 142)",
-]
+// Theme chart tokens (globals.css), so the series follow light/dark mode.
+const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
 
 // Custom tooltips matching shadcn styling
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -142,20 +139,12 @@ function UserStatsView({
   allLogs: DevLoginLogRow[]
 }) {
   const userLogs = useMemo(() => allLogs.filter((log) => log.email === email), [email, allLogs])
-  const [auditLogs, setAuditLogs] = useState<any[]>([])
-  const [loadingAudit, setLoadingAudit] = useState(false)
-
-  useEffect(() => {
-    if (!userId) return
-    setLoadingAudit(true)
-    fetch(`/api/admin/dev/login-logs?type=audit&user_id=${userId}`)
-      .then((res) => res.json())
-      .then((payload) => {
-        setAuditLogs(payload.data || [])
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setLoadingAudit(false))
-  }, [userId])
+  const { data: auditLogs = [], isLoading: loadingAudit } = useQuery({
+    queryKey: QUERY_KEYS.devUserAuditLogs(userId ?? ""),
+    queryFn: async () =>
+      (await apiJson<{ data?: any[] }>(`/api/admin/dev/login-logs?type=audit&user_id=${userId}`)).data ?? [],
+    enabled: Boolean(userId),
+  })
 
   const userStats = useMemo(() => {
     const total = userLogs.length
@@ -988,7 +977,7 @@ export function DevLoginLogsContent() {
           <p className="text-muted-foreground text-xs">
             {meta.days ? `Showing sign-ins from the last ${meta.days} days.` : "Showing all recorded sign-ins."}
             {meta.truncated
-              ? ` Capped at ${meta.limit.toLocaleString()} rows — older events in this window are not shown, and the counts above cover only what is loaded.`
+              ? ` Capped at ${formatNumber(meta.limit)} rows — older events in this window are not shown, and the counts above cover only what is loaded.`
               : ""}
           </p>
         ) : null}
@@ -1083,7 +1072,7 @@ export function DevLoginLogsContent() {
                     <XAxis dataKey="hour" tickLine={false} axisLine={false} className="text-xs" />
                     <YAxis tickLine={false} axisLine={false} className="text-xs" />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" fill="oklch(0.65 0.15 250)" radius={[4, 4, 0, 0]} name="Logins" />
+                    <Bar dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} name="Logins" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1152,7 +1141,7 @@ export function DevLoginLogsContent() {
                       className="font-mono text-xs"
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" fill="oklch(0.7 0.12 85)" radius={[0, 4, 4, 0]} name="Logins" />
+                    <Bar dataKey="count" fill="var(--chart-4)" radius={[0, 4, 4, 0]} name="Logins" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

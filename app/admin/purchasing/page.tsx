@@ -9,6 +9,7 @@ import Link from "next/link"
 import { PageWrapper, PageHeader, Section } from "@/components/layout"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { formatCurrency } from "@/lib/format"
 
 interface PurchasingStats {
   totalSuppliers: number
@@ -28,10 +29,6 @@ export default function PurchasingDashboard() {
     queryKey: QUERY_KEYS.adminPurchasingDashboard(),
     queryFn: fetchPurchasingStats,
   })
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
-  }
 
   return (
     <PageWrapper maxWidth="full" background="gradient">

@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error("Error converting video:", error)
+    log.error("Error converting video:", error)
 
     if (tempFile && existsSync(tempFile)) {
       try {
