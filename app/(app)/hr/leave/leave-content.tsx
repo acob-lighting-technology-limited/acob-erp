@@ -41,6 +41,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
+import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
@@ -115,34 +116,6 @@ type CombinedLeaveItem = Omit<LeaveRequest, "user"> & {
     company_email?: string | null
     department?: string | null
   } | null
-}
-
-/**
- * What still stops a leave request from being submitted, in the order the form
- * asks for it. The Submit button used to grey out with no reason given.
- */
-function leaveRequestMissing({
-  formData,
-  totalDays,
-  availableDays,
-  requiresAttachment,
-}: {
-  formData: LeaveRequestFormData
-  totalDays: number
-  availableDays: number
-  requiresAttachment: boolean
-}): string[] {
-  const missing: string[] = []
-  if (!formData.leave_type_id) missing.push("Choose a leave type")
-  if (formData.segments.length === 0) missing.push("Pick your leave dates")
-  else if (totalDays <= 0) missing.push("Pick at least one working day")
-  else if (formData.leave_type_id && totalDays > availableDays)
-    missing.push(`This request is ${totalDays} day${totalDays === 1 ? "" : "s"}; you have ${availableDays} available`)
-  if (!formData.reason) missing.push("Give a reason")
-  if (!formData.reliever_identifier) missing.push("Choose a reliever")
-  if (!formData.handover_file && !formData.handover_checklist_url) missing.push("Attach your handover document")
-  if (requiresAttachment && !formData.attachment) missing.push("Attach the document this leave type requires")
-  return missing
 }
 
 export function LeaveContent({
@@ -1248,12 +1221,22 @@ export function LeaveContent({
         approvalRouteStages={leaveRoutePreview?.stages || []}
         preview={segmentsPreview(formData.segments, holidaySet)}
         leaveCalendar={leaveCalendar}
-        missingRequirements={leaveRequestMissing({
-          formData,
-          totalDays: segmentsTotalDays(formData.segments, holidaySet),
-          availableDays: selectedAvailableDays,
-          requiresAttachment: requiresAttachmentOnCreate,
-        })}
+        missingRequirements={leaveRequestMissing(
+          {
+            leave_type_id: formData.leave_type_id,
+            segments: formData.segments,
+            reason: formData.reason,
+            reliever_identifier: formData.reliever_identifier,
+            handover_file: formData.handover_file,
+            handover_checklist_url: formData.handover_checklist_url,
+            attachment: formData.attachment,
+          },
+          {
+            totalDays: segmentsTotalDays(formData.segments, holidaySet),
+            availableDays: selectedAvailableDays,
+            requiresAttachment: requiresAttachmentOnCreate,
+          }
+        )}
         submitting={submitting}
         onSubmit={handleSubmitRequest}
       />
