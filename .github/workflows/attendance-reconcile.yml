@@ -1,0 +1,32 @@
+name: Attendance reconcile
+
+# Hourly run of /api/cron/attendance/device-reconcile, which puts clock times
+# back to what the device or the ERP recorded. Vercel's free plan only allows a
+# daily cron, and a pg_cron job could be switched off by anyone with database
+# access, so the hourly trigger lives here. The nightly Vercel cron stays as a
+# backstop. Needs the CRON_SECRET repository secret (same value as on Vercel).
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: attendance-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # The response names staff and their clock times, and this repo's Actions
+      # logs are public, so only the status code is printed.
+      - name: Reconcile attendance
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 300 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://matrix.acoblighting.com/api/cron/attendance/device-reconcile")
+          echo "device-reconcile responded ${status}"
+          test "${status}" = "200"
