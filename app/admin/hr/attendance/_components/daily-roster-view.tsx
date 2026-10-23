@@ -37,6 +37,7 @@ import { formatWATDate } from "@/lib/utils/date"
 import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { isEarlyDeparture, getManualStatusEditOptions } from "@/lib/hr/attendance-status"
+import { cn } from "@/lib/utils"
 import { StatusBadge, formatTime, labelSource } from "./status-badge"
 import { ClockTimes, NameWithDept } from "./clock-times"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
@@ -322,18 +323,27 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       label: "Clock In",
       sortable: true,
       accessor: (r) => r.clock_in ?? "",
-      render: (r) => (
-        <span className="flex items-center justify-center gap-1 text-sm">
-          {r.clock_in ? (
-            <>
-              <Clock className="h-3 w-3 shrink-0 text-green-600" />
-              <span>{formatTime(r.clock_in)}</span>
-            </>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </span>
-      ),
+      render: (r) => {
+        const isLateArrival =
+          (r.status === "late" || r.status === "lateness_with_permission" || isLate(r.clock_in)) && r.status !== "early"
+        return (
+          <span className="flex items-center justify-center gap-1 text-sm">
+            {r.clock_in ? (
+              <>
+                <Clock
+                  className={cn(
+                    "h-3 w-3 shrink-0",
+                    isLateArrival ? "text-yellow-600 dark:text-yellow-500" : "text-green-600"
+                  )}
+                />
+                <span>{formatTime(r.clock_in)}</span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </span>
+        )
+      },
       align: "center",
     },
     {
@@ -572,6 +582,14 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         />
         <StatCard
           variant="compact"
+          title="Early"
+          value={stats.early}
+          icon={Users}
+          iconBgColor="bg-green-500/10"
+          iconColor="text-green-500"
+        />
+        <StatCard
+          variant="compact"
           title="Late"
           value={stats.late}
           icon={Clock}
@@ -585,14 +603,6 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
           icon={AlertCircle}
           iconBgColor="bg-red-500/10"
           iconColor="text-red-500"
-        />
-        <StatCard
-          variant="compact"
-          title="Early"
-          value={stats.early}
-          icon={Users}
-          iconBgColor="bg-green-500/10"
-          iconColor="text-green-500"
         />
         <StatCard
           variant="compact"
@@ -619,7 +629,16 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
           title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
-          subtitle: (r) => <ClockTimes clockIn={r.clock_in} clockOut={r.clock_out} />,
+          subtitle: (r) => (
+            <ClockTimes
+              clockIn={r.clock_in}
+              clockOut={r.clock_out}
+              isLate={
+                (r.status === "late" || r.status === "lateness_with_permission" || isLate(r.clock_in)) &&
+                r.status !== "early"
+              }
+            />
+          ),
           trailing: (r) => (
             <StatusBadge
               status={r.status}

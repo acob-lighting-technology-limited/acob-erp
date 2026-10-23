@@ -13,8 +13,8 @@ const log = logger("cron-attendance-device-reconcile")
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
-/** Days looked back on a normal nightly run. */
-const DEFAULT_LOOKBACK_DAYS = 7
+/** Days looked back on a normal run. Covers a full payroll month plus slack, since edits have reached back weeks. */
+const DEFAULT_LOOKBACK_DAYS = 45
 const EMAIL_ROW_LIMIT = 200
 
 /**
