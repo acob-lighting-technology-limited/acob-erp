@@ -79,6 +79,32 @@ const LEGACY_SLA_STAGE_MAP: Record<string, string> = {
   pending_hcs: "hr_pending",
 }
 
+const MD_STAGE_CODE = "pending_md"
+
+/** When each request reached its current stage: its latest live approval, if any. */
+async function loadStageStartTimes(db: SupabaseClient<any, any, any>, requestIds: string[]) {
+  const startedAt = new Map<string, number>()
+  if (requestIds.length === 0) return startedAt
+
+  const { data } = await db
+    .from("leave_approvals")
+    .select("leave_request_id, approved_at, created_at, superseded")
+    .in("leave_request_id", requestIds)
+    .eq("status", "approved")
+
+  for (const row of (data || []) as {
+    leave_request_id: string
+    approved_at?: string | null
+    created_at: string
+    superseded?: boolean | null
+  }[]) {
+    if (row.superseded) continue
+    const at = new Date(row.approved_at || row.created_at).getTime()
+    if (at > (startedAt.get(row.leave_request_id) ?? 0)) startedAt.set(row.leave_request_id, at)
+  }
+  return startedAt
+}
+
 async function resolveAdminHrLeadUserIds(db: SupabaseClient<any, any, any>): Promise<string[]> {
   const { data: leads } = await db
     .from("profiles")
@@ -168,10 +194,19 @@ export async function PATCH() {
     const hrLeadUserIds = await resolveAdminHrLeadUserIds(db)
     let remindersSent = 0
 
-    for (const request of (pendingRequests || []) as PendingLeaveRequestRow[]) {
-      // Industry-standard lapse behavior: unresolved requests are expired/cancelled
-      // once leave start date is reached.
-      if (request.start_date && request.start_date <= today) {
+    const pendingRows = (pendingRequests || []) as PendingLeaveRequestRow[]
+    const stageStartedAt = await loadStageStartTimes(
+      db,
+      pendingRows.map((row) => row.id)
+    )
+
+    for (const request of pendingRows) {
+      // Unresolved requests lapse once the leave start date is reached — except at the
+      // MD stage. By then every other approver has signed off and the employee goes on
+      // leave as planned; cancelling it left real leave unrecorded (7 requests, Aug–Oct
+      // 2026). It stays pending until the MD acts.
+      const awaitingMd = request.current_stage_code === MD_STAGE_CODE
+      if (request.start_date && request.start_date <= today && !awaitingMd) {
         const expiryReason = `Auto-lapsed: no final approval before leave start date (${request.start_date}).`
 
         const { error: expireError } = await db
@@ -262,8 +297,10 @@ export async function PATCH() {
       const policy = policyMap.get(slaStage)
       if (!policy) continue
 
-      const createdAt = new Date(request.created_at).getTime()
-      const dueAt = createdAt + policy.due_hours * 60 * 60 * 1000
+      // The clock starts when the request reached its current approver, not when it was
+      // submitted — otherwise a late stage is "overdue" the moment it arrives.
+      const stageStart = stageStartedAt.get(request.id) ?? new Date(request.created_at).getTime()
+      const dueAt = stageStart + policy.due_hours * 60 * 60 * 1000
       const reminderAt = dueAt - policy.reminder_hours_before * 60 * 60 * 1000
 
       if (now >= reminderAt && now < dueAt) {
