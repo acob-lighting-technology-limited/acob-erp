@@ -28,6 +28,7 @@ import {
 
 import { toast } from "sonner"
 import { cn, formatName, getInitials } from "@/lib/utils"
+import { isActiveChild } from "@/lib/navigation/active-child"
 import { createClient } from "@/lib/supabase/client"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
@@ -158,6 +159,7 @@ const navigationSections: NavSectionDef[] = [
         children: [
           { name: "Portfolios", href: "/portfolios" },
           { name: "Projects", href: "/projects" },
+          { name: "Sites", href: "/portfolios/sites" },
         ],
       },
     ],
@@ -453,7 +455,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                       {item.children!.map((child) => {
                         const hasSubChildren = child.children && child.children.length > 0
                         const isSubOpen = openSubSections.has(child.href)
-                        const isChildActive = pathname === child.href || pathname?.startsWith(child.href + "/")
+                        const isChildActive = isActiveChild(pathname, child.href, item.children!)
                         const hasActiveGrandchild = child.children?.some(
                           (gc) => pathname === gc.href || pathname?.startsWith(gc.href + "/")
                         )

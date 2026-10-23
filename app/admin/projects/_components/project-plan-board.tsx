@@ -58,10 +58,11 @@ import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { TASK_WEIGHT_DEFAULT } from "@/lib/tasks/scoring"
 import { countWork } from "@/lib/projects/health"
-import { TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
+import { EMPTY_TASK_FORM, TaskFormDialog, type TaskFormState } from "@/components/tasks/TaskFormDialog"
 import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task } from "@/types/task"
 import type { Project } from "@/components/projects/project-list-content"
+import { fetchProjectTasks, projectTasksKey, type WorkTask } from "@/lib/projects/work-tasks"
 
 type Plan = {
   id: string
@@ -71,46 +72,7 @@ type Plan = {
   sort_order: number
 }
 
-type ProjectTask = {
-  id: string
-  title: string
-  description?: string | null
-  priority?: string | null
-  status: string
-  weight: number | null
-  rating: number | null
-  plan_id: string | null
-  due_date: string | null
-  task_start_date?: string | null
-  task_end_date?: string | null
-  work_item_number?: string | null
-  assigned_to?: string | null
-  department?: string | null
-  goal_id?: string | null
-  kpi_id?: string | null
-  assignment_type?: "individual" | "multiple" | "department" | null
-  is_archived: boolean | null
-  assigned_user?: { first_name: string | null; last_name: string | null } | null
-}
-
-const EMPTY_TASK_FORM: TaskFormState = {
-  title: "",
-  description: "",
-  priority: "medium",
-  status: "pending",
-  assigned_to: "",
-  department: "",
-  due_date: "",
-  assignment_type: "individual",
-  assigned_users: [],
-  project_id: "",
-  plan_id: "",
-  goal_id: "",
-  kpi_id: "",
-  weight: TASK_WEIGHT_DEFAULT,
-  task_start_date: "",
-  task_end_date: "",
-}
+type ProjectTask = WorkTask
 
 export type ProjectPlanStaffOption = {
   id: string
@@ -193,7 +155,7 @@ export function ProjectPlanBoard({
   }
 
   const plansKey = ["project-plans", project.id]
-  const tasksKey = ["project-tasks", project.id]
+  const tasksKey = projectTasksKey(project.id)
 
   const { data: plans = [], isLoading: plansLoading } = useQuery<Plan[]>({
     queryKey: plansKey,
@@ -207,12 +169,7 @@ export function ProjectPlanBoard({
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<ProjectTask[]>({
     queryKey: tasksKey,
-    queryFn: async () => {
-      const res = await apiFetch(`/api/projects/${project.id}/tasks`, { cache: "no-store" })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to load tasks")
-      return payload.data
-    },
+    queryFn: () => fetchProjectTasks(project.id),
   })
 
   const addPlan = useMutation({
@@ -435,6 +392,7 @@ export function ProjectPlanBoard({
       assignment_type: (task.assignment_type as "individual" | "multiple") || "individual",
       assigned_users: task.assigned_to ? [task.assigned_to] : [],
       project_id: project.id,
+      portfolio_id: "",
       plan_id: task.plan_id || "",
       goal_id: task.goal_id || "",
       kpi_id: task.kpi_id || "",

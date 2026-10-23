@@ -243,7 +243,7 @@ export function PortfolioProjectsDialog({
         <DialogFooter className="gap-2 border-t pt-4 sm:justify-between">
           <Button type="button" variant="outline" onClick={onCreateProject} disabled={busy !== null}>
             <Plus className="mr-2 h-4 w-4" />
-            New Project
+            Create Project
           </Button>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy !== null}>

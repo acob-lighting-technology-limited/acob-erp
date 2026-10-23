@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn, formatName, getInitials } from "@/lib/utils"
+import { isActiveChild } from "@/lib/navigation/active-child"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Button } from "@/components/ui/button"
@@ -393,6 +394,7 @@ const adminNavigation: NavItem[] = [
     children: [
       { name: "Portfolios", href: "/admin/portfolios" },
       { name: "Projects", href: "/admin/projects" },
+      { name: "Sites", href: "/admin/portfolios/sites" },
     ],
   },
   {
@@ -895,7 +897,7 @@ export function AdminSidebar({
                       {item.children!.map((child) => {
                         const hasSubChildren = child.children && child.children.length > 0
                         const isSubOpen = openSubSections.has(child.href)
-                        const isChildActive = pathname === child.href || pathname?.startsWith(child.href + "/")
+                        const isChildActive = isActiveChild(pathname, child.href, item.children!)
                         const hasActiveGrandchild = child.children?.some(
                           (gc) => pathname === gc.href || pathname?.startsWith(gc.href + "/")
                         )

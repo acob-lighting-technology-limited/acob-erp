@@ -88,7 +88,7 @@ export const guideModuleGroups: GuideModuleGroup[] = [
         name: "Portfolios",
         href: "/portfolios",
         icon: Layers,
-        summary: "Portfolios and the projects inside them, with progress and health.",
+        summary: "Portfolios, the projects inside them with progress and health, and the Sites register.",
       },
     ],
   },

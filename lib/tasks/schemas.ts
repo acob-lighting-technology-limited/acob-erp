@@ -17,6 +17,8 @@ export const TaskBodySchema = z.object({
   kpi_id: z.string().uuid("Corporate KPI is required"),
   project_id: z.string().uuid().optional().nullable(),
   plan_id: z.string().uuid().optional().nullable(),
+  // Portfolio-wide work; mutually exclusive with project_id (see lib/tasks/work-links).
+  portfolio_id: z.string().uuid().optional().nullable(),
   // Compulsory: task weight is the denominator of the employee's KPI score.
   weight: z
     .number()

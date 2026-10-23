@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
+import { hasWorkLinkConflict, withWorkLinkNames, WORK_LINK_CONFLICT } from "@/lib/tasks/work-links"
 import { checkRequestSize } from "@/lib/api/request-size"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { apiError, ApiErrorCode } from "@/lib/api/errors"
@@ -37,6 +38,7 @@ const UpdateTaskSchema = z.object({
   kpi_id: z.string().uuid().optional().nullable(),
   project_id: z.string().uuid().optional().nullable(),
   plan_id: z.string().uuid().optional().nullable(),
+  portfolio_id: z.string().uuid().optional().nullable(),
   weight: z.number().int().min(TASK_WEIGHT_MIN).max(TASK_WEIGHT_MAX).optional(),
   task_start_date: z.string().optional().nullable(),
   task_end_date: z.string().optional().nullable(),
@@ -78,18 +80,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       return apiError("Task not found", ApiErrorCode.NOT_FOUND, 404)
     }
 
-    const dataClient = getServiceRoleClientOrFallback(supabase)
-    let projectName: string | null = null
-    if (task.project_id) {
-      const { data: projectRow } = await dataClient
-        .from("projects")
-        .select("project_name")
-        .eq("id", task.project_id)
-        .maybeSingle()
-      projectName = projectRow?.project_name ?? null
-    }
-
-    return NextResponse.json({ data: { ...task, project_name: projectName } })
+    return NextResponse.json({ data: await withWorkLinkNames(getServiceRoleClientOrFallback(supabase), task) })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in task GET")
     return apiError("Failed to fetch task", ApiErrorCode.INTERNAL_ERROR, 500)
@@ -139,6 +130,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     }
 
     const payload = parsed.data
+    if (hasWorkLinkConflict(payload.project_id, payload.portfolio_id)) {
+      return apiError(WORK_LINK_CONFLICT, ApiErrorCode.VALIDATION_ERROR, 400)
+    }
     const { data: existingTask } = await supabase
       .from("tasks")
       .select("id, title, department, assignment_type, assigned_to, source_type, goal_id, due_date")
@@ -182,6 +176,14 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       ...payload,
       updated_by: user.id,
       updated_at: now,
+    }
+
+    // Setting one work link clears the other, so moving a task from a project to
+    // a portfolio (or back) never trips tasks_project_or_portfolio_check.
+    if (payload.project_id) updatePayload.portfolio_id = null
+    if (payload.portfolio_id) {
+      updatePayload.project_id = null
+      updatePayload.plan_id = null
     }
 
     if (payload.assigned_to !== undefined && payload.assigned_to !== existingTask.assigned_to) {
@@ -283,18 +285,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       }
     }
 
-    let projectName: string | null = null
-    if (updatedTask.project_id) {
-      const dataClient = getServiceRoleClientOrFallback(supabase)
-      const { data: projectRow } = await dataClient
-        .from("projects")
-        .select("project_name")
-        .eq("id", updatedTask.project_id)
-        .maybeSingle()
-      projectName = projectRow?.project_name ?? null
-    }
-
-    return NextResponse.json({ data: { ...updatedTask, project_name: projectName } })
+    return NextResponse.json({ data: await withWorkLinkNames(getServiceRoleClientOrFallback(supabase), updatedTask) })
   } catch (error) {
     log.error({ err: String(error) }, "Unhandled error in task PATCH")
     return apiError("Failed to update task", ApiErrorCode.INTERNAL_ERROR, 500)

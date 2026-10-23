@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Target, Users, User, Calendar, Scale, FolderKanban } from "lucide-react"
+import { Target, Users, User, Calendar, Scale, FolderKanban, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,6 +33,8 @@ import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { fetchProjectRecords, PROJECTS_QUERY_KEY } from "@/lib/projects/records"
+import { usePortfolios } from "@/hooks/use-portfolios"
+import { portfolioLabel } from "@/lib/tasks/work-links"
 
 interface ProjectOption {
   id: string
@@ -61,6 +63,7 @@ const taskFormSchema = z.object({
   kpi_id: z.string().min(1, "Corporate KPI is required"),
   project_id: z.string().optional().nullable(),
   plan_id: z.string().optional().nullable(),
+  portfolio_id: z.string().optional().nullable(),
   // Compulsory: this is the denominator of the assignee's KPI score.
   weight: z.coerce.number().int().min(TASK_WEIGHT_MIN).max(TASK_WEIGHT_MAX),
   task_start_date: z.string().optional(),
@@ -80,12 +83,35 @@ export interface TaskFormState {
   assignment_type: "individual" | "multiple"
   assigned_users: string[]
   project_id: string
+  /** Portfolio-wide work; only ever set when project_id is not. */
+  portfolio_id: string
   plan_id: string
   goal_id: string
   kpi_id: string
   weight: number
   task_start_date: string
   task_end_date: string
+}
+
+/** A blank form for a new task. Callers spread it and set what they fix (project, plan, portfolio). */
+export const EMPTY_TASK_FORM: TaskFormState = {
+  title: "",
+  description: "",
+  priority: "medium",
+  status: "pending",
+  assigned_to: "",
+  department: "",
+  due_date: "",
+  assignment_type: "individual",
+  assigned_users: [],
+  project_id: "",
+  portfolio_id: "",
+  plan_id: "",
+  goal_id: "",
+  kpi_id: "",
+  weight: TASK_WEIGHT_DEFAULT,
+  task_start_date: "",
+  task_end_date: "",
 }
 
 // Stable default: a fresh [] each render changes hook deps and can loop effects.
@@ -109,6 +135,9 @@ interface TaskFormDialogProps {
   /** Set when the form is opened from inside a plan. */
   lockedPlanId?: string | null
   lockedPlanName?: string | null
+  /** Set when the form is opened from inside a portfolio: the task is portfolio-wide work. */
+  lockedPortfolioId?: string | null
+  lockedPortfolioName?: string | null
 }
 
 const NO_HOLIDAYS: ReadonlySet<string> = new Set()
@@ -130,6 +159,8 @@ export function TaskFormDialog({
   lockedProjectName = null,
   lockedPlanId = null,
   lockedPlanName = null,
+  lockedPortfolioId = null,
+  lockedPortfolioName = null,
 }: TaskFormDialogProps) {
   const [isMultiAssign, setIsMultiAssign] = useState(false)
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
@@ -149,6 +180,7 @@ export function TaskFormDialog({
       kpi_id: taskForm.kpi_id,
       project_id: lockedProjectId || taskForm.project_id,
       plan_id: lockedPlanId || taskForm.plan_id,
+      portfolio_id: lockedPortfolioId || (lockedProjectId ? "" : taskForm.portfolio_id),
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
       task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
       task_end_date: taskForm.task_end_date,
@@ -180,6 +212,7 @@ export function TaskFormDialog({
       kpi_id: taskForm.kpi_id || "",
       project_id: lockedProjectId || taskForm.project_id || "",
       plan_id: lockedPlanId || taskForm.plan_id || "",
+      portfolio_id: lockedPortfolioId || (lockedProjectId ? "" : taskForm.portfolio_id || ""),
       weight: taskForm.weight || TASK_WEIGHT_DEFAULT,
       task_start_date: taskForm.task_start_date || (!selectedTask ? toLocalISODate() : ""),
       task_end_date: taskForm.task_end_date || "",
@@ -195,7 +228,7 @@ export function TaskFormDialog({
       setIsMultiAssign(false)
       setSelectedUserIds([])
     }
-  }, [isOpen, reset, selectedTask, taskForm, lockedProjectId, lockedPlanId])
+  }, [isOpen, reset, selectedTask, taskForm, lockedProjectId, lockedPlanId, lockedPortfolioId])
 
   const lockLevel = !selectedTask
     ? "none"
@@ -209,6 +242,7 @@ export function TaskFormDialog({
   const departmentValue = watch("department")
   const kpiId = watch("kpi_id")
   const projectId = watch("project_id")
+  const portfolioId = watch("portfolio_id")
   const weightValue = watch("weight")
   const titleValue = watch("title")
   const statusValue = watch("status")
@@ -276,7 +310,7 @@ export function TaskFormDialog({
   const { data: fetchedProjects } = useQuery({
     queryKey: PROJECTS_QUERY_KEY,
     queryFn: fetchProjectRecords,
-    enabled: isOpen && !lockedProjectId,
+    enabled: isOpen && !lockedProjectId && !lockedPortfolioId,
   })
   // Props, then every project the caller can see, then the selected task's own
   // project — so a linked project always displays, even before the list loads.
@@ -293,6 +327,17 @@ export function TaskFormDialog({
     }
     return Array.from(map.values())
   }, [initialProjects, fetchedProjects, selectedTask?.project_id, selectedTask?.project_name])
+
+  // Portfolio-wide work (e.g. a group of sites in development) that no single
+  // project owns. Optional like projects, so a failed load never blocks saving.
+  const { data: portfoliosPayload } = usePortfolios({ enabled: isOpen && !lockedProjectId && !lockedPortfolioId })
+  const portfolioOptions = useMemo(() => {
+    const options = (portfoliosPayload?.data ?? []).map((p) => ({ id: p.id, label: portfolioLabel(p) }))
+    if (selectedTask?.portfolio_id && !options.some((o) => o.id === selectedTask.portfolio_id)) {
+      options.push({ id: selectedTask.portfolio_id, label: selectedTask.portfolio_name || "Linked Portfolio" })
+    }
+    return options
+  }, [portfoliosPayload, selectedTask?.portfolio_id, selectedTask?.portfolio_name])
 
   const employeeSelectOptions = useMemo(() => {
     return scopedAssignableEmployees.map((member) => ({
@@ -315,8 +360,12 @@ export function TaskFormDialog({
       due_date: values.due_date ?? "",
       assignment_type: targetUsers.length > 1 ? "multiple" : "individual",
       assigned_users: targetUsers,
-      project_id: lockedProjectId || (values.project_id === "__none__" ? "" : (values.project_id ?? "")),
+      project_id: lockedPortfolioId
+        ? ""
+        : lockedProjectId || (values.project_id === "__none__" ? "" : (values.project_id ?? "")),
       plan_id: lockedPlanId || (values.plan_id ?? ""),
+      // A task is project work or portfolio work, never both.
+      portfolio_id: lockedPortfolioId || (lockedProjectId || values.project_id ? "" : (values.portfolio_id ?? "")),
       weight: values.weight ?? TASK_WEIGHT_DEFAULT,
       goal_id: values.goal_id || "",
       kpi_id: values.kpi_id === "__none__" ? "" : (values.kpi_id ?? ""),
@@ -601,46 +650,110 @@ export function TaskFormDialog({
             </p>
           </div>
 
-          {/* Project Linking Section */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="project_id" className="flex items-center gap-1.5 text-xs font-semibold">
-                <FolderKanban className="text-primary h-3.5 w-3.5" />
-                Project
-              </Label>
-              <Badge variant="secondary" className="text-[10px]">
-                {lockedProjectId ? "Fixed" : "Optional"}
-              </Badge>
-            </div>
-            {lockedProjectId ? (
-              <div className="bg-muted/50 text-muted-foreground mt-1 rounded-md border px-3 py-2 text-xs">
-                {lockedProjectName || "This project"}
-                {lockedPlanName ? ` · ${lockedPlanName}` : ""}
+          {/* Opened from a portfolio: the task is fixed as portfolio-wide work. */}
+          {lockedPortfolioId && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Layers className="text-primary h-3.5 w-3.5" />
+                  Portfolio
+                </Label>
+                <Badge variant="secondary" className="text-xs">
+                  Fixed
+                </Badge>
               </div>
-            ) : (
+              <div className="bg-muted/50 text-muted-foreground mt-1 rounded-md border px-3 py-2 text-xs">
+                {lockedPortfolioName || "This portfolio"}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                Work across the whole portfolio. For one project&apos;s work, add the task from that project&apos;s plan
+                board instead.
+              </p>
+            </div>
+          )}
+
+          {/* Project Linking Section */}
+          {!lockedPortfolioId && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="project_id" className="flex items-center gap-1.5 text-xs font-semibold">
+                  <FolderKanban className="text-primary h-3.5 w-3.5" />
+                  Project
+                </Label>
+                <Badge variant="secondary" className="text-[10px]">
+                  {lockedProjectId ? "Fixed" : "Optional"}
+                </Badge>
+              </div>
+              {lockedProjectId ? (
+                <div className="bg-muted/50 text-muted-foreground mt-1 rounded-md border px-3 py-2 text-xs">
+                  {lockedProjectName || "This project"}
+                  {lockedPlanName ? ` · ${lockedPlanName}` : ""}
+                </div>
+              ) : (
+                <Select
+                  value={projectId || "__none__"}
+                  onValueChange={(val) => {
+                    setValue("project_id", val === "__none__" ? "" : val)
+                    if (val !== "__none__") setValue("portfolio_id", "")
+                  }}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select a project (Optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground italic">None (not project work)</span>
+                    </SelectItem>
+                    {projectOptions.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.project_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-muted-foreground text-[11px]">
+                A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
+              </p>
+            </div>
+          )}
+
+          {/* Portfolio Linking Section — only for work no single project owns */}
+          {!lockedProjectId && !lockedPortfolioId && !projectId && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="portfolio_id" className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Layers className="text-primary h-3.5 w-3.5" />
+                  Portfolio
+                </Label>
+                <Badge variant="secondary" className="text-xs">
+                  Optional
+                </Badge>
+              </div>
               <Select
-                value={projectId || "__none__"}
-                onValueChange={(val) => setValue("project_id", val === "__none__" ? "" : val)}
+                value={portfolioId || "__none__"}
+                onValueChange={(val) => setValue("portfolio_id", val === "__none__" ? "" : val)}
               >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select a project (Optional)" />
+                <SelectTrigger id="portfolio_id" className="mt-1">
+                  <SelectValue placeholder="Select a portfolio (Optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">
-                    <span className="text-muted-foreground italic">None (not project work)</span>
+                    <span className="text-muted-foreground italic">None (not portfolio work)</span>
                   </SelectItem>
-                  {projectOptions.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.project_name}
+                  {portfolioOptions.map((portfolio) => (
+                    <SelectItem key={portfolio.id} value={portfolio.id}>
+                      {portfolio.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-            <p className="text-muted-foreground text-[11px]">
-              A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
-            </p>
-          </div>
+              <p className="text-muted-foreground text-xs">
+                For work across a whole portfolio, such as a group of sites in development. Pick a project instead when
+                the work belongs to one project.
+              </p>
+            </div>
+          )}
 
           {/* Timeline Section */}
           <div className="grid gap-3 sm:grid-cols-2">

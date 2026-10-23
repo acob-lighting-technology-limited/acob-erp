@@ -136,7 +136,7 @@ function PortfolioProjects({
             {onAddProject && (
               <Button type="button" size="sm" onClick={onAddProject}>
                 <Plus className="mr-2 h-4 w-4" />
-                New Project
+                Add Project
               </Button>
             )}
           </div>
@@ -456,7 +456,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
             ...(isAdmin
               ? [
                   { label: "Manage Projects", icon: FolderCog, onClick: (r: Portfolio) => setManagingId(r.id) },
-                  { label: "New Project", icon: Plus, onClick: (r: Portfolio) => setCreateInPortfolioId(r.id) },
+                  { label: "Add Project", icon: Plus, onClick: (r: Portfolio) => setCreateInPortfolioId(r.id) },
                   { label: "Edit Portfolio", onClick: (r: Portfolio) => setEditing(r) },
                   {
                     label: "Delete Portfolio",

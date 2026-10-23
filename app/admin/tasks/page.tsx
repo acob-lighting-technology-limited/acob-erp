@@ -8,6 +8,7 @@ import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
+import { loadWorkLinkNames } from "@/lib/tasks/work-links"
 
 interface GoalFilterOption {
   id: string
@@ -84,11 +85,10 @@ async function getAdminTasksData() {
 
   const rawTasks = (tasksResult.data || []) as Task[]
 
-  // Collect all profile, goal, KPI and project IDs
+  // Collect all profile, goal and KPI IDs
   const profileIds = new Set<string>()
   const goalIds = new Set<string>()
   const kpiIds = new Set<string>()
-  const projectIds = new Set<string>()
 
   rawTasks.forEach((t) => {
     if (t.assigned_to) profileIds.add(t.assigned_to)
@@ -97,10 +97,9 @@ async function getAdminTasksData() {
     if (t.reviewed_by) profileIds.add(t.reviewed_by)
     if (t.goal_id) goalIds.add(t.goal_id)
     if (t.kpi_id) kpiIds.add(t.kpi_id)
-    if (t.project_id) projectIds.add(t.project_id)
   })
 
-  const [profilesRes, goalsRes, kpisRes, projectsRes, allProjectsRes] = await Promise.all([
+  const [profilesRes, goalsRes, kpisRes, { projectNames, portfolioNames }, allProjectsRes] = await Promise.all([
     profileIds.size > 0
       ? dataClient.from("profiles").select("id, first_name, last_name, department").in("id", Array.from(profileIds))
       : { data: [] },
@@ -113,9 +112,7 @@ async function getAdminTasksData() {
           .select("id, measure, strategic_objective, strategic_priority")
           .in("id", Array.from(kpiIds))
       : { data: [] },
-    projectIds.size > 0
-      ? dataClient.from("projects").select("id, project_name").in("id", Array.from(projectIds))
-      : { data: [] },
+    loadWorkLinkNames(dataClient, rawTasks),
     dataClient.from("projects").select("id, project_name").order("project_name", { ascending: true }),
   ])
 
@@ -127,9 +124,6 @@ async function getAdminTasksData() {
   )
   type KpiInfo = { id: string; measure: string; strategic_objective: string; strategic_priority: string }
   const kpiMap = new Map<string, KpiInfo>(((kpisRes.data || []) as KpiInfo[]).map((k) => [k.id, k]))
-  const projectMap = new Map<string, string>(
-    ((projectsRes.data || []) as Array<{ id: string; project_name: string }>).map((p) => [p.id, p.project_name])
-  )
 
   const tasksWithUsers = rawTasks.map((task) => {
     const copy: Task = { ...task }
@@ -138,7 +132,8 @@ async function getAdminTasksData() {
     if (task.created_by) copy.created_by_user = profileMap.get(task.created_by)
     if (task.reviewed_by) copy.reviewed_by_user = profileMap.get(task.reviewed_by)
     if (task.goal_id) copy.goal_title = goalMap.get(task.goal_id) || null
-    if (task.project_id) copy.project_name = projectMap.get(task.project_id) || null
+    if (task.project_id) copy.project_name = projectNames.get(task.project_id) || null
+    if (task.portfolio_id) copy.portfolio_name = portfolioNames.get(task.portfolio_id) || null
     if (task.kpi_id) {
       const kpi = kpiMap.get(task.kpi_id)
       if (kpi) {

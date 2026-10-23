@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
       updated_at: new Date().toISOString(),
     })
     .in("status", ["pending", "pending_evidence"])
+    // A request waiting only on the MD was taken as leave; it stays for the MD to sign off.
+    .or("current_stage_code.is.null,current_stage_code.neq.pending_md")
     .lt("end_date", today)
     .select("id, user_id, start_date, end_date")
 
