@@ -22,7 +22,9 @@ import { EmptyState } from "@/components/ui/patterns"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { cn, getInitials } from "@/lib/utils"
+import { cn } from "@/lib/utils"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { StaffCardDialog, staffCardQueryOptions } from "@/components/ui/staff-card-dialog"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { formatWATDate, formatWATTime, toLocalISODate, toLocalYearMonth } from "@/lib/utils/date"
 import { LunchReviewDialog } from "./_components/lunch-review-dialog"
@@ -38,7 +40,7 @@ import {
   type LunchVoter,
 } from "@/lib/hr/lunch-voting"
 import { logger } from "@/lib/logger"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("lunch-content")
@@ -942,16 +944,49 @@ function PollRow({
       {expanded && voters.length > 0 && (
         <div className="mt-2 space-y-1 pl-8 sm:pl-9">
           {voters.map((voter) => (
-            <div key={voter.user_id} className="flex items-center gap-2">
-              <VoterAvatar voter={voter} className="h-6 w-6 text-[10px]" />
-              <span className="text-muted-foreground truncate text-xs">
-                {voter.user_id === currentUserId ? "You" : voter.full_name}
-              </span>
-            </div>
+            <VoterRow key={voter.user_id} voter={voter} currentUserId={currentUserId} />
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+function VoterRow({ voter, currentUserId }: { voter: LunchVoter; currentUserId: string }) {
+  const [cardOpen, setCardOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const isYou = voter.user_id === currentUserId
+  const label = isYou ? `${voter.full_name} (You)` : voter.full_name
+
+  const prefetchCard = () => {
+    void queryClient.prefetchQuery(staffCardQueryOptions(voter.user_id))
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setCardOpen(true)}
+        onPointerEnter={prefetchCard}
+        onFocus={prefetchCard}
+        aria-label={`View ${label}'s contact card`}
+        className="group hover:bg-muted/40 focus-visible:ring-ring flex w-full items-center gap-2 rounded-md py-0.5 text-left transition-colors focus-visible:rounded-md focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <StaffAvatar name={voter.full_name} src={voter.avatar_url} size="xs" />
+        <span className="text-muted-foreground group-hover:text-foreground truncate text-xs group-hover:underline">
+          {isYou ? "You" : voter.full_name}
+        </span>
+      </button>
+      {cardOpen && (
+        <StaffCardDialog
+          profileId={voter.user_id}
+          open={cardOpen}
+          onOpenChange={setCardOpen}
+          name={voter.full_name}
+          src={voter.avatar_url}
+        />
+      )}
+    </>
   )
 }
 
@@ -967,11 +1002,13 @@ function AvatarStack({ voters, currentUserId }: { voters: LunchVoter[]; currentU
   return (
     <div className="flex items-center -space-x-2">
       {shownDesktop.map((voter, idx) => (
-        <VoterAvatar
+        <StaffAvatar
           key={voter.user_id}
-          voter={voter}
+          name={voter.full_name}
+          src={voter.avatar_url}
+          size="xs"
           className={cn(
-            "ring-background h-6 w-6 text-[9px] ring-2",
+            "ring-background ring-2",
             voter.user_id === currentUserId && "ring-primary",
             idx === 3 && "hidden sm:inline-flex"
           )}
@@ -988,34 +1025,5 @@ function AvatarStack({ voters, currentUserId }: { voters: LunchVoter[]; currentU
         </span>
       )}
     </div>
-  )
-}
-
-function VoterAvatar({ voter, className }: { voter: LunchVoter; className?: string }) {
-  const [first, last] = voter.full_name.split(" ")
-
-  if (voter.avatar_url) {
-    return (
-      // Signed Supabase URLs are not on the configured next/image domains, so
-      // a plain img keeps this from failing at runtime.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={voter.avatar_url}
-        alt={voter.full_name}
-        className={cn("shrink-0 rounded-full object-cover", className)}
-      />
-    )
-  }
-
-  return (
-    <span
-      className={cn(
-        "bg-primary/10 text-primary flex shrink-0 items-center justify-center rounded-full font-semibold",
-        className
-      )}
-      title={voter.full_name}
-    >
-      {getInitials(undefined, first, last)}
-    </span>
   )
 }
