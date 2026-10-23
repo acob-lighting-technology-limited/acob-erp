@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { StatusBadge, labelSource } from "../_components/status-badge"
 import { ClockTimes, NameWithDept } from "../_components/clock-times"
+import { cn } from "@/lib/utils"
 import { useDepartmentCodes } from "@/hooks/use-department-code"
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
@@ -227,12 +228,18 @@ export function AdminAttendanceRecordsPage({
       sortable: true,
       accessor: (r) => r.clock_in ?? "",
       hideOnMobile: true,
-      render: (r) => (
-        <span className="flex items-center gap-1">
-          <Clock className="h-3 w-3 text-green-600" />
-          {formatTime(r.clock_in)}
-        </span>
-      ),
+      render: (r) => {
+        const isLateArrival =
+          (r.status === "late" || r.status === "lateness_with_permission" || isLate(r.clock_in)) && r.status !== "early"
+        return (
+          <span className="flex items-center gap-1">
+            <Clock
+              className={cn("h-3 w-3", isLateArrival ? "text-yellow-600 dark:text-yellow-500" : "text-green-600")}
+            />
+            {formatTime(r.clock_in)}
+          </span>
+        )
+      },
       align: "center",
     },
     {
@@ -436,7 +443,14 @@ export function AdminAttendanceRecordsPage({
             title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
             subtitle: (r) => (
               <>
-                <ClockTimes clockIn={r.clock_in} clockOut={r.clock_out} />
+                <ClockTimes
+                  clockIn={r.clock_in}
+                  clockOut={r.clock_out}
+                  isLate={
+                    (r.status === "late" || r.status === "lateness_with_permission" || isLate(r.clock_in)) &&
+                    r.status !== "early"
+                  }
+                />
                 {` · ${r.total_hours?.toFixed(1) ?? 0}h · ${formatDate(r.date)}`}
               </>
             ),

@@ -40,8 +40,10 @@ import {
   quarterBounds,
   toLocalISODate,
   toLocalYearMonth,
+  isLate,
 } from "@/lib/hr/attendance-utils"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
+import { cn } from "@/lib/utils"
 import {
   ATTENDANCE_STATUS_LABELS,
   getManualStatusEditOptions,
@@ -593,7 +595,16 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
               <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
                 {day.record?.clock_in ? (
                   <>
-                    <Clock className="h-3.5 w-3.5 shrink-0 text-green-600" />
+                    <Clock
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        day.status === "late" ||
+                          day.status === "lateness_with_permission" ||
+                          (day.status !== "present" && isLate(day.record.clock_in))
+                          ? "text-yellow-600 dark:text-yellow-500"
+                          : "text-green-600"
+                      )}
+                    />
                     <span>{formatTime(day.record.clock_in)}</span>
                   </>
                 ) : (
