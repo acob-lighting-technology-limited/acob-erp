@@ -10,6 +10,9 @@ on:
     - cron: "7 * * * *"
   workflow_dispatch:
 
+# It only calls the app over HTTPS; the GITHUB_TOKEN needs no access at all.
+permissions: {}
+
 concurrency:
   group: attendance-reconcile
   cancel-in-progress: false
