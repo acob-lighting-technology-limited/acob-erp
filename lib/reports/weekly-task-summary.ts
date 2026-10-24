@@ -12,7 +12,7 @@ import { normalizeDepartmentName } from "@/shared/departments"
  * open shows as assigned-not-completed, which is the point of the 0 / 3 rows.
  */
 
-export type WeeklyTaskSummaryPlacement = "none" | "work_done" | "challenges"
+export type WeeklyTaskSummaryPlacement = "none" | "work_done" | "work_done_column" | "challenges"
 
 export type WeeklyTaskSummaryPerson = {
   id: string

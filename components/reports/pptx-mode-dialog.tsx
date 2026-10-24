@@ -209,6 +209,16 @@ export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = t
             <Button
               variant="outline"
               className="h-14 flex-col items-start justify-center gap-0.5 px-4"
+              onClick={() => handleTasksSelect("work_done_column")}
+            >
+              <span className="font-semibold">Beside Work Done</span>
+              <span className="text-muted-foreground text-xs font-normal">
+                Narrow task summary column next to Work Done
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-14 flex-col items-start justify-center gap-0.5 px-4"
               onClick={() => handleTasksSelect("challenges")}
             >
               <span className="font-semibold">Beside Challenges</span>

@@ -733,12 +733,15 @@ const PPTX_WEEKLY_LINE_HEIGHT_RATIO = 1.15
 const PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO = 0.48
 const PPTX_WEEKLY_LINE_SPACING_MULTIPLE = 1.3
 
+// Content slides keep their chrome slim: the header, footer and side margins
+// were trimmed so the report text gets the room (~0.5in more height, ~0.25in
+// more width). Cover, department title and index slides keep their own layout.
 const WEEKLY_CONTENT_LAYOUT = {
-  headerH: 0.65,
-  marginX: 0.25,
+  headerH: 0.5,
+  marginX: 0.12,
   slideW: 13.33,
-  footerY: 6.9,
-  footerH: 0.6,
+  footerY: 7.08,
+  footerH: 0.42,
 }
 
 const applyWeeklySlideTransition = (slide: PptxSlide) => {
@@ -755,8 +758,7 @@ const applyWeeklySlideTransition = (slide: PptxSlide) => {
 
 const getWeeklyContentBoxes = () => {
   const { headerH, marginX, slideW, footerY } = WEEKLY_CONTENT_LAYOUT
-  // Tuned so the full-page Work Done container is ~15.14cm high.
-  const bodyBottomSafety = 0.14
+  const bodyBottomSafety = 0.08
   // Card chrome above the body text: title row + hairline + gap (see addSectionCard).
   const CARD_HEADER_H = 0.72
   const textBottomSafety = 0.1
@@ -765,7 +767,7 @@ const getWeeklyContentBoxes = () => {
   const col2W = usableW * (2 / 5) - 0.15
   const col2X = marginX + col1W + 0.15
 
-  const startY = headerH + 0.15
+  const startY = headerH + 0.08
   const availH = footerY - startY - bodyBottomSafety
   const row1H = availH * (4 / 6)
   const row2H = availH * (2 / 6) - 0.15
@@ -983,7 +985,7 @@ type WeeklyDepartmentLayout = {
   challenges: WeeklyContentBox
   /** "On Work Done": slim per-person strip under the Work Done card. */
   strip?: WeeklyContentBox
-  /** "Beside Challenges": per-person card to the right of Challenges. */
+  /** "Beside Work Done" / "Beside Challenges": per-person card beside that section. */
   summary?: WeeklyContentBox
 }
 
@@ -993,6 +995,8 @@ const PPTX_TASK_STRIP_MAX_LINES = 4
 const PPTX_TASK_STRIP_LABEL = "BY STAFF   "
 const PPTX_TASK_STRIP_SEPARATOR = "   ·   "
 const PPTX_TASK_COUNT_COL_W = 0.75
+const PPTX_TASK_SIDE_COLUMN_W = 3.3
+const PPTX_TASK_SIDE_COLUMN_GAP = 0.12
 
 const formatTaskRatio = (counts: { completed: number; assigned: number }) => `${counts.completed} / ${counts.assigned}`
 
@@ -1043,6 +1047,22 @@ const getWeeklyDepartmentLayout = (slot?: WeeklyTaskSummarySlot): WeeklyDepartme
       tasks: boxes.page2Top,
       challenges: boxes.page2Bottom,
       strip: { x: card.x, y: card.y + card.h - stripH, w: card.w, h: stripH, textW: stripTextW, textH: stripH - 0.1 },
+    }
+  }
+
+  if (slot?.placement === "work_done_column") {
+    const card = boxes.continuation
+    const mainW = card.w - PPTX_TASK_SIDE_COLUMN_W - PPTX_TASK_SIDE_COLUMN_GAP
+    return {
+      workDone: { ...card, w: mainW, textW: mainW - 0.3 },
+      tasks: boxes.page2Top,
+      challenges: boxes.page2Bottom,
+      summary: {
+        ...card,
+        x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
+        w: PPTX_TASK_SIDE_COLUMN_W,
+        textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
+      },
     }
   }
 
@@ -1151,7 +1171,7 @@ const addWeeklyHeaderAndFooter = (
 
   // Matrix mark, top right. The header bar is dark in both themes, so this is
   // always the inverse (flat white) variant.
-  const markBox = logoBoxByHeight(EXPORT_LOGOS.matrixMarkInverse, 0.45)
+  const markBox = logoBoxByHeight(EXPORT_LOGOS.matrixMarkInverse, 0.36)
   try {
     slide.addImage({
       path: EXPORT_LOGOS.matrixMarkInverse.path,
@@ -1174,7 +1194,7 @@ const addWeeklyHeaderAndFooter = (
 
   // ACOB LIGHTING wordmark, bottom left. The footer strip is green in both
   // themes, so this is always the inverse (white text) variant.
-  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.34)
+  const wordmarkBox = logoBoxByHeight(EXPORT_LOGOS.acobInverse, 0.28)
   try {
     slide.addImage({
       path: EXPORT_LOGOS.acobInverse.path,
@@ -1525,16 +1545,16 @@ const addTaskSummaryStrip = (
   })
 }
 
-/** Largest font that fits every person, one column before two. */
-const planTaskSummaryRows = (count: number, textH: number) => {
-  for (const columns of [1, 2]) {
+/** Largest font that fits every person, one column before two (when the card is wide enough). */
+const planTaskSummaryRows = (count: number, textH: number, maxColumns: number) => {
+  for (const columns of maxColumns > 1 ? [1, 2] : [1]) {
     for (let fontSize = 14; fontSize >= PPTX_WEEKLY_MIN_BODY_FONT_SIZE; fontSize -= 1) {
       const rows = Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize)))
       if (count <= rows * columns) return { fontSize, columns, rows }
     }
   }
   const fontSize = PPTX_WEEKLY_MIN_BODY_FONT_SIZE
-  return { fontSize, columns: 2, rows: Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize))) }
+  return { fontSize, columns: maxColumns, rows: Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize))) }
 }
 
 /** "Beside Challenges": department total in the title, one row per person below. */
@@ -1567,13 +1587,17 @@ const addTaskSummaryCard = (
     return
   }
 
-  const { fontSize, columns, rows } = planTaskSummaryRows(summary.people.length, box.textH)
+  // A narrow side column holds one list; two would leave names a few letters wide.
+  const maxColumns = box.textW >= 4 ? 2 : 1
+  const { fontSize, columns, rows } = planTaskSummaryRows(summary.people.length, box.textH, maxColumns)
   const capacity = rows * columns
   const overflow = summary.people.length - capacity
   const shown = overflow > 0 ? summary.people.slice(0, capacity - 1) : summary.people
 
   const colGap = 0.2
-  const colW = (box.textW - colGap * (columns - 1)) / columns
+  // textW leaves almost no right inset; right-aligned counts need a real one.
+  const listW = box.textW - 0.14
+  const colW = (listW - colGap * (columns - 1)) / columns
   const nameW = colW - PPTX_TASK_COUNT_COL_W
   const maxNameChars = charsPerLineAt(nameW, fontSize)
   // Names and counts are separate text boxes with identical font and spacing so
@@ -1649,6 +1673,9 @@ const addWorkDoneSlide = (
   )
   if (onWorkDone && layout.strip) {
     addTaskSummaryStrip(pres, slide, layout.strip, onWorkDone, theme)
+  }
+  if (taskSummary?.placement === "work_done_column" && layout.summary) {
+    addTaskSummaryCard(pres, slide, layout.summary, taskSummary.summary, theme)
   }
 
   return slide
