@@ -994,8 +994,8 @@ const PPTX_TASK_STRIP_GAP = 0.1
 const PPTX_TASK_STRIP_MAX_LINES = 4
 const PPTX_TASK_STRIP_LABEL = "BY STAFF   "
 const PPTX_TASK_STRIP_SEPARATOR = "   ·   "
-const PPTX_TASK_COUNT_COL_W = 0.75
-const PPTX_TASK_SIDE_COLUMN_W = 3.3
+const PPTX_TASK_COUNT_COL_W = 0.65
+const PPTX_TASK_SIDE_COLUMN_W = 2.4
 const PPTX_TASK_SIDE_COLUMN_GAP = 0.12
 
 const formatTaskRatio = (counts: { completed: number; assigned: number }) => `${counts.completed} / ${counts.assigned}`
@@ -1024,6 +1024,24 @@ const countTaskStripLines = (summary: WeeklyDeptTaskSummary, textW: number): num
   return Math.min(PPTX_TASK_STRIP_MAX_LINES, lines)
 }
 
+/**
+ * "Kleopatra Aiyede" -> "Kleopatra A.", so names fit the narrow summary
+ * column. Falls back to the full name where two people in the department
+ * would otherwise read the same.
+ */
+const withShortNames = (summary: WeeklyDeptTaskSummary): WeeklyDeptTaskSummary => {
+  const shorten = (name: string) => {
+    const parts = name.trim().split(/\s+/)
+    return parts.length < 2 ? name : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
+  }
+  const uses = new Map<string, number>()
+  summary.people.forEach((p) => uses.set(shorten(p.name), (uses.get(shorten(p.name)) ?? 0) + 1))
+  return {
+    ...summary,
+    people: summary.people.map((p) => ({ ...p, name: uses.get(shorten(p.name)) === 1 ? shorten(p.name) : p.name })),
+  }
+}
+
 const resolveTaskSummarySlot = (
   report: WeeklyReport,
   options?: WeeklyTaskSummaryOptions
@@ -1031,7 +1049,7 @@ const resolveTaskSummarySlot = (
   if (!options || options.placement === "none") return undefined
   const department = normalizeDepartmentName(report.department)
   const summary = options.summaries.get(department) ?? { department, completed: 0, assigned: 0, people: [] }
-  return { placement: options.placement, summary }
+  return { placement: options.placement, summary: withShortNames(summary) }
 }
 
 const getWeeklyDepartmentLayout = (slot?: WeeklyTaskSummarySlot): WeeklyDepartmentLayout => {
@@ -1566,9 +1584,19 @@ const addTaskSummaryCard = (
   theme: WeeklyPptxTheme = "light"
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
-  addSectionCardChrome(pres, slide, box, "TASKS COMPLETED", colors.accent, theme, {
-    text: formatTaskRatio(summary),
+  // The narrow Work Done column has no room for the long label beside the total.
+  addSectionCardChrome(pres, slide, box, box.w < 3 ? "TASKS DONE" : "TASKS COMPLETED", colors.accent, theme)
+  slide.addText(formatTaskRatio(summary), {
+    x: box.x + 0.26,
+    y: box.y + 0.11,
+    w: box.w - 0.5,
+    h: 0.3,
+    fontSize: PPTX_WEEKLY_SECTION_TITLE_SIZE,
+    bold: true,
     color: colors.textPrimary,
+    align: "right",
+    valign: "middle",
+    fontFace: "Calibri",
   })
 
   const textX = box.x + 0.26
