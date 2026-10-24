@@ -3,8 +3,15 @@ import { shuffle } from "@/lib/utils/random"
 import { Footer, Table } from "docx"
 import { normalizeDepartmentName } from "@/shared/departments"
 
+import type {
+  WeeklyDeptTaskSummary,
+  WeeklyTaskSummaryOptions,
+  WeeklyTaskSummaryPlacement,
+} from "@/lib/reports/weekly-task-summary"
+
 import {
   PptxSlide,
+  PptxTextRun,
   PptxPresentation,
   PptxConstructor,
   loadPptxGenJS,
@@ -767,6 +774,12 @@ const getWeeklyContentBoxes = () => {
   const page2Gap = 0.08
   const page2TopH = (availH - page2Gap) * 0.75
   const page2BottomH = (availH - page2Gap) * 0.25
+  const splitTopH = (availH - page2Gap) * 0.55
+  const splitBottomH = (availH - page2Gap) * 0.45
+  const splitBottomY = startY + splitTopH + page2Gap
+  const splitColGap = 0.15
+  const splitChallengesW = (usableW - splitColGap) * 0.6
+  const splitSummaryW = usableW - splitColGap - splitChallengesW
 
   return {
     row1Left: {
@@ -816,6 +829,32 @@ const getWeeklyContentBoxes = () => {
       h: page2BottomH,
       textW: usableW - 0.3,
       textH: Math.max(0.6, page2BottomH - CARD_HEADER_H - textBottomSafety),
+    },
+    // "Beside Challenges" task summary: Tasks for New Week gives up height so the
+    // bottom row is tall enough to split into Challenges | Task summary.
+    splitTop: {
+      x: marginX,
+      y: startY,
+      w: usableW,
+      h: splitTopH,
+      textW: usableW - 0.3,
+      textH: Math.max(0.6, splitTopH - CARD_HEADER_H - textBottomSafety),
+    },
+    splitChallenges: {
+      x: marginX,
+      y: splitBottomY,
+      w: splitChallengesW,
+      h: splitBottomH,
+      textW: splitChallengesW - 0.3,
+      textH: Math.max(0.6, splitBottomH - CARD_HEADER_H - textBottomSafety),
+    },
+    splitSummary: {
+      x: marginX + splitChallengesW + splitColGap,
+      y: splitBottomY,
+      w: splitSummaryW,
+      h: splitBottomH,
+      textW: splitSummaryW - 0.3,
+      textH: Math.max(0.6, splitBottomH - CARD_HEADER_H - textBottomSafety),
     },
   }
 }
@@ -932,8 +971,107 @@ const buildWeeklySectionPlan = (
   }
 }
 
-const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
+/** One department's task counts and where they sit in full mode. */
+type WeeklyTaskSummarySlot = {
+  placement: Exclude<WeeklyTaskSummaryPlacement, "none">
+  summary: WeeklyDeptTaskSummary
+}
+
+type WeeklyDepartmentLayout = {
+  workDone: WeeklyContentBox
+  tasks: WeeklyContentBox
+  challenges: WeeklyContentBox
+  /** "On Work Done": slim per-person strip under the Work Done card. */
+  strip?: WeeklyContentBox
+  /** "Beside Challenges": per-person card to the right of Challenges. */
+  summary?: WeeklyContentBox
+}
+
+const PPTX_TASK_STRIP_FONT_SIZE = 12
+const PPTX_TASK_STRIP_GAP = 0.1
+const PPTX_TASK_STRIP_MAX_LINES = 4
+const PPTX_TASK_STRIP_LABEL = "BY STAFF   "
+const PPTX_TASK_STRIP_SEPARATOR = "   ·   "
+const PPTX_TASK_COUNT_COL_W = 0.75
+
+const formatTaskRatio = (counts: { completed: number; assigned: number }) => `${counts.completed} / ${counts.assigned}`
+
+const weeklyLineHeightIn = (fontSize: number) =>
+  (fontSize * PPTX_WEEKLY_LINE_HEIGHT_RATIO * PPTX_WEEKLY_LINE_SPACING_MULTIPLE) / 72
+
+const charsPerLineAt = (widthIn: number, fontSize: number) =>
+  Math.max(4, Math.floor((widthIn * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
+
+/** Estimated wrapped lines for the strip, treating each "Name 3 / 4" entry as unbreakable. */
+const countTaskStripLines = (summary: WeeklyDeptTaskSummary, textW: number): number => {
+  const limit = charsPerLineAt(textW, PPTX_TASK_STRIP_FONT_SIZE)
+  let lines = 1
+  let used = PPTX_TASK_STRIP_LABEL.length
+  summary.people.forEach((person, index) => {
+    const entry = `${person.name} ${formatTaskRatio(person)}`.length
+    const withSeparator = entry + (index > 0 ? PPTX_TASK_STRIP_SEPARATOR.length : 0)
+    if (used + withSeparator > limit) {
+      lines += 1
+      used = entry
+    } else {
+      used += withSeparator
+    }
+  })
+  return Math.min(PPTX_TASK_STRIP_MAX_LINES, lines)
+}
+
+const resolveTaskSummarySlot = (
+  report: WeeklyReport,
+  options?: WeeklyTaskSummaryOptions
+): WeeklyTaskSummarySlot | undefined => {
+  if (!options || options.placement === "none") return undefined
+  const department = normalizeDepartmentName(report.department)
+  const summary = options.summaries.get(department) ?? { department, completed: 0, assigned: 0, people: [] }
+  return { placement: options.placement, summary }
+}
+
+const getWeeklyDepartmentLayout = (slot?: WeeklyTaskSummarySlot): WeeklyDepartmentLayout => {
   const boxes = getWeeklyContentBoxes()
+
+  if (slot?.placement === "work_done") {
+    const card = boxes.continuation
+    const stripTextW = card.w - 0.5
+    const stripH = 0.2 + countTaskStripLines(slot.summary, stripTextW) * weeklyLineHeightIn(PPTX_TASK_STRIP_FONT_SIZE)
+    const taken = stripH + PPTX_TASK_STRIP_GAP
+    return {
+      workDone: { ...card, h: card.h - taken, textH: Math.max(0.6, card.textH - taken) },
+      tasks: boxes.page2Top,
+      challenges: boxes.page2Bottom,
+      strip: { x: card.x, y: card.y + card.h - stripH, w: card.w, h: stripH, textW: stripTextW, textH: stripH - 0.1 },
+    }
+  }
+
+  if (slot?.placement === "challenges") {
+    return {
+      workDone: boxes.continuation,
+      tasks: boxes.splitTop,
+      challenges: boxes.splitChallenges,
+      summary: boxes.splitSummary,
+    }
+  }
+
+  return { workDone: boxes.continuation, tasks: boxes.page2Top, challenges: boxes.page2Bottom }
+}
+
+const getZeroTasksColor = (theme: WeeklyPptxTheme) => (theme === "dark" ? "F87171" : "B91C1C")
+
+const getTaskRatioColor = (counts: { completed: number; assigned: number }, theme: WeeklyPptxTheme) => {
+  if (counts.assigned > 0 && counts.completed === 0) return getZeroTasksColor(theme)
+  return getWeeklyPptxThemeColors(theme).accent
+}
+
+const truncateToChars = (text: string, maxChars: number) =>
+  text.length <= maxChars ? text : `${text.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`
+
+const getReportSectionPlans = (
+  report: WeeklyReport,
+  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout()
+): WeeklySectionPlan[] => {
   return [
     buildWeeklySectionPlan(
       "work_done",
@@ -941,8 +1079,8 @@ const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
       ACOB_GREEN,
       report.work_done,
       "No data provided.",
-      boxes.continuation.textW,
-      boxes.continuation.textH
+      layout.workDone.textW,
+      layout.workDone.textH
     ),
     buildWeeklySectionPlan(
       "tasks_new_week",
@@ -950,8 +1088,8 @@ const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
       SECTION_TASKS,
       report.tasks_new_week,
       "No data provided.",
-      boxes.page2Top.textW,
-      boxes.page2Top.textH
+      layout.tasks.textW,
+      layout.tasks.textH
     ),
     buildWeeklySectionPlan(
       "challenges",
@@ -959,8 +1097,8 @@ const getReportSectionPlans = (report: WeeklyReport): WeeklySectionPlan[] => {
       SECTION_CHALLENGES,
       report.challenges,
       "No challenges reported.",
-      boxes.page2Bottom.textW,
-      boxes.page2Bottom.textH
+      layout.challenges.textW,
+      layout.challenges.textH
     ),
   ]
 }
@@ -1079,17 +1217,19 @@ const addWeeklyHeaderAndFooter = (
   }
 }
 
-const addSectionCard = (
+type WeeklyContentBox = { x: number; y: number; w: number; h: number; textW: number; textH: number }
+
+/** Inline count after a card title, e.g. "WORK DONE   14 / 20 TASKS COMPLETED". */
+type WeeklyTitleSuffix = { text: string; color: string }
+
+const addSectionCardChrome = (
   pres: PptxPresentation,
   slide: PptxSlide,
-  box: { x: number; y: number; w: number; h: number; textW: number; textH: number },
+  box: WeeklyContentBox,
   title: string,
   color: string,
-  text: string,
-  fontSize: number,
-  allowAutoShrink = true,
-  useManualHangingWrap = false,
-  theme: WeeklyPptxTheme = "light"
+  theme: WeeklyPptxTheme = "light",
+  titleSuffix?: WeeklyTitleSuffix
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
@@ -1113,14 +1253,17 @@ const addSectionCard = (
     line: { color, width: 0 },
   })
 
-  slide.addText(title, {
+  const titleRuns: PptxTextRun[] = [{ text: title, options: { color } }]
+  if (titleSuffix) {
+    titleRuns.push({ text: `   ${titleSuffix.text}`, options: { color: titleSuffix.color } })
+  }
+  slide.addText(titleRuns, {
     x: box.x + 0.26,
     y: box.y + 0.11,
     w: box.w - 0.46,
     h: 0.3,
     fontSize: PPTX_WEEKLY_SECTION_TITLE_SIZE,
     bold: true,
-    color,
     charSpacing: 2,
     valign: "middle",
     fontFace: "Calibri",
@@ -1135,6 +1278,24 @@ const addSectionCard = (
     fill: { color: colors.separator },
     line: { color: colors.separator, width: 0 },
   })
+}
+
+const addSectionCard = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  title: string,
+  color: string,
+  text: string,
+  fontSize: number,
+  allowAutoShrink = true,
+  useManualHangingWrap = false,
+  theme: WeeklyPptxTheme = "light",
+  titleSuffix?: WeeklyTitleSuffix
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  addSectionCardChrome(pres, slide, box, title, color, theme, titleSuffix)
+
   const wrappedText =
     useManualHangingWrap && fontSize > 0
       ? wrapTextByCharsCompact(
@@ -1308,6 +1469,154 @@ const addCompactContentSlide = (
   return slide
 }
 
+/** "On Work Done": one or more lines of "Name 3 / 4" entries under the Work Done card. */
+const addTaskSummaryStrip = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  summary: WeeklyDeptTaskSummary,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
+    fill: { color: colors.card },
+    line: { color: colors.cardBorder, width: 1 },
+  })
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: box.x,
+    y: box.y,
+    w: 0.07,
+    h: box.h,
+    fill: { color: colors.accent },
+    line: { color: colors.accent, width: 0 },
+  })
+
+  const runs: PptxTextRun[] = [
+    { text: PPTX_TASK_STRIP_LABEL, options: { bold: true, color: colors.textMuted, fontSize: 10, charSpacing: 2 } },
+  ]
+  if (summary.people.length === 0) {
+    runs.push({ text: "No tasks were due or completed this week.", options: { color: colors.textMuted } })
+  }
+  summary.people.forEach((person, index) => {
+    if (index > 0) runs.push({ text: PPTX_TASK_STRIP_SEPARATOR, options: { color: colors.textMuted } })
+    // Non-breaking spaces keep each "Name 3 / 4" on one line; lines break only at separators.
+    const nbsp = (text: string) => text.replace(/ /g, " ")
+    runs.push({ text: nbsp(`${person.name} `), options: { color: colors.textPrimary } })
+    runs.push({
+      text: nbsp(formatTaskRatio(person)),
+      options: { bold: true, color: getTaskRatioColor(person, theme) },
+    })
+  })
+
+  slide.addText(runs, {
+    x: box.x + 0.26,
+    y: box.y + 0.05,
+    w: box.textW,
+    h: box.textH,
+    fontSize: PPTX_TASK_STRIP_FONT_SIZE,
+    valign: "middle",
+    fontFace: "Calibri",
+    lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
+    fit: "shrink",
+  })
+}
+
+/** Largest font that fits every person, one column before two. */
+const planTaskSummaryRows = (count: number, textH: number) => {
+  for (const columns of [1, 2]) {
+    for (let fontSize = 14; fontSize >= PPTX_WEEKLY_MIN_BODY_FONT_SIZE; fontSize -= 1) {
+      const rows = Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize)))
+      if (count <= rows * columns) return { fontSize, columns, rows }
+    }
+  }
+  const fontSize = PPTX_WEEKLY_MIN_BODY_FONT_SIZE
+  return { fontSize, columns: 2, rows: Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize))) }
+}
+
+/** "Beside Challenges": department total in the title, one row per person below. */
+const addTaskSummaryCard = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  summary: WeeklyDeptTaskSummary,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  addSectionCardChrome(pres, slide, box, "TASKS COMPLETED", colors.accent, theme, {
+    text: formatTaskRatio(summary),
+    color: colors.textPrimary,
+  })
+
+  const textX = box.x + 0.26
+  const textY = box.y + 0.62
+  if (summary.people.length === 0) {
+    slide.addText("No tasks were due or completed this week.", {
+      x: textX,
+      y: textY,
+      w: box.textW,
+      h: box.textH,
+      fontSize: PPTX_WEEKLY_BODY_FONT_SIZE,
+      color: colors.textMuted,
+      valign: "top",
+      fontFace: "Calibri",
+    })
+    return
+  }
+
+  const { fontSize, columns, rows } = planTaskSummaryRows(summary.people.length, box.textH)
+  const capacity = rows * columns
+  const overflow = summary.people.length - capacity
+  const shown = overflow > 0 ? summary.people.slice(0, capacity - 1) : summary.people
+
+  const colGap = 0.2
+  const colW = (box.textW - colGap * (columns - 1)) / columns
+  const nameW = colW - PPTX_TASK_COUNT_COL_W
+  const maxNameChars = charsPerLineAt(nameW, fontSize)
+  // Names and counts are separate text boxes with identical font and spacing so
+  // the rows line up; names are cut short rather than allowed to wrap, which
+  // would push every later name off its count.
+  const textOptions = {
+    fontSize,
+    valign: "top",
+    fontFace: "Calibri",
+    lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
+    wrap: false,
+  }
+
+  for (let col = 0; col < columns; col += 1) {
+    const people = shown.slice(col * rows, (col + 1) * rows)
+    const nameRuns: PptxTextRun[] = people.map((person) => ({
+      text: truncateToChars(person.name, maxNameChars),
+      options: { color: colors.sectionText, breakLine: true },
+    }))
+    const countRuns: PptxTextRun[] = people.map((person) => ({
+      text: formatTaskRatio(person),
+      options: { bold: true, color: getTaskRatioColor(person, theme), breakLine: true },
+    }))
+    if (col === columns - 1 && overflow > 0) {
+      nameRuns.push({ text: `+${overflow + 1} more`, options: { color: colors.textMuted, breakLine: true } })
+    }
+    if (nameRuns.length === 0) continue
+
+    const colX = textX + col * (colW + colGap)
+    slide.addText(nameRuns, { ...textOptions, x: colX, y: textY, w: nameW, h: box.textH, align: "left" })
+    if (countRuns.length > 0) {
+      slide.addText(countRuns, {
+        ...textOptions,
+        x: colX + nameW,
+        y: textY,
+        w: PPTX_TASK_COUNT_COL_W,
+        h: box.textH,
+        align: "right",
+      })
+    }
+  }
+}
+
 const addWorkDoneSlide = (
   pres: PptxPresentation,
   department: string,
@@ -1315,26 +1624,32 @@ const addWorkDoneSlide = (
   nextDept?: string,
   pageNumber?: number,
   theme: WeeklyPptxTheme = "light",
-  slidePosition?: { index: number; total: number }
+  slidePosition?: { index: number; total: number },
+  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout(),
+  taskSummary?: WeeklyTaskSummarySlot
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
   slide.background = { color: colors.canvas }
   addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber, theme, slidePosition)
 
-  const boxes = getWeeklyContentBoxes()
+  const onWorkDone = taskSummary?.placement === "work_done" ? taskSummary.summary : undefined
   addSectionCard(
     pres,
     slide,
-    boxes.continuation,
+    layout.workDone,
     workDonePlan.title,
     workDonePlan.color,
     workDonePlan.text,
     workDonePlan.fontSize,
     true,
     false,
-    theme
+    theme,
+    onWorkDone ? { text: `${formatTaskRatio(onWorkDone)} TASKS COMPLETED`, color: colors.textPrimary } : undefined
   )
+  if (onWorkDone && layout.strip) {
+    addTaskSummaryStrip(pres, slide, layout.strip, onWorkDone, theme)
+  }
 
   return slide
 }
@@ -1347,18 +1662,19 @@ const addTasksAndChallengesSlide = (
   nextDept?: string,
   pageNumber?: number,
   theme: WeeklyPptxTheme = "light",
-  slidePosition?: { index: number; total: number }
+  slidePosition?: { index: number; total: number },
+  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout(),
+  taskSummary?: WeeklyTaskSummarySlot
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
   slide.background = { color: colors.canvas }
   addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber, theme, slidePosition)
 
-  const boxes = getWeeklyContentBoxes()
   addSectionCard(
     pres,
     slide,
-    boxes.page2Top,
+    layout.tasks,
     tasksPlan.title,
     tasksPlan.color,
     tasksPlan.text,
@@ -1370,7 +1686,7 @@ const addTasksAndChallengesSlide = (
   addSectionCard(
     pres,
     slide,
-    boxes.page2Bottom,
+    layout.challenges,
     challengesPlan.title,
     challengesPlan.color,
     challengesPlan.text,
@@ -1379,12 +1695,17 @@ const addTasksAndChallengesSlide = (
     false,
     theme
   )
+  if (taskSummary?.placement === "challenges" && layout.summary) {
+    addTaskSummaryCard(pres, slide, layout.summary, taskSummary.summary, theme)
+  }
 
   return slide
 }
 
 type DepartmentPptxPlan = {
   report: WeeklyReport
+  layout: WeeklyDepartmentLayout
+  taskSummary?: WeeklyTaskSummarySlot
   workDone: WeeklySectionPlan
   tasks: WeeklySectionPlan
   challenges: WeeklySectionPlan
@@ -1392,10 +1713,17 @@ type DepartmentPptxPlan = {
   startPage?: number
 }
 
-const buildDepartmentPptxPlan = (report: WeeklyReport): DepartmentPptxPlan => {
-  const [workDone, tasks, challenges] = getReportSectionPlans(report)
+const buildDepartmentPptxPlan = (
+  report: WeeklyReport,
+  taskSummaryOptions?: WeeklyTaskSummaryOptions
+): DepartmentPptxPlan => {
+  const taskSummary = resolveTaskSummarySlot(report, taskSummaryOptions)
+  const layout = getWeeklyDepartmentLayout(taskSummary)
+  const [workDone, tasks, challenges] = getReportSectionPlans(report, layout)
   return {
     report,
+    layout,
+    taskSummary,
     workDone,
     tasks,
     challenges,
@@ -1411,7 +1739,7 @@ const renderDepartmentWeeklySlides = (
   theme: WeeklyPptxTheme = "light",
   position?: { index: number; total: number }
 ) => {
-  const { report, workDone, tasks, challenges } = departmentPlan
+  const { report, workDone, tasks, challenges, layout, taskSummary } = departmentPlan
   const p = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
   const name = p ? `${p.first_name} ${p.last_name}` : "Employee"
 
@@ -1425,10 +1753,17 @@ const renderDepartmentWeeklySlides = (
   // could not tell what was coming up until you were already on the last slide
   // of the department. Where you are within the department is now carried by
   // the "1 OF 2" / "2 OF 2" label in the header.
-  const workDoneSlide = addWorkDoneSlide(pres, report.department, workDone, nextDepartmentName, pageCursor, theme, {
-    index: 1,
-    total: 2,
-  })
+  const workDoneSlide = addWorkDoneSlide(
+    pres,
+    report.department,
+    workDone,
+    nextDepartmentName,
+    pageCursor,
+    theme,
+    { index: 1, total: 2 },
+    layout,
+    taskSummary
+  )
   applyWeeklySlideTransition(workDoneSlide)
   if (typeof pageCursor === "number") pageCursor += 1
 
@@ -1440,7 +1775,9 @@ const renderDepartmentWeeklySlides = (
     nextDepartmentName,
     pageCursor,
     theme,
-    { index: 2, total: 2 }
+    { index: 2, total: 2 },
+    layout,
+    taskSummary
   )
   applyWeeklySlideTransition(tasksChallengesSlide)
 }
@@ -1483,7 +1820,8 @@ export const exportToPPTX = async (
   report: WeeklyReport,
   mode: WeeklyPptxMode = "full",
   theme: WeeklyPptxTheme = "light",
-  meetingDate?: string
+  meetingDate?: string,
+  taskSummaryOptions?: WeeklyTaskSummaryOptions
 ) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
@@ -1496,7 +1834,7 @@ export const exportToPPTX = async (
   if (mode === "compact") {
     renderDepartmentCompactSlides(pres, report, undefined, 3, theme)
   } else {
-    const departmentPlan = buildDepartmentPptxPlan(report)
+    const departmentPlan = buildDepartmentPptxPlan(report, taskSummaryOptions)
     // Slides 2+ — Department title + full-mode content slides
     renderDepartmentWeeklySlides(pres, departmentPlan, undefined, 2, theme)
   }
@@ -1520,7 +1858,8 @@ export const exportAllToPPTX = async (
   mode: WeeklyPptxMode = "full",
   theme: WeeklyPptxTheme = "light",
   meetingDate?: string,
-  order: WeeklyDeptOrder = "default"
+  order: WeeklyDeptOrder = "default",
+  taskSummaryOptions?: WeeklyTaskSummaryOptions
 ) => {
   const PptxConstructor = await loadPptxGenJS()
   const pres = new PptxConstructor()
@@ -1548,7 +1887,7 @@ export const exportAllToPPTX = async (
       pageCursor += 2
     })
   } else {
-    const departmentPlans = sortedReports.map((report) => buildDepartmentPptxPlan(report))
+    const departmentPlans = sortedReports.map((report) => buildDepartmentPptxPlan(report, taskSummaryOptions))
     departmentPlans.forEach((entry) => {
       departmentStartPages.push(pageCursor)
       entry.startPage = pageCursor
@@ -1580,7 +1919,7 @@ export const exportAllToPPTX = async (
     })
   } else {
     const departmentPlans = sortedReports.map((report, idx) => {
-      const entry = buildDepartmentPptxPlan(report)
+      const entry = buildDepartmentPptxPlan(report, taskSummaryOptions)
       entry.startPage = departmentStartPages[idx]
       return entry
     })

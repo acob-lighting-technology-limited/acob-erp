@@ -25,6 +25,7 @@ import {
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
+import { loadWeeklyTaskSummaryOptions, type WeeklyTaskSummaryPlacement } from "@/lib/reports/weekly-task-summary"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -170,15 +171,25 @@ export function WeeklyReportsContent({
   const runPptxExport = async (
     mode: WeeklyPptxMode,
     theme: WeeklyPptxTheme = "light",
-    order: WeeklyDeptOrder = "default"
+    order: WeeklyDeptOrder = "default",
+    taskPlacement: WeeklyTaskSummaryPlacement = "none"
   ) => {
     if (!pendingPptxExport) return
+    const summaryWeek = pendingPptxExport.kind === "all" ? weekFilter : pendingPptxExport.report.week_number
+    const summaryYear = pendingPptxExport.kind === "all" ? yearFilter : pendingPptxExport.report.year
+    let taskSummary
+    try {
+      taskSummary = await loadWeeklyTaskSummaryOptions(taskPlacement, summaryWeek, summaryYear)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load task counts")
+      return
+    }
     const exportMeetingDate = meetingDate
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, exportMeetingDate, order)
+      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, exportMeetingDate, order, taskSummary)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
-      await exportToPPTX(pendingPptxExport.report, mode, theme, exportMeetingDate)
+      await exportToPPTX(pendingPptxExport.report, mode, theme, exportMeetingDate, taskSummary)
     }
     setPptxModeDialogOpen(false)
     setPendingPptxExport(null)

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { toast } from "sonner"
 import { useMemo, useState } from "react"
 import { formatWATDate, formatWATTimeDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -29,6 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
+import { loadWeeklyTaskSummaryOptions, type WeeklyTaskSummaryPlacement } from "@/lib/reports/weekly-task-summary"
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
@@ -285,15 +287,25 @@ export default function WeeklyReportsPortal() {
   const runPptxExport = async (
     mode: WeeklyPptxMode,
     theme: WeeklyPptxTheme = "light",
-    order: WeeklyDeptOrder = "default"
+    order: WeeklyDeptOrder = "default",
+    taskPlacement: WeeklyTaskSummaryPlacement = "none"
   ) => {
     if (!pendingPptxExport) return
+    const summaryWeek = pendingPptxExport.kind === "all" ? weekFilter : pendingPptxExport.report.week_number
+    const summaryYear = pendingPptxExport.kind === "all" ? yearFilter : pendingPptxExport.report.year
+    let taskSummary
+    try {
+      taskSummary = await loadWeeklyTaskSummaryOptions(taskPlacement, summaryWeek, summaryYear)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load task counts")
+      return
+    }
 
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, meetingDate, order)
+      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, meetingDate, order, taskSummary)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
-      await exportToPPTX(pendingPptxExport.report, mode, theme, meetingDate)
+      await exportToPPTX(pendingPptxExport.report, mode, theme, meetingDate, taskSummary)
     }
 
     setPptxModeDialogOpen(false)
