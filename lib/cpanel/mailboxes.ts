@@ -4,17 +4,12 @@ import { ORG_STAFF_DOMAIN } from "@/lib/org-config"
 import { getAccountUsage, listMailboxes, type CpanelAccountUsage, type CpanelMailbox } from "./client"
 import { MAILBOX_ALERT_PERCENT } from "./quota"
 
-export type MailboxOwnerKind = "staff" | "inactive_staff" | "project" | "site" | "none"
-
-/** A project-site mailbox: the login email of a Starlink kit recorded in Matrix. */
-export interface MailboxSite {
-  name: string
-  projectName: string | null
-}
+export type MailboxOwnerKind = "staff" | "inactive_staff" | "project" | "none"
 
 export interface MailboxProject {
   id: string
   name: string
+  source?: "direct" | "starlink"
 }
 
 export interface MailboxOwner {
@@ -26,9 +21,7 @@ export interface MailboxOwner {
 
 export interface MailboxReportRow extends CpanelMailbox {
   owner: MailboxOwner | null
-  /** Set when no employee owns the mailbox but a Starlink kit logs in with it. */
-  site: MailboxSite | null
-  /** Set when the mailbox is assigned directly to a company project. */
+  /** Set when the mailbox is assigned to a project (directly or via a project Starlink kit). */
   project: MailboxProject | null
   ownerKind: MailboxOwnerKind
   /** Owner has left or is suspended, but the mailbox still lets them log in. */
@@ -69,7 +62,7 @@ interface ProfileRow {
 interface SiteRow {
   email: string | null
   site_name: string
-  project: { project_name: string } | Array<{ project_name: string }> | null
+  project: { id: string; project_name: string } | Array<{ id: string; project_name: string }> | null
 }
 
 interface ProjectMailboxRow {
@@ -97,11 +90,9 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
         "id, full_name, first_name, last_name, department, company_email, employment_status, mailbox_status, mailbox_error"
       )
       .not("company_email", "is", null),
-    // Site mailboxes are recognised from the Starlink kits' login emails, so
-    // a site is labelled as soon as its kit is added — nothing else to maintain.
     serviceClient
       .from("starlink_sites")
-      .select("email, site_name, project:projects(project_name)")
+      .select("email, site_name, project:projects(id, project_name)")
       .not("email", "is", null),
     serviceClient
       .from("project_mailboxes")
@@ -110,26 +101,32 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
   ])
   if (profilesResult.error) throw new Error(profilesResult.error.message)
   if (sitesResult.error) throw new Error(sitesResult.error.message)
-  // If migration has not yet been pushed, handle graceful empty array fallback during rollout
   const projectMailboxesData = projectMailboxesResult.error
     ? []
     : ((projectMailboxesResult.data ?? []) as ProjectMailboxRow[])
 
-  const sitesByEmail = new Map<string, MailboxSite>()
+  const projectsByEmail = new Map<string, MailboxProject>()
+
+  // 1. Map Starlink kit emails directly to their project
   for (const s of (sitesResult.data ?? []) as SiteRow[]) {
     const email = s.email?.trim().toLowerCase()
     if (!email) continue
     const project = Array.isArray(s.project) ? s.project[0] : s.project
-    sitesByEmail.set(email, { name: s.site_name, projectName: project?.project_name ?? null })
+    const projectName = project?.project_name ?? s.site_name
+    projectsByEmail.set(email, {
+      id: project?.id ?? s.site_name,
+      name: projectName,
+      source: "starlink",
+    })
   }
 
-  const projectsByEmail = new Map<string, MailboxProject>()
+  // 2. Direct project mailboxes from project_mailboxes
   for (const pm of projectMailboxesData) {
     const email = pm.email?.trim().toLowerCase()
     if (!email) continue
     const project = Array.isArray(pm.project) ? pm.project[0] : pm.project
     if (project) {
-      projectsByEmail.set(email, { id: project.id, name: project.project_name })
+      projectsByEmail.set(email, { id: project.id, name: project.project_name, source: "direct" })
     }
   }
 
@@ -148,22 +145,12 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
       ? { id: p.id, name: profileName(p), department: p.department, employmentStatus: status }
       : null
     const inactiveOwnerCanLogIn = inactive && !m.suspendedLogin
-    const site = p ? null : (sitesByEmail.get(m.email) ?? null)
-    const project = p || site ? null : (projectsByEmail.get(m.email) ?? null)
-    const ownerKind: MailboxOwnerKind = p
-      ? inactive
-        ? "inactive_staff"
-        : "staff"
-      : project
-        ? "project"
-        : site
-          ? "site"
-          : "none"
+    const project = p ? null : (projectsByEmail.get(m.email) ?? null)
+    const ownerKind: MailboxOwnerKind = p ? (inactive ? "inactive_staff" : "staff") : project ? "project" : "none"
 
     return {
       ...m,
       owner,
-      site,
       project,
       ownerKind,
       inactiveOwnerCanLogIn,
