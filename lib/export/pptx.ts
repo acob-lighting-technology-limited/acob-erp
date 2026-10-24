@@ -1262,7 +1262,12 @@ const addWeeklyHeaderAndFooter = (
 type WeeklyContentBox = { x: number; y: number; w: number; h: number; textW: number; textH: number }
 
 /** Inline count after a card title, e.g. "WORK DONE   14 / 20 TASKS COMPLETED". */
-type WeeklyTitleSuffix = { text: string; color: string }
+type WeeklyTitleSuffix = {
+  text: string
+  color: string
+  /** Narrow cards: no letter-spacing on the title row, so label and total fit side by side. */
+  compact?: boolean
+}
 
 const addSectionCardChrome = (
   pres: PptxPresentation,
@@ -1298,7 +1303,11 @@ const addSectionCardChrome = (
 
   const titleRuns: PptxTextRun[] = [{ text: title, options: { color } }]
   if (titleSuffix) {
-    titleRuns.push({ text: `   ${titleSuffix.text}`, options: { color: titleSuffix.color } })
+    titleRuns.push({
+      // Non-breaking spaces so a tight row never splits "19 / 36" across lines.
+      text: `${titleSuffix.compact ? "  " : "   "}${titleSuffix.text}`.replace(/ /g, "\u00A0"),
+      options: { color: titleSuffix.color },
+    })
   }
   slide.addText(titleRuns, {
     x: box.x + 0.26,
@@ -1307,7 +1316,7 @@ const addSectionCardChrome = (
     h: 0.3,
     fontSize: titleSize,
     bold: true,
-    charSpacing: 2,
+    charSpacing: titleSuffix?.compact ? 0 : 2,
     valign: "middle",
     fontFace: "Calibri",
   })
@@ -1547,7 +1556,7 @@ const addTaskSummaryStrip = (
   summary.people.forEach((person, index) => {
     if (index > 0) runs.push({ text: PPTX_TASK_STRIP_SEPARATOR, options: { color: colors.textMuted } })
     // Non-breaking spaces keep each "Name 3 / 4" on one line; lines break only at separators.
-    const nbsp = (text: string) => text.replace(/ /g, " ")
+    const nbsp = (text: string) => text.replace(/ /g, "\u00A0")
     runs.push({ text: nbsp(`${person.name} `), options: { color: colors.textPrimary } })
     runs.push({
       text: nbsp(formatTaskRatio(person)),
@@ -1589,7 +1598,7 @@ const addTaskSummaryCard = (
   theme: WeeklyPptxTheme = "light"
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
-  // The narrow Work Done column has no room for the long label beside the total.
+  // The narrow Work Done column only has room for a short label beside the total.
   const isNarrow = box.w < 3
   const titleSize = isNarrow ? PPTX_TASK_SIDE_TITLE_SIZE : PPTX_WEEKLY_SECTION_TITLE_SIZE
   addSectionCardChrome(
@@ -1599,28 +1608,30 @@ const addTaskSummaryCard = (
     isNarrow ? "TASKS DONE" : "TASKS COMPLETED",
     colors.accent,
     theme,
-    undefined,
+    // Narrow column: the total runs straight after the label, unspaced, so the
+    // two share the row without colliding.
+    isNarrow ? { text: formatTaskRatio(summary), color: colors.textPrimary, compact: true } : undefined,
     titleSize
   )
-  // Wide card: total right-aligned on the title row. Narrow column: there is no
-  // room beside the label, so the total gets its own larger line under it.
-  const totalLineH = isNarrow ? 0.45 : 0
-  slide.addText(formatTaskRatio(summary), {
-    x: box.x + 0.26,
-    y: isNarrow ? box.y + 0.58 : box.y + 0.11,
-    w: box.w - 0.5,
-    h: isNarrow ? 0.4 : 0.3,
-    fontSize: isNarrow ? 20 : titleSize,
-    bold: true,
-    color: colors.textPrimary,
-    align: isNarrow ? "left" : "right",
-    valign: "middle",
-    fontFace: "Calibri",
-  })
+  // Wide card: the total sits right-aligned at the end of the title row.
+  if (!isNarrow) {
+    slide.addText(formatTaskRatio(summary), {
+      x: box.x + 0.26,
+      y: box.y + 0.11,
+      w: box.w - 0.5,
+      h: 0.3,
+      fontSize: titleSize,
+      bold: true,
+      color: colors.textPrimary,
+      align: "right",
+      valign: "middle",
+      fontFace: "Calibri",
+    })
+  }
 
   const textX = box.x + 0.26
-  const textY = box.y + 0.62 + totalLineH
-  const listH = box.textH - totalLineH
+  const textY = box.y + 0.62
+  const listH = box.textH
   if (summary.people.length === 0) {
     slide.addText("No tasks were due or completed this week.", {
       x: textX,
