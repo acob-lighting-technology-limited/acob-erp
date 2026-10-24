@@ -994,8 +994,12 @@ const PPTX_TASK_STRIP_GAP = 0.1
 const PPTX_TASK_STRIP_MAX_LINES = 4
 const PPTX_TASK_STRIP_LABEL = "BY STAFF   "
 const PPTX_TASK_STRIP_SEPARATOR = "   ·   "
-const PPTX_TASK_COUNT_COL_W = 0.65
-const PPTX_TASK_SIDE_COLUMN_W = 2.4
+const PPTX_TASK_COUNT_COL_W = 0.6
+const PPTX_TASK_SIDE_COLUMN_W = 2
+// The side column is a reference panel, not the thing being read out, so it
+// stays smaller than the Work Done text beside it.
+const PPTX_TASK_SIDE_MAX_FONT = 12
+const PPTX_TASK_SIDE_TITLE_SIZE = 10
 const PPTX_TASK_SIDE_COLUMN_GAP = 0.12
 
 const formatTaskRatio = (counts: { completed: number; assigned: number }) => `${counts.completed} / ${counts.assigned}`
@@ -1267,7 +1271,8 @@ const addSectionCardChrome = (
   title: string,
   color: string,
   theme: WeeklyPptxTheme = "light",
-  titleSuffix?: WeeklyTitleSuffix
+  titleSuffix?: WeeklyTitleSuffix,
+  titleSize = PPTX_WEEKLY_SECTION_TITLE_SIZE
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
@@ -1300,7 +1305,7 @@ const addSectionCardChrome = (
     y: box.y + 0.11,
     w: box.w - 0.46,
     h: 0.3,
-    fontSize: PPTX_WEEKLY_SECTION_TITLE_SIZE,
+    fontSize: titleSize,
     bold: true,
     charSpacing: 2,
     valign: "middle",
@@ -1564,9 +1569,9 @@ const addTaskSummaryStrip = (
 }
 
 /** Largest font that fits every person, one column before two (when the card is wide enough). */
-const planTaskSummaryRows = (count: number, textH: number, maxColumns: number) => {
+const planTaskSummaryRows = (count: number, textH: number, maxColumns: number, maxFont = 14) => {
   for (const columns of maxColumns > 1 ? [1, 2] : [1]) {
-    for (let fontSize = 14; fontSize >= PPTX_WEEKLY_MIN_BODY_FONT_SIZE; fontSize -= 1) {
+    for (let fontSize = maxFont; fontSize >= PPTX_WEEKLY_MIN_BODY_FONT_SIZE; fontSize -= 1) {
       const rows = Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize)))
       if (count <= rows * columns) return { fontSize, columns, rows }
     }
@@ -1585,28 +1590,43 @@ const addTaskSummaryCard = (
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   // The narrow Work Done column has no room for the long label beside the total.
-  addSectionCardChrome(pres, slide, box, box.w < 3 ? "TASKS DONE" : "TASKS COMPLETED", colors.accent, theme)
+  const isNarrow = box.w < 3
+  const titleSize = isNarrow ? PPTX_TASK_SIDE_TITLE_SIZE : PPTX_WEEKLY_SECTION_TITLE_SIZE
+  addSectionCardChrome(
+    pres,
+    slide,
+    box,
+    isNarrow ? "TASKS DONE" : "TASKS COMPLETED",
+    colors.accent,
+    theme,
+    undefined,
+    titleSize
+  )
+  // Wide card: total right-aligned on the title row. Narrow column: there is no
+  // room beside the label, so the total gets its own larger line under it.
+  const totalLineH = isNarrow ? 0.45 : 0
   slide.addText(formatTaskRatio(summary), {
     x: box.x + 0.26,
-    y: box.y + 0.11,
+    y: isNarrow ? box.y + 0.58 : box.y + 0.11,
     w: box.w - 0.5,
-    h: 0.3,
-    fontSize: PPTX_WEEKLY_SECTION_TITLE_SIZE,
+    h: isNarrow ? 0.4 : 0.3,
+    fontSize: isNarrow ? 20 : titleSize,
     bold: true,
     color: colors.textPrimary,
-    align: "right",
+    align: isNarrow ? "left" : "right",
     valign: "middle",
     fontFace: "Calibri",
   })
 
   const textX = box.x + 0.26
-  const textY = box.y + 0.62
+  const textY = box.y + 0.62 + totalLineH
+  const listH = box.textH - totalLineH
   if (summary.people.length === 0) {
     slide.addText("No tasks were due or completed this week.", {
       x: textX,
       y: textY,
       w: box.textW,
-      h: box.textH,
+      h: listH,
       fontSize: PPTX_WEEKLY_BODY_FONT_SIZE,
       color: colors.textMuted,
       valign: "top",
@@ -1617,7 +1637,12 @@ const addTaskSummaryCard = (
 
   // A narrow side column holds one list; two would leave names a few letters wide.
   const maxColumns = box.textW >= 4 ? 2 : 1
-  const { fontSize, columns, rows } = planTaskSummaryRows(summary.people.length, box.textH, maxColumns)
+  const { fontSize, columns, rows } = planTaskSummaryRows(
+    summary.people.length,
+    listH,
+    maxColumns,
+    isNarrow ? PPTX_TASK_SIDE_MAX_FONT : 14
+  )
   const capacity = rows * columns
   const overflow = summary.people.length - capacity
   const shown = overflow > 0 ? summary.people.slice(0, capacity - 1) : summary.people
@@ -1655,14 +1680,14 @@ const addTaskSummaryCard = (
     if (nameRuns.length === 0) continue
 
     const colX = textX + col * (colW + colGap)
-    slide.addText(nameRuns, { ...textOptions, x: colX, y: textY, w: nameW, h: box.textH, align: "left" })
+    slide.addText(nameRuns, { ...textOptions, x: colX, y: textY, w: nameW, h: listH, align: "left" })
     if (countRuns.length > 0) {
       slide.addText(countRuns, {
         ...textOptions,
         x: colX + nameW,
         y: textY,
         w: PPTX_TASK_COUNT_COL_W,
-        h: box.textH,
+        h: listH,
         align: "right",
       })
     }
