@@ -23,6 +23,8 @@ import {
   MAX_BENEFICIARIES,
   PAYMENT_REQUEST_MIN,
   PETTY_CASH_MAX,
+  REQUISITION_ATTACHMENT_MAX_COUNT,
+  REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES,
   amountOutOfRangeMessage,
   lineItemsTotal,
 } from "@/lib/requisitions/limits"
@@ -154,9 +156,22 @@ export function NewRequisitionDialog({
 
   const handleFiles = async (files: FileList | null) => {
     if (!files?.length) return
+    const fileArray = Array.from(files)
+    if (attachments.length + fileArray.length > REQUISITION_ATTACHMENT_MAX_COUNT) {
+      toast.error(
+        `You can attach at most ${REQUISITION_ATTACHMENT_MAX_COUNT} files (${attachments.length} already attached)`
+      )
+      return
+    }
+    const currentBytes = attachments.reduce((sum, a) => sum + (a.file_size || 0), 0)
+    const newBytes = fileArray.reduce((sum, f) => sum + f.size, 0)
+    if (currentBytes + newBytes > REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES) {
+      toast.error(`Combined attachments cannot exceed ${REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES / (1024 * 1024)} MB`)
+      return
+    }
     setUploading(true)
     try {
-      const uploaded = await uploadRequisitionFiles(Array.from(files), "documents")
+      const uploaded = await uploadRequisitionFiles(fileArray, "documents", attachments)
       setAttachments((prev) => [...prev, ...uploaded])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed")
@@ -402,13 +417,16 @@ export function NewRequisitionDialog({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="req-files">Supporting documents (optional)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="req-files">Supporting documents (optional)</Label>
+                  <span className="text-muted-foreground text-xs">Max 20 files · 20 MB total</span>
+                </div>
                 <Input
                   id="req-files"
                   type="file"
                   multiple
                   accept="application/pdf,image/png,image/jpeg,image/webp"
-                  disabled={uploading}
+                  disabled={uploading || attachments.length >= REQUISITION_ATTACHMENT_MAX_COUNT}
                   onChange={(e) => {
                     handleFiles(e.target.files)
                     e.target.value = ""
@@ -417,28 +435,44 @@ export function NewRequisitionDialog({
               </div>
             </div>
             {attachments.length ? (
-              <ul className="space-y-1">
-                {attachments.map((file, i) => (
-                  <li
-                    key={file.file_path}
-                    className="flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-sm"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Upload className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
-                      <span className="truncate">{file.file_name}</span>
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove ${file.file_name}`}
-                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+              <div className="space-y-1.5">
+                <div className="text-muted-foreground flex items-center justify-between text-xs">
+                  <span>
+                    {attachments.length} of {REQUISITION_ATTACHMENT_MAX_COUNT} files
+                  </span>
+                  <span>
+                    {(attachments.reduce((sum, a) => sum + (a.file_size || 0), 0) / (1024 * 1024)).toFixed(1)} MB /{" "}
+                    {REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES / (1024 * 1024)} MB
+                  </span>
+                </div>
+                <ul className="max-h-48 space-y-1 overflow-y-auto pr-1">
+                  {attachments.map((file, i) => (
+                    <li
+                      key={file.file_path}
+                      className="flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-sm"
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Upload className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
+                        <span className="truncate">{file.file_name}</span>
+                        {file.file_size ? (
+                          <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                            ({(file.file_size / (1024 * 1024)).toFixed(1)} MB)
+                          </span>
+                        ) : null}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove ${file.file_name}`}
+                        onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
           </div>
         )}

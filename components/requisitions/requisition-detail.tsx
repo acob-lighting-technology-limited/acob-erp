@@ -343,7 +343,7 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Supporting documents</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="max-h-60 space-y-2 overflow-y-auto pr-1">
                 {requisition.attachments.map((file) =>
                   file.signed_url ? (
                     <a

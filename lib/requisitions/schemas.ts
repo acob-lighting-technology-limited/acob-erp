@@ -1,5 +1,13 @@
 import { z } from "zod"
-import { MAX_BENEFICIARIES, PETTY_CASH_MAX, amountOutOfRangeMessage, lineItemsTotal } from "./limits"
+import {
+  MAX_BENEFICIARIES,
+  PETTY_CASH_MAX,
+  REQUISITION_ATTACHMENT_MAX_COUNT,
+  REQUISITION_ATTACHMENT_MAX_FILE_BYTES,
+  REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES,
+  amountOutOfRangeMessage,
+  lineItemsTotal,
+} from "./limits"
 
 /** The editable fields of a requisition funding category — the form and both API methods use these. */
 export const FundingCategoryFieldsSchema = z.object({
@@ -56,7 +64,15 @@ export const RequisitionAttachmentSchema = z.object({
   file_name: z.string().trim().min(1, "File name is required").max(255),
   file_path: z.string().trim().min(1, "File path is required").max(500),
   file_type: z.string().max(100).optional(),
-  file_size: z.number().int().nonnegative().optional(),
+  file_size: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(
+      REQUISITION_ATTACHMENT_MAX_FILE_BYTES,
+      `Each file must be ${REQUISITION_ATTACHMENT_MAX_FILE_BYTES / (1024 * 1024)} MB or less`
+    )
+    .optional(),
 })
 
 const PIN = z.string().regex(/^\d{6}$/, "Enter your 6-digit approval PIN")
@@ -86,8 +102,17 @@ function checkBeneficiarySplit(
 
 const CommonFields = {
   beneficiary_details: z.array(BeneficiarySchema).min(1, "Add at least one beneficiary"),
-  // Supporting documents are optional — a receipt or invoice is not always to hand.
-  attachments: z.array(RequisitionAttachmentSchema).max(10).optional().default([]),
+  // Supporting documents are optional — up to 20 files, max 20 MB combined.
+  attachments: z
+    .array(RequisitionAttachmentSchema)
+    .max(REQUISITION_ATTACHMENT_MAX_COUNT, `At most ${REQUISITION_ATTACHMENT_MAX_COUNT} files allowed`)
+    .refine(
+      (files) =>
+        !files || files.reduce((sum, f) => sum + (f.file_size || 0), 0) <= REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES,
+      `Combined attachments cannot exceed ${REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES / (1024 * 1024)} MB`
+    )
+    .optional()
+    .default([]),
   funding_category_id: z.string().uuid().nullish(),
   help_desk_ticket_id: z.string().uuid().nullish(),
 }

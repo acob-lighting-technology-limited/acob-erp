@@ -15,6 +15,13 @@ export const FORM_LABELS: Record<RequisitionFormType, string> = {
   petty_cash: "Petty Cash",
 }
 
+/** Maximum number of attachments allowed on a single requisition. */
+export const REQUISITION_ATTACHMENT_MAX_COUNT = 20
+/** Maximum allowed size for any single attachment file (10 MB). */
+export const REQUISITION_ATTACHMENT_MAX_FILE_BYTES = 10 * 1024 * 1024
+/** Maximum combined size across all attachments on a requisition (20 MB). */
+export const REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES = 20 * 1024 * 1024
+
 function naira(value: number): string {
   return `₦${value.toLocaleString("en-NG")}`
 }
