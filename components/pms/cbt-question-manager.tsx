@@ -3,9 +3,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Brain, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react"
+import { Brain, Pencil, Plus, RefreshCw, Trash2, Upload } from "lucide-react"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { toast } from "sonner"
+import { CbtUploadDialog } from "./cbt-upload-dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
@@ -204,6 +205,7 @@ export function CbtQuestionManager({
   const loadPage = () => questionsQuery.refetch()
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
@@ -466,6 +468,10 @@ export function CbtQuestionManager({
               <Link href="/admin/pms/cycles">Manage Cycles</Link>
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={() => setIsUploadOpen(true)}>
+            <Upload className="h-4 w-4" />
+            Upload Questions
+          </Button>
           <Button size="sm" onClick={openCreateModal}>
             <Plus className="h-4 w-4" />
             {copy.add}
@@ -805,6 +811,16 @@ export function CbtQuestionManager({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CbtUploadDialog
+        open={isUploadOpen}
+        onOpenChange={setIsUploadOpen}
+        cycles={cycles}
+        selectedCycleId={currentCycleId}
+        lockDepartment={lockDepartment}
+        departmentsList={departmentsList}
+        onSuccess={() => void loadPage()}
+      />
     </DataTablePage>
   )
 }
