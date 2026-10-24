@@ -10,6 +10,10 @@ import { normalizeDepartmentName } from "@/shared/departments"
  * cycle uses) plus anything finished in it; "completed" is the subset
  * approved as completed inside the window. A task owed this week but still
  * open shows as assigned-not-completed, which is the point of the 0 / 3 rows.
+ *
+ * Action points follow the same window. Week N-1's items are the "tasks for
+ * the new week" set at the last meeting (plus any carried into it), so week
+ * N's meeting is where they are checked.
  */
 
 export type WeeklyTaskSummaryPerson = {
@@ -19,11 +23,20 @@ export type WeeklyTaskSummaryPerson = {
   assigned: number
 }
 
+export type WeeklyActionPointCounts = {
+  total: number
+  completed: number
+  inProgress: number
+  /** pending and not_started: nothing done on it yet. */
+  notStarted: number
+}
+
 export type WeeklyDeptTaskSummary = {
   department: string
   completed: number
   assigned: number
   people: WeeklyTaskSummaryPerson[]
+  actionPoints: WeeklyActionPointCounts
 }
 
 /** What the full-layout PowerPoint export needs to draw the task counts column. */
@@ -46,6 +59,11 @@ export type SummaryTaskRow = CycleAnchoredTask & {
   assigned_to: string | null
   status: string | null
   completed_at: string | null
+}
+
+export type SummaryActionPointRow = {
+  department: string | null
+  status: string | null
 }
 
 export type SummaryPersonRow = {
@@ -77,6 +95,14 @@ export function getWeeklyTaskWindow(week: number, year: number, anchorDay: numbe
     endAt: new Date(meetingMonday - LAGOS_OFFSET_MS).toISOString(),
   }
 }
+
+/** The office week before `week`, whose action points week `week`'s meeting reviews. */
+export function getPreviousOfficeWeek(week: number, year: number): { week: number; year: number } {
+  // Same rollover the action tracker's carry-forward uses.
+  return week > 1 ? { week: week - 1, year } : { week: 52, year: year - 1 }
+}
+
+const emptyActionPoints = (): WeeklyActionPointCounts => ({ total: 0, completed: 0, inProgress: 0, notStarted: 0 })
 
 const personName = (p: SummaryPersonRow) => `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Unnamed"
 
@@ -111,7 +137,13 @@ export function summarizeWeeklyTasks(
     const person = peopleById.get(userId)
     if (!person?.department) return
     const department = normalizeDepartmentName(person.department)
-    const dept = byDept.get(department) ?? { department, completed: 0, assigned: 0, people: [] }
+    const dept = byDept.get(department) ?? {
+      department,
+      completed: 0,
+      assigned: 0,
+      people: [],
+      actionPoints: emptyActionPoints(),
+    }
     dept.completed += entry.completed
     dept.assigned += entry.assigned
     dept.people.push({ id: userId, name: personName(person), ...entry })
@@ -124,6 +156,31 @@ export function summarizeWeeklyTasks(
       (a, b) => b.completed - a.completed || b.assigned - a.assigned || a.name.localeCompare(b.name)
     ),
   }))
+}
+
+/** Adds action-point counts, creating entries for departments with action points but no tasks. */
+export function attachActionPoints(
+  summaries: WeeklyDeptTaskSummary[],
+  rows: SummaryActionPointRow[]
+): WeeklyDeptTaskSummary[] {
+  const byDept = new Map(summaries.map((s) => [s.department, { ...s, actionPoints: emptyActionPoints() }]))
+  for (const row of rows) {
+    if (!row.department) continue
+    const department = normalizeDepartmentName(row.department)
+    const dept = byDept.get(department) ?? {
+      department,
+      completed: 0,
+      assigned: 0,
+      people: [],
+      actionPoints: emptyActionPoints(),
+    }
+    dept.actionPoints.total += 1
+    if (row.status === "completed") dept.actionPoints.completed += 1
+    else if (row.status === "in_progress") dept.actionPoints.inProgress += 1
+    else dept.actionPoints.notStarted += 1
+    byDept.set(department, dept)
+  }
+  return Array.from(byDept.values())
 }
 
 /** Client-side: task counts for one report week, ready to pass to the PowerPoint export. */

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  attachActionPoints,
+  getPreviousOfficeWeek,
   getWeeklyTaskWindow,
   summarizeWeeklyTasks,
   type SummaryPersonRow,
@@ -82,4 +84,29 @@ test("summarizeWeeklyTasks: skips assignees with no department", () => {
     window
   )
   assert.deepEqual(summaries, [])
+})
+
+test("getPreviousOfficeWeek: week N's meeting reviews week N-1's action points", () => {
+  assert.deepEqual(getPreviousOfficeWeek(30, 2026), { week: 29, year: 2026 })
+  assert.deepEqual(getPreviousOfficeWeek(1, 2026), { week: 52, year: 2025 })
+})
+
+test("attachActionPoints: counts by status and adds departments with no tasks", () => {
+  const [tasksDept] = summarizeWeeklyTasks([task({ due_date: "2026-07-28" })], people, window)
+  const result = attachActionPoints(
+    [tasksDept],
+    [
+      { department: "IT and Communications", status: "completed" },
+      { department: "IT and Communications", status: "in_progress" },
+      { department: "IT and Communications", status: "pending" },
+      { department: "IT and Communications", status: "not_started" },
+      { department: "Accounts", status: "completed" },
+      { department: null, status: "completed" },
+    ]
+  )
+  const it = result.find((d) => d.people.length > 0)
+  const accounts = result.find((d) => d.people.length === 0)
+  assert.deepEqual(it?.actionPoints, { total: 4, completed: 1, inProgress: 1, notStarted: 2 })
+  assert.deepEqual(accounts?.actionPoints, { total: 1, completed: 1, inProgress: 0, notStarted: 0 })
+  assert.equal(accounts?.assigned, 0)
 })

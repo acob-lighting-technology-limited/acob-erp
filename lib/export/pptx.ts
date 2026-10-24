@@ -986,6 +986,9 @@ const PPTX_TASK_SIDE_COLUMN_W = 2
 const PPTX_TASK_SIDE_MAX_FONT = 12
 const PPTX_TASK_SIDE_TITLE_SIZE = 10
 const PPTX_TASK_SIDE_COLUMN_GAP = 0.12
+// Space above the Action Points label, and the label row + hairline + gap under it.
+const PPTX_TASK_SECTION_GAP = 0.25
+const PPTX_TASK_SECTION_HEADER_H = 0.5
 
 const formatTaskRatio = (counts: { completed: number; assigned: number }) => `${counts.completed} / ${counts.assigned}`
 
@@ -1019,7 +1022,13 @@ const resolveTaskSummary = (
 ): WeeklyDeptTaskSummary | undefined => {
   if (!options) return undefined
   const department = normalizeDepartmentName(report.department)
-  const summary = options.summaries.get(department) ?? { department, completed: 0, assigned: 0, people: [] }
+  const summary = options.summaries.get(department) ?? {
+    department,
+    completed: 0,
+    assigned: 0,
+    people: [],
+    actionPoints: { total: 0, completed: 0, inProgress: 0, notStarted: 0 },
+  }
   return withShortNames(summary)
 }
 
@@ -1476,7 +1485,69 @@ const planTaskSummaryRows = (count: number, textH: number) => {
   return { fontSize, rows: Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize))) }
 }
 
-/** Task counts column beside Work Done: department total in the title, one row per person. */
+type SummaryRow = { label: string; value: string; color: string }
+
+/**
+ * Label / count rows in two aligned text boxes with identical font and
+ * spacing. Labels are cut short rather than allowed to wrap, which would push
+ * every later label off its count. Returns the height used, in inches.
+ */
+const addSummaryRows = (
+  slide: PptxSlide,
+  box: { x: number; y: number; w: number },
+  rows: SummaryRow[],
+  fontSize: number,
+  labelColor: string
+): number => {
+  if (rows.length === 0) return 0
+  const height = rows.length * weeklyLineHeightIn(fontSize) + 0.05
+  const labelW = box.w - PPTX_TASK_COUNT_COL_W
+  const maxLabelChars = charsPerLineAt(labelW, fontSize)
+  const textOptions = {
+    fontSize,
+    valign: "top",
+    fontFace: "Calibri",
+    lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
+    wrap: false,
+    y: box.y,
+    h: height,
+  }
+  slide.addText(
+    rows.map((row) => ({
+      text: truncateToChars(row.label, maxLabelChars),
+      options: { color: labelColor, breakLine: true },
+    })),
+    { ...textOptions, x: box.x, w: labelW, align: "left" }
+  )
+  slide.addText(
+    rows.map((row) => ({ text: row.value, options: { bold: true, color: row.color, breakLine: true } })),
+    { ...textOptions, x: box.x + labelW, w: PPTX_TASK_COUNT_COL_W, align: "right" }
+  )
+  return height
+}
+
+/** A short muted note in place of an empty list (kept to one line in the narrow column). Returns the height used. */
+const addSummaryNote = (slide: PptxSlide, box: { x: number; y: number; w: number }, text: string, color: string) => {
+  const height = weeklyLineHeightIn(PPTX_TASK_SIDE_MAX_FONT) + 0.05
+  slide.addText(text, {
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: height,
+    fontSize: PPTX_TASK_SIDE_MAX_FONT,
+    color,
+    valign: "top",
+    fontFace: "Calibri",
+  })
+  return height
+}
+
+/**
+ * Task counts column beside Work Done: "TASKS DONE" with one row per person,
+ * then "ACTION POINTS" for the items set at the last meeting. Each section's
+ * total runs straight after its short label, unspaced, so the two share the
+ * narrow title row without colliding.
+ */
 const addTaskSummaryCard = (
   pres: PptxPresentation,
   slide: PptxSlide,
@@ -1485,8 +1556,6 @@ const addTaskSummaryCard = (
   theme: WeeklyPptxTheme = "light"
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
-  // The total runs straight after a short label, unspaced, so the two share
-  // the narrow title row without colliding.
   addSectionCardChrome(
     pres,
     slide,
@@ -1499,60 +1568,77 @@ const addTaskSummaryCard = (
   )
 
   const textX = box.x + 0.26
-  const textY = box.y + 0.62
+  // textW leaves almost no right inset; right-aligned counts need a real one.
+  const listW = box.textW - 0.14
+  const actionRowsH = 3 * weeklyLineHeightIn(PPTX_TASK_SIDE_MAX_FONT) + 0.05
+  const actionBlockH = PPTX_TASK_SECTION_GAP + PPTX_TASK_SECTION_HEADER_H + actionRowsH
+  let y = box.y + 0.62
+
+  // People get whatever the action-points block leaves.
   if (summary.people.length === 0) {
-    slide.addText("No tasks were due or completed this week.", {
+    y += addSummaryNote(slide, { x: textX, y, w: listW }, "No tasks this week.", colors.textMuted)
+  } else {
+    const { fontSize, rows } = planTaskSummaryRows(summary.people.length, box.textH - actionBlockH)
+    const overflow = summary.people.length - rows
+    const shown = overflow > 0 ? summary.people.slice(0, rows - 1) : summary.people
+    const personRows: SummaryRow[] = shown.map((person) => ({
+      label: person.name,
+      value: formatTaskRatio(person),
+      color: getTaskRatioColor(person, theme),
+    }))
+    if (overflow > 0) personRows.push({ label: `+${overflow + 1} more`, value: "", color: colors.textMuted })
+    y += addSummaryRows(slide, { x: textX, y, w: listW }, personRows, fontSize, colors.sectionText)
+  }
+
+  // Action points section: its own label + total, hairline, then the breakdown.
+  y += PPTX_TASK_SECTION_GAP
+  const ap = summary.actionPoints
+  slide.addText(
+    [
+      { text: "ACTION POINTS", options: { color: colors.accent } },
+      {
+        text: `  ${ap.completed} / ${ap.total}`.replace(/ /g, "\u00A0"),
+        options: { color: colors.textPrimary },
+      },
+    ],
+    {
       x: textX,
-      y: textY,
-      w: box.textW,
-      h: box.textH,
-      fontSize: PPTX_TASK_SIDE_MAX_FONT,
-      color: colors.textMuted,
-      valign: "top",
+      y,
+      w: box.w - 0.46,
+      h: 0.3,
+      fontSize: PPTX_TASK_SIDE_TITLE_SIZE,
+      bold: true,
+      charSpacing: 0,
+      valign: "middle",
       fontFace: "Calibri",
-    })
+    }
+  )
+  slide.addShape(pres.ShapeType?.rect ?? "rect", {
+    x: textX,
+    y: y + 0.35,
+    w: box.w - 0.5,
+    h: 0.012,
+    fill: { color: colors.separator },
+    line: { color: colors.separator, width: 0 },
+  })
+  y += PPTX_TASK_SECTION_HEADER_H
+
+  if (ap.total === 0) {
+    addSummaryNote(slide, { x: textX, y, w: listW }, "None set last meeting.", colors.textMuted)
     return
   }
-
-  const { fontSize, rows } = planTaskSummaryRows(summary.people.length, box.textH)
-  const overflow = summary.people.length - rows
-  const shown = overflow > 0 ? summary.people.slice(0, rows - 1) : summary.people
-
-  // textW leaves almost no right inset; right-aligned counts need a real one.
-  const nameW = box.textW - 0.14 - PPTX_TASK_COUNT_COL_W
-  const maxNameChars = charsPerLineAt(nameW, fontSize)
-  // Names and counts are separate text boxes with identical font and spacing so
-  // the rows line up; names are cut short rather than allowed to wrap, which
-  // would push every later name off its count.
-  const textOptions = {
-    fontSize,
-    valign: "top",
-    fontFace: "Calibri",
-    lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
-    wrap: false,
-  }
-
-  const nameRuns: PptxTextRun[] = shown.map((person) => ({
-    text: truncateToChars(person.name, maxNameChars),
-    options: { color: colors.sectionText, breakLine: true },
-  }))
-  const countRuns: PptxTextRun[] = shown.map((person) => ({
-    text: formatTaskRatio(person),
-    options: { bold: true, color: getTaskRatioColor(person, theme), breakLine: true },
-  }))
-  if (overflow > 0) {
-    nameRuns.push({ text: `+${overflow + 1} more`, options: { color: colors.textMuted, breakLine: true } })
-  }
-
-  slide.addText(nameRuns, { ...textOptions, x: textX, y: textY, w: nameW, h: box.textH, align: "left" })
-  slide.addText(countRuns, {
-    ...textOptions,
-    x: textX + nameW,
-    y: textY,
-    w: PPTX_TASK_COUNT_COL_W,
-    h: box.textH,
-    align: "right",
-  })
+  const zero = getZeroTasksColor(theme)
+  addSummaryRows(
+    slide,
+    { x: textX, y, w: listW },
+    [
+      { label: "Completed", value: String(ap.completed), color: ap.completed > 0 ? colors.accent : colors.textPrimary },
+      { label: "In progress", value: String(ap.inProgress), color: colors.textPrimary },
+      { label: "Not started", value: String(ap.notStarted), color: ap.notStarted > 0 ? zero : colors.textPrimary },
+    ],
+    PPTX_TASK_SIDE_MAX_FONT,
+    colors.sectionText
+  )
 }
 
 const addWorkDoneSlide = (

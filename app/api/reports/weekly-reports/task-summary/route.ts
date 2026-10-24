@@ -6,8 +6,11 @@ import { quotePostgrestValue } from "@/lib/supabase/postgrest-filter"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
 import {
+  attachActionPoints,
+  getPreviousOfficeWeek,
   getWeeklyTaskWindow,
   summarizeWeeklyTasks,
+  type SummaryActionPointRow,
   type SummaryPersonRow,
   type SummaryTaskRow,
 } from "@/lib/reports/weekly-task-summary"
@@ -23,7 +26,7 @@ const QuerySchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100),
 })
 
-// Task counts per department and person for the weekly report deck. The deck is
+// Task and action-point counts per department for the weekly report deck. The deck is
 // presented to the whole meeting, so any signed-in staff member who can export
 // it gets the same numbers; tasks RLS would only show them their own rows.
 export async function GET(request: NextRequest) {
@@ -68,15 +71,29 @@ export async function GET(request: NextRequest) {
       (t) => t.category !== "weekly_action"
     )
     const userIds = Array.from(new Set(taskRows.map((t) => t.assigned_to).filter((id): id is string => Boolean(id))))
-    if (userIds.length === 0) return NextResponse.json({ data: [] })
 
-    const { data: people, error: peopleError } = await db
-      .from("staff_directory")
-      .select("id, first_name, last_name, department")
-      .in("id", userIds)
-    if (peopleError) return serverError(log, peopleError)
+    let people: SummaryPersonRow[] = []
+    if (userIds.length > 0) {
+      const { data, error: peopleError } = await db
+        .from("staff_directory")
+        .select("id, first_name, last_name, department")
+        .in("id", userIds)
+      if (peopleError) return serverError(log, peopleError)
+      people = (data ?? []) as SummaryPersonRow[]
+    }
 
-    return NextResponse.json({ data: summarizeWeeklyTasks(taskRows, (people ?? []) as SummaryPersonRow[], window) })
+    const reviewed = getPreviousOfficeWeek(week, year)
+    const { data: actionPoints, error: actionPointsError } = await db
+      .from("action_items")
+      .select("department, status")
+      .eq("week_number", reviewed.week)
+      .eq("year", reviewed.year)
+    if (actionPointsError) return serverError(log, actionPointsError)
+
+    const summaries = summarizeWeeklyTasks(taskRows, people, window)
+    return NextResponse.json({
+      data: attachActionPoints(summaries, (actionPoints ?? []) as SummaryActionPointRow[]),
+    })
   } catch (error) {
     return serverError(log, error)
   }
