@@ -1,9 +1,9 @@
 "use client"
 
 /* eslint-disable @next/next/no-img-element -- the signature preview is a short-lived signed URL */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { CheckCircle2, CircleAlert, KeyRound, Loader2, PenLine, Upload } from "lucide-react"
+import { CheckCircle2, CircleAlert, KeyRound, Loader2, PenLine, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -40,12 +40,62 @@ function StatusLine({ done, text }: { done: boolean; text: string }) {
   )
 }
 
+const ALLOWED_SIGNATURE_TYPES = ["image/png", "image/jpeg", "image/webp"]
+
 export function SignatureSection({ status, onSaved }: { status: SigningStatus; onSaved: (s: SigningStatus) => void }) {
   const [drawn, setDrawn] = useState<Blob | null>(null)
   const [file, setFile] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState("draw")
   const [saving, setSaving] = useState(false)
   const handleDrawn = useCallback((blob: Blob | null) => setDrawn(blob), [])
+
+  useEffect(() => {
+    if (!file) {
+      setFilePreview(null)
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setFilePreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  const handleFile = (f: File | null) => {
+    if (!f) return
+    if (!ALLOWED_SIGNATURE_TYPES.includes(f.type)) {
+      toast.error("Please choose a PNG, JPG, or WebP image")
+      return
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      toast.error("Image must be smaller than 5 MB")
+      return
+    }
+    setFile(f)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const droppedFile = e.dataTransfer.files?.[0]
+    if (droppedFile) {
+      handleFile(droppedFile)
+    }
+  }
 
   const save = async () => {
     const blob = mode === "draw" ? drawn : file
@@ -101,15 +151,79 @@ export function SignatureSection({ status, onSaved }: { status: SigningStatus; o
           <TabsContent value="draw" className="pt-2">
             <SignaturePad onChange={handleDrawn} />
           </TabsContent>
-          <TabsContent value="upload" className="space-y-2 pt-2">
-            <Label htmlFor="signature-file">Image of your signature (PNG, JPG or WebP)</Label>
-            <Input
+          <TabsContent value="upload" className="space-y-3 pt-2">
+            <Label htmlFor="signature-file" className="text-sm font-medium">
+              Image of your signature (PNG, JPG or WebP)
+            </Label>
+
+            {file && filePreview ? (
+              <div className="border-primary/40 bg-muted/20 relative rounded-lg border-2 border-dashed p-4">
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <div className="rounded-md border bg-white p-3 shadow-xs">
+                    <img src={filePreview} alt="Signature preview" className="max-h-24 max-w-full object-contain" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-foreground text-xs font-medium">{file.name}</p>
+                    <p className="text-muted-foreground text-[11px]">{(file.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      Choose another
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive h-8 text-xs"
+                      onClick={() => setFile(null)}
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                  isDragging
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/40"
+                }`}
+              >
+                <div className="bg-background mb-2 flex h-10 w-10 items-center justify-center rounded-full border shadow-xs">
+                  <Upload className={`h-5 w-5 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                </div>
+                <p className="text-foreground text-sm font-medium">
+                  <span className="text-primary font-semibold">Click to upload</span> or drag and drop
+                </p>
+                <p className="text-muted-foreground mt-0.5 text-xs">PNG, JPG or WebP (max 5 MB)</p>
+                <p className="text-muted-foreground/80 mt-2 text-[11px]">Dark ink on white background works best.</p>
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
               id="signature-file"
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="sr-only"
+              onChange={(e) => {
+                handleFile(e.target.files?.[0] ?? null)
+                e.target.value = ""
+              }}
             />
-            <p className="text-muted-foreground text-xs">Dark ink on white paper works best.</p>
           </TabsContent>
         </Tabs>
         <Button onClick={save} disabled={saving}>
