@@ -1,7 +1,9 @@
-﻿import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { canManageFleet } from "@/lib/fleet-booking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { getOneDriveService } from "@/lib/onedrive"
+import { isSharePointFleetPath } from "@/lib/fleet/archive"
 
 type FleetBookingAttachmentRow = {
   id: string
@@ -57,12 +59,24 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
       return NextResponse.json({ error: "Failed to load attachments" }, { status: 500 })
     }
 
+    const onedrive = getOneDriveService()
+    const onedriveEnabled = onedrive.isEnabled()
+
     const rows = await Promise.all(
       ((attachments || []) as FleetBookingAttachmentRow[]).map(async (row) => {
-        const { data } = await dataClient.storage.from("fleet_booking_documents").createSignedUrl(row.file_path, 900)
+        let signedUrl: string | null = null
+        if (isSharePointFleetPath(row.file_path)) {
+          if (onedriveEnabled) {
+            signedUrl = await onedrive.getDownloadUrl(row.file_path).catch(() => null)
+          }
+        } else {
+          const { data } = await dataClient.storage.from("fleet_booking_documents").createSignedUrl(row.file_path, 900)
+          signedUrl = data?.signedUrl || null
+        }
+
         return {
           ...row,
-          signed_url: data?.signedUrl || null,
+          signed_url: signedUrl,
         }
       })
     )
