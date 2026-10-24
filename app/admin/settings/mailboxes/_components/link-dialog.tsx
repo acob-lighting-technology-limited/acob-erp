@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Briefcase, Building, Link2, Loader2, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import { apiFetch } from "@/lib/api-client"
 import type { MailboxReportRow } from "@/lib/cpanel/mailboxes"
@@ -55,8 +55,26 @@ export function LinkDialog({
     enabled: Boolean(mailbox),
   })
 
-  const employees = optionsData?.employees ?? []
-  const projects = optionsData?.projects ?? []
+  const employees = optionsData?.employees
+  const projects = optionsData?.projects
+
+  const employeeOptions = useMemo(
+    () =>
+      (employees ?? []).map((e) => ({
+        value: e.id,
+        label: e.department ? `${e.name} (${e.department})` : e.name,
+      })),
+    [employees]
+  )
+
+  const projectOptions = useMemo(
+    () =>
+      (projects ?? []).map((p) => ({
+        value: p.id,
+        label: p.location ? `${p.name} · ${p.location}` : p.name,
+      })),
+    [projects]
+  )
 
   useEffect(() => {
     if (mailbox) {
@@ -117,7 +135,7 @@ export function LinkDialog({
     }
   }
 
-  const selectedEmployee = employees.find((e) => e.id === selectedProfileId)
+  const selectedEmployee = employees?.find((e) => e.id === selectedProfileId)
 
   return (
     <ResponsiveModal
@@ -125,82 +143,71 @@ export function LinkDialog({
       onOpenChange={onOpenChange}
       title="Link Mailbox"
       description={`Assign or re-link ${mailbox.email} to an employee or project.`}
+      desktopClassName="max-w-lg"
     >
-      <form onSubmit={handleSave} className="space-y-4 pt-2">
-        <div className="bg-muted/40 rounded-lg border p-3 text-sm">
+      <form onSubmit={handleSave} className="max-w-full min-w-0 space-y-4 pt-2">
+        <div className="bg-muted/40 min-w-0 rounded-lg border p-3 text-sm">
           <span className="text-muted-foreground">Mailbox:</span>{" "}
-          <span className="font-mono font-medium">{mailbox.email}</span>
+          <span className="font-mono font-medium break-all">{mailbox.email}</span>
         </div>
 
-        <div className="bg-muted/20 space-y-3 rounded-lg border p-3.5">
+        <div className="bg-muted/20 min-w-0 space-y-3 rounded-lg border p-3.5">
           <Label className="text-sm font-semibold">Assign To</Label>
           <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setLinkType("staff")}
-              className={`flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
+              className={`flex min-w-0 cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
                 linkType === "staff"
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-muted text-muted-foreground hover:bg-accent"
               }`}
             >
-              <User className="text-primary mb-1 h-5 w-5" />
-              <span className="text-center text-xs font-medium">Staff Member</span>
+              <User className="text-primary mb-1 h-5 w-5 shrink-0" />
+              <span className="w-full truncate text-center text-xs font-medium">Staff Member</span>
             </button>
 
             <button
               type="button"
               onClick={() => setLinkType("project")}
-              className={`flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
+              className={`flex min-w-0 cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
                 linkType === "project"
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-muted text-muted-foreground hover:bg-accent"
               }`}
             >
-              <Briefcase className="mb-1 h-5 w-5 text-blue-500" />
-              <span className="text-center text-xs font-medium">Project</span>
+              <Briefcase className="mb-1 h-5 w-5 shrink-0 text-blue-500" />
+              <span className="w-full truncate text-center text-xs font-medium">Project</span>
             </button>
 
             <button
               type="button"
               onClick={() => setLinkType("none")}
-              className={`flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
+              className={`flex min-w-0 cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
                 linkType === "none"
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-muted text-muted-foreground hover:bg-accent"
               }`}
             >
-              <Building className="text-muted-foreground mb-1 h-5 w-5" />
-              <span className="text-center text-xs font-medium">Unlink / Shared</span>
+              <Building className="text-muted-foreground mb-1 h-5 w-5 shrink-0" />
+              <span className="w-full truncate text-center text-xs font-medium">Unlink / Shared</span>
             </button>
           </div>
 
           {/* Staff Picker */}
           {linkType === "staff" && (
-            <div className="space-y-1.5 pt-1">
-              <Label htmlFor="edit-staff-select" className="text-xs">
-                Select Employee
-              </Label>
-              <Select value={selectedProfileId} onValueChange={setSelectedProfileId}>
-                <SelectTrigger id="edit-staff-select" className="text-sm">
-                  <SelectValue placeholder="Choose an employee..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {employees.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.id} className="text-xs">
-                      <div className="flex flex-col py-0.5">
-                        <span className="text-foreground font-medium">{emp.name}</span>
-                        <span className="text-muted-foreground">
-                          {emp.department ?? "No dept"}
-                          {emp.companyEmail ? ` · currently: ${emp.companyEmail}` : " · no email assigned"}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="min-w-0 space-y-1.5 pt-1">
+              <Label className="text-xs">Select Employee</Label>
+              <SearchableSelect
+                value={selectedProfileId}
+                onValueChange={setSelectedProfileId}
+                placeholder="Choose an employee..."
+                options={employeeOptions}
+                searchPlaceholder="Search employees..."
+                className="w-full min-w-0 text-sm"
+              />
               {selectedEmployee?.companyEmail && selectedEmployee.companyEmail !== mailbox.email && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-xs break-words text-amber-600 dark:text-amber-400">
                   Will change {selectedEmployee.name}&apos;s company email from {selectedEmployee.companyEmail} to{" "}
                   {mailbox.email}.
                 </p>
@@ -210,27 +217,16 @@ export function LinkDialog({
 
           {/* Project Picker */}
           {linkType === "project" && (
-            <div className="space-y-1.5 pt-1">
-              <Label htmlFor="edit-project-select" className="text-xs">
-                Select Project
-              </Label>
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger id="edit-project-select" className="text-sm">
-                  <SelectValue placeholder="Choose a project..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {projects.map((proj) => (
-                    <SelectItem key={proj.id} value={proj.id} className="text-xs">
-                      <div className="flex flex-col py-0.5">
-                        <span className="text-foreground font-medium">{proj.name}</span>
-                        <span className="text-muted-foreground">
-                          {proj.location ?? "No location"} {proj.status ? `· ${proj.status}` : ""}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="min-w-0 space-y-1.5 pt-1">
+              <Label className="text-xs">Select Project</Label>
+              <SearchableSelect
+                value={selectedProjectId}
+                onValueChange={setSelectedProjectId}
+                placeholder="Choose a project..."
+                options={projectOptions}
+                searchPlaceholder="Search projects..."
+                className="w-full min-w-0 text-sm"
+              />
             </div>
           )}
 

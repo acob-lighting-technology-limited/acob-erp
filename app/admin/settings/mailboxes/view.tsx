@@ -8,6 +8,7 @@ import {
   Database,
   HardDrive,
   Inbox,
+  KeyRound,
   Link2,
   Lock,
   LockOpen,
@@ -27,6 +28,7 @@ import { MAILBOX_ALERT_PERCENT, formatBytes, mailboxLevel } from "@/lib/cpanel/q
 import type { MailboxReport, MailboxReportRow, MissingMailboxRow } from "@/lib/cpanel/mailboxes"
 import { CreateMailboxDialog } from "./_components/create-mailbox-dialog"
 import { LinkDialog } from "./_components/link-dialog"
+import { PasswordDialog } from "./_components/password-dialog"
 import { QuotaDialog } from "./_components/quota-dialog"
 import { SuspensionDialog, type SuspensionTarget } from "./_components/suspension-dialog"
 
@@ -108,6 +110,7 @@ export function MailboxesPage() {
   })
   const [createOpen, setCreateOpen] = useState(false)
   const [linkTarget, setLinkTarget] = useState<MailboxReportRow | null>(null)
+  const [passwordTarget, setPasswordTarget] = useState<MailboxReportRow | null>(null)
   const [quotaTarget, setQuotaTarget] = useState<MailboxReportRow | null>(null)
   const [suspensionTarget, setSuspensionTarget] = useState<SuspensionTarget | null>(null)
 
@@ -410,6 +413,7 @@ export function MailboxesPage() {
           onRetry={() => void refetch()}
           rowActions={[
             { label: "Change quota", icon: HardDrive, onClick: (m) => setQuotaTarget(m) },
+            { label: "Reset password", icon: KeyRound, onClick: (m) => setPasswordTarget(m) },
             { label: "Link mailbox", icon: Link2, onClick: (m) => setLinkTarget(m) },
             {
               label: "Suspend mailbox",
@@ -465,6 +469,7 @@ export function MailboxesPage() {
         onOpenChange={(open) => !open && setLinkTarget(null)}
         onLinked={() => void refetch()}
       />
+      <PasswordDialog mailbox={passwordTarget} onOpenChange={(open) => !open && setPasswordTarget(null)} />
       <QuotaDialog
         mailbox={quotaTarget}
         onOpenChange={(open) => !open && setQuotaTarget(null)}
