@@ -4,6 +4,9 @@ import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { getMissingSetup, signedStorageUrl, SIGNATURE_BUCKET } from "@/lib/approval-signing/server"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { normalizeDepartmentName } from "@/shared/departments"
+import { getOneDriveService } from "@/lib/onedrive"
+import { isSharePointArchivePath } from "./archive"
+import { logger } from "@/lib/logger"
 import type { RoutingProfile } from "./routing"
 import type {
   Requisition,
@@ -12,6 +15,8 @@ import type {
   RequisitionStage,
   RequisitionViewerActions,
 } from "./types"
+
+const log = logger("requisitions-server")
 
 export const REQUISITION_DOCUMENTS_BUCKET = "requisition_documents"
 
@@ -129,14 +134,34 @@ export async function loadRequisition(admin: SupabaseClient, id: string): Promis
 
 /** Adds short-lived signed URLs for attachments, signatures and receipts. */
 export async function withSignedUrls(admin: SupabaseClient, req: Requisition): Promise<Requisition> {
+  const onedrive = getOneDriveService()
+  const onedriveEnabled = onedrive.isEnabled()
+
   const attachments = await Promise.all(
-    (req.attachments || []).map(
-      async (file: RequisitionAttachment): Promise<RequisitionAttachment> => ({
+    (req.attachments || []).map(async (file: RequisitionAttachment): Promise<RequisitionAttachment> => {
+      let signedUrl: string | null = null
+      if (isSharePointArchivePath(file.file_path)) {
+        if (onedriveEnabled) {
+          try {
+            signedUrl = await onedrive.getDownloadUrl(file.file_path)
+          } catch (err) {
+            log.warn("Failed to get SharePoint download URL for attachment", { path: file.file_path, err })
+            signedUrl = file.web_url || null
+          }
+        } else {
+          signedUrl = file.web_url || null
+        }
+      } else {
+        signedUrl = await signedStorageUrl(admin, REQUISITION_DOCUMENTS_BUCKET, file.file_path)
+      }
+
+      return {
         ...file,
-        signed_url: await signedStorageUrl(admin, REQUISITION_DOCUMENTS_BUCKET, file.file_path),
-      })
-    )
+        signed_url: signedUrl,
+      }
+    })
   )
+
   const stages = await Promise.all(
     (req.stages || []).map(
       async (stage: RequisitionStage): Promise<RequisitionStage> => ({
@@ -145,15 +170,33 @@ export async function withSignedUrls(admin: SupabaseClient, req: Requisition): P
       })
     )
   )
+
   const payments = await Promise.all(
-    (req.payments || []).map(
-      async (payment: RequisitionPayment): Promise<RequisitionPayment> => ({
+    (req.payments || []).map(async (payment: RequisitionPayment): Promise<RequisitionPayment> => {
+      let receiptUrl: string | null = null
+      if (payment.receipt_path) {
+        if (isSharePointArchivePath(payment.receipt_path)) {
+          if (onedriveEnabled) {
+            try {
+              receiptUrl = await onedrive.getDownloadUrl(payment.receipt_path)
+            } catch (err) {
+              log.warn("Failed to get SharePoint download URL for receipt", { path: payment.receipt_path, err })
+              receiptUrl = null
+            }
+          }
+        } else {
+          receiptUrl = await signedStorageUrl(admin, REQUISITION_DOCUMENTS_BUCKET, payment.receipt_path)
+        }
+      }
+
+      return {
         ...payment,
-        receipt_url: await signedStorageUrl(admin, REQUISITION_DOCUMENTS_BUCKET, payment.receipt_path),
+        receipt_url: receiptUrl,
         signature_url: await signedStorageUrl(admin, SIGNATURE_BUCKET, payment.signature_path),
-      })
-    )
+      }
+    })
   )
+
   return { ...req, attachments, stages, payments }
 }
 

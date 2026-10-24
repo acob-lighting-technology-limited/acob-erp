@@ -6,7 +6,11 @@ import { notifyRequisitionEvent } from "@/lib/requisitions/notify"
 import { RecordPaymentSchema } from "@/lib/requisitions/schemas"
 import { getViewerContext, loadRequisition } from "@/lib/requisitions/server"
 import { isOwnUploadPath, requireRequisitionUser, requisitionErrorResponse } from "@/lib/requisitions/route-helpers"
+import { archiveRequisitionToSharePoint } from "@/lib/requisitions/archive"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+
+const log = logger("requisitions-payments")
 
 /**
  * POST /api/requisitions/[id]/payments — record a payment (Processed By).
@@ -59,8 +63,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) throw error
 
     const updated = await loadRequisition(admin, id)
-    if (updated)
+    if (updated) {
       await notifyRequisitionEvent(admin, { kind: "payment", req: updated, actorId: user.id, amount: body.amount })
+      if (updated.status === "paid") {
+        archiveRequisitionToSharePoint(admin, id).catch((archiveErr) => {
+          log.error("Failed to auto-archive paid requisition to SharePoint", { id, err: archiveErr })
+        })
+      }
+    }
 
     await writeAuditLog(
       supabase,

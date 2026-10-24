@@ -73,6 +73,8 @@ export const RequisitionAttachmentSchema = z.object({
       `Each file must be ${REQUISITION_ATTACHMENT_MAX_FILE_BYTES / (1024 * 1024)} MB or less`
     )
     .optional(),
+  web_url: z.string().url().max(1000).nullish(),
+  archived_at: z.string().max(100).nullish(),
 })
 
 const PIN = z.string().regex(/^\d{6}$/, "Enter your 6-digit approval PIN")
