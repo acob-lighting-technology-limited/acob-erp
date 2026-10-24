@@ -720,9 +720,6 @@ const addDeptIndexSlide = (
 }
 
 const PPTX_WEEKLY_BODY_FONT_SIZE = 14
-// Full-mode sections may grow past the default when the text is short, so a
-// light week does not leave half the card empty.
-const PPTX_WEEKLY_MAX_BODY_FONT_SIZE = 16
 // Floor for shrink-to-fit. Anything under ~10pt is unreadable when projected,
 // so an over-long report should visibly overflow (and get trimmed) rather than
 // silently render at a size nobody in the room can read.
@@ -920,7 +917,7 @@ const chooseSectionFontSize = (
   text: string,
   boxWIn: number,
   boxHIn: number,
-  maxFont = PPTX_WEEKLY_MAX_BODY_FONT_SIZE,
+  maxFont = PPTX_WEEKLY_BODY_FONT_SIZE,
   minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE
 ): number => {
   for (let fontSize = maxFont; fontSize >= minFont; fontSize -= 0.5) {
@@ -931,12 +928,14 @@ const chooseSectionFontSize = (
 }
 
 /**
- * Font steps are coarse — the next half point up can wrap two more lines and
- * overflow — so the chosen size usually leaves some height unused. Hand that
+ * Only for text that had to shrink below the normal size: font steps are
+ * coarse — the next half point up can wrap two more lines and overflow — so a
+ * compressed report often stops short of the card's bottom. Hand that height
  * back as space between items, keeping half a line in reserve against the
- * estimate running short.
+ * estimate running short. Text that fits at the normal size is left as it is.
  */
 const chooseParagraphSpacing = (text: string, boxWIn: number, boxHIn: number, fontSize: number): number => {
+  if (fontSize >= PPTX_WEEKLY_BODY_FONT_SIZE) return 0
   const items = text.split("\n").filter((line) => line.trim().length > 0).length
   if (items < 2) return 0
   const lineH = fitLineHeightPt(fontSize)
@@ -959,7 +958,7 @@ const buildWeeklySectionPlan = (
 ): WeeklySectionPlan => {
   const normalized = autoNumberLines(rawText) || fallbackText
   const text = withListItemSpacing(normalized)
-  const fontSize = chooseSectionFontSize(text, boxWIn, boxHIn, PPTX_WEEKLY_MAX_BODY_FONT_SIZE, minFont)
+  const fontSize = chooseSectionFontSize(text, boxWIn, boxHIn, PPTX_WEEKLY_BODY_FONT_SIZE, minFont)
   return {
     key,
     title,
@@ -975,8 +974,9 @@ type WeeklyDepartmentLayout = {
   workDone: WeeklyContentBox
   tasks: WeeklyContentBox
   challenges: WeeklyContentBox
-  /** Task counts column to the right of Work Done (full mode with counts). */
-  summary?: WeeklyContentBox
+  /** Column to the right of Work Done (full mode with counts), split into two equal cards. */
+  taskCounts?: WeeklyContentBox
+  actionPoints?: WeeklyContentBox
 }
 
 const PPTX_TASK_COUNT_COL_W = 0.6
@@ -986,9 +986,9 @@ const PPTX_TASK_SIDE_COLUMN_W = 2
 const PPTX_TASK_SIDE_MAX_FONT = 12
 const PPTX_TASK_SIDE_TITLE_SIZE = 10
 const PPTX_TASK_SIDE_COLUMN_GAP = 0.12
-// Space above the Action Points label, and the label row + hairline + gap under it.
-const PPTX_TASK_SECTION_GAP = 0.25
-const PPTX_TASK_SECTION_HEADER_H = 0.5
+const PPTX_TASK_CARD_GAP = 0.08
+// Card chrome above the body text, as in getWeeklyContentBoxes.
+const PPTX_TASK_CARD_HEADER_H = 0.72
 
 const formatTaskRatio = (counts: { completed: number; assigned: number }) => `${counts.completed} / ${counts.assigned}`
 
@@ -1040,16 +1040,20 @@ const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLay
 
   const card = boxes.continuation
   const mainW = card.w - PPTX_TASK_SIDE_COLUMN_W - PPTX_TASK_SIDE_COLUMN_GAP
+  const halfH = (card.h - PPTX_TASK_CARD_GAP) / 2
+  const half = {
+    x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
+    w: PPTX_TASK_SIDE_COLUMN_W,
+    h: halfH,
+    textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
+    textH: Math.max(0.6, halfH - PPTX_TASK_CARD_HEADER_H - 0.1),
+  }
   return {
     workDone: { ...card, w: mainW, textW: mainW - 0.3 },
     tasks: boxes.page2Top,
     challenges: boxes.page2Bottom,
-    summary: {
-      ...card,
-      x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
-      w: PPTX_TASK_SIDE_COLUMN_W,
-      textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
-    },
+    taskCounts: { ...half, y: card.y },
+    actionPoints: { ...half, y: card.y + halfH + PPTX_TASK_CARD_GAP },
   }
 }
 
@@ -1543,12 +1547,11 @@ const addSummaryNote = (slide: PptxSlide, box: { x: number; y: number; w: number
 }
 
 /**
- * Task counts column beside Work Done: "TASKS DONE" with one row per person,
- * then "ACTION POINTS" for the items set at the last meeting. Each section's
- * total runs straight after its short label, unspaced, so the two share the
- * narrow title row without colliding.
+ * Top card of the column beside Work Done: "TASKS DONE" with one row per
+ * person. The total runs straight after the short label, unspaced, so the two
+ * share the narrow title row without colliding.
  */
-const addTaskSummaryCard = (
+const addTaskCountsCard = (
   pres: PptxPresentation,
   slide: PptxSlide,
   box: WeeklyContentBox,
@@ -1567,74 +1570,61 @@ const addTaskSummaryCard = (
     PPTX_TASK_SIDE_TITLE_SIZE
   )
 
-  const textX = box.x + 0.26
-  // textW leaves almost no right inset; right-aligned counts need a real one.
-  const listW = box.textW - 0.14
-  const actionRowsH = 3 * weeklyLineHeightIn(PPTX_TASK_SIDE_MAX_FONT) + 0.05
-  const actionBlockH = PPTX_TASK_SECTION_GAP + PPTX_TASK_SECTION_HEADER_H + actionRowsH
-  let y = box.y + 0.62
-
-  // People get whatever the action-points block leaves.
+  const at = { x: box.x + 0.26, y: box.y + 0.62, w: box.textW - 0.14 }
   if (summary.people.length === 0) {
-    y += addSummaryNote(slide, { x: textX, y, w: listW }, "No tasks this week.", colors.textMuted)
-  } else {
-    const { fontSize, rows } = planTaskSummaryRows(summary.people.length, box.textH - actionBlockH)
-    const overflow = summary.people.length - rows
-    const shown = overflow > 0 ? summary.people.slice(0, rows - 1) : summary.people
-    const personRows: SummaryRow[] = shown.map((person) => ({
-      label: person.name,
-      value: formatTaskRatio(person),
-      color: getTaskRatioColor(person, theme),
-    }))
-    if (overflow > 0) personRows.push({ label: `+${overflow + 1} more`, value: "", color: colors.textMuted })
-    y += addSummaryRows(slide, { x: textX, y, w: listW }, personRows, fontSize, colors.sectionText)
-  }
-
-  // Action points section: its own label + total, hairline, then the breakdown.
-  y += PPTX_TASK_SECTION_GAP
-  const ap = summary.actionPoints
-  slide.addText(
-    [
-      { text: "ACTION POINTS", options: { color: colors.accent } },
-      {
-        text: `  ${ap.completed} / ${ap.total}`.replace(/ /g, "\u00A0"),
-        options: { color: colors.textPrimary },
-      },
-    ],
-    {
-      x: textX,
-      y,
-      w: box.w - 0.46,
-      h: 0.3,
-      fontSize: PPTX_TASK_SIDE_TITLE_SIZE,
-      bold: true,
-      charSpacing: 0,
-      valign: "middle",
-      fontFace: "Calibri",
-    }
-  )
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: textX,
-    y: y + 0.35,
-    w: box.w - 0.5,
-    h: 0.012,
-    fill: { color: colors.separator },
-    line: { color: colors.separator, width: 0 },
-  })
-  y += PPTX_TASK_SECTION_HEADER_H
-
-  if (ap.total === 0) {
-    addSummaryNote(slide, { x: textX, y, w: listW }, "None set last meeting.", colors.textMuted)
+    addSummaryNote(slide, at, "No tasks this week.", colors.textMuted)
     return
   }
-  const zero = getZeroTasksColor(theme)
+  const { fontSize, rows } = planTaskSummaryRows(summary.people.length, box.textH)
+  const overflow = summary.people.length - rows
+  const shown = overflow > 0 ? summary.people.slice(0, rows - 1) : summary.people
+  const personRows: SummaryRow[] = shown.map((person) => ({
+    label: person.name,
+    value: formatTaskRatio(person),
+    color: getTaskRatioColor(person, theme),
+  }))
+  if (overflow > 0) personRows.push({ label: `+${overflow + 1} more`, value: "", color: colors.textMuted })
+  addSummaryRows(slide, at, personRows, fontSize, colors.sectionText)
+}
+
+/** Bottom card: the action points set at the last meeting, done / total and by status. */
+const addActionPointsCard = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  summary: WeeklyDeptTaskSummary,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  const ap = summary.actionPoints
+  addSectionCardChrome(
+    pres,
+    slide,
+    box,
+    "ACTION POINTS",
+    colors.accent,
+    theme,
+    { text: `${ap.completed} / ${ap.total}`, color: colors.textPrimary, compact: true },
+    PPTX_TASK_SIDE_TITLE_SIZE
+  )
+
+  // textW leaves almost no right inset; right-aligned counts need a real one.
+  const at = { x: box.x + 0.26, y: box.y + 0.62, w: box.textW - 0.14 }
+  if (ap.total === 0) {
+    addSummaryNote(slide, at, "None set last meeting.", colors.textMuted)
+    return
+  }
   addSummaryRows(
     slide,
-    { x: textX, y, w: listW },
+    at,
     [
       { label: "Completed", value: String(ap.completed), color: ap.completed > 0 ? colors.accent : colors.textPrimary },
       { label: "In progress", value: String(ap.inProgress), color: colors.textPrimary },
-      { label: "Not started", value: String(ap.notStarted), color: ap.notStarted > 0 ? zero : colors.textPrimary },
+      {
+        label: "Not started",
+        value: String(ap.notStarted),
+        color: ap.notStarted > 0 ? getZeroTasksColor(theme) : colors.textPrimary,
+      },
     ],
     PPTX_TASK_SIDE_MAX_FONT,
     colors.sectionText
@@ -1670,8 +1660,9 @@ const addWorkDoneSlide = (
     theme,
     workDonePlan.paraSpaceAfter
   )
-  if (taskSummary && layout.summary) {
-    addTaskSummaryCard(pres, slide, layout.summary, taskSummary, theme)
+  if (taskSummary && layout.taskCounts && layout.actionPoints) {
+    addTaskCountsCard(pres, slide, layout.taskCounts, taskSummary, theme)
+    addActionPointsCard(pres, slide, layout.actionPoints, taskSummary, theme)
   }
 
   return slide
