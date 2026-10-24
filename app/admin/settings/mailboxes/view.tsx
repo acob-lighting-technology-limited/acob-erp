@@ -3,8 +3,20 @@
 import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
-import { AlertTriangle, Database, HardDrive, Inbox, Lock, LockOpen, MailWarning, UserX } from "lucide-react"
+import {
+  AlertTriangle,
+  Database,
+  HardDrive,
+  Inbox,
+  Link2,
+  Lock,
+  LockOpen,
+  MailWarning,
+  Plus,
+  UserX,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -13,6 +25,8 @@ import { MailboxUsageBar } from "@/components/mailbox/mailbox-usage-bar"
 import { apiFetch } from "@/lib/api-client"
 import { MAILBOX_ALERT_PERCENT, formatBytes, mailboxLevel } from "@/lib/cpanel/quota"
 import type { MailboxReport, MailboxReportRow, MissingMailboxRow } from "@/lib/cpanel/mailboxes"
+import { CreateMailboxDialog } from "./_components/create-mailbox-dialog"
+import { LinkDialog } from "./_components/link-dialog"
 import { QuotaDialog } from "./_components/quota-dialog"
 import { SuspensionDialog, type SuspensionTarget } from "./_components/suspension-dialog"
 
@@ -25,6 +39,7 @@ const TAB_KEYS: TabKey[] = ["active", "attention", "suspended", "missing"]
 const OWNER_LABELS: Record<MailboxReportRow["ownerKind"], string> = {
   staff: "Staff",
   inactive_staff: "Exited / suspended staff",
+  project: "Project",
   site: "Project site",
   none: "No staff record",
 }
@@ -57,6 +72,14 @@ function LoginBadge({ row }: { row: MailboxReportRow }) {
 }
 
 function OwnerCell({ row }: { row: MailboxReportRow }) {
+  if (row.project) {
+    return (
+      <div className="min-w-0 space-y-0.5">
+        <p className="truncate text-sm font-medium">Project – {row.project.name}</p>
+        <p className="text-muted-foreground truncate text-xs">Project mailbox</p>
+      </div>
+    )
+  }
   if (row.site) {
     return (
       <div className="min-w-0 space-y-0.5">
@@ -78,15 +101,13 @@ function OwnerCell({ row }: { row: MailboxReportRow }) {
 }
 
 export function MailboxesPage() {
-  // The tab lives in state, not the URL: DataTable's own query-string handling
-  // rewrites the URL and would drop ?tab=, bouncing back to the first tab in a loop.
-  // The URL is still read once so a link (e.g. from the 90% alert email) lands
-  // on the right tab.
   const searchParams = useSearchParams()
   const [tab, setTab] = useState<TabKey>(() => {
     const fromUrl = searchParams.get("tab") as TabKey | null
     return fromUrl && TAB_KEYS.includes(fromUrl) ? fromUrl : "active"
   })
+  const [createOpen, setCreateOpen] = useState(false)
+  const [linkTarget, setLinkTarget] = useState<MailboxReportRow | null>(null)
   const [quotaTarget, setQuotaTarget] = useState<MailboxReportRow | null>(null)
   const [suspensionTarget, setSuspensionTarget] = useState<SuspensionTarget | null>(null)
 
@@ -94,8 +115,6 @@ export function MailboxesPage() {
   const mailboxes = useMemo(() => data?.mailboxes ?? [], [data])
   const missing = useMemo(() => data?.missing ?? [], [data])
   const attention = useMemo(() => mailboxes.filter((m) => m.needsAttention), [mailboxes])
-  // Active and Suspended split every mailbox between them, so none is hidden;
-  // a leaver nobody suspended stays in Active and is flagged in Needs attention.
   const suspended = useMemo(() => mailboxes.filter((m) => m.suspendedLogin || m.suspendedIncoming), [mailboxes])
   const active = useMemo(() => mailboxes.filter((m) => !m.suspendedLogin && !m.suspendedIncoming), [mailboxes])
 
@@ -131,7 +150,8 @@ export function MailboxesPage() {
         key: "owner",
         label: "Owner",
         sortable: true,
-        accessor: (m) => m.owner?.name ?? (m.site ? `Site – ${m.site.name}` : ""),
+        accessor: (m) =>
+          m.owner?.name ?? (m.project ? `Project – ${m.project.name}` : m.site ? `Site – ${m.site.name}` : ""),
         resizable: true,
         initialWidth: 220,
         render: (m) => <OwnerCell row={m} />,
@@ -306,9 +326,15 @@ export function MailboxesPage() {
   return (
     <DataTablePage
       title="Mailboxes"
-      description="Staff mailboxes on cPanel, matched against employee records. Usage is read live from cPanel."
+      description="Staff and project mailboxes on cPanel, matched against employee and project records. Usage is read live from cPanel."
       icon={HardDrive}
       backLink={{ href: "/admin/settings", label: "Back to Settings" }}
+      actions={
+        <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+          <Plus className="h-4 w-4" />
+          Create Mailbox
+        </Button>
+      }
       tabs={tabs}
       activeTab={tab}
       onTabChange={(next) => setTab(next as TabKey)}
@@ -375,7 +401,7 @@ export function MailboxesPage() {
           getRowId={(m) => m.email}
           searchPlaceholder="Search mailbox or owner..."
           searchFn={(m, q) =>
-            `${m.email} ${m.owner?.name ?? ""} ${m.site?.name ?? ""} ${m.site?.projectName ?? ""}`
+            `${m.email} ${m.owner?.name ?? ""} ${m.project?.name ?? ""} ${m.site?.name ?? ""} ${m.site?.projectName ?? ""}`
               .toLowerCase()
               .includes(q.toLowerCase())
           }
@@ -384,6 +410,7 @@ export function MailboxesPage() {
           onRetry={() => void refetch()}
           rowActions={[
             { label: "Change quota", icon: HardDrive, onClick: (m) => setQuotaTarget(m) },
+            { label: "Link mailbox", icon: Link2, onClick: (m) => setLinkTarget(m) },
             {
               label: "Suspend mailbox",
               icon: Lock,
@@ -400,7 +427,9 @@ export function MailboxesPage() {
           ]}
           mobileRow={{
             title: (m) => m.email,
-            subtitle: (m) => m.owner?.name ?? (m.site ? `Site – ${m.site.name}` : "No staff record"),
+            subtitle: (m) =>
+              m.owner?.name ??
+              (m.project ? `Project – ${m.project.name}` : m.site ? `Site – ${m.site.name}` : "No staff record"),
             trailing: (m) => (
               <MailboxUsageBar
                 usedBytes={m.usedBytes}
@@ -430,6 +459,12 @@ export function MailboxesPage() {
         />
       )}
 
+      <CreateMailboxDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={() => void refetch()} />
+      <LinkDialog
+        mailbox={linkTarget}
+        onOpenChange={(open) => !open && setLinkTarget(null)}
+        onLinked={() => void refetch()}
+      />
       <QuotaDialog
         mailbox={quotaTarget}
         onOpenChange={(open) => !open && setQuotaTarget(null)}
