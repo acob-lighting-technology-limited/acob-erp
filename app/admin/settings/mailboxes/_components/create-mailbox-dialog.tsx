@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Briefcase, Building, Check, Copy, Eye, EyeOff, Loader2, Plus, RefreshCw, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import { apiFetch } from "@/lib/api-client"
 
@@ -42,7 +42,6 @@ function generateRandomPassword(): string {
   const array = new Uint8Array(16)
   window.crypto.getRandomValues(array)
 
-  // Ensure at least one of each character group
   const pwd = [
     upper[array[0] % upper.length],
     lower[array[1] % lower.length],
@@ -51,7 +50,6 @@ function generateRandomPassword(): string {
     ...Array.from(array.slice(4), (b) => all[b % all.length]),
   ]
 
-  // Fisher-Yates shuffle
   for (let i = pwd.length - 1; i > 0; i--) {
     const j = array[i] % (i + 1)
     const tmp = pwd[i]
@@ -101,10 +99,27 @@ export function CreateMailboxDialog({
   })
 
   const staffDomain = optionsData?.staffDomain ?? "org.acoblighting.com"
-  const employees = optionsData?.employees ?? []
-  const projects = optionsData?.projects ?? []
+  const employees = optionsData?.employees
+  const projects = optionsData?.projects
 
-  // Initialize or reset form on open
+  const employeeOptions = useMemo(
+    () =>
+      (employees ?? []).map((e) => ({
+        value: e.id,
+        label: e.department ? `${e.name} (${e.department})` : e.name,
+      })),
+    [employees]
+  )
+
+  const projectOptions = useMemo(
+    () =>
+      (projects ?? []).map((p) => ({
+        value: p.id,
+        label: p.location ? `${p.name} · ${p.location}` : p.name,
+      })),
+    [projects]
+  )
+
   useEffect(() => {
     if (open) {
       setPrefix("")
@@ -121,10 +136,9 @@ export function CreateMailboxDialog({
     }
   }, [open])
 
-  // Auto-suggest prefix when employee is selected and prefix is still empty
   const handleSelectEmployee = (profileId: string) => {
     setSelectedProfileId(profileId)
-    const emp = employees.find((e) => e.id === profileId)
+    const emp = employees?.find((e) => e.id === profileId)
     if (emp && !prefix) {
       if (emp.companyEmail?.endsWith(`@${staffDomain}`)) {
         setPrefix(emp.companyEmail.split("@")[0] ?? "")
@@ -139,10 +153,9 @@ export function CreateMailboxDialog({
     }
   }
 
-  // Auto-suggest prefix when project is selected and prefix is still empty
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId)
-    const proj = projects.find((p) => p.id === projectId)
+    const proj = projects?.find((p) => p.id === projectId)
     if (proj && !prefix) {
       const clean = proj.name
         .toLowerCase()
@@ -213,10 +226,10 @@ export function CreateMailboxDialog({
 
       let linkedLabel = "Shared / Standalone"
       if (linkType === "staff") {
-        const emp = employees.find((e) => e.id === selectedProfileId)
+        const emp = employees?.find((e) => e.id === selectedProfileId)
         linkedLabel = emp ? `${emp.name} (${emp.department ?? "Staff"})` : "Staff member"
       } else if (linkType === "project") {
-        const proj = projects.find((p) => p.id === selectedProjectId)
+        const proj = projects?.find((p) => p.id === selectedProjectId)
         linkedLabel = proj ? `Project – ${proj.name}` : "Project"
       }
 
@@ -235,7 +248,7 @@ export function CreateMailboxDialog({
     }
   }
 
-  const selectedEmployee = employees.find((e) => e.id === selectedProfileId)
+  const selectedEmployee = employees?.find((e) => e.id === selectedProfileId)
 
   return (
     <ResponsiveModal
@@ -247,14 +260,15 @@ export function CreateMailboxDialog({
           ? "The mailbox is active on cPanel. Be sure to copy credentials before closing."
           : "Provision a new mailbox on cPanel, allocate storage quota in GB, and link to an employee or project."
       }
+      desktopClassName="max-w-lg"
     >
       {createdSummary ? (
-        <div className="space-y-4 pt-2">
-          <div className="bg-muted/40 space-y-3 rounded-lg border p-4">
+        <div className="min-w-0 space-y-4 pt-2">
+          <div className="bg-muted/40 min-w-0 space-y-3 rounded-lg border p-4">
             <div className="flex items-start justify-between gap-2">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Email Address</p>
-                <p className="font-mono text-base font-medium break-all">{createdSummary.email}</p>
+                <p className="font-mono text-sm font-medium break-all">{createdSummary.email}</p>
               </div>
               <Button size="sm" variant="outline" onClick={handleCopyCredentials} className="shrink-0 gap-1.5">
                 {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
@@ -274,9 +288,9 @@ export function CreateMailboxDialog({
                 <span className="text-muted-foreground">Storage Quota:</span>{" "}
                 <span className="font-medium">{createdSummary.quotaGb} GB</span>
               </div>
-              <div>
+              <div className="truncate">
                 <span className="text-muted-foreground">Assigned To:</span>{" "}
-                <span className="font-medium">{createdSummary.linkedLabel}</span>
+                <span className="truncate font-medium">{createdSummary.linkedLabel}</span>
               </div>
             </div>
           </div>
@@ -286,27 +300,27 @@ export function CreateMailboxDialog({
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+        <form onSubmit={handleSubmit} className="max-w-full min-w-0 space-y-4 pt-2">
           {/* Email Address */}
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <Label htmlFor="email-prefix">Email Address</Label>
-            <div className="flex rounded-md shadow-xs">
+            <div className="flex w-full min-w-0 rounded-md shadow-xs">
               <Input
                 id="email-prefix"
                 value={prefix}
                 onChange={(e) => setPrefix(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
                 placeholder="username or project-name"
-                className="rounded-r-none font-mono text-sm"
+                className="min-w-0 flex-1 rounded-r-none font-mono text-sm"
                 required
               />
-              <span className="border-input bg-muted text-muted-foreground inline-flex items-center rounded-r-md border border-l-0 px-3 font-mono text-sm select-none">
+              <span className="border-input bg-muted text-muted-foreground inline-flex shrink-0 items-center rounded-r-md border border-l-0 px-3 font-mono text-xs select-none sm:text-sm">
                 @{staffDomain}
               </span>
             </div>
           </div>
 
           {/* Password */}
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="mailbox-password">Initial Password</Label>
               <Button
@@ -320,13 +334,13 @@ export function CreateMailboxDialog({
                 Regenerate
               </Button>
             </div>
-            <div className="relative">
+            <div className="relative min-w-0">
               <Input
                 id="mailbox-password"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pr-10 font-mono text-sm"
+                className="w-full pr-10 font-mono text-sm"
                 required
               />
               <button
@@ -342,12 +356,12 @@ export function CreateMailboxDialog({
           </div>
 
           {/* Storage Quota (GB) */}
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <div className="flex items-center justify-between">
               <Label>Mailbox Quota (GB)</Label>
               <span className="text-muted-foreground text-xs font-semibold">Allocating: {effectiveQuotaGb} GB</span>
             </div>
-            <div className="grid grid-cols-6 gap-2">
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
               {[1, 2, 5, 10, 25].map((gb) => (
                 <Button
                   key={gb}
@@ -358,7 +372,7 @@ export function CreateMailboxDialog({
                     setIsCustomQuota(false)
                     setQuotaGb(gb)
                   }}
-                  className="w-full text-xs"
+                  className="h-8 w-full text-xs"
                 >
                   {gb} GB
                 </Button>
@@ -368,7 +382,7 @@ export function CreateMailboxDialog({
                 variant={isCustomQuota ? "default" : "outline"}
                 size="sm"
                 onClick={() => setIsCustomQuota(true)}
-                className="w-full text-xs"
+                className="h-8 w-full text-xs"
               >
                 Custom
               </Button>
@@ -392,75 +406,63 @@ export function CreateMailboxDialog({
           </div>
 
           {/* Link To Selection */}
-          <div className="bg-muted/20 space-y-3 rounded-lg border p-3.5">
+          <div className="bg-muted/20 min-w-0 space-y-3 rounded-lg border p-3.5">
             <Label className="text-sm font-semibold">Link Mailbox To</Label>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setLinkType("staff")}
-                className={`flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
+                className={`flex min-w-0 cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
                   linkType === "staff"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-muted text-muted-foreground hover:bg-accent"
                 }`}
               >
-                <User className="text-primary mb-1 h-5 w-5" />
-                <span className="text-center text-xs font-medium">Staff Member</span>
+                <User className="text-primary mb-1 h-5 w-5 shrink-0" />
+                <span className="w-full truncate text-center text-xs font-medium">Staff Member</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setLinkType("project")}
-                className={`flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
+                className={`flex min-w-0 cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
                   linkType === "project"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-muted text-muted-foreground hover:bg-accent"
                 }`}
               >
-                <Briefcase className="mb-1 h-5 w-5 text-blue-500" />
-                <span className="text-center text-xs font-medium">Project</span>
+                <Briefcase className="mb-1 h-5 w-5 shrink-0 text-blue-500" />
+                <span className="w-full truncate text-center text-xs font-medium">Project</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setLinkType("none")}
-                className={`flex cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
+                className={`flex min-w-0 cursor-pointer flex-col items-center justify-between rounded-md border-2 p-2.5 transition-colors ${
                   linkType === "none"
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-muted text-muted-foreground hover:bg-accent"
                 }`}
               >
-                <Building className="text-muted-foreground mb-1 h-5 w-5" />
-                <span className="text-center text-xs font-medium">Shared / Standalone</span>
+                <Building className="text-muted-foreground mb-1 h-5 w-5 shrink-0" />
+                <span className="w-full truncate text-center text-xs font-medium">Shared</span>
               </button>
             </div>
 
             {/* Staff Picker */}
             {linkType === "staff" && (
-              <div className="space-y-1.5 pt-1">
-                <Label htmlFor="staff-select" className="text-xs">
-                  Select Employee
-                </Label>
-                <Select value={selectedProfileId} onValueChange={handleSelectEmployee}>
-                  <SelectTrigger id="staff-select" className="text-sm">
-                    <SelectValue placeholder="Choose an employee..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id} className="text-xs">
-                        <div className="flex flex-col py-0.5">
-                          <span className="text-foreground font-medium">{emp.name}</span>
-                          <span className="text-muted-foreground">
-                            {emp.department ?? "No dept"}
-                            {emp.companyEmail ? ` · currently: ${emp.companyEmail}` : " · no email assigned"}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="min-w-0 space-y-1.5 pt-1">
+                <Label className="text-xs">Select Employee</Label>
+                <SearchableSelect
+                  value={selectedProfileId}
+                  onValueChange={handleSelectEmployee}
+                  placeholder="Choose an employee..."
+                  options={employeeOptions}
+                  searchPlaceholder="Search employees..."
+                  className="w-full min-w-0 text-sm"
+                />
                 {selectedEmployee?.companyEmail && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                  <p className="text-xs break-words text-amber-600 dark:text-amber-400">
                     Will update {selectedEmployee.name}&apos;s company email from {selectedEmployee.companyEmail} to{" "}
                     {fullEmail}.
                   </p>
@@ -470,27 +472,16 @@ export function CreateMailboxDialog({
 
             {/* Project Picker */}
             {linkType === "project" && (
-              <div className="space-y-1.5 pt-1">
-                <Label htmlFor="project-select" className="text-xs">
-                  Select Project
-                </Label>
-                <Select value={selectedProjectId} onValueChange={handleSelectProject}>
-                  <SelectTrigger id="project-select" className="text-sm">
-                    <SelectValue placeholder="Choose a project..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {projects.map((proj) => (
-                      <SelectItem key={proj.id} value={proj.id} className="text-xs">
-                        <div className="flex flex-col py-0.5">
-                          <span className="text-foreground font-medium">{proj.name}</span>
-                          <span className="text-muted-foreground">
-                            {proj.location ?? "No location"} {proj.status ? `· ${proj.status}` : ""}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="min-w-0 space-y-1.5 pt-1">
+                <Label className="text-xs">Select Project</Label>
+                <SearchableSelect
+                  value={selectedProjectId}
+                  onValueChange={handleSelectProject}
+                  placeholder="Choose a project..."
+                  options={projectOptions}
+                  searchPlaceholder="Search projects..."
+                  className="w-full min-w-0 text-sm"
+                />
                 <p className="text-muted-foreground text-xs">
                   Associates this mailbox directly with the selected project operations and team.
                 </p>
