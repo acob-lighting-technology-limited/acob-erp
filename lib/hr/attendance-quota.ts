@@ -6,6 +6,7 @@ const log = logger("attendance-quota")
 /**
  * Department leads can grant a maximum of 3 LWP/AWP permissions per employee per month.
  * Any additional permission beyond 3 must be approved by a global admin.
+ * Admin-initiated manual alterations and Out-of-Station (OOS) are uncapped.
  */
 export async function validateLwpAwpMonthlyQuota(params: {
   dataClient: SupabaseClient
@@ -14,8 +15,14 @@ export async function validateLwpAwpMonthlyQuota(params: {
   date: string // YYYY-MM-DD
   isAdminLike: boolean
   excludeRecordId?: string | null
+  isManualAlteration?: boolean
 }): Promise<{ allowed: boolean; error?: string }> {
-  // Only enforce quota for LWP, IWP, and AWP permissions
+  // Manual alterations initiated by Admin do not count towards the 3-appeal quota
+  if (params.isManualAlteration) {
+    return { allowed: true }
+  }
+
+  // Only enforce quota for LWP, IWP, and AWP permissions (OOS is uncapped)
   const PERMISSION_STATUS_LIST = ["lateness_with_permission", "absent_with_permission", "incomplete_with_permission"]
   if (!PERMISSION_STATUS_LIST.includes(params.targetStatus)) {
     return { allowed: true }

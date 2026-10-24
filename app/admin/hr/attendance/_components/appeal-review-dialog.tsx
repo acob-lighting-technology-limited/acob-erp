@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { apiFetch } from "@/lib/api-client"
+import { formatWATDateTime } from "@/lib/utils/date"
 
 export interface AppealRow {
   id: string
@@ -31,6 +32,14 @@ export interface AppealRow {
   appeal_reason: string
   resolution_note: string | null
   status: "pending" | "approved" | "rejected" | "resolved"
+  stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
+  initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
+  lead_reviewed_by?: string | null
+  lead_reviewed_at?: string | null
+  lead_resolution_note?: string | null
+  admin_reviewed_by?: string | null
+  admin_reviewed_at?: string | null
+  admin_resolution_note?: string | null
   created_at: string
 }
 
@@ -78,7 +87,14 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
       })
       const payload = await res.json().catch(() => null)
       if (!res.ok) throw new Error(payload?.error ?? `Failed to ${action} appeal`)
-      toast.success(action === "approve" ? "Appeal approved" : "Appeal rejected")
+
+      const successMsg =
+        action === "reject"
+          ? "Appeal rejected"
+          : payload?.isFinalApproval
+            ? "Appeal approved"
+            : "Appeal endorsed and advanced to next stage"
+      toast.success(successMsg)
       onSuccess()
       onClose()
     } catch (err) {
@@ -92,13 +108,22 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
     if (!isOpen) onClose()
   }
 
-  // Reset note when a new appeal opens
   function handleNoteChange(value: string) {
     setNote(value)
   }
 
-  // When the dialog opens with a new appeal, seed the note
   const displayNote = appeal ? note : ""
+
+  const approveButtonText = () => {
+    if (approvingLoad) return "Processing…"
+    if (appeal?.stage === "pending_lead") {
+      return appeal.initiated_by_role === "admin_manual" ? "Confirm Alteration" : "Endorse (Advance to HR)"
+    }
+    if (appeal?.stage === "pending_hr_lead") {
+      return "Final Approve (HR Lead)"
+    }
+    return "Approve"
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -122,11 +147,31 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Appeal Date</span>
+                <span className="text-muted-foreground">Date</span>
                 <span className="font-medium">{appeal.appeal_date}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status when appealed</span>
+              {appeal.initiated_by_role === "admin_manual" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Origin</span>
+                  <Badge variant="outline" className="border-blue-200 text-blue-600">
+                    Admin Manual Alteration
+                  </Badge>
+                </div>
+              )}
+              {appeal.initiated_by_role === "lead_on_behalf" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Origin</span>
+                  <Badge variant="outline" className="border-purple-200 text-purple-600">
+                    Lead on Behalf
+                  </Badge>
+                </div>
+              )}
+            </div>
+
+            {/* Status change preview */}
+            <div className="space-y-1.5">
+              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Status Change</p>
+              <div className="flex items-center gap-2 text-sm">
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
@@ -135,18 +180,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 >
                   {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
                 </Badge>
-              </div>
-              {appeal.live_status && appeal.live_status !== appeal.current_status && (
-                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
-                  This day has changed since the appeal was raised and is now{" "}
-                  <strong>
-                    {ATTENDANCE_STATUS_LABELS[appeal.live_status as UnifiedAttendanceStatus] ?? appeal.live_status}
-                  </strong>
-                  . Check the clock times before deciding - the appeal may no longer be needed.
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Requesting</span>
+                <span className="text-muted-foreground font-medium">→</span>
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.requested_status as UnifiedAttendanceStatus] ??
@@ -159,18 +193,33 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               </div>
             </div>
 
-            {/* Employee's original reason */}
+            {/* Reason */}
             <div className="space-y-1">
               <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                Employee&apos;s Reason
+                {appeal.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Employee's Reason"}
               </p>
               <p className="text-sm leading-relaxed">{appeal.appeal_reason}</p>
             </div>
 
+            {/* Previous endorsement note if in later stages */}
+            {appeal.lead_resolution_note && appeal.stage !== "pending_lead" && (
+              <div className="bg-muted/40 space-y-1 rounded border p-2.5 text-xs">
+                <div className="text-foreground flex items-center justify-between font-medium">
+                  <span>Lead Endorsement</span>
+                  {appeal.lead_reviewed_at && (
+                    <span className="text-muted-foreground font-mono text-[11px]">
+                      {formatWATDateTime(appeal.lead_reviewed_at)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted-foreground italic">&ldquo;{appeal.lead_resolution_note}&rdquo;</p>
+              </div>
+            )}
+
             {/* Resolution note */}
             <div className="space-y-2">
               <Label htmlFor="resolution-note">
-                Resolution Note <span className="text-muted-foreground text-xs">(required for rejection)</span>
+                Decision Note <span className="text-muted-foreground text-xs">(required for rejection)</span>
               </Label>
               <Textarea
                 id="resolution-note"
@@ -199,9 +248,9 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
           <Button
             className="bg-emerald-600 text-white hover:bg-emerald-700"
             onClick={() => void handleAction("approve")}
-            disabled={isLoading || !appeal || !currentNote.trim()}
+            disabled={isLoading || !appeal}
           >
-            {approvingLoad ? "Approving…" : "Approve"}
+            {approveButtonText()}
           </Button>
         </DialogFooter>
       </DialogContent>

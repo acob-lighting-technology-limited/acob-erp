@@ -7,11 +7,13 @@ import { deviceOutageStartDate, getDeviceHealth } from "@/lib/hr/device-health"
 import { logger } from "@/lib/logger"
 import { toLocalYearMonth, monthBounds, loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { toLocalISODate } from "@/lib/utils/date"
+import { addIsoDays } from "@/lib/hr/leave-days"
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { notifyAppealSubmittedMail } from "@/lib/hr/attendance-notify"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 import { createNotification } from "@/lib/notifications/create"
+import { isAdminLikeRole } from "@/lib/admin/rbac"
 
 const log = logger("hr-attendance-appeals")
 export const dynamic = "force-dynamic"
@@ -37,10 +39,6 @@ function isAllowedRequestedStatus(s: string): s is AllowedRequestedStatus {
 
 /**
  * How far back an appeal may reach, in whole months including the current one.
- *
- * Permission appeals stay at 2 (current + previous): they justify a normal late or absent day,
- * and payroll for older months has already run. Out-of-station reaches 6, because a long site
- * posting can end well after the days it covers — the case the 2-month window blocked entirely.
  */
 const APPEAL_WINDOW_MONTHS: Record<AllowedRequestedStatus, number> = {
   absent_with_permission: 2,
@@ -69,7 +67,7 @@ export async function GET(request: NextRequest) {
     let query = dataClient
       .from("attendance_appeals")
       .select(
-        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
+        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
       )
       .eq("user_id", user.id)
       .order("appeal_date", { ascending: false })
@@ -104,6 +102,7 @@ const CreateAppealSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "appeal_date must be in YYYY-MM-DD format"),
   requested_status: z.string().trim().min(1, APPEAL_FIELDS_REQUIRED),
   appeal_reason: z.string().trim().min(1, APPEAL_FIELDS_REQUIRED).max(2000),
+  target_user_id: z.string().uuid().optional(),
 })
 
 const UpdateAppealSchema = z.object({
@@ -125,6 +124,7 @@ export async function POST(request: NextRequest) {
     const appealDate = parsed.data.appeal_date
     const requestedStatus = parsed.data.requested_status
     const appealReason = parsed.data.appeal_reason
+    const targetUserId = parsed.data.target_user_id
 
     // Validate presence
     if (!appealDate || !requestedStatus || !appealReason) {
@@ -139,38 +139,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "appeal_date must be in YYYY-MM-DD format" }, { status: 400 })
     }
 
-    // A day can only be appealed once it is over. Until then "absent" or
-    // "incomplete" usually means not-arrived-yet or a punch the device has not
-    // delivered - two of the stuck appeals in Sep 2026 were raised at 09:00 on
-    // the day itself, before the device synced.
-    if (appealDate >= toLocalISODate()) {
-      return NextResponse.json(
-        { error: "You can appeal a day once it has ended. Check back tomorrow if it still looks wrong." },
-        { status: 400 }
-      )
-    }
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const today = toLocalISODate()
+    const isAdvance = appealDate >= today
 
-    // While the device is holding punches it has not delivered, every day since its
-    // last delivery looks absent or incomplete only because the backlog has not
-    // arrived. The /hr/attendance banner tells staff to wait; this enforces it.
-    const deviceClient = getServiceClient()
-    if (deviceClient) {
-      const health = await getDeviceHealth(deviceClient).catch((error: unknown) => {
-        log.error({ err: String(error) }, "Device health check failed during appeal")
-        return null
-      })
-      if (health?.offline && appealDate >= deviceOutageStartDate(health)) {
+    // Advance requests rules
+    if (isAdvance) {
+      if (requestedStatus === "incomplete_with_permission") {
         return NextResponse.json(
-          {
-            error:
-              "The clock-in device has lost connection and has not sent all records yet. If you clocked in or out, it is saved on the device and will show once it reconnects. Please check again after it is restored.",
-          },
-          { status: 409 }
+          { error: "Incomplete With Permission (IWP) can only be requested after the day has occurred." },
+          { status: 400 }
+        )
+      }
+      const maxAdvanceDate = addIsoDays(today, 30)
+      if (appealDate > maxAdvanceDate) {
+        return NextResponse.json(
+          { error: "Advance permission requests cannot be submitted more than 30 days in advance." },
+          { status: 400 }
         )
       }
     }
 
-    // Validate requested_status first — it determines how far back the appeal may reach.
+    // Device outage check only applies for past dates
+    if (!isAdvance) {
+      const deviceClient = getServiceClient()
+      if (deviceClient) {
+        const health = await getDeviceHealth(deviceClient).catch((error: unknown) => {
+          log.error({ err: String(error) }, "Device health check failed during appeal")
+          return null
+        })
+        if (health?.offline && appealDate >= deviceOutageStartDate(health)) {
+          return NextResponse.json(
+            {
+              error:
+                "The clock-in device has lost connection and has not sent all records yet. If you clocked in or out, it is saved on the device and will show once it reconnects. Please check again after it is restored.",
+            },
+            { status: 409 }
+          )
+        }
+      }
+    }
+
+    // Validate requested_status
     if (!isAllowedRequestedStatus(requestedStatus)) {
       return NextResponse.json(
         {
@@ -180,30 +190,84 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate appeal_date is inside the window for this kind of appeal.
-    const monthsBack = APPEAL_WINDOW_MONTHS[requestedStatus]
-    const appealYearMonth = appealDate.slice(0, 7)
-    const currentMonth = toLocalYearMonth(new Date())
-    const earliestMonth = earliestAllowedMonth(monthsBack)
-    if (appealYearMonth > currentMonth || appealYearMonth < earliestMonth) {
-      return NextResponse.json(
-        {
-          error:
-            monthsBack <= 2
-              ? "Appeals are only allowed for the current or previous month"
-              : `Out-of-station appeals are only allowed for the last ${monthsBack} months (from ${earliestMonth})`,
-        },
-        { status: 400 }
-      )
+    // Validate appeal_date is inside window for past appeals
+    if (!isAdvance) {
+      const monthsBack = APPEAL_WINDOW_MONTHS[requestedStatus]
+      const appealYearMonth = appealDate.slice(0, 7)
+      const currentMonth = toLocalYearMonth(new Date())
+      const earliestMonth = earliestAllowedMonth(monthsBack)
+      if (appealYearMonth > currentMonth || appealYearMonth < earliestMonth) {
+        return NextResponse.json(
+          {
+            error:
+              monthsBack <= 2
+                ? "Appeals are only allowed for the current or previous month"
+                : `Out-of-station appeals are only allowed for the last ${monthsBack} months (from ${earliestMonth})`,
+          },
+          { status: 400 }
+        )
+      }
     }
 
-    const dataClient = getServiceRoleClientOrFallback(supabase)
+    // Determine target employee & caller roles
+    let effectiveUserId = user.id
+    let initiatedByRole: "employee" | "lead_on_behalf" | "admin_manual" = "employee"
 
-    // Check for existing pending/approved appeal for the same day
+    const { data: callerProfile } = await dataClient
+      .from("profiles")
+      .select("id, department, is_department_lead, role, full_name, first_name, last_name")
+      .eq("id", user.id)
+      .maybeSingle<{
+        id: string
+        department: string | null
+        is_department_lead: boolean
+        role: string | null
+        full_name: string | null
+        first_name: string | null
+        last_name: string | null
+      }>()
+
+    if (targetUserId && targetUserId !== user.id) {
+      const { data: targetProfile } = await dataClient
+        .from("profiles")
+        .select("id, department, is_department_lead, full_name, first_name, last_name")
+        .eq("id", targetUserId)
+        .maybeSingle<{
+          id: string
+          department: string | null
+          is_department_lead: boolean
+          full_name: string | null
+          first_name: string | null
+          last_name: string | null
+        }>()
+
+      if (!targetProfile) {
+        return NextResponse.json({ error: "Target employee not found" }, { status: 404 })
+      }
+
+      const isCallerLead = Boolean(
+        callerProfile?.is_department_lead &&
+          callerProfile.department &&
+          callerProfile.department === targetProfile.department
+      )
+      const isCallerAdmin = Boolean(isAdminLikeRole(callerProfile?.role))
+
+      if (!isCallerLead && !isCallerAdmin) {
+        return NextResponse.json(
+          { error: "You are not authorized to submit appeals on behalf of this employee" },
+          { status: 403 }
+        )
+      }
+
+      effectiveUserId = targetUserId
+      initiatedByRole = isCallerLead ? "lead_on_behalf" : "admin_manual"
+    }
+
+    // Check for existing pending/approved appeal for effective user on that day
     const { data: existingAppeal } = await dataClient
       .from("attendance_appeals")
       .select("id, status")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("appeal_date", appealDate)
       .in("status", ["pending", "approved"])
       .maybeSingle()
@@ -212,25 +276,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `An active appeal already exists for ${appealDate}` }, { status: 409 })
     }
 
-    // Find attendance record for that date (nullable — absent days may have no record)
+    // Find attendance record for that date if past
     const { data: attendanceRecord } = await dataClient
       .from("attendance_records")
       .select("id, clock_in, clock_out, status, waived")
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("date", appealDate)
       .maybeSingle()
 
-    // Derive the current unified status
-    const currentStatus = deriveUnifiedAttendanceStatus(
-      {
-        record: attendanceRecord ?? null,
-        recordDate: appealDate,
-      },
-      policy
-    )
+    // Derive current status
+    const currentStatus = isAdvance
+      ? "scheduled"
+      : deriveUnifiedAttendanceStatus(
+          {
+            record: attendanceRecord ?? null,
+            recordDate: appealDate,
+          },
+          policy
+        )
 
-    // Validate it's an appealable status
-    if (!isAppealableStatus(currentStatus)) {
+    if (!isAdvance && !isAppealableStatus(currentStatus)) {
       return NextResponse.json(
         {
           error: `Cannot appeal a day with status '${currentStatus}'. Only absent, late, or incomplete days are eligible.`,
@@ -239,11 +304,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate requested_status matches the rule.
-    // absent → AWP; late/incomplete → LWP. Out of station explains any of the three — being
-    // away on company business can leave no punch at all, or a late one on the way back — so
-    // it is offered alongside whichever permission status fits the day.
-    if (requestedStatus !== "out_of_station") {
+    // For past days, validate requested_status fits
+    if (!isAdvance && requestedStatus !== "out_of_station") {
       if (currentStatus === "absent" && requestedStatus !== "absent_with_permission") {
         return NextResponse.json(
           { error: "Absent days can only be appealed as absent_with_permission (AWP) or out_of_station (OOS)" },
@@ -265,40 +327,81 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Same monthly cap a department lead is held to when approving (3 LWP/AWP/IWP
-    // days), checked here so the employee is told up front instead of raising an
-    // appeal that can only fail at review. Admin & HR can still grant more days
-    // manually; OOS appeals are not permission days and are not capped.
+    // Check monthly quota (OOS and Admin manual alterations are uncapped)
     const quotaCheck = await validateLwpAwpMonthlyQuota({
       dataClient,
-      userId: user.id,
+      userId: effectiveUserId,
       targetStatus: requestedStatus,
       date: appealDate,
       isAdminLike: false,
       excludeRecordId: attendanceRecord?.id ?? null,
+      isManualAlteration: initiatedByRole === "admin_manual",
     })
     if (!quotaCheck.allowed) {
       return NextResponse.json(
         {
-          error:
-            "You already have 3 permission days (LWP/AWP/IWP) this month, which is the most an appeal can grant. Speak to Admin & HR if this day needs to be adjusted.",
+          error: "This employee already has 3 permission days (LWP/AWP/IWP) this month, which is the maximum allowed.",
         },
         { status: 422 }
       )
     }
 
-    // Insert the appeal
+    // Fetch effective user profile to check if they are a lead
+    const { data: effectiveProfile } = await dataClient
+      .from("profiles")
+      .select("id, department, is_department_lead, full_name, first_name, last_name")
+      .eq("id", effectiveUserId)
+      .maybeSingle<{
+        id: string
+        department: string | null
+        is_department_lead: boolean
+        full_name: string | null
+        first_name: string | null
+        last_name: string | null
+      }>()
+
+    const isEffectiveLead = Boolean(effectiveProfile?.is_department_lead)
+    let initialStage: "pending_lead" | "pending_admin" | "pending_hr_lead"
+
+    if (initiatedByRole === "lead_on_behalf") {
+      // Lead already reviewed & submitted it -> advances straight to Stage 2 (Admin)
+      initialStage = "pending_admin"
+    } else if (initiatedByRole === "admin_manual") {
+      // Admin alteration -> requires lead confirmation (or HR Lead if target is lead)
+      initialStage = isEffectiveLead ? "pending_hr_lead" : "pending_lead"
+    } else {
+      // Employee submitting for themselves:
+      // If employee is a department lead, Stage 1 is Admin review
+      initialStage = isEffectiveLead ? "pending_admin" : "pending_lead"
+    }
+
+    const now = new Date().toISOString()
+    const insertPayload: Record<string, unknown> = {
+      attendance_record_id: attendanceRecord?.id ?? null,
+      user_id: effectiveUserId,
+      appeal_date: appealDate,
+      current_status: currentStatus,
+      requested_status: requestedStatus,
+      appeal_reason: appealReason,
+      status: "pending",
+      stage: initialStage,
+      initiated_by_role: initiatedByRole,
+      created_by: user.id,
+    }
+
+    if (initiatedByRole === "lead_on_behalf") {
+      insertPayload.lead_reviewed_by = user.id
+      insertPayload.lead_reviewed_at = now
+      insertPayload.lead_resolution_note = "Submitted on behalf by Department Lead"
+    } else if (initiatedByRole === "admin_manual") {
+      insertPayload.admin_reviewed_by = user.id
+      insertPayload.admin_reviewed_at = now
+      insertPayload.admin_resolution_note = appealReason
+    }
+
     const { data: appeal, error: insertError } = await dataClient
       .from("attendance_appeals")
-      .insert({
-        attendance_record_id: attendanceRecord?.id ?? null,
-        user_id: user.id,
-        appeal_date: appealDate,
-        current_status: currentStatus,
-        requested_status: requestedStatus,
-        appeal_reason: appealReason,
-        status: "pending",
-      })
+      .insert(insertPayload)
       .select()
       .single()
 
@@ -307,9 +410,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to submit appeal" }, { status: 500 })
     }
 
-    // Provenance: the employee's appeal request joins the day's timeline.
+    // Provenance event
     await recordAttendanceEvent(dataClient, {
-      userId: user.id,
+      userId: effectiveUserId,
       eventDate: appealDate,
       eventType: "appeal_requested",
       attendanceRecordId: attendanceRecord?.id ?? null,
@@ -318,32 +421,21 @@ export async function POST(request: NextRequest) {
       source: "appeal",
       comment: appealReason,
       actorId: user.id,
-      metadata: { appeal_id: appeal.id },
+      metadata: { appeal_id: appeal.id, stage: initialStage, initiated_by_role: initiatedByRole },
     })
 
-    // Notify the employee's department lead (or super admins if none)
+    // Notifications
     try {
-      const { data: employeeProfile } = await dataClient
-        .from("profiles")
-        .select("department, full_name, first_name, last_name")
-        .eq("id", user.id)
-        .maybeSingle<{
-          department: string | null
-          full_name: string | null
-          first_name: string | null
-          last_name: string | null
-        }>()
-
-      const employeeDept = employeeProfile?.department ?? null
+      const employeeDept = effectiveProfile?.department ?? null
       const employeeName =
-        employeeProfile?.full_name?.trim() ||
-        [employeeProfile?.first_name, employeeProfile?.last_name].filter(Boolean).join(" ") ||
+        effectiveProfile?.full_name?.trim() ||
+        [effectiveProfile?.first_name, effectiveProfile?.last_name].filter(Boolean).join(" ") ||
         "An employee"
 
       type ProfileRow = { id: string }
       let recipientIds: string[] = []
 
-      if (employeeDept) {
+      if (initialStage === "pending_lead" && employeeDept) {
         const { data: leads } = await dataClient
           .from("profiles")
           .select("id")
@@ -351,28 +443,35 @@ export async function POST(request: NextRequest) {
           .eq("is_department_lead", true)
           .returns<ProfileRow[]>()
         recipientIds = (leads ?? []).map((l) => l.id)
-      }
-
-      if (recipientIds.length === 0) {
-        // Fall back to super admins
-        const { data: superAdmins } = await dataClient
+      } else if (initialStage === "pending_admin") {
+        const { data: admins } = await dataClient
           .from("profiles")
           .select("id")
-          .eq("is_super_admin", true)
+          .in("role", ["admin", "super_admin", "developer"])
           .returns<ProfileRow[]>()
-        recipientIds = (superAdmins ?? []).map((a) => a.id)
+        recipientIds = (admins ?? []).map((a) => a.id)
+      } else if (initialStage === "pending_hr_lead") {
+        const { data: hrLeads } = await dataClient
+          .from("profiles")
+          .select("id")
+          .eq("department", "Admin and HR")
+          .eq("is_department_lead", true)
+          .returns<ProfileRow[]>()
+        recipientIds = (hrLeads ?? []).map((l) => l.id)
       }
 
       for (const recipientId of recipientIds) {
+        if (recipientId === user.id) continue
         try {
           await createNotification({
             p_user_id: recipientId,
             p_type: "approval_request",
             p_category: "approvals",
-            p_title: "Attendance Appeal Submitted",
-            p_message: `${employeeName} has submitted an attendance appeal for ${appealDate} (${currentStatus} → ${requestedStatus}).`,
+            p_title: isAdvance ? "Advance Permission Notice" : "Attendance Appeal Submitted",
+            p_message: `${employeeName} has ${isAdvance ? "requested advance permission" : "submitted an appeal"} for ${appealDate} (${requestedStatus}).`,
             p_priority: "normal",
-            p_link_url: "/admin/hr/attendance?tab=appeals",
+            p_link_url:
+              initialStage === "pending_lead" ? "/dept/hr/attendance?tab=appeals" : "/admin/hr/attendance?tab=appeals",
             p_actor_id: user.id,
             p_entity_type: "attendance_appeal",
             p_entity_id: appeal.id,
@@ -385,15 +484,15 @@ export async function POST(request: NextRequest) {
       log.error({ err: String(notifyErr) }, "Failed to send appeal notifications")
     }
 
-    // Email the department lead and the Admin & HR lead, so an appeal does not
-    // depend on someone opening the app to be seen.
-    await notifyAppealSubmittedMail(dataClient, {
-      appellantId: user.id,
-      date: appealDate,
-      fromStatus: currentStatus,
-      requestedStatus,
-      reason: appealReason,
-    })
+    if (!isAdvance) {
+      await notifyAppealSubmittedMail(dataClient, {
+        appellantId: effectiveUserId,
+        date: appealDate,
+        fromStatus: currentStatus,
+        requestedStatus,
+        reason: appealReason,
+      })
+    }
 
     return NextResponse.json({ data: appeal }, { status: 201 })
   } catch (err) {
@@ -429,7 +528,7 @@ export async function PATCH(request: NextRequest) {
       .from("attendance_appeals")
       .select("id, user_id, status")
       .eq("id", id)
-      .maybeSingle()
+      .maybeSingle<{ id: string; user_id: string; status: string }>()
 
     if (fetchError || !appeal) {
       return NextResponse.json({ error: "Appeal not found" }, { status: 404 })
@@ -485,7 +584,7 @@ export async function DELETE(request: NextRequest) {
       .from("attendance_appeals")
       .select("id, user_id, status")
       .eq("id", id)
-      .maybeSingle()
+      .maybeSingle<{ id: string; user_id: string; status: string }>()
 
     if (fetchError || !appeal) {
       return NextResponse.json({ error: "Appeal not found" }, { status: 404 })
