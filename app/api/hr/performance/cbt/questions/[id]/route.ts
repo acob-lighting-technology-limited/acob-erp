@@ -21,8 +21,6 @@ const UpdateSchema = z.object({
   correct_option: z.enum(["A", "B", "C", "D"]).optional(),
   explanation: z.string().trim().optional().nullable(),
   is_active: z.boolean().optional(),
-  is_bonus: z.boolean().optional(),
-  targeted_emails: z.array(z.string()).optional(),
 })
 
 async function getAuthorizedContext() {
@@ -37,37 +35,26 @@ async function getAuthorizedContext() {
 
 /**
  * Confirms the caller may manage the department that owns this question.
- *
- * These handlers address a question by id alone, so without this a department
- * lead could edit or delete another department's CBT bank.
- *
- * Global admins never get to read or edit a regular (non-bonus) question's
- * content — that's the department lead's own test, and admin visibility would
- * defeat the impartiality boundary enforced on GET. A blind moderation delete
- * (removing a flagged/broken question without ever seeing it) is still
- * allowed when `allowContentBlindDelete` is set. Bonus questions remain fully
- * admin-manageable, since admins author those themselves.
+ * Global admins have full access across all departments; department leads
+ * are restricted to questions within their owned department(s).
  */
 async function assertCanManageQuestion(
   dataClient: { from: (table: string) => any },
   context: AccessContextV2,
   questionId: string,
-  options: { allowContentBlindDelete?: boolean } = {}
+  _options: { allowContentBlindDelete?: boolean } = {}
 ): Promise<NextResponse | null> {
   const { data: existing } = await dataClient
     .from("cbt_questions")
-    .select("department, is_bonus")
+    .select("department")
     .eq("id", questionId)
     .maybeSingle()
 
-  const row = existing as { department?: string | null; is_bonus?: boolean | null } | null
+  const row = existing as { department?: string | null } | null
   const department = row?.department ?? null
   if (!department) return NextResponse.json({ error: "Question not found" }, { status: 404 })
 
   if (context.actingContext === "global_admin") {
-    if (!row?.is_bonus && !options.allowContentBlindDelete) {
-      return NextResponse.json({ error: "Only the owning department lead can edit this question." }, { status: 403 })
-    }
     return null
   }
 
@@ -119,7 +106,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       .update(parsed.data)
       .eq("id", params.id)
       .select(
-        "id, review_cycle_id, department, prompt, option_a, option_b, option_c, option_d, correct_option, explanation, is_active, created_at, is_bonus, targeted_emails"
+        "id, review_cycle_id, department, prompt, option_a, option_b, option_c, option_d, correct_option, explanation, is_active, created_at"
       )
       .single()
 

@@ -58,7 +58,6 @@ type QuestionRow = {
   option_d: string
   correct_option?: "A" | "B" | "C" | "D"
   department?: string | null
-  is_bonus?: boolean
 }
 
 type AttemptRow = {
@@ -342,7 +341,7 @@ export async function POST(request: NextRequest) {
     const loadAttemptQuestions = async (questionIds: string[]): Promise<QuestionRow[]> => {
       const { data: questionsData, error: questionsError } = await supabase
         .from("cbt_questions")
-        .select("id, review_cycle_id, prompt, option_a, option_b, option_c, option_d, department, is_bonus")
+        .select("id, review_cycle_id, prompt, option_a, option_b, option_c, option_d, department")
         .in("id", questionIds)
         .returns<QuestionRow[]>()
 
@@ -369,13 +368,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (sessionQuestions.length === 0) {
-      // 2. Fetch all active standard questions for the review cycle
+      // 2. Fetch all active questions for the review cycle
       const { data: allQuestions, error: questionsError } = await supabase
         .from("cbt_questions")
-        .select("id, review_cycle_id, prompt, option_a, option_b, option_c, option_d, department, is_bonus")
+        .select("id, review_cycle_id, prompt, option_a, option_b, option_c, option_d, department")
         .eq("review_cycle_id", review_cycle_id)
         .eq("is_active", true)
-        .eq("is_bonus", false)
         .returns<QuestionRow[]>()
 
       if (questionsError) throw questionsError
@@ -386,17 +384,6 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Query active bonus questions matching candidate's email
-      const { data: bonusQuestions, error: bonusError } = await supabase
-        .from("cbt_questions")
-        .select("id, review_cycle_id, prompt, option_a, option_b, option_c, option_d, department, is_bonus")
-        .eq("review_cycle_id", review_cycle_id)
-        .eq("is_active", true)
-        .eq("is_bonus", true)
-        .contains("targeted_emails", [company_email])
-        .returns<QuestionRow[]>()
-
-      if (bonusError) throw bonusError
       // Load active CBT settings (questions count, per-question duration)
       const cbtSettings = await getCbtSettings(supabase)
       const targetCount = cbtSettings.total_questions_count
@@ -432,11 +419,6 @@ export async function POST(request: NextRequest) {
         }
 
         sessionQuestions = chosenQuestions.slice(0, targetCount)
-      }
-
-      // 4. Append targeted bonus questions if any exist
-      if (bonusQuestions && bonusQuestions.length > 0) {
-        sessionQuestions = [...sessionQuestions, ...bonusQuestions]
       }
 
       const cbt_details = {
@@ -490,8 +472,7 @@ export async function POST(request: NextRequest) {
     }
 
     const activeCbtSettings = await getCbtSettings(supabase)
-    const effectiveQuestionCount = sessionQuestions.filter((q) => !q.is_bonus).length
-    const totalTimeSeconds = effectiveQuestionCount * activeCbtSettings.time_per_question_seconds
+    const totalTimeSeconds = sessionQuestions.length * activeCbtSettings.time_per_question_seconds
 
     return NextResponse.json({
       data: {
@@ -514,7 +495,6 @@ export async function POST(request: NextRequest) {
           id: question.id,
           prompt: question.prompt,
           department: question.department || "",
-          is_bonus: question.is_bonus || false,
           options: {
             A: question.option_a,
             B: question.option_b,
@@ -559,34 +539,18 @@ export async function PATCH(request: NextRequest) {
 
     const { data: questions, error: questionsError } = await supabase
       .from("cbt_questions")
-      .select("id, correct_option, is_bonus")
+      .select("id, correct_option")
       .in("id", attempt.question_ids)
-      .returns<Array<Pick<QuestionRow, "id" | "correct_option" | "is_bonus">>>()
+      .returns<Array<Pick<QuestionRow, "id" | "correct_option">>>()
 
     if (questionsError) throw questionsError
 
     const questionMap = new Map((questions || []).map((question) => [question.id, question.correct_option]))
-    const gradedQuestions = (questions || []).filter((q) => !q.is_bonus)
-    const gradedQuestionIds = gradedQuestions.map((q) => q.id)
-
-    const totalQuestions = gradedQuestionIds.length
-    const correctAnswers = gradedQuestionIds.reduce((count, questionId) => {
-      return count + (answers[questionId] && answers[questionId] === questionMap.get(questionId) ? 1 : 0)
+    const totalQuestions = (questions || []).length
+    const correctAnswers = (questions || []).reduce((count, question) => {
+      return count + (answers[question.id] && answers[question.id] === questionMap.get(question.id) ? 1 : 0)
     }, 0)
     const score = totalQuestions === 0 ? 0 : Math.round((correctAnswers / totalQuestions) * 10000) / 100
-
-    // Bonus/joke questions are scored too, but kept out of `score` above —
-    // they're targeted at specific candidates for fun, not part of the real
-    // assessment, so they shouldn't move an actual performance evaluation.
-    // Tracked in cbt_details and reviewed separately at
-    // /admin/pms/cbt/extra/scores.
-    const bonusQuestionIds = (questions || []).filter((q) => q.is_bonus).map((q) => q.id)
-    const bonusTotalQuestions = bonusQuestionIds.length
-    const bonusCorrectAnswers = bonusQuestionIds.reduce((count, questionId) => {
-      return count + (answers[questionId] && answers[questionId] === questionMap.get(questionId) ? 1 : 0)
-    }, 0)
-    const bonusScore =
-      bonusTotalQuestions === 0 ? null : Math.round((bonusCorrectAnswers / bonusTotalQuestions) * 10000) / 100
 
     const now = new Date().toISOString()
     const { error: updateAttemptError } = await supabase
@@ -601,9 +565,6 @@ export async function PATCH(request: NextRequest) {
         cbt_details: {
           ...(attempt.cbt_details || {}),
           tab_switch_count: tab_switch_count ?? 0,
-          bonus_total_questions: bonusTotalQuestions,
-          bonus_correct_answers: bonusCorrectAnswers,
-          bonus_score: bonusScore,
         },
       })
       .eq("id", attempt.id)
