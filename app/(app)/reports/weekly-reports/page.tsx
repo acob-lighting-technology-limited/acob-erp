@@ -674,13 +674,45 @@ export default function WeeklyReportsPortal() {
                     ))}
                 </div>
               </div>
-              <div className="md:col-span-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 md:col-span-3">
                 <Link
                   href={`/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
                   className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
                 >
                   View action tracker
                 </Link>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => {
+                      setExportTarget({ kind: "single", report })
+                      setExportOptionsOpen(true)
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Export
+                  </Button>
+                  {canMutateFilteredWeek && canMutateReport(report) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 text-xs"
+                      onClick={() => {
+                        setSelectedReportParams({
+                          week: report.week_number,
+                          year: report.year,
+                          dept: report.department,
+                        })
+                        setIsDialogOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ),
@@ -696,6 +728,30 @@ export default function WeeklyReportsPortal() {
             const submitterName = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
             return `${submitterName} (W${report.week_number}) · ${report.year}`
           },
+          meta: (report) => {
+            const meetingDateDisplay = meetingDate ? new Date(`${meetingDate}T00:00:00`) : null
+            const formattedMeeting =
+              meetingDateDisplay && !Number.isNaN(meetingDateDisplay.getTime())
+                ? formatWATDate(meetingDateDisplay, { day: "numeric", month: "short" })
+                : null
+            return (
+              <>
+                {formattedMeeting && (
+                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+                    📅 {formattedMeeting}
+                  </span>
+                )}
+                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                  🕒 {formatWATTimeDate(report.created_at)}
+                </span>
+              </>
+            )
+          },
+          snippet: (report) => {
+            const snippetText = autoNumberLines(report.work_done).trim()
+            return snippetText ? `Work Done: ${snippetText}` : null
+          },
+          expandInline: true,
           trailing: (report) => {
             const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
             return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>

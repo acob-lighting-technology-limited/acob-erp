@@ -394,6 +394,12 @@ export function ChallengesView({
         mobileRow={{
           title: (row) => row.title,
           subtitle: (row) => `${row.department} · Week ${row.week_number}, ${row.year}`,
+          snippet: (row) =>
+            row.resolution_note
+              ? `Resolution: ${row.resolution_note}`
+              : row.description
+                ? `Details: ${row.description}`
+                : null,
           trailing: (row) => getStatusBadge(row.status),
           detail: {
             title: (row) => row.title,
@@ -402,6 +408,7 @@ export function ChallengesView({
             fields: (row) => [
               { label: "Department", value: row.department },
               { label: "Week", value: `Week ${row.week_number}, ${row.year}` },
+              ...(row.description ? [{ label: "Description", value: row.description, fullWidth: true }] : []),
               { label: "Resolution / Mitigation", value: row.resolution_note || "No note yet", fullWidth: true },
             ],
             actions: (row) =>
