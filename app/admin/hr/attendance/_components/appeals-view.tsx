@@ -235,7 +235,32 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         mobileRow={{
           title: (r) => `${r.user_name} · ${r.department}`,
           subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
+          snippet: (r) => (r.appeal_reason ? `Reason: ${r.appeal_reason}` : null),
+          expandInline: true,
           trailing: (r) => statusBadge(r.status),
+          detail: {
+            title: (r) => `${r.user_name} (${r.department})`,
+            subtitle: (r) => `Appeal for ${formatWATDate(r.appeal_date)}`,
+            badges: (r) => statusBadge(r.status),
+            fields: (r) => [
+              { label: "Appeal Date", value: formatWATDate(r.appeal_date) },
+              { label: "Current Status", value: r.current_status },
+              { label: "Requested Status", value: r.requested_status },
+              { label: "Status", value: r.status },
+              { label: "Appeal Reason", value: r.appeal_reason || "No reason specified", fullWidth: true },
+              ...(r.resolution_note ? [{ label: "Resolution Note", value: r.resolution_note, fullWidth: true }] : []),
+            ],
+            actions: (r) =>
+              r.status === "pending"
+                ? [
+                    {
+                      label: "Review Appeal",
+                      variant: "default",
+                      onClick: () => setReviewAppeal(r),
+                    },
+                  ]
+                : [],
+          },
           onSelect: (r) => {
             if (r.status === "pending") setReviewAppeal(r)
           },
