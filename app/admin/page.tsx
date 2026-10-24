@@ -14,7 +14,7 @@ import { AwayToday } from "@/components/admin/away-today"
 import { loadAwayToday } from "@/lib/admin/away-today"
 import { addIsoDays } from "@/lib/hr/leave-days"
 import type { ActionQueueItem } from "@/components/admin/dashboard-types"
-import { buildRecentActivity, isExcludedActivity } from "@/components/admin/dashboard-helpers"
+import { buildRecentActivity, collapseRecentActivity, isExcludedActivity } from "@/components/admin/dashboard-helpers"
 import { logger } from "@/lib/logger"
 import { taskDeadline } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
@@ -258,11 +258,10 @@ export default async function AdminDashboardPage() {
     return row.reliever_id === user?.id && (stage === "pending_reliever" || stage === "reliever_pending")
   }).length
 
-  let filteredRawActivity: ActivityLogRow[] = []
+  let rawActivity: ActivityLogRow[] = []
   if (canSeeAuditActivity) {
     const activitySelect =
       "id, user_id, created_at, action, operation, entity_type, table_name, entity_id, department, metadata, changed_fields, new_values, old_values"
-    let rawActivity: ActivityLogRow[] = []
 
     if (departmentScope) {
       if (queryDepartmentScope && queryDepartmentScope.length > 0) {
@@ -272,9 +271,10 @@ export default async function AdminDashboardPage() {
             .select(activitySelect)
             .neq("action", "client_error")
             .neq("entity_type", "ui_runtime")
+            .neq("entity_type", "system_runtime")
             .in("department", queryDepartmentScope)
             .order("created_at", { ascending: false })
-            .limit(20)
+            .limit(50)
             .returns<ActivityLogRow[]>(),
           scopedUserIds.length > 0
             ? dataClient
@@ -282,9 +282,10 @@ export default async function AdminDashboardPage() {
                 .select(activitySelect)
                 .neq("action", "client_error")
                 .neq("entity_type", "ui_runtime")
+                .neq("entity_type", "system_runtime")
                 .in("user_id", scopedUserIds)
                 .order("created_at", { ascending: false })
-                .limit(20)
+                .limit(50)
                 .returns<ActivityLogRow[]>()
             : Promise.resolve({ data: [] as ActivityLogRow[], error: null }),
         ])
@@ -306,17 +307,17 @@ export default async function AdminDashboardPage() {
         .select(activitySelect)
         .neq("action", "client_error")
         .neq("entity_type", "ui_runtime")
+        .neq("entity_type", "system_runtime")
         .order("created_at", { ascending: false })
-        .limit(20)
+        .limit(50)
         .returns<ActivityLogRow[]>()
       if (auditError) log.error("Recent activity query failed", auditError)
       rawActivity = data || []
     }
-
-    filteredRawActivity = rawActivity.filter((item) => !isExcludedActivity(item)).slice(0, 8)
   }
 
-  const actorIds = Array.from(new Set(filteredRawActivity.map((item) => item.user_id).filter(Boolean)))
+  const collapsedActivity = collapseRecentActivity(rawActivity, 8)
+  const actorIds = Array.from(new Set(collapsedActivity.map(({ row }) => row.user_id).filter(Boolean))) as string[]
   let actorMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>()
   if (actorIds.length > 0) {
     const { data: actorProfiles } = await dataClient
@@ -336,7 +337,7 @@ export default async function AdminDashboardPage() {
     )
   }
 
-  const recentActivity = buildRecentActivity(filteredRawActivity, actorMap)
+  const recentActivity = buildRecentActivity(collapsedActivity, actorMap)
   const accessContext = scope ? buildAccessContextV2(scope) : null
   const canAccessAction = (_requiredRoles: string[], href: string) =>
     Boolean(accessContext && canAccessRouteV2(accessContext, resolveAdminRouteKeyV2(href)))

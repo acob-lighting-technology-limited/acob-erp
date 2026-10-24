@@ -32,7 +32,12 @@ import {
   type AdminPaymentActivityRow,
   type AdminTaskActivityRow,
 } from "@/components/admin/activity-tabs"
-import { normalizeToken, buildRecentActivity, isExcludedActivity } from "@/components/admin/dashboard-helpers"
+import {
+  normalizeToken,
+  buildRecentActivity,
+  collapseRecentActivity,
+  isExcludedActivity,
+} from "@/components/admin/dashboard-helpers"
 import { logger } from "@/lib/logger"
 
 const log = logger("dept-dashboard")
@@ -247,7 +252,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
   })()
 
   // ── Audit activity ───────────────────────────────────────────────────────
-  let filteredRawActivity: ActivityLogRow[] = []
+  let rawActivity: ActivityLogRow[] = []
   const activitySelect =
     "id, user_id, created_at, action, operation, entity_type, table_name, entity_id, department, metadata, changed_fields, new_values, old_values"
   if (queryDepartmentScope.length > 0) {
@@ -257,9 +262,10 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
         .select(activitySelect)
         .neq("action", "client_error")
         .neq("entity_type", "ui_runtime")
+        .neq("entity_type", "system_runtime")
         .in("department", queryDepartmentScope)
         .order("created_at", { ascending: false })
-        .limit(20)
+        .limit(50)
         .returns<ActivityLogRow[]>(),
       scopedUserIds.length > 0
         ? dataClient
@@ -267,21 +273,22 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             .select(activitySelect)
             .neq("action", "client_error")
             .neq("entity_type", "ui_runtime")
+            .neq("entity_type", "system_runtime")
             .in("user_id", scopedUserIds)
             .order("created_at", { ascending: false })
-            .limit(20)
+            .limit(50)
             .returns<ActivityLogRow[]>()
         : Promise.resolve({ data: [] as ActivityLogRow[], error: null }),
     ])
     const byId = new Map<string, ActivityLogRow>()
     for (const item of [...(deptActivity.data || []), ...(userActivity.data || [])]) byId.set(item.id, item)
-    filteredRawActivity = Array.from(byId.values())
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .filter((item) => !isExcludedActivity(item))
-      .slice(0, 8)
+    rawActivity = Array.from(byId.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
   }
 
-  const actorIds = Array.from(new Set(filteredRawActivity.map((item) => item.user_id).filter(Boolean))) as string[]
+  const collapsedActivity = collapseRecentActivity(rawActivity, 8)
+  const actorIds = Array.from(new Set(collapsedActivity.map(({ row }) => row.user_id).filter(Boolean))) as string[]
   let actorMap = new Map<string, { first_name?: string; last_name?: string; company_email?: string }>()
   if (actorIds.length > 0) {
     const { data: actorProfiles } = await dataClient
@@ -301,7 +308,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
     )
   }
 
-  const recentActivity = buildRecentActivity(filteredRawActivity, actorMap)
+  const recentActivity = buildRecentActivity(collapsedActivity, actorMap)
 
   return (
     <PageWrapper maxWidth="full" background="gradient">
