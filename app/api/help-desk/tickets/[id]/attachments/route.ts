@@ -4,6 +4,8 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { logger } from "@/lib/logger"
+import { getOneDriveService } from "@/lib/onedrive"
+import { isSharePointHelpDeskPath } from "@/lib/help-desk/archive"
 
 const log = logger("api-help-desk-attachments")
 export const dynamic = "force-dynamic"
@@ -48,10 +50,21 @@ export async function GET(_: NextRequest, props: { params: Promise<{ id: string 
     if (error) throw error
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
+    const onedrive = getOneDriveService()
+    const onedriveEnabled = onedrive.isEnabled()
+
     const withUrls = await Promise.all(
       (data || []).map(async (row) => {
-        const { data: signed } = await dataClient.storage.from(BUCKET).createSignedUrl(row.file_path, 3600)
-        return { ...row, signed_url: signed?.signedUrl ?? null }
+        let signedUrl: string | null = null
+        if (isSharePointHelpDeskPath(row.file_path)) {
+          if (onedriveEnabled) {
+            signedUrl = await onedrive.getDownloadUrl(row.file_path).catch(() => null)
+          }
+        } else {
+          const { data: signed } = await dataClient.storage.from(BUCKET).createSignedUrl(row.file_path, 3600)
+          signedUrl = signed?.signedUrl ?? null
+        }
+        return { ...row, signed_url: signedUrl }
       })
     )
 
@@ -180,9 +193,17 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       return NextResponse.json({ error: "You can only remove files you uploaded" }, { status: 403 })
     }
 
-    const dataClient = getServiceRoleClientOrFallback(supabase)
-    await dataClient.storage.from(BUCKET).remove([existing.file_path])
+    if (isSharePointHelpDeskPath(existing.file_path)) {
+      const onedrive = getOneDriveService()
+      if (onedrive.isEnabled()) {
+        await onedrive.deleteItem(existing.file_path).catch(() => {})
+      }
+    } else {
+      const dataClient = getServiceRoleClientOrFallback(supabase)
+      await dataClient.storage.from(BUCKET).remove([existing.file_path])
+    }
 
+    const dataClient = getServiceRoleClientOrFallback(supabase)
     const { error } = await dataClient.from("help_desk_attachments").delete().eq("id", attachmentId)
     if (error) throw error
 
