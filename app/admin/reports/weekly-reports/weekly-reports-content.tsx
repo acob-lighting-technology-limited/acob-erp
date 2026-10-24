@@ -25,7 +25,7 @@ import {
 } from "@/lib/export-utils"
 import { WeeklyReportAdminDialog } from "@/components/admin/reports/weekly-report-dialog"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
-import { loadWeeklyTaskSummaryOptions, type WeeklyTaskSummaryPlacement } from "@/lib/reports/weekly-task-summary"
+import { loadWeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
 import { DeleteReportDialog } from "./_components/delete-report-dialog"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
@@ -171,18 +171,20 @@ export function WeeklyReportsContent({
   const runPptxExport = async (
     mode: WeeklyPptxMode,
     theme: WeeklyPptxTheme = "light",
-    order: WeeklyDeptOrder = "default",
-    taskPlacement: WeeklyTaskSummaryPlacement = "none"
+    order: WeeklyDeptOrder = "default"
   ) => {
     if (!pendingPptxExport) return
     const summaryWeek = pendingPptxExport.kind === "all" ? weekFilter : pendingPptxExport.report.week_number
     const summaryYear = pendingPptxExport.kind === "all" ? yearFilter : pendingPptxExport.report.year
+    // The full layout always carries the task counts column. If the counts
+    // cannot be loaded, still export — the deck is needed for the meeting.
     let taskSummary
-    try {
-      taskSummary = await loadWeeklyTaskSummaryOptions(taskPlacement, summaryWeek, summaryYear)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load task counts")
-      return
+    if (mode === "full") {
+      try {
+        taskSummary = await loadWeeklyTaskSummaryOptions(summaryWeek, summaryYear)
+      } catch {
+        toast.warning("Could not load task counts — exporting without them")
+      }
     }
     const exportMeetingDate = meetingDate
     if (pendingPptxExport.kind === "all") {

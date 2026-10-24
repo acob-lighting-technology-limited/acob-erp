@@ -3,11 +3,7 @@ import { shuffle } from "@/lib/utils/random"
 import { Footer, Table } from "docx"
 import { normalizeDepartmentName } from "@/shared/departments"
 
-import type {
-  WeeklyDeptTaskSummary,
-  WeeklyTaskSummaryOptions,
-  WeeklyTaskSummaryPlacement,
-} from "@/lib/reports/weekly-task-summary"
+import type { WeeklyDeptTaskSummary, WeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
 
 import {
   PptxSlide,
@@ -724,6 +720,9 @@ const addDeptIndexSlide = (
 }
 
 const PPTX_WEEKLY_BODY_FONT_SIZE = 14
+// Full-mode sections may grow past the default when the text is short, so a
+// light week does not leave half the card empty.
+const PPTX_WEEKLY_MAX_BODY_FONT_SIZE = 16
 // Floor for shrink-to-fit. Anything under ~10pt is unreadable when projected,
 // so an over-long report should visibly overflow (and get trimmed) rather than
 // silently render at a size nobody in the room can read.
@@ -732,6 +731,15 @@ const PPTX_WEEKLY_SECTION_TITLE_SIZE = 12
 const PPTX_WEEKLY_LINE_HEIGHT_RATIO = 1.15
 const PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO = 0.48
 const PPTX_WEEKLY_LINE_SPACING_MULTIPLE = 1.3
+// Measured off PowerPoint renders of real reports (Calibri): ~0.43-0.45em per
+// character and a 1.2em line before the 1.3 multiple. The older 0.48 / 1.15
+// pair over-counted wrapping and chose a smaller font than the box needed.
+// 0.445 sits at the wide end of that range so the estimate errs towards fitting.
+const PPTX_FIT_CHAR_WIDTH_RATIO = 0.445
+const PPTX_FIT_LINE_HEIGHT_RATIO = 1.2
+// Leftover height is spread between items, capped so a short list does not
+// end up with gaps wider than the lines themselves.
+const PPTX_FIT_MAX_PARA_SPACE_RATIO = 0.75
 
 // Content slides keep their chrome slim: the header, footer and side margins
 // were trimmed so the report text gets the room (~0.5in more height, ~0.25in
@@ -776,12 +784,6 @@ const getWeeklyContentBoxes = () => {
   const page2Gap = 0.08
   const page2TopH = (availH - page2Gap) * 0.75
   const page2BottomH = (availH - page2Gap) * 0.25
-  const splitTopH = (availH - page2Gap) * 0.55
-  const splitBottomH = (availH - page2Gap) * 0.45
-  const splitBottomY = startY + splitTopH + page2Gap
-  const splitColGap = 0.15
-  const splitChallengesW = (usableW - splitColGap) * 0.6
-  const splitSummaryW = usableW - splitColGap - splitChallengesW
 
   return {
     row1Left: {
@@ -832,32 +834,6 @@ const getWeeklyContentBoxes = () => {
       textW: usableW - 0.3,
       textH: Math.max(0.6, page2BottomH - CARD_HEADER_H - textBottomSafety),
     },
-    // "Beside Challenges" task summary: Tasks for New Week gives up height so the
-    // bottom row is tall enough to split into Challenges | Task summary.
-    splitTop: {
-      x: marginX,
-      y: startY,
-      w: usableW,
-      h: splitTopH,
-      textW: usableW - 0.3,
-      textH: Math.max(0.6, splitTopH - CARD_HEADER_H - textBottomSafety),
-    },
-    splitChallenges: {
-      x: marginX,
-      y: splitBottomY,
-      w: splitChallengesW,
-      h: splitBottomH,
-      textW: splitChallengesW - 0.3,
-      textH: Math.max(0.6, splitBottomH - CARD_HEADER_H - textBottomSafety),
-    },
-    splitSummary: {
-      x: marginX + splitChallengesW + splitColGap,
-      y: splitBottomY,
-      w: splitSummaryW,
-      h: splitBottomH,
-      textW: splitSummaryW - 0.3,
-      textH: Math.max(0.6, splitBottomH - CARD_HEADER_H - textBottomSafety),
-    },
   }
 }
 
@@ -867,6 +843,8 @@ type WeeklySectionPlan = {
   color: string
   text: string
   fontSize: number
+  /** Extra points after each item, spreading leftover card height between them. */
+  paraSpaceAfter: number
   allowAutoShrink: boolean
 }
 
@@ -932,21 +910,40 @@ const countWrappedLines = (text: string, maxCharsPerLine: number): number => {
   return total
 }
 
+const fitCharsPerLine = (boxWIn: number, fontSize: number) =>
+  Math.max(10, Math.floor((boxWIn * 72) / (fontSize * PPTX_FIT_CHAR_WIDTH_RATIO)))
+
+const fitLineHeightPt = (fontSize: number) => fontSize * PPTX_FIT_LINE_HEIGHT_RATIO * PPTX_WEEKLY_LINE_SPACING_MULTIPLE
+
+/** Largest font, in half-point steps, whose wrapped text fits the box. */
 const chooseSectionFontSize = (
   text: string,
   boxWIn: number,
   boxHIn: number,
-  preferredFont = PPTX_WEEKLY_BODY_FONT_SIZE,
-  minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE,
-  _strictFit = true
+  maxFont = PPTX_WEEKLY_MAX_BODY_FONT_SIZE,
+  minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE
 ): number => {
-  for (let fontSize = preferredFont; fontSize >= minFont; fontSize -= 0.5) {
-    const charsPerLine = Math.max(10, Math.floor((boxWIn * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
-    const effectiveLineHeight = fontSize * PPTX_WEEKLY_LINE_HEIGHT_RATIO * PPTX_WEEKLY_LINE_SPACING_MULTIPLE
-    const maxLines = Math.max(1, Math.floor((boxHIn * 72) / effectiveLineHeight))
-    if (countWrappedLines(text, charsPerLine) <= maxLines) return fontSize
+  for (let fontSize = maxFont; fontSize >= minFont; fontSize -= 0.5) {
+    const maxLines = Math.max(1, Math.floor((boxHIn * 72) / fitLineHeightPt(fontSize)))
+    if (countWrappedLines(text, fitCharsPerLine(boxWIn, fontSize)) <= maxLines) return fontSize
   }
   return minFont
+}
+
+/**
+ * Font steps are coarse — the next half point up can wrap two more lines and
+ * overflow — so the chosen size usually leaves some height unused. Hand that
+ * back as space between items, keeping half a line in reserve against the
+ * estimate running short.
+ */
+const chooseParagraphSpacing = (text: string, boxWIn: number, boxHIn: number, fontSize: number): number => {
+  const items = text.split("\n").filter((line) => line.trim().length > 0).length
+  if (items < 2) return 0
+  const lineH = fitLineHeightPt(fontSize)
+  const used = countWrappedLines(text, fitCharsPerLine(boxWIn, fontSize)) * lineH
+  const spare = boxHIn * 72 - used - lineH / 2
+  if (spare <= 0) return 0
+  return Math.min(fontSize * PPTX_FIT_MAX_PARA_SPACE_RATIO, Math.floor((spare / (items - 1)) * 2) / 2)
 }
 
 const buildWeeklySectionPlan = (
@@ -958,42 +955,30 @@ const buildWeeklySectionPlan = (
   boxWIn: number,
   boxHIn: number,
   minFont = PPTX_WEEKLY_MIN_BODY_FONT_SIZE,
-  strictFit = true,
   allowAutoShrink = true
 ): WeeklySectionPlan => {
   const normalized = autoNumberLines(rawText) || fallbackText
   const text = withListItemSpacing(normalized)
+  const fontSize = chooseSectionFontSize(text, boxWIn, boxHIn, PPTX_WEEKLY_MAX_BODY_FONT_SIZE, minFont)
   return {
     key,
     title,
     color,
     text,
-    fontSize: chooseSectionFontSize(text, boxWIn, boxHIn, PPTX_WEEKLY_BODY_FONT_SIZE, minFont, strictFit),
+    fontSize,
+    paraSpaceAfter: chooseParagraphSpacing(text, boxWIn, boxHIn, fontSize),
     allowAutoShrink,
   }
-}
-
-/** One department's task counts and where they sit in full mode. */
-type WeeklyTaskSummarySlot = {
-  placement: Exclude<WeeklyTaskSummaryPlacement, "none">
-  summary: WeeklyDeptTaskSummary
 }
 
 type WeeklyDepartmentLayout = {
   workDone: WeeklyContentBox
   tasks: WeeklyContentBox
   challenges: WeeklyContentBox
-  /** "On Work Done": slim per-person strip under the Work Done card. */
-  strip?: WeeklyContentBox
-  /** "Beside Work Done" / "Beside Challenges": per-person card beside that section. */
+  /** Task counts column to the right of Work Done (full mode with counts). */
   summary?: WeeklyContentBox
 }
 
-const PPTX_TASK_STRIP_FONT_SIZE = 12
-const PPTX_TASK_STRIP_GAP = 0.1
-const PPTX_TASK_STRIP_MAX_LINES = 4
-const PPTX_TASK_STRIP_LABEL = "BY STAFF   "
-const PPTX_TASK_STRIP_SEPARATOR = "   ·   "
 const PPTX_TASK_COUNT_COL_W = 0.6
 const PPTX_TASK_SIDE_COLUMN_W = 2
 // The side column is a reference panel, not the thing being read out, so it
@@ -1009,24 +994,6 @@ const weeklyLineHeightIn = (fontSize: number) =>
 
 const charsPerLineAt = (widthIn: number, fontSize: number) =>
   Math.max(4, Math.floor((widthIn * 72) / (fontSize * PPTX_WEEKLY_AVG_CHAR_WIDTH_RATIO)))
-
-/** Estimated wrapped lines for the strip, treating each "Name 3 / 4" entry as unbreakable. */
-const countTaskStripLines = (summary: WeeklyDeptTaskSummary, textW: number): number => {
-  const limit = charsPerLineAt(textW, PPTX_TASK_STRIP_FONT_SIZE)
-  let lines = 1
-  let used = PPTX_TASK_STRIP_LABEL.length
-  summary.people.forEach((person, index) => {
-    const entry = `${person.name} ${formatTaskRatio(person)}`.length
-    const withSeparator = entry + (index > 0 ? PPTX_TASK_STRIP_SEPARATOR.length : 0)
-    if (used + withSeparator > limit) {
-      lines += 1
-      used = entry
-    } else {
-      used += withSeparator
-    }
-  })
-  return Math.min(PPTX_TASK_STRIP_MAX_LINES, lines)
-}
 
 /**
  * "Kleopatra Aiyede" -> "Kleopatra A.", so names fit the narrow summary
@@ -1046,58 +1013,35 @@ const withShortNames = (summary: WeeklyDeptTaskSummary): WeeklyDeptTaskSummary =
   }
 }
 
-const resolveTaskSummarySlot = (
+const resolveTaskSummary = (
   report: WeeklyReport,
   options?: WeeklyTaskSummaryOptions
-): WeeklyTaskSummarySlot | undefined => {
-  if (!options || options.placement === "none") return undefined
+): WeeklyDeptTaskSummary | undefined => {
+  if (!options) return undefined
   const department = normalizeDepartmentName(report.department)
   const summary = options.summaries.get(department) ?? { department, completed: 0, assigned: 0, people: [] }
-  return { placement: options.placement, summary: withShortNames(summary) }
+  return withShortNames(summary)
 }
 
-const getWeeklyDepartmentLayout = (slot?: WeeklyTaskSummarySlot): WeeklyDepartmentLayout => {
+const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLayout => {
   const boxes = getWeeklyContentBoxes()
-
-  if (slot?.placement === "work_done") {
-    const card = boxes.continuation
-    const stripTextW = card.w - 0.5
-    const stripH = 0.2 + countTaskStripLines(slot.summary, stripTextW) * weeklyLineHeightIn(PPTX_TASK_STRIP_FONT_SIZE)
-    const taken = stripH + PPTX_TASK_STRIP_GAP
-    return {
-      workDone: { ...card, h: card.h - taken, textH: Math.max(0.6, card.textH - taken) },
-      tasks: boxes.page2Top,
-      challenges: boxes.page2Bottom,
-      strip: { x: card.x, y: card.y + card.h - stripH, w: card.w, h: stripH, textW: stripTextW, textH: stripH - 0.1 },
-    }
+  if (!withTaskSummary) {
+    return { workDone: boxes.continuation, tasks: boxes.page2Top, challenges: boxes.page2Bottom }
   }
 
-  if (slot?.placement === "work_done_column") {
-    const card = boxes.continuation
-    const mainW = card.w - PPTX_TASK_SIDE_COLUMN_W - PPTX_TASK_SIDE_COLUMN_GAP
-    return {
-      workDone: { ...card, w: mainW, textW: mainW - 0.3 },
-      tasks: boxes.page2Top,
-      challenges: boxes.page2Bottom,
-      summary: {
-        ...card,
-        x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
-        w: PPTX_TASK_SIDE_COLUMN_W,
-        textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
-      },
-    }
+  const card = boxes.continuation
+  const mainW = card.w - PPTX_TASK_SIDE_COLUMN_W - PPTX_TASK_SIDE_COLUMN_GAP
+  return {
+    workDone: { ...card, w: mainW, textW: mainW - 0.3 },
+    tasks: boxes.page2Top,
+    challenges: boxes.page2Bottom,
+    summary: {
+      ...card,
+      x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
+      w: PPTX_TASK_SIDE_COLUMN_W,
+      textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
+    },
   }
-
-  if (slot?.placement === "challenges") {
-    return {
-      workDone: boxes.continuation,
-      tasks: boxes.splitTop,
-      challenges: boxes.splitChallenges,
-      summary: boxes.splitSummary,
-    }
-  }
-
-  return { workDone: boxes.continuation, tasks: boxes.page2Top, challenges: boxes.page2Bottom }
 }
 
 const getZeroTasksColor = (theme: WeeklyPptxTheme) => (theme === "dark" ? "F87171" : "B91C1C")
@@ -1261,7 +1205,7 @@ const addWeeklyHeaderAndFooter = (
 
 type WeeklyContentBox = { x: number; y: number; w: number; h: number; textW: number; textH: number }
 
-/** Inline count after a card title, e.g. "WORK DONE   14 / 20 TASKS COMPLETED". */
+/** Inline count after a card title, e.g. "TASKS DONE  14 / 20". */
 type WeeklyTitleSuffix = {
   text: string
   color: string
@@ -1343,10 +1287,10 @@ const addSectionCard = (
   allowAutoShrink = true,
   useManualHangingWrap = false,
   theme: WeeklyPptxTheme = "light",
-  titleSuffix?: WeeklyTitleSuffix
+  paraSpaceAfter = 0
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
-  addSectionCardChrome(pres, slide, box, title, color, theme, titleSuffix)
+  addSectionCardChrome(pres, slide, box, title, color, theme)
 
   const wrappedText =
     useManualHangingWrap && fontSize > 0
@@ -1367,6 +1311,7 @@ const addSectionCard = (
     fontFace: "Calibri",
     breakLine: !useManualHangingWrap,
     lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
+    ...(paraSpaceAfter > 0 ? { paraSpaceAfter } : {}),
     fit: allowAutoShrink ? "shrink" : undefined,
   })
 }
@@ -1521,75 +1466,17 @@ const addCompactContentSlide = (
   return slide
 }
 
-/** "On Work Done": one or more lines of "Name 3 / 4" entries under the Work Done card. */
-const addTaskSummaryStrip = (
-  pres: PptxPresentation,
-  slide: PptxSlide,
-  box: WeeklyContentBox,
-  summary: WeeklyDeptTaskSummary,
-  theme: WeeklyPptxTheme = "light"
-) => {
-  const colors = getWeeklyPptxThemeColors(theme)
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: box.x,
-    y: box.y,
-    w: box.w,
-    h: box.h,
-    fill: { color: colors.card },
-    line: { color: colors.cardBorder, width: 1 },
-  })
-  slide.addShape(pres.ShapeType?.rect ?? "rect", {
-    x: box.x,
-    y: box.y,
-    w: 0.07,
-    h: box.h,
-    fill: { color: colors.accent },
-    line: { color: colors.accent, width: 0 },
-  })
-
-  const runs: PptxTextRun[] = [
-    { text: PPTX_TASK_STRIP_LABEL, options: { bold: true, color: colors.textMuted, fontSize: 10, charSpacing: 2 } },
-  ]
-  if (summary.people.length === 0) {
-    runs.push({ text: "No tasks were due or completed this week.", options: { color: colors.textMuted } })
-  }
-  summary.people.forEach((person, index) => {
-    if (index > 0) runs.push({ text: PPTX_TASK_STRIP_SEPARATOR, options: { color: colors.textMuted } })
-    // Non-breaking spaces keep each "Name 3 / 4" on one line; lines break only at separators.
-    const nbsp = (text: string) => text.replace(/ /g, "\u00A0")
-    runs.push({ text: nbsp(`${person.name} `), options: { color: colors.textPrimary } })
-    runs.push({
-      text: nbsp(formatTaskRatio(person)),
-      options: { bold: true, color: getTaskRatioColor(person, theme) },
-    })
-  })
-
-  slide.addText(runs, {
-    x: box.x + 0.26,
-    y: box.y + 0.05,
-    w: box.textW,
-    h: box.textH,
-    fontSize: PPTX_TASK_STRIP_FONT_SIZE,
-    valign: "middle",
-    fontFace: "Calibri",
-    lineSpacingMultiple: PPTX_WEEKLY_LINE_SPACING_MULTIPLE,
-    fit: "shrink",
-  })
-}
-
-/** Largest font that fits every person, one column before two (when the card is wide enough). */
-const planTaskSummaryRows = (count: number, textH: number, maxColumns: number, maxFont = 14) => {
-  for (const columns of maxColumns > 1 ? [1, 2] : [1]) {
-    for (let fontSize = maxFont; fontSize >= PPTX_WEEKLY_MIN_BODY_FONT_SIZE; fontSize -= 1) {
-      const rows = Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize)))
-      if (count <= rows * columns) return { fontSize, columns, rows }
-    }
+/** Largest font, up to the column's cap, that fits every person in one list. */
+const planTaskSummaryRows = (count: number, textH: number) => {
+  for (let fontSize = PPTX_TASK_SIDE_MAX_FONT; fontSize >= PPTX_WEEKLY_MIN_BODY_FONT_SIZE; fontSize -= 1) {
+    const rows = Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize)))
+    if (count <= rows) return { fontSize, rows }
   }
   const fontSize = PPTX_WEEKLY_MIN_BODY_FONT_SIZE
-  return { fontSize, columns: maxColumns, rows: Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize))) }
+  return { fontSize, rows: Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize))) }
 }
 
-/** "Beside Challenges": department total in the title, one row per person below. */
+/** Task counts column beside Work Done: department total in the title, one row per person. */
 const addTaskSummaryCard = (
   pres: PptxPresentation,
   slide: PptxSlide,
@@ -1598,47 +1485,28 @@ const addTaskSummaryCard = (
   theme: WeeklyPptxTheme = "light"
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
-  // The narrow Work Done column only has room for a short label beside the total.
-  const isNarrow = box.w < 3
-  const titleSize = isNarrow ? PPTX_TASK_SIDE_TITLE_SIZE : PPTX_WEEKLY_SECTION_TITLE_SIZE
+  // The total runs straight after a short label, unspaced, so the two share
+  // the narrow title row without colliding.
   addSectionCardChrome(
     pres,
     slide,
     box,
-    isNarrow ? "TASKS DONE" : "TASKS COMPLETED",
+    "TASKS DONE",
     colors.accent,
     theme,
-    // Narrow column: the total runs straight after the label, unspaced, so the
-    // two share the row without colliding.
-    isNarrow ? { text: formatTaskRatio(summary), color: colors.textPrimary, compact: true } : undefined,
-    titleSize
+    { text: formatTaskRatio(summary), color: colors.textPrimary, compact: true },
+    PPTX_TASK_SIDE_TITLE_SIZE
   )
-  // Wide card: the total sits right-aligned at the end of the title row.
-  if (!isNarrow) {
-    slide.addText(formatTaskRatio(summary), {
-      x: box.x + 0.26,
-      y: box.y + 0.11,
-      w: box.w - 0.5,
-      h: 0.3,
-      fontSize: titleSize,
-      bold: true,
-      color: colors.textPrimary,
-      align: "right",
-      valign: "middle",
-      fontFace: "Calibri",
-    })
-  }
 
   const textX = box.x + 0.26
   const textY = box.y + 0.62
-  const listH = box.textH
   if (summary.people.length === 0) {
     slide.addText("No tasks were due or completed this week.", {
       x: textX,
       y: textY,
       w: box.textW,
-      h: listH,
-      fontSize: PPTX_WEEKLY_BODY_FONT_SIZE,
+      h: box.textH,
+      fontSize: PPTX_TASK_SIDE_MAX_FONT,
       color: colors.textMuted,
       valign: "top",
       fontFace: "Calibri",
@@ -1646,23 +1514,12 @@ const addTaskSummaryCard = (
     return
   }
 
-  // A narrow side column holds one list; two would leave names a few letters wide.
-  const maxColumns = box.textW >= 4 ? 2 : 1
-  const { fontSize, columns, rows } = planTaskSummaryRows(
-    summary.people.length,
-    listH,
-    maxColumns,
-    isNarrow ? PPTX_TASK_SIDE_MAX_FONT : 14
-  )
-  const capacity = rows * columns
-  const overflow = summary.people.length - capacity
-  const shown = overflow > 0 ? summary.people.slice(0, capacity - 1) : summary.people
+  const { fontSize, rows } = planTaskSummaryRows(summary.people.length, box.textH)
+  const overflow = summary.people.length - rows
+  const shown = overflow > 0 ? summary.people.slice(0, rows - 1) : summary.people
 
-  const colGap = 0.2
   // textW leaves almost no right inset; right-aligned counts need a real one.
-  const listW = box.textW - 0.14
-  const colW = (listW - colGap * (columns - 1)) / columns
-  const nameW = colW - PPTX_TASK_COUNT_COL_W
+  const nameW = box.textW - 0.14 - PPTX_TASK_COUNT_COL_W
   const maxNameChars = charsPerLineAt(nameW, fontSize)
   // Names and counts are separate text boxes with identical font and spacing so
   // the rows line up; names are cut short rather than allowed to wrap, which
@@ -1675,34 +1532,27 @@ const addTaskSummaryCard = (
     wrap: false,
   }
 
-  for (let col = 0; col < columns; col += 1) {
-    const people = shown.slice(col * rows, (col + 1) * rows)
-    const nameRuns: PptxTextRun[] = people.map((person) => ({
-      text: truncateToChars(person.name, maxNameChars),
-      options: { color: colors.sectionText, breakLine: true },
-    }))
-    const countRuns: PptxTextRun[] = people.map((person) => ({
-      text: formatTaskRatio(person),
-      options: { bold: true, color: getTaskRatioColor(person, theme), breakLine: true },
-    }))
-    if (col === columns - 1 && overflow > 0) {
-      nameRuns.push({ text: `+${overflow + 1} more`, options: { color: colors.textMuted, breakLine: true } })
-    }
-    if (nameRuns.length === 0) continue
-
-    const colX = textX + col * (colW + colGap)
-    slide.addText(nameRuns, { ...textOptions, x: colX, y: textY, w: nameW, h: listH, align: "left" })
-    if (countRuns.length > 0) {
-      slide.addText(countRuns, {
-        ...textOptions,
-        x: colX + nameW,
-        y: textY,
-        w: PPTX_TASK_COUNT_COL_W,
-        h: listH,
-        align: "right",
-      })
-    }
+  const nameRuns: PptxTextRun[] = shown.map((person) => ({
+    text: truncateToChars(person.name, maxNameChars),
+    options: { color: colors.sectionText, breakLine: true },
+  }))
+  const countRuns: PptxTextRun[] = shown.map((person) => ({
+    text: formatTaskRatio(person),
+    options: { bold: true, color: getTaskRatioColor(person, theme), breakLine: true },
+  }))
+  if (overflow > 0) {
+    nameRuns.push({ text: `+${overflow + 1} more`, options: { color: colors.textMuted, breakLine: true } })
   }
+
+  slide.addText(nameRuns, { ...textOptions, x: textX, y: textY, w: nameW, h: box.textH, align: "left" })
+  slide.addText(countRuns, {
+    ...textOptions,
+    x: textX + nameW,
+    y: textY,
+    w: PPTX_TASK_COUNT_COL_W,
+    h: box.textH,
+    align: "right",
+  })
 }
 
 const addWorkDoneSlide = (
@@ -1714,14 +1564,13 @@ const addWorkDoneSlide = (
   theme: WeeklyPptxTheme = "light",
   slidePosition?: { index: number; total: number },
   layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout(),
-  taskSummary?: WeeklyTaskSummarySlot
+  taskSummary?: WeeklyDeptTaskSummary
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
   slide.background = { color: colors.canvas }
   addWeeklyHeaderAndFooter(pres, slide, department, nextDept, pageNumber, theme, slidePosition)
 
-  const onWorkDone = taskSummary?.placement === "work_done" ? taskSummary.summary : undefined
   addSectionCard(
     pres,
     slide,
@@ -1733,13 +1582,10 @@ const addWorkDoneSlide = (
     true,
     false,
     theme,
-    onWorkDone ? { text: `${formatTaskRatio(onWorkDone)} TASKS COMPLETED`, color: colors.textPrimary } : undefined
+    workDonePlan.paraSpaceAfter
   )
-  if (onWorkDone && layout.strip) {
-    addTaskSummaryStrip(pres, slide, layout.strip, onWorkDone, theme)
-  }
-  if (taskSummary?.placement === "work_done_column" && layout.summary) {
-    addTaskSummaryCard(pres, slide, layout.summary, taskSummary.summary, theme)
+  if (taskSummary && layout.summary) {
+    addTaskSummaryCard(pres, slide, layout.summary, taskSummary, theme)
   }
 
   return slide
@@ -1754,8 +1600,7 @@ const addTasksAndChallengesSlide = (
   pageNumber?: number,
   theme: WeeklyPptxTheme = "light",
   slidePosition?: { index: number; total: number },
-  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout(),
-  taskSummary?: WeeklyTaskSummarySlot
+  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout()
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
@@ -1772,7 +1617,8 @@ const addTasksAndChallengesSlide = (
     tasksPlan.fontSize,
     true,
     false,
-    theme
+    theme,
+    tasksPlan.paraSpaceAfter
   )
   addSectionCard(
     pres,
@@ -1784,11 +1630,9 @@ const addTasksAndChallengesSlide = (
     challengesPlan.fontSize,
     true,
     false,
-    theme
+    theme,
+    challengesPlan.paraSpaceAfter
   )
-  if (taskSummary?.placement === "challenges" && layout.summary) {
-    addTaskSummaryCard(pres, slide, layout.summary, taskSummary.summary, theme)
-  }
 
   return slide
 }
@@ -1796,7 +1640,7 @@ const addTasksAndChallengesSlide = (
 type DepartmentPptxPlan = {
   report: WeeklyReport
   layout: WeeklyDepartmentLayout
-  taskSummary?: WeeklyTaskSummarySlot
+  taskSummary?: WeeklyDeptTaskSummary
   workDone: WeeklySectionPlan
   tasks: WeeklySectionPlan
   challenges: WeeklySectionPlan
@@ -1808,8 +1652,8 @@ const buildDepartmentPptxPlan = (
   report: WeeklyReport,
   taskSummaryOptions?: WeeklyTaskSummaryOptions
 ): DepartmentPptxPlan => {
-  const taskSummary = resolveTaskSummarySlot(report, taskSummaryOptions)
-  const layout = getWeeklyDepartmentLayout(taskSummary)
+  const taskSummary = resolveTaskSummary(report, taskSummaryOptions)
+  const layout = getWeeklyDepartmentLayout(Boolean(taskSummary))
   const [workDone, tasks, challenges] = getReportSectionPlans(report, layout)
   return {
     report,
@@ -1867,8 +1711,7 @@ const renderDepartmentWeeklySlides = (
     pageCursor,
     theme,
     { index: 2, total: 2 },
-    layout,
-    taskSummary
+    layout
   )
   applyWeeklySlideTransition(tasksChallengesSlide)
 }

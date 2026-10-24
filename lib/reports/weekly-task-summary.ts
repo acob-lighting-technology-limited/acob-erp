@@ -12,8 +12,6 @@ import { normalizeDepartmentName } from "@/shared/departments"
  * open shows as assigned-not-completed, which is the point of the 0 / 3 rows.
  */
 
-export type WeeklyTaskSummaryPlacement = "none" | "work_done" | "work_done_column" | "challenges"
-
 export type WeeklyTaskSummaryPerson = {
   id: string
   name: string
@@ -28,9 +26,8 @@ export type WeeklyDeptTaskSummary = {
   people: WeeklyTaskSummaryPerson[]
 }
 
-/** What the PowerPoint export needs: where to draw the counts, and the counts. */
+/** What the full-layout PowerPoint export needs to draw the task counts column. */
 export type WeeklyTaskSummaryOptions = {
-  placement: WeeklyTaskSummaryPlacement
   /** Keyed by canonical department name. */
   summaries: Map<string, WeeklyDeptTaskSummary>
 }
@@ -129,15 +126,10 @@ export function summarizeWeeklyTasks(
   }))
 }
 
-/** Client-side: the export options for a chosen placement, or undefined for "none". */
-export async function loadWeeklyTaskSummaryOptions(
-  placement: WeeklyTaskSummaryPlacement,
-  week: number,
-  year: number
-): Promise<WeeklyTaskSummaryOptions | undefined> {
-  if (placement === "none") return undefined
+/** Client-side: task counts for one report week, ready to pass to the PowerPoint export. */
+export async function loadWeeklyTaskSummaryOptions(week: number, year: number): Promise<WeeklyTaskSummaryOptions> {
   const res = await fetch(`/api/reports/weekly-reports/task-summary?week=${week}&year=${year}`)
   if (!res.ok) throw new Error("Could not load task counts for this week")
   const { data } = (await res.json()) as { data: WeeklyDeptTaskSummary[] }
-  return { placement, summaries: new Map(data.map((d) => [d.department, d])) }
+  return { summaries: new Map(data.map((d) => [d.department, d])) }
 }

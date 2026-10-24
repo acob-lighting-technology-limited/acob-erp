@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
-import { loadWeeklyTaskSummaryOptions, type WeeklyTaskSummaryPlacement } from "@/lib/reports/weekly-task-summary"
+import { loadWeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
@@ -287,18 +287,20 @@ export default function WeeklyReportsPortal() {
   const runPptxExport = async (
     mode: WeeklyPptxMode,
     theme: WeeklyPptxTheme = "light",
-    order: WeeklyDeptOrder = "default",
-    taskPlacement: WeeklyTaskSummaryPlacement = "none"
+    order: WeeklyDeptOrder = "default"
   ) => {
     if (!pendingPptxExport) return
     const summaryWeek = pendingPptxExport.kind === "all" ? weekFilter : pendingPptxExport.report.week_number
     const summaryYear = pendingPptxExport.kind === "all" ? yearFilter : pendingPptxExport.report.year
+    // The full layout always carries the task counts column. If the counts
+    // cannot be loaded, still export — the deck is needed for the meeting.
     let taskSummary
-    try {
-      taskSummary = await loadWeeklyTaskSummaryOptions(taskPlacement, summaryWeek, summaryYear)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load task counts")
-      return
+    if (mode === "full") {
+      try {
+        taskSummary = await loadWeeklyTaskSummaryOptions(summaryWeek, summaryYear)
+      } catch {
+        toast.warning("Could not load task counts — exporting without them")
+      }
     }
 
     if (pendingPptxExport.kind === "all") {

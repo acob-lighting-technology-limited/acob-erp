@@ -5,113 +5,70 @@ import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { WeeklyDeptOrder, WeeklyPptxMode, WeeklyPptxTheme } from "@/lib/export-utils"
-import type { WeeklyTaskSummaryPlacement } from "@/lib/reports/weekly-task-summary"
 
 interface PptxModeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSelect: (
-    mode: WeeklyPptxMode,
-    theme: WeeklyPptxTheme,
-    order: WeeklyDeptOrder,
-    taskPlacement: WeeklyTaskSummaryPlacement
-  ) => void
+  onSelect: (mode: WeeklyPptxMode, theme: WeeklyPptxTheme, order: WeeklyDeptOrder) => void
   showOrderStep?: boolean
 }
 
-type Step = "layout" | "theme" | "order" | "tasks"
+type Step = 1 | 2 | 3
 
 export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = true }: PptxModeDialogProps) {
-  const [step, setStep] = useState<Step>("layout")
+  const [step, setStep] = useState<Step>(1)
   const [mode, setMode] = useState<WeeklyPptxMode>("full")
   const [theme, setTheme] = useState<WeeklyPptxTheme>("light")
-  const [order, setOrder] = useState<WeeklyDeptOrder>("default")
-
-  // Task counts only have a place in the full layout; compact skips the step.
-  const steps: Step[] = [
-    "layout",
-    "theme",
-    ...(showOrderStep ? (["order"] as const) : []),
-    ...(mode === "full" ? (["tasks"] as const) : []),
-  ]
-  const stepIndex = steps.indexOf(step)
-
-  const advance = (next: { mode?: WeeklyPptxMode; theme?: WeeklyPptxTheme; order?: WeeklyDeptOrder }) => {
-    const nextMode = next.mode ?? mode
-    const nextTheme = next.theme ?? theme
-    const nextOrder = next.order ?? order
-    const remaining: Step[] = [
-      "layout",
-      "theme",
-      ...(showOrderStep ? (["order"] as const) : []),
-      ...(nextMode === "full" ? (["tasks"] as const) : []),
-    ]
-    const following = remaining[remaining.indexOf(step) + 1]
-    if (following) {
-      setStep(following)
-    } else {
-      onSelect(nextMode, nextTheme, nextOrder, "none")
-    }
-  }
-
-  const goBack = () => {
-    const previous = steps[stepIndex - 1]
-    if (previous) setStep(previous)
-  }
 
   const handleOpenChange = (o: boolean) => {
-    if (!o) setStep("layout")
+    if (!o) setStep(1)
     onOpenChange(o)
   }
 
   const handleModeSelect = (m: WeeklyPptxMode) => {
     setMode(m)
-    advance({ mode: m })
+    setStep(2)
   }
 
   const handleThemeSelect = (t: WeeklyPptxTheme) => {
     setTheme(t)
-    advance({ theme: t })
+    if (showOrderStep) {
+      setStep(3)
+    } else {
+      onSelect(mode, t, "default")
+    }
   }
 
-  const handleOrderSelect = (o: WeeklyDeptOrder) => {
-    setOrder(o)
-    advance({ order: o })
+  const handleOrderSelect = (order: WeeklyDeptOrder) => {
+    onSelect(mode, theme, order)
   }
 
-  const handleTasksSelect = (placement: WeeklyTaskSummaryPlacement) => {
-    onSelect(mode, theme, order, placement)
-  }
+  const totalSteps = showOrderStep ? 3 : 2
 
-  const stepConfig: Record<Step, { title: string; description: string }> = {
-    layout: { title: "Layout", description: "Choose the slide layout for your PowerPoint export." },
-    theme: { title: "Theme", description: "Choose the colour theme." },
-    order: { title: "Department Order", description: "Choose how departments are ordered in the presentation." },
-    tasks: {
-      title: "Task Counts",
-      description: "Show each department's completed tasks, and each assignee's completed / assigned count.",
+  const stepConfig = {
+    1: {
+      title: `Step 1 of ${totalSteps} — Layout`,
+      description: "Choose the slide layout for your PowerPoint export.",
+    },
+    2: {
+      title: `Step 2 of ${totalSteps} — Theme`,
+      description: "Choose the colour theme.",
+    },
+    3: {
+      title: "Step 3 of 3 — Department Order",
+      description: "Choose how departments are ordered in the presentation.",
     },
   }
-  // Before the layout is chosen the step count is not known yet; assume full.
-  const totalSteps = steps.length
-
-  const backButton = (
-    <Button variant="ghost" size="sm" className="mt-1 gap-1 self-start" onClick={goBack}>
-      <ChevronLeft className="h-4 w-4" /> Back
-    </Button>
-  )
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            Step {stepIndex + 1} of {totalSteps} — {stepConfig[step].title}
-          </DialogTitle>
+          <DialogTitle>{stepConfig[step].title}</DialogTitle>
           <DialogDescription>{stepConfig[step].description}</DialogDescription>
         </DialogHeader>
 
-        {step === "layout" && (
+        {step === 1 && (
           <div className="grid gap-3">
             <Button
               variant="outline"
@@ -132,7 +89,7 @@ export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = t
           </div>
         )}
 
-        {step === "theme" && (
+        {step === 2 && (
           <div className="grid gap-3">
             <Button
               variant="outline"
@@ -150,11 +107,13 @@ export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = t
               <span className="font-semibold">Dark</span>
               <span className="text-muted-foreground text-xs font-normal">Black background, light text</span>
             </Button>
-            {backButton}
+            <Button variant="ghost" size="sm" className="mt-1 gap-1 self-start" onClick={() => setStep(1)}>
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
           </div>
         )}
 
-        {step === "order" && (
+        {step === 3 && (
           <div className="grid gap-3">
             <Button
               variant="outline"
@@ -182,51 +141,9 @@ export function PptxModeDialog({ open, onOpenChange, onSelect, showOrderStep = t
               <span className="font-semibold">Random</span>
               <span className="text-muted-foreground text-xs font-normal">Shuffle department order on each export</span>
             </Button>
-            {backButton}
-          </div>
-        )}
-
-        {step === "tasks" && (
-          <div className="grid gap-3">
-            <Button
-              variant="outline"
-              className="h-14 flex-col items-start justify-center gap-0.5 px-4"
-              onClick={() => handleTasksSelect("none")}
-            >
-              <span className="font-semibold">Normal</span>
-              <span className="text-muted-foreground text-xs font-normal">No task counts</span>
+            <Button variant="ghost" size="sm" className="mt-1 gap-1 self-start" onClick={() => setStep(2)}>
+              <ChevronLeft className="h-4 w-4" /> Back
             </Button>
-            <Button
-              variant="outline"
-              className="h-14 flex-col items-start justify-center gap-0.5 px-4"
-              onClick={() => handleTasksSelect("work_done")}
-            >
-              <span className="font-semibold">On Work Done</span>
-              <span className="text-muted-foreground text-xs font-normal">
-                Total in the Work Done title, staff strip underneath
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-14 flex-col items-start justify-center gap-0.5 px-4"
-              onClick={() => handleTasksSelect("work_done_column")}
-            >
-              <span className="font-semibold">Beside Work Done</span>
-              <span className="text-muted-foreground text-xs font-normal">
-                Narrow task summary column next to Work Done
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-14 flex-col items-start justify-center gap-0.5 px-4"
-              onClick={() => handleTasksSelect("challenges")}
-            >
-              <span className="font-semibold">Beside Challenges</span>
-              <span className="text-muted-foreground text-xs font-normal">
-                Taller Challenges row, split with a task summary card
-              </span>
-            </Button>
-            {backButton}
           </div>
         )}
       </DialogContent>
