@@ -3,7 +3,12 @@ import { shuffle } from "@/lib/utils/random"
 import { Footer, Table } from "docx"
 import { normalizeDepartmentName } from "@/shared/departments"
 
-import type { WeeklyDeptTaskSummary, WeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
+import {
+  emptyDeptSummary,
+  type WeeklyCountRow,
+  type WeeklyDeptTaskSummary,
+  type WeeklyTaskSummaryOptions,
+} from "@/lib/reports/weekly-task-summary"
 
 import {
   PptxSlide,
@@ -977,6 +982,11 @@ type WeeklyDepartmentLayout = {
   /** Column to the right of Work Done (full mode with counts): staff list over action points, 2:1. */
   taskCounts?: WeeklyContentBox
   actionPoints?: WeeklyContentBox
+  /** Column to the right of Tasks for the New Week: due this week over overdue, 2:1. */
+  dueThisWeek?: WeeklyContentBox
+  overdue?: WeeklyContentBox
+  /** Beside Challenges: challenges still pending from earlier weeks. */
+  pendingChallenges?: WeeklyContentBox
 }
 
 const PPTX_TASK_COUNT_COL_W = 0.6
@@ -1008,11 +1018,21 @@ const withShortNames = (summary: WeeklyDeptTaskSummary): WeeklyDeptTaskSummary =
     const parts = name.trim().split(/\s+/)
     return parts.length < 2 ? name : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`
   }
+  // Collisions are judged across the whole department, so a person reads the
+  // same in every card.
+  const fullNames = new Map<string, string>()
+  ;[...summary.people, ...summary.dueThisWeek.people, ...summary.overdue.people].forEach((p) =>
+    fullNames.set(p.id, p.name)
+  )
   const uses = new Map<string, number>()
-  summary.people.forEach((p) => uses.set(shorten(p.name), (uses.get(shorten(p.name)) ?? 0) + 1))
+  fullNames.forEach((name) => uses.set(shorten(name), (uses.get(shorten(name)) ?? 0) + 1))
+  const display = (name: string) => (uses.get(shorten(name)) === 1 ? shorten(name) : name)
+  const renameRows = (rows: WeeklyCountRow[]) => rows.map((p) => ({ ...p, name: display(p.name) }))
   return {
     ...summary,
-    people: summary.people.map((p) => ({ ...p, name: uses.get(shorten(p.name)) === 1 ? shorten(p.name) : p.name })),
+    people: summary.people.map((p) => ({ ...p, name: display(p.name) })),
+    dueThisWeek: { ...summary.dueThisWeek, people: renameRows(summary.dueThisWeek.people) },
+    overdue: { ...summary.overdue, people: renameRows(summary.overdue.people) },
   }
 }
 
@@ -1022,14 +1042,7 @@ const resolveTaskSummary = (
 ): WeeklyDeptTaskSummary | undefined => {
   if (!options) return undefined
   const department = normalizeDepartmentName(report.department)
-  const summary = options.summaries.get(department) ?? {
-    department,
-    completed: 0,
-    assigned: 0,
-    people: [],
-    actionPoints: { total: 0, completed: 0, inProgress: 0, notStarted: 0 },
-  }
-  return withShortNames(summary)
+  return withShortNames(options.summaries.get(department) ?? emptyDeptSummary(department))
 }
 
 const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLayout => {
@@ -1040,10 +1053,6 @@ const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLay
 
   const card = boxes.continuation
   const mainW = card.w - PPTX_TASK_SIDE_COLUMN_W - PPTX_TASK_SIDE_COLUMN_GAP
-  // Two-thirds for the staff list, which grows with the department; action
-  // points never need more than three rows.
-  const tasksH = (card.h - PPTX_TASK_CARD_GAP) * (2 / 3)
-  const actionsH = card.h - PPTX_TASK_CARD_GAP - tasksH
   const column = (y: number, h: number): WeeklyContentBox => ({
     x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
     y,
@@ -1052,12 +1061,24 @@ const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLay
     textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
     textH: Math.max(0.6, h - PPTX_TASK_CARD_HEADER_H - 0.1),
   })
+  // A tall card split 2:1, the larger share on top for the per-person list.
+  const splitTwoToOne = (box: WeeklyContentBox): [WeeklyContentBox, WeeklyContentBox] => {
+    const topH = (box.h - PPTX_TASK_CARD_GAP) * (2 / 3)
+    return [column(box.y, topH), column(box.y + topH + PPTX_TASK_CARD_GAP, box.h - PPTX_TASK_CARD_GAP - topH)]
+  }
+  const narrow = (box: WeeklyContentBox): WeeklyContentBox => ({ ...box, w: mainW, textW: mainW - 0.3 })
+
+  const [taskCounts, actionPoints] = splitTwoToOne(card)
+  const [dueThisWeek, overdue] = splitTwoToOne(boxes.page2Top)
   return {
-    workDone: { ...card, w: mainW, textW: mainW - 0.3 },
-    tasks: boxes.page2Top,
-    challenges: boxes.page2Bottom,
-    taskCounts: column(card.y, tasksH),
-    actionPoints: column(card.y + tasksH + PPTX_TASK_CARD_GAP, actionsH),
+    workDone: narrow(card),
+    tasks: narrow(boxes.page2Top),
+    challenges: narrow(boxes.page2Bottom),
+    taskCounts,
+    actionPoints,
+    dueThisWeek,
+    overdue,
+    pendingChallenges: column(boxes.page2Bottom.y, boxes.page2Bottom.h),
   }
 }
 
@@ -1570,11 +1591,55 @@ const addSummaryNote = (slide: PptxSlide, box: { x: number; y: number; w: number
   return height
 }
 
+type CountListCard = {
+  title: string
+  /** Runs straight after the short title, unspaced, so both fit the narrow row. */
+  total: string
+  subtitle?: string
+  rows: SummaryRow[]
+  emptyNote: string
+}
+
 /**
- * Top card of the column beside Work Done: "TASKS DONE" with one row per
- * person. The total runs straight after the short label, unspaced, so the two
- * share the narrow title row without colliding.
+ * A narrow side card: title and total, an optional muted subtitle, then label /
+ * count rows at the largest size (up to 12pt) that fits, folding the rest into
+ * "+N more".
  */
+const addCountListCard = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  card: CountListCard,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  const bodyTop = addSectionCardChrome(
+    pres,
+    slide,
+    box,
+    card.title,
+    colors.accent,
+    theme,
+    { text: card.total, color: colors.textPrimary, compact: true },
+    PPTX_TASK_SIDE_TITLE_SIZE,
+    card.subtitle
+  )
+  // textW leaves almost no right inset; right-aligned counts need a real one.
+  const at = { x: box.x + 0.26, y: box.y + bodyTop, w: box.textW - 0.14 }
+  if (card.rows.length === 0) {
+    addSummaryNote(slide, at, card.emptyNote, colors.textMuted)
+    return
+  }
+  const { fontSize, rows } = planTaskSummaryRows(card.rows.length, box.h - bodyTop - 0.1)
+  const overflow = card.rows.length - rows
+  const shown = overflow > 0 ? card.rows.slice(0, rows - 1) : card.rows
+  if (overflow > 0) shown.push({ label: `+${overflow + 1} more`, value: "", color: colors.textMuted })
+  addSummaryRows(slide, at, shown, fontSize, colors.sectionText)
+}
+
+const formatDaysAgo = (days: number) => (days < 14 ? `${days} days` : `${Math.floor(days / 7)} weeks`)
+
+/** Beside Work Done, top: everyone in the department with completed / assigned. */
 const addTaskCountsCard = (
   pres: PptxPresentation,
   slide: PptxSlide,
@@ -1583,36 +1648,26 @@ const addTaskCountsCard = (
   theme: WeeklyPptxTheme = "light"
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
-  addSectionCardChrome(
+  addCountListCard(
     pres,
     slide,
     box,
-    "TASKS DONE",
-    colors.accent,
-    theme,
-    { text: formatTaskRatio(summary), color: colors.textPrimary, compact: true },
-    PPTX_TASK_SIDE_TITLE_SIZE
+    {
+      title: "TASKS DONE",
+      total: formatTaskRatio(summary),
+      rows: summary.people.map((person) => ({
+        label: person.name,
+        value: formatTaskRatio(person),
+        color: getTaskRatioColor(person, theme),
+        labelColor: person.assigned === 0 ? colors.textMuted : undefined,
+      })),
+      emptyNote: "No tasks this week.",
+    },
+    theme
   )
-
-  const at = { x: box.x + 0.26, y: box.y + 0.62, w: box.textW - 0.14 }
-  if (summary.people.length === 0) {
-    addSummaryNote(slide, at, "No tasks this week.", colors.textMuted)
-    return
-  }
-  const { fontSize, rows } = planTaskSummaryRows(summary.people.length, box.textH)
-  const overflow = summary.people.length - rows
-  const shown = overflow > 0 ? summary.people.slice(0, rows - 1) : summary.people
-  const personRows: SummaryRow[] = shown.map((person) => ({
-    label: person.name,
-    value: formatTaskRatio(person),
-    color: getTaskRatioColor(person, theme),
-    labelColor: person.assigned === 0 ? colors.textMuted : undefined,
-  }))
-  if (overflow > 0) personRows.push({ label: `+${overflow + 1} more`, value: "", color: colors.textMuted })
-  addSummaryRows(slide, at, personRows, fontSize, colors.sectionText)
 }
 
-/** Bottom card: the action points set at the last meeting, done / total and by status. */
+/** Beside Work Done, bottom: last meeting's action points by status. */
 const addActionPointsCard = (
   pres: PptxPresentation,
   slide: PptxSlide,
@@ -1622,38 +1677,118 @@ const addActionPointsCard = (
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const ap = summary.actionPoints
-  const bodyTop = addSectionCardChrome(
+  const countColor = (value: number, good: boolean) =>
+    value === 0 ? colors.textPrimary : good ? colors.accent : getZeroTasksColor(theme)
+  addCountListCard(
     pres,
     slide,
     box,
-    "ACTION POINTS",
-    colors.accent,
-    theme,
-    { text: `${ap.completed} / ${ap.total}`, color: colors.textPrimary, compact: true },
-    PPTX_TASK_SIDE_TITLE_SIZE,
-    "(Tasks for Last Week)"
+    {
+      title: "ACTION POINTS",
+      total: `${ap.completed} / ${ap.total}`,
+      subtitle: "(Tasks for Last Week)",
+      rows:
+        ap.total === 0
+          ? []
+          : [
+              { label: "Completed", value: String(ap.completed), color: countColor(ap.completed, true) },
+              { label: "In progress", value: String(ap.inProgress), color: colors.textPrimary },
+              { label: "Not started", value: String(ap.notStarted), color: countColor(ap.notStarted, false) },
+            ],
+      emptyNote: "None set last meeting.",
+    },
+    theme
   )
+}
 
-  // textW leaves almost no right inset; right-aligned counts need a real one.
-  const at = { x: box.x + 0.26, y: box.y + bodyTop, w: box.textW - 0.14 }
-  if (ap.total === 0) {
-    addSummaryNote(slide, at, "None set last meeting.", colors.textMuted)
-    return
-  }
-  addSummaryRows(
+/** Beside Tasks for the New Week, top: everyone, with open tasks due in the coming week. */
+const addDueThisWeekCard = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  summary: WeeklyDeptTaskSummary,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  addCountListCard(
+    pres,
     slide,
-    at,
-    [
-      { label: "Completed", value: String(ap.completed), color: ap.completed > 0 ? colors.accent : colors.textPrimary },
-      { label: "In progress", value: String(ap.inProgress), color: colors.textPrimary },
-      {
-        label: "Not started",
-        value: String(ap.notStarted),
-        color: ap.notStarted > 0 ? getZeroTasksColor(theme) : colors.textPrimary,
-      },
-    ],
-    PPTX_TASK_SIDE_MAX_FONT,
-    colors.sectionText
+    box,
+    {
+      title: "DUE THIS WEEK",
+      total: String(summary.dueThisWeek.total),
+      rows: summary.dueThisWeek.people.map((person) => ({
+        label: person.name,
+        value: String(person.count),
+        color: person.count > 0 ? colors.textPrimary : colors.textMuted,
+        labelColor: person.count > 0 ? undefined : colors.textMuted,
+      })),
+      emptyNote: "Nothing due this week.",
+    },
+    theme
+  )
+}
+
+/** Beside Tasks for the New Week, bottom: open work already past its deadline. */
+const addOverdueCard = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  summary: WeeklyDeptTaskSummary,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const { overdue } = summary
+  addCountListCard(
+    pres,
+    slide,
+    box,
+    {
+      title: "OVERDUE",
+      total: String(overdue.total),
+      subtitle: overdue.oldestDays === null ? undefined : `(oldest: ${formatDaysAgo(overdue.oldestDays)})`,
+      rows: overdue.people.map((person) => ({
+        label: person.name,
+        value: String(person.count),
+        color: getZeroTasksColor(theme),
+      })),
+      emptyNote: "Nothing overdue.",
+    },
+    theme
+  )
+}
+
+/** Beside Challenges: challenges from earlier weeks still open or being mitigated. */
+const addPendingChallengesCard = (
+  pres: PptxPresentation,
+  slide: PptxSlide,
+  box: WeeklyContentBox,
+  summary: WeeklyDeptTaskSummary,
+  theme: WeeklyPptxTheme = "light"
+) => {
+  const colors = getWeeklyPptxThemeColors(theme)
+  const pending = summary.pendingChallenges
+  addCountListCard(
+    pres,
+    slide,
+    box,
+    {
+      title: "PENDING",
+      total: String(pending.total),
+      subtitle: pending.oldest ? `(oldest: week ${pending.oldest.week})` : "(from earlier weeks)",
+      rows:
+        pending.total === 0
+          ? []
+          : [
+              {
+                label: "Open",
+                value: String(pending.open),
+                color: pending.open > 0 ? getZeroTasksColor(theme) : colors.textPrimary,
+              },
+              { label: "Mitigating", value: String(pending.mitigating), color: colors.textPrimary },
+            ],
+      emptyNote: "None pending.",
+    },
+    theme
   )
 }
 
@@ -1703,7 +1838,8 @@ const addTasksAndChallengesSlide = (
   pageNumber?: number,
   theme: WeeklyPptxTheme = "light",
   slidePosition?: { index: number; total: number },
-  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout()
+  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout(),
+  taskSummary?: WeeklyDeptTaskSummary
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
@@ -1736,6 +1872,11 @@ const addTasksAndChallengesSlide = (
     theme,
     challengesPlan.paraSpaceAfter
   )
+  if (taskSummary && layout.dueThisWeek && layout.overdue && layout.pendingChallenges) {
+    addDueThisWeekCard(pres, slide, layout.dueThisWeek, taskSummary, theme)
+    addOverdueCard(pres, slide, layout.overdue, taskSummary, theme)
+    addPendingChallengesCard(pres, slide, layout.pendingChallenges, taskSummary, theme)
+  }
 
   return slide
 }
@@ -1814,7 +1955,8 @@ const renderDepartmentWeeklySlides = (
     pageCursor,
     theme,
     { index: 2, total: 2 },
-    layout
+    layout,
+    taskSummary
   )
   applyWeeklySlideTransition(tasksChallengesSlide)
 }

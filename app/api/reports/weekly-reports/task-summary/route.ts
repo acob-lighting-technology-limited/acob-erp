@@ -7,10 +7,13 @@ import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
 import {
   attachActionPoints,
+  attachOpenTasks,
+  attachPendingChallenges,
   getPreviousOfficeWeek,
   getWeeklyTaskWindow,
   summarizeWeeklyTasks,
   type SummaryActionPointRow,
+  type SummaryChallengeRow,
   type SummaryPersonRow,
   type SummaryTaskRow,
 } from "@/lib/reports/weekly-task-summary"
@@ -70,7 +73,25 @@ export async function GET(request: NextRequest) {
     const taskRows = ((tasks ?? []) as Array<SummaryTaskRow & { category: string | null }>).filter(
       (t) => t.category !== "weekly_action"
     )
-    const userIds = Array.from(new Set(taskRows.map((t) => t.assigned_to).filter((id): id is string => Boolean(id))))
+    // Open work with a deadline up to the end of the coming week: the ones due
+    // in it, and everything already past due.
+    const comingWeek = getWeeklyTaskWindow(week + 1, year, config?.anchor_day ?? DEFAULT_ANCHOR_DAY)
+    const comingEnd = q(comingWeek.endDate)
+    const { data: openTasks, error: openTasksError } = await db
+      .from("tasks")
+      .select("assigned_to, status, category, completed_at, due_date, task_end_date, created_at")
+      .eq("is_archived", false)
+      .not("assigned_to", "is", null)
+      .in("status", ["pending", "in_progress", "submitted_for_review"])
+      .or(`due_date.lte.${comingEnd},task_end_date.lte.${comingEnd}`)
+    if (openTasksError) return serverError(log, openTasksError)
+    const openTaskRows = ((openTasks ?? []) as Array<SummaryTaskRow & { category: string | null }>).filter(
+      (t) => t.category !== "weekly_action"
+    )
+
+    const userIds = Array.from(
+      new Set([...taskRows, ...openTaskRows].map((t) => t.assigned_to).filter((id): id is string => Boolean(id)))
+    )
 
     // Every active member gets a row (0 / 0 when given nothing), plus anyone who
     // had tasks this week but has since left, so their work still counts.
@@ -100,10 +121,18 @@ export async function GET(request: NextRequest) {
       .eq("year", reviewed.year)
     if (actionPointsError) return serverError(log, actionPointsError)
 
-    const summaries = summarizeWeeklyTasks(taskRows, people, window)
-    return NextResponse.json({
-      data: attachActionPoints(summaries, (actionPoints ?? []) as SummaryActionPointRow[]),
-    })
+    const { data: challenges, error: challengesError } = await db
+      .from("meeting_challenges")
+      .select("department, status, week_number, year")
+      .in("status", ["open", "mitigating"])
+      .lte("year", year)
+    if (challengesError) return serverError(log, challengesError)
+
+    let summaries = summarizeWeeklyTasks(taskRows, people, window)
+    summaries = attachActionPoints(summaries, (actionPoints ?? []) as SummaryActionPointRow[])
+    summaries = attachOpenTasks(summaries, openTaskRows, people, comingWeek)
+    summaries = attachPendingChallenges(summaries, (challenges ?? []) as SummaryChallengeRow[], week, year)
+    return NextResponse.json({ data: summaries })
   } catch (error) {
     return serverError(log, error)
   }

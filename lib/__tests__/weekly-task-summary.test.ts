@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import {
   attachActionPoints,
+  attachOpenTasks,
+  attachPendingChallenges,
   getPreviousOfficeWeek,
   getWeeklyTaskWindow,
   summarizeWeeklyTasks,
@@ -126,4 +128,54 @@ test("summarizeWeeklyTasks: department members with no tasks show as 0 / 0, last
       ["Chidi Eze", 0, 0],
     ]
   )
+})
+
+// Week 30's meeting is Mon 3 Aug, so the week it plans is Mon 3 — Sun 9 Aug:
+// the seven days before week 31's meeting.
+const comingWeek = getWeeklyTaskWindow(31, 2026, 12)
+
+test("attachOpenTasks: due in the coming week vs already past due, real deadlines only", () => {
+  const [dept] = attachOpenTasks(
+    summarizeWeeklyTasks([], people, window),
+    [
+      task({ due_date: "2026-08-03" }), // due Monday
+      task({ task_end_date: "2026-08-09" }), // due Sunday
+      task({ due_date: "2026-08-10" }), // next-next week: neither
+      task({ assigned_to: "chidi", due_date: "2026-07-20" }), // 14 days overdue
+      task({ assigned_to: "chidi", due_date: "2026-08-01" }), // 2 days overdue
+      task({ assigned_to: "chidi" }), // no deadline: ignored even though created long ago
+    ],
+    people,
+    comingWeek
+  )
+  assert.equal(comingWeek.startDate, "2026-08-03")
+  assert.deepEqual(
+    dept.dueThisWeek.people.map((p) => [p.name, p.count]),
+    [
+      ["Amaka Obi", 2],
+      ["Chidi Eze", 0],
+    ]
+  )
+  assert.equal(dept.overdue.total, 2)
+  assert.equal(dept.overdue.oldestDays, 14)
+  assert.deepEqual(
+    dept.overdue.people.map((p) => [p.name, p.count]),
+    [["Chidi Eze", 2]]
+  )
+})
+
+test("attachPendingChallenges: open or mitigating from earlier weeks only", () => {
+  const [dept] = attachPendingChallenges(
+    summarizeWeeklyTasks([], people, window),
+    [
+      { department: "IT and Communications", status: "open", week_number: 24, year: 2026 },
+      { department: "IT and Communications", status: "mitigating", week_number: 29, year: 2026 },
+      { department: "IT and Communications", status: "open", week_number: 30, year: 2026 }, // this week's
+      { department: "IT and Communications", status: "resolved", week_number: 20, year: 2026 },
+      { department: "IT and Communications", status: "open", week_number: 50, year: 2025 },
+    ],
+    30,
+    2026
+  )
+  assert.deepEqual(dept.pendingChallenges, { total: 3, open: 2, mitigating: 1, oldest: { week: 50, year: 2025 } })
 })
