@@ -541,6 +541,9 @@ export default async function AdminDashboardPage() {
       {/* 2x2 on desktop with every row the same height; each card scrolls inside
           it instead of leaving the grid ragged. Phones stack at natural height. */}
       <div className="grid grid-cols-1 gap-6 lg:auto-rows-[400px] lg:grid-cols-2">
+        {canSeeAuditActivity && (
+          <RecentActivityFeed activity={recentActivity} showViewAll={canAccessAction([], "/admin/audit-logs")} />
+        )}
         <ActionQueue
           title="Pending approvals"
           icon={Stamp}
@@ -556,9 +559,6 @@ export default async function AdminDashboardPage() {
           emptyDescription="Overdue tasks, due payments and open tickets will appear here."
         />
         <AwayToday items={awayToday} todayIso={todayIso} />
-        {canSeeAuditActivity && (
-          <RecentActivityFeed activity={recentActivity} showViewAll={canAccessAction([], "/admin/audit-logs")} />
-        )}
       </div>
     </PageWrapper>
   )
