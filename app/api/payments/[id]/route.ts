@@ -12,6 +12,7 @@ import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { classifyStarlinkMonths, type StarlinkMonth } from "@/lib/starlink/billing-schedule"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
+import { archivePaymentToSharePoint } from "@/lib/payments/archive"
 
 const log = logger("api/payments/id")
 
@@ -303,6 +304,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       },
       { failOpen: true }
     )
+
+    if (updatedPayment.status === "paid") {
+      void archivePaymentToSharePoint(dataClient, id).catch((err) => {
+        log.error({ paymentId: id, err: String(err) }, "Background payment archive to SharePoint failed")
+      })
+    }
 
     return NextResponse.json({ data: updatedPayment })
   } catch (error: unknown) {
