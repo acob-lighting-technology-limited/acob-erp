@@ -1544,7 +1544,8 @@ export function DataTable<TData>({
               const sn = snByRowId.get(rowId) ?? 1
 
               const handleSelect = () => {
-                if (detailConfig) setDetailRow(row)
+                if (mobileRow.expandInline && canExpand) toggleExpand(rowId)
+                else if (detailConfig) setDetailRow(row)
                 else if (mobileRow.onSelect) mobileRow.onSelect(row)
                 else if (canExpand) toggleExpand(rowId)
               }
@@ -1557,25 +1558,53 @@ export function DataTable<TData>({
                 </span>
               ) : null
 
+              const hasRichContent = Boolean(mobileRow.meta || mobileRow.snippet || mobileRow.wrapSubtitle)
+
               return (
                 <div key={rowId}>
                   <button
                     type="button"
                     onClick={handleSelect}
-                    className="hover:bg-muted/40 active:bg-muted relative flex w-full items-center gap-3 py-2.5 pr-3.5 pl-3 text-left transition-colors"
+                    className={cn(
+                      "hover:bg-muted/40 active:bg-muted relative flex w-full gap-3 py-2.5 pr-3.5 pl-3 text-left transition-colors",
+                      hasRichContent ? "items-start sm:items-center" : "items-center"
+                    )}
                   >
-                    {leadingContent && <span className="shrink-0">{leadingContent}</span>}
-                    <span className="min-w-0 flex-1">
+                    {leadingContent && (
+                      <span className={cn("shrink-0", hasRichContent && "mt-0.5 sm:mt-0")}>{leadingContent}</span>
+                    )}
+                    <span className="min-w-0 flex-1 space-y-0.5">
                       <span className="block truncate text-sm font-medium">{mobileRow.title(row)}</span>
                       {mobileRow.subtitle && (
-                        <span className="text-muted-foreground block truncate text-xs">{mobileRow.subtitle(row)}</span>
+                        <span
+                          className={cn("text-muted-foreground block text-xs", !mobileRow.wrapSubtitle && "truncate")}
+                        >
+                          {mobileRow.subtitle(row)}
+                        </span>
+                      )}
+                      {mobileRow.meta && (
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                          {mobileRow.meta(row)}
+                        </div>
+                      )}
+                      {mobileRow.snippet && (
+                        <p className="text-muted-foreground/80 line-clamp-2 pt-1 text-xs whitespace-pre-line">
+                          {mobileRow.snippet(row)}
+                        </p>
                       )}
                     </span>
-                    {mobileRow.trailing && <span className="shrink-0 text-right">{mobileRow.trailing(row)}</span>}
-                    <ChevronRight className="text-muted-foreground/50 h-4 w-4 shrink-0" />
+                    {mobileRow.trailing && (
+                      <span className="shrink-0 self-center text-right">{mobileRow.trailing(row)}</span>
+                    )}
+                    <ChevronRight
+                      className={cn(
+                        "text-muted-foreground/50 h-4 w-4 shrink-0 self-center transition-transform duration-200",
+                        mobileRow.expandInline && isExpanded && "text-primary rotate-90"
+                      )}
+                    />
                   </button>
                   {expandable && isExpanded && canExpand && (
-                    <div className="bg-muted/30 border-t p-3">{expandable.render(row)}</div>
+                    <div className="bg-muted/20 border-t p-3 text-xs">{expandable.render(row)}</div>
                   )}
                 </div>
               )
