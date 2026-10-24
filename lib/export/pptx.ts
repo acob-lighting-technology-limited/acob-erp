@@ -974,7 +974,7 @@ type WeeklyDepartmentLayout = {
   workDone: WeeklyContentBox
   tasks: WeeklyContentBox
   challenges: WeeklyContentBox
-  /** Column to the right of Work Done (full mode with counts), split into two equal cards. */
+  /** Column to the right of Work Done (full mode with counts): staff list over action points, 2:1. */
   taskCounts?: WeeklyContentBox
   actionPoints?: WeeklyContentBox
 }
@@ -1040,27 +1040,33 @@ const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLay
 
   const card = boxes.continuation
   const mainW = card.w - PPTX_TASK_SIDE_COLUMN_W - PPTX_TASK_SIDE_COLUMN_GAP
-  const halfH = (card.h - PPTX_TASK_CARD_GAP) / 2
-  const half = {
+  // Two-thirds for the staff list, which grows with the department; action
+  // points never need more than three rows.
+  const tasksH = (card.h - PPTX_TASK_CARD_GAP) * (2 / 3)
+  const actionsH = card.h - PPTX_TASK_CARD_GAP - tasksH
+  const column = (y: number, h: number): WeeklyContentBox => ({
     x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
+    y,
     w: PPTX_TASK_SIDE_COLUMN_W,
-    h: halfH,
+    h,
     textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
-    textH: Math.max(0.6, halfH - PPTX_TASK_CARD_HEADER_H - 0.1),
-  }
+    textH: Math.max(0.6, h - PPTX_TASK_CARD_HEADER_H - 0.1),
+  })
   return {
     workDone: { ...card, w: mainW, textW: mainW - 0.3 },
     tasks: boxes.page2Top,
     challenges: boxes.page2Bottom,
-    taskCounts: { ...half, y: card.y },
-    actionPoints: { ...half, y: card.y + halfH + PPTX_TASK_CARD_GAP },
+    taskCounts: column(card.y, tasksH),
+    actionPoints: column(card.y + tasksH + PPTX_TASK_CARD_GAP, actionsH),
   }
 }
 
 const getZeroTasksColor = (theme: WeeklyPptxTheme) => (theme === "dark" ? "F87171" : "B91C1C")
 
 const getTaskRatioColor = (counts: { completed: number; assigned: number }, theme: WeeklyPptxTheme) => {
-  if (counts.assigned > 0 && counts.completed === 0) return getZeroTasksColor(theme)
+  // Nothing assigned is not the person falling short, so it is grey, not red.
+  if (counts.assigned === 0) return getWeeklyPptxThemeColors(theme).textMuted
+  if (counts.completed === 0) return getZeroTasksColor(theme)
   return getWeeklyPptxThemeColors(theme).accent
 }
 
@@ -1234,8 +1240,10 @@ const addSectionCardChrome = (
   color: string,
   theme: WeeklyPptxTheme = "light",
   titleSuffix?: WeeklyTitleSuffix,
-  titleSize = PPTX_WEEKLY_SECTION_TITLE_SIZE
-) => {
+  titleSize = PPTX_WEEKLY_SECTION_TITLE_SIZE,
+  /** A small muted line under the title, inside the header (above the hairline). */
+  subtitle?: string
+): number => {
   const colors = getWeeklyPptxThemeColors(theme)
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: box.x,
@@ -1268,7 +1276,7 @@ const addSectionCardChrome = (
   }
   slide.addText(titleRuns, {
     x: box.x + 0.26,
-    y: box.y + 0.11,
+    y: box.y + (subtitle ? 0.06 : 0.11),
     w: box.w - 0.46,
     h: 0.3,
     fontSize: titleSize,
@@ -1278,15 +1286,31 @@ const addSectionCardChrome = (
     fontFace: "Calibri",
   })
 
+  if (subtitle) {
+    slide.addText(subtitle, {
+      x: box.x + 0.26,
+      y: box.y + 0.32,
+      w: box.w - 0.46,
+      h: 0.22,
+      fontSize: 9,
+      color: colors.textMuted,
+      valign: "middle",
+      fontFace: "Calibri",
+    })
+  }
+
   // Hairline under the title, separating label from content.
+  const hairlineY = subtitle ? 0.6 : 0.46
   slide.addShape(pres.ShapeType?.rect ?? "rect", {
     x: box.x + 0.26,
-    y: box.y + 0.46,
+    y: box.y + hairlineY,
     w: box.w - 0.5,
     h: 0.012,
     fill: { color: colors.separator },
     line: { color: colors.separator, width: 0 },
   })
+  // Where the card's body starts, below the header.
+  return hairlineY + 0.16
 }
 
 const addSectionCard = (
@@ -1489,7 +1513,7 @@ const planTaskSummaryRows = (count: number, textH: number) => {
   return { fontSize, rows: Math.max(1, Math.floor(textH / weeklyLineHeightIn(fontSize))) }
 }
 
-type SummaryRow = { label: string; value: string; color: string }
+type SummaryRow = { label: string; value: string; color: string; labelColor?: string }
 
 /**
  * Label / count rows in two aligned text boxes with identical font and
@@ -1519,7 +1543,7 @@ const addSummaryRows = (
   slide.addText(
     rows.map((row) => ({
       text: truncateToChars(row.label, maxLabelChars),
-      options: { color: labelColor, breakLine: true },
+      options: { color: row.labelColor ?? labelColor, breakLine: true },
     })),
     { ...textOptions, x: box.x, w: labelW, align: "left" }
   )
@@ -1582,6 +1606,7 @@ const addTaskCountsCard = (
     label: person.name,
     value: formatTaskRatio(person),
     color: getTaskRatioColor(person, theme),
+    labelColor: person.assigned === 0 ? colors.textMuted : undefined,
   }))
   if (overflow > 0) personRows.push({ label: `+${overflow + 1} more`, value: "", color: colors.textMuted })
   addSummaryRows(slide, at, personRows, fontSize, colors.sectionText)
@@ -1597,7 +1622,7 @@ const addActionPointsCard = (
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const ap = summary.actionPoints
-  addSectionCardChrome(
+  const bodyTop = addSectionCardChrome(
     pres,
     slide,
     box,
@@ -1605,11 +1630,12 @@ const addActionPointsCard = (
     colors.accent,
     theme,
     { text: `${ap.completed} / ${ap.total}`, color: colors.textPrimary, compact: true },
-    PPTX_TASK_SIDE_TITLE_SIZE
+    PPTX_TASK_SIDE_TITLE_SIZE,
+    "(Tasks for Last Week)"
   )
 
   // textW leaves almost no right inset; right-aligned counts need a real one.
-  const at = { x: box.x + 0.26, y: box.y + 0.62, w: box.textW - 0.14 }
+  const at = { x: box.x + 0.26, y: box.y + bodyTop, w: box.textW - 0.14 }
   if (ap.total === 0) {
     addSummaryNote(slide, at, "None set last meeting.", colors.textMuted)
     return

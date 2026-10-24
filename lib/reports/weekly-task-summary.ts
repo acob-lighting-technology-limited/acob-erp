@@ -10,6 +10,8 @@ import { normalizeDepartmentName } from "@/shared/departments"
  * cycle uses) plus anything finished in it; "completed" is the subset
  * approved as completed inside the window. A task owed this week but still
  * open shows as assigned-not-completed, which is the point of the 0 / 3 rows.
+ * Everyone passed in `people` gets a row, so staff given nothing that week
+ * show as 0 / 0 rather than disappearing.
  *
  * Action points follow the same window. Week N-1's items are the "tasks for
  * the new week" set at the last meeting (plus any carried into it), so week
@@ -133,9 +135,9 @@ export function summarizeWeeklyTasks(
   }
 
   const byDept = new Map<string, WeeklyDeptTaskSummary>()
-  counts.forEach((entry, userId) => {
-    const person = peopleById.get(userId)
-    if (!person?.department) return
+  peopleById.forEach((person, userId) => {
+    if (!person.department) return
+    const entry = counts.get(userId) ?? { completed: 0, assigned: 0 }
     const department = normalizeDepartmentName(person.department)
     const dept = byDept.get(department) ?? {
       department,

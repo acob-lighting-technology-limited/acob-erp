@@ -69,12 +69,13 @@ test("summarizeWeeklyTasks: counts done-in-window over owed-in-window", () => {
 })
 
 test("summarizeWeeklyTasks: completion just after Sunday midnight WAT falls in the next week", () => {
-  const summaries = summarizeWeeklyTasks(
+  const [dept] = summarizeWeeklyTasks(
     [task({ status: "completed", completed_at: "2026-08-02T23:30:00Z", due_date: "2026-08-04" })],
     people,
     window
   )
-  assert.equal(summaries.length, 0)
+  assert.equal(dept.assigned, 0)
+  assert.equal(dept.completed, 0)
 })
 
 test("summarizeWeeklyTasks: skips assignees with no department", () => {
@@ -109,4 +110,20 @@ test("attachActionPoints: counts by status and adds departments with no tasks", 
   assert.deepEqual(it?.actionPoints, { total: 4, completed: 1, inProgress: 1, notStarted: 2 })
   assert.deepEqual(accounts?.actionPoints, { total: 1, completed: 1, inProgress: 0, notStarted: 0 })
   assert.equal(accounts?.assigned, 0)
+})
+
+test("summarizeWeeklyTasks: department members with no tasks show as 0 / 0, last", () => {
+  const [dept] = summarizeWeeklyTasks(
+    [task({ assigned_to: "amaka", due_date: "2026-07-28" })],
+    [...people, { id: "bola", first_name: "Bola", last_name: "Ade", department: "IT and Communications" }],
+    window
+  )
+  assert.deepEqual(
+    dept.people.map((p) => [p.name, p.completed, p.assigned]),
+    [
+      ["Amaka Obi", 0, 1],
+      ["Bola Ade", 0, 0],
+      ["Chidi Eze", 0, 0],
+    ]
+  )
 })

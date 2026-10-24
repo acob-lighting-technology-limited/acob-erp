@@ -72,15 +72,25 @@ export async function GET(request: NextRequest) {
     )
     const userIds = Array.from(new Set(taskRows.map((t) => t.assigned_to).filter((id): id is string => Boolean(id))))
 
-    let people: SummaryPersonRow[] = []
-    if (userIds.length > 0) {
+    // Every active member gets a row (0 / 0 when given nothing), plus anyone who
+    // had tasks this week but has since left, so their work still counts.
+    const { data: activeStaff, error: staffError } = await db
+      .from("staff_directory")
+      .select("id, first_name, last_name, department")
+      .eq("employment_status", "active")
+    if (staffError) return serverError(log, staffError)
+    const peopleById = new Map(((activeStaff ?? []) as SummaryPersonRow[]).map((p) => [p.id, p]))
+
+    const missing = userIds.filter((id) => !peopleById.has(id))
+    if (missing.length > 0) {
       const { data, error: peopleError } = await db
         .from("staff_directory")
         .select("id, first_name, last_name, department")
-        .in("id", userIds)
+        .in("id", missing)
       if (peopleError) return serverError(log, peopleError)
-      people = (data ?? []) as SummaryPersonRow[]
+      ;((data ?? []) as SummaryPersonRow[]).forEach((p) => peopleById.set(p.id, p))
     }
+    const people = Array.from(peopleById.values())
 
     const reviewed = getPreviousOfficeWeek(week, year)
     const { data: actionPoints, error: actionPointsError } = await db
