@@ -9,9 +9,9 @@ import { getCurrentOfficeWeek, getReportingOfficeWeek } from "@/lib/meeting-week
 import { toast } from "sonner"
 import { getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
-import { CalendarDays, Download, FileBarChart, FileSpreadsheet, Plus } from "lucide-react"
+import { CalendarDays, Download, FileBarChart, FileSpreadsheet, Pencil, Plus } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableDetailAction, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import {
@@ -553,9 +553,71 @@ export function WeeklyReportsContent({
             const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
             return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
           },
-          onSelect: (report) => {
-            setEditingReport(report)
-            setIsAdminDialogOpen(true)
+          detail: {
+            title: (report) => report.department,
+            badges: (report) => {
+              const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
+              return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
+            },
+            fields: (report) => {
+              const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
+              const submitterName = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
+              const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
+              return [
+                { label: "Week", value: `W${report.week_number}, ${report.year}` },
+                { label: "Meeting Date", value: meetingDate },
+                { label: "Submitted By", value: submitterName },
+                {
+                  label: "Action Tracker",
+                  value: trackerStatus.label,
+                  href: `/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${encodeURIComponent(report.department)}`,
+                },
+                { label: "Submitted", value: formatWATTimeDate(report.created_at) },
+                {
+                  label: "Work Done",
+                  value: autoNumberLines(report.work_done) || "No work recorded.",
+                  fullWidth: true,
+                  copyable: true,
+                },
+                {
+                  label: "Tasks for New Week",
+                  value: autoNumberLines(report.tasks_new_week) || "No new tasks recorded.",
+                  fullWidth: true,
+                  copyable: true,
+                },
+                {
+                  label: "Challenges",
+                  value: autoNumberLines(report.challenges) || "No challenges recorded.",
+                  fullWidth: true,
+                  copyable: true,
+                },
+              ]
+            },
+            actions: (report) => {
+              const items: DataTableDetailAction[] = [
+                {
+                  label: "Export",
+                  icon: Download,
+                  variant: "outline",
+                  onClick: () => {
+                    setExportTarget({ kind: "single", report })
+                    setExportOptionsOpen(true)
+                  },
+                },
+              ]
+              if (canMutateFilteredWeek && canMutateReport(report)) {
+                items.unshift({
+                  label: "Edit",
+                  icon: Pencil,
+                  variant: "default",
+                  onClick: () => {
+                    setEditingReport(report)
+                    setIsAdminDialogOpen(true)
+                  },
+                })
+              }
+              return items
+            },
           },
         }}
         cardRenderer={(report) => {
