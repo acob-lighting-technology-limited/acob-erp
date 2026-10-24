@@ -4,12 +4,17 @@ import { ORG_STAFF_DOMAIN } from "@/lib/org-config"
 import { getAccountUsage, listMailboxes, type CpanelAccountUsage, type CpanelMailbox } from "./client"
 import { MAILBOX_ALERT_PERCENT } from "./quota"
 
-export type MailboxOwnerKind = "staff" | "inactive_staff" | "site" | "none"
+export type MailboxOwnerKind = "staff" | "inactive_staff" | "project" | "site" | "none"
 
 /** A project-site mailbox: the login email of a Starlink kit recorded in Matrix. */
 export interface MailboxSite {
   name: string
   projectName: string | null
+}
+
+export interface MailboxProject {
+  id: string
+  name: string
 }
 
 export interface MailboxOwner {
@@ -23,6 +28,8 @@ export interface MailboxReportRow extends CpanelMailbox {
   owner: MailboxOwner | null
   /** Set when no employee owns the mailbox but a Starlink kit logs in with it. */
   site: MailboxSite | null
+  /** Set when the mailbox is assigned directly to a company project. */
+  project: MailboxProject | null
   ownerKind: MailboxOwnerKind
   /** Owner has left or is suspended, but the mailbox still lets them log in. */
   inactiveOwnerCanLogIn: boolean
@@ -65,6 +72,11 @@ interface SiteRow {
   project: { project_name: string } | Array<{ project_name: string }> | null
 }
 
+interface ProjectMailboxRow {
+  email: string | null
+  project: { id: string; project_name: string } | Array<{ id: string; project_name: string }> | null
+}
+
 const INACTIVE_STATUSES = new Set(["exited", "suspended"])
 
 function profileName(p: ProfileRow): string {
@@ -72,12 +84,11 @@ function profileName(p: ProfileRow): string {
 }
 
 /**
- * Compares every cPanel mailbox with the staff profiles. Needs a service-role
- * client: the report spans every employee, and profiles RLS shows a normal
- * user only their own row.
+ * Compares every cPanel mailbox with the staff profiles, project mailboxes, and site kits.
+ * Needs a service-role client: the report spans every employee and project.
  */
 export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<MailboxReport> {
-  const [mailboxes, account, profilesResult, sitesResult] = await Promise.all([
+  const [mailboxes, account, profilesResult, sitesResult, projectMailboxesResult] = await Promise.all([
     listMailboxes(),
     getAccountUsage(),
     serviceClient
@@ -92,9 +103,17 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
       .from("starlink_sites")
       .select("email, site_name, project:projects(project_name)")
       .not("email", "is", null),
+    serviceClient
+      .from("project_mailboxes")
+      .select("email, project:projects(id, project_name)")
+      .not("email", "is", null),
   ])
   if (profilesResult.error) throw new Error(profilesResult.error.message)
   if (sitesResult.error) throw new Error(sitesResult.error.message)
+  // If migration has not yet been pushed, handle graceful empty array fallback during rollout
+  const projectMailboxesData = projectMailboxesResult.error
+    ? []
+    : ((projectMailboxesResult.data ?? []) as ProjectMailboxRow[])
 
   const sitesByEmail = new Map<string, MailboxSite>()
   for (const s of (sitesResult.data ?? []) as SiteRow[]) {
@@ -102,6 +121,16 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
     if (!email) continue
     const project = Array.isArray(s.project) ? s.project[0] : s.project
     sitesByEmail.set(email, { name: s.site_name, projectName: project?.project_name ?? null })
+  }
+
+  const projectsByEmail = new Map<string, MailboxProject>()
+  for (const pm of projectMailboxesData) {
+    const email = pm.email?.trim().toLowerCase()
+    if (!email) continue
+    const project = Array.isArray(pm.project) ? pm.project[0] : pm.project
+    if (project) {
+      projectsByEmail.set(email, { id: project.id, name: project.project_name })
+    }
   }
 
   const profiles = (profilesResult.data ?? []) as ProfileRow[]
@@ -120,11 +149,23 @@ export async function loadMailboxReport(serviceClient: SupabaseClient): Promise<
       : null
     const inactiveOwnerCanLogIn = inactive && !m.suspendedLogin
     const site = p ? null : (sitesByEmail.get(m.email) ?? null)
+    const project = p || site ? null : (projectsByEmail.get(m.email) ?? null)
+    const ownerKind: MailboxOwnerKind = p
+      ? inactive
+        ? "inactive_staff"
+        : "staff"
+      : project
+        ? "project"
+        : site
+          ? "site"
+          : "none"
+
     return {
       ...m,
       owner,
       site,
-      ownerKind: p ? (inactive ? "inactive_staff" : "staff") : site ? "site" : "none",
+      project,
+      ownerKind,
       inactiveOwnerCanLogIn,
       needsAttention: inactiveOwnerCanLogIn || (m.usedPercent ?? 0) >= MAILBOX_ALERT_PERCENT,
     }
