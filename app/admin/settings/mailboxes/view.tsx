@@ -42,7 +42,6 @@ const OWNER_LABELS: Record<MailboxReportRow["ownerKind"], string> = {
   staff: "Staff",
   inactive_staff: "Exited / suspended staff",
   project: "Project",
-  site: "Project site",
   none: "No staff record",
 }
 
@@ -78,15 +77,9 @@ function OwnerCell({ row }: { row: MailboxReportRow }) {
     return (
       <div className="min-w-0 space-y-0.5">
         <p className="truncate text-sm font-medium">Project – {row.project.name}</p>
-        <p className="text-muted-foreground truncate text-xs">Project mailbox</p>
-      </div>
-    )
-  }
-  if (row.site) {
-    return (
-      <div className="min-w-0 space-y-0.5">
-        <p className="truncate text-sm font-medium">Site – {row.site.name}</p>
-        <p className="text-muted-foreground truncate text-xs">{row.site.projectName ?? "No project linked"}</p>
+        <p className="text-muted-foreground truncate text-xs">
+          {row.project.source === "starlink" ? "Starlink site kit" : "Project mailbox"}
+        </p>
       </div>
     )
   }
@@ -153,8 +146,7 @@ export function MailboxesPage() {
         key: "owner",
         label: "Owner",
         sortable: true,
-        accessor: (m) =>
-          m.owner?.name ?? (m.project ? `Project – ${m.project.name}` : m.site ? `Site – ${m.site.name}` : ""),
+        accessor: (m) => m.owner?.name ?? (m.project ? `Project – ${m.project.name}` : ""),
         resizable: true,
         initialWidth: 220,
         render: (m) => <OwnerCell row={m} />,
@@ -404,9 +396,7 @@ export function MailboxesPage() {
           getRowId={(m) => m.email}
           searchPlaceholder="Search mailbox or owner..."
           searchFn={(m, q) =>
-            `${m.email} ${m.owner?.name ?? ""} ${m.project?.name ?? ""} ${m.site?.name ?? ""} ${m.site?.projectName ?? ""}`
-              .toLowerCase()
-              .includes(q.toLowerCase())
+            `${m.email} ${m.owner?.name ?? ""} ${m.project?.name ?? ""}`.toLowerCase().includes(q.toLowerCase())
           }
           isLoading={isLoading}
           error={errorMessage}
@@ -431,9 +421,7 @@ export function MailboxesPage() {
           ]}
           mobileRow={{
             title: (m) => m.email,
-            subtitle: (m) =>
-              m.owner?.name ??
-              (m.project ? `Project – ${m.project.name}` : m.site ? `Site – ${m.site.name}` : "No staff record"),
+            subtitle: (m) => m.owner?.name ?? (m.project ? `Project – ${m.project.name}` : "No staff record"),
             trailing: (m) => (
               <MailboxUsageBar
                 usedBytes={m.usedBytes}

@@ -50,5 +50,6 @@ export function buildPaymentDocumentPath(
 }
 
 export function isOneDrivePaymentDocumentPath(filePath: string | null | undefined): boolean {
-  return String(filePath || "").startsWith(`/${PAYMENT_DOCUMENT_LIBRARY}/`)
+  const str = String(filePath || "")
+  return str.startsWith(`/${PAYMENT_DOCUMENT_LIBRARY}/`) || str.startsWith("/finance/") || str.startsWith("https://")
 }

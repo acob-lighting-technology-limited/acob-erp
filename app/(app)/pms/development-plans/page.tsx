@@ -287,6 +287,21 @@ export default function DevelopmentPlansPage() {
         mobileRow={{
           title: (plan) => plan.title,
           subtitle: (plan) => FOCUS_LABELS[plan.focus_area] || plan.focus_area,
+          meta: (plan) => (
+            <>
+              <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] capitalize">
+                🎯 {plan.priority}
+              </span>
+              <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                📅 Due {formatDate(plan.target_date)}
+              </span>
+              <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                ✓ {planProgress(plan)}% ({plan.actions?.length || 0} steps)
+              </span>
+            </>
+          ),
+          snippet: (plan) => plan.description || null,
+          expandInline: true,
           trailing: (plan) => (
             <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-[10px] capitalize">
               {plan.status.replace("_", " ")}

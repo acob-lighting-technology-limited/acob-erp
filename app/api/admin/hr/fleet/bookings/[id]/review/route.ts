@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { assertNoFleetOverlap, canManageFleet } from "@/lib/fleet-booking"
 import { z } from "zod"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
@@ -7,6 +7,7 @@ import { writeAuditLog } from "@/lib/audit/write-audit"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
+import { archiveFleetBookingToSharePoint } from "@/lib/fleet/archive"
 
 const log = logger("api/admin/hr/fleet/bookings/id/review")
 
@@ -102,6 +103,12 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       },
       { failOpen: true }
     )
+
+    if (nextStatus === "approved") {
+      void archiveFleetBookingToSharePoint(dataClient, bookingId).catch((err) => {
+        log.error({ bookingId, err: String(err) }, "Background fleet booking archive to SharePoint failed")
+      })
+    }
 
     return NextResponse.json({ data })
   } catch (error) {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -147,10 +147,9 @@ export function UserHelpDeskTicketDetailsDialog({
   }, [events, comments])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* `max-h`, not a fixed `h`: a two-line ticket gets a short dialog. */}
-      <DialogContent className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl md:max-w-2xl">
+        <SheetHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
           <div className="flex flex-wrap items-center gap-1.5">
             {ticket?.ticket_number && (
               <Badge variant="outline" className="font-mono text-[11px]">
@@ -161,11 +160,11 @@ export function UserHelpDeskTicketDetailsDialog({
             {ticket && <PriorityBadge priority={ticket.priority} />}
           </div>
 
-          <DialogTitle className="text-base leading-snug font-semibold">
+          <SheetTitle className="text-base leading-snug font-semibold">
             {ticket ? ticket.title : "Help desk ticket"}
-          </DialogTitle>
+          </SheetTitle>
 
-          <DialogDescription className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+          <SheetDescription className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
             <span>{ticket?.service_department || "General service"}</span>
             {ticket?.created_at && (
               <>
@@ -173,8 +172,8 @@ export function UserHelpDeskTicketDetailsDialog({
                 <span>Logged {formatDateTime(ticket.created_at)}</span>
               </>
             )}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {/* Changing the status is why this dialog gets opened — it sits above the
             scroll rather than inside a tab. */}
@@ -376,7 +375,7 @@ export function UserHelpDeskTicketDetailsDialog({
             </Tabs>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }

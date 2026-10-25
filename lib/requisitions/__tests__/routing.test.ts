@@ -2,6 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { resolveRequisitionStages, type RoutingProfile } from "../routing"
 import { amountChangeMessage, amountOutOfRangeMessage, lineItemsTotal } from "../limits"
+import { PaymentRequestSchema } from "../schemas"
 
 const lead = (id: string, department: string, extra: string[] = []): RoutingProfile => ({
   id,
@@ -134,8 +135,8 @@ test("department names are normalised", () => {
 })
 
 test("amount limits", () => {
-  assert.equal(amountOutOfRangeMessage("payment_request", 30_000), null)
-  assert.match(amountOutOfRangeMessage("payment_request", 29_999) || "", /Petty Cash/)
+  assert.equal(amountOutOfRangeMessage("payment_request", 50_000), null)
+  assert.match(amountOutOfRangeMessage("payment_request", 49_999) || "", /Petty Cash/)
   assert.equal(amountOutOfRangeMessage("petty_cash", 50_000), null)
   assert.match(amountOutOfRangeMessage("petty_cash", 50_001) || "", /Payment Request/)
   assert.equal(amountOutOfRangeMessage("petty_cash", 100), null)
@@ -150,4 +151,23 @@ test("amount changes", () => {
 
 test("line item totals round to kobo", () => {
   assert.equal(lineItemsTotal([{ amount: 0.1 }, { amount: 0.2 }, { amount: "1000" }]), 1000.3)
+})
+
+test("payment request requires site location", () => {
+  const base = {
+    form_type: "payment_request" as const,
+    project_name: "Solar Expansion",
+    purpose: "Procurement of cables",
+    amount: 75_000,
+    beneficiary_details: [{ account_name: "Vendor Ltd", account_number: "0123456789", bank_name: "Access Bank" }],
+  }
+
+  const missingSite = PaymentRequestSchema.safeParse(base)
+  assert.equal(missingSite.success, false)
+
+  const emptySite = PaymentRequestSchema.safeParse({ ...base, site_location: "   " })
+  assert.equal(emptySite.success, false)
+
+  const valid = PaymentRequestSchema.safeParse({ ...base, site_location: "Abuja HQ" })
+  assert.equal(valid.success, true)
 })

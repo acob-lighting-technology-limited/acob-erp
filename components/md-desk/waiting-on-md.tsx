@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { useNow } from "@/hooks/use-now"
 import { ArrowUpRight, Clock, FileText, Inbox, Wallet } from "lucide-react"
@@ -11,6 +12,8 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { formatWATDate, formatWATRelative } from "@/lib/utils/date"
 import { MD_DESK_QUEUE_LABELS, type MdDeskQueueItem, type MdDeskQueueKind } from "@/lib/md-desk/types"
+import { RequisitionPreviewSheet } from "@/components/requisitions/requisition-preview-sheet"
+import { MdQueuePreviewSheet } from "./md-queue-preview-sheet"
 import { useMdDeskOverview } from "./use-md-desk"
 
 const KIND_CLASSES: Record<MdDeskQueueKind, string> = {
@@ -26,6 +29,7 @@ const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN
 export function WaitingOnMd() {
   const now = useNow()
   const { data, isLoading, error, refetch } = useMdDeskOverview()
+  const [selectedQueueItem, setSelectedQueueItem] = useState<MdDeskQueueItem | null>(null)
   const items = data?.queue.items ?? []
   const counts = data?.queue.counts
   const overdue = items.filter((i) => now - new Date(i.waiting_since).getTime() > 3 * 86_400_000).length
@@ -36,14 +40,23 @@ export function WaitingOnMd() {
       label: "Item",
       sortable: true,
       accessor: (i) => i.title,
+      width: "max-w-md",
       render: (i) => (
-        <div className="min-w-0 space-y-0.5">
-          <p className="flex items-center gap-2 truncate font-medium">
-            {i.title}
-            {i.urgent && <Badge variant="destructive">Emergency</Badge>}
+        <button
+          type="button"
+          onClick={() => setSelectedQueueItem(i)}
+          className="group block w-full max-w-xs min-w-0 space-y-0.5 text-left md:max-w-sm lg:max-w-md"
+        >
+          <p className="group-hover:text-primary flex items-center gap-2 font-medium group-hover:underline">
+            <span className="truncate">{i.title}</span>
+            {i.urgent && (
+              <Badge variant="destructive" className="shrink-0">
+                Emergency
+              </Badge>
+            )}
           </p>
           {i.detail && <p className="text-muted-foreground truncate text-xs">{i.detail}</p>}
-        </div>
+        </button>
       ),
     },
     {
@@ -51,6 +64,7 @@ export function WaitingOnMd() {
       label: "Type",
       sortable: true,
       accessor: (i) => i.kind,
+      width: "w-32",
       render: (i) => (
         <Badge variant="outline" className={`border-transparent ${KIND_CLASSES[i.kind]}`}>
           {MD_DESK_QUEUE_LABELS[i.kind]}
@@ -62,9 +76,10 @@ export function WaitingOnMd() {
       label: "From",
       sortable: true,
       accessor: (i) => i.requester,
+      width: "max-w-[220px]",
       render: (i) => (
-        <span className="text-sm">
-          {i.requester}
+        <span className="line-clamp-1 text-sm" title={`${i.requester}${i.department ? ` · ${i.department}` : ""}`}>
+          <span className="font-medium">{i.requester}</span>
           {i.department && <span className="text-muted-foreground"> · {i.department}</span>}
         </span>
       ),
@@ -74,14 +89,16 @@ export function WaitingOnMd() {
       label: "Amount",
       accessor: (i) => (typeof i.amount === "number" ? naira.format(i.amount) : "—"),
       hideOnMobile: true,
+      width: "w-28",
     },
     {
       key: "waiting_since",
       label: "Waiting since",
       sortable: true,
       accessor: (i) => i.waiting_since,
+      width: "w-32",
       render: (i) => (
-        <span className="text-sm" title={formatWATDate(i.waiting_since)}>
+        <span className="text-sm whitespace-nowrap" title={formatWATDate(i.waiting_since)}>
           {formatWATRelative(i.waiting_since)}
         </span>
       ),
@@ -89,12 +106,12 @@ export function WaitingOnMd() {
     {
       key: "open",
       label: "",
+      width: "w-24",
+      align: "right",
       render: (i) => (
-        <Button asChild size="sm" variant="outline">
-          <Link href={i.href}>
-            Open
-            <ArrowUpRight className="ml-1 h-3.5 w-3.5" aria-hidden />
-          </Link>
+        <Button size="sm" variant="outline" onClick={() => setSelectedQueueItem(i)}>
+          Review
+          <ArrowUpRight className="ml-1 h-3.5 w-3.5" aria-hidden />
         </Button>
       ),
     },
@@ -241,7 +258,7 @@ export function WaitingOnMd() {
             </div>
           ),
           onSelect: (i) => {
-            window.location.href = i.href
+            setSelectedQueueItem(i)
           },
           detail: {
             title: (i) => i.title,
@@ -270,7 +287,7 @@ export function WaitingOnMd() {
             ],
             actions: (i) => [
               {
-                label: "Open Approval Screen",
+                label: "Open Full Screen",
                 icon: ArrowUpRight,
                 href: i.href,
               },
@@ -278,6 +295,20 @@ export function WaitingOnMd() {
           },
         }}
       />
+
+      {selectedQueueItem?.kind === "requisition" ? (
+        <RequisitionPreviewSheet
+          requisitionId={selectedQueueItem.id.replace("requisition-", "")}
+          open={Boolean(selectedQueueItem)}
+          onOpenChange={(open) => !open && setSelectedQueueItem(null)}
+        />
+      ) : (
+        <MdQueuePreviewSheet
+          item={selectedQueueItem}
+          open={Boolean(selectedQueueItem)}
+          onOpenChange={(open) => !open && setSelectedQueueItem(null)}
+        />
+      )}
     </DataTablePage>
   )
 }

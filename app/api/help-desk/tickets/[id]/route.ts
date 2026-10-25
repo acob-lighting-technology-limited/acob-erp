@@ -14,6 +14,8 @@ import { sendHelpDeskMail } from "@/lib/help-desk/mailer"
 import { logger } from "@/lib/logger"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
 import { createNotification } from "@/lib/notifications/create"
+import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
+import { archiveHelpDeskTicketToSharePoint } from "@/lib/help-desk/archive"
 
 const log = logger("help-desk-ticket")
 export const dynamic = "force-dynamic"
@@ -317,6 +319,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       } catch (mailError) {
         log.error({ err: String(mailError) }, "Help desk mail error on resolve")
       }
+    }
+
+    if (["resolved", "closed"].includes(String(updated.status))) {
+      const dataClient = getServiceRoleClientOrFallback(supabase)
+      void archiveHelpDeskTicketToSharePoint(dataClient, ticket.id).catch((err) => {
+        log.error({ ticketId: ticket.id, err: String(err) }, "Background Help Desk archive to SharePoint failed")
+      })
     }
 
     return NextResponse.json({ data: updated })

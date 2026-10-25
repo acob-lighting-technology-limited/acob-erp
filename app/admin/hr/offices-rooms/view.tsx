@@ -39,6 +39,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 import { personName } from "@/lib/format"
+import { DepartmentStatusBadge } from "@/app/admin/hr/departments/view"
 
 const log = logger("hr-office-locations")
 
@@ -105,15 +106,13 @@ function LocationCard({
           <p className="font-semibold">{location.name}</p>
           <p className="text-muted-foreground text-xs">{location.employee_count || 0} employees</p>
         </div>
-        <Badge variant={location.is_active ? "default" : "secondary"}>
-          {location.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <DepartmentStatusBadge isActive={location.is_active} />
       </div>
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline">
           {OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type}
         </Badge>
-        {location.department ? <Badge variant="secondary">{location.department}</Badge> : null}
+        {location.department ? <Badge variant="outline">{location.department}</Badge> : null}
       </div>
       <p className="text-muted-foreground text-sm">{location.description || "No description added"}</p>
       <div className="flex items-center gap-2">
@@ -315,7 +314,7 @@ export function OfficeLocationsPage({
       hideOnMobile: true,
       render: (location) =>
         location.department ? (
-          <Badge variant="secondary">{location.department}</Badge>
+          <span className="text-sm">{location.department}</span>
         ) : (
           <span className="text-muted-foreground text-sm">-</span>
         ),
@@ -325,18 +324,18 @@ export function OfficeLocationsPage({
       label: "Headcount",
       sortable: true,
       accessor: (location) => location.employee_count || 0,
-      render: (location) => <Badge variant="secondary">{location.employee_count || 0} employees</Badge>,
+      render: (location) => (
+        <span className="text-muted-foreground text-sm">
+          {location.employee_count || 0} {location.employee_count === 1 ? "employee" : "employees"}
+        </span>
+      ),
     },
     {
       key: "status",
       label: "Status",
       sortable: true,
       accessor: (location) => (location.is_active ? "active" : "inactive"),
-      render: (location) => (
-        <Badge variant={location.is_active ? "default" : "secondary"}>
-          {location.is_active ? "Active" : "Inactive"}
-        </Badge>
-      ),
+      render: (location) => <DepartmentStatusBadge isActive={location.is_active} />,
     },
   ]
 
@@ -602,20 +601,12 @@ export function OfficeLocationsPage({
           title: (location) => location.name,
           subtitle: (location) =>
             `${OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type} · ${location.department || "All Departments"} · ${location.employee_count || 0} employees`,
-          trailing: (location) => (
-            <Badge variant={location.is_active ? "default" : "secondary"} className="text-[10px]">
-              {location.is_active ? "Active" : "Inactive"}
-            </Badge>
-          ),
+          trailing: (location) => <DepartmentStatusBadge isActive={location.is_active} />,
           detail: {
             title: (location) => location.name,
             subtitle: (location) =>
               OFFICE_TYPE_OPTIONS.find((item) => item.value === location.type)?.label || location.type,
-            badges: (location) => (
-              <Badge variant={location.is_active ? "default" : "secondary"} className="text-[10px]">
-                {location.is_active ? "Active" : "Inactive"}
-              </Badge>
-            ),
+            badges: (location) => <DepartmentStatusBadge isActive={location.is_active} />,
             fields: (location) => [
               {
                 label: "Type",

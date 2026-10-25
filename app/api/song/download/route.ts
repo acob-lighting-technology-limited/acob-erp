@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { run, parseHttpUrl } from "@/lib/shell/run"
 import { findNewestFile } from "@/lib/media/temp-files"
-import { readFile, unlink, mkdir } from "fs/promises"
-import { existsSync } from "fs"
+import { unlink, mkdir } from "fs/promises"
+import { existsSync, createReadStream, statSync } from "fs"
+import { Readable } from "stream"
 import path from "path"
 import { tmpdir } from "os"
 import { serverError } from "@/lib/api/errors"
 import { logger } from "@/lib/logger"
 
 const log = logger("api/song/download")
+
+export const maxDuration = 300
+
+const tempDir = path.join(tmpdir(), "song-downloads")
 
 const DRM_PROTECTED_PLATFORMS = [
   "spotify.com",
@@ -31,6 +36,42 @@ function isDRMProtected(url: string): boolean {
   }
 }
 
+function getDRMResponse(url: string) {
+  try {
+    const urlObj = new URL(url)
+    const domain = urlObj.hostname.toLowerCase().replace("www.", "")
+    let platformName = "This platform"
+    if (domain.includes("spotify")) platformName = "Spotify"
+    else if (domain.includes("apple") || domain.includes("itunes")) platformName = "Apple Music"
+    else if (domain.includes("amazon")) platformName = "Amazon Music"
+    else if (domain.includes("pandora")) platformName = "Pandora"
+    else if (domain.includes("tidal")) platformName = "Tidal"
+    else if (domain.includes("qobuz")) platformName = "Qobuz"
+
+    return NextResponse.json(
+      {
+        error: `${platformName} uses DRM (Digital Rights Management) protection and cannot be downloaded.`,
+        drmProtected: true,
+        platform: platformName,
+        suggestions: [
+          "Try YouTube Music, SoundCloud, or Bandcamp instead",
+          "Use the official platform app for offline listening",
+          "Look for official download options in the platform's premium features",
+        ],
+      },
+      { status: 400 }
+    )
+  } catch {
+    return NextResponse.json(
+      {
+        error: "This platform uses DRM protection and cannot be downloaded.",
+        drmProtected: true,
+      },
+      { status: 400 }
+    )
+  }
+}
+
 export async function POST(request: NextRequest) {
   let tempFile: string | null = null
 
@@ -48,118 +89,47 @@ export async function POST(request: NextRequest) {
     }
 
     if (isDRMProtected(url)) {
-      try {
-        const urlObj = new URL(url)
-        const domain = urlObj.hostname.toLowerCase().replace("www.", "")
-        let platformName = "This platform"
-        if (domain.includes("spotify")) platformName = "Spotify"
-        else if (domain.includes("apple") || domain.includes("itunes")) platformName = "Apple Music"
-        else if (domain.includes("amazon")) platformName = "Amazon Music"
-        else if (domain.includes("pandora")) platformName = "Pandora"
-        else if (domain.includes("tidal")) platformName = "Tidal"
-        else if (domain.includes("qobuz")) platformName = "Qobuz"
-
-        return NextResponse.json(
-          {
-            error: `${platformName} uses DRM (Digital Rights Management) protection and cannot be downloaded.`,
-            drmProtected: true,
-            platform: platformName,
-            suggestions: [
-              "Try YouTube Music, SoundCloud, or Bandcamp instead",
-              "Use the official platform app for offline listening",
-              "Look for official download options in the platform's premium features",
-            ],
-          },
-          { status: 400 }
-        )
-      } catch {
-        return NextResponse.json(
-          {
-            error: "This platform uses DRM protection and cannot be downloaded.",
-            drmProtected: true,
-          },
-          { status: 400 }
-        )
-      }
+      return getDRMResponse(url)
     }
 
-    const tempDir = path.join(tmpdir(), "song-downloads")
     if (!existsSync(tempDir)) {
       await mkdir(tempDir, { recursive: true })
     }
 
-    let songTitle = title || "song"
-    let songArtist = artist || "Unknown"
-    try {
-      const { stdout: infoStdout, stderr: infoStderr } = await run(
-        "yt-dlp",
-        ["-J", "--no-warnings", target.toString()],
-        {
-          maxBuffer: 10 * 1024 * 1024,
-          timeout: 30000,
+    let songTitle = title || ""
+    let songArtist = artist || ""
+
+    if (!songTitle || !songArtist) {
+      try {
+        const { stdout: infoStdout, stderr: infoStderr } = await run(
+          "yt-dlp",
+          ["-J", "--no-warnings", target.toString()],
+          {
+            maxBuffer: 10 * 1024 * 1024,
+            timeout: 30000,
+          }
+        )
+
+        if (infoStderr && (infoStderr.includes("[DRM]") || infoStderr.includes("DRM protection"))) {
+          return getDRMResponse(url)
         }
-      )
 
-      if (infoStderr && (infoStderr.includes("[DRM]") || infoStderr.includes("DRM protection"))) {
-        const urlObj = new URL(url)
-        const domain = urlObj.hostname.toLowerCase().replace("www.", "")
-        let platformName = "This platform"
-        if (domain.includes("spotify")) platformName = "Spotify"
-        else if (domain.includes("apple") || domain.includes("itunes")) platformName = "Apple Music"
-        else if (domain.includes("amazon")) platformName = "Amazon Music"
-        else if (domain.includes("pandora")) platformName = "Pandora"
-        else if (domain.includes("tidal")) platformName = "Tidal"
-        else if (domain.includes("qobuz")) platformName = "Qobuz"
-
-        return NextResponse.json(
-          {
-            error: `${platformName} uses DRM (Digital Rights Management) protection and cannot be downloaded.`,
-            drmProtected: true,
-            platform: platformName,
-            suggestions: [
-              "Try YouTube Music, SoundCloud, or Bandcamp instead",
-              "Use the official platform app for offline listening",
-              "Look for official download options in the platform's premium features",
-            ],
-          },
-          { status: 400 }
-        )
+        const info = JSON.parse(infoStdout)
+        if (info.title && !songTitle) songTitle = info.title
+        if ((info.artist || info.uploader || info.creator) && !songArtist) {
+          songArtist = info.artist || info.uploader || info.creator
+        }
+      } catch (err: any) {
+        const errorMessage = err.stderr || err.message || ""
+        if (errorMessage.includes("[DRM]") || errorMessage.includes("DRM protection")) {
+          return getDRMResponse(url)
+        }
+        log.info("Could not fetch song metadata, using provided/default")
       }
-
-      const info = JSON.parse(infoStdout)
-      if (info.title) songTitle = info.title
-      if (info.artist || info.uploader || info.creator) {
-        songArtist = info.artist || info.uploader || info.creator
-      }
-    } catch (err: any) {
-      const errorMessage = err.stderr || err.message || ""
-      if (errorMessage.includes("[DRM]") || errorMessage.includes("DRM protection")) {
-        const urlObj = new URL(url)
-        const domain = urlObj.hostname.toLowerCase().replace("www.", "")
-        let platformName = "This platform"
-        if (domain.includes("spotify")) platformName = "Spotify"
-        else if (domain.includes("apple") || domain.includes("itunes")) platformName = "Apple Music"
-        else if (domain.includes("amazon")) platformName = "Amazon Music"
-        else if (domain.includes("pandora")) platformName = "Pandora"
-        else if (domain.includes("tidal")) platformName = "Tidal"
-        else if (domain.includes("qobuz")) platformName = "Qobuz"
-
-        return NextResponse.json(
-          {
-            error: `${platformName} uses DRM (Digital Rights Management) protection and cannot be downloaded.`,
-            drmProtected: true,
-            platform: platformName,
-            suggestions: [
-              "Try YouTube Music, SoundCloud, or Bandcamp instead",
-              "Use the official platform app for offline listening",
-              "Look for official download options in the platform's premium features",
-            ],
-          },
-          { status: 400 }
-        )
-      }
-      log.info("Could not fetch song title, using provided/default")
     }
+
+    if (!songTitle) songTitle = "song"
+    if (!songArtist) songArtist = "Unknown"
 
     const sanitizedTitle = songTitle
       .replace(/[<>:"/\\|?*]/g, "_")
@@ -173,10 +143,10 @@ export async function POST(request: NextRequest) {
       .substring(0, 50)
       .trim()
 
+    const fileId = globalThis.crypto.randomUUID()
     const timestamp = Date.now()
-    let outputTemplate = path.join(tempDir, `${sanitizedArtist}_${sanitizedTitle}_${timestamp}.%(ext)s`)
+    const outputTemplate = path.join(tempDir, `${fileId}_${timestamp}.%(ext)s`)
 
-    // argv array, so nothing in the URL or the title-derived path is parsed.
     const ytdlpArgs: string[] = []
     let audioBitrate = "0" // Default to best quality
 
@@ -191,127 +161,73 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    ytdlpArgs.push("-x", "--audio-format", "mp3", "--audio-quality", audioBitrate)
-    outputTemplate = path.join(tempDir, `${sanitizedArtist}_${sanitizedTitle}_${timestamp}.mp3`)
-    ytdlpArgs.push("-o", outputTemplate, "--no-warnings", target.toString())
-
-    let stdout: string
-    let stderr: string
+    ytdlpArgs.push(
+      "-x",
+      "--audio-format",
+      "mp3",
+      "--audio-quality",
+      audioBitrate,
+      "-N",
+      "5",
+      "-o",
+      outputTemplate,
+      "--no-warnings",
+      target.toString()
+    )
 
     try {
-      const result = await run("yt-dlp", ytdlpArgs, {
+      await run("yt-dlp", ytdlpArgs, {
         maxBuffer: 50 * 1024 * 1024,
-        timeout: 120000,
+        timeout: 300000,
       })
-      stdout = result.stdout
-      stderr = result.stderr || ""
     } catch (execError: any) {
       const errorMessage = execError.stderr || execError.message || ""
       if (errorMessage.includes("[DRM]") || errorMessage.includes("DRM protection")) {
-        const urlObj = new URL(url)
-        const domain = urlObj.hostname.toLowerCase().replace("www.", "")
-        let platformName = "This platform"
-        if (domain.includes("spotify")) platformName = "Spotify"
-        else if (domain.includes("apple") || domain.includes("itunes")) platformName = "Apple Music"
-        else if (domain.includes("amazon")) platformName = "Amazon Music"
-        else if (domain.includes("pandora")) platformName = "Pandora"
-        else if (domain.includes("tidal")) platformName = "Tidal"
-        else if (domain.includes("qobuz")) platformName = "Qobuz"
-
-        return NextResponse.json(
-          {
-            error: `${platformName} uses DRM (Digital Rights Management) protection and cannot be downloaded.`,
-            drmProtected: true,
-            platform: platformName,
-            suggestions: [
-              "Try YouTube Music, SoundCloud, or Bandcamp instead",
-              "Use the official platform app for offline listening",
-              "Look for official download options in the platform's premium features",
-            ],
-          },
-          { status: 400 }
-        )
+        return getDRMResponse(url)
       }
       throw execError
-    }
-
-    log.info("Download stdout:", stdout)
-    if (stderr) {
-      if (stderr.includes("[DRM]") || stderr.includes("DRM protection")) {
-        const urlObj = new URL(url)
-        const domain = urlObj.hostname.toLowerCase().replace("www.", "")
-        let platformName = "This platform"
-        if (domain.includes("spotify")) platformName = "Spotify"
-        else if (domain.includes("apple") || domain.includes("itunes")) platformName = "Apple Music"
-        else if (domain.includes("amazon")) platformName = "Amazon Music"
-        else if (domain.includes("pandora")) platformName = "Pandora"
-        else if (domain.includes("tidal")) platformName = "Tidal"
-        else if (domain.includes("qobuz")) platformName = "Qobuz"
-
-        return NextResponse.json(
-          {
-            error: `${platformName} uses DRM (Digital Rights Management) protection and cannot be downloaded.`,
-            drmProtected: true,
-            platform: platformName,
-            suggestions: [
-              "Try YouTube Music, SoundCloud, or Bandcamp instead",
-              "Use the official platform app for offline listening",
-              "Look for official download options in the platform's premium features",
-            ],
-          },
-          { status: 400 }
-        )
-      }
-      log.info("Download stderr:", stderr)
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500))
 
     tempFile =
-      (await findNewestFile(tempDir, { contains: String(timestamp) })) ??
-      (await findNewestFile(tempDir, { extensions: [".mp3"], withinMs: 2 * 60 * 1000 })) ??
-      (await findNewestFile(tempDir, { extensions: [".mp3"] }))
+      (await findNewestFile(tempDir, { contains: fileId })) ??
+      (await findNewestFile(tempDir, { extensions: [".mp3"], withinMs: 5 * 60 * 1000 }))
 
     if (!tempFile || !existsSync(tempFile)) {
-      let ffmpegInstalled = false
-      try {
-        await run("which", ["ffmpeg"])
-        ffmpegInstalled = true
-      } catch (e) {}
-
-      if (!ffmpegInstalled) {
-        throw new Error("ffmpeg is required for MP3 conversion.")
-      }
-
       throw new Error("Download failed - file not found.")
     }
-
-    const fileBuffer = await readFile(tempFile)
 
     const sanitizedFilename = `${sanitizedArtist}_${sanitizedTitle}.mp3`
       .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
       .substring(0, 200)
 
-    setTimeout(async () => {
-      try {
-        if (tempFile && existsSync(tempFile)) {
-          await unlink(tempFile)
-        }
-      } catch (err) {
-        log.error("Error cleaning up temp file:", err)
-      }
-    }, 1000)
+    const stat = statSync(tempFile)
 
-    return new NextResponse(fileBuffer as any, {
-      headers: {
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodeURIComponent(sanitizedFilename)}`,
-        "Content-Length": fileBuffer.length.toString(),
+    // Safety fallback cleanup after 30 minutes
+    const fileToClean = tempFile
+    setTimeout(
+      async () => {
+        try {
+          if (existsSync(fileToClean)) {
+            await unlink(fileToClean)
+          }
+        } catch {}
       },
+      30 * 60 * 1000
+    )
+
+    const downloadUrl = `/api/public/download?id=${fileId}&name=${encodeURIComponent(sanitizedFilename)}`
+
+    return NextResponse.json({
+      success: true,
+      fileId,
+      filename: sanitizedFilename,
+      size: stat.size,
+      downloadUrl,
     })
   } catch (error: any) {
     log.error("Error downloading song:", error)
-
     if (tempFile && existsSync(tempFile)) {
       try {
         await unlink(tempFile)
@@ -319,9 +235,17 @@ export async function POST(request: NextRequest) {
         log.error("Error cleaning up temp file:", err)
       }
     }
-
     return serverError(log, error, "Download failed")
   }
 }
 
-export const maxDuration = 120
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const fileId = searchParams.get("id")
+  if (fileId) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/api/public/download"
+    return NextResponse.redirect(url)
+  }
+  return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+}

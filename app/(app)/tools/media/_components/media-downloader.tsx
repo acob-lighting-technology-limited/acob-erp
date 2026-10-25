@@ -140,67 +140,42 @@ export function MediaDownloader() {
     }
   }, [url, mode, mediaType, handleFetchInfo])
 
-  const handleDownload = async (formatId?: string, trackUrl?: string) => {
+  const handleDownload = (formatId?: string, trackUrl?: string, filesize?: number | null) => {
     const urlToDownload = trackUrl || url
     const isAudio = formatId?.startsWith("audio_mp3_") || mediaType === "song"
     const formatType = isAudio ? "MP3" : "video"
 
-    setDownloadingFormatId(formatId || "best")
     setError("")
 
-    const toastId = toast.loading(`Preparing ${formatType} download...`)
+    const toastId = toast.loading(`Starting ${formatType} download...`)
 
-    try {
-      const endpoint = mediaType === "video" ? "/api/download" : "/api/song/download"
-      const response = await apiFetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: urlToDownload,
-          format_id: formatId,
-          title: info?.title,
-          artist: info?.artist || info?.uploader,
-        }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Download failed")
-      }
-
-      const contentDisposition = response.headers.get("Content-Disposition")
-      let filename = `${info?.title || "download"}.${isAudio ? "mp3" : "mp4"}`
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i)
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, "")
-        }
-      }
-
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = downloadUrl
-      a.download = filename
-      a.style.display = "none"
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(downloadUrl)
-      document.body.removeChild(a)
-
-      toast.success("Downloaded successfully!", {
-        id: toastId,
-        description: `Saved: ${filename}`,
-      })
-    } catch (err: any) {
-      const errorMsg = err.message || "Download failed"
-      setError(errorMsg)
-      toast.error(errorMsg, { id: toastId })
-    } finally {
-      setDownloadingFormatId(null)
+    const params = new URLSearchParams({
+      url: urlToDownload,
+      format_id: formatId || "",
+      title: info?.title || "",
+    })
+    if (info?.artist || info?.uploader) {
+      params.set("artist", info.artist || info.uploader || "")
     }
+    if (filesize && filesize > 0) {
+      params.set("size", filesize.toString())
+    }
+
+    const downloadUrl = `/api/public/download?${params.toString()}`
+
+    const a = document.createElement("a")
+    a.href = downloadUrl
+    a.download = ""
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+
+    setTimeout(() => {
+      toast.success("Download started! Check your browser or download manager.", {
+        id: toastId,
+        description: info?.title ? `Saving: ${info.title}` : undefined,
+      })
+    }, 2000)
   }
 
   const handleBatchDownload = async () => {
@@ -456,7 +431,7 @@ export function MediaDownloader() {
                             variant="outline"
                             size="sm"
                             disabled={downloadingFormatId !== null}
-                            onClick={() => handleDownload(f.format_id)}
+                            onClick={() => handleDownload(f.format_id, undefined, f.filesize)}
                           >
                             {downloadingFormatId === f.format_id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -487,7 +462,7 @@ export function MediaDownloader() {
                             variant="outline"
                             size="sm"
                             disabled={downloadingFormatId !== null}
-                            onClick={() => handleDownload(f.format_id)}
+                            onClick={() => handleDownload(f.format_id, undefined, f.filesize)}
                           >
                             {downloadingFormatId === f.format_id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />

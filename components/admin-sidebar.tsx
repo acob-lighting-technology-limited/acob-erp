@@ -20,8 +20,9 @@ import {
   MessageSquare,
   LogOut,
   Settings,
+  Server,
   FileBarChart,
-  FileCode2,
+  Mail,
   Megaphone,
   ShieldCheck,
   FlaskConical,
@@ -164,15 +165,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       roles: [],
       children: [
         { name: "Requisitions", href: `${base}/accounts/requisitions` },
-        { name: "Payments", href: `${base}/accounts/payments` },
-        { name: "Bills", href: `${base}/accounts/bills` },
-        { name: "Invoices", href: `${base}/accounts/invoices` },
-        { name: "Finance Reports", href: `${base}/accounts/reports` },
-        {
-          name: "Assets",
-          href: `${base}/assets`,
-          children: [{ name: "Issues", href: `${base}/assets/issues` }],
-        },
+        { name: "Assets", href: `${base}/assets` },
       ],
     },
     {
@@ -212,7 +205,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       section: "operations",
       name: "Correspondence",
       href: `${base}/correspondence`,
-      icon: FileCode2,
+      icon: Mail,
       roles: [],
     },
     {
@@ -303,15 +296,6 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
   },
   {
-    // Shown to the MD, delegates, super admins and developers (showMdDesk); the page re-checks.
-    section: "management",
-    name: "MD's Desk",
-    href: "/admin/md-desk",
-    icon: Briefcase,
-    roles: ["developer", "super_admin", "admin"],
-    children: mdDeskNavChildren("/admin/md-desk"),
-  },
-  {
     section: "management",
     name: "HR",
     description: "Human Resources",
@@ -328,6 +312,30 @@ const adminNavigation: NavItem[] = [
       { name: "Resource Booking", href: "/admin/hr/resources" },
       { name: "Offices & Rooms", href: "/admin/hr/offices-rooms" },
     ],
+  },
+  {
+    section: "management",
+    name: "IT",
+    description: "Information Technology",
+    href: "/admin/it",
+    icon: Server,
+    roles: ["developer", "super_admin", "admin"],
+    children: [
+      { name: "Onboarding", href: "/admin/onboarding" },
+      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
+      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
+      { name: "Network Activity", href: "/admin/security/network-activity" },
+      { name: "Bypass & Override", href: "/admin/security/bypass-override" },
+    ],
+  },
+  {
+    // Shown to the MD, delegates, super admins and developers (showMdDesk); the page re-checks.
+    section: "management",
+    name: "MD's Desk",
+    href: "/admin/md-desk",
+    icon: Briefcase,
+    roles: ["developer", "super_admin", "admin"],
+    children: mdDeskNavChildren("/admin/md-desk"),
   },
   {
     // Split out of HR — it had grown to 11 sub-items nested three levels
@@ -353,21 +361,7 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
-      { name: "Payments", href: "/admin/accounts/payments" },
-      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
-      { name: "Bills", href: "/admin/accounts/bills" },
-      { name: "Invoices", href: "/admin/accounts/invoices" },
       { name: "Payroll", href: "/admin/payroll" },
-      { name: "Finance Reports", href: "/admin/accounts/reports" },
-      {
-        name: "Purchasing",
-        href: "/admin/purchasing",
-        children: [
-          { name: "Orders", href: "/admin/purchasing/orders" },
-          { name: "Receipts", href: "/admin/purchasing/receipts" },
-          { name: "Suppliers", href: "/admin/purchasing/suppliers" },
-        ],
-      },
       {
         name: "Inventory",
         href: "/admin/inventory",
@@ -381,7 +375,6 @@ const adminNavigation: NavItem[] = [
       {
         name: "Assets",
         href: "/admin/assets",
-        children: [{ name: "Issues", href: "/admin/assets/issues" }],
       },
     ],
   },
@@ -457,7 +450,7 @@ const adminNavigation: NavItem[] = [
     section: "operations",
     name: "Correspondence",
     href: "/admin/correspondence",
-    icon: FileCode2,
+    icon: Mail,
     roles: ["developer", "super_admin", "admin"],
   },
   {
@@ -496,43 +489,33 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
-    section: "compliance",
-    name: "System & Security",
-    href: "/admin/security",
+    section: "system",
+    name: "Audit Logs",
+    href: "/admin/audit-logs",
     icon: ShieldCheck,
     roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Audit Logs", href: "/admin/audit-logs" },
-      { name: "Network Activity", href: "/admin/security/network-activity" },
-      { name: "Bypass & Override", href: "/admin/security/bypass-override" },
-    ],
   },
   {
-    section: "compliance",
+    section: "system",
     name: "Settings",
     href: "/admin/settings",
     icon: Settings,
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Users", href: "/admin/settings/users" },
-      // Lists every account and its sign-in state, and resolves to settings.main
-      // for exactly that reason. It sat under HR, where its visibility was
-      // controlled by a grant unrelated to the item it appeared beside.
-      { name: "Onboarding", href: "/admin/onboarding" },
       { name: "Roles", href: "/admin/settings/roles" },
       { name: "Company", href: "/admin/settings/company" },
       { name: "Attendance", href: "/admin/settings/attendance" },
       { name: "CBT", href: "/admin/settings/cbt" },
       { name: "Mail", href: "/admin/settings/mail" },
-      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],
   },
   {
-    // Its own collapsible item under Compliance. Developer-only —
+    // Its own collapsible item under System. Developer-only —
     // /admin/dev resolves to dev.main, which canAccessRouteV2 gates to the
     // developer role, so the whole branch is hidden from admin / super_admin.
-    section: "compliance",
+    section: "system",
     name: "Developer",
     href: "/admin/dev",
     icon: FlaskConical,
@@ -552,7 +535,7 @@ const adminSections = [
   { key: "overview", label: "Overview" },
   { key: "management", label: "Management" },
   { key: "operations", label: "Operations" },
-  { key: "compliance", label: "Compliance" },
+  { key: "system", label: "System" },
 ]
 
 const ADMIN_ROUTE_ALIASES: RouteAliases = {
@@ -561,6 +544,8 @@ const ADMIN_ROUTE_ALIASES: RouteAliases = {
   "/admin/finance": ["/admin/payments"],
   // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
   "/admin/corporate-services": ["/admin/corporate-scorecard"],
+  // Audit Logs — legacy /admin/security redirects into audit-logs.
+  "/admin/audit-logs": ["/admin/security"],
 }
 
 export function AdminSidebar({
@@ -1059,26 +1044,17 @@ export function AdminSidebar({
                 Dashboard
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              asChild
-              className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
-            >
-              <Link href="/admin/settings" className="flex w-full items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              asChild
-              className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
-            >
-              {/* Personal settings, which the admin shell otherwise has no route
-                  to. Distinct from the org settings above, hence the label. */}
-              <Link href="/settings" className="flex w-full items-center gap-2">
-                <User className="h-4 w-4" />
-                My Settings
-              </Link>
-            </DropdownMenuItem>
+            {(!deptId || isAdminLikeUser) && (
+              <DropdownMenuItem
+                asChild
+                className="cursor-pointer text-[var(--admin-sidebar-foreground)] focus:bg-[var(--admin-accent-soft)] focus:text-[var(--admin-primary)] data-[highlighted]:bg-[var(--admin-accent-soft)] data-[highlighted]:text-[var(--admin-primary)]"
+              >
+                <Link href="/admin/settings" className="flex w-full items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+            )}
             {deptConsoles
               .filter((console) => console.id !== deptId)
               .map((console) => (

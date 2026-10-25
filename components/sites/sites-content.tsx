@@ -23,7 +23,7 @@ export function SitesContent({ isAdmin }: { isAdmin: boolean }) {
   const [dialog, setDialog] = useState<SiteDialogState>({ mode: "closed" })
   const [deleting, setDeleting] = useState<SiteRecord | null>(null)
   const { data, isLoading } = useSites()
-  const canEdit = data?.canEdit ?? false
+  const canEdit = isAdmin && (data?.canEdit ?? false)
 
   // Counted per site, not per document: "3 sites have expired paperwork" is the
   // number management asks for.
@@ -108,7 +108,13 @@ export function SitesContent({ isAdmin }: { isAdmin: boolean }) {
         </StatGrid>
       }
     >
-      <SitesTable dialog={dialog} setDialog={setDialog} deleting={deleting} setDeleting={setDeleting} />
+      <SitesTable
+        isAdmin={isAdmin}
+        dialog={dialog}
+        setDialog={setDialog}
+        deleting={deleting}
+        setDeleting={setDeleting}
+      />
     </DataTablePage>
   )
 }

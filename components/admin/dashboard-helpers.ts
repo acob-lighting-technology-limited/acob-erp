@@ -62,17 +62,43 @@ export function isExcludedActivity(
   const action = normalizeToken(item.action || item.operation || "")
   const entityType = normalizeToken(item.entity_type || item.table_name || "")
 
-  if (["sync", "migrate", "update_schema", "migration", "client_error"].includes(action)) return true
-  if (["ui_runtime", "frontend"].includes(entityType)) return true
+  if (["sync", "migrate", "update_schema", "migration", "client_error", "system_error"].includes(action)) return true
+  if (["ui_runtime", "frontend", "system_runtime"].includes(entityType)) return true
   return false
 }
 
-export function buildRecentActivity(
-  filteredRawActivity: (DescribableAuditRow & { id: string; user_id: string | null; created_at: string })[],
-  actorMap: Map<string, { first_name?: string; last_name?: string; company_email?: string }>
+export type ActivityAuditRow = DescribableAuditRow & {
+  id: string
+  user_id: string | null
+  created_at: string
+}
+
+export interface CollapsedActivityEntry<R extends ActivityAuditRow = ActivityAuditRow> {
+  row: R
+  sentence: string
+}
+
+export function collapseRecentActivity<R extends ActivityAuditRow>(
+  rawRows: R[],
+  limit = 8
+): CollapsedActivityEntry<R>[] {
+  const rows = (rawRows || []).filter((item) => !isExcludedActivity(item))
+  return describeActivityFeed(rows).slice(0, limit)
+}
+
+export function buildRecentActivity<R extends ActivityAuditRow>(
+  entries: R[] | CollapsedActivityEntry<R>[],
+  actorMap: Map<string, { first_name?: string; last_name?: string; company_email?: string }>,
+  limit?: number
 ): RecentActivityItem[] {
-  const rows = (filteredRawActivity || []).filter((item) => !isExcludedActivity(item))
-  return describeActivityFeed(rows).map(({ row, sentence }) => {
+  const isPreCollapsed = entries.length > 0 && "sentence" in entries[0]
+  const collapsed: CollapsedActivityEntry<R>[] = isPreCollapsed
+    ? (entries as CollapsedActivityEntry<R>[])
+    : describeActivityFeed((entries as R[]).filter((item) => !isExcludedActivity(item)))
+
+  const sliced = typeof limit === "number" ? collapsed.slice(0, limit) : collapsed
+
+  return sliced.map(({ row, sentence }) => {
     const actor = row.user_id ? actorMap.get(row.user_id) : undefined
     const actorName =
       actor?.first_name && actor?.last_name

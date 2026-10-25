@@ -1,7 +1,7 @@
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
+import { DEFAULT_TEAMS_LINK } from "@/lib/events/types"
 
-export const DEFAULT_TEAMS_LINK =
-  "https://teams.microsoft.com/l/meetup-join/19%3ameeting_MWZhNTgwYjEtMzdjMi00ZDZkLWJhM2YtZjFiNjgxNDEzN2Nk%40thread.v2/0?context=%7b%22Tid%22%3a%22b1f048ac-9f61-4cfd-98a3-13454b2682e5%22%2c%22Oid%22%3a%22224317b2-9cfb-425c-bc86-57bb397c73cd%22%7d"
+export { DEFAULT_TEAMS_LINK }
 
 export const LEGACY_DEFAULT_AGENDA = [
   "Opening Prayer",

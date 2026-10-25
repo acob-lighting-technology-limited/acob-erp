@@ -1308,7 +1308,7 @@ export function DataTable<TData>({
                       )}
                     >
                       {selectable && (
-                        <TableCell className="w-10 text-center">
+                        <TableCell className="w-10 py-3 text-center">
                           <Checkbox
                             checked={selectedRows.has(rowId)}
                             onCheckedChange={() => toggleSelect(rowId)}
@@ -1317,7 +1317,7 @@ export function DataTable<TData>({
                         </TableCell>
                       )}
                       {showRowNumbers && expandable && expandAtStart ? (
-                        <TableCell className="text-muted-foreground w-16 text-center font-mono text-xs font-medium whitespace-nowrap">
+                        <TableCell className="text-muted-foreground w-16 py-3 text-center font-mono text-xs font-medium whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1">
                             {canExpand ? (
                               <Button
@@ -1344,7 +1344,7 @@ export function DataTable<TData>({
                       ) : (
                         <>
                           {expandable && expandAtStart && (
-                            <TableCell className="w-10 text-center">
+                            <TableCell className="w-10 py-3 text-center">
                               {canExpand ? (
                                 <Button
                                   variant="ghost"
@@ -1367,7 +1367,7 @@ export function DataTable<TData>({
                             </TableCell>
                           )}
                           {showRowNumbers && (
-                            <TableCell className="text-muted-foreground w-12 text-center font-mono text-xs font-medium">
+                            <TableCell className="text-muted-foreground w-12 py-3 text-center font-mono text-xs font-medium">
                               {globalIndex + 1}
                             </TableCell>
                           )}
@@ -1377,16 +1377,22 @@ export function DataTable<TData>({
                         <TableCell
                           key={col.key}
                           className={cn(
+                            "py-3",
+                            colWidths[col.key] && "overflow-hidden",
                             col.align === "right" && "text-right",
                             col.align === "center" && "text-center",
-                            col.hideOnMobile && !contactsAvailable && "hidden md:table-cell"
+                            col.hideOnMobile && !contactsAvailable && "hidden md:table-cell",
+                            col.width
                           )}
+                          style={
+                            colWidths[col.key] ? { width: colWidths[col.key], maxWidth: colWidths[col.key] } : undefined
+                          }
                         >
                           {col.render ? col.render(row, globalIndex) : col.accessor ? (col.accessor(row) ?? "-") : "-"}
                         </TableCell>
                       ))}
                       {expandable && !expandAtStart && (
-                        <TableCell>
+                        <TableCell className="py-3">
                           {canExpand ? (
                             <Button
                               variant="ghost"
@@ -1402,7 +1408,7 @@ export function DataTable<TData>({
                         </TableCell>
                       )}
                       {rowActions && rowActions.length > 0 && (
-                        <TableCell className="text-right">
+                        <TableCell className="py-3 text-right">
                           {(() => {
                             const visible = rowActions.filter((a) => !a.hidden || !a.hidden(row))
                             if (visible.length === 0) return null
@@ -1544,9 +1550,9 @@ export function DataTable<TData>({
               const sn = snByRowId.get(rowId) ?? 1
 
               const handleSelect = () => {
-                if (detailConfig) setDetailRow(row)
+                if (canExpand) toggleExpand(rowId)
+                else if (detailConfig) setDetailRow(row)
                 else if (mobileRow.onSelect) mobileRow.onSelect(row)
-                else if (canExpand) toggleExpand(rowId)
               }
 
               const leadingContent = mobileRow.leading ? (
@@ -1557,25 +1563,53 @@ export function DataTable<TData>({
                 </span>
               ) : null
 
+              const hasRichContent = Boolean(mobileRow.meta || mobileRow.snippet || mobileRow.wrapSubtitle)
+
               return (
                 <div key={rowId}>
                   <button
                     type="button"
                     onClick={handleSelect}
-                    className="hover:bg-muted/40 active:bg-muted relative flex w-full items-center gap-3 py-2.5 pr-3.5 pl-3 text-left transition-colors"
+                    className={cn(
+                      "hover:bg-muted/40 active:bg-muted relative flex w-full gap-3 py-2.5 pr-3.5 pl-3 text-left transition-colors",
+                      hasRichContent ? "items-start sm:items-center" : "items-center"
+                    )}
                   >
-                    {leadingContent && <span className="shrink-0">{leadingContent}</span>}
-                    <span className="min-w-0 flex-1">
+                    {leadingContent && (
+                      <span className={cn("shrink-0", hasRichContent && "mt-0.5 sm:mt-0")}>{leadingContent}</span>
+                    )}
+                    <span className="min-w-0 flex-1 space-y-0.5">
                       <span className="block truncate text-sm font-medium">{mobileRow.title(row)}</span>
                       {mobileRow.subtitle && (
-                        <span className="text-muted-foreground block truncate text-xs">{mobileRow.subtitle(row)}</span>
+                        <span
+                          className={cn("text-muted-foreground block text-xs", !mobileRow.wrapSubtitle && "truncate")}
+                        >
+                          {mobileRow.subtitle(row)}
+                        </span>
+                      )}
+                      {mobileRow.meta && (
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                          {mobileRow.meta(row)}
+                        </div>
+                      )}
+                      {mobileRow.snippet && (
+                        <p className="text-muted-foreground/80 line-clamp-2 pt-1 text-xs whitespace-pre-line">
+                          {mobileRow.snippet(row)}
+                        </p>
                       )}
                     </span>
-                    {mobileRow.trailing && <span className="shrink-0 text-right">{mobileRow.trailing(row)}</span>}
-                    <ChevronRight className="text-muted-foreground/50 h-4 w-4 shrink-0" />
+                    {mobileRow.trailing && (
+                      <span className="shrink-0 self-center text-right">{mobileRow.trailing(row)}</span>
+                    )}
+                    <ChevronRight
+                      className={cn(
+                        "text-muted-foreground/50 h-4 w-4 shrink-0 self-center transition-transform duration-200",
+                        mobileRow.expandInline && isExpanded && "text-primary rotate-90"
+                      )}
+                    />
                   </button>
                   {expandable && isExpanded && canExpand && (
-                    <div className="bg-muted/30 border-t p-3">{expandable.render(row)}</div>
+                    <div className="bg-muted/20 border-t p-3 text-xs">{expandable.render(row)}</div>
                   )}
                 </div>
               )
@@ -1753,13 +1787,19 @@ export function DataTable<TData>({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {paginatedData.map((row) => {
                 const rowId = getRowId(row)
+                const canExpand = expandable && (!expandable.canExpand || expandable.canExpand(row))
                 const handleCardClick = (e: ReactMouseEvent<HTMLDivElement>) => {
                   const target = e.target as HTMLElement
                   if (isInteractiveTarget(target)) {
                     return
                   }
-                  if (detailConfig) setDetailRow(row)
-                  else if (mobileRow?.onSelect) mobileRow.onSelect(row)
+                  if (canExpand) {
+                    toggleExpand(rowId)
+                  } else if (detailConfig) {
+                    setDetailRow(row)
+                  } else if (mobileRow?.onSelect) {
+                    mobileRow.onSelect(row)
+                  }
                 }
 
                 return (
@@ -1768,7 +1808,7 @@ export function DataTable<TData>({
                     onClick={handleCardClick}
                     className={cn(
                       "h-full",
-                      (Boolean(detailConfig) || Boolean(mobileRow?.onSelect)) && "cursor-pointer"
+                      (Boolean(canExpand) || Boolean(detailConfig) || Boolean(mobileRow?.onSelect)) && "cursor-pointer"
                     )}
                   >
                     {cardRenderer(row)}

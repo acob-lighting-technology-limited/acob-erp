@@ -103,7 +103,18 @@ export async function POST(request: NextRequest) {
     const seenQualities = new Set<string>()
 
     if (info.formats) {
-      for (const f of info.formats) {
+      // Prioritize standard formats over bloated live master playlists (m3u8)
+      const sortedFormats = [...info.formats].sort((a, b) => {
+        const aIsM3u8 = a.protocol?.includes("m3u8") ? 1 : 0
+        const bIsM3u8 = b.protocol?.includes("m3u8") ? 1 : 0
+        if (aIsM3u8 !== bIsM3u8) return aIsM3u8 - bIsM3u8
+        const aSize = a.filesize || a.filesize_approx || 0
+        const bSize = b.filesize || b.filesize_approx || 0
+        if (aSize > 0 && bSize > 0) return aSize - bSize
+        return 0
+      })
+
+      for (const f of sortedFormats) {
         // Skip audio-only formats for video list
         if (f.vcodec === "none") continue
 

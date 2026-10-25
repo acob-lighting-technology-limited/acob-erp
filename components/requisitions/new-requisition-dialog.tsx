@@ -23,6 +23,8 @@ import {
   MAX_BENEFICIARIES,
   PAYMENT_REQUEST_MIN,
   PETTY_CASH_MAX,
+  REQUISITION_ATTACHMENT_MAX_COUNT,
+  REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES,
   amountOutOfRangeMessage,
   lineItemsTotal,
 } from "@/lib/requisitions/limits"
@@ -36,6 +38,14 @@ import type {
 import { uploadRequisitionFiles } from "@/lib/requisitions/upload"
 
 const NO_FUNDING = "none"
+
+type CostCategory = "admin" | "operational"
+
+interface ProjectOption {
+  id: string
+  project_name: string
+  location?: string | null
+}
 
 interface BeneficiaryDraft {
   account_name: string
@@ -57,13 +67,13 @@ function FormChoice({ onPick }: { onPick: (type: RequisitionFormType) => void })
       type: "payment_request",
       icon: FileText,
       title: FORM_LABELS.payment_request,
-      text: `${formatNaira(PAYMENT_REQUEST_MIN).replace(".00", "")} and above. For a project, with a purpose and site.`,
+      text: `${formatNaira(PAYMENT_REQUEST_MIN).replace(".00", "")} and above. For project expenses, vendor invoices, contracts, and major purchases.`,
     },
     {
       type: "petty_cash",
       icon: Receipt,
       title: FORM_LABELS.petty_cash,
-      text: `Up to ${formatNaira(PETTY_CASH_MAX).replace(".00", "")}. A short list of small items.`,
+      text: `Up to ${formatNaira(PETTY_CASH_MAX).replace(".00", "")}. For minor office expenses, urgent supplies, and daily running costs.`,
     },
   ]
   return (
@@ -81,8 +91,7 @@ function FormChoice({ onPick }: { onPick: (type: RequisitionFormType) => void })
         </button>
       ))}
       <p className="text-muted-foreground text-xs sm:col-span-2">
-        Between {formatNaira(PAYMENT_REQUEST_MIN).replace(".00", "")} and{" "}
-        {formatNaira(PETTY_CASH_MAX).replace(".00", "")}, either form can be used.
+        Expenses under ₦50,000 must use Petty Cash. For exactly ₦50,000, either form can be used.
       </p>
     </div>
   )
@@ -104,6 +113,11 @@ export function NewRequisitionDialog({
   helpDeskTicket?: { id: string; ticket_number: string; title: string } | null
 }) {
   const [formType, setFormType] = useState<RequisitionFormType | null>(null)
+  const [costCategory, setCostCategory] = useState<CostCategory>("operational")
+  const [selectedProjectId, setSelectedProjectId] = useState("")
+  const [customProjectName, setCustomProjectName] = useState("")
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
   const [projectName, setProjectName] = useState("")
   const [purpose, setPurpose] = useState("")
   const [siteLocation, setSiteLocation] = useState("")
@@ -119,6 +133,9 @@ export function NewRequisitionDialog({
   useEffect(() => {
     if (!open) return
     setFormType(null)
+    setCostCategory("operational")
+    setSelectedProjectId("")
+    setCustomProjectName("")
     setProjectName("")
     setPurpose(helpDeskTicket ? `For help desk ticket ${helpDeskTicket.ticket_number}: ${helpDeskTicket.title}` : "")
     setSiteLocation("")
@@ -129,11 +146,75 @@ export function NewRequisitionDialog({
     setBeneficiaries([emptyBeneficiary()])
     setAttachments([])
     setFundingId(NO_FUNDING)
-    apiFetch("/api/requisitions/funding-categories")
-      .then((res) => res.json())
-      .then((json) => setFundingCategories(json.data || []))
-      .catch(() => setFundingCategories([]))
+    setLoadingProjects(true)
+
+    Promise.all([
+      apiFetch("/api/requisitions/funding-categories")
+        .then((res) => res.json())
+        .then((json) => setFundingCategories(json.data || []))
+        .catch(() => setFundingCategories([])),
+      apiFetch("/api/projects")
+        .then((res) => res.json())
+        .then((json) => {
+          if (Array.isArray(json.data)) {
+            const list: ProjectOption[] = json.data
+              .filter((p: { id?: string; project_name?: string }) => p?.id && p?.project_name?.trim())
+              .map((p: { id: string; project_name: string; location?: string | null }) => ({
+                id: p.id,
+                project_name: p.project_name.trim(),
+                location: p.location || null,
+              }))
+            setProjects(list)
+          } else {
+            setProjects([])
+          }
+        })
+        .catch(() => setProjects([])),
+    ]).finally(() => {
+      setLoadingProjects(false)
+    })
   }, [open, helpDeskTicket])
+
+  const resolvedProjectName =
+    costCategory === "operational"
+      ? selectedProjectId === "__other__"
+        ? customProjectName.trim()
+        : projectName.trim()
+      : projectName.trim()
+
+  const handleCostCategoryChange = (val: CostCategory) => {
+    setCostCategory(val)
+    if (val === "operational") {
+      if (selectedProjectId === "__other__") {
+        setProjectName(customProjectName)
+      } else {
+        const found = projects.find((p) => p.id === selectedProjectId)
+        setProjectName(found ? found.project_name : "")
+      }
+    }
+  }
+
+  const handleProjectSelect = (val: string) => {
+    setSelectedProjectId(val)
+    if (val === "__other__") {
+      setProjectName(customProjectName)
+    } else {
+      const found = projects.find((p) => p.id === val)
+      if (found) {
+        setProjectName(found.project_name)
+        if (!siteLocation.trim() && found.location) {
+          setSiteLocation(found.location)
+        }
+      } else {
+        setProjectName("")
+      }
+    }
+  }
+
+  const handleCustomProjectChange = (val: string) => {
+    setCustomProjectName(val)
+    setProjectName(val)
+  }
 
   const total = useMemo(
     () =>
@@ -146,6 +227,8 @@ export function NewRequisitionDialog({
   const otherForm: RequisitionFormType = formType === "petty_cash" ? "payment_request" : "petty_cash"
   const maxBeneficiaries = formType ? MAX_BENEFICIARIES[formType] : 1
   const showSplit = beneficiaries.length > 1
+  const isPaymentRequestIncomplete =
+    formType === "payment_request" && (!resolvedProjectName || !purpose.trim() || !siteLocation.trim())
 
   const updateBeneficiary = (index: number, field: keyof BeneficiaryDraft, value: string) =>
     setBeneficiaries((prev) => prev.map((b, i) => (i === index ? { ...b, [field]: value } : b)))
@@ -154,9 +237,22 @@ export function NewRequisitionDialog({
 
   const handleFiles = async (files: FileList | null) => {
     if (!files?.length) return
+    const fileArray = Array.from(files)
+    if (attachments.length + fileArray.length > REQUISITION_ATTACHMENT_MAX_COUNT) {
+      toast.error(
+        `You can attach at most ${REQUISITION_ATTACHMENT_MAX_COUNT} files (${attachments.length} already attached)`
+      )
+      return
+    }
+    const currentBytes = attachments.reduce((sum, a) => sum + (a.file_size || 0), 0)
+    const newBytes = fileArray.reduce((sum, f) => sum + f.size, 0)
+    if (currentBytes + newBytes > REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES) {
+      toast.error(`Combined attachments cannot exceed ${REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES / (1024 * 1024)} MB`)
+      return
+    }
     setUploading(true)
     try {
-      const uploaded = await uploadRequisitionFiles(Array.from(files), "documents")
+      const uploaded = await uploadRequisitionFiles(fileArray, "documents", attachments)
       setAttachments((prev) => [...prev, ...uploaded])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed")
@@ -168,6 +264,22 @@ export function NewRequisitionDialog({
   const submit = async () => {
     if (!formType) return
     if (rangeProblem) return toast.error(rangeProblem)
+
+    if (formType === "payment_request") {
+      if (!resolvedProjectName) {
+        toast.error("Project is required")
+        return
+      }
+      if (!purpose.trim()) {
+        toast.error("Purpose is required")
+        return
+      }
+      if (!siteLocation.trim()) {
+        toast.error("Site location is required")
+        return
+      }
+    }
+
     const beneficiaryPayload = beneficiaries.map((b) => ({
       account_name: b.account_name,
       account_number: b.account_number.replace(/\s/g, ""),
@@ -189,9 +301,9 @@ export function NewRequisitionDialog({
           }
         : {
             form_type: formType,
-            project_name: projectName,
-            purpose,
-            site_location: siteLocation || undefined,
+            project_name: resolvedProjectName,
+            purpose: purpose.trim(),
+            site_location: siteLocation.trim(),
             amount: Number(amount) || 0,
             ...common,
           }
@@ -238,9 +350,61 @@ export function NewRequisitionDialog({
             {formType === "payment_request" ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="req-project">Project</Label>
-                  <Input id="req-project" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+                  <Label htmlFor="req-category">Cost category</Label>
+                  <Select value={costCategory} onValueChange={(val: CostCategory) => handleCostCategoryChange(val)}>
+                    <SelectTrigger id="req-category" aria-label="Cost category">
+                      <SelectValue placeholder="Select cost category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="operational">Operational Cost</SelectItem>
+                      <SelectItem value="admin">Admin Cost</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                {costCategory === "admin" ? (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="req-project">Project</Label>
+                    <Input
+                      id="req-project"
+                      placeholder="Enter project name"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label htmlFor="req-project-select">Project</Label>
+                      <Select value={selectedProjectId} onValueChange={handleProjectSelect}>
+                        <SelectTrigger id="req-project-select" aria-label="Project">
+                          <SelectValue placeholder={loadingProjects ? "Loading projects..." : "Select a project"} />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          {projects.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.project_name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="__other__">Others</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {selectedProjectId === "__other__" ? (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label htmlFor="req-custom-project">Specify Project</Label>
+                        <Input
+                          id="req-custom-project"
+                          placeholder="Enter project name"
+                          value={customProjectName}
+                          onChange={(e) => handleCustomProjectChange(e.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </>
+                )}
+
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="req-purpose">Purpose</Label>
                   <Textarea id="req-purpose" rows={3} value={purpose} onChange={(e) => setPurpose(e.target.value)} />
@@ -255,8 +419,13 @@ export function NewRequisitionDialog({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="req-site">Site location (optional)</Label>
-                  <Input id="req-site" value={siteLocation} onChange={(e) => setSiteLocation(e.target.value)} />
+                  <Label htmlFor="req-site">Site location</Label>
+                  <Input
+                    id="req-site"
+                    placeholder="Enter site location"
+                    value={siteLocation}
+                    onChange={(e) => setSiteLocation(e.target.value)}
+                  />
                 </div>
               </div>
             ) : (
@@ -402,13 +571,16 @@ export function NewRequisitionDialog({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="req-files">Supporting documents (optional)</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="req-files">Supporting documents (optional)</Label>
+                  <span className="text-muted-foreground text-xs">Max 20 files · 20 MB total</span>
+                </div>
                 <Input
                   id="req-files"
                   type="file"
                   multiple
                   accept="application/pdf,image/png,image/jpeg,image/webp"
-                  disabled={uploading}
+                  disabled={uploading || attachments.length >= REQUISITION_ATTACHMENT_MAX_COUNT}
                   onChange={(e) => {
                     handleFiles(e.target.files)
                     e.target.value = ""
@@ -417,28 +589,44 @@ export function NewRequisitionDialog({
               </div>
             </div>
             {attachments.length ? (
-              <ul className="space-y-1">
-                {attachments.map((file, i) => (
-                  <li
-                    key={file.file_path}
-                    className="flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-sm"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Upload className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
-                      <span className="truncate">{file.file_name}</span>
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remove ${file.file_name}`}
-                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+              <div className="space-y-1.5">
+                <div className="text-muted-foreground flex items-center justify-between text-xs">
+                  <span>
+                    {attachments.length} of {REQUISITION_ATTACHMENT_MAX_COUNT} files
+                  </span>
+                  <span>
+                    {(attachments.reduce((sum, a) => sum + (a.file_size || 0), 0) / (1024 * 1024)).toFixed(1)} MB /{" "}
+                    {REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES / (1024 * 1024)} MB
+                  </span>
+                </div>
+                <ul className="max-h-48 space-y-1 overflow-y-auto pr-1">
+                  {attachments.map((file, i) => (
+                    <li
+                      key={file.file_path}
+                      className="flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-sm"
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Upload className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
+                        <span className="truncate">{file.file_name}</span>
+                        {file.file_size ? (
+                          <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                            ({(file.file_size / (1024 * 1024)).toFixed(1)} MB)
+                          </span>
+                        ) : null}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remove ${file.file_name}`}
+                        onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
           </div>
         )}
@@ -448,7 +636,10 @@ export function NewRequisitionDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button onClick={submit} disabled={submitting || uploading || Boolean(rangeProblem) || total <= 0}>
+            <Button
+              onClick={submit}
+              disabled={submitting || uploading || Boolean(rangeProblem) || total <= 0 || isPaymentRequestIncomplete}
+            >
               {submitting || uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Submit {FORM_LABELS[formType]}
             </Button>

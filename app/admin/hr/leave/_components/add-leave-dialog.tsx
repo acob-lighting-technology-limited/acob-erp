@@ -79,8 +79,10 @@ async function fetchLeaveTypeOptions(userId: string): Promise<LeaveTypeOption[]>
       }
     }
 
-    // Active types only — retired types (Casual/Encashment/Personal) must not be grantable.
-    const activeTypes = (typesRes.ok ? (typesPayload?.data ?? []) : []).filter((t) => t.is_active !== false)
+    // Active Sick Leave only — only Sick Leave is directly grantable via manual bypass.
+    const activeTypes = (typesRes.ok ? (typesPayload?.data ?? []) : []).filter(
+      (t) => t.is_active !== false && t.name.toLowerCase().includes("sick")
+    )
 
     return activeTypes.map((t) => ({
       id: t.id,
@@ -195,7 +197,8 @@ export function AddLeaveDialog({
         <DialogHeader>
           <DialogTitle>Add Leave</DialogTitle>
           <DialogDescription>
-            Record approved leave directly, bypassing the request and approval workflow.
+            Record approved Sick Leave directly. Other leave types must be submitted through the standard employee leave
+            workflow.
           </DialogDescription>
         </DialogHeader>
 

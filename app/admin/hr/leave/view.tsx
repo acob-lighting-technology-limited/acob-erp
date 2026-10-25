@@ -396,12 +396,16 @@ export function LeaveApprovePage({
         label: "Employee",
         sortable: true,
         resizable: true,
-        initialWidth: 200,
+        initialWidth: 260,
         accessor: (r) => r.user?.full_name || "Employee",
         render: (r) => (
-          <div className="flex flex-col">
-            <span className="font-medium">{r.user?.full_name || "Employee"}</span>
-            <span className="text-muted-foreground text-xs">{r.user?.company_email}</span>
+          <div className="flex max-w-[260px] min-w-0 flex-col">
+            <span className="truncate font-medium" title={r.user?.full_name || "Employee"}>
+              {r.user?.full_name || "Employee"}
+            </span>
+            <span className="text-muted-foreground truncate text-xs" title={r.user?.company_email || undefined}>
+              {r.user?.company_email}
+            </span>
           </div>
         ),
       },
@@ -412,6 +416,7 @@ export function LeaveApprovePage({
         resizable: true,
         initialWidth: 150,
         accessor: (r) => r.leave_type?.name || "—",
+        render: (r) => <span className="text-sm font-medium whitespace-nowrap">{r.leave_type?.name || "—"}</span>,
       },
       {
         key: "period",

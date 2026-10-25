@@ -34,7 +34,6 @@ type Question = {
   prompt: string
   options: Record<"A" | "B" | "C" | "D", string>
   department?: string
-  is_bonus?: boolean
 }
 
 type SessionData = {
@@ -357,13 +356,7 @@ export default function CbtPage() {
     [answers, session]
   )
 
-  // Graded-only count for the pre-test instructions screen — bonus questions
-  // stay invisible until the candidate actually lands on one mid-test, so
-  // showing the full total here (including bonus) would tip them off early.
-  const standardQuestionsCount = useMemo(
-    () => (session ? session.questions.filter((q) => !q.is_bonus).length : 0),
-    [session]
-  )
+  const totalQuestionsCount = useMemo(() => (session ? session.questions.length : 0), [session])
 
   // On the resume screen, show what's actually left on the clock rather than
   // the full allowance — the deadline keeps counting down in real time even
@@ -500,7 +493,7 @@ export default function CbtPage() {
                 </div>
                 <div className="border-border/60 flex justify-between border-b pb-2">
                   <span>Total Questions</span>
-                  <span className="text-foreground font-medium">{standardQuestionsCount}</span>
+                  <span className="text-foreground font-medium">{totalQuestionsCount}</span>
                 </div>
                 <div className="border-border/60 flex justify-between border-b pb-2">
                   <span>{resumeTimeLeftSeconds !== null ? "Time Remaining" : "Total Time Allowed"}</span>
@@ -545,7 +538,7 @@ export default function CbtPage() {
                     <div className="flex justify-between">
                       <span>Answers Saved</span>
                       <span className="text-foreground font-medium">
-                        {Math.min(answeredCount, standardQuestionsCount)} of {standardQuestionsCount}
+                        {Math.min(answeredCount, totalQuestionsCount)} of {totalQuestionsCount}
                       </span>
                     </div>
                   </>
@@ -588,12 +581,8 @@ export default function CbtPage() {
   }
 
   if (session && testStarted && selectedQuestion) {
-    const standardQuestions = session.questions.filter((q) => !q.is_bonus)
-    const isCurrentBonus = selectedQuestion.is_bonus
-    const totalQuestionsToShow = isCurrentBonus ? session.questions.length : standardQuestions.length
-    const answeredCountToShow = isCurrentBonus
-      ? answeredCount
-      : standardQuestions.filter((q) => Boolean(answers[q.id])).length
+    const totalQuestionsToShow = session.questions.length
+    const answeredCountToShow = answeredCount
 
     return (
       <main className="bg-background text-foreground relative flex min-h-screen items-center justify-center p-6">
@@ -610,8 +599,7 @@ export default function CbtPage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-muted-foreground text-sm tracking-wider uppercase">
-                ACOB CBT Assessment — {selectedCycleName} —{" "}
-                {selectedQuestion.is_bonus ? "Bonus" : selectedQuestion.department || "General"}
+                ACOB CBT Assessment — {selectedCycleName} — {selectedQuestion.department || "General"}
               </p>
               <h1 className="text-foreground mt-2 text-3xl font-semibold">
                 {session.candidate.first_name}, keep going

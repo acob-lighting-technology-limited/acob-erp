@@ -27,6 +27,24 @@ import { serverError } from "@/lib/api/errors"
 
 const log = logger("hr-attendance-reports-api")
 
+function timeSpanInHours(startStr?: string | null, endStr?: string | null): number {
+  if (!startStr || !endStr) return 0
+  const startParts = startStr.split(":").map(Number)
+  const endParts = endStr.split(":").map(Number)
+  if (
+    !Number.isFinite(startParts[0]) ||
+    !Number.isFinite(startParts[1]) ||
+    !Number.isFinite(endParts[0]) ||
+    !Number.isFinite(endParts[1])
+  ) {
+    return 0
+  }
+  const startSeconds = startParts[0] * 3600 + startParts[1] * 60 + (startParts[2] || 0)
+  const endSeconds = endParts[0] * 3600 + endParts[1] * 60 + (endParts[2] || 0)
+  if (endSeconds <= startSeconds) return 0
+  return (endSeconds - startSeconds) / 3600
+}
+
 type AttendanceRow = {
   user_id: string | null
   date?: string | null
@@ -214,6 +232,7 @@ export async function GET(request: NextRequest) {
         lateness_with_permission_days = 0,
         incomplete_with_permission_days = 0,
         total_hours = 0,
+        physical_hours = 0,
         total_missed_hours = 0,
         waived_days = 0,
         cds_days = 0,
@@ -362,6 +381,9 @@ export async function GET(request: NextRequest) {
           clock_out_days++
         }
         overtime_hours += overtimeHoursFor(rec.clock_out, policy)
+        if (derived !== "out_of_station") {
+          physical_hours += timeSpanInHours(rec.clock_in, rec.clock_out)
+        }
       }
 
       const total_working_days = available_days
@@ -393,6 +415,7 @@ export async function GET(request: NextRequest) {
         holiday_days,
         attendance_credits: Math.round(attendance_credits * 100) / 100,
         total_hours: Math.round(total_hours * 10) / 10,
+        physical_hours: Math.round(physical_hours * 10) / 10,
         total_missed_hours: Math.round(total_missed_hours * 10) / 10,
         attendance_rate,
         attendance_exempt: Boolean(profile.attendance_exempt),
@@ -417,6 +440,7 @@ export async function GET(request: NextRequest) {
       clock_out_minutes_sum: number
       clock_out_days: number
       total_hours: number
+      physical_hours: number
       overtime_hours: number
       absent_days: number
       incomplete_days: number
@@ -437,6 +461,7 @@ export async function GET(request: NextRequest) {
           clock_out_minutes_sum: 0,
           clock_out_days: 0,
           total_hours: 0,
+          physical_hours: 0,
           overtime_hours: 0,
           absent_days: 0,
           incomplete_days: 0,
@@ -454,6 +479,7 @@ export async function GET(request: NextRequest) {
       dept.clock_out_minutes_sum += summary.clock_out_minutes_sum
       dept.clock_out_days += summary.clock_out_days
       dept.total_hours += summary.total_hours
+      dept.physical_hours += summary.physical_hours
       dept.overtime_hours += summary.overtime_hours
       dept.absent_days += summary.absent_days
       dept.incomplete_days += summary.incomplete_days ?? 0
@@ -474,6 +500,9 @@ export async function GET(request: NextRequest) {
           dept.clock_out_days > 0 ? Math.round(dept.clock_out_minutes_sum / dept.clock_out_days) : null,
         total_hours: Math.round(dept.total_hours * 10) / 10,
         avg_total_hours: dept.employee_count > 0 ? Math.round((dept.total_hours / dept.employee_count) * 10) / 10 : 0,
+        physical_hours: Math.round(dept.physical_hours * 10) / 10,
+        avg_physical_hours:
+          dept.employee_count > 0 ? Math.round((dept.physical_hours / dept.employee_count) * 10) / 10 : 0,
         overtime_hours: Math.round(dept.overtime_hours * 10) / 10,
         avg_overtime_hours:
           dept.employee_count > 0 ? Math.round((dept.overtime_hours / dept.employee_count) * 10) / 10 : 0,

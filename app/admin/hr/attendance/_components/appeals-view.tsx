@@ -20,16 +20,32 @@ interface AppealsViewProps {
   lockedDepartment?: string
 }
 
-function statusBadge(status: AppealRow["status"]) {
-  if (status === "approved")
+function statusBadge(status: AppealRow["status"], stage?: AppealRow["stage"]) {
+  if (status === "approved") {
     return (
       <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Approved</Badge>
     )
-  if (status === "rejected")
+  }
+  if (status === "rejected") {
     return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Rejected</Badge>
+  }
   // Closed because the day was changed directly rather than through the appeal.
-  if (status === "resolved")
+  if (status === "resolved") {
     return <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
+  }
+  if (stage === "pending_lead") {
+    return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Awaiting Lead</Badge>
+  }
+  if (stage === "pending_admin") {
+    return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Awaiting Admin</Badge>
+  }
+  if (stage === "pending_hr_lead") {
+    return (
+      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+        Awaiting HR Lead
+      </Badge>
+    )
+  }
   return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending</Badge>
 }
 
@@ -157,10 +173,10 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
       },
       {
         key: "status",
-        label: "Status",
+        label: "Status / Stage",
         sortable: true,
-        accessor: (r) => r.status,
-        render: (r) => statusBadge(r.status),
+        accessor: (r) => r.stage ?? r.status,
+        render: (r) => statusBadge(r.status, r.stage),
       },
     ],
     []
@@ -235,7 +251,32 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         mobileRow={{
           title: (r) => `${r.user_name} · ${r.department}`,
           subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
+          snippet: (r) => (r.appeal_reason ? `Reason: ${r.appeal_reason}` : null),
+          expandInline: true,
           trailing: (r) => statusBadge(r.status),
+          detail: {
+            title: (r) => `${r.user_name} (${r.department})`,
+            subtitle: (r) => `Appeal for ${formatWATDate(r.appeal_date)}`,
+            badges: (r) => statusBadge(r.status),
+            fields: (r) => [
+              { label: "Appeal Date", value: formatWATDate(r.appeal_date) },
+              { label: "Current Status", value: r.current_status },
+              { label: "Requested Status", value: r.requested_status },
+              { label: "Status", value: r.status },
+              { label: "Appeal Reason", value: r.appeal_reason || "No reason specified", fullWidth: true },
+              ...(r.resolution_note ? [{ label: "Resolution Note", value: r.resolution_note, fullWidth: true }] : []),
+            ],
+            actions: (r) =>
+              r.status === "pending"
+                ? [
+                    {
+                      label: "Review Appeal",
+                      variant: "default",
+                      onClick: () => setReviewAppeal(r),
+                    },
+                  ]
+                : [],
+          },
           onSelect: (r) => {
             if (r.status === "pending") setReviewAppeal(r)
           },

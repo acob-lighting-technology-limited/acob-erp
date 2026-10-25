@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableDetailAction, DataTableFilter } from "@/components/ui/data-table"
 import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { buildMeetingDocumentFileName } from "@/lib/reports/meeting-date"
@@ -682,28 +682,53 @@ export function MeetingDocumentTypeTable({
               row.uploaded_by && uploadedByNameMap.has(row.uploaded_by) ? uploadedByNameMap.get(row.uploaded_by) : "-"
 
             return (
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg border p-4">
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">File Name</p>
-                  <p className="mt-2 text-sm break-words">{row.file_name}</p>
+              <div className="space-y-3">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-xs tracking-wide uppercase">File Name</p>
+                    <p className="mt-2 text-sm break-words">{row.file_name}</p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-xs tracking-wide uppercase">Meeting Date</p>
+                    <p className="mt-2 text-sm">{formatMeetingDate(row.meeting_date)}</p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-xs tracking-wide uppercase">Submitted By</p>
+                    <p className="mt-2 text-sm">
+                      {row.uploaded_by && submittedBy !== "-" ? (
+                        <StaffNameWithAvatar
+                          name={submittedBy ?? "-"}
+                          profileId={row.uploaded_by}
+                          src={staffAvatars[row.uploaded_by]}
+                        />
+                      ) : (
+                        submittedBy
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-lg border p-4">
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">Meeting Date</p>
-                  <p className="mt-2 text-sm">{formatMeetingDate(row.meeting_date)}</p>
-                </div>
-                <div className="rounded-lg border p-4">
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">Submitted By</p>
-                  <p className="mt-2 text-sm">
-                    {row.uploaded_by && submittedBy !== "-" ? (
-                      <StaffNameWithAvatar
-                        name={submittedBy ?? "-"}
-                        profileId={row.uploaded_by}
-                        src={staffAvatars[row.uploaded_by]}
-                      />
-                    ) : (
-                      submittedBy
-                    )}
-                  </p>
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => {
+                      if (!row.signed_url) {
+                        toast.error("No downloadable file is available for this record")
+                        return
+                      }
+                      void handleDownload(row)
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download File
+                  </Button>
+                  {!readOnly && (
+                    <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => openEdit(row)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  )}
                 </div>
               </div>
             )
@@ -714,8 +739,25 @@ export function MeetingDocumentTypeTable({
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
-          title: (row) => `W${row.meeting_week} ${row.meeting_year}`,
+          title: (row) => `Week ${row.meeting_week}, ${row.meeting_year}`,
           subtitle: (row) => formatMeetingDate(row.meeting_date),
+          meta: (row) => {
+            const submittedBy =
+              row.uploaded_by && uploadedByNameMap.has(row.uploaded_by) ? uploadedByNameMap.get(row.uploaded_by) : null
+            return (
+              <>
+                {submittedBy && (
+                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                    👤 {submittedBy}
+                  </span>
+                )}
+                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px]">
+                  📄 {row.file_name}
+                </span>
+              </>
+            )
+          },
+          expandInline: true,
           trailing: (row) => (row.is_locked ? <Badge variant="outline">Locked</Badge> : undefined),
           detail: {
             title: (row) => `W${row.meeting_week} ${row.meeting_year}`,
@@ -732,6 +774,31 @@ export function MeetingDocumentTypeTable({
               { label: "File", value: row.file_name },
               { label: "Status", value: row.is_locked ? "Locked" : "Active" },
             ],
+            actions: (row) => {
+              const items: DataTableDetailAction[] = [
+                {
+                  label: "Download",
+                  icon: Download,
+                  variant: "default",
+                  onClick: () => {
+                    if (!row.signed_url) {
+                      toast.error("No downloadable file is available for this record")
+                      return
+                    }
+                    void handleDownload(row)
+                  },
+                },
+              ]
+              if (!readOnly) {
+                items.push({
+                  label: "Edit",
+                  icon: Pencil,
+                  variant: "outline",
+                  onClick: () => openEdit(row),
+                })
+              }
+              return items
+            },
           },
         }}
         cardRenderer={(row) => {

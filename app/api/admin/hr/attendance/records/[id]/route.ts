@@ -94,6 +94,68 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           ))
     const isCoveredWithoutTimes =
       nextStatus === "waiver" || nextStatus === "absent_with_permission" || nextStatus === "out_of_station"
+    const isPermissionStatus = isPermissionAttendanceStatus(nextStatus)
+    const isActorAdmin = auth.scope.isAdminLike && auth.scope.scopeMode !== "lead"
+    const isAlteringOther = auth.scope.userId !== record.user_id
+
+    // Two-party rule: If an Admin alters an attendance record to LWP, AWP, IWP, or OOS,
+    // it cannot be applied unilaterally — it stages as an appeal awaiting Lead confirmation.
+    if (isPermissionStatus && isActorAdmin && isAlteringOther) {
+      const { data: targetProfile } = await dataClient
+        .from("profiles")
+        .select("department, is_department_lead, full_name")
+        .eq("id", record.user_id)
+        .maybeSingle<{ department: string | null; is_department_lead: boolean; full_name: string | null }>()
+
+      const isTargetLead = Boolean(targetProfile?.is_department_lead)
+      const targetStage = isTargetLead ? "pending_hr_lead" : "pending_lead"
+      const now = new Date().toISOString()
+
+      const { data: staged, error: stageError } = await dataClient
+        .from("attendance_appeals")
+        .insert({
+          attendance_record_id: record.id,
+          user_id: record.user_id,
+          appeal_date: record.date,
+          current_status: record.status,
+          requested_status: nextStatus,
+          appeal_reason: parsed.data.manual_comment,
+          status: "pending",
+          stage: targetStage,
+          initiated_by_role: "admin_manual",
+          admin_reviewed_by: auth.scope.userId,
+          admin_reviewed_at: now,
+          admin_resolution_note: parsed.data.manual_comment,
+          created_by: auth.scope.userId,
+        })
+        .select("id")
+        .maybeSingle()
+
+      if (stageError) {
+        log.error({ err: stageError }, "Failed to stage manual alteration")
+        return NextResponse.json({ error: "Failed to stage alteration" }, { status: 500 })
+      }
+
+      await recordAttendanceEvent(dataClient, {
+        userId: record.user_id,
+        eventDate: record.date,
+        eventType: "manual_update",
+        attendanceRecordId: record.id,
+        fromStatus: record.status,
+        toStatus: nextStatus,
+        source: "manual",
+        comment: parsed.data.manual_comment,
+        actorId: auth.scope.userId,
+        metadata: { appeal_id: staged?.id, staged_stage: targetStage },
+      })
+
+      return NextResponse.json({
+        data: record,
+        staged: true,
+        message: `Status alteration to ${nextStatus} staged. Awaiting confirmation from ${isTargetLead ? "Admin & HR Lead" : "Department Lead"}.`,
+      })
+    }
+
     const isLWP = nextStatus === "lateness_with_permission" || nextStatus === "incomplete_with_permission"
 
     const quotaCheck = await validateLwpAwpMonthlyQuota({

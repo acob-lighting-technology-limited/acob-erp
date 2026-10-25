@@ -25,12 +25,16 @@ export interface RequisitionLineItem {
 
 export interface RequisitionAttachment {
   file_name: string
-  /** Path inside the private requisition_documents bucket. */
+  /** Path inside the private requisition_documents bucket or SharePoint archive. */
   file_path: string
   file_type?: string
   file_size?: number
-  /** Short-lived signed URL, added by the API when the requisition is read. */
+  /** Short-lived signed URL or SharePoint download URL, added by the API when the requisition is read. */
   signed_url?: string | null
+  /** Direct SharePoint web link if archived. */
+  web_url?: string | null
+  /** Timestamp when the attachment was archived to SharePoint. */
+  archived_at?: string | null
 }
 
 export interface RequisitionFundingCategory {

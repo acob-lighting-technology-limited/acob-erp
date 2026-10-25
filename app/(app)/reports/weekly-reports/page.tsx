@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { toast } from "sonner"
 import { useMemo, useState } from "react"
 import { formatWATDate, formatWATTimeDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -9,7 +10,7 @@ import { getCurrentOfficeWeek, getReportingOfficeWeek } from "@/lib/meeting-week
 import { fetchWeeklyReportLockState, getDefaultMeetingDateIso } from "@/lib/weekly-report-lock"
 import { CalendarDays, Download, FileBarChart, FileSpreadsheet, Pencil, Plus } from "lucide-react"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableDetailAction, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import {
@@ -29,6 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { getDepartmentAliases, normalizeDepartmentName } from "@/shared/departments"
 import { PptxModeDialog } from "@/components/reports/pptx-mode-dialog"
+import { loadWeeklyTaskSummaryOptions } from "@/lib/reports/weekly-task-summary"
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
@@ -288,12 +290,24 @@ export default function WeeklyReportsPortal() {
     order: WeeklyDeptOrder = "default"
   ) => {
     if (!pendingPptxExport) return
+    const summaryWeek = pendingPptxExport.kind === "all" ? weekFilter : pendingPptxExport.report.week_number
+    const summaryYear = pendingPptxExport.kind === "all" ? yearFilter : pendingPptxExport.report.year
+    // The full layout always carries the task counts column. If the counts
+    // cannot be loaded, still export — the deck is needed for the meeting.
+    let taskSummary
+    if (mode === "full") {
+      try {
+        taskSummary = await loadWeeklyTaskSummaryOptions(summaryWeek, summaryYear)
+      } catch {
+        toast.warning("Could not load task counts — exporting without them")
+      }
+    }
 
     if (pendingPptxExport.kind === "all") {
-      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, meetingDate, order)
+      await exportAllToPPTX(reports, weekFilter, yearFilter, mode, theme, meetingDate, order, taskSummary)
     } else {
       const { exportToPPTX } = await import("@/lib/export-utils")
-      await exportToPPTX(pendingPptxExport.report, mode, theme, meetingDate)
+      await exportToPPTX(pendingPptxExport.report, mode, theme, meetingDate, taskSummary)
     }
 
     setPptxModeDialogOpen(false)
@@ -660,13 +674,45 @@ export default function WeeklyReportsPortal() {
                     ))}
                 </div>
               </div>
-              <div className="md:col-span-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 md:col-span-3">
                 <Link
                   href={`/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
                   className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
                 >
                   View action tracker
                 </Link>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => {
+                      setExportTarget({ kind: "single", report })
+                      setExportOptionsOpen(true)
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Export
+                  </Button>
+                  {canMutateFilteredWeek && canMutateReport(report) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 text-xs"
+                      onClick={() => {
+                        setSelectedReportParams({
+                          week: report.week_number,
+                          year: report.year,
+                          dept: report.department,
+                        })
+                        setIsDialogOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ),
@@ -682,12 +728,40 @@ export default function WeeklyReportsPortal() {
             const submitterName = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
             return `${submitterName} (W${report.week_number}) · ${report.year}`
           },
+          meta: (report) => {
+            const meetingDateDisplay = meetingDate ? new Date(`${meetingDate}T00:00:00`) : null
+            const formattedMeeting =
+              meetingDateDisplay && !Number.isNaN(meetingDateDisplay.getTime())
+                ? formatWATDate(meetingDateDisplay, { day: "numeric", month: "short" })
+                : null
+            return (
+              <>
+                {formattedMeeting && (
+                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+                    📅 {formattedMeeting}
+                  </span>
+                )}
+                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                  🕒 {formatWATTimeDate(report.created_at)}
+                </span>
+              </>
+            )
+          },
+          snippet: (report) => {
+            const snippetText = autoNumberLines(report.work_done).trim()
+            return snippetText ? `Work Done: ${snippetText}` : null
+          },
+          expandInline: true,
           trailing: (report) => {
             const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
             return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
           },
           detail: {
             title: (report) => report.department,
+            badges: (report) => {
+              const trackerStatus = getDepartmentTrackerStatus(report.department, trackingData)
+              return <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
+            },
             fields: (report) => {
               const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
               const submitterName = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"
@@ -696,9 +770,60 @@ export default function WeeklyReportsPortal() {
                 { label: "Week", value: `W${report.week_number}, ${report.year}` },
                 { label: "Meeting Date", value: meetingDate },
                 { label: "Submitted By", value: submitterName },
-                { label: "Action Tracker", value: trackerStatus.label },
+                {
+                  label: "Action Tracker",
+                  value: trackerStatus.label,
+                  href: `/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${encodeURIComponent(report.department)}`,
+                },
                 { label: "Submitted", value: formatWATTimeDate(report.created_at) },
+                {
+                  label: "Work Done",
+                  value: autoNumberLines(report.work_done) || "No work recorded.",
+                  fullWidth: true,
+                  copyable: true,
+                },
+                {
+                  label: "Tasks for New Week",
+                  value: autoNumberLines(report.tasks_new_week) || "No new tasks recorded.",
+                  fullWidth: true,
+                  copyable: true,
+                },
+                {
+                  label: "Challenges",
+                  value: autoNumberLines(report.challenges) || "No challenges recorded.",
+                  fullWidth: true,
+                  copyable: true,
+                },
               ]
+            },
+            actions: (report) => {
+              const items: DataTableDetailAction[] = [
+                {
+                  label: "Export",
+                  icon: Download,
+                  variant: "outline",
+                  onClick: () => {
+                    setExportTarget({ kind: "single", report })
+                    setExportOptionsOpen(true)
+                  },
+                },
+              ]
+              if (canMutateFilteredWeek && canMutateReport(report)) {
+                items.unshift({
+                  label: "Edit",
+                  icon: Pencil,
+                  variant: "default",
+                  onClick: () => {
+                    setSelectedReportParams({
+                      week: report.week_number,
+                      year: report.year,
+                      dept: report.department,
+                    })
+                    setIsDialogOpen(true)
+                  },
+                })
+              }
+              return items
             },
           },
         }}

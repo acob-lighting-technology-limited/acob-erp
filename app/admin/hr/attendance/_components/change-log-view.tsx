@@ -333,9 +333,30 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
           title: (r) => `${r.employee_name} · ${r.change_label}`,
           subtitle: (r) =>
             `${daySpan(r)}${r.days.length > 1 ? ` (${dayCount(r)})` : ""} · by ${r.actor_name}${r.from_status || r.from_mixed || r.to_status ? ` · ${fromText(r) || "—"} → ${statusText(r.to_status) || "—"}` : ""}`,
+          snippet: (r) => (r.comment ? `Comment: ${r.comment}` : null),
+          expandInline: true,
           trailing: (r) => (
             <Badge className={CATEGORY_CLASSES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>
           ),
+          detail: {
+            title: (r) => `${r.employee_name} — ${r.change_label}`,
+            subtitle: (r) => `${daySpan(r)} · by ${r.actor_name}`,
+            badges: (r) => (
+              <Badge className={CATEGORY_CLASSES[r.category]}>{CHANGE_LOG_CATEGORY_LABELS[r.category]}</Badge>
+            ),
+            fields: (r) => [
+              { label: "Employee", value: r.employee_name },
+              { label: "Department", value: r.department },
+              { label: "Date Span", value: `${daySpan(r)} (${dayCount(r)})` },
+              { label: "Changed By", value: r.actor_name },
+              { label: "Timestamp", value: formatWATDateTime(r.changed_at) },
+              ...(r.from_status || r.from_mixed || r.to_status
+                ? [{ label: "Status Transition", value: `${fromText(r) || "—"} → ${statusText(r.to_status) || "—"}` }]
+                : []),
+              { label: "Comment", value: r.comment || "No comment was typed.", fullWidth: true },
+              ...(r.details ? [{ label: "System Details", value: r.details, fullWidth: true }] : []),
+            ],
+          },
         }}
         cardRenderer={(r) => (
           <div className="bg-card space-y-2 rounded-xl border p-4 text-xs">

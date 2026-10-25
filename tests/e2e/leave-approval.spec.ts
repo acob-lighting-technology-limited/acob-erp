@@ -44,7 +44,7 @@ test("Full leave approval flow", async ({ browser }) => {
   await closeSession(lead.context)
 
   const hr = await createLoggedInSession(browser, seed.testHR)
-  await hr.page.goto("/admin/hr/leave/approve")
+  await hr.page.goto("/admin/hr/leave")
   const hrCard = hr.page.locator("div.rounded.border.p-3").filter({ hasText: unique }).first()
   await expect(hr.page.getByText("My Action Queue")).toBeVisible()
   await expect(hrCard).toBeVisible()

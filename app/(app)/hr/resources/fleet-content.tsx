@@ -428,6 +428,8 @@ export function FleetContent() {
               {row.reviewer.department ? <p className="text-muted-foreground">{row.reviewer.department}</p> : null}
               {row.reviewed_at ? <p className="text-muted-foreground">{formatDateTime(row.reviewed_at)}</p> : null}
             </div>
+          ) : row.status === "cancelled" ? (
+            <span className="text-muted-foreground text-xs">{row.admin_note || "Cancelled"}</span>
           ) : (
             <span className="text-muted-foreground text-xs">Not yet reviewed</span>
           ),

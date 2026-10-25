@@ -2022,21 +2022,23 @@ async function fetchLeaveTypeOptions(userId: string): Promise<LeaveTypeOption[]>
       }>
     } | null
     if (!res.ok) return []
-    return (payload?.data ?? []).map((b) => {
-      const remaining =
-        b.has_balance === false
-          ? null
-          : b.balance_days != null
-            ? Number(b.balance_days)
-            : Number(b.allocated_days || 0) + Number(b.carry_forward_days || 0) - Number(b.used_days || 0)
-      return {
-        id: b.leave_type_id,
-        name: b.leave_type?.name ?? "Leave",
-        remaining,
-        maxDays: b.leave_type?.max_days ?? null,
-        needsEvidence: b.eligibility_status === "missing_evidence",
-      }
-    })
+    return (payload?.data ?? [])
+      .filter((b) => b.leave_type?.name?.toLowerCase().includes("sick"))
+      .map((b) => {
+        const remaining =
+          b.has_balance === false
+            ? null
+            : b.balance_days != null
+              ? Number(b.balance_days)
+              : Number(b.allocated_days || 0) + Number(b.carry_forward_days || 0) - Number(b.used_days || 0)
+        return {
+          id: b.leave_type_id,
+          name: b.leave_type?.name ?? "Leave",
+          remaining,
+          maxDays: b.leave_type?.max_days ?? null,
+          needsEvidence: b.eligibility_status === "missing_evidence",
+        }
+      })
   } catch {
     return []
   }
@@ -2232,8 +2234,8 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
   return (
     <div className="space-y-4 pt-2">
       <p className="text-muted-foreground text-sm">
-        Record <strong>approved leave</strong> for one employee, bypassing the request workflow. It posts a real
-        approved leave request, draws down their balance, and shows as &ldquo;On Leave&rdquo; in attendance.
+        Record <strong>emergency Sick Leave</strong> for one employee directly. All other leave types (Annual, Casual,
+        etc.) cannot be bypassed and must be requested through the normal leave workflow.
       </p>
 
       <div className="space-y-1">

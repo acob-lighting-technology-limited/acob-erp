@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, parseISO, isValid, differenceInDays, isBefore, startOfDay } from "date-fns"
 import { CreditCard, Download, Eye, FileText, Plus, Receipt, Upload } from "lucide-react"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -19,11 +19,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
-import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
+import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { CreatePaymentDialog } from "./create-payment-dialog"
 import { ExportColumnsDialog } from "./export-columns-dialog"
+import { PaymentPreviewSheet } from "./payment-preview-sheet"
 import { PaymentStatsCards } from "./payment-stats-cards"
 import { ReceiptSelectionDialog } from "./receipt-selection-dialog"
 import { usePaymentExport } from "./use-payment-export"
@@ -129,6 +130,7 @@ export function PaymentsTable({
 }: PaymentsTableProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [previewPaymentId, setPreviewPaymentId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
@@ -293,6 +295,65 @@ export function PaymentsTable({
     [processedPayments]
   )
 
+  const counts = useMemo(() => {
+    let recurring = 0
+    let oneTime = 0
+    for (const p of processedPayments) {
+      if (p.payment_type === "recurring") recurring++
+      else if (p.payment_type === "one-time") oneTime++
+    }
+    return {
+      all: processedPayments.length,
+      recurring,
+      oneTime,
+    }
+  }, [processedPayments])
+
+  const tabs = useMemo<DataTableTab[]>(
+    () => [
+      { key: "all", label: `All (${counts.all})` },
+      { key: "recurring", label: `Recurring (${counts.recurring})` },
+      { key: "one-time", label: `One-Time (${counts.oneTime})` },
+    ],
+    [counts]
+  )
+
+  const searchParams = useSearchParams()
+  const initialFilterValues = useMemo<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {}
+    const tabParam = searchParams.get("tab")
+    const typeParam = searchParams.getAll("payment_type")
+    if (tabParam === "recurring" || tabParam === "one-time") {
+      init.payment_type = [tabParam]
+    } else if (typeParam.length > 0) {
+      init.payment_type = typeParam
+    }
+    return init
+  }, [searchParams])
+
+  const [filterValues, setFilterValues] = useState<Record<string, string[]>>(initialFilterValues)
+
+  const activeTab = useMemo(() => {
+    const types = filterValues.payment_type
+    if (types && types.length === 1) {
+      if (types[0] === "recurring") return "recurring"
+      if (types[0] === "one-time") return "one-time"
+    }
+    return "all"
+  }, [filterValues])
+
+  const handleTabChange = useCallback((nextTab: string) => {
+    setFilterValues((prev) => {
+      const next = { ...prev }
+      if (nextTab === "all") {
+        delete next.payment_type
+      } else {
+        next.payment_type = [nextTab]
+      }
+      return next
+    })
+  }, [])
+
   const departmentOptions = useMemo(
     () =>
       (currentUser.isAdmin
@@ -348,6 +409,7 @@ export function PaymentsTable({
         key: "payment_type",
         label: "Type",
         placeholder: "All Types",
+        multi: false,
         options: [
           { value: "one-time", label: "One-time" },
           { value: "recurring", label: "Recurring" },
@@ -409,7 +471,15 @@ export function PaymentsTable({
       accessor: (row) => row.title,
       resizable: true,
       initialWidth: 240,
-      render: (row) => <span className="font-medium">{row.title}</span>,
+      render: (row) => (
+        <button
+          type="button"
+          onClick={() => setPreviewPaymentId(row.id)}
+          className="hover:text-primary text-left font-medium hover:underline"
+        >
+          {row.title}
+        </button>
+      ),
     },
     {
       key: "department_id",
@@ -481,7 +551,7 @@ export function PaymentsTable({
                 className="h-8 w-8"
                 onClick={(event) => {
                   event.stopPropagation()
-                  router.push(`${basePath}/${row.id}`, { scroll: false })
+                  setPreviewPaymentId(row.id)
                 }}
                 aria-label="View payment"
               >
@@ -794,6 +864,9 @@ export function PaymentsTable({
       description="Manage and track department payments and recurring subscriptions."
       icon={CreditCard}
       backLink={backLink}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
       spacing="tight"
       stats={<PaymentStatsCards stats={stats} formatCurrency={formatCurrency} />}
       actions={
@@ -816,6 +889,8 @@ export function PaymentsTable({
         data={processedPayments}
         columns={columns}
         filters={filters}
+        filterValues={filterValues}
+        onFilterValuesChange={setFilterValues}
         onProcessedDataChange={handleProcessedDataChange}
         getRowId={(row) => row.id}
         searchPlaceholder="Search title, issuer, department, or reference..."
@@ -859,10 +934,11 @@ export function PaymentsTable({
                 label: "View Details",
                 icon: Eye,
                 variant: "outline" as const,
-                onClick: () => router.push(`${basePath}/${row.id}`, { scroll: false }),
+                onClick: () => setPreviewPaymentId(row.id),
               },
             ],
           },
+          onSelect: (row) => setPreviewPaymentId(row.id),
         }}
         urlSync
         skeletonRows={6}
@@ -871,8 +947,8 @@ export function PaymentsTable({
         emptyDescription="No payments match the current search and filters."
         cardRenderer={(row) => (
           <div
-            className="bg-card rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md"
-            onClick={() => router.push(`${basePath}/${row.id}`, { scroll: false })}
+            className="bg-card cursor-pointer rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md"
+            onClick={() => setPreviewPaymentId(row.id)}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1085,6 +1161,14 @@ export function PaymentsTable({
           setExportPaymentType(id === "one-time" || id === "recurring" ? id : "all")
           setExportDialogOpen(true)
         }}
+      />
+
+      <PaymentPreviewSheet
+        paymentId={previewPaymentId}
+        open={Boolean(previewPaymentId)}
+        onOpenChange={(open) => !open && setPreviewPaymentId(null)}
+        basePath={basePath}
+        scope={isAdminPath ? "admin" : "app"}
       />
     </DataTablePage>
   )

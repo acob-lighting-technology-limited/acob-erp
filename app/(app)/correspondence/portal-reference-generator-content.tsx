@@ -313,7 +313,7 @@ export function PortalReferenceGeneratorContent({
         hideOnMobile: true,
         render: (row) => (
           <span
-            className="block max-w-[180px] truncate"
+            className="block max-w-[220px] truncate text-sm"
             title={row.department_name || row.assigned_department_name || undefined}
           >
             {row.department_name || row.assigned_department_name || "-"}
@@ -333,7 +333,7 @@ export function PortalReferenceGeneratorContent({
         sortable: true,
         accessor: (row) => row.subject,
         render: (row) => (
-          <span className="block max-w-[260px] truncate font-normal xl:max-w-md" title={row.subject}>
+          <span className="block text-sm font-medium" title={row.subject}>
             {row.subject}
           </span>
         ),

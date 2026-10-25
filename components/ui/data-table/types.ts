@@ -290,8 +290,16 @@ export interface DataTableProps<TData> {
     title: (row: TData) => ReactNode
     /** Secondary line — status, category, meta. */
     subtitle?: (row: TData) => ReactNode
+    /** Allow subtitle to wrap into multiple lines instead of single-line truncation. */
+    wrapSubtitle?: boolean
+    /** Additional metadata badges, pills, or chips rendered below subtitle. */
+    meta?: (row: TData) => ReactNode
+    /** Content preview snippet (1-2 lines) rendered below subtitle / meta. */
+    snippet?: (row: TData) => ReactNode
     /** Right-hand slot, fixed width so it aligns across rows. */
     trailing?: (row: TData) => ReactNode
+    /** Expand inline as an accordion when tapped, using the `expandable` renderer. */
+    expandInline?: boolean
     /** Tapping the row. Ignored when `detail` is set (the sheet opens instead). */
     onSelect?: (row: TData) => void
 

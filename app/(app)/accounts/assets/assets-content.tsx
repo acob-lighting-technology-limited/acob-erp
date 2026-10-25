@@ -66,12 +66,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
         label: "Unique Code",
         sortable: true,
         accessor: (row) => row.asset?.unique_code || "",
-        render: (row) => (
-          <div className="flex items-center gap-1.5">
-            <Hash className="text-muted-foreground h-3.5 w-3.5" />
-            <span className="font-mono text-sm">{row.asset?.unique_code || "-"}</span>
-          </div>
-        ),
+        render: (row) => <span className="font-mono text-sm">{row.asset?.unique_code || "-"}</span>,
       },
       {
         key: "asset_model",

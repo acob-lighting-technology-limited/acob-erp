@@ -62,6 +62,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Employee is not within your scope" }, { status: 403 })
     }
 
+    // Restriction: Only Sick Leave can be directly recorded/bypassed in Attendance Manager
+    const { data: ltRow } = await dataClient
+      .from("leave_types")
+      .select("id, name, code")
+      .eq("id", leave_type_id)
+      .maybeSingle<{ id: string; name: string; code?: string | null }>()
+
+    const isSick = Boolean(
+      ltRow && (ltRow.name.toLowerCase().includes("sick") || (ltRow.code && ltRow.code.toLowerCase().includes("sick")))
+    )
+
+    if (!isSick) {
+      return NextResponse.json(
+        {
+          error:
+            "Only Sick Leave can be recorded directly in Attendance Manager. All other leave types must be requested through the standard leave request workflow.",
+        },
+        { status: 400 }
+      )
+    }
+
     // Same working-day rules as an employee-submitted request: weekends and
     // public holidays are neither charged nor allowed to be the end date, and
     // the resumption date is the next real working day.
@@ -152,11 +173,10 @@ export async function POST(request: NextRequest) {
     )
 
     try {
-      const [{ data: ltRow }, { data: adminProfile }] = await Promise.all([
-        dataClient.from("leave_types").select("name").eq("id", leave_type_id).maybeSingle(),
+      const [{ data: adminProfile }] = await Promise.all([
         dataClient.from("profiles").select("full_name, first_name, last_name").eq("id", scope.userId).maybeSingle(),
       ])
-      const leaveTypeName = ltRow?.name || "Leave"
+      const leaveTypeName = ltRow?.name || "Sick Leave"
       const adminName =
         adminProfile?.full_name ||
         `${adminProfile?.first_name || ""} ${adminProfile?.last_name || ""}`.trim() ||
@@ -168,129 +188,24 @@ export async function POST(request: NextRequest) {
         userIds: [user_id],
         title: "Leave recorded on your behalf",
         message: `Approved leave for ${leaveTypeName} was recorded on your behalf by ${adminName} for ${effectiveStartDate} to ${effectiveEndDate} (${days_count} day(s)).`,
-        actorId: scope.userId,
-        linkUrl: "/hr/leave",
+        linkUrl: "/leave",
         entityId: created.id,
-        emailEvent: "approved",
-        emailSubject: `Leave Recorded on Your Behalf — ${leaveTypeName}${refSuffix}`,
-        emailTitle: "Leave Recorded by Management",
-        badgeText: "Leave Recorded",
-        badgeVariant: "success",
-        detailsTitle: "Approved Leave Schedule",
-        details: [
-          { label: "Leave Type", value: leaveTypeName },
-          { label: "Duration", value: `${days_count} day(s)` },
-          { label: "Start Date", value: effectiveStartDate },
-          { label: "End Date", value: effectiveEndDate },
-          { label: "Resumption Date", value: resume_date },
-          { label: "Recorded By", value: adminName },
-          { label: "Reason / Notes", value: reason },
-        ],
-        ctaLabel: "View Leave Details",
+        emailSubject: `Approved Leave Recorded: ${leaveTypeName}${refSuffix}`,
+        emailMessage: `Hello,\n\nApproved leave for ${leaveTypeName} from ${effectiveStartDate} to ${effectiveEndDate} (${days_count} working day(s)) has been recorded on your behalf by ${adminName}.${reason ? `\n\nReason: ${reason}` : ""}\n\nView details: ${process.env.NEXT_PUBLIC_APP_URL || ""}/leave`,
       })
     } catch (notifyErr) {
-      log.error({ err: String(notifyErr) }, "Failed to notify employee of manual leave")
+      log.error({ err: String(notifyErr) }, "Failed to send manual leave notification")
     }
 
-    return NextResponse.json({ message: "Leave recorded", id: created.id, days_count })
-  } catch (error) {
-    log.error({ err: String(error) }, "Error in POST /api/admin/hr/attendance/leave/manual")
-    return NextResponse.json({ error: "An error occurred" }, { status: 500 })
+    return NextResponse.json({ success: true, id: created.id, days_count }, { status: 201 })
+  } catch (err) {
+    log.error({ err: String(err) }, "Manual leave POST failed")
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-// ── List manager-created leave grants ───────────────────────────────────────────────────
+// ── List manual leave grants (read-only for audit / removal list) ──────────────────
 export async function GET(request: NextRequest) {
-  const rl = await rateLimit(`admin-hr-leave-manual-list:${getClientId(request)}`, { limit: 30, windowSec: 60 })
-  if (!rl.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 })
-
-  try {
-    const scopeResult = await requireApiAdminScope()
-    if (!scopeResult.ok) return scopeResult.response
-    const { scope, supabase } = scopeResult
-    const dataClient = getServiceRoleClientOrFallback(supabase)
-
-    let scopedUserIds: string[] | null = null
-    const depts = getScopedDepartments(scope)
-    if (depts !== null) {
-      if (depts.length === 0) return NextResponse.json({ data: [] })
-      const { data: scopedProfiles } = await dataClient.from("profiles").select("id").in("department", depts)
-      scopedUserIds = (scopedProfiles ?? []).map((p) => p.id)
-      if (scopedUserIds.length === 0) return NextResponse.json({ data: [] })
-    }
-
-    let query = dataClient
-      .from("leave_requests")
-      .select("id, user_id, start_date, end_date, days_count, reason, status, leave_type_id")
-      .eq("admin_manual", true)
-      .eq("status", "approved")
-      .order("start_date", { ascending: false })
-      .limit(1000)
-    if (scopedUserIds !== null) query = query.in("user_id", scopedUserIds)
-
-    const { data, error } = await query
-    if (error) {
-      log.error({ err: String(error) }, "Failed to fetch manual leave")
-      return NextResponse.json({ error: "Failed to fetch leave records" }, { status: 500 })
-    }
-
-    const rows = (data ?? []) as Array<{
-      id: string
-      user_id: string
-      start_date: string
-      end_date: string
-      days_count: number | null
-      reason: string | null
-      leave_type_id: string | null
-    }>
-
-    const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))]
-    const typeIds = [...new Set(rows.map((r) => r.leave_type_id).filter(Boolean))] as string[]
-    const [profiles, types] = await Promise.all([
-      userIds.length > 0
-        ? dataClient
-            .from("profiles")
-            .select("id, full_name, first_name, last_name")
-            .in("id", userIds)
-            .then((r) => r.data ?? [])
-        : Promise.resolve([]),
-      typeIds.length > 0
-        ? dataClient
-            .from("leave_types")
-            .select("id, name")
-            .in("id", typeIds)
-            .then((r) => r.data ?? [])
-        : Promise.resolve([]),
-    ])
-    const nameMap = new Map<string, string>()
-    for (const p of profiles)
-      nameMap.set(p.id, p.full_name?.trim() || [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unknown")
-    const typeMap = new Map<string, string>()
-    for (const t of types) typeMap.set(t.id, t.name)
-
-    const result = rows.map((r) => ({
-      id: r.id,
-      user_id: r.user_id,
-      user_name: nameMap.get(r.user_id) ?? "Unknown",
-      leave_type: r.leave_type_id ? (typeMap.get(r.leave_type_id) ?? "Leave") : "Leave",
-      start_date: r.start_date,
-      end_date: r.end_date,
-      days_count: r.days_count,
-      notes: r.reason ?? null,
-    }))
-
-    return NextResponse.json({ data: result })
-  } catch (error) {
-    log.error({ err: String(error) }, "Error in GET /api/admin/hr/attendance/leave/manual")
-    return NextResponse.json({ error: "An error occurred" }, { status: 500 })
-  }
-}
-
-// ── Revoke a manager-created leave grant (restore balance + clear roster) ────────────────
-export async function DELETE(request: NextRequest) {
-  const rl = await rateLimit(`admin-hr-leave-manual-delete:${getClientId(request)}`, { limit: 20, windowSec: 60 })
-  if (!rl.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 })
-
   try {
     const scopeResult = await requireApiAdminScope()
     if (!scopeResult.ok) return scopeResult.response
@@ -298,11 +213,108 @@ export async function DELETE(request: NextRequest) {
     const adminOnly = requireAttendanceAdmin(scope)
     if (adminOnly) return adminOnly
 
-    const id = String(request.nextUrl.searchParams.get("id") || "")
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const depts = getScopedDepartments(scope)
+
+    const query = dataClient
+      .from("leave_requests")
+      .select(
+        `
+        id,
+        user_id,
+        start_date,
+        end_date,
+        days_count,
+        reason,
+        created_at,
+        admin_manual,
+        profiles!leave_requests_user_id_fkey(id, full_name, first_name, last_name, department),
+        leave_types(name)
+      `
+      )
+      .eq("admin_manual", true)
+      .order("start_date", { ascending: false })
+      .limit(100)
+
+    const { data, error } = await query
+    if (error) {
+      log.error({ err: JSON.stringify(error) }, "Manual leave fetch failed")
+      return NextResponse.json({ error: "Failed to load leave grants" }, { status: 500 })
+    }
+
+    type Row = {
+      id: string
+      user_id: string
+      start_date: string
+      end_date: string
+      days_count: number | null
+      reason: string | null
+      profiles:
+        | {
+            id: string
+            full_name: string | null
+            first_name: string | null
+            last_name: string | null
+            department: string | null
+          }
+        | {
+            id: string
+            full_name: string | null
+            first_name: string | null
+            last_name: string | null
+            department: string | null
+          }[]
+        | null
+      leave_types: { name: string } | { name: string }[] | null
+    }
+
+    const rows = (data || []) as unknown as Row[]
+    const filtered = depts
+      ? rows.filter((r) => {
+          const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+          return p?.department && depts.includes(p.department)
+        })
+      : rows
+
+    const mapped = filtered.map((r) => {
+      const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+      const lt = Array.isArray(r.leave_types) ? r.leave_types[0] : r.leave_types
+      const name = p?.full_name?.trim() || [p?.first_name, p?.last_name].filter(Boolean).join(" ") || "Unknown Employee"
+      return {
+        id: r.id,
+        user_id: r.user_id,
+        user_name: name,
+        start_date: r.start_date,
+        end_date: r.end_date,
+        leave_type: lt?.name || "Leave",
+        days_count: r.days_count,
+        notes: r.reason,
+      }
+    })
+
+    return NextResponse.json({ data: mapped })
+  } catch (err) {
+    log.error({ err: String(err) }, "Manual leave GET failed")
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+// ── Remove a manual leave grant ──────────────────────────────────────────
+export async function DELETE(request: NextRequest) {
+  try {
+    const scopeResult = await requireApiAdminScope()
+    if (!scopeResult.ok) return scopeResult.response
+    const { scope, supabase } = scopeResult
+    const adminOnly = requireAttendanceAdmin(scope)
+    if (adminOnly) return adminOnly
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
     const dataClient = getServiceRoleClientOrFallback(supabase)
-    const { data: leave } = await dataClient
+
+    const { data: leave, error: fetchErr } = await dataClient
       .from("leave_requests")
       .select("id, user_id, leave_type_id, days_count, start_date, end_date, admin_manual")
       .eq("id", id)
@@ -316,35 +328,36 @@ export async function DELETE(request: NextRequest) {
         admin_manual: boolean
       }>()
 
-    if (!leave) return NextResponse.json({ error: "Leave record not found" }, { status: 404 })
+    if (fetchErr || !leave) {
+      return NextResponse.json({ error: "Leave record not found" }, { status: 404 })
+    }
+
     if (!leave.admin_manual) {
-      return NextResponse.json({ error: "Only manager-created leave can be removed here" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Cannot delete employee-submitted leave here. Manage it through the Leave module." },
+        { status: 400 }
+      )
     }
+
     if (!(await assertInScope(dataClient, scope, leave.user_id))) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      return NextResponse.json({ error: "Employee is not within your scope" }, { status: 403 })
     }
 
-    const days = Number(leave.days_count || 0)
-
-    const { error } = await dataClient.from("leave_requests").delete().eq("id", id)
-    if (error) {
-      log.error({ err: JSON.stringify(error) }, "Failed to delete manual leave")
-      return NextResponse.json({ error: "Failed to delete leave record" }, { status: 500 })
+    const { error: deleteErr } = await dataClient.from("leave_requests").delete().eq("id", id)
+    if (deleteErr) {
+      log.error({ err: JSON.stringify(deleteErr) }, "Manual leave delete failed")
+      return NextResponse.json({ error: "Failed to delete leave" }, { status: 500 })
     }
-
-    // No balance to restore: entitlement is derived from the employee's leave requests, so
-    // deleting the request above already frees the days.
-
-    // No attendance_records to clean up — we never wrote on_leave rows (see POST note).
-    // Removing the leave_requests row reverts derivation to the day's real status.
 
     await recordAttendanceEvent(dataClient, {
       userId: leave.user_id,
       eventDate: leave.start_date,
       eventType: "leave_revoked",
+      fromStatus: "on_leave",
       source: "manual",
+      comment: "Manual leave record removed by administrator",
       actorId: scope.userId,
-      metadata: { leave_request_id: id, start_date: leave.start_date, end_date: leave.end_date },
+      metadata: { leave_request_id: id },
     })
 
     await writeAuditLog(
@@ -353,15 +366,15 @@ export async function DELETE(request: NextRequest) {
         action: "delete",
         entityType: "leave_request",
         entityId: id,
-        oldValues: { user_id: leave.user_id, start_date: leave.start_date, end_date: leave.end_date },
+        oldValues: leave,
         context: { actorId: scope.userId, source: "api", route: "/api/admin/hr/attendance/leave/manual" },
       },
       { failOpen: true }
     )
 
-    return NextResponse.json({ message: "Leave removed" })
-  } catch (error) {
-    log.error({ err: String(error) }, "Error in DELETE /api/admin/hr/attendance/leave/manual")
-    return NextResponse.json({ error: "An error occurred" }, { status: 500 })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    log.error({ err: String(err) }, "Manual leave DELETE failed")
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -56,7 +56,7 @@ export const QUERY_KEYS = {
   cbtSessionOptions: () => ["cbt-session-options"],
   cbtSnapshot: () => ["cbt-snapshot"],
   cbtCandidateEmails: () => ["cbt-candidate-emails"],
-  cbtQuestions: (variant: string) => ["cbt-questions", variant],
+  cbtQuestions: () => ["cbt-questions"],
   metricAddSeed: (metric: string, userId: string, cycleId: string) => ["metric-add-seed", metric, userId, cycleId],
   metricSnapshot: (metric: string, cycleId: string) => ["metric-snapshot", metric, cycleId],
   adminDevelopmentPlans: () => ["admin-development-plans"],
@@ -70,7 +70,6 @@ export const QUERY_KEYS = {
   pmsAnalytics: () => ["pms-analytics"],
   cbtAttemptDetail: (profileId: string, cycleId: string) => ["cbt-attempt-detail", profileId, cycleId],
   cbtAttempts: () => ["cbt-attempts"],
-  cbtBonusScores: () => ["cbt-bonus-scores"],
   strategicGoals: (scope: string, department?: string | null, year?: number | null) => [
     "strategic-goals",
     scope,

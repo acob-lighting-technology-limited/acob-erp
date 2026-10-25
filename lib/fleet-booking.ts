@@ -88,3 +88,27 @@ export async function canManageFleet(supabase: SupabaseClient<Database>, userId:
   const primary = normalizeDepartmentName(String(scope.department || ""))
   return managed.includes(DEPT_ADMIN_HR) || primary === DEPT_ADMIN_HR
 }
+
+/**
+ * Automatically transitions any pending fleet bookings whose scheduled end time has
+ * already passed (`end_at < now`) to "cancelled", noting that the booking window passed
+ * without review. This keeps stale un-actioned requests from cluttering the queue indefinitely.
+ */
+export async function autoCloseStaleFleetBookings(supabase: SupabaseClient): Promise<number> {
+  const now = new Date().toISOString()
+  const { data: stale, error } = await supabase
+    .from("fleet_bookings")
+    .update({
+      status: "cancelled",
+      admin_note: "Auto-closed: booking window passed without review",
+      updated_at: now,
+    })
+    .eq("status", "pending")
+    .lt("end_at", now)
+    .select("id")
+
+  if (error) {
+    return 0
+  }
+  return stale?.length ?? 0
+}

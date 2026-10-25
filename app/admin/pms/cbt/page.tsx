@@ -228,7 +228,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
   // Question counts per cycle come from the question bank's own cached list —
   // one request instead of one per cycle.
   const questionsQuery = useQuery({
-    queryKey: QUERY_KEYS.cbtQuestions("standard"),
+    queryKey: QUERY_KEYS.cbtQuestions(),
     queryFn: async () =>
       (
         await apiJson<{ data?: Array<{ id: string; review_cycle_id?: string | null }> }>(
@@ -629,18 +629,13 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
     },
   ]
 
-  // Regular CBT questions are authored by the department lead who owns them —
-  // admins never get a "Manage Questions" action here, only the score/count
-  // view (see the API-level content redaction in the questions route).
-  const cycleRowActions: RowAction<CycleRow>[] = isLeadView
-    ? [
-        {
-          label: "Manage Questions",
-          icon: Eye,
-          onClick: (row) => router.push(`${basePath}/question?cycleId=${encodeURIComponent(row.id)}`),
-        },
-      ]
-    : []
+  const cycleRowActions: RowAction<CycleRow>[] = [
+    {
+      label: "Manage Questions",
+      icon: Eye,
+      onClick: (row) => router.push(`${basePath}/question?cycleId=${encodeURIComponent(row.id)}`),
+    },
+  ]
 
   const individualRowActions: RowAction<IndividualRow>[] = [
     {
@@ -700,25 +695,12 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
             <RefreshCw className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          {isLeadView ? (
-            // Bonus questions are an admin-only concern (leads can't author
-            // for the "Bonus" pseudo-department), so this stays hidden here.
-            <Link href={`${basePath}/question`}>
-              <Button size="sm">
-                <span className="hidden sm:inline">Create Test</span>
-                <span className="sm:hidden">Create</span>
-              </Button>
-            </Link>
-          ) : (
-            // Regular question creation moved to the owning department lead —
-            // admins keep Bonus Questions only.
-            <Link href="/admin/pms/cbt/extra">
-              <Button variant="outline" size="sm">
-                <span className="hidden sm:inline">Bonus Questions</span>
-                <span className="sm:hidden">Bonus</span>
-              </Button>
-            </Link>
-          )}
+          <Link href={`${basePath}/question`}>
+            <Button size="sm">
+              <span className="hidden sm:inline">Create Test</span>
+              <span className="sm:hidden">Create</span>
+            </Button>
+          </Link>
         </div>
       }
       stats={

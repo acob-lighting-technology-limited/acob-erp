@@ -505,6 +505,20 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
         mobileRow={{
           title: (r) => r.measure,
           subtitle: (r) => `${r.perspective} · ${r.strategic_objective}`,
+          meta: (r) => (
+            <>
+              <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                🎯 Target: {r.target_text}
+              </span>
+              {r.overall_attainment != null && (
+                <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">
+                  Attainment: {r.overall_attainment.toFixed(1)}%
+                </span>
+              )}
+            </>
+          ),
+          snippet: (r) => `Pillar: ${r.strategic_priority}`,
+          expandInline: true,
           trailing: (r) => (
             <Badge variant="outline" className="text-[10px]">
               {r.core_departments.length} depts

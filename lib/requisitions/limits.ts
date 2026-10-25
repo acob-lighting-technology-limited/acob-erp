@@ -1,7 +1,7 @@
 import type { RequisitionFormType } from "./types"
 
 /** A Payment Request must be raised at this amount or more. */
-export const PAYMENT_REQUEST_MIN = 30_000
+export const PAYMENT_REQUEST_MIN = 50_000
 /** Petty cash can never exceed this, before or after a signer's change. */
 export const PETTY_CASH_MAX = 50_000
 
@@ -14,6 +14,13 @@ export const FORM_LABELS: Record<RequisitionFormType, string> = {
   payment_request: "Payment Request",
   petty_cash: "Petty Cash",
 }
+
+/** Maximum number of attachments allowed on a single requisition. */
+export const REQUISITION_ATTACHMENT_MAX_COUNT = 20
+/** Maximum allowed size for any single attachment file (10 MB). */
+export const REQUISITION_ATTACHMENT_MAX_FILE_BYTES = 10 * 1024 * 1024
+/** Maximum combined size across all attachments on a requisition (20 MB). */
+export const REQUISITION_ATTACHMENT_MAX_TOTAL_BYTES = 20 * 1024 * 1024
 
 function naira(value: number): string {
   return `₦${value.toLocaleString("en-NG")}`
