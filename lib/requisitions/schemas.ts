@@ -124,7 +124,7 @@ export const PaymentRequestSchema = z
     form_type: z.literal("payment_request"),
     project_name: z.string().trim().min(1, "Project is required").max(200),
     purpose: z.string().trim().min(3, "Purpose must be at least 3 characters").max(2000),
-    site_location: z.string().trim().max(200).optional(),
+    site_location: z.string().trim().min(1, "Site location is required").max(200),
     amount: money,
     ...CommonFields,
   })
