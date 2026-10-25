@@ -77,8 +77,9 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
       accessor: (t) => t.title,
       resizable: true,
       initialWidth: 280,
+      width: "max-w-md",
       render: (t) => (
-        <div className="min-w-0 space-y-0.5">
+        <div className="max-w-xs min-w-0 space-y-0.5 md:max-w-sm lg:max-w-md">
           <p className="truncate font-medium">{t.title}</p>
           <p className="text-muted-foreground truncate text-xs">
             {[t.work_item_number, t.project_name].filter(Boolean).join(" · ") || "—"}
@@ -91,12 +92,22 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
       label: "Submitted by",
       sortable: true,
       accessor: (t) => assigneeName(t),
+      width: "w-40",
+      render: (t) => <span className="block truncate text-sm">{assigneeName(t)}</span>,
     },
-    { key: "department", label: "Department", sortable: true, accessor: (t) => t.department ?? "—" },
+    {
+      key: "department",
+      label: "Department",
+      sortable: true,
+      accessor: (t) => t.department ?? "—",
+      width: "w-40",
+      render: (t) => <span className="block truncate text-sm">{t.department || "—"}</span>,
+    },
     {
       key: "kpi",
       label: "Corporate KPI",
       accessor: (t) => t.kpi_measure ?? "—",
+      width: "max-w-xs",
       render: (t) => <span className="line-clamp-2 text-sm">{t.kpi_measure || "—"}</span>,
       hideOnMobile: true,
     },
@@ -105,6 +116,7 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
       label: "Weight",
       sortable: true,
       accessor: (t) => String(t.weight || TASK_WEIGHT_DEFAULT),
+      width: "w-20",
       render: weightBadge,
     },
     {
@@ -112,13 +124,14 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
       label: "Waiting since",
       sortable: true,
       accessor: (t) => submittedAt(t),
+      width: "w-32",
       render: (t) => (
-        <span className="text-sm" title={formatWATDate(submittedAt(t))}>
+        <span className="text-sm whitespace-nowrap" title={formatWATDate(submittedAt(t))}>
           {formatWATRelative(submittedAt(t))}
         </span>
       ),
     },
-    { key: "review", label: "Review", render: (t) => control(t) },
+    { key: "review", label: "Review", width: "w-36", render: (t) => control(t) },
   ]
 
   const filters: DataTableFilter<Task>[] = [

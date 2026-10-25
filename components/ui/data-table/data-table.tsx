@@ -1379,8 +1379,12 @@ export function DataTable<TData>({
                           className={cn(
                             col.align === "right" && "text-right",
                             col.align === "center" && "text-center",
-                            col.hideOnMobile && !contactsAvailable && "hidden md:table-cell"
+                            col.hideOnMobile && !contactsAvailable && "hidden md:table-cell",
+                            col.width
                           )}
+                          style={
+                            colWidths[col.key] ? { width: colWidths[col.key], maxWidth: colWidths[col.key] } : undefined
+                          }
                         >
                           {col.render ? col.render(row, globalIndex) : col.accessor ? (col.accessor(row) ?? "-") : "-"}
                         </TableCell>
