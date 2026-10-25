@@ -1378,6 +1378,7 @@ export function DataTable<TData>({
                           key={col.key}
                           className={cn(
                             "py-3",
+                            colWidths[col.key] && "overflow-hidden",
                             col.align === "right" && "text-right",
                             col.align === "center" && "text-center",
                             col.hideOnMobile && !contactsAvailable && "hidden md:table-cell",
