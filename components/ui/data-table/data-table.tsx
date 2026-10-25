@@ -1544,10 +1544,9 @@ export function DataTable<TData>({
               const sn = snByRowId.get(rowId) ?? 1
 
               const handleSelect = () => {
-                if (mobileRow.expandInline && canExpand) toggleExpand(rowId)
+                if (canExpand) toggleExpand(rowId)
                 else if (detailConfig) setDetailRow(row)
                 else if (mobileRow.onSelect) mobileRow.onSelect(row)
-                else if (canExpand) toggleExpand(rowId)
               }
 
               const leadingContent = mobileRow.leading ? (
@@ -1782,13 +1781,19 @@ export function DataTable<TData>({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {paginatedData.map((row) => {
                 const rowId = getRowId(row)
+                const canExpand = expandable && (!expandable.canExpand || expandable.canExpand(row))
                 const handleCardClick = (e: ReactMouseEvent<HTMLDivElement>) => {
                   const target = e.target as HTMLElement
                   if (isInteractiveTarget(target)) {
                     return
                   }
-                  if (detailConfig) setDetailRow(row)
-                  else if (mobileRow?.onSelect) mobileRow.onSelect(row)
+                  if (canExpand) {
+                    toggleExpand(rowId)
+                  } else if (detailConfig) {
+                    setDetailRow(row)
+                  } else if (mobileRow?.onSelect) {
+                    mobileRow.onSelect(row)
+                  }
                 }
 
                 return (
@@ -1797,7 +1802,7 @@ export function DataTable<TData>({
                     onClick={handleCardClick}
                     className={cn(
                       "h-full",
-                      (Boolean(detailConfig) || Boolean(mobileRow?.onSelect)) && "cursor-pointer"
+                      (Boolean(canExpand) || Boolean(detailConfig) || Boolean(mobileRow?.onSelect)) && "cursor-pointer"
                     )}
                   >
                     {cardRenderer(row)}
