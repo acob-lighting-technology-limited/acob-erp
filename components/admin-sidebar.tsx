@@ -299,15 +299,6 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
   },
   {
-    // Shown to the MD, delegates, super admins and developers (showMdDesk); the page re-checks.
-    section: "management",
-    name: "MD's Desk",
-    href: "/admin/md-desk",
-    icon: Briefcase,
-    roles: ["developer", "super_admin", "admin"],
-    children: mdDeskNavChildren("/admin/md-desk"),
-  },
-  {
     section: "management",
     name: "HR",
     description: "Human Resources",
@@ -324,6 +315,15 @@ const adminNavigation: NavItem[] = [
       { name: "Resource Booking", href: "/admin/hr/resources" },
       { name: "Offices & Rooms", href: "/admin/hr/offices-rooms" },
     ],
+  },
+  {
+    // Shown to the MD, delegates, super admins and developers (showMdDesk); the page re-checks.
+    section: "management",
+    name: "MD's Desk",
+    href: "/admin/md-desk",
+    icon: Briefcase,
+    roles: ["developer", "super_admin", "admin"],
+    children: mdDeskNavChildren("/admin/md-desk"),
   },
   {
     // Split out of HR — it had grown to 11 sub-items nested three levels
