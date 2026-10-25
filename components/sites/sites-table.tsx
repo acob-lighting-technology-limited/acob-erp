@@ -34,12 +34,14 @@ export type SiteDialogState = { mode: "closed" } | { mode: "add" } | { mode: "ed
  */
 export function SitesTable({
   portfolioId = null,
+  isAdmin = false,
   dialog,
   setDialog,
   deleting,
   setDeleting,
 }: {
   portfolioId?: string | null
+  isAdmin?: boolean
   dialog: SiteDialogState
   setDialog: (state: SiteDialogState) => void
   deleting: SiteRecord | null
@@ -47,7 +49,7 @@ export function SitesTable({
 }) {
   const queryClient = useQueryClient()
   const { data, isLoading, error, refetch } = useSites(portfolioId)
-  const canEdit = data?.canEdit ?? false
+  const canEdit = Boolean(isAdmin && data?.canEdit)
   const today = toLocalISODate()
 
   const rows = useMemo<SiteRow[]>(

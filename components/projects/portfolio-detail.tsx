@@ -73,7 +73,8 @@ export function PortfolioDetail({
   const [siteDialog, setSiteDialog] = useState<SiteDialogState>({ mode: "closed" })
   const [deletingSite, setDeletingSite] = useState<SiteRecord | null>(null)
   // Only `canEdit` is read here; the Sites tab shares this query's cache entry.
-  const canEditSites = useSites(portfolioId).data?.canEdit ?? false
+  const sitesQuery = useSites(portfolioId)
+  const canEditSites = isAdmin && (sitesQuery.data?.canEdit ?? false)
   // The portfolio's own tasks plus every task on its projects.
   const tasksQuery = useQuery({
     queryKey: portfolioTasksKey(portfolioId),
@@ -269,6 +270,7 @@ export function PortfolioDetail({
       ) : activeTab === "sites" ? (
         <SitesTable
           portfolioId={portfolio.id}
+          isAdmin={isAdmin}
           dialog={siteDialog}
           setDialog={setSiteDialog}
           deleting={deletingSite}
