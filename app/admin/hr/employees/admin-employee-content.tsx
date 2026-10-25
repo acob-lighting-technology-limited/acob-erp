@@ -805,8 +805,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "name",
         label: "Name",
         sortable: true,
-        resizable: true,
-        initialWidth: 220,
+        width: "min-w-[200px]",
         accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
           <div className="flex items-center gap-2.5">
@@ -993,6 +992,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       {
         key: "actions",
         label: "Action",
+        align: "right",
+        width: "w-20",
         render: (r) => (
           <div className="flex items-center justify-end gap-1">
             {canManageUsers && (
