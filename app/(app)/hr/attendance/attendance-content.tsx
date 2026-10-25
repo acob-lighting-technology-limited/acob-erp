@@ -354,8 +354,14 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         accessor: (row) => row.clock_in ?? "",
         render: (row) => (
           <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <Clock className="hidden h-3.5 w-3.5 shrink-0 text-green-600 sm:inline-block" />
-            <span>{formatClockTime(row.clock_in)}</span>
+            {row.clock_in ? (
+              <>
+                <Clock className="hidden h-3.5 w-3.5 shrink-0 text-green-600 sm:inline-block" />
+                <span>{formatClockTime(row.clock_in)}</span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
           </span>
         ),
       },
@@ -366,8 +372,16 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         accessor: (row) => row.clock_out ?? "",
         render: (row) => (
           <span className="flex items-center gap-1.5 whitespace-nowrap">
-            <Clock className="hidden h-3.5 w-3.5 shrink-0 text-red-500 sm:inline-block" />
-            <span>{getClockOutLabel(row)}</span>
+            {row.clock_out ? (
+              <>
+                <Clock className="hidden h-3.5 w-3.5 shrink-0 text-red-500 sm:inline-block" />
+                <span>{getClockOutLabel(row)}</span>
+              </>
+            ) : row.clock_in && row.date === toLocalISODate() ? (
+              <span className="font-medium text-blue-600 dark:text-blue-400">{getClockOutLabel(row)}</span>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
           </span>
         ),
       },
