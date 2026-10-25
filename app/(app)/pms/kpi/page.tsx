@@ -1,21 +1,13 @@
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserPmsData } from "../_lib"
 import { TASK_WEIGHT_DEFAULT, isTaskInCycle } from "@/lib/tasks/scoring"
+import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"
 import { EmployeeKpiTabs } from "./_components/employee-kpi-tabs"
 
-type GoalCycleRow = {
-  id: string
-  review_cycle_id: string | null
-}
-
-type ReviewCycleRow = {
-  id: string
-  name: string
-}
-
-type GoalTaskRow = {
+type TaskRow = {
   id: string
   goal_id: string | null
+  kpi_id: string | null
   title: string | null
   description: string | null
   status: string | null
@@ -42,6 +34,7 @@ type KpiTableTask = {
   assignmentType: string
   weight: number
   rating: number | null
+  kpiTitle?: string | null
 }
 
 type KpiTableRow = {
@@ -73,136 +66,155 @@ export default async function PmsKpiPage({
   const { score, cycles, activeCycleId, profile } = await getCurrentUserPmsData(effectiveCycleId)
   const supabase = await createClient()
 
-  const goalIds = score.breakdown.goals.map((goal) => goal.goal_id).filter((id): id is string => Boolean(id))
-  // Tasks with no goal are scored work too — they are grouped under the empty
-  // key, which is exactly the id filtered out of `goalIds` above.
-  const hasAdHocGroup = score.breakdown.goals.some((goal) => !goal.goal_id)
+  const quarterlyCycles = cycles
+    .filter((c) => matchesCadence("quarterly", c.reviewType, c.name))
+    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+
+  const targetCycles =
+    effectiveCycleId && effectiveCycleId !== "all"
+      ? quarterlyCycles.filter((c) => c.id === effectiveCycleId)
+      : quarterlyCycles
 
   const TASK_FIELDS =
-    "id, goal_id, title, description, status, due_date, task_end_date, created_at, weight, rating, assignment_type, assigned_to, department"
+    "id, goal_id, kpi_id, title, description, status, due_date, task_end_date, created_at, weight, rating, assignment_type, assigned_to, department"
 
-  let goalCycleByGoalId = new Map<string, string>()
-  const tasksByGoalId = new Map<string, KpiTableTask[]>()
+  const currentUserId = profile?.id || ""
 
-  if (goalIds.length > 0 || hasAdHocGroup) {
-    const [
-      { data: goalCycleRows },
-      { data: cycleRows },
-      { data: taskRows },
-      { data: adHocRows },
-      { data: completionRows },
-    ] = await Promise.all([
-      goalIds.length > 0
-        ? supabase.from("goals_objectives").select("id, review_cycle_id").in("id", goalIds).returns<GoalCycleRow[]>()
-        : Promise.resolve({ data: [] as GoalCycleRow[] }),
-      supabase
-        .from("review_cycles")
-        .select("id, name, start_date")
-        .returns<Array<ReviewCycleRow & { start_date: string | null }>>(),
-      goalIds.length > 0
-        ? supabase.from("tasks").select(TASK_FIELDS).in("goal_id", goalIds).returns<GoalTaskRow[]>()
-        : Promise.resolve({ data: [] as GoalTaskRow[] }),
-      hasAdHocGroup && profile?.id
-        ? supabase
-            .from("tasks")
-            .select(TASK_FIELDS)
-            .is("goal_id", null)
-            .eq("assigned_to", profile.id)
-            .eq("is_archived", false)
-            .returns<GoalTaskRow[]>()
-        : Promise.resolve({ data: [] as GoalTaskRow[] }),
-      profile?.id
-        ? supabase
-            .from("task_user_completion")
-            .select("task_id")
-            .eq("user_id", profile.id)
-            .returns<TaskCompletionRow[]>()
-        : Promise.resolve({ data: [] as TaskCompletionRow[] }),
-    ])
+  const [{ data: assignedTasks }, { data: completionRows }] = await Promise.all([
+    currentUserId
+      ? supabase
+          .from("tasks")
+          .select(TASK_FIELDS)
+          .eq("assigned_to", currentUserId)
+          .eq("is_archived", false)
+          .returns<TaskRow[]>()
+      : Promise.resolve({ data: [] as TaskRow[] }),
+    currentUserId
+      ? supabase
+          .from("task_user_completion")
+          .select("task_id")
+          .eq("user_id", currentUserId)
+          .returns<TaskCompletionRow[]>()
+      : Promise.resolve({ data: [] as TaskCompletionRow[] }),
+  ])
 
-    const cycleNameById = new Map<string, string>()
-    for (const cycle of cycleRows || []) {
-      cycleNameById.set(cycle.id, cycle.name || toQuarterLabel(cycle.start_date))
-    }
+  const completedTaskIds = new Set((completionRows || []).map((row) => row.task_id))
 
-    goalCycleByGoalId = new Map(
-      (goalCycleRows || []).map((goalCycle) => [
-        goalCycle.id,
-        goalCycle.review_cycle_id ? cycleNameById.get(goalCycle.review_cycle_id) || "Current" : "Current",
-      ])
-    )
+  const { data: completedExtraTasks } =
+    completedTaskIds.size > 0
+      ? await supabase
+          .from("tasks")
+          .select(TASK_FIELDS)
+          .in("id", Array.from(completedTaskIds))
+          .eq("is_archived", false)
+          .returns<TaskRow[]>()
+      : { data: [] as TaskRow[] }
 
-    const completedTaskIds = new Set((completionRows || []).map((row) => row.task_id))
-    const currentUserId = profile?.id || ""
-    const currentUserDepartment = profile?.department || ""
-
-    const cycleStart = score.cycle_start_date
-    const cycleEnd = score.cycle_end_date
-
-    for (const task of [...(taskRows || []), ...(adHocRows || [])]) {
-      // The score counts a task in the cycle its deadline falls in, so the
-      // drill-down has to use the same rule or it lists work the number above
-      // it never included.
-      if (cycleStart && cycleEnd && !isTaskInCycle(task, cycleStart, cycleEnd)) continue
-
-      const isIndividualTaskForUser = task.assigned_to === currentUserId
-      const hasCompletionByUser = completedTaskIds.has(task.id)
-
-      if (!isIndividualTaskForUser && !hasCompletionByUser) {
-        continue
-      }
-
-      const groupKey = task.goal_id || ""
-      const existing = tasksByGoalId.get(groupKey) || []
-      existing.push({
-        id: task.id,
-        title: task.title || "Untitled task",
-        description: task.description,
-        status: task.status || "pending",
-        dueDate: task.task_end_date || task.due_date,
-        assignmentType: "individual",
-        weight: task.weight ?? TASK_WEIGHT_DEFAULT,
-        rating: task.rating,
-      })
-      tasksByGoalId.set(groupKey, existing)
-    }
+  const taskMap = new Map<string, TaskRow>()
+  for (const t of [...(assignedTasks || []), ...(completedExtraTasks || [])]) {
+    if (t?.id) taskMap.set(t.id, t)
   }
+  const allUserTasks = Array.from(taskMap.values())
 
-  const rows: KpiTableRow[] = score.breakdown.goals.map((goal) => {
-    const goalTasks = tasksByGoalId.get(goal.goal_id) || []
-    const ratedTasks = goalTasks.filter((t) => typeof t.rating === "number" && t.rating > 0)
+  const kpiIds = Array.from(new Set(allUserTasks.map((t) => t.kpi_id).filter(Boolean))) as string[]
+  const { data: kpiRows } =
+    kpiIds.length > 0
+      ? await supabase
+          .from("corporate_kpis")
+          .select("id, measure, strategic_objective")
+          .in("id", kpiIds)
+          .returns<Array<{ id: string; measure: string; strategic_objective: string }>>()
+      : { data: [] }
+  const kpiTitleById = new Map((kpiRows || []).map((k) => [k.id, k.measure || k.strategic_objective]))
+
+  const matchedTaskIds = new Set<string>()
+
+  const rows: KpiTableRow[] = targetCycles.map((cycle) => {
+    const matchingTasks = allUserTasks.filter((task) => {
+      const match = isTaskInCycle(task, cycle.startDate, cycle.endDate)
+      if (match) matchedTaskIds.add(task.id)
+      return match
+    })
+
+    const cycleTasks: KpiTableTask[] = matchingTasks.map((task) => ({
+      id: task.id,
+      title: task.title || "Untitled task",
+      description: task.description,
+      status: task.status || "pending",
+      dueDate: task.task_end_date || task.due_date,
+      assignmentType: task.assignment_type || "individual",
+      weight: task.weight ?? TASK_WEIGHT_DEFAULT,
+      rating: task.rating,
+      kpiTitle: task.kpi_id ? kpiTitleById.get(task.kpi_id) || null : null,
+    }))
+
+    const ratedTasks = cycleTasks.filter((t) => typeof t.rating === "number" && t.rating > 0)
     const avgRating =
       ratedTasks.length > 0
         ? (ratedTasks.reduce((acc, t) => acc + (t.rating || 0), 0) / ratedTasks.length).toFixed(1)
         : null
 
-    const earnedPoints = goalTasks.reduce((acc, t) => {
+    const earnedPoints = cycleTasks.reduce((acc, t) => {
       if (!t.weight || t.rating == null) return acc
       return acc + (t.weight * t.rating) / 5
     }, 0)
     const roundedEarned = Math.round(earnedPoints * 100) / 100
 
-    let resolvedCycle = goalCycleByGoalId.get(goal.goal_id)
-    if (!resolvedCycle || resolvedCycle === "Current") {
-      const firstTaskWithDate = goalTasks.find((t) => t.dueDate)
-      if (firstTaskWithDate?.dueDate) {
-        resolvedCycle = toQuarterLabel(firstTaskWithDate.dueDate)
-      } else {
-        resolvedCycle = goal.goal_id ? "Goal" : "Ad-hoc"
-      }
-    }
+    const totalWeight = cycleTasks.reduce((acc, t) => acc + (t.weight || 0), 0)
+    const effectiveKpi = totalWeight > 0 ? `${Math.round((earnedPoints / totalWeight) * 100)}%` : "-"
+
+    const completedCount = cycleTasks.filter((t) => t.status === "completed").length
 
     return {
-      cycle: resolvedCycle,
+      cycle: formatCycleLabel(cycle.name),
       rating: avgRating ? `${avgRating}/5` : "Unrated",
-      earned: `${roundedEarned} / ${goal.priority_weight}`,
-      effective_kpi_pct: `${goal.effective_kpi_pct}%`,
-      linked_tasks: `${goal.linked_tasks_completed}/${goal.linked_tasks_total}`,
-      weight: String(goal.priority_weight),
-      __goalId: goal.goal_id,
-      __tasks: goalTasks,
+      earned: `${roundedEarned} / ${totalWeight}`,
+      effective_kpi_pct: effectiveKpi,
+      linked_tasks: `${completedCount}/${cycleTasks.length}`,
+      weight: String(totalWeight),
+      __goalId: cycle.id,
+      __tasks: cycleTasks,
     }
   })
+
+  // Catch any tasks not covered by known quarterly cycles
+  const unmatchedTasks = allUserTasks.filter((t) => !matchedTaskIds.has(t.id))
+  if (unmatchedTasks.length > 0 && effectiveCycleId === "all") {
+    const unratedTasks = unmatchedTasks.filter((t) => typeof t.rating === "number" && t.rating > 0)
+    const avgRating =
+      unratedTasks.length > 0
+        ? (unratedTasks.reduce((acc, t) => acc + (t.rating || 0), 0) / unratedTasks.length).toFixed(1)
+        : null
+
+    const earnedPoints = unmatchedTasks.reduce((acc, t) => {
+      if (!t.weight || t.rating == null) return acc
+      return acc + (t.weight * t.rating) / 5
+    }, 0)
+    const roundedEarned = Math.round(earnedPoints * 100) / 100
+    const totalWeight = unmatchedTasks.reduce((acc, t) => acc + (t.weight || 0), 0)
+    const effectiveKpi = totalWeight > 0 ? `${Math.round((earnedPoints / totalWeight) * 100)}%` : "-"
+
+    rows.push({
+      cycle: "Ad-hoc / Undated",
+      rating: avgRating ? `${avgRating}/5` : "Unrated",
+      earned: `${roundedEarned} / ${totalWeight}`,
+      effective_kpi_pct: effectiveKpi,
+      linked_tasks: `${unmatchedTasks.filter((t) => t.status === "completed").length}/${unmatchedTasks.length}`,
+      weight: String(totalWeight),
+      __goalId: "adhoc",
+      __tasks: unmatchedTasks.map((t) => ({
+        id: t.id,
+        title: t.title || "Untitled task",
+        description: t.description,
+        status: t.status || "pending",
+        dueDate: t.task_end_date || t.due_date,
+        assignmentType: t.assignment_type || "individual",
+        weight: t.weight ?? TASK_WEIGHT_DEFAULT,
+        rating: t.rating,
+        kpiTitle: t.kpi_id ? kpiTitleById.get(t.kpi_id) || null : null,
+      })),
+    })
+  }
 
   return (
     <EmployeeKpiTabs

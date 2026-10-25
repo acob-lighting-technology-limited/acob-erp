@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { computeIndividualPerformanceScore } from "@/lib/performance/scoring"
+import { getUnifiedPerformanceReviews } from "@/lib/performance/review-data"
+import { mergeDuplicateReviews } from "@/lib/pms/reviews"
 
 type ProfileRow = {
   id: string
@@ -18,7 +20,7 @@ type AttendanceRow = {
   status: string | null
 }
 
-type ReviewRow = {
+export type ReviewRow = {
   id: string
   created_at: string
   status: string | null
@@ -53,19 +55,16 @@ export async function getCurrentUserPmsData(cycleId?: string) {
     .eq("id", user.id)
     .maybeSingle<ProfileRow>()
 
-  const [{ data: latestReview }, { data: cycleRows }] = await Promise.all([
-    supabase
-      .from("performance_reviews")
-      .select("id, created_at, status, final_score")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .returns<ReviewRow[]>(),
+  const [{ reviews: unifiedReviews }, { data: cycleRows }] = await Promise.all([
+    getUnifiedPerformanceReviews(supabase, { userId: user.id }),
     supabase
       .from("review_cycles")
       .select("id, name, start_date, end_date, status, review_type")
       .order("start_date", { ascending: false }),
   ])
+
+  const mergedReviews = mergeDuplicateReviews(unifiedReviews)
+  const latestReview = mergedReviews[0] ?? null
 
   const score = await computeIndividualPerformanceScore(supabase, { userId: user.id, cycleId })
 
@@ -115,6 +114,6 @@ export async function getCurrentUserPmsData(cycleId?: string) {
       presentDays: score.breakdown.attendance.present,
       trackedDays: score.breakdown.attendance.total,
     },
-    latestReview: latestReview?.[0] ?? null,
+    latestReview,
   }
 }

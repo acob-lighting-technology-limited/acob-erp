@@ -497,6 +497,11 @@ export function PmsTablePage({
                                             {task.description}
                                           </p>
                                         ) : null}
+                                        {(task as { kpiTitle?: string | null }).kpiTitle ? (
+                                          <p className="text-primary/90 line-clamp-1 max-w-md text-xs font-medium">
+                                            Corporate KPI: {(task as { kpiTitle?: string | null }).kpiTitle}
+                                          </p>
+                                        ) : null}
                                       </div>
                                     </td>
                                     <td className="px-3 py-2.5">
