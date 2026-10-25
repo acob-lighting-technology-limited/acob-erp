@@ -58,7 +58,7 @@ export function HRAdminDashboard({
 }: HRAdminDashboardProps = {}) {
   const scope = useAdminScope()
   const canAccessHrResources = showResourceBooking && scope.isAdminLike && scope.scopeMode !== "lead"
-  const leavePath = basePath === "/admin/hr" ? `${basePath}/leave/approve` : `${basePath}/leave`
+  const leavePath = `${basePath}/leave`
 
   const {
     data: stats = {
@@ -94,13 +94,6 @@ export function HRAdminDashboard({
           value={stats.todayAttendance}
           icon={Clock}
           description="Employees clocked in today"
-        />
-        <StatCard
-          variant="compact"
-          title="Pending Reviews"
-          value={stats.upcomingReviews}
-          icon={FileText}
-          description="Reviews to complete"
         />
         <StatCard
           variant="compact"
@@ -361,88 +354,6 @@ export function HRAdminDashboard({
                   fillColor="bg-emerald-500"
                   hoverTextClassName="group-hover:text-white"
                   className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-emerald-500/60 dark:hover:border-emerald-400/60"
-                  iconClassName="text-muted-foreground h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          </Link>
-
-          {/* Payroll */}
-          <Link href={`${basePath}/payroll`} className="group block">
-            <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/60 hover:shadow-xl dark:hover:border-blue-400/60">
-              <div className="space-y-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <IconFill
-                      icon={FileText}
-                      fillColor="bg-blue-500"
-                      className="h-9 w-9 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-600 transition-transform duration-200 group-hover:scale-105 dark:text-blue-400"
-                      iconClassName="h-5 w-5"
-                    />
-                    <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-blue-500">
-                      Payroll
-                    </h3>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 rounded-full border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-bold text-blue-600 dark:text-blue-400"
-                  >
-                    Payroll Panel
-                  </Badge>
-                </div>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Manage payroll periods and calculate payslips
-                </p>
-              </div>
-              <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Payslip Calculations</span>
-                <IconFill
-                  icon={ChevronRight}
-                  fillColor="bg-blue-500"
-                  hoverTextClassName="group-hover:text-white"
-                  className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-blue-500/60 dark:hover:border-blue-400/60"
-                  iconClassName="text-muted-foreground h-3.5 w-3.5"
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          </Link>
-
-          {/* PMS */}
-          <Link href={`${basePath}/pms`} className="group block">
-            <div className="bg-card border-border flex h-full flex-col justify-between rounded-xl border p-4.5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-500/60 hover:shadow-xl dark:hover:border-amber-400/60">
-              <div className="space-y-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <IconFill
-                      icon={Award}
-                      fillColor="bg-amber-500"
-                      className="h-9 w-9 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-600 transition-transform duration-200 group-hover:scale-105 dark:text-amber-400"
-                      iconClassName="h-5 w-5"
-                    />
-                    <h3 className="text-foreground text-base font-semibold transition-colors group-hover:text-amber-500">
-                      PMS
-                    </h3>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 rounded-full border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400"
-                  >
-                    {stats.upcomingReviews} Reviews
-                  </Badge>
-                </div>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Track live KPI, goals, attendance, CBT, behaviour, and reviews
-                </p>
-              </div>
-              <div className="border-border/40 mt-4 flex items-center justify-between border-t pt-2.5">
-                <span className="text-muted-foreground text-[11px] font-medium">Performance System</span>
-                <IconFill
-                  icon={ChevronRight}
-                  fillColor="bg-amber-500"
-                  hoverTextClassName="group-hover:text-white"
-                  className="border-border h-6 w-6 rounded-full border transition-all duration-200 group-hover:translate-x-0.5 hover:border-amber-500/60 dark:hover:border-amber-400/60"
                   iconClassName="text-muted-foreground h-3.5 w-3.5"
                   aria-hidden="true"
                 />

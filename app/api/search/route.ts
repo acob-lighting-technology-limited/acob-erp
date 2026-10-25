@@ -444,7 +444,7 @@ export async function GET(request: NextRequest) {
       const id = String(l.id)
       const href =
         tier === "admin"
-          ? `/admin/hr/leave/approve?requestId=${id}`
+          ? `/admin/hr/leave?requestId=${id}`
           : tier === "lead"
             ? `/dept/${scope.primaryDeptId}/hr/leave`
             : `/hr/leave`

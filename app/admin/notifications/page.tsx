@@ -274,7 +274,7 @@ async function getAdminNotificationsData() {
         title: "Pending Leave Requests",
         message: `${pendingLeaveCount} leave request${pendingLeaveCount > 1 ? "s" : ""} awaiting approval`,
         timestamp,
-        link: "/admin/hr/leave/approve",
+        link: "/admin/hr/leave",
         linkText: "Review Requests",
         read: false,
         priority: "high",

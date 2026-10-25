@@ -135,6 +135,8 @@ const nextConfig = {
       { source: "/admin/payments/departments", destination: "/admin/accounts/payments", permanent: true },
       { source: "/admin/corporate-scorecard/summary", destination: "/admin/corporate-services/scorecard?tab=summary", permanent: true },
       { source: "/admin/hr/attendance/reports", destination: "/admin/hr/attendance", permanent: true },
+      { source: "/admin/hr/leave/approve", destination: "/admin/hr/leave", permanent: true },
+      { source: "/dept/:dept_id/hr/leave/approve", destination: "/dept/:dept_id/hr/leave", permanent: true },
       { source: "/admin/hr/employees/payroll", destination: "/admin/payroll", permanent: true },
       { source: "/admin/hr/payroll", destination: "/admin/payroll", permanent: true },
       { source: "/admin/hr/payroll/dummy", destination: "/admin/payroll/calculator", permanent: true },
