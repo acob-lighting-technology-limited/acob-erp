@@ -806,7 +806,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Name",
         sortable: true,
         resizable: true,
-        initialWidth: 200,
+        initialWidth: 220,
         accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
           <div className="flex items-center gap-2.5">
@@ -841,7 +841,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "email",
         label: "Email",
         resizable: true,
-        initialWidth: 180,
+        initialWidth: 230,
         accessor: (r) => r.company_email,
         hideOnMobile: true,
         render: (r) => (
@@ -855,7 +855,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   aria-label="Copy email"
                 >
                   <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <span className="max-w-[150px] truncate">{r.company_email}</span>
+                  <span className="truncate">{r.company_email}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Click to copy email</TooltipContent>
@@ -865,7 +865,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground/80 hover:text-foreground ml-5 text-left text-xs whitespace-nowrap transition-colors"
+                    className="text-muted-foreground/80 hover:text-foreground ml-5 truncate text-left text-xs transition-colors"
                     onClick={() => void handleCopyEmail(r.additional_email || "")}
                     aria-label="Copy additional email"
                   >
@@ -895,10 +895,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "department",
         label: "Department",
         sortable: true,
+        resizable: true,
+        initialWidth: 200,
         accessor: (r) => r.department,
         render: (r) => (
           <div className="flex min-w-0 flex-col items-start gap-1">
-            <span className="max-w-[150px] truncate text-xs font-medium" title={r.department}>
+            <span className="truncate text-xs font-medium" title={r.department}>
               {r.department}
             </span>
             {r.is_department_lead && (
@@ -920,7 +922,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               label: "Exit Date",
               sortable: true,
               resizable: true,
-              initialWidth: 110,
+              initialWidth: 120,
               accessor: (r: Employee) => r.separation_date || "",
               render: (r: Employee) => (
                 <span className="text-muted-foreground text-xs whitespace-nowrap">
@@ -934,6 +936,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               key: "employment_type",
               label: "Employee Type",
               sortable: true,
+              resizable: true,
+              initialWidth: 130,
               accessor: (r: Employee) => r.employment_type || "full_time",
               render: (r: Employee) => {
                 const type = r.employment_type || "full_time"
