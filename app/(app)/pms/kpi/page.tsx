@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { getCurrentUserPmsData } from "../_lib"
-import { TASK_WEIGHT_DEFAULT, isTaskInCycle } from "@/lib/tasks/scoring"
+import { TASK_WEIGHT_DEFAULT, computeWeightedTaskScore, isTaskInCycle } from "@/lib/tasks/scoring"
 import { formatCycleLabel, matchesCadence } from "@/lib/pms/cadence"
 import { EmployeeKpiTabs } from "./_components/employee-kpi-tabs"
 
@@ -148,29 +148,31 @@ export default async function PmsKpiPage({
       kpiTitle: task.kpi_id ? kpiTitleById.get(task.kpi_id) || null : null,
     }))
 
+    const taskScore = computeWeightedTaskScore(cycleTasks)
     const ratedTasks = cycleTasks.filter((t) => typeof t.rating === "number" && t.rating > 0)
     const avgRating =
       ratedTasks.length > 0
         ? (ratedTasks.reduce((acc, t) => acc + (t.rating || 0), 0) / ratedTasks.length).toFixed(1)
         : null
 
-    const earnedPoints = cycleTasks.reduce((acc, t) => {
-      if (!t.weight || t.rating == null) return acc
-      return acc + (t.weight * t.rating) / 5
-    }, 0)
-    const roundedEarned = Math.round(earnedPoints * 100) / 100
-
+    const effectiveKpi = taskScore.score !== null ? `${Math.round(taskScore.score)}%` : "-"
+    const roundedEarned = Math.round(taskScore.earnedPoints * 100) / 100
+    const scoredWeight = taskScore.availablePoints
     const totalWeight = cycleTasks.reduce((acc, t) => acc + (t.weight || 0), 0)
-    const effectiveKpi = totalWeight > 0 ? `${Math.round((earnedPoints / totalWeight) * 100)}%` : "-"
 
-    const completedCount = cycleTasks.filter((t) => t.status === "completed").length
+    let completionLabel = `${ratedTasks.length}/${cycleTasks.length}`
+    if (taskScore.awaitingRatingCount > 0) {
+      completionLabel += ` (${taskScore.awaitingRatingCount} awaiting rating)`
+    } else if (taskScore.unresolvedCount > 0) {
+      completionLabel += ` (${taskScore.unresolvedCount} in progress)`
+    }
 
     return {
       cycle: formatCycleLabel(cycle.name),
       rating: avgRating ? `${avgRating}/5` : "Unrated",
-      earned: `${roundedEarned} / ${totalWeight}`,
+      earned: `${roundedEarned} / ${scoredWeight}`,
       effective_kpi_pct: effectiveKpi,
-      linked_tasks: `${completedCount}/${cycleTasks.length}`,
+      linked_tasks: completionLabel,
       weight: String(totalWeight),
       __goalId: cycle.id,
       __tasks: cycleTasks,
@@ -180,26 +182,31 @@ export default async function PmsKpiPage({
   // Catch any tasks not covered by known quarterly cycles
   const unmatchedTasks = allUserTasks.filter((t) => !matchedTaskIds.has(t.id))
   if (unmatchedTasks.length > 0 && effectiveCycleId === "all") {
+    const taskScore = computeWeightedTaskScore(unmatchedTasks)
     const unratedTasks = unmatchedTasks.filter((t) => typeof t.rating === "number" && t.rating > 0)
     const avgRating =
       unratedTasks.length > 0
         ? (unratedTasks.reduce((acc, t) => acc + (t.rating || 0), 0) / unratedTasks.length).toFixed(1)
         : null
 
-    const earnedPoints = unmatchedTasks.reduce((acc, t) => {
-      if (!t.weight || t.rating == null) return acc
-      return acc + (t.weight * t.rating) / 5
-    }, 0)
-    const roundedEarned = Math.round(earnedPoints * 100) / 100
+    const effectiveKpi = taskScore.score !== null ? `${Math.round(taskScore.score)}%` : "-"
+    const roundedEarned = Math.round(taskScore.earnedPoints * 100) / 100
+    const scoredWeight = taskScore.availablePoints
     const totalWeight = unmatchedTasks.reduce((acc, t) => acc + (t.weight || 0), 0)
-    const effectiveKpi = totalWeight > 0 ? `${Math.round((earnedPoints / totalWeight) * 100)}%` : "-"
+
+    let completionLabel = `${unratedTasks.length}/${unmatchedTasks.length}`
+    if (taskScore.awaitingRatingCount > 0) {
+      completionLabel += ` (${taskScore.awaitingRatingCount} awaiting rating)`
+    } else if (taskScore.unresolvedCount > 0) {
+      completionLabel += ` (${taskScore.unresolvedCount} in progress)`
+    }
 
     rows.push({
       cycle: "Ad-hoc / Undated",
       rating: avgRating ? `${avgRating}/5` : "Unrated",
-      earned: `${roundedEarned} / ${totalWeight}`,
+      earned: `${roundedEarned} / ${scoredWeight}`,
       effective_kpi_pct: effectiveKpi,
-      linked_tasks: `${unmatchedTasks.filter((t) => t.status === "completed").length}/${unmatchedTasks.length}`,
+      linked_tasks: completionLabel,
       weight: String(totalWeight),
       __goalId: "adhoc",
       __tasks: unmatchedTasks.map((t) => ({
