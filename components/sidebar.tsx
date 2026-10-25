@@ -11,7 +11,7 @@ import {
   ChevronsUpDown,
   ChevronRight,
   ClipboardList,
-  FileCode2,
+  Mail,
   FileBarChart,
   FileText,
   Landmark,
@@ -100,7 +100,7 @@ type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
 /**
  * Section keys and labels match adminSections in admin-sidebar.tsx, so the same
  * feature sits under the same heading on every surface. Keep them in step: the
- * staff shell has no Compliance section, but the sections it does have use the
+ * staff shell has no System section, but the sections it does have use the
  * same keys and the same order.
  */
 const navigationSections: NavSectionDef[] = [
@@ -188,7 +188,7 @@ const navigationSections: NavSectionDef[] = [
           },
         ],
       },
-      { name: "Correspondence", href: "/correspondence", icon: FileCode2 },
+      { name: "Correspondence", href: "/correspondence", icon: Mail },
       {
         name: "Documentation",
         href: "/documentation",

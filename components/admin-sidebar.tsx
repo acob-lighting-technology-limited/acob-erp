@@ -22,7 +22,7 @@ import {
   Settings,
   Server,
   FileBarChart,
-  FileCode2,
+  Mail,
   Megaphone,
   ShieldCheck,
   FlaskConical,
@@ -205,7 +205,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       section: "operations",
       name: "Correspondence",
       href: `${base}/correspondence`,
-      icon: FileCode2,
+      icon: Mail,
       roles: [],
     },
     {
@@ -450,7 +450,7 @@ const adminNavigation: NavItem[] = [
     section: "operations",
     name: "Correspondence",
     href: "/admin/correspondence",
-    icon: FileCode2,
+    icon: Mail,
     roles: ["developer", "super_admin", "admin"],
   },
   {
@@ -489,14 +489,14 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
-    section: "compliance",
+    section: "system",
     name: "Audit Logs",
     href: "/admin/audit-logs",
     icon: ShieldCheck,
     roles: ["developer", "super_admin", "admin"],
   },
   {
-    section: "compliance",
+    section: "system",
     name: "Settings",
     href: "/admin/settings",
     icon: Settings,
@@ -512,10 +512,10 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
-    // Its own collapsible item under Compliance. Developer-only —
+    // Its own collapsible item under System. Developer-only —
     // /admin/dev resolves to dev.main, which canAccessRouteV2 gates to the
     // developer role, so the whole branch is hidden from admin / super_admin.
-    section: "compliance",
+    section: "system",
     name: "Developer",
     href: "/admin/dev",
     icon: FlaskConical,
@@ -535,7 +535,7 @@ const adminSections = [
   { key: "overview", label: "Overview" },
   { key: "management", label: "Management" },
   { key: "operations", label: "Operations" },
-  { key: "compliance", label: "Compliance" },
+  { key: "system", label: "System" },
 ]
 
 const ADMIN_ROUTE_ALIASES: RouteAliases = {
