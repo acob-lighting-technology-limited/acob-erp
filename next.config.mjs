@@ -147,6 +147,8 @@ const nextConfig = {
       { source: "/admin/pms/goals", destination: "/admin/pms/kpi?tab=goals", permanent: true },
       { source: "/admin/reports/meeting-documents", destination: "/admin/reports/general-meeting/kss", permanent: true },
       { source: "/admin/reports/mail", destination: "/admin/communications/meetings/mail", permanent: true },
+      { source: "/admin/security", destination: "/admin/audit-logs", permanent: true },
+      { source: "/admin/it", destination: "/admin/onboarding", permanent: true },
       { source: "/admin/tools/reference-generator", destination: "/admin/correspondence", permanent: true },
       { source: "/dept/:dept_id/pms/goals", destination: "/dept/:dept_id/pms/kpi?tab=goals", permanent: true },
       {

@@ -154,6 +154,7 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   if (pathname === "/admin") return "admin.dashboard"
   if (pathname.startsWith("/admin/audit-logs")) return "auditlogs.main"
   if (pathname.startsWith("/admin/dev")) return "dev.main"
+  if (pathname.startsWith("/admin/it")) return "settings.main"
   if (pathname.startsWith("/admin/settings")) return "settings.main"
   // Onboarding lists every account and its sign-in state — same account-admin
   // surface as Settings → Users, so it gates on the same route key.

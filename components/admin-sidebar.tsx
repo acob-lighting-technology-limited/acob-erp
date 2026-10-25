@@ -20,6 +20,7 @@ import {
   MessageSquare,
   LogOut,
   Settings,
+  Server,
   FileBarChart,
   FileCode2,
   Megaphone,
@@ -313,6 +314,21 @@ const adminNavigation: NavItem[] = [
     ],
   },
   {
+    section: "management",
+    name: "IT",
+    description: "Information Technology",
+    href: "/admin/it",
+    icon: Server,
+    roles: ["developer", "super_admin", "admin"],
+    children: [
+      { name: "Onboarding", href: "/admin/onboarding" },
+      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
+      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
+      { name: "Network Activity", href: "/admin/security/network-activity" },
+      { name: "Bypass & Override", href: "/admin/security/bypass-override" },
+    ],
+  },
+  {
     // Shown to the MD, delegates, super admins and developers (showMdDesk); the page re-checks.
     section: "management",
     name: "MD's Desk",
@@ -345,7 +361,6 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
-      { name: "Starlink Kits", href: "/admin/accounts/starlink" },
       { name: "Payroll", href: "/admin/payroll" },
       {
         name: "Inventory",
@@ -475,15 +490,10 @@ const adminNavigation: NavItem[] = [
   },
   {
     section: "compliance",
-    name: "System & Security",
-    href: "/admin/security",
+    name: "Audit Logs",
+    href: "/admin/audit-logs",
     icon: ShieldCheck,
     roles: ["developer", "super_admin", "admin"],
-    children: [
-      { name: "Audit Logs", href: "/admin/audit-logs" },
-      { name: "Network Activity", href: "/admin/security/network-activity" },
-      { name: "Bypass & Override", href: "/admin/security/bypass-override" },
-    ],
   },
   {
     section: "compliance",
@@ -493,16 +503,11 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Users", href: "/admin/settings/users" },
-      // Lists every account and its sign-in state, and resolves to settings.main
-      // for exactly that reason. It sat under HR, where its visibility was
-      // controlled by a grant unrelated to the item it appeared beside.
-      { name: "Onboarding", href: "/admin/onboarding" },
       { name: "Roles", href: "/admin/settings/roles" },
       { name: "Company", href: "/admin/settings/company" },
       { name: "Attendance", href: "/admin/settings/attendance" },
       { name: "CBT", href: "/admin/settings/cbt" },
       { name: "Mail", href: "/admin/settings/mail" },
-      { name: "Mailboxes", href: "/admin/settings/mailboxes" },
       { name: "Maintenance", href: "/admin/settings/maintenance" },
     ],
   },
@@ -539,6 +544,8 @@ const ADMIN_ROUTE_ALIASES: RouteAliases = {
   "/admin/finance": ["/admin/payments"],
   // Corporate Services — legacy /admin/corporate-scorecard redirects into scorecard.
   "/admin/corporate-services": ["/admin/corporate-scorecard"],
+  // Audit Logs — legacy /admin/security redirects into audit-logs.
+  "/admin/audit-logs": ["/admin/security"],
 }
 
 export function AdminSidebar({
