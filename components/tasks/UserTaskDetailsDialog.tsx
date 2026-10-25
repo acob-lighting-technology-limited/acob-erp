@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -80,14 +80,10 @@ export function UserTaskDetailsDialog({
   const endSource = selectedTask.task_end_date || selectedTask.due_date
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/*
-        `max-h`, not a fixed `h`: a task with no description and no comments gets
-        a short dialog instead of a near-full screen of empty space.
-      */}
-      <DialogContent className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl md:max-w-2xl">
         {/* ── Header: identity, and each fact exactly once ─────────────────── */}
-        <DialogHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
+        <SheetHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
           <div className="flex flex-wrap items-center gap-1.5">
             {selectedTask.work_item_number && (
               <Badge variant="outline" className="font-mono text-[11px]">
@@ -116,9 +112,9 @@ export function UserTaskDetailsDialog({
             )}
           </div>
 
-          <DialogTitle className="text-base leading-snug font-semibold">{selectedTask.title}</DialogTitle>
+          <SheetTitle className="text-base leading-snug font-semibold">{selectedTask.title}</SheetTitle>
 
-          <DialogDescription className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+          <SheetDescription className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
             <span>Assigned by {assignedByName}</span>
             {selectedTask.department && (
               <>
@@ -128,8 +124,8 @@ export function UserTaskDetailsDialog({
             )}
             <span aria-hidden>·</span>
             <span className={isOverdue ? "text-destructive font-medium" : undefined}>Due {dueLabel}</span>
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {/* ── The action, pinned directly under the header ─────────────────── */}
         {/* Moving a task forward is why this dialog gets opened, so it sits above
@@ -297,7 +293,7 @@ export function UserTaskDetailsDialog({
             </div>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
