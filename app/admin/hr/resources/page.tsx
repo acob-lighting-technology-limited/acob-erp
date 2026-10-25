@@ -156,16 +156,19 @@ export default function AdminFleetPage() {
         key: "resource",
         label: "Resource",
         sortable: true,
-        resizable: true,
-        initialWidth: 200,
         accessor: (r) => r.resource?.name || "Unknown",
-        render: (r) => <span className="font-medium">{r.resource?.name || "Unknown"}</span>,
+        render: (r) => <span className="font-medium whitespace-nowrap">{r.resource?.name || "Unknown"}</span>,
       },
       {
         key: "requester",
         label: "Requester",
         sortable: true,
         accessor: (r) => r.requester?.full_name || r.requester?.company_email || "Employee",
+        render: (r) => (
+          <span className="font-medium whitespace-nowrap">
+            {r.requester?.full_name || r.requester?.company_email || "Employee"}
+          </span>
+        ),
       },
       {
         key: "timeframe",
@@ -173,8 +176,8 @@ export default function AdminFleetPage() {
         accessor: (r) => r.start_at,
         hideOnMobile: true,
         render: (r) => (
-          <div className="text-xs">
-            <p>{formatDateTime(r.start_at)}</p>
+          <div className="text-xs whitespace-nowrap">
+            <p className="font-medium">{formatDateTime(r.start_at)}</p>
             <p className="text-muted-foreground">to {formatDateTime(r.end_at)}</p>
           </div>
         ),
@@ -184,7 +187,11 @@ export default function AdminFleetPage() {
         label: "Reason",
         accessor: (r) => r.reason,
         hideOnMobile: true,
-        render: (r) => <span className="max-w-[200px] truncate text-xs">{r.reason}</span>,
+        render: (r) => (
+          <p className="max-w-[280px] truncate text-xs" title={r.reason || undefined}>
+            {r.reason || "—"}
+          </p>
+        ),
       },
       {
         key: "status",
@@ -213,7 +220,7 @@ export default function AdminFleetPage() {
         accessor: (r) => String(r.attachment_count || 0),
         hideOnMobile: true,
         render: (r) => (
-          <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+          <span className="text-muted-foreground inline-flex items-center gap-1 text-xs whitespace-nowrap">
             <Paperclip className="h-3 w-3" />
             {r.attachment_count || 0}
           </span>
@@ -224,18 +231,17 @@ export default function AdminFleetPage() {
         label: "Decision By",
         accessor: (r) => r.reviewer?.full_name || "-",
         hideOnMobile: true,
-        initialWidth: 200,
         render: (r) =>
           r.reviewer?.full_name ? (
-            <div className="text-xs">
+            <div className="text-xs whitespace-nowrap">
               <p className="font-medium">{r.reviewer.full_name}</p>
               {r.reviewer.department && <p className="text-muted-foreground">{r.reviewer.department}</p>}
               {r.reviewed_at && <p className="text-muted-foreground">{formatDateTime(r.reviewed_at)}</p>}
             </div>
           ) : r.status === "cancelled" ? (
-            <span className="text-muted-foreground text-xs">{r.admin_note || "Cancelled"}</span>
+            <span className="text-muted-foreground text-xs whitespace-nowrap">{r.admin_note || "Cancelled"}</span>
           ) : (
-            <span className="text-muted-foreground text-xs">Not yet reviewed</span>
+            <span className="text-muted-foreground text-xs whitespace-nowrap">Not yet reviewed</span>
           ),
       },
     ],
