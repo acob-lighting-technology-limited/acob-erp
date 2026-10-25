@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { CreatePaymentDialog } from "./create-payment-dialog"
 import { ExportColumnsDialog } from "./export-columns-dialog"
+import { PaymentPreviewSheet } from "./payment-preview-sheet"
 import { PaymentStatsCards } from "./payment-stats-cards"
 import { ReceiptSelectionDialog } from "./receipt-selection-dialog"
 import { usePaymentExport } from "./use-payment-export"
@@ -129,6 +130,7 @@ export function PaymentsTable({
 }: PaymentsTableProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [previewPaymentId, setPreviewPaymentId] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
@@ -469,7 +471,15 @@ export function PaymentsTable({
       accessor: (row) => row.title,
       resizable: true,
       initialWidth: 240,
-      render: (row) => <span className="font-medium">{row.title}</span>,
+      render: (row) => (
+        <button
+          type="button"
+          onClick={() => setPreviewPaymentId(row.id)}
+          className="hover:text-primary text-left font-medium hover:underline"
+        >
+          {row.title}
+        </button>
+      ),
     },
     {
       key: "department_id",
@@ -541,7 +551,7 @@ export function PaymentsTable({
                 className="h-8 w-8"
                 onClick={(event) => {
                   event.stopPropagation()
-                  router.push(`${basePath}/${row.id}`, { scroll: false })
+                  setPreviewPaymentId(row.id)
                 }}
                 aria-label="View payment"
               >
@@ -924,10 +934,11 @@ export function PaymentsTable({
                 label: "View Details",
                 icon: Eye,
                 variant: "outline" as const,
-                onClick: () => router.push(`${basePath}/${row.id}`, { scroll: false }),
+                onClick: () => setPreviewPaymentId(row.id),
               },
             ],
           },
+          onSelect: (row) => setPreviewPaymentId(row.id),
         }}
         urlSync
         skeletonRows={6}
@@ -936,8 +947,8 @@ export function PaymentsTable({
         emptyDescription="No payments match the current search and filters."
         cardRenderer={(row) => (
           <div
-            className="bg-card rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md"
-            onClick={() => router.push(`${basePath}/${row.id}`, { scroll: false })}
+            className="bg-card cursor-pointer rounded-lg border p-5 shadow-sm transition-shadow hover:shadow-md"
+            onClick={() => setPreviewPaymentId(row.id)}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1150,6 +1161,14 @@ export function PaymentsTable({
           setExportPaymentType(id === "one-time" || id === "recurring" ? id : "all")
           setExportDialogOpen(true)
         }}
+      />
+
+      <PaymentPreviewSheet
+        paymentId={previewPaymentId}
+        open={Boolean(previewPaymentId)}
+        onOpenChange={(open) => !open && setPreviewPaymentId(null)}
+        basePath={basePath}
+        scope={isAdminPath ? "admin" : "app"}
       />
     </DataTablePage>
   )
