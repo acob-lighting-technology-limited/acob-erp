@@ -9,7 +9,7 @@ const log = logger("api/public/download")
 
 export const maxDuration = 300
 
-function buildStreamHeaders(title: string | null, isAudio: boolean) {
+function buildStreamHeaders(title: string | null, isAudio: boolean, size?: string | null) {
   const cleanTitle = (title || "download")
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
     .replace(/\s+/g, "_")
@@ -19,10 +19,20 @@ function buildStreamHeaders(title: string | null, isAudio: boolean) {
   const filename = `${cleanTitle}${ext}`
   const contentType = isAudio ? "audio/mpeg" : "video/webm"
 
-  return {
+  const headers: Record<string, string> = {
     "Content-Type": contentType,
     "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "Accept-Ranges": "bytes",
   }
+
+  if (size) {
+    const parsed = parseInt(size, 10)
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      headers["Content-Length"] = parsed.toString()
+    }
+  }
+
+  return headers
 }
 
 export async function HEAD(request: NextRequest) {
@@ -31,11 +41,12 @@ export async function HEAD(request: NextRequest) {
 
   const format_id = request.nextUrl.searchParams.get("format_id")
   const title = request.nextUrl.searchParams.get("title")
+  const size = request.nextUrl.searchParams.get("size")
   const isAudio = format_id?.startsWith("audio_mp3_") ?? false
 
   return new Response(null, {
     status: 200,
-    headers: buildStreamHeaders(title, isAudio),
+    headers: buildStreamHeaders(title, isAudio, size),
   })
 }
 
@@ -53,6 +64,7 @@ export async function GET(request: NextRequest) {
 
     const format_id = request.nextUrl.searchParams.get("format_id")
     const title = request.nextUrl.searchParams.get("title")
+    const size = request.nextUrl.searchParams.get("size")
     const isAudio = format_id?.startsWith("audio_mp3_") ?? false
 
     const ytdlpArgs = ["--js-runtimes", "node"]
@@ -96,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     return new Response(webStream, {
       status: 200,
-      headers: buildStreamHeaders(title, isAudio),
+      headers: buildStreamHeaders(title, isAudio, size),
     })
   } catch (error: any) {
     log.error("Failed to initiate media stream:", error)

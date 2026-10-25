@@ -140,16 +140,14 @@ export function MediaDownloader() {
     }
   }, [url, mode, mediaType, handleFetchInfo])
 
-  const handleDownload = (formatId?: string, trackUrl?: string) => {
+  const handleDownload = (formatId?: string, trackUrl?: string, filesize?: number | null) => {
     const urlToDownload = trackUrl || url
     const isAudio = formatId?.startsWith("audio_mp3_") || mediaType === "song"
     const formatType = isAudio ? "MP3" : "video"
 
     setError("")
 
-    const toastId = toast.loading(
-      `Connecting ${formatType} stream... Neat Download Manager will take over in a moment.`
-    )
+    const toastId = toast.loading(`Starting ${formatType} download...`)
 
     const params = new URLSearchParams({
       url: urlToDownload,
@@ -158,6 +156,9 @@ export function MediaDownloader() {
     })
     if (info?.artist || info?.uploader) {
       params.set("artist", info.artist || info.uploader || "")
+    }
+    if (filesize && filesize > 0) {
+      params.set("size", filesize.toString())
     }
 
     const downloadUrl = `/api/public/download?${params.toString()}`
@@ -170,11 +171,11 @@ export function MediaDownloader() {
     document.body.removeChild(a)
 
     setTimeout(() => {
-      toast.success("Stream connected! Neat Download Manager has started the download.", {
+      toast.success("Download started! Check your browser or download manager.", {
         id: toastId,
         description: info?.title ? `Saving: ${info.title}` : undefined,
       })
-    }, 2500)
+    }, 2000)
   }
 
   const handleBatchDownload = async () => {
@@ -430,7 +431,7 @@ export function MediaDownloader() {
                             variant="outline"
                             size="sm"
                             disabled={downloadingFormatId !== null}
-                            onClick={() => handleDownload(f.format_id)}
+                            onClick={() => handleDownload(f.format_id, undefined, f.filesize)}
                           >
                             {downloadingFormatId === f.format_id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -461,7 +462,7 @@ export function MediaDownloader() {
                             variant="outline"
                             size="sm"
                             disabled={downloadingFormatId !== null}
-                            onClick={() => handleDownload(f.format_id)}
+                            onClick={() => handleDownload(f.format_id, undefined, f.filesize)}
                           >
                             {downloadingFormatId === f.format_id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
