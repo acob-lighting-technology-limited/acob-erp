@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { canManageFleet } from "@/lib/fleet-booking"
+import { canManageFleet, autoCloseStaleFleetBookings } from "@/lib/fleet-booking"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { resolveApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
     // Resolve admin scope for department-level filtering
     const scope = await resolveApiAdminScope()
     const scopedDepts = scope ? getScopedDepartments(scope) : null
+
+    // Auto-close any stale pending bookings whose scheduled time has passed
+    await autoCloseStaleFleetBookings(dataClient)
 
     const statusParam = request.nextUrl.searchParams.get("status")
 

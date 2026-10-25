@@ -3,6 +3,7 @@ import {
   assertBookingWindow,
   assertNoFleetOverlap,
   assertReason,
+  autoCloseStaleFleetBookings,
   FLEET_ALLOWED_MIME_TYPES,
   FLEET_BLOCKING_STATUSES,
   FLEET_MAX_FILE_SIZE,
@@ -56,6 +57,9 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    // Auto-close any stale pending bookings whose scheduled time has passed
+    await autoCloseStaleFleetBookings(validationClient)
 
     const scopeParam = searchParams.get("scope") || searchParams.get("tab") || "all"
 

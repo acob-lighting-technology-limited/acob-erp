@@ -232,6 +232,8 @@ export default function AdminFleetPage() {
               {r.reviewer.department && <p className="text-muted-foreground">{r.reviewer.department}</p>}
               {r.reviewed_at && <p className="text-muted-foreground">{formatDateTime(r.reviewed_at)}</p>}
             </div>
+          ) : r.status === "cancelled" ? (
+            <span className="text-muted-foreground text-xs">{r.admin_note || "Cancelled"}</span>
           ) : (
             <span className="text-muted-foreground text-xs">Not yet reviewed</span>
           ),
