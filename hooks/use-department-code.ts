@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { apiFetch, apiJson } from "@/lib/api-client"
-import { normalizeDepartmentName } from "@/shared/departments"
+import { getDepartmentShortCode, normalizeDepartmentName } from "@/shared/departments"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
 type DepartmentRow = { name?: string | null; department_code?: string | null }
@@ -28,7 +28,11 @@ export function useDepartmentCodes(): (department: string | null | undefined) =>
       .filter((row) => row.department_code)
       .map((row) => [normalizeDepartmentName(String(row.name || "")), String(row.department_code)])
   )
-  return (department) => (department ? (codes.get(normalizeDepartmentName(department)) ?? department) : "")
+  return (department) => {
+    if (!department) return ""
+    const norm = normalizeDepartmentName(department)
+    return codes.get(norm) ?? getDepartmentShortCode(department) ?? department
+  }
 }
 
 /**
