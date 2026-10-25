@@ -160,6 +160,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [editForm, setEditForm] = useState({ status: "", manual_comment: "" })
   const [saving, setSaving] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   // Ticks each minute so an open page switches from arrivals to departures at closing.
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -170,6 +171,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const {
     data: roster,
     isLoading: loading,
+    isFetching,
     refetch,
   } = useQuery({
     queryKey: QUERY_KEYS.dailyRoster(rosterDate, lockedDepartment ?? null),
@@ -201,7 +203,21 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const records = useMemo(() => roster?.records ?? [], [roster])
   const policy = roster?.policy ?? DEFAULT_ATTENDANCE_POLICY
   const closeTime = roster?.closeTime ?? null
-  const load = () => void refetch()
+  const load = async () => {
+    setRefreshing(true)
+    try {
+      const result = await refetch()
+      if (result.isError) {
+        toast.error("Failed to refresh roster")
+      } else {
+        toast.success("Roster refreshed")
+      }
+    } catch {
+      toast.error("Failed to refresh roster")
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   // Default order only - clicking a column header still sorts by that column.
   const phase = rosterPhase({ rosterDate, now, closeTime: closeTime ?? policy.endTime })
@@ -511,9 +527,10 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
                 size="icon"
                 className="border-input h-full w-8 shrink-0 rounded-none border-l"
                 onClick={() => void load()}
+                disabled={refreshing || isFetching}
                 aria-label="Refresh now"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className={cn("h-3.5 w-3.5", (refreshing || isFetching) && "animate-spin")} />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">
