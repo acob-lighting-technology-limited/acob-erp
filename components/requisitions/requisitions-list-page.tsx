@@ -44,6 +44,7 @@ import type {
 import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeVariant } from "./requisition-detail"
+import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
 
 export type RequisitionsSurface = "staff" | "admin" | "dept"
 
@@ -104,6 +105,7 @@ export function RequisitionsListPage({
   const [error, setError] = useState<string | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isExportOpen, setIsExportOpen] = useState(false)
+  const [previewId, setPreviewId] = useState<string | null>(null)
   const [signing, setSigning] = useState<{
     requisition: Requisition
     viewer: RequisitionViewerActions
@@ -158,7 +160,16 @@ export function RequisitionsListPage({
       sortable: true,
       accessor: (r) => r.requisition_number,
       render: (r) => (
-        <Link href={detailHref(r)} className="text-primary font-mono text-xs font-semibold hover:underline">
+        <Link
+          href={detailHref(r)}
+          onClick={(e) => {
+            if (!e.metaKey && !e.ctrlKey && e.button === 0) {
+              e.preventDefault()
+              setPreviewId(r.id)
+            }
+          }}
+          className="text-primary font-mono text-xs font-semibold hover:underline"
+        >
           {r.requisition_number}
         </Link>
       ),
@@ -384,7 +395,7 @@ export function RequisitionsListPage({
               onClick: (r) => void openSign(r, "reject"),
               hidden: (r) => !r.sign_stage_id,
             },
-            { label: "View", icon: Eye, onClick: (r) => router.push(detailHref(r)) },
+            { label: "View", icon: Eye, onClick: (r) => setPreviewId(r.id) },
           ]}
           isLoading={isLoading}
           error={error}
@@ -399,12 +410,12 @@ export function RequisitionsListPage({
             subtitle: (r) =>
               `${r.requisition_number} · ${r.requester?.full_name || r.department} · ${formatNaira(r.amount)}`,
             trailing: (r) => (
-              <Badge variant={statusBadgeVariant(r.status)} className="text-[10px]">
+              <Badge variant={statusBadgeVariant(r.status)} className="text-xs">
                 {STATUS_LABELS[r.status]}
               </Badge>
             ),
-            // The detail is a whole form on its own route, so a row opens it.
-            onSelect: (r) => router.push(detailHref(r)),
+            // The detail opens in a slide-over preview drawer, keeping list position intact.
+            onSelect: (r) => setPreviewId(r.id),
           }}
           emptyTitle={
             tab === "action" ? "Nothing waiting on you" : tab === "payment" ? "Nothing to pay" : "No requisitions"
@@ -420,9 +431,17 @@ export function RequisitionsListPage({
           skeletonRows={6}
           urlSync
           cardRenderer={(r) => (
-            <Link
-              href={detailHref(r)}
-              className="bg-card hover:border-primary/40 block h-full space-y-3 rounded-xl border p-4 shadow-sm transition"
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setPreviewId(r.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  setPreviewId(r.id)
+                }
+              }}
+              className="bg-card hover:border-primary/40 block h-full cursor-pointer space-y-3 rounded-xl border p-4 text-left shadow-sm transition"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground font-mono text-xs font-semibold">{r.requisition_number}</span>
@@ -433,12 +452,12 @@ export function RequisitionsListPage({
                 {FORM_LABELS[r.form_type]} · {r.requester?.full_name || r.department}
               </p>
               <div className="flex items-center justify-between gap-2 border-t pt-2">
-                <Badge variant={statusBadgeVariant(r.status)} className="text-[10px]">
+                <Badge variant={statusBadgeVariant(r.status)} className="text-xs">
                   {STATUS_LABELS[r.status]}
                 </Badge>
-                <span className="text-muted-foreground truncate text-[11px]">{progressLabel(r)}</span>
+                <span className="text-muted-foreground truncate text-xs">{progressLabel(r)}</span>
               </div>
-            </Link>
+            </div>
           )}
         />
       )}
@@ -461,6 +480,14 @@ export function RequisitionsListPage({
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onSuccess={(r) => router.push(detailHref(r))}
+      />
+      <RequisitionPreviewSheet
+        requisitionId={previewId}
+        open={Boolean(previewId)}
+        onOpenChange={(open) => !open && setPreviewId(null)}
+        onSign={(req, viewerActions, mode) => {
+          setSigning({ requisition: req, viewer: viewerActions, mode })
+        }}
       />
       <ExportOptionsDialog
         open={isExportOpen}

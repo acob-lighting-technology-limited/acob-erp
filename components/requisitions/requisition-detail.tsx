@@ -37,9 +37,9 @@ import { PaymentDialog } from "./payment-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { useStaffOptions } from "./use-staff-options"
 
-type Viewer = RequisitionViewerActions & { is_admin: boolean }
+export type Viewer = RequisitionViewerActions & { is_admin: boolean }
 
-function when(value: string | null) {
+export function when(value: string | null) {
   if (!value) return ""
   return new Date(value).toLocaleString("en-GB", {
     day: "2-digit",
@@ -56,7 +56,7 @@ export function statusBadgeVariant(status: Requisition["status"]) {
   return "secondary" as const
 }
 
-function StageIcon({ stage }: { stage: RequisitionStage }) {
+export function StageIcon({ stage }: { stage: RequisitionStage }) {
   const cls = "mt-0.5 h-4 w-4 shrink-0"
   if (stage.state === "signed") return <CheckCircle2 className={`${cls} text-emerald-600`} aria-hidden />
   if (stage.state === "bypassed") return <SkipForward className={`${cls} text-muted-foreground`} aria-hidden />
@@ -65,7 +65,7 @@ function StageIcon({ stage }: { stage: RequisitionStage }) {
   return <Circle className={`${cls} text-amber-500`} aria-hidden />
 }
 
-function stageLine(stage: RequisitionStage) {
+export function stageLine(stage: RequisitionStage) {
   switch (stage.state) {
     case "signed":
       return `Signed by ${stage.actor?.full_name || "—"} · ${when(stage.acted_at)}`
