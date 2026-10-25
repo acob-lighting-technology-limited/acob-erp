@@ -433,7 +433,11 @@ export function DepartmentsPage({
       label: "Headcount",
       sortable: true,
       accessor: (department) => department.employee_count || 0,
-      render: (department) => <Badge variant="secondary">{department.employee_count || 0} employees</Badge>,
+      render: (department) => (
+        <span className="text-muted-foreground text-sm">
+          {department.employee_count || 0} {department.employee_count === 1 ? "employee" : "employees"}
+        </span>
+      ),
       align: "center",
     },
     {
