@@ -7,14 +7,7 @@ import { CheckCircle2, Download, ExternalLink, FileText, History, Loader2 } from
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { apiFetch } from "@/lib/api-client"
@@ -98,18 +91,18 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && close()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[640px]">
+    <Sheet open={open} onOpenChange={(next) => !next && close()}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl md:max-w-2xl">
         {isLoading || !doc ? (
           <>
-            <DialogHeader>
-              <DialogTitle>{error ? "Document unavailable" : "Loading document"}</DialogTitle>
-              <DialogDescription>
+            <SheetHeader className="border-b p-5 pb-4">
+              <SheetTitle>{error ? "Document unavailable" : "Loading document"}</SheetTitle>
+              <SheetDescription>
                 {error instanceof Error ? error.message : "Fetching the latest details..."}
-              </DialogDescription>
-            </DialogHeader>
+              </SheetDescription>
+            </SheetHeader>
             {!error && (
-              <div className="space-y-3">
+              <div className="space-y-3 p-5">
                 <Skeleton className="h-5 w-2/3" />
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-24 w-full" />
@@ -118,8 +111,8 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
           </>
         ) : (
           <>
-            <DialogHeader>
-              <div className="flex flex-wrap items-center gap-2">
+            <SheetHeader className="border-b p-5 pb-4">
+              <div className="flex flex-wrap items-center gap-2 pr-8">
                 <Badge variant="outline" className="font-mono text-xs">
                   {doc.reference_code}
                 </Badge>
@@ -130,123 +123,125 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
                 )}
                 {doc.status !== "published" && <ControlledDocStatusBadge status={doc.status} />}
               </div>
-              <DialogTitle className="pt-1 text-left">{doc.title}</DialogTitle>
-              {doc.description && <DialogDescription className="text-left">{doc.description}</DialogDescription>}
-            </DialogHeader>
+              <SheetTitle className="pt-1 text-left text-lg font-bold">{doc.title}</SheetTitle>
+              {doc.description && <SheetDescription className="text-left text-xs">{doc.description}</SheetDescription>}
+            </SheetHeader>
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Field label="Category">{doc.category || "—"}</Field>
-              <Field label="Owner">{doc.owner_department || "—"}</Field>
-              <Field label="Applies to">{describeAudience(doc)}</Field>
-              <Field label="Effective">{formatDocDate(current?.effective_date)}</Field>
-              <Field label="Next review">
-                <ReviewDateBadge date={doc.next_review_date} />
-              </Field>
-              <Field label="Published">{formatDocDate(doc.published_at)}</Field>
+            <div className="flex-1 space-y-6 overflow-y-auto p-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <Field label="Category">{doc.category || "—"}</Field>
+                <Field label="Owner">{doc.owner_department || "—"}</Field>
+                <Field label="Applies to">{describeAudience(doc)}</Field>
+                <Field label="Effective">{formatDocDate(current?.effective_date)}</Field>
+                <Field label="Next review">
+                  <ReviewDateBadge date={doc.next_review_date} />
+                </Field>
+                <Field label="Published">{formatDocDate(doc.published_at)}</Field>
+              </div>
+
+              {current ? (
+                <div className="bg-muted/40 space-y-3 rounded-lg border p-3">
+                  <div className="flex items-start gap-3">
+                    <FileText className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{current.file_name}</p>
+                      <p className="text-muted-foreground text-xs">
+                        Version {current.version_number} · {formatFileSize(current.file_size)}
+                        {current.change_summary ? ` · ${current.change_summary}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm">
+                      <a
+                        href={controlledDocFileHref(current.id, "inline")}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setOpenedVersionId(current.id)}
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open
+                      </a>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <a
+                        href={controlledDocFileHref(current.id, "attachment")}
+                        onClick={() => setOpenedVersionId(current.id)}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">No file has been uploaded yet.</p>
+              )}
+
+              {doc.doc_type === "policy" && doc.status === "published" && current && (
+                <div className="space-y-3 rounded-lg border p-3">
+                  {doc.my_acknowledged_at ? (
+                    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                      You acknowledged version {current.version_number} on {formatDocDate(doc.my_acknowledged_at)}.
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium">Acknowledgement required</p>
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          id="cd-ack"
+                          checked={confirmed}
+                          disabled={!hasOpenedCurrent}
+                          onCheckedChange={(value) => setConfirmed(value === true)}
+                        />
+                        <Label htmlFor="cd-ack" className="text-sm leading-snug font-normal">
+                          I have read and understood {doc.reference_code} version {current.version_number}, and I agree
+                          to comply with it.
+                        </Label>
+                      </div>
+                      {!hasOpenedCurrent && (
+                        <p className="text-muted-foreground text-xs">Open or download the policy first.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {history.length > 0 && (
+                <div className="space-y-2">
+                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                    <History className="h-4 w-4" />
+                    Previous versions
+                  </p>
+                  <ul className="divide-y rounded-lg border">
+                    {history.map((version) => (
+                      <li key={version.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-sm">
+                            v{version.version_number} · effective {formatDocDate(version.effective_date)}
+                          </p>
+                          <p className="text-muted-foreground truncate text-xs">
+                            {version.change_summary || version.file_name}
+                            {version.uploaded_by_name ? ` · ${version.uploaded_by_name}` : ""}
+                          </p>
+                        </div>
+                        <Button asChild size="sm" variant="ghost" className="shrink-0">
+                          <a
+                            href={controlledDocFileHref(version.id, "attachment")}
+                            aria-label={`Download v${version.version_number}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
-            {current ? (
-              <div className="bg-muted/40 space-y-3 rounded-lg border p-3">
-                <div className="flex items-start gap-3">
-                  <FileText className="text-muted-foreground mt-0.5 h-5 w-5 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{current.file_name}</p>
-                    <p className="text-muted-foreground text-xs">
-                      Version {current.version_number} · {formatFileSize(current.file_size)}
-                      {current.change_summary ? ` · ${current.change_summary}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild size="sm">
-                    <a
-                      href={controlledDocFileHref(current.id, "inline")}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setOpenedVersionId(current.id)}
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Open
-                    </a>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <a
-                      href={controlledDocFileHref(current.id, "attachment")}
-                      onClick={() => setOpenedVersionId(current.id)}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">No file has been uploaded yet.</p>
-            )}
-
-            {doc.doc_type === "policy" && doc.status === "published" && current && (
-              <div className="space-y-3 rounded-lg border p-3">
-                {doc.my_acknowledged_at ? (
-                  <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    You acknowledged version {current.version_number} on {formatDocDate(doc.my_acknowledged_at)}.
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium">Acknowledgement required</p>
-                    <div className="flex items-start gap-2">
-                      <Checkbox
-                        id="cd-ack"
-                        checked={confirmed}
-                        disabled={!hasOpenedCurrent}
-                        onCheckedChange={(value) => setConfirmed(value === true)}
-                      />
-                      <Label htmlFor="cd-ack" className="text-sm leading-snug font-normal">
-                        I have read and understood {doc.reference_code} version {current.version_number}, and I agree to
-                        comply with it.
-                      </Label>
-                    </div>
-                    {!hasOpenedCurrent && (
-                      <p className="text-muted-foreground text-xs">Open or download the policy first.</p>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {history.length > 0 && (
-              <div className="space-y-2">
-                <p className="flex items-center gap-1.5 text-sm font-medium">
-                  <History className="h-4 w-4" />
-                  Previous versions
-                </p>
-                <ul className="divide-y rounded-lg border">
-                  {history.map((version) => (
-                    <li key={version.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="text-sm">
-                          v{version.version_number} · effective {formatDocDate(version.effective_date)}
-                        </p>
-                        <p className="text-muted-foreground truncate text-xs">
-                          {version.change_summary || version.file_name}
-                          {version.uploaded_by_name ? ` · ${version.uploaded_by_name}` : ""}
-                        </p>
-                      </div>
-                      <Button asChild size="sm" variant="ghost" className="shrink-0">
-                        <a
-                          href={controlledDocFileHref(version.id, "attachment")}
-                          aria-label={`Download v${version.version_number}`}
-                        >
-                          <Download className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <DialogFooter>
+            <SheetFooter className="bg-muted/20 flex flex-row items-center justify-between border-t p-4 sm:justify-between">
               <Button variant="outline" onClick={close}>
                 Close
               </Button>
@@ -256,10 +251,10 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
                   Acknowledge {CONTROLLED_DOC_META.policy.label}
                 </Button>
               )}
-            </DialogFooter>
+            </SheetFooter>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }
