@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Timer, UserX, AlertCircle, Sunrise, Sunset, FileWarning, Building2, Briefcase } from "lucide-react"
+import { Clock, Timer, UserX, AlertCircle, Sunrise, Sunset, FileWarning, Building2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   ATTENDANCE_TRACKING_START,
@@ -115,17 +115,6 @@ const METRICS: Metric[] = [
     excludeZero: true,
   },
   {
-    key: "total_hours",
-    title: "Most Official Office Time Spent",
-    description: "Highest official credited work hours logged",
-    icon: Briefcase,
-    iconColor: "text-sky-500",
-    getValue: (r) => r.total_hours,
-    formatValue: (v) => `${v.toFixed(1)}h`,
-    sort: "desc",
-    excludeZero: true,
-  },
-  {
     key: "overtime_hours",
     title: "Most Overtime",
     description: "Hours worked past close of business",
@@ -211,16 +200,6 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
     iconColor: "text-blue-500",
     accentClass: "border-blue-500/20 bg-blue-500/5 dark:bg-blue-500/10",
     getValue: (d) => d.avg_physical_hours ?? (d.employee_count > 0 ? (d.physical_hours ?? 0) / d.employee_count : 0),
-    formatValue: (v) => `${v.toFixed(1)}h avg`,
-    sort: "desc",
-  },
-  dept_official_time: {
-    key: "dept_official_time",
-    title: "Dept. Avg Official Time Spent",
-    description: "Average official credited work hours per employee",
-    iconColor: "text-sky-500",
-    accentClass: "border-sky-500/20 bg-sky-500/5 dark:bg-sky-500/10",
-    getValue: (d) => d.avg_total_hours ?? (d.employee_count > 0 ? d.total_hours / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)}h avg`,
     sort: "desc",
   },
@@ -543,7 +522,6 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
             {renderIndividualMetricCard(rankingsByKey.get("avg_clock_in"))}
             {renderIndividualMetricCard(rankingsByKey.get("avg_clock_out"))}
             {renderIndividualMetricCard(rankingsByKey.get("physical_hours"))}
-            {renderIndividualMetricCard(rankingsByKey.get("total_hours"))}
             {renderIndividualMetricCard(rankingsByKey.get("overtime_hours"))}
             {renderIndividualMetricCard(rankingsByKey.get("absent_days"))}
             {renderIndividualMetricCard(rankingsByKey.get("incomplete_days"))}
@@ -557,7 +535,6 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
             {renderDepartmentCardByKey("dept_avg_clock_in")}
             {renderDepartmentCardByKey("dept_avg_clock_out")}
             {renderDepartmentCardByKey("dept_time_in_office")}
-            {renderDepartmentCardByKey("dept_official_time")}
             {renderDepartmentCardByKey("dept_overtime")}
             {renderDepartmentCardByKey("dept_absences")}
             {renderDepartmentCardByKey("dept_incomplete")}
@@ -576,9 +553,6 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
 
             {renderIndividualMetricCard(rankingsByKey.get("physical_hours"))}
             {renderDepartmentCardByKey("dept_time_in_office")}
-
-            {renderIndividualMetricCard(rankingsByKey.get("total_hours"))}
-            {renderDepartmentCardByKey("dept_official_time")}
 
             {renderIndividualMetricCard(rankingsByKey.get("overtime_hours"))}
             {renderDepartmentCardByKey("dept_overtime")}
