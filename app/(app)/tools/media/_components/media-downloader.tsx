@@ -140,7 +140,7 @@ export function MediaDownloader() {
     }
   }, [url, mode, mediaType, handleFetchInfo])
 
-  const handleDownload = async (formatId?: string, trackUrl?: string) => {
+  const handleDownload = (formatId?: string, trackUrl?: string) => {
     const urlToDownload = trackUrl || url
     const isAudio = formatId?.startsWith("audio_mp3_") || mediaType === "song"
     const formatType = isAudio ? "MP3" : "video"
@@ -148,59 +148,38 @@ export function MediaDownloader() {
     setDownloadingFormatId(formatId || "best")
     setError("")
 
-    const toastId = toast.loading(`Preparing ${formatType} download...`)
+    const toastId = toast.loading(
+      `Preparing ${formatType} download... Your browser / download manager will take over shortly.`
+    )
 
-    try {
-      const endpoint = mediaType === "video" ? "/api/download" : "/api/song/download"
-      const response = await apiFetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: urlToDownload,
-          format_id: formatId,
-          title: info?.title,
-          artist: info?.artist || info?.uploader,
-        }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Download failed")
-      }
-
-      const contentDisposition = response.headers.get("Content-Disposition")
-      let filename = `${info?.title || "download"}.${isAudio ? "mp3" : "mp4"}`
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/i)
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, "")
-        }
-      }
-
-      const blob = await response.blob()
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = downloadUrl
-      a.download = filename
-      a.style.display = "none"
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(downloadUrl)
-      document.body.removeChild(a)
-
-      toast.success("Downloaded successfully!", {
-        id: toastId,
-        description: `Saved: ${filename}`,
-      })
-    } catch (err: any) {
-      const errorMsg = err.message || "Download failed"
-      setError(errorMsg)
-      toast.error(errorMsg, { id: toastId })
-    } finally {
-      setDownloadingFormatId(null)
+    const endpoint = mediaType === "video" ? "/api/download" : "/api/song/download"
+    const params = new URLSearchParams({
+      url: urlToDownload,
+      format_id: formatId || "",
+      title: info?.title || "",
+    })
+    if (info?.artist || info?.uploader) {
+      params.set("artist", info.artist || info.uploader || "")
     }
+
+    const downloadUrl = `${endpoint}?${params.toString()}`
+
+    // Trigger download via hidden iframe so browser / download manager handles streaming natively
+    const iframe = document.createElement("iframe")
+    iframe.style.display = "none"
+    iframe.src = downloadUrl
+    document.body.appendChild(iframe)
+
+    setTimeout(() => {
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe)
+      }
+      toast.success("Download dispatched to your browser / download manager!", {
+        id: toastId,
+        description: info?.title ? `Saving: ${info.title}` : undefined,
+      })
+      setDownloadingFormatId(null)
+    }, 4000)
   }
 
   const handleBatchDownload = async () => {
