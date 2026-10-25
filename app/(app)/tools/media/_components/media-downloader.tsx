@@ -140,60 +140,41 @@ export function MediaDownloader() {
     }
   }, [url, mode, mediaType, handleFetchInfo])
 
-  const handleDownload = async (formatId?: string, trackUrl?: string) => {
+  const handleDownload = (formatId?: string, trackUrl?: string) => {
     const urlToDownload = trackUrl || url
     const isAudio = formatId?.startsWith("audio_mp3_") || mediaType === "song"
     const formatType = isAudio ? "MP3" : "video"
 
-    setDownloadingFormatId(formatId || "best")
     setError("")
 
-    const toastId = toast.loading(`Preparing ${formatType} on server... This takes a few moments for high quality.`)
+    const toastId = toast.loading(
+      `Connecting ${formatType} stream... Neat Download Manager will take over in a moment.`
+    )
 
-    try {
-      const endpoint = mediaType === "video" ? "/api/download" : "/api/song/download"
-      const response = await apiFetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: urlToDownload,
-          format_id: formatId,
-          title: info?.title,
-          artist: info?.artist || info?.uploader,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to prepare download")
-      }
-
-      toast.success("Ready! Handing off to your download manager...", {
-        id: toastId,
-        description: `Saving: ${data.filename}`,
-      })
-
-      // The file is 100% ready on server disk. Triggering a download anchor
-      // immediately starts the attachment download without any wait or timeout.
-      const downloadUrl =
-        data.downloadUrl ||
-        `/api/public/download?id=${encodeURIComponent(data.fileId)}&name=${encodeURIComponent(data.filename)}`
-      const a = document.createElement("a")
-      a.href = downloadUrl
-      a.download = data.filename || "download"
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-    } catch (err: any) {
-      const errorMsg = err.message || "Download failed"
-      setError(errorMsg)
-      toast.error(errorMsg, { id: toastId })
-    } finally {
-      setDownloadingFormatId(null)
+    const params = new URLSearchParams({
+      url: urlToDownload,
+      format_id: formatId || "",
+      title: info?.title || "",
+    })
+    if (info?.artist || info?.uploader) {
+      params.set("artist", info.artist || info.uploader || "")
     }
+
+    const downloadUrl = `/api/public/download?${params.toString()}`
+
+    const a = document.createElement("a")
+    a.href = downloadUrl
+    a.download = ""
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+
+    setTimeout(() => {
+      toast.success("Stream connected! Neat Download Manager has started the download.", {
+        id: toastId,
+        description: info?.title ? `Saving: ${info.title}` : undefined,
+      })
+    }, 2500)
   }
 
   const handleBatchDownload = async () => {

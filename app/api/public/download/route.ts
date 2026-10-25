@@ -1,120 +1,105 @@
 import { NextRequest, NextResponse } from "next/server"
-import { findNewestFile } from "@/lib/media/temp-files"
-import { existsSync, createReadStream, statSync } from "fs"
+import { parseHttpUrl } from "@/lib/shell/run"
+import { isSafeFormatSelector } from "@/lib/media/temp-files"
+import { spawn } from "child_process"
 import { Readable } from "stream"
-import path from "path"
-import { tmpdir } from "os"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/public/download")
 
 export const maxDuration = 300
 
-const videoTempDir = path.join(tmpdir(), "video-downloads")
-const songTempDir = path.join(tmpdir(), "song-downloads")
+function buildStreamHeaders(title: string | null, isAudio: boolean) {
+  const cleanTitle = (title || "download")
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+    .replace(/\s+/g, "_")
+    .substring(0, 150)
+    .trim()
+  const ext = isAudio ? ".mp3" : ".webm"
+  const filename = `${cleanTitle}${ext}`
+  const contentType = isAudio ? "audio/mpeg" : "video/webm"
 
-async function resolvePreparedFile(fileId: string): Promise<string | null> {
-  if (!fileId || !/^[a-zA-Z0-9-]{10,64}$/.test(fileId)) {
-    return null
+  return {
+    "Content-Type": contentType,
+    "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
   }
-
-  let tempFile = await findNewestFile(videoTempDir, { contains: fileId })
-  if (!tempFile || !existsSync(tempFile)) {
-    tempFile = await findNewestFile(songTempDir, { contains: fileId })
-  }
-
-  return tempFile && existsSync(tempFile) ? tempFile : null
 }
 
 export async function HEAD(request: NextRequest) {
-  try {
-    const fileId = request.nextUrl.searchParams.get("id")
-    if (!fileId) return new Response(null, { status: 400 })
+  const url = request.nextUrl.searchParams.get("url")
+  if (!url) return new Response(null, { status: 400 })
 
-    const tempFile = await resolvePreparedFile(fileId)
-    if (!tempFile) return new Response(null, { status: 404 })
+  const format_id = request.nextUrl.searchParams.get("format_id")
+  const title = request.nextUrl.searchParams.get("title")
+  const isAudio = format_id?.startsWith("audio_mp3_") ?? false
 
-    const rawName = request.nextUrl.searchParams.get("name") || path.basename(tempFile)
-    const sanitizedFilename = rawName.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").substring(0, 150)
-    const isAudio = sanitizedFilename.endsWith(".mp3")
-    const stat = statSync(tempFile)
-
-    return new Response(null, {
-      status: 200,
-      headers: {
-        "Accept-Ranges": "bytes",
-        "Content-Length": stat.size.toString(),
-        "Content-Type": isAudio ? "audio/mpeg" : "video/mp4",
-        "Content-Disposition": `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodeURIComponent(sanitizedFilename)}`,
-      },
-    })
-  } catch {
-    return new Response(null, { status: 500 })
-  }
+  return new Response(null, {
+    status: 200,
+    headers: buildStreamHeaders(title, isAudio),
+  })
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const fileId = request.nextUrl.searchParams.get("id")
-    if (!fileId) {
-      return NextResponse.json({ error: "Invalid file ID" }, { status: 400 })
+    const url = request.nextUrl.searchParams.get("url")
+    if (!url) {
+      return NextResponse.json({ error: "URL is required" }, { status: 400 })
     }
 
-    const tempFile = await resolvePreparedFile(fileId)
-    if (!tempFile) {
-      return NextResponse.json({ error: "File not found or expired" }, { status: 404 })
+    const target = parseHttpUrl(url)
+    if (!target) {
+      return NextResponse.json({ error: "Enter a valid http(s) link." }, { status: 400 })
     }
 
-    const rawName = request.nextUrl.searchParams.get("name") || path.basename(tempFile)
-    const sanitizedFilename = rawName.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").substring(0, 150)
-    const isAudio = sanitizedFilename.endsWith(".mp3")
-    const contentType = isAudio ? "audio/mpeg" : "video/mp4"
+    const format_id = request.nextUrl.searchParams.get("format_id")
+    const title = request.nextUrl.searchParams.get("title")
+    const isAudio = format_id?.startsWith("audio_mp3_") ?? false
 
-    const stat = statSync(tempFile)
-    const fileSize = stat.size
+    const ytdlpArgs = ["--js-runtimes", "node"]
 
-    // Handle HTTP Range requests for download accelerators like NDM and IDM
-    const rangeHeader = request.headers.get("range")
-    if (rangeHeader) {
-      const parts = rangeHeader.replace(/bytes=/, "").split("-")
-      const start = parseInt(parts[0], 10)
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+    if (isAudio) {
+      ytdlpArgs.push("-f", "bestaudio")
+    } else if (format_id && isSafeFormatSelector(format_id) && format_id !== "best") {
+      ytdlpArgs.push("-f", `${format_id}+bestaudio/${format_id}`)
+    } else {
+      ytdlpArgs.push("-f", "bestvideo+bestaudio/best")
+    }
 
-      if (start >= fileSize || end >= fileSize || start > end) {
-        return new Response(null, {
-          status: 416,
-          headers: {
-            "Content-Range": `bytes */${fileSize}`,
-          },
-        })
+    // Pipe directly to stdout for instant streaming
+    ytdlpArgs.push("-o", "-", "--no-warnings", target.toString())
+
+    const ytProcess = spawn("yt-dlp", ytdlpArgs, {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+
+    request.signal.addEventListener("abort", () => {
+      try {
+        ytProcess.kill()
+      } catch {}
+    })
+
+    ytProcess.stdout.on("close", () => {
+      try {
+        ytProcess.kill()
+      } catch {}
+    })
+
+    ytProcess.stderr.on("data", (data) => {
+      const msg = data.toString()
+      if (msg.includes("ERROR:")) {
+        log.error("yt-dlp streaming error:", msg)
       }
+    })
 
-      const chunkSize = end - start + 1
-      const nodeStream = createReadStream(tempFile, { start, end })
-      const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>
-
-      return new Response(webStream, {
-        status: 206,
-        headers: {
-          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-          "Accept-Ranges": "bytes",
-          "Content-Length": chunkSize.toString(),
-          "Content-Type": contentType,
-          "Content-Disposition": `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodeURIComponent(sanitizedFilename)}`,
-        },
-      })
-    }
-
-    const nodeStream = createReadStream(tempFile)
-    const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>
+    const webStream = Readable.toWeb(ytProcess.stdout) as ReadableStream<Uint8Array>
 
     return new Response(webStream, {
       status: 200,
-      headers: {
-        "Accept-Ranges": "bytes",
-        "Content-Length": fileSize.toString(),
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodeURIComponent(sanitizedFilename)}`,
-      },
+      headers: buildStreamHeaders(title, isAudio),
     })
-  } catch {
-    return NextResponse.json({ error: "Failed to deliver file" }, { status: 500 })
+  } catch (error: any) {
+    log.error("Failed to initiate media stream:", error)
+    return NextResponse.json({ error: "Failed to initiate stream" }, { status: 500 })
   }
 }
