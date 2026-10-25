@@ -792,7 +792,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Emp. No.",
         sortable: true,
         resizable: true,
-        initialWidth: 100,
+        initialWidth: 150,
         accessor: (r) => r.employee_number || "",
         hideOnMobile: true,
         render: (r) => (
@@ -943,6 +943,24 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           }
           return <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap", badgeColor)}>{display}</Badge>
         },
+      },
+      {
+        key: "view_profile",
+        label: "Profile",
+        align: "center",
+        width: "w-32",
+        render: (r) => (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs font-medium"
+            onClick={() => void handleViewEmployeeDetails(r)}
+          >
+            <Eye className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+            View Profile
+          </Button>
+        ),
       },
       {
         key: "actions",

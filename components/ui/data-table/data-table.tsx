@@ -1308,7 +1308,7 @@ export function DataTable<TData>({
                       )}
                     >
                       {selectable && (
-                        <TableCell className="w-10 text-center">
+                        <TableCell className="w-10 py-3 text-center">
                           <Checkbox
                             checked={selectedRows.has(rowId)}
                             onCheckedChange={() => toggleSelect(rowId)}
@@ -1317,7 +1317,7 @@ export function DataTable<TData>({
                         </TableCell>
                       )}
                       {showRowNumbers && expandable && expandAtStart ? (
-                        <TableCell className="text-muted-foreground w-16 text-center font-mono text-xs font-medium whitespace-nowrap">
+                        <TableCell className="text-muted-foreground w-16 py-3 text-center font-mono text-xs font-medium whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1">
                             {canExpand ? (
                               <Button
@@ -1344,7 +1344,7 @@ export function DataTable<TData>({
                       ) : (
                         <>
                           {expandable && expandAtStart && (
-                            <TableCell className="w-10 text-center">
+                            <TableCell className="w-10 py-3 text-center">
                               {canExpand ? (
                                 <Button
                                   variant="ghost"
@@ -1367,7 +1367,7 @@ export function DataTable<TData>({
                             </TableCell>
                           )}
                           {showRowNumbers && (
-                            <TableCell className="text-muted-foreground w-12 text-center font-mono text-xs font-medium">
+                            <TableCell className="text-muted-foreground w-12 py-3 text-center font-mono text-xs font-medium">
                               {globalIndex + 1}
                             </TableCell>
                           )}
@@ -1377,6 +1377,7 @@ export function DataTable<TData>({
                         <TableCell
                           key={col.key}
                           className={cn(
+                            "py-3",
                             col.align === "right" && "text-right",
                             col.align === "center" && "text-center",
                             col.hideOnMobile && !contactsAvailable && "hidden md:table-cell",
@@ -1390,7 +1391,7 @@ export function DataTable<TData>({
                         </TableCell>
                       ))}
                       {expandable && !expandAtStart && (
-                        <TableCell>
+                        <TableCell className="py-3">
                           {canExpand ? (
                             <Button
                               variant="ghost"
@@ -1406,7 +1407,7 @@ export function DataTable<TData>({
                         </TableCell>
                       )}
                       {rowActions && rowActions.length > 0 && (
-                        <TableCell className="text-right">
+                        <TableCell className="py-3 text-right">
                           {(() => {
                             const visible = rowActions.filter((a) => !a.hidden || !a.hidden(row))
                             if (visible.length === 0) return null
