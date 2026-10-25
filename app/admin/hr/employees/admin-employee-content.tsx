@@ -794,7 +794,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Emp. No.",
         sortable: true,
         resizable: true,
-        initialWidth: 150,
+        initialWidth: 110,
         accessor: (r) => r.employee_number || "",
         hideOnMobile: true,
         render: (r) => (
@@ -806,7 +806,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         label: "Name",
         sortable: true,
         resizable: true,
-        initialWidth: 260,
+        initialWidth: 200,
         accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
           <div className="flex items-center gap-2.5">
@@ -841,21 +841,21 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "email",
         label: "Email",
         resizable: true,
-        initialWidth: 240,
+        initialWidth: 180,
         accessor: (r) => r.company_email,
         hideOnMobile: true,
         render: (r) => (
-          <div className="flex flex-col gap-0.5 text-xs">
+          <div className="flex min-w-0 flex-col gap-0.5 text-xs">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-left whitespace-nowrap transition-colors"
+                  className="text-muted-foreground hover:text-foreground inline-flex max-w-full items-center gap-1.5 text-left transition-colors"
                   onClick={() => void handleCopyEmail(r.company_email)}
                   aria-label="Copy email"
                 >
                   <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <span>{r.company_email}</span>
+                  <span className="max-w-[150px] truncate">{r.company_email}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Click to copy email</TooltipContent>
@@ -897,8 +897,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         sortable: true,
         accessor: (r) => r.department,
         render: (r) => (
-          <div className="flex flex-col items-start gap-1">
-            <span className="text-xs font-medium whitespace-nowrap">{r.department}</span>
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <span className="max-w-[150px] truncate text-xs font-medium" title={r.department}>
+              {r.department}
+            </span>
             {r.is_department_lead && (
               <Badge
                 variant="outline"
@@ -918,7 +920,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               label: "Exit Date",
               sortable: true,
               resizable: true,
-              initialWidth: 130,
+              initialWidth: 110,
               accessor: (r: Employee) => r.separation_date || "",
               render: (r: Employee) => (
                 <span className="text-muted-foreground text-xs whitespace-nowrap">
@@ -927,57 +929,60 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               ),
             },
           ]
-        : []),
-      {
-        key: "employment_type",
-        label: "Employee Type",
-        sortable: true,
-        accessor: (r) => r.employment_type || "full_time",
-        render: (r) => {
-          const type = r.employment_type || "full_time"
-          let display = "Full Time"
-          let badgeColor = "bg-blue-500/10 text-blue-500 hover:bg-blue-500/10 border-transparent shadow-none"
+        : [
+            {
+              key: "employment_type",
+              label: "Employee Type",
+              sortable: true,
+              accessor: (r: Employee) => r.employment_type || "full_time",
+              render: (r: Employee) => {
+                const type = r.employment_type || "full_time"
+                let display = "Full Time"
+                let badgeColor = "bg-blue-500/10 text-blue-500 hover:bg-blue-500/10 border-transparent shadow-none"
 
-          if (type === "part_time") {
-            display = "Part Time"
-            badgeColor = "bg-slate-500/10 text-slate-500 hover:bg-slate-500/10 border-transparent shadow-none"
-          } else if (r.contract_categories?.name) {
-            display = r.contract_categories.name
-            const catUpper = display.toUpperCase()
-            if (catUpper.includes("NYSC")) {
-              badgeColor =
-                "bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 border-transparent shadow-none"
-            } else if (catUpper.includes("SIWES") || catUpper.includes("INTERN")) {
-              badgeColor =
-                "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 border-transparent shadow-none"
-            } else if (catUpper.includes("NEXT") || catUpper.includes("GEN")) {
-              badgeColor =
-                "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border-transparent shadow-none"
-            } else {
-              badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
-            }
-          } else if (type === "contract") {
-            display = "Contract Staff"
-            badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
-          }
-          return <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap", badgeColor)}>{display}</Badge>
-        },
-      },
+                if (type === "part_time") {
+                  display = "Part Time"
+                  badgeColor = "bg-slate-500/10 text-slate-500 hover:bg-slate-500/10 border-transparent shadow-none"
+                } else if (r.contract_categories?.name) {
+                  display = r.contract_categories.name
+                  const catUpper = display.toUpperCase()
+                  if (catUpper.includes("NYSC")) {
+                    badgeColor =
+                      "bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 border-transparent shadow-none"
+                  } else if (catUpper.includes("SIWES") || catUpper.includes("INTERN")) {
+                    badgeColor =
+                      "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 border-transparent shadow-none"
+                  } else if (catUpper.includes("NEXT") || catUpper.includes("GEN")) {
+                    badgeColor =
+                      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border-transparent shadow-none"
+                  } else {
+                    badgeColor =
+                      "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
+                  }
+                } else if (type === "contract") {
+                  display = "Contract Staff"
+                  badgeColor = "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
+                }
+                return <Badge className={cn("px-1.5 py-0 text-[10px] whitespace-nowrap", badgeColor)}>{display}</Badge>
+              },
+            },
+          ]),
       {
         key: "view_profile",
         label: "Profile",
         align: "center",
-        width: "w-32",
+        hideOnMobile: true,
+        width: "w-24",
         render: (r) => (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 text-xs font-medium"
+            className="h-7 px-2 text-xs font-medium"
             onClick={() => void handleViewEmployeeDetails(r)}
           >
-            <Eye className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-            View Profile
+            <Eye className="mr-1 h-3.5 w-3.5" aria-hidden />
+            Profile
           </Button>
         ),
       },
