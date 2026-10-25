@@ -30,6 +30,7 @@ export interface Employee {
   birthday: string | null
   employment_date: string | null
   confirmation_date?: string | null
+  separation_date?: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -74,6 +75,8 @@ export function buildEmployeeExportRows(employees: Employee[], opts: ExportOptio
       row["Confirmation Date"] = member.confirmation_date
         ? formatDDMMYYYY(member.confirmation_date) || member.confirmation_date
         : "-"
+    if (selectedColumns["Exit Date"])
+      row["Exit Date"] = member.separation_date ? formatDDMMYYYY(member.separation_date) || member.separation_date : "-"
     if (selectedColumns["Employment Type"]) {
       const type = member.employment_type || "full_time"
       row["Employment Type"] =

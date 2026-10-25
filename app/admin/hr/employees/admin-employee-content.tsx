@@ -120,6 +120,7 @@ export interface Employee {
   birthday: string | null
   employment_date: string | null
   confirmation_date?: string | null
+  separation_date?: string | null
   is_admin: boolean
   is_department_lead: boolean
   lead_departments: string[]
@@ -258,6 +259,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
     "Date of Birth": true,
     "Employment Date": true,
     "Confirmation Date": true,
+    "Exit Date": true,
     "Employment Type": true,
     "Contract Category": true,
     "Lead Departments": true,
@@ -909,6 +911,23 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           </div>
         ),
       },
+      ...(activeTab === "former"
+        ? [
+            {
+              key: "separation_date",
+              label: "Exit Date",
+              sortable: true,
+              resizable: true,
+              initialWidth: 130,
+              accessor: (r: Employee) => r.separation_date || "",
+              render: (r: Employee) => (
+                <span className="text-muted-foreground text-xs whitespace-nowrap">
+                  {r.separation_date ? formatDDMMYYYY(r.separation_date) : "—"}
+                </span>
+              ),
+            },
+          ]
+        : []),
       {
         key: "employment_type",
         label: "Employee Type",
@@ -1226,6 +1245,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                     <span className="text-muted-foreground">Confirmed</span>
                     <span>{r.confirmation_date ? formatDDMMYYYY(r.confirmation_date) : "—"}</span>
                   </div>
+                  {r.separation_date && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Exit Date</span>
+                      <span>{formatDDMMYYYY(r.separation_date)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">DOB</span>
                     <span>{formatDateOfBirth(r.date_of_birth, r.birthday) ?? "—"}</span>
