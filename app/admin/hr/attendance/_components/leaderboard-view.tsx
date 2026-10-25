@@ -28,7 +28,7 @@ interface LeaderboardReport {
   department: string
   attendance_rate: number
   total_hours: number
-  office_hours?: number
+  physical_hours?: number
   overtime_hours?: number
   absent_days: number
   incomplete_days?: number
@@ -44,9 +44,9 @@ interface DepartmentStat {
   avg_clock_in_minutes: number | null
   avg_clock_out_minutes: number | null
   total_hours: number
+  physical_hours?: number
   avg_total_hours?: number
-  office_hours?: number
-  avg_office_hours?: number
+  avg_physical_hours?: number
   overtime_hours?: number
   avg_overtime_hours?: number
   absent_days?: number
@@ -104,12 +104,12 @@ const METRICS: Metric[] = [
     sort: "desc",
   },
   {
-    key: "office_hours",
+    key: "physical_hours",
     title: "Most Time Spent in Office",
-    description: "Highest hours logged from clock-in to clock-out",
+    description: "Highest physical hours logged (clock-in to clock-out)",
     icon: Clock,
     iconColor: "text-blue-500",
-    getValue: (r) => r.office_hours ?? 0,
+    getValue: (r) => r.physical_hours ?? 0,
     formatValue: (v) => `${v.toFixed(1)}h`,
     sort: "desc",
     excludeZero: true,
@@ -117,12 +117,13 @@ const METRICS: Metric[] = [
   {
     key: "total_hours",
     title: "Most Official Office Time Spent",
-    description: "Highest official credited work hours (including OOS and waivers)",
+    description: "Highest official credited work hours logged",
     icon: Briefcase,
-    iconColor: "text-indigo-500",
+    iconColor: "text-sky-500",
     getValue: (r) => r.total_hours,
     formatValue: (v) => `${v.toFixed(1)}h`,
     sort: "desc",
+    excludeZero: true,
   },
   {
     key: "overtime_hours",
@@ -205,20 +206,20 @@ const DEPT_METRICS: Record<string, DepartmentMetricConfig> = {
   },
   dept_time_in_office: {
     key: "dept_time_in_office",
-    title: "Dept. Avg Time in Office",
-    description: "Average hours logged per employee from clock-in to clock-out",
+    title: "Dept. Avg Time Spent in Office",
+    description: "Average physical hours logged per employee (clock-in to clock-out)",
     iconColor: "text-blue-500",
     accentClass: "border-blue-500/20 bg-blue-500/5 dark:bg-blue-500/10",
-    getValue: (d) => d.avg_office_hours ?? (d.employee_count > 0 ? (d.office_hours ?? 0) / d.employee_count : 0),
+    getValue: (d) => d.avg_physical_hours ?? (d.employee_count > 0 ? (d.physical_hours ?? 0) / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)}h avg`,
     sort: "desc",
   },
   dept_official_time: {
     key: "dept_official_time",
-    title: "Dept. Avg Official Time",
-    description: "Average official credited hours per employee",
-    iconColor: "text-indigo-500",
-    accentClass: "border-indigo-500/20 bg-indigo-500/5 dark:bg-indigo-500/10",
+    title: "Dept. Avg Official Time Spent",
+    description: "Average official credited work hours per employee",
+    iconColor: "text-sky-500",
+    accentClass: "border-sky-500/20 bg-sky-500/5 dark:bg-sky-500/10",
     getValue: (d) => d.avg_total_hours ?? (d.employee_count > 0 ? d.total_hours / d.employee_count : 0),
     formatValue: (v) => `${v.toFixed(1)}h avg`,
     sort: "desc",
@@ -541,7 +542,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           <>
             {renderIndividualMetricCard(rankingsByKey.get("avg_clock_in"))}
             {renderIndividualMetricCard(rankingsByKey.get("avg_clock_out"))}
-            {renderIndividualMetricCard(rankingsByKey.get("office_hours"))}
+            {renderIndividualMetricCard(rankingsByKey.get("physical_hours"))}
             {renderIndividualMetricCard(rankingsByKey.get("total_hours"))}
             {renderIndividualMetricCard(rankingsByKey.get("overtime_hours"))}
             {renderIndividualMetricCard(rankingsByKey.get("absent_days"))}
@@ -573,7 +574,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
             {renderIndividualMetricCard(rankingsByKey.get("avg_clock_out"))}
             {renderDepartmentCardByKey("dept_avg_clock_out")}
 
-            {renderIndividualMetricCard(rankingsByKey.get("office_hours"))}
+            {renderIndividualMetricCard(rankingsByKey.get("physical_hours"))}
             {renderDepartmentCardByKey("dept_time_in_office")}
 
             {renderIndividualMetricCard(rankingsByKey.get("total_hours"))}

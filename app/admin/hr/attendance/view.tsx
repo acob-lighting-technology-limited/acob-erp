@@ -81,6 +81,7 @@ export interface AttendanceReport {
   holiday_days?: number
   attendance_credits?: number
   total_hours: number
+  physical_hours?: number
   total_missed_hours?: number
   attendance_rate: number
   overtime_hours?: number
