@@ -178,7 +178,9 @@ export function MediaDownloader() {
 
       // The file is 100% ready on server disk. Triggering a download anchor
       // immediately starts the attachment download without any wait or timeout.
-      const downloadUrl = `${endpoint}?id=${encodeURIComponent(data.fileId)}&name=${encodeURIComponent(data.filename)}`
+      const downloadUrl =
+        data.downloadUrl ||
+        `/api/public/download?id=${encodeURIComponent(data.fileId)}&name=${encodeURIComponent(data.filename)}`
       const a = document.createElement("a")
       a.href = downloadUrl
       a.download = data.filename || "download"

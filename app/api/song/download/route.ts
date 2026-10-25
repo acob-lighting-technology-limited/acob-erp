@@ -217,11 +217,14 @@ export async function POST(request: NextRequest) {
       30 * 60 * 1000
     )
 
+    const downloadUrl = `/api/public/download?id=${fileId}&name=${encodeURIComponent(sanitizedFilename)}`
+
     return NextResponse.json({
       success: true,
       fileId,
       filename: sanitizedFilename,
       size: stat.size,
+      downloadUrl,
     })
   } catch (error: any) {
     log.error("Error downloading song:", error)
@@ -237,47 +240,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams
-    const fileId = searchParams.get("id")
-
-    if (!fileId || !/^[a-zA-Z0-9-]{10,64}$/.test(fileId)) {
-      return NextResponse.json({ error: "Invalid file ID" }, { status: 400 })
-    }
-
-    const tempFile = await findNewestFile(tempDir, { contains: fileId })
-    if (!tempFile || !existsSync(tempFile)) {
-      return NextResponse.json({ error: "File not found or expired" }, { status: 404 })
-    }
-
-    const rawName = searchParams.get("name") || path.basename(tempFile)
-    const sanitizedFilename = rawName.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").substring(0, 150)
-
-    const stat = statSync(tempFile)
-    const nodeStream = createReadStream(tempFile)
-    const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>
-
-    const fileToClean = tempFile
-    nodeStream.on("close", async () => {
-      try {
-        if (existsSync(fileToClean)) {
-          await unlink(fileToClean)
-        }
-      } catch (err) {
-        log.error("Error cleaning up temp file on close:", err)
-      }
-    })
-
-    return new Response(webStream, {
-      status: 200,
-      headers: {
-        "Content-Type": "audio/mpeg",
-        "Content-Disposition": `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodeURIComponent(sanitizedFilename)}`,
-        "Content-Length": stat.size.toString(),
-      },
-    })
-  } catch (error: any) {
-    log.error("Error serving downloaded song:", error)
-    return serverError(log, error, "Failed to deliver file")
+  const searchParams = request.nextUrl.searchParams
+  const fileId = searchParams.get("id")
+  if (fileId) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/api/public/download"
+    return NextResponse.redirect(url)
   }
+  return NextResponse.json({ error: "Invalid request" }, { status: 400 })
 }
