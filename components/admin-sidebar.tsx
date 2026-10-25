@@ -168,11 +168,7 @@ function buildDeptNavigation(deptId: string): NavItem[] {
         { name: "Bills", href: `${base}/accounts/bills` },
         { name: "Invoices", href: `${base}/accounts/invoices` },
         { name: "Finance Reports", href: `${base}/accounts/reports` },
-        {
-          name: "Assets",
-          href: `${base}/assets`,
-          children: [{ name: "Issues", href: `${base}/assets/issues` }],
-        },
+        { name: "Assets", href: `${base}/assets` },
       ],
     },
     {
@@ -381,7 +377,6 @@ const adminNavigation: NavItem[] = [
       {
         name: "Assets",
         href: "/admin/assets",
-        children: [{ name: "Issues", href: "/admin/assets/issues" }],
       },
     ],
   },

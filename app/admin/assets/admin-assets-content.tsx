@@ -1456,6 +1456,10 @@ export function AdminAssetsContent({
       backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => router.push("/admin/assets/issues")} className="gap-2" size="sm">
+            <AlertCircle className="h-4 w-4" />
+            Issues
+          </Button>
           <Button variant="outline" onClick={() => setExportOptionsOpen(true)} className="gap-2" size="sm">
             <Download className="h-4 w-4" />
             Export
@@ -1467,10 +1471,6 @@ export function AdminAssetsContent({
               <span className="sm:hidden">Add</span>
             </Button>
           )}
-          <Button variant="outline" onClick={() => router.push("/admin/assets/issues")} className="gap-2" size="sm">
-            <AlertCircle className="h-4 w-4" />
-            Issues
-          </Button>
         </div>
       }
       stats={
