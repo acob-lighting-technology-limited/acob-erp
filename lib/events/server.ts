@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { toLocalISODate } from "@/lib/utils/date"
+import { getOfficeWeekFromDate, getOfficeWeekMonday } from "@/lib/meeting-week"
+import { normalizeDepartmentName } from "@/shared/departments"
+import { DEFAULT_TEAMS_LINK } from "@/lib/events/types"
 import type {
   BusyBlock,
   CalendarEvent,
@@ -137,6 +140,247 @@ async function mergeHolidays(supabase: SupabaseClient, from: Date, to: Date, tar
   }
 }
 
+/**
+ * Projects weekly company meetings (KSS at 08:30 and General Meeting at 09:00) into synthetic
+ * CalendarEvent objects. If a week's meeting is rescheduled (e.g. to Tuesday because Monday
+ * is a public holiday or by admin override), the event dynamically reflects that date.
+ */
+async function mergeWeeklyMeetingsAndKss(
+  supabase: SupabaseClient,
+  from: Date,
+  to: Date,
+  target: CalendarEvent[]
+): Promise<void> {
+  const weeksToQuery = new Map<string, { week: number; year: number }>()
+  const cur = new Date(from.getTime())
+  while (cur <= to) {
+    const info = getOfficeWeekFromDate(cur)
+    const key = `${info.year}-${info.week}`
+    if (!weeksToQuery.has(key)) {
+      weeksToQuery.set(key, info)
+    }
+    cur.setDate(cur.getDate() + 1)
+  }
+
+  if (weeksToQuery.size === 0) return
+
+  const weekList = Array.from(weeksToQuery.values())
+  const years = Array.from(new Set(weekList.map((w) => w.year)))
+  const weekNumbers = Array.from(new Set(weekList.map((w) => w.week)))
+  const mondayIsos = weekList.map((w) => toLocalISODate(getOfficeWeekMonday(w.week, w.year)))
+
+  const [windowsRes, rosterRes, holidayRes] = await Promise.all([
+    supabase
+      .from("weekly_report_meeting_windows")
+      .select("week_number, year, meeting_date, meeting_time")
+      .in("year", years)
+      .in("week_number", weekNumbers),
+    supabase
+      .from("kss_weekly_roster")
+      .select("meeting_week, meeting_year, department, presenter_id, presenter_name")
+      .in("meeting_year", years)
+      .in("meeting_week", weekNumbers)
+      .eq("is_active", true),
+    supabase
+      .from("holiday_calendar")
+      .select("holiday_date")
+      .in("holiday_date", mondayIsos)
+      .eq("is_business_day", false),
+  ])
+
+  if (windowsRes.error) log.warn({ err: windowsRes.error.message }, "Failed to load weekly meeting windows")
+  if (rosterRes.error) log.warn({ err: rosterRes.error.message }, "Failed to load kss roster")
+
+  const windowsMap = new Map<string, { meeting_date: string | null; meeting_time: string | null }>()
+  for (const row of (windowsRes.data ?? []) as Array<{
+    week_number: number
+    year: number
+    meeting_date: string | null
+    meeting_time: string | null
+  }>) {
+    windowsMap.set(`${row.year}-${row.week_number}`, row)
+  }
+
+  const rosterMap = new Map<
+    string,
+    {
+      department: string | null
+      presenter_id: string | null
+      presenter_name: string | null
+    }
+  >()
+  const presenterIdsToLookup: string[] = []
+
+  for (const row of (rosterRes.data ?? []) as Array<{
+    meeting_week: number
+    meeting_year: number
+    department: string | null
+    presenter_id: string | null
+    presenter_name: string | null
+  }>) {
+    rosterMap.set(`${row.meeting_year}-${row.meeting_week}`, row)
+    if (row.presenter_id && !row.presenter_name) {
+      presenterIdsToLookup.push(row.presenter_id)
+    }
+  }
+
+  const presenterNames = new Map<string, string>()
+  if (presenterIdsToLookup.length > 0) {
+    const { data: staffList } = await supabase
+      .from("staff_directory")
+      .select("id, full_name, first_name, last_name")
+      .in("id", Array.from(new Set(presenterIdsToLookup)))
+    for (const s of (staffList ?? []) as DirectoryRow[]) {
+      presenterNames.set(s.id, displayName(s))
+    }
+  }
+
+  const holidayDates = new Set<string>(
+    ((holidayRes.data ?? []) as Array<{ holiday_date: string }>).map((h) => h.holiday_date)
+  )
+
+  const existingIds = new Set(target.map((t) => t.id))
+
+  for (const { week, year } of weekList) {
+    const monday = getOfficeWeekMonday(week, year)
+    const mondayIso = toLocalISODate(monday)
+    const tuesday = new Date(monday.getTime())
+    tuesday.setDate(tuesday.getDate() + 1)
+    const tuesdayIso = toLocalISODate(tuesday)
+
+    const windowConfig = windowsMap.get(`${year}-${week}`)
+    let meetingDateIso: string
+
+    if (windowConfig?.meeting_date) {
+      meetingDateIso = windowConfig.meeting_date
+    } else if (holidayDates.has(mondayIso)) {
+      meetingDateIso = tuesdayIso
+    } else {
+      meetingDateIso = mondayIso
+    }
+
+    const roster = rosterMap.get(`${year}-${week}`)
+    const dept = roster?.department ? normalizeDepartmentName(roster.department) : null
+    const presenter =
+      roster?.presenter_name?.trim() || (roster?.presenter_id ? presenterNames.get(roster.presenter_id) : null) || null
+
+    const startTime = (windowConfig?.meeting_time || "08:30").slice(0, 5)
+    let kssStartStr = `${meetingDateIso}T08:30:00+01:00`
+    let kssEndStr = `${meetingDateIso}T09:00:00+01:00`
+    let meetingStartStr = `${meetingDateIso}T09:00:00+01:00`
+    let meetingEndStr = `${meetingDateIso}T11:00:00+01:00`
+
+    if (startTime !== "08:30" && /^\d{2}:\d{2}$/.test(startTime)) {
+      const [hh, mm] = startTime.split(":").map(Number)
+      if (Number.isFinite(hh) && Number.isFinite(mm)) {
+        const kssH = String(hh).padStart(2, "0")
+        const kssM = String(mm).padStart(2, "0")
+        kssStartStr = `${meetingDateIso}T${kssH}:${kssM}:00+01:00`
+
+        const meetDate = new Date(`${meetingDateIso}T${kssH}:${kssM}:00+01:00`)
+        meetDate.setMinutes(meetDate.getMinutes() + 30)
+        const mH = String(meetDate.getHours()).padStart(2, "0")
+        const mM = String(meetDate.getMinutes()).padStart(2, "0")
+        kssEndStr = `${meetingDateIso}T${mH}:${mM}:00+01:00`
+        meetingStartStr = kssEndStr
+
+        meetDate.setHours(meetDate.getHours() + 2)
+        const endH = String(meetDate.getHours()).padStart(2, "0")
+        const endM = String(meetDate.getMinutes()).padStart(2, "0")
+        meetingEndStr = `${meetingDateIso}T${endH}:${endM}:00+01:00`
+      }
+    }
+
+    // 1. KSS: 08:30 - 09:00 WAT (+01:00)
+    const kssId = `kss-${year}-w${week}`
+    const kssStartDate = new Date(kssStartStr)
+    const kssEndDate = new Date(kssEndStr)
+
+    if (!existingIds.has(kssId) && kssStartDate < to && kssEndDate > from) {
+      const kssTitle =
+        dept && presenter ? `KSS: ${dept} (${presenter})` : dept ? `KSS: ${dept}` : "Knowledge Sharing Session (KSS)"
+
+      const kssDescription = [
+        `Knowledge Sharing Session (KSS) · Week ${week}, ${year}`,
+        presenter ? `Presenter: ${presenter}` : null,
+        dept ? `Department: ${dept}` : null,
+        "",
+        "Join on Microsoft Teams or in person in the Conference Room.",
+      ]
+        .filter(Boolean)
+        .join("\n")
+
+      target.push({
+        id: kssId,
+        type: "workshop",
+        title: kssTitle,
+        description: kssDescription,
+        start_at: kssStartStr,
+        end_at: kssEndStr,
+        all_day: false,
+        location_type: "hybrid",
+        room_id: null,
+        room_name: null,
+        venue: "Conference Room & Microsoft Teams",
+        meeting_url: DEFAULT_TEAMS_LINK,
+        visibility: "company",
+        department_id: null,
+        department_name: dept,
+        md_involvement: "attending",
+        status: "scheduled",
+        organizer_id: null,
+        organizer_name: presenter || (dept ? `${dept} Department` : "ACOB"),
+        created_by: "system",
+        attendees: [],
+        my_rsvp: null,
+        can_manage: false,
+      })
+      existingIds.add(kssId)
+    }
+
+    // 2. General Meeting: 09:00 - 11:00 WAT (+01:00)
+    const meetingId = `general-meeting-${year}-w${week}`
+    const meetingStartDate = new Date(meetingStartStr)
+    const meetingEndDate = new Date(meetingEndStr)
+
+    if (!existingIds.has(meetingId) && meetingStartDate < to && meetingEndDate > from) {
+      const meetingDescription = [
+        `ACOB Weekly General Meeting · Week ${week}, ${year}`,
+        "Agenda: Opening Prayer, KSS, Minutes of Last Meeting, Departmental Updates, Ongoing Projects, Any Other Business, MD's Remarks, Closing.",
+        "",
+        "Join on Microsoft Teams or in person in the Conference Room.",
+      ].join("\n")
+
+      target.push({
+        id: meetingId,
+        type: "meeting",
+        title: `General Meeting · Week ${week}`,
+        description: meetingDescription,
+        start_at: meetingStartStr,
+        end_at: meetingEndStr,
+        all_day: false,
+        location_type: "hybrid",
+        room_id: null,
+        room_name: null,
+        venue: "Conference Room & Microsoft Teams",
+        meeting_url: DEFAULT_TEAMS_LINK,
+        visibility: "company",
+        department_id: null,
+        department_name: null,
+        md_involvement: "attending",
+        status: "scheduled",
+        organizer_id: null,
+        organizer_name: "ACOB Management",
+        created_by: "system",
+        attendees: [],
+        my_rsvp: null,
+        can_manage: false,
+      })
+      existingIds.add(meetingId)
+    }
+  }
+}
+
 export async function loadEvents(
   session: EventsSession,
   { from, to, scope = "all", includeBusy = true }: LoadEventsOptions
@@ -163,8 +407,13 @@ export async function loadEvents(
     const { data: busy, error: busyError } = await busyPromise
     if (busyError) log.warn({ err: busyError.message }, "Failed to load busy blocks")
     const emptyEvents: CalendarEvent[] = []
-    // Holidays still need to appear even when there are no calendar events this month.
-    if (scope !== "md") await mergeHolidays(supabase, from, to, emptyEvents)
+    // Holidays and recurring weekly company meetings still need to appear even when
+    // there are no ad-hoc calendar events this month.
+    if (scope !== "md") {
+      await mergeHolidays(supabase, from, to, emptyEvents)
+      await mergeWeeklyMeetingsAndKss(supabase, from, to, emptyEvents)
+    }
+    emptyEvents.sort((a, b) => a.start_at.localeCompare(b.start_at))
     return { events: emptyEvents, busy: (busy ?? []) as BusyBlock[] }
   }
 
@@ -238,9 +487,13 @@ export async function loadEvents(
     }
   })
 
-  // Merge public holidays from holiday_calendar as synthetic all-day events.
+  // Merge public holidays from holiday_calendar and weekly company meetings (KSS + General Meeting).
   // Done only for the "all" scope — MD's Desk is already a focused personal schedule.
-  if (scope !== "md") await mergeHolidays(supabase, from, to, events)
+  if (scope !== "md") {
+    await mergeHolidays(supabase, from, to, events)
+    await mergeWeeklyMeetingsAndKss(supabase, from, to, events)
+  }
+  events.sort((a, b) => a.start_at.localeCompare(b.start_at))
 
   return { events, busy: (busyRes.data ?? []) as BusyBlock[] }
 }
