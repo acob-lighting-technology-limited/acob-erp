@@ -156,25 +156,35 @@ export default function AdminFleetPage() {
         key: "resource",
         label: "Resource",
         sortable: true,
+        width: "max-w-[150px]",
         accessor: (r) => r.resource?.name || "Unknown",
-        render: (r) => <span className="font-medium whitespace-nowrap">{r.resource?.name || "Unknown"}</span>,
+        render: (r) => (
+          <span className="block max-w-[150px] truncate font-medium" title={r.resource?.name || "Unknown"}>
+            {r.resource?.name || "Unknown"}
+          </span>
+        ),
       },
       {
         key: "requester",
         label: "Requester",
         sortable: true,
+        width: "max-w-[150px]",
         accessor: (r) => r.requester?.full_name || r.requester?.company_email || "Employee",
-        render: (r) => (
-          <span className="font-medium whitespace-nowrap">
-            {r.requester?.full_name || r.requester?.company_email || "Employee"}
-          </span>
-        ),
+        render: (r) => {
+          const name = r.requester?.full_name || r.requester?.company_email || "Employee"
+          return (
+            <span className="block max-w-[150px] truncate font-medium" title={name}>
+              {name}
+            </span>
+          )
+        },
       },
       {
         key: "timeframe",
         label: "Timeframe",
         accessor: (r) => r.start_at,
         hideOnMobile: true,
+        width: "whitespace-nowrap",
         render: (r) => (
           <div className="text-xs whitespace-nowrap">
             <p className="font-medium">{formatDateTime(r.start_at)}</p>
@@ -187,8 +197,9 @@ export default function AdminFleetPage() {
         label: "Reason",
         accessor: (r) => r.reason,
         hideOnMobile: true,
+        width: "max-w-[180px]",
         render: (r) => (
-          <p className="max-w-[280px] truncate text-xs" title={r.reason || undefined}>
+          <p className="max-w-[180px] truncate text-xs" title={r.reason || undefined}>
             {r.reason || "—"}
           </p>
         ),
@@ -229,19 +240,31 @@ export default function AdminFleetPage() {
       {
         key: "reviewer",
         label: "Decision By",
-        accessor: (r) => r.reviewer?.full_name || "-",
+        accessor: (r) => r.reviewer?.full_name || r.admin_note || "-",
         hideOnMobile: true,
+        width: "max-w-[150px]",
         render: (r) =>
           r.reviewer?.full_name ? (
-            <div className="text-xs whitespace-nowrap">
-              <p className="font-medium">{r.reviewer.full_name}</p>
-              {r.reviewer.department && <p className="text-muted-foreground">{r.reviewer.department}</p>}
-              {r.reviewed_at && <p className="text-muted-foreground">{formatDateTime(r.reviewed_at)}</p>}
+            <div className="max-w-[150px] text-xs">
+              <p className="truncate font-medium" title={r.reviewer.full_name}>
+                {r.reviewer.full_name}
+              </p>
+              {r.reviewer.department && (
+                <p className="text-muted-foreground truncate" title={r.reviewer.department}>
+                  {r.reviewer.department}
+                </p>
+              )}
+              {r.reviewed_at && (
+                <p className="text-muted-foreground text-[11px] whitespace-nowrap">{formatDateTime(r.reviewed_at)}</p>
+              )}
             </div>
-          ) : r.status === "cancelled" ? (
-            <span className="text-muted-foreground text-xs whitespace-nowrap">{r.admin_note || "Cancelled"}</span>
           ) : (
-            <span className="text-muted-foreground text-xs whitespace-nowrap">Not yet reviewed</span>
+            <p
+              className="text-muted-foreground max-w-[150px] truncate text-xs"
+              title={r.status === "cancelled" ? r.admin_note || "Cancelled" : "Not yet reviewed"}
+            >
+              {r.status === "cancelled" ? r.admin_note || "Cancelled" : "Not yet reviewed"}
+            </p>
           ),
       },
     ],
@@ -421,7 +444,9 @@ export default function AdminFleetPage() {
                       )}
                     </div>
                   ) : (
-                    <p className="text-muted-foreground mt-1 italic">Pending admin decision</p>
+                    <p className="text-muted-foreground mt-1 italic">
+                      {r.status === "cancelled" ? r.admin_note || "Cancelled" : "Pending admin decision"}
+                    </p>
                   )}
                 </div>
               </div>
