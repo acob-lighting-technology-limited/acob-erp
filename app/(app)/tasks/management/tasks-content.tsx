@@ -414,32 +414,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         ),
       hideOnMobile: true,
     },
-    {
-      key: "view",
-      label: "",
-      align: "right",
-      render: (t) => (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs font-medium"
-              onClick={(event) => {
-                event.stopPropagation()
-                void openTaskDetails(t)
-              }}
-              aria-label={`View details for ${t.title}`}
-            >
-              <Eye className="h-3.5 w-3.5" />
-              <span>View</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">View task details & history</TooltipContent>
-        </Tooltip>
-      ),
-    },
   ]
 
   const filters: DataTableFilter<Task>[] = [
