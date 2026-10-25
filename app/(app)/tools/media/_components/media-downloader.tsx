@@ -140,7 +140,7 @@ export function MediaDownloader() {
     }
   }, [url, mode, mediaType, handleFetchInfo])
 
-  const handleDownload = (formatId?: string, trackUrl?: string) => {
+  const handleDownload = async (formatId?: string, trackUrl?: string) => {
     const urlToDownload = trackUrl || url
     const isAudio = formatId?.startsWith("audio_mp3_") || mediaType === "song"
     const formatType = isAudio ? "MP3" : "video"
@@ -148,38 +148,50 @@ export function MediaDownloader() {
     setDownloadingFormatId(formatId || "best")
     setError("")
 
-    const toastId = toast.loading(
-      `Preparing ${formatType} download... Your browser / download manager will take over shortly.`
-    )
+    const toastId = toast.loading(`Preparing ${formatType} on server... This takes a few moments for high quality.`)
 
-    const endpoint = mediaType === "video" ? "/api/download" : "/api/song/download"
-    const params = new URLSearchParams({
-      url: urlToDownload,
-      format_id: formatId || "",
-      title: info?.title || "",
-    })
-    if (info?.artist || info?.uploader) {
-      params.set("artist", info.artist || info.uploader || "")
-    }
-
-    const downloadUrl = `${endpoint}?${params.toString()}`
-
-    // Trigger download via hidden iframe so browser / download manager handles streaming natively
-    const iframe = document.createElement("iframe")
-    iframe.style.display = "none"
-    iframe.src = downloadUrl
-    document.body.appendChild(iframe)
-
-    setTimeout(() => {
-      if (document.body.contains(iframe)) {
-        document.body.removeChild(iframe)
-      }
-      toast.success("Download dispatched to your browser / download manager!", {
-        id: toastId,
-        description: info?.title ? `Saving: ${info.title}` : undefined,
+    try {
+      const endpoint = mediaType === "video" ? "/api/download" : "/api/song/download"
+      const response = await apiFetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: urlToDownload,
+          format_id: formatId,
+          title: info?.title,
+          artist: info?.artist || info?.uploader,
+        }),
       })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Failed to prepare download")
+      }
+
+      toast.success("Ready! Handing off to your download manager...", {
+        id: toastId,
+        description: `Saving: ${data.filename}`,
+      })
+
+      // The file is 100% ready on server disk. Triggering a download anchor
+      // immediately starts the attachment download without any wait or timeout.
+      const downloadUrl = `${endpoint}?id=${encodeURIComponent(data.fileId)}&name=${encodeURIComponent(data.filename)}`
+      const a = document.createElement("a")
+      a.href = downloadUrl
+      a.download = data.filename || "download"
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch (err: any) {
+      const errorMsg = err.message || "Download failed"
+      setError(errorMsg)
+      toast.error(errorMsg, { id: toastId })
+    } finally {
       setDownloadingFormatId(null)
-    }, 4000)
+    }
   }
 
   const handleBatchDownload = async () => {

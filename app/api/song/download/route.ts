@@ -13,6 +13,8 @@ const log = logger("api/song/download")
 
 export const maxDuration = 300
 
+const tempDir = path.join(tmpdir(), "song-downloads")
+
 const DRM_PROTECTED_PLATFORMS = [
   "spotify.com",
   "open.spotify.com",
@@ -70,184 +72,166 @@ function getDRMResponse(url: string) {
   }
 }
 
-async function processSongDownload(params: {
-  url: string | null
-  format_id?: string | null
-  title?: string | null
-  artist?: string | null
-}) {
+export async function POST(request: NextRequest) {
   let tempFile: string | null = null
 
-  const { url, format_id, title, artist } = params
+  try {
+    const body = await request.json()
+    const { url, format_id, title, artist } = body
 
-  if (!url) {
-    return NextResponse.json({ error: "URL is required" }, { status: 400 })
-  }
+    if (!url) {
+      return NextResponse.json({ error: "URL is required" }, { status: 400 })
+    }
 
-  const target = parseHttpUrl(url)
-  if (!target) {
-    return NextResponse.json({ error: "Enter a valid http(s) link." }, { status: 400 })
-  }
+    const target = parseHttpUrl(url)
+    if (!target) {
+      return NextResponse.json({ error: "Enter a valid http(s) link." }, { status: 400 })
+    }
 
-  if (isDRMProtected(url)) {
-    return getDRMResponse(url)
-  }
+    if (isDRMProtected(url)) {
+      return getDRMResponse(url)
+    }
 
-  const tempDir = path.join(tmpdir(), "song-downloads")
-  if (!existsSync(tempDir)) {
-    await mkdir(tempDir, { recursive: true })
-  }
+    if (!existsSync(tempDir)) {
+      await mkdir(tempDir, { recursive: true })
+    }
 
-  let songTitle = title || ""
-  let songArtist = artist || ""
+    let songTitle = title || ""
+    let songArtist = artist || ""
 
-  // Only query yt-dlp metadata if title/artist was not passed from client
-  if (!songTitle || !songArtist) {
-    try {
-      const { stdout: infoStdout, stderr: infoStderr } = await run(
-        "yt-dlp",
-        ["-J", "--no-warnings", target.toString()],
-        {
-          maxBuffer: 10 * 1024 * 1024,
-          timeout: 30000,
+    if (!songTitle || !songArtist) {
+      try {
+        const { stdout: infoStdout, stderr: infoStderr } = await run(
+          "yt-dlp",
+          ["-J", "--no-warnings", target.toString()],
+          {
+            maxBuffer: 10 * 1024 * 1024,
+            timeout: 30000,
+          }
+        )
+
+        if (infoStderr && (infoStderr.includes("[DRM]") || infoStderr.includes("DRM protection"))) {
+          return getDRMResponse(url)
         }
-      )
 
-      if (infoStderr && (infoStderr.includes("[DRM]") || infoStderr.includes("DRM protection"))) {
-        return getDRMResponse(url)
+        const info = JSON.parse(infoStdout)
+        if (info.title && !songTitle) songTitle = info.title
+        if ((info.artist || info.uploader || info.creator) && !songArtist) {
+          songArtist = info.artist || info.uploader || info.creator
+        }
+      } catch (err: any) {
+        const errorMessage = err.stderr || err.message || ""
+        if (errorMessage.includes("[DRM]") || errorMessage.includes("DRM protection")) {
+          return getDRMResponse(url)
+        }
+        log.info("Could not fetch song metadata, using provided/default")
       }
+    }
 
-      const info = JSON.parse(infoStdout)
-      if (info.title && !songTitle) songTitle = info.title
-      if ((info.artist || info.uploader || info.creator) && !songArtist) {
-        songArtist = info.artist || info.uploader || info.creator
+    if (!songTitle) songTitle = "song"
+    if (!songArtist) songArtist = "Unknown"
+
+    const sanitizedTitle = songTitle
+      .replace(/[<>:"/\\|?*]/g, "_")
+      .replace(/\s+/g, "_")
+      .substring(0, 100)
+      .trim()
+
+    const sanitizedArtist = songArtist
+      .replace(/[<>:"/\\|?*]/g, "_")
+      .replace(/\s+/g, "_")
+      .substring(0, 50)
+      .trim()
+
+    const fileId = globalThis.crypto.randomUUID()
+    const timestamp = Date.now()
+    const outputTemplate = path.join(tempDir, `${fileId}_${timestamp}.%(ext)s`)
+
+    const ytdlpArgs: string[] = []
+    let audioBitrate = "0" // Default to best quality
+
+    if (format_id && format_id.startsWith("audio_mp3_")) {
+      const bitrateMatch = format_id.match(/audio_mp3_(\d+)/)
+      if (bitrateMatch) {
+        const bitrate = parseInt(bitrateMatch[1])
+        if (bitrate >= 320) audioBitrate = "0"
+        else if (bitrate >= 256) audioBitrate = "2"
+        else if (bitrate >= 192) audioBitrate = "5"
+        else audioBitrate = "9"
       }
-    } catch (err: any) {
-      const errorMessage = err.stderr || err.message || ""
+    }
+
+    ytdlpArgs.push(
+      "-x",
+      "--audio-format",
+      "mp3",
+      "--audio-quality",
+      audioBitrate,
+      "-N",
+      "5",
+      "-o",
+      outputTemplate,
+      "--no-warnings",
+      target.toString()
+    )
+
+    try {
+      await run("yt-dlp", ytdlpArgs, {
+        maxBuffer: 50 * 1024 * 1024,
+        timeout: 300000,
+      })
+    } catch (execError: any) {
+      const errorMessage = execError.stderr || execError.message || ""
       if (errorMessage.includes("[DRM]") || errorMessage.includes("DRM protection")) {
         return getDRMResponse(url)
       }
-      log.info("Could not fetch song metadata, using provided/default")
+      throw execError
     }
-  }
 
-  if (!songTitle) songTitle = "song"
-  if (!songArtist) songArtist = "Unknown"
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
-  const sanitizedTitle = songTitle
-    .replace(/[<>:"/\\|?*]/g, "_")
-    .replace(/\s+/g, "_")
-    .substring(0, 100)
-    .trim()
+    tempFile =
+      (await findNewestFile(tempDir, { contains: fileId })) ??
+      (await findNewestFile(tempDir, { extensions: [".mp3"], withinMs: 5 * 60 * 1000 }))
 
-  const sanitizedArtist = songArtist
-    .replace(/[<>:"/\\|?*]/g, "_")
-    .replace(/\s+/g, "_")
-    .substring(0, 50)
-    .trim()
-
-  const timestamp = Date.now()
-  const outputTemplate = path.join(tempDir, `${sanitizedArtist}_${sanitizedTitle}_${timestamp}.%(ext)s`)
-
-  const ytdlpArgs: string[] = []
-  let audioBitrate = "0" // Default to best quality
-
-  if (format_id && format_id.startsWith("audio_mp3_")) {
-    const bitrateMatch = format_id.match(/audio_mp3_(\d+)/)
-    if (bitrateMatch) {
-      const bitrate = parseInt(bitrateMatch[1])
-      if (bitrate >= 320) audioBitrate = "0"
-      else if (bitrate >= 256) audioBitrate = "2"
-      else if (bitrate >= 192) audioBitrate = "5"
-      else audioBitrate = "9"
+    if (!tempFile || !existsSync(tempFile)) {
+      throw new Error("Download failed - file not found.")
     }
-  }
 
-  ytdlpArgs.push(
-    "-x",
-    "--audio-format",
-    "mp3",
-    "--audio-quality",
-    audioBitrate,
-    "-N",
-    "5",
-    "-o",
-    outputTemplate,
-    "--no-warnings",
-    target.toString()
-  )
+    const sanitizedFilename = `${sanitizedArtist}_${sanitizedTitle}.mp3`
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+      .substring(0, 200)
 
-  try {
-    await run("yt-dlp", ytdlpArgs, {
-      maxBuffer: 50 * 1024 * 1024,
-      timeout: 300000,
+    const stat = statSync(tempFile)
+
+    // Safety fallback cleanup after 30 minutes
+    const fileToClean = tempFile
+    setTimeout(
+      async () => {
+        try {
+          if (existsSync(fileToClean)) {
+            await unlink(fileToClean)
+          }
+        } catch {}
+      },
+      30 * 60 * 1000
+    )
+
+    return NextResponse.json({
+      success: true,
+      fileId,
+      filename: sanitizedFilename,
+      size: stat.size,
     })
-  } catch (execError: any) {
-    const errorMessage = execError.stderr || execError.message || ""
-    if (errorMessage.includes("[DRM]") || errorMessage.includes("DRM protection")) {
-      return getDRMResponse(url)
-    }
-    throw execError
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  tempFile =
-    (await findNewestFile(tempDir, { contains: String(timestamp) })) ??
-    (await findNewestFile(tempDir, { extensions: [".mp3"], withinMs: 5 * 60 * 1000 })) ??
-    (await findNewestFile(tempDir, { extensions: [".mp3"] }))
-
-  if (!tempFile || !existsSync(tempFile)) {
-    throw new Error("Download failed - file not found.")
-  }
-
-  const sanitizedFilename = `${sanitizedArtist}_${sanitizedTitle}.mp3`
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
-    .substring(0, 200)
-
-  const stat = statSync(tempFile)
-  const nodeStream = createReadStream(tempFile)
-  const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>
-
-  const fileToClean = tempFile
-  nodeStream.on("close", async () => {
-    try {
-      if (existsSync(fileToClean)) {
-        await unlink(fileToClean)
-      }
-    } catch (err) {
-      log.error("Error cleaning up temp file on close:", err)
-    }
-  })
-
-  // Safety fallback cleanup after 30 minutes
-  setTimeout(
-    async () => {
-      try {
-        if (existsSync(fileToClean)) {
-          await unlink(fileToClean)
-        }
-      } catch {}
-    },
-    30 * 60 * 1000
-  )
-
-  return new Response(webStream, {
-    status: 200,
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Content-Disposition": `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodeURIComponent(sanitizedFilename)}`,
-      "Content-Length": stat.size.toString(),
-    },
-  })
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    return await processSongDownload(body)
   } catch (error: any) {
     log.error("Error downloading song:", error)
+    if (tempFile && existsSync(tempFile)) {
+      try {
+        await unlink(tempFile)
+      } catch (err) {
+        log.error("Error cleaning up temp file:", err)
+      }
+    }
     return serverError(log, error, "Download failed")
   }
 }
@@ -255,13 +239,45 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const url = searchParams.get("url")
-    const format_id = searchParams.get("format_id")
-    const title = searchParams.get("title")
-    const artist = searchParams.get("artist")
-    return await processSongDownload({ url, format_id, title, artist })
+    const fileId = searchParams.get("id")
+
+    if (!fileId || !/^[a-zA-Z0-9-]{10,64}$/.test(fileId)) {
+      return NextResponse.json({ error: "Invalid file ID" }, { status: 400 })
+    }
+
+    const tempFile = await findNewestFile(tempDir, { contains: fileId })
+    if (!tempFile || !existsSync(tempFile)) {
+      return NextResponse.json({ error: "File not found or expired" }, { status: 404 })
+    }
+
+    const rawName = searchParams.get("name") || path.basename(tempFile)
+    const sanitizedFilename = rawName.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").substring(0, 150)
+
+    const stat = statSync(tempFile)
+    const nodeStream = createReadStream(tempFile)
+    const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>
+
+    const fileToClean = tempFile
+    nodeStream.on("close", async () => {
+      try {
+        if (existsSync(fileToClean)) {
+          await unlink(fileToClean)
+        }
+      } catch (err) {
+        log.error("Error cleaning up temp file on close:", err)
+      }
+    })
+
+    return new Response(webStream, {
+      status: 200,
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Content-Disposition": `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodeURIComponent(sanitizedFilename)}`,
+        "Content-Length": stat.size.toString(),
+      },
+    })
   } catch (error: any) {
-    log.error("Error downloading song:", error)
-    return serverError(log, error, "Download failed")
+    log.error("Error serving downloaded song:", error)
+    return serverError(log, error, "Failed to deliver file")
   }
 }
