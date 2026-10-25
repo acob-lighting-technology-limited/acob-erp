@@ -17,6 +17,7 @@ import {
   CalendarDays,
   Target,
   Scale,
+  Eye,
 } from "lucide-react"
 
 import { UserTaskDetailsDialog } from "@/components/tasks/UserTaskDetailsDialog"
@@ -413,6 +414,32 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         ),
       hideOnMobile: true,
     },
+    {
+      key: "view",
+      label: "",
+      align: "right",
+      render: (t) => (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs font-medium"
+              onClick={(event) => {
+                event.stopPropagation()
+                void openTaskDetails(t)
+              }}
+              aria-label={`View details for ${t.title}`}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              <span>View</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">View task details & history</TooltipContent>
+        </Tooltip>
+      ),
+    },
   ]
 
   const filters: DataTableFilter<Task>[] = [
@@ -550,6 +577,13 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             .includes(q)
         }
         filters={filters}
+        rowActions={[
+          {
+            label: "View",
+            icon: Eye,
+            onClick: (t) => void openTaskDetails(t),
+          },
+        ]}
         pagination={{ pageSize: 25 }}
         stickyToolbar
         viewToggle
@@ -611,6 +645,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
               },
             ],
           },
+          onSelect: (t) => void openTaskDetails(t),
         }}
         cardRenderer={(t) => (
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 h-full space-y-3 rounded-xl border p-4 shadow-sm transition-all">
@@ -636,6 +671,21 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                 <Scale className="h-3.5 w-3.5 shrink-0" />
                 <span>Weight {t.weight ?? TASK_WEIGHT_DEFAULT}</span>
               </div>
+            </div>
+            <div className="mt-2 flex items-center justify-end border-t pt-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs font-medium"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void openTaskDetails(t)
+                }}
+              >
+                <Eye className="h-3 w-3" />
+                <span>View</span>
+              </Button>
             </div>
           </div>
         )}
