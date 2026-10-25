@@ -214,6 +214,7 @@ export async function GET(request: NextRequest) {
         lateness_with_permission_days = 0,
         incomplete_with_permission_days = 0,
         total_hours = 0,
+        office_hours = 0,
         total_missed_hours = 0,
         waived_days = 0,
         cds_days = 0,
@@ -362,6 +363,21 @@ export async function GET(request: NextRequest) {
           clock_out_days++
         }
         overtime_hours += overtimeHoursFor(rec.clock_out, policy)
+        if (rec.clock_in && rec.clock_out) {
+          if (typeof rec.total_hours === "number" && rec.total_hours > 0) {
+            office_hours += rec.total_hours
+          } else {
+            const [inH, inM, inS = 0] = rec.clock_in.split(":").map(Number)
+            const [outH, outM, outS = 0] = rec.clock_out.split(":").map(Number)
+            if (Number.isFinite(inH) && Number.isFinite(inM) && Number.isFinite(outH) && Number.isFinite(outM)) {
+              const inSec = inH * 3600 + inM * 60 + inS
+              const outSec = outH * 3600 + outM * 60 + outS
+              if (outSec > inSec) {
+                office_hours += (outSec - inSec) / 3600
+              }
+            }
+          }
+        }
       }
 
       const total_working_days = available_days
@@ -393,6 +409,7 @@ export async function GET(request: NextRequest) {
         holiday_days,
         attendance_credits: Math.round(attendance_credits * 100) / 100,
         total_hours: Math.round(total_hours * 10) / 10,
+        office_hours: Math.round(office_hours * 10) / 10,
         total_missed_hours: Math.round(total_missed_hours * 10) / 10,
         attendance_rate,
         attendance_exempt: Boolean(profile.attendance_exempt),
@@ -417,6 +434,7 @@ export async function GET(request: NextRequest) {
       clock_out_minutes_sum: number
       clock_out_days: number
       total_hours: number
+      office_hours: number
       overtime_hours: number
       absent_days: number
       incomplete_days: number
@@ -437,6 +455,7 @@ export async function GET(request: NextRequest) {
           clock_out_minutes_sum: 0,
           clock_out_days: 0,
           total_hours: 0,
+          office_hours: 0,
           overtime_hours: 0,
           absent_days: 0,
           incomplete_days: 0,
@@ -454,6 +473,7 @@ export async function GET(request: NextRequest) {
       dept.clock_out_minutes_sum += summary.clock_out_minutes_sum
       dept.clock_out_days += summary.clock_out_days
       dept.total_hours += summary.total_hours
+      dept.office_hours += summary.office_hours
       dept.overtime_hours += summary.overtime_hours
       dept.absent_days += summary.absent_days
       dept.incomplete_days += summary.incomplete_days ?? 0
@@ -474,6 +494,8 @@ export async function GET(request: NextRequest) {
           dept.clock_out_days > 0 ? Math.round(dept.clock_out_minutes_sum / dept.clock_out_days) : null,
         total_hours: Math.round(dept.total_hours * 10) / 10,
         avg_total_hours: dept.employee_count > 0 ? Math.round((dept.total_hours / dept.employee_count) * 10) / 10 : 0,
+        office_hours: Math.round(dept.office_hours * 10) / 10,
+        avg_office_hours: dept.employee_count > 0 ? Math.round((dept.office_hours / dept.employee_count) * 10) / 10 : 0,
         overtime_hours: Math.round(dept.overtime_hours * 10) / 10,
         avg_overtime_hours:
           dept.employee_count > 0 ? Math.round((dept.overtime_hours / dept.employee_count) * 10) / 10 : 0,
