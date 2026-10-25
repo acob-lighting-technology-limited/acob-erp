@@ -7,6 +7,7 @@ import type { MdDeskDelegate, MdDeskQueue, MdDeskQueueItem } from "@/lib/md-desk
 import type { Task, TaskPersonSummary } from "@/types/task"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
 import { isLeadForTaskDepartment } from "@/lib/tasks/rating-authority"
+import { normalizeDepartmentName } from "@/shared/departments"
 
 const log = logger("md-desk")
 
@@ -120,14 +121,16 @@ async function loadSelfAssignedTasksAwaitingMd(db: SupabaseClient, mdId: string 
 
   const assigneeIds = Array.from(new Set(selfAssigned.map((t) => t.assigned_to as string)))
   const projectIds = Array.from(new Set(selfAssigned.map((t) => t.project_id).filter(Boolean) as string[]))
-  const [profilesRes, projectsRes] = await Promise.all([
+  const [profilesRes, projectsRes, deptsRes] = await Promise.all([
     db.from("profiles").select("id, role, department, is_department_lead, lead_departments").in("id", assigneeIds),
     projectIds.length
       ? db.from("projects").select("id, project_manager_id").in("id", projectIds)
       : Promise.resolve({ data: [], error: null }),
+    db.from("departments").select("name, department_code, department_head_id"),
   ])
   if (profilesRes.error) log.error({ err: profilesRes.error.message }, "Failed to load task assignee profiles")
   if (projectsRes.error) log.error({ err: projectsRes.error.message }, "Failed to load task projects")
+  if (deptsRes.error) log.error({ err: deptsRes.error.message }, "Failed to load departments")
 
   const profileById = new Map(((profilesRes.data ?? []) as ReviewerProfileRow[]).map((p) => [p.id, p]))
   const managerByProject = new Map(
@@ -136,12 +139,35 @@ async function loadSelfAssignedTasksAwaitingMd(db: SupabaseClient, mdId: string 
       p.project_manager_id,
     ])
   )
+  const deptHeadByNormName = new Map<string, string | null>()
+  for (const d of (deptsRes.data ?? []) as { name: string | null; department_head_id: string | null }[]) {
+    if (d.name) {
+      deptHeadByNormName.set(normalizeDepartmentName(d.name), d.department_head_id)
+    }
+  }
 
   return selfAssigned.filter((t) => {
     const profile = profileById.get(t.assigned_to as string)
+    const taskDeptNorm = normalizeDepartmentName(t.department || profile?.department)
+    const deptHeadId = taskDeptNorm ? deptHeadByNormName.get(taskDeptNorm) : null
+    const isDeptLead = isLeadForTaskDepartment(profile, t.department) || (deptHeadId && deptHeadId === t.assigned_to)
+
+    // 1. If the assignee is the lead for this department, there is no higher reviewer in this department -> goes to MD.
+    if (isDeptLead) return true
+
+    // 2. If the department has a designated lead and the assignee is not that lead, the lead reviews it.
+    if (deptHeadId && deptHeadId !== t.assigned_to) {
+      return false
+    }
+
+    // 3. Project manager self-assigned task on a project with no department lead above it:
+    const isProjectManager = Boolean(t.project_id) && managerByProject.get(t.project_id as string) === t.assigned_to
+    if (isProjectManager) return true
+
+    // 4. Admin-tier role who has no department lead above them:
     if (isAdminLikeRole(profile?.role)) return true
-    if (isLeadForTaskDepartment(profile, t.department)) return true
-    return Boolean(t.project_id) && managerByProject.get(t.project_id as string) === t.assigned_to
+
+    return false
   })
 }
 
