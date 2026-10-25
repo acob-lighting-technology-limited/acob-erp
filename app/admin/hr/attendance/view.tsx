@@ -81,7 +81,6 @@ export interface AttendanceReport {
   holiday_days?: number
   attendance_credits?: number
   total_hours: number
-  office_hours?: number
   total_missed_hours?: number
   attendance_rate: number
   overtime_hours?: number
@@ -1261,21 +1260,23 @@ export function AttendanceReportsPage({
             subtitle: (r) => {
               const code = deptCode(r.department)
               return (
-                <span className="flex w-full items-center justify-between">
-                  <span className="text-muted-foreground shrink-0 font-medium">{code}</span>
-                  <span className="flex flex-1 items-center justify-center gap-2 text-center font-medium sm:gap-6 md:gap-8">
-                    <span className="text-blue-600 dark:text-blue-400">
-                      <span className="font-semibold tabular-nums">{r.present_days}</span> present
-                    </span>
-                    <span className="text-amber-600 dark:text-amber-400">
-                      <span className="font-semibold tabular-nums">{r.late_days}</span> late
-                    </span>
-                    <span className="text-red-600 dark:text-red-400">
-                      <span className="font-semibold tabular-nums">{r.absent_days}</span> absent
-                    </span>
+                <span className="flex flex-wrap items-center gap-2.5 text-left font-medium sm:gap-4">
+                  {code && (
+                    <>
+                      <span className="text-muted-foreground shrink-0">{code}</span>
+                      <span className="text-muted-foreground/40 shrink-0" aria-hidden="true">
+                        ·
+                      </span>
+                    </>
+                  )}
+                  <span className="text-blue-600 dark:text-blue-400">
+                    <span className="font-semibold tabular-nums">{r.present_days}</span> present
                   </span>
-                  <span className="invisible hidden shrink-0 sm:inline" aria-hidden="true">
-                    {code}
+                  <span className="text-amber-600 dark:text-amber-400">
+                    <span className="font-semibold tabular-nums">{r.late_days}</span> late
+                  </span>
+                  <span className="text-red-600 dark:text-red-400">
+                    <span className="font-semibold tabular-nums">{r.absent_days}</span> absent
                   </span>
                 </span>
               )
