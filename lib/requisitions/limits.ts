@@ -1,7 +1,7 @@
 import type { RequisitionFormType } from "./types"
 
 /** A Payment Request must be raised at this amount or more. */
-export const PAYMENT_REQUEST_MIN = 30_000
+export const PAYMENT_REQUEST_MIN = 50_000
 /** Petty cash can never exceed this, before or after a signer's change. */
 export const PETTY_CASH_MAX = 50_000
 

@@ -134,8 +134,8 @@ test("department names are normalised", () => {
 })
 
 test("amount limits", () => {
-  assert.equal(amountOutOfRangeMessage("payment_request", 30_000), null)
-  assert.match(amountOutOfRangeMessage("payment_request", 29_999) || "", /Petty Cash/)
+  assert.equal(amountOutOfRangeMessage("payment_request", 50_000), null)
+  assert.match(amountOutOfRangeMessage("payment_request", 49_999) || "", /Petty Cash/)
   assert.equal(amountOutOfRangeMessage("petty_cash", 50_000), null)
   assert.match(amountOutOfRangeMessage("petty_cash", 50_001) || "", /Payment Request/)
   assert.equal(amountOutOfRangeMessage("petty_cash", 100), null)

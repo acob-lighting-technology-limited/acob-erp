@@ -59,13 +59,13 @@ function FormChoice({ onPick }: { onPick: (type: RequisitionFormType) => void })
       type: "payment_request",
       icon: FileText,
       title: FORM_LABELS.payment_request,
-      text: `${formatNaira(PAYMENT_REQUEST_MIN).replace(".00", "")} and above. For a project, with a purpose and site.`,
+      text: `${formatNaira(PAYMENT_REQUEST_MIN).replace(".00", "")} and above. For project expenses, vendor invoices, contracts, and major purchases.`,
     },
     {
       type: "petty_cash",
       icon: Receipt,
       title: FORM_LABELS.petty_cash,
-      text: `Up to ${formatNaira(PETTY_CASH_MAX).replace(".00", "")}. A short list of small items.`,
+      text: `Up to ${formatNaira(PETTY_CASH_MAX).replace(".00", "")}. For minor office expenses, urgent supplies, and daily running costs.`,
     },
   ]
   return (
@@ -83,8 +83,7 @@ function FormChoice({ onPick }: { onPick: (type: RequisitionFormType) => void })
         </button>
       ))}
       <p className="text-muted-foreground text-xs sm:col-span-2">
-        Between {formatNaira(PAYMENT_REQUEST_MIN).replace(".00", "")} and{" "}
-        {formatNaira(PETTY_CASH_MAX).replace(".00", "")}, either form can be used.
+        Expenses under ₦50,000 must use Petty Cash. For exactly ₦50,000, either form can be used.
       </p>
     </div>
   )
