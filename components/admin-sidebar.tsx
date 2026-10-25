@@ -164,10 +164,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       roles: [],
       children: [
         { name: "Requisitions", href: `${base}/accounts/requisitions` },
-        { name: "Payments", href: `${base}/accounts/payments` },
-        { name: "Bills", href: `${base}/accounts/bills` },
-        { name: "Invoices", href: `${base}/accounts/invoices` },
-        { name: "Finance Reports", href: `${base}/accounts/reports` },
         { name: "Assets", href: `${base}/assets` },
       ],
     },
@@ -349,21 +345,8 @@ const adminNavigation: NavItem[] = [
     roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
-      { name: "Payments", href: "/admin/accounts/payments" },
       { name: "Starlink Kits", href: "/admin/accounts/starlink" },
-      { name: "Bills", href: "/admin/accounts/bills" },
-      { name: "Invoices", href: "/admin/accounts/invoices" },
       { name: "Payroll", href: "/admin/payroll" },
-      { name: "Finance Reports", href: "/admin/accounts/reports" },
-      {
-        name: "Purchasing",
-        href: "/admin/purchasing",
-        children: [
-          { name: "Orders", href: "/admin/purchasing/orders" },
-          { name: "Receipts", href: "/admin/purchasing/receipts" },
-          { name: "Suppliers", href: "/admin/purchasing/suppliers" },
-        ],
-      },
       {
         name: "Inventory",
         href: "/admin/inventory",

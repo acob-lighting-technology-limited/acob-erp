@@ -147,7 +147,6 @@ const navigationSections: NavSectionDef[] = [
         icon: Landmark,
         children: [
           { name: "Requisitions", href: "/accounts/requisitions" },
-          { name: "Payments", href: "/accounts/payments" },
           { name: "Payroll", href: "/accounts/payroll" },
           { name: "Assets", href: "/accounts/assets" },
         ],
