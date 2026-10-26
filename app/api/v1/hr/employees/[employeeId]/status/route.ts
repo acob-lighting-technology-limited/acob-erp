@@ -59,8 +59,6 @@ const ChangeStatusSchema = z.object({
   }),
   reason_code: z.string().trim().max(100).optional(),
   reason_label: z.string().trim().max(200).optional(),
-  leave_type_id: z.union([z.string().uuid(), z.literal("")]).optional(),
-  leave_type_name: z.string().trim().max(100).optional(),
   suspension_end_date: z.string().trim().max(40).nullable().optional(),
   separation_date: z.string().trim().max(40).optional(),
   /** Mailbox steps the admin confirmed in the Change Status dialog. */
@@ -78,7 +76,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const body = parsed.data
     const mailboxActions = body.mailbox ?? null
 
-    const { status, reason_code, reason_label, leave_type_id, suspension_end_date, separation_date } = body
+    const { status, reason_code, reason_label, suspension_end_date, separation_date } = body
 
     // Block exit if employee has active assignments
     if (status === "exited") {
@@ -106,8 +104,6 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       profileUpdate.admin_routes = []
       if (separation_date) profileUpdate.separation_date = separation_date
       if (reason_code) profileUpdate.separation_reason = reason_code
-    } else if (status === "on_leave") {
-      profileUpdate.leave_type_id = leave_type_id ?? null
     } else if (status === "active") {
       // Re-activation: clear exit/leave fields
       profileUpdate.separation_date = null
