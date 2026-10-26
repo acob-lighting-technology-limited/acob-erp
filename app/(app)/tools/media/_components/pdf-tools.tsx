@@ -1,8 +1,22 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { saveAs } from "file-saver"
 import { toast } from "sonner"
-import { apiFetch } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
+import {
+  extractPdfText,
+  imagesToPdf,
+  mergePdfs,
+  pdfToDocx,
+  resizeImageToPng,
+  splitPdf,
+  toPdfBlob,
+  watermarkPdf,
+} from "@/lib/pdf/client-tools"
+import type { PdfServerCapabilities } from "@/app/api/pdf/capabilities/route"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -44,6 +58,38 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(exponent === 0 ? 0 : 2)} ${units[exponent]}`
 }
 
+/** Tools that need native binaries, so they run on the server (document service). */
+const SERVER_TOOLS = ["compress", "convert", "password", "ocr"] as const
+type ServerTool = (typeof SERVER_TOOLS)[number]
+const isServerTool = (tool: PdfToolType): tool is ServerTool => (SERVER_TOOLS as readonly string[]).includes(tool)
+
+/**
+ * Vercel rejects function request bodies over 4.5 MB with a plain-text 413
+ * before the route runs. Keep a margin for the multipart overhead. Only the
+ * server tools are subject to this; the rest run in the browser.
+ */
+const MAX_UPLOAD_BYTES = 4.2 * 1024 * 1024
+
+/**
+ * POST to a PDF route and throw a readable message on failure. Checks the upload
+ * size first, and never assumes the error body is JSON: the platform's 413 is
+ * plain text, which previously surfaced as "Unexpected token 'R'…".
+ */
+async function postPdfTool(path: string, formData: FormData, fallbackError: string): Promise<Response> {
+  let totalBytes = 0
+  formData.forEach((value) => {
+    if (value instanceof File) totalBytes += value.size
+  })
+  const tooLarge = `Files are too large (${formatBytes(totalBytes)}). The limit is ${formatBytes(MAX_UPLOAD_BYTES)} per request — use smaller or fewer files.`
+  if (totalBytes > MAX_UPLOAD_BYTES) throw new Error(tooLarge)
+
+  const response = await apiFetch(path, { method: "POST", body: formData })
+  if (response.ok) return response
+  if (response.status === 413) throw new Error(tooLarge)
+  const payload = await response.json().catch(() => null)
+  throw new Error(payload?.error || `${fallbackError} (status ${response.status})`)
+}
+
 export function PdfTools() {
   const [toolType, setToolType] = useState<PdfToolType>("merge")
   const [pdfFiles, setPdfFiles] = useState<File[]>([])
@@ -82,6 +128,29 @@ export function PdfTools() {
   const [pdfPassword, setPdfPassword] = useState("")
   const [ocrOutputFormat, setOcrOutputFormat] = useState<"text" | "pdf">("text")
   const [ocrText, setOcrText] = useState("")
+
+  const { data: serverCapabilities } = useQuery({
+    queryKey: QUERY_KEYS.pdfServerCapabilities(),
+    queryFn: () => apiJson<PdfServerCapabilities>("/api/pdf/capabilities"),
+    staleTime: 5 * 60 * 1000,
+  })
+  // Unknown while loading — treat as available so nothing flickers disabled.
+  const isToolUnavailable = (tool: PdfToolType) => isServerTool(tool) && serverCapabilities?.[tool] === false
+  const currentToolUnavailable = isToolUnavailable(toolType)
+
+  /** Run a browser-side tool with the shared processing state and toasts. */
+  const runInBrowser = async (loading: string, success: string, failure: string, work: () => Promise<void>) => {
+    setProcessing(true)
+    const toastId = toast.loading(loading)
+    try {
+      await work()
+      toast.success(success, { id: toastId })
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : failure, { id: toastId })
+    } finally {
+      setProcessing(false)
+    }
+  }
 
   const handlePdfFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -131,35 +200,10 @@ export function PdfTools() {
       toast.error("Please select at least 2 PDF files to merge")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Merging PDFs...")
-    try {
-      const formData = new FormData()
-      pdfFiles.forEach((file, index) => {
-        formData.append(`file${index}`, file)
-      })
-      formData.append("count", pdfFiles.length.toString())
-
-      const response = await apiFetch("/api/pdf/merge", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Merge failed")
-      }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `merged_${Date.now()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("PDFs merged successfully!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Merge failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    await runInBrowser("Merging PDFs...", "PDFs merged successfully!", "Merge failed", async () => {
+      const merged = await mergePdfs(pdfFiles.map((file) => ({ name: file.name, data: file })))
+      saveAs(toPdfBlob(merged), `merged_${Date.now()}.pdf`)
+    })
   }
 
   const handleSplit = async () => {
@@ -171,34 +215,10 @@ export function PdfTools() {
       toast.error("Please enter page ranges (e.g., 1-5, 10-15)")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Splitting PDF...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-      formData.append("pages", splitPages)
-      formData.append("pageRanges", splitPages)
-
-      const response = await apiFetch("/api/pdf/split", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Split failed")
-      }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `split_${singlePdfFile.name.replace(/\.pdf$/i, "")}_${Date.now()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("PDF split successfully!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Split failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    await runInBrowser("Splitting PDF...", "PDF split successfully!", "Split failed", async () => {
+      const split = await splitPdf(singlePdfFile, splitPages)
+      saveAs(toPdfBlob(split), `split_${singlePdfFile.name.replace(/\.pdf$/i, "")}_${Date.now()}.pdf`)
+    })
   }
 
   const handleCompress = async () => {
@@ -230,11 +250,7 @@ export function PdfTools() {
         formData.append("percentage", percentage)
       }
 
-      const response = await apiFetch("/api/pdf/compress", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Compression failed")
-      }
+      const response = await postPdfTool("/api/pdf/compress", formData, "Compression failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -284,11 +300,7 @@ export function PdfTools() {
       formData.append("file", singlePdfFile)
       formData.append("format", convertFormat)
 
-      const response = await apiFetch("/api/pdf/convert", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Conversion failed")
-      }
+      const response = await postPdfTool("/api/pdf/convert", formData, "Conversion failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -333,35 +345,15 @@ export function PdfTools() {
       toast.error("Please select at least one image file")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Converting images to PDF...")
-    try {
-      const formData = new FormData()
-      imageFiles.forEach((file, index) => {
-        formData.append(`file${index}`, file)
-      })
-      formData.append("count", imageFiles.length.toString())
-
-      const response = await apiFetch("/api/pdf/images-to-pdf", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Conversion failed")
+    await runInBrowser(
+      "Converting images to PDF...",
+      "Images converted to PDF successfully!",
+      "Conversion failed",
+      async () => {
+        const pdf = await imagesToPdf(imageFiles.map((file) => ({ name: file.name, data: file })))
+        saveAs(toPdfBlob(pdf), `images_${Date.now()}.pdf`)
       }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `images_${Date.now()}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("Images converted to PDF successfully!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Conversion failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    )
   }
 
   const handleExtractText = async () => {
@@ -369,26 +361,12 @@ export function PdfTools() {
       toast.error("Please select a PDF file")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Extracting text...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-
-      const response = await apiFetch("/api/pdf/extract-text", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Text extraction failed")
-      }
-      const data = await response.json()
-      setExtractedText(data.text || "No text found in PDF")
-      toast.success("Text extracted successfully!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Text extraction failed", { id: toastId })
-      setExtractedText("")
-    } finally {
-      setProcessing(false)
-    }
+    setExtractedText("")
+    await runInBrowser("Extracting text...", "Text extracted successfully!", "Text extraction failed", async () => {
+      const { pages } = await extractPdfText(singlePdfFile)
+      const text = pages.join("\n\n").trim()
+      setExtractedText(text || "No selectable text found. If this is a scanned PDF, use OCR.")
+    })
   }
 
   const handlePdfToDoc = async () => {
@@ -396,33 +374,15 @@ export function PdfTools() {
       toast.error("Please select a PDF file")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Converting PDF to DOCX...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-      formData.append("format", "docx")
-
-      const response = await apiFetch("/api/pdf/to-doc", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Conversion failed")
+    await runInBrowser(
+      "Converting PDF to DOCX...",
+      "PDF converted to DOCX successfully!",
+      "Conversion failed",
+      async () => {
+        const docx = await pdfToDocx(singlePdfFile)
+        saveAs(docx, `${singlePdfFile.name.replace(/\.pdf$/i, "")}_${Date.now()}.docx`)
       }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${singlePdfFile.name.replace(/\.pdf$/i, "")}_${Date.now()}.docx`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("PDF converted to DOCX successfully!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Conversion failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    )
   }
 
   const handleWatermark = async () => {
@@ -438,47 +398,21 @@ export function PdfTools() {
       toast.error("Please select a watermark image")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Adding watermark...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-      formData.append("watermarkType", watermarkType)
-      if (watermarkType === "text") {
-        formData.append("watermarkText", watermarkText)
-      } else {
-        formData.append("watermarkImage", watermarkImage!)
-      }
-      formData.append("position", watermarkPosition)
-      formData.append("opacity", watermarkOpacity)
-      formData.append("fontSize", watermarkFontSize)
-      formData.append("rotation", watermarkRotation)
-      formData.append("color", watermarkColor)
-      if (watermarkPosition === "custom") {
-        formData.append("x", watermarkX)
-        formData.append("y", watermarkY)
-      }
-
-      const response = await apiFetch("/api/pdf/watermark", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Watermarking failed")
-      }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `watermarked_${singlePdfFile.name}`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("Watermark added successfully!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Watermarking failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    await runInBrowser("Adding watermark...", "Watermark added successfully!", "Watermarking failed", async () => {
+      const rotation = parseFloat(watermarkRotation)
+      const watermarked = await watermarkPdf(singlePdfFile, {
+        text: watermarkType === "text" ? watermarkText : undefined,
+        image: watermarkType === "image" && watermarkImage ? await resizeImageToPng(watermarkImage, 200) : undefined,
+        position: watermarkPosition,
+        x: parseFloat(watermarkX) || 0,
+        y: parseFloat(watermarkY) || 0,
+        fontSize: parseFloat(watermarkFontSize) || 48,
+        opacity: parseFloat(watermarkOpacity) || 0.5,
+        rotation: Number.isFinite(rotation) ? rotation : -45,
+        color: watermarkColor,
+      })
+      saveAs(toPdfBlob(watermarked), `watermarked_${singlePdfFile.name}`)
+    })
   }
 
   const handlePassword = async () => {
@@ -498,11 +432,7 @@ export function PdfTools() {
       formData.append("action", passwordAction)
       formData.append("password", pdfPassword)
 
-      const response = await apiFetch("/api/pdf/password", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Password operation failed")
-      }
+      const response = await postPdfTool("/api/pdf/password", formData, "Password operation failed")
 
       const contentType = response.headers.get("content-type") || ""
       if (contentType.includes("application/json")) {
@@ -539,11 +469,7 @@ export function PdfTools() {
       formData.append("file", singlePdfFile)
       formData.append("outputFormat", ocrOutputFormat)
 
-      const response = await apiFetch("/api/pdf/ocr", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "OCR failed")
-      }
+      const response = await postPdfTool("/api/pdf/ocr", formData, "OCR failed")
 
       if (ocrOutputFormat === "text") {
         const data = await response.json()
@@ -599,6 +525,7 @@ export function PdfTools() {
             }}
           >
             {t.replace("-", " ")}
+            {isToolUnavailable(t) && <span className="text-muted-foreground ml-1 normal-case">(soon)</span>}
           </Button>
         ))}
       </div>
@@ -607,9 +534,22 @@ export function PdfTools() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="capitalize">{toolType.replace("-", " ")} PDF</CardTitle>
-            <CardDescription>Configure options and upload PDF files.</CardDescription>
+            <CardDescription>
+              {isServerTool(toolType)
+                ? `Processed on the server. Files up to ${formatBytes(MAX_UPLOAD_BYTES)}.`
+                : "Processed on your device — the file is not uploaded and there is no size limit."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {currentToolUnavailable && (
+              <div
+                role="status"
+                className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+              >
+                This tool is not available yet. It needs a document-processing server that is still being set up. Merge,
+                Split, Images to PDF, Extract Text, To Doc and Watermark work now.
+              </div>
+            )}
             {/* Input upload sections based on tool type */}
             {toolType === "merge" && (
               <div className="space-y-4">
@@ -739,7 +679,11 @@ export function PdfTools() {
                     onChange={(e) => setPercentage(e.target.value)}
                   />
                 )}
-                <Button className="w-full" onClick={handleCompress} disabled={!singlePdfFile || processing}>
+                <Button
+                  className="w-full"
+                  onClick={handleCompress}
+                  disabled={!singlePdfFile || processing || currentToolUnavailable}
+                >
                   {processing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -794,7 +738,11 @@ export function PdfTools() {
                     <option value="webp">WebP (.webp)</option>
                   </select>
                 </div>
-                <Button className="w-full" onClick={handleConvert} disabled={!singlePdfFile || processing}>
+                <Button
+                  className="w-full"
+                  onClick={handleConvert}
+                  disabled={!singlePdfFile || processing || currentToolUnavailable}
+                >
                   {processing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -1091,7 +1039,7 @@ export function PdfTools() {
                 <Button
                   className="w-full"
                   onClick={handlePassword}
-                  disabled={!singlePdfFile || !pdfPassword || processing}
+                  disabled={!singlePdfFile || !pdfPassword || processing || currentToolUnavailable}
                 >
                   {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Key className="mr-2 h-4 w-4" />}
                   Execute Password Security
@@ -1121,7 +1069,11 @@ export function PdfTools() {
                     <option value="pdf">Searchable PDF Layer</option>
                   </select>
                 </div>
-                <Button className="w-full" onClick={handleOcr} disabled={!singlePdfFile || processing}>
+                <Button
+                  className="w-full"
+                  onClick={handleOcr}
+                  disabled={!singlePdfFile || processing || currentToolUnavailable}
+                >
                   {processing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -1164,18 +1116,18 @@ export function PdfTools() {
               <strong>Split</strong>: Splits a PDF by extracting specified pages/ranges (e.g., &quot;1-3, 5, 8&quot;).
             </p>
             <p>
-              <strong>Compress</strong>: Reduces PDF size by compressing images inside. If Ghostscript is installed on
-              the host system, it will yield significantly higher compression rates.
-            </p>
-            <p>
               <strong>Images to PDF</strong>: Packs multiple image files into pages of a single PDF file.
             </p>
             <p>
-              <strong>Extract Text</strong>: Parses digital text layers from a PDF directly in-memory.
+              <strong>Extract Text</strong>: Reads the selectable text in a PDF. Scanned pages have none — use OCR.
             </p>
             <p>
-              <strong>OCR</strong>: Performs optical character recognition on scanned/image PDFs to extract text using
-              Tesseract.
+              Merge, Split, Images to PDF, Extract Text, To Doc and Watermark run on your device, so large files work
+              and nothing is uploaded.
+            </p>
+            <p>
+              <strong>Compress</strong>, <strong>Convert</strong>, <strong>Password</strong> and <strong>OCR</strong>{" "}
+              run on the server, with a {formatBytes(MAX_UPLOAD_BYTES)} limit per file.
             </p>
           </CardContent>
         </Card>

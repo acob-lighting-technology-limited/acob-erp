@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import {
+  GRANTABLE_ADMIN_ROUTES,
   canAccessRouteV2,
   canMutateV2,
   getDataScopeV2,
@@ -128,6 +129,15 @@ test("route resolver maps critical override routes", () => {
   assert.equal(resolveAdminRouteKeyV2("/admin/corporate-services/risk-register"), "scorecard.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/events"), "events.main")
   assert.equal(resolveAdminRouteKeyV2("/admin/md-desk"), "mddesk.main")
+})
+
+test("version history is open to every admin-like role but not to leads", () => {
+  const route = resolveAdminRouteKeyV2("/admin/version-history")
+  assert.equal(route, "versionhistory.main")
+  assert.equal(canAccessRouteV2(adminGlobalContext, route), true)
+  assert.equal(canAccessRouteV2(superAdminContext, route), true)
+  assert.equal(canAccessRouteV2(leadContext, route), false)
+  assert.equal(GRANTABLE_ADMIN_ROUTES.includes(route), false)
 })
 
 test("unrecognised admin routes are denied, not dept-visible", () => {

@@ -242,6 +242,25 @@ export function LeaveDetailDialog({
             {/* TAB 1: OVERVIEW & SPECS */}
             {activeTab === "overview" && (
               <div className="space-y-4">
+                {leave.department_overlaps && leave.department_overlaps.length > 0 && (
+                  <div className="space-y-1 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                    <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <span>Concurrent Department Leave Notice</span>
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed dark:text-amber-300/80">
+                      The following colleague(s) in this department also have scheduled or pending leave during these
+                      dates:
+                    </p>
+                    <ul className="list-inside list-disc space-y-0.5 font-medium">
+                      {leave.department_overlaps.map((overlap, idx) => (
+                        <li key={idx}>
+                          {overlap.full_name} ({overlap.status}) — {overlap.start_date} to {overlap.end_date}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {/* Sections, not cards: the dialog is already a surface, and the
                       four "hero" tiles above these repeated the dates the header and
                       the specifications below both already state. */}

@@ -28,7 +28,7 @@ import {
   resolveSegments,
   resolveSegmentsWithHolidays,
   isRelieverStage,
-  assertNoDepartmentOverlap,
+  findDepartmentOverlaps,
   assertRequesterNotBlockedByRelieverCommitment,
   assertSameDepartmentReliever,
   assertBlackoutWindowAllowed,
@@ -134,7 +134,19 @@ export async function POST(request: NextRequest) {
     })
 
     await assertNoOverlap(validationClient, user.id, start_date, endDate)
-    await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, start_date, endDate)
+    const departmentOverlaps = await findDepartmentOverlaps(
+      validationClient,
+      user.id,
+      requester.department_id,
+      start_date,
+      endDate
+    )
+    if (departmentOverlaps.length > 0) {
+      log.info(
+        { userId: user.id, departmentId: requester.department_id, count: departmentOverlaps.length },
+        "Leave submitted with concurrent department leave overlap (soft warning allowed)"
+      )
+    }
     await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, start_date, endDate)
     await assertRelieverAvailability(validationClient, reliever.id, start_date, endDate)
 
@@ -371,6 +383,7 @@ export async function POST(request: NextRequest) {
         ...newRequest,
         required_documents: eligibility.requiredDocuments,
         missing_documents: eligibility.missingDocuments,
+        department_overlaps: departmentOverlaps,
       },
       message:
         initialStatus === "pending_evidence"

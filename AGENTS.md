@@ -199,6 +199,27 @@ Stage and commit each group one at a time using `git add <specific files>` — n
 - ❌ Committing all changes in one shot without grouping analysis
 - ❌ Splitting a feature's migration into a separate commit from its app code
 
+## Version History — Update It With Every User-Facing Change (Mandatory)
+
+`/admin/version-history` is Matrix's release notes, read by admins. Its single
+source is `RELEASES` in `lib/version-history.ts`. A change staff or admins will
+notice is not finished until it has a line there, **in the same commit** as the
+feature or fix.
+
+- **One release per month, versioned `YYYY.MM`.** Add your line to the current
+  month's release under the right `area`. When the month turns, add a new
+  release at the **top** with a `title` and one-sentence `summary`. Never
+  renumber or rewrite an old release, and do not invent semver numbers.
+- **Write for the reader, not the reviewer.** Say what people now see or can
+  do ("Staff can hide their name on lunch votes"), not how it was built.
+- **Leave out** refactors, lint, types, tests, tooling, migrations with no
+  visible effect, and fixes to something that never reached users.
+- **Bigger changes for staff also get a `lib/whats-new.ts` entry**, which shows
+  a one-time popup. That popup is not the history: an entry there still needs
+  its line in `RELEASES`.
+- Keep the month's `title` and `summary` up to date as its largest changes
+  land, so the release still describes the month at a glance.
+
 ## Commit Message Standard
 
 - Format commits as `type: description`.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { areRequiredDocumentsVerified, getLeavePolicy } from "@/lib/hr/leave-workflow"
+import { findDepartmentOverlaps } from "@/app/api/hr/leave/requests/_lib/shared"
 import { logger } from "@/lib/logger"
 import { getRequestScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { enforceRouteAccessV2, requireAccessContextV2 } from "@/lib/admin/api-guard-v2"
@@ -24,6 +25,7 @@ type ProfileSummary = {
   company_email?: string | null
   role?: string | null
   department?: string | null
+  department_id?: string | null
 }
 
 type LeaveApprovalRow = {
@@ -45,6 +47,9 @@ type LeaveQueueRequestRow = {
   created_at: string
   status?: string | null
   leave_type_id: string
+  user_id?: string | null
+  start_date?: string | null
+  end_date?: string | null
   reliever_id?: string | null
   approval_stage?: string | null
   current_stage_code?: string | null
@@ -141,7 +146,7 @@ export async function GET(request: NextRequest) {
       .select(
         `
         *,
-        user:profiles!leave_requests_user_id_profiles_fkey(id, full_name, company_email, department),
+        user:profiles!leave_requests_user_id_profiles_fkey(id, full_name, company_email, department, department_id),
         reliever:profiles!leave_requests_reliever_id_fkey(id, full_name, company_email),
         supervisor:profiles!leave_requests_supervisor_id_fkey(id, full_name, company_email),
         leave_type:leave_types!leave_requests_leave_type_id_fkey(id, name)
@@ -243,6 +248,14 @@ export async function GET(request: NextRequest) {
     const now = Date.now()
     const enriched = await Promise.all(
       typedRequests.map(async (item) => {
+        let departmentOverlaps: Array<{
+          id: string
+          user_id: string
+          full_name: string
+          start_date: string
+          end_date: string
+          status: string
+        }> = []
         try {
           const stageCode = item.current_stage_code || item.approval_stage || ""
           const slaStage = LEGACY_SLA_STAGE_MAP[stageCode] || "reliever_pending"
@@ -261,9 +274,21 @@ export async function GET(request: NextRequest) {
           const leavePolicy = await getLeavePolicy(supabase, item.leave_type_id)
           const requiredDocs = leavePolicy.required_documents || []
           const evidenceStatus = await areRequiredDocumentsVerified(supabase, item.id, requiredDocs)
+          departmentOverlaps =
+            item.start_date && item.end_date && item.user_id
+              ? await findDepartmentOverlaps(
+                  dataClient,
+                  item.user_id,
+                  item.user?.department_id,
+                  item.start_date,
+                  item.end_date,
+                  item.id
+                )
+              : []
 
           return {
             ...item,
+            department_overlaps: departmentOverlaps,
             approvals: approvalsByRequest.get(item.id) || [],
             current_approver: item.current_approver_user_id
               ? approverMap.get(item.current_approver_user_id) || null
@@ -280,6 +305,7 @@ export async function GET(request: NextRequest) {
         } catch (itemError: unknown) {
           return {
             ...item,
+            department_overlaps: departmentOverlaps,
             approvals: approvalsByRequest.get(item.id) || [],
             current_approver: item.current_approver_user_id
               ? approverMap.get(item.current_approver_user_id) || null

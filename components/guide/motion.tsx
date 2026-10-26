@@ -118,14 +118,18 @@ export function MaskText({
   }
 
   const Comp = motion[as]
-  const words = text.split(" ")
+  const words = text.trim().split(/\s+/)
   const play =
     trigger === "mount" ? { animate: "show" } : { whileInView: "show", viewport: { once: true, amount: 0.6 } }
 
   return (
     <Comp className={className} aria-label={text} initial="hidden" {...play}>
       {words.map((word, i) => (
-        <span key={`${word}-${i}`} aria-hidden className="inline-block overflow-hidden pb-[0.12em] align-top">
+        <span
+          key={`${word}-${i}`}
+          aria-hidden
+          className={cn("inline-block overflow-hidden pb-[0.12em] align-top", i < words.length - 1 && "mr-[0.25em]")}
+        >
           <motion.span
             className="inline-block will-change-transform"
             variants={{
@@ -135,7 +139,6 @@ export function MaskText({
           >
             {word}
           </motion.span>
-          {i < words.length - 1 && " "}
         </span>
       ))}
     </Comp>

@@ -234,24 +234,39 @@ export function isRelieverStage(request: LeaveRequestStageState) {
   return stage === "pending_reliever" || stage === "reliever_pending"
 }
 
-export async function assertNoDepartmentOverlap(
+export type DepartmentOverlap = {
+  id: string
+  user_id: string
+  full_name: string
+  start_date: string
+  end_date: string
+  status: string
+}
+
+export async function findDepartmentOverlaps(
   supabase: SupabaseServerClient,
   requesterId: string,
   departmentId: string | null | undefined,
   startDate: string,
   endDate: string,
   excludeRequestId?: string
-) {
-  if (!departmentId) return
+): Promise<DepartmentOverlap[]> {
+  if (!departmentId) return []
 
   const { data: peers } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, full_name")
     .eq("department_id", departmentId)
     .neq("id", requesterId)
 
-  const peerIds = ((peers || []) as ProfileReferenceRow[]).map((row) => row.id).filter(Boolean)
-  if (peerIds.length === 0) return
+  const peerList = (peers || []) as Array<{ id: string; full_name?: string | null }>
+  if (peerList.length === 0) return []
+
+  const peerMap = new Map<string, string>()
+  for (const peer of peerList) {
+    if (peer.id) peerMap.set(peer.id, peer.full_name || "Colleague")
+  }
+  const peerIds = Array.from(peerMap.keys())
 
   let overlapQuery = supabase
     .from("leave_requests")
@@ -260,20 +275,40 @@ export async function assertNoDepartmentOverlap(
     .in("status", ["pending", "pending_evidence", "approved"])
     .lte("start_date", endDate)
     .gte("end_date", startDate)
-    .limit(1)
+    .order("start_date", { ascending: true })
 
   if (excludeRequestId) {
     overlapQuery = overlapQuery.neq("id", excludeRequestId)
   }
 
   const { data: overlapRows, error: overlapError } = await overlapQuery
-  if (overlapError) {
-    throw new Error("Failed to validate department leave overlap")
+  if (overlapError || !overlapRows) {
+    return []
   }
 
-  if (overlapRows && overlapRows.length > 0) {
-    throw new Error("Another employee in your department already has an overlapping leave for these dates.")
-  }
+  return overlapRows.map((row) => ({
+    id: row.id,
+    user_id: row.user_id,
+    full_name: peerMap.get(row.user_id) || "Colleague",
+    start_date: row.start_date,
+    end_date: row.end_date,
+    status: row.status,
+  }))
+}
+
+/**
+ * @deprecated Department leave overlap is no longer enforced as a hard rejection.
+ * Use findDepartmentOverlaps to display a soft warning instead.
+ */
+export async function assertNoDepartmentOverlap(
+  _supabase: SupabaseServerClient,
+  _requesterId: string,
+  _departmentId: string | null | undefined,
+  _startDate: string,
+  _endDate: string,
+  _excludeRequestId?: string
+): Promise<void> {
+  // Soft warning only: no longer throws to allow multiple department members to request leave
 }
 
 export async function assertRequesterNotBlockedByRelieverCommitment(
