@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -136,6 +137,12 @@ export interface AttendanceRecord {
   manual_comment?: string | null
   early_closure_time?: string | null
   late_resumption_time?: string | null
+  pending_appeal?: {
+    id: string
+    stage: string
+    requested_status: string
+    initiated_by_role: string
+  } | null
 }
 
 interface DailyRosterViewProps {
@@ -291,7 +298,11 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       }
       const payload = await res.json().catch(() => null)
       if (!res.ok) throw new Error(payload?.error ?? "Failed to save")
-      toast.success(isNew ? "Record created" : "Record updated")
+      if (payload?.staged) {
+        toast.info(payload.message || "Status alteration staged awaiting department lead confirmation.")
+      } else {
+        toast.success(isNew ? "Record created" : "Record updated")
+      }
       setEditRecord(null)
       void load()
     } catch (err) {
@@ -444,11 +455,21 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       sortable: true,
       accessor: (r) => r.status,
       render: (r) => (
-        <StatusBadge
-          status={r.status}
-          record={r}
-          earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
-        />
+        <div className="flex flex-col items-center gap-1">
+          <StatusBadge
+            status={r.status}
+            record={r}
+            earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
+          />
+          {r.pending_appeal && (
+            <Badge
+              variant="outline"
+              className="border-amber-300 bg-amber-50 px-1.5 py-0 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+            >
+              {r.pending_appeal.stage === "pending_lead" ? "Pending Lead" : "Pending Review"}
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -573,7 +594,8 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const { isOnTimePresent, options: statusOptions } = getManualStatusEditOptions(editRecord)
 
   const hasManualComment = editForm.manual_comment.trim().length >= 3
-  const cannotSave = saving || !editForm.status || !hasManualComment || isOnTimePresent
+  const hasPendingAppeal = Boolean(editRecord?.pending_appeal)
+  const cannotSave = saving || !editForm.status || !hasManualComment || isOnTimePresent || hasPendingAppeal
 
   const todayIso = toLocalISODate()
   function shiftDate(deltaDays: number) {
@@ -756,6 +778,12 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {editRecord?.pending_appeal && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
+                An alteration or appeal is already pending for this day (
+                {editRecord.pending_appeal.stage.replace(/_/g, " ")}). Please review or manage it in the Appeals tab.
+              </div>
+            )}
             {isOnTimePresent ? (
               <p className="text-muted-foreground text-sm">
                 This record is fully present and on-time. No overrides (LWP/AWP) are applicable.
