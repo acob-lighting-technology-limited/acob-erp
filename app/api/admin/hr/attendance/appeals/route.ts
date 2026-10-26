@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
 const ReviewAppealSchema = z.object({
   id: z.string().trim().min(1),
   action: z.enum(["approve", "reject"]),
-  resolution_note: z.string().optional(),
+  resolution_note: z.string().nullable().optional(),
 })
 
 export async function PATCH(request: NextRequest) {
