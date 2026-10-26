@@ -55,6 +55,7 @@ export type AdminRouteKeyV2 =
   | "settings.main"
   | "tasks.main"
   | "tools.main"
+  | "versionhistory.main"
   | "unknown"
 
 /**
@@ -219,6 +220,7 @@ export function resolveAdminRouteKeyV2(pathname: string): AdminRouteKeyV2 {
   }
   if (pathname.startsWith("/admin/tasks")) return "tasks.main"
   if (pathname.startsWith("/admin/tools")) return "tools.main"
+  if (pathname.startsWith("/admin/version-history")) return "versionhistory.main"
   return "unknown"
 }
 
@@ -309,6 +311,10 @@ export function getRoutePolicyV2(route: AdminRouteKeyV2): RoutePolicyV2 {
       return { visibility: "none", mutations: "global", adminOnly: true, domain: "reports" }
     case "tools.main":
       return { visibility: "dept", mutations: "dept", adminOnly: false, domain: "communications" }
+    case "versionhistory.main":
+      // Release notes for the whole platform: readable by every admin-like
+      // role, not grantable, and not part of the department-lead console.
+      return { visibility: "none", mutations: "none", adminOnly: true, domain: null }
     case "unknown":
     default:
       // Deny by default. A new /admin/* section with no resolver branch lands
@@ -344,6 +350,8 @@ export function canAccessRouteV2(context: AccessContextV2, route: AdminRouteKeyV
     if (route === "admin.dashboard") return true
     // Membership-gated, not grantable — see getRoutePolicyV2("mddesk.main").
     if (route === "mddesk.main") return true
+    // Read-only release notes — see getRoutePolicyV2("versionhistory.main").
+    if (route === "versionhistory.main") return true
     // Accounts and Finance map to each other so existing grants stay valid
     if (route === "accounts.main" || route === "finance.main") {
       return adminHasRoute(context, "accounts.main") || adminHasRoute(context, "finance.main")

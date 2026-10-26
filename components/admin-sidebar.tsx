@@ -26,6 +26,7 @@ import {
   Megaphone,
   ShieldCheck,
   FlaskConical,
+  History,
   User,
   Users,
   Building2,
@@ -493,6 +494,13 @@ const adminNavigation: NavItem[] = [
     name: "Audit Logs",
     href: "/admin/audit-logs",
     icon: ShieldCheck,
+    roles: ["developer", "super_admin", "admin"],
+  },
+  {
+    section: "system",
+    name: "Version History",
+    href: "/admin/version-history",
+    icon: History,
     roles: ["developer", "super_admin", "admin"],
   },
   {
