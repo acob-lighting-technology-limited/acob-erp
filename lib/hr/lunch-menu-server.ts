@@ -144,15 +144,18 @@ export async function loadMenuById(client: SupabaseClient, menuId: string): Prom
  * result through maskVotesForViewer before it leaves the server.
  */
 export async function loadVotesForMenu(client: SupabaseClient, menuId: string): Promise<LunchVoteRecord[]> {
-  const { data: voteRows } = await client
+  // A failed read must surface. Swallowing it shows a poll with nobody on it,
+  // which looks like a real answer — staff then vote against a false picture.
+  const { data: voteRows, error: voteError } = await client
     .from("lunch_votes")
     .select("id, menu_id, user_id, is_eating, hide_name, created_at, updated_at")
     .eq("menu_id", menuId)
+  if (voteError) throw new Error(`Failed to load lunch votes: ${voteError.message}`)
 
   const votes = (voteRows || []) as VoteRow[]
   if (votes.length === 0) return []
 
-  const [{ data: selectionRows }, { data: profileRows }] = await Promise.all([
+  const [{ data: selectionRows, error: selectionError }, { data: profileRows }] = await Promise.all([
     client
       .from("lunch_vote_selections")
       .select("vote_id, group_id, option_id")
@@ -168,6 +171,7 @@ export async function loadVotesForMenu(client: SupabaseClient, menuId: string): 
         votes.map((v) => v.user_id)
       ),
   ])
+  if (selectionError) throw new Error(`Failed to load lunch vote selections: ${selectionError.message}`)
 
   const selections = (selectionRows || []) as SelectionRow[]
   const profiles = (profileRows || []) as {
