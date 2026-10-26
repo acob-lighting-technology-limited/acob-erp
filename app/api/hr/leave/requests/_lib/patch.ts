@@ -29,7 +29,7 @@ import {
   resolveSegments,
   resolveSegmentsWithHolidays,
   isRelieverStage,
-  assertNoDepartmentOverlap,
+  findDepartmentOverlaps,
   assertRequesterNotBlockedByRelieverCommitment,
   canRequesterModifyBeforeRelieverDecision,
   getUserDepartmentId,
@@ -282,7 +282,20 @@ export async function PATCH(request: NextRequest) {
     })
 
     await assertNoOverlap(validationClient, user.id, targetStartDate, endDate, id)
-    await assertNoDepartmentOverlap(validationClient, user.id, requester.department_id, targetStartDate, endDate, id)
+    const departmentOverlaps = await findDepartmentOverlaps(
+      validationClient,
+      user.id,
+      requester.department_id,
+      targetStartDate,
+      endDate,
+      id
+    )
+    if (departmentOverlaps.length > 0) {
+      log.info(
+        { userId: user.id, departmentId: requester.department_id, count: departmentOverlaps.length },
+        "Leave updated with concurrent department leave overlap (soft warning allowed)"
+      )
+    }
     await assertRequesterNotBlockedByRelieverCommitment(validationClient, user.id, targetStartDate, endDate, id)
     await assertRelieverAvailability(validationClient, relieverId, targetStartDate, endDate, id)
 
@@ -425,6 +438,7 @@ export async function PATCH(request: NextRequest) {
         ...updatedRequest,
         required_documents: eligibility.requiredDocuments,
         missing_documents: eligibility.missingDocuments,
+        department_overlaps: departmentOverlaps,
       },
       message: "Leave request updated successfully",
     })

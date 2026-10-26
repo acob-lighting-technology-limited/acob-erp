@@ -85,7 +85,10 @@ export const RELEASES: Release[] = [
       },
       {
         area: "Leave",
-        items: ["Leave waiting for the MD is no longer cancelled automatically"],
+        items: [
+          "Leave waiting for the MD is no longer cancelled automatically",
+          "Multiple employees in the same department can now apply for overlapping leave without being blocked, with soft overlap notices shown to applicants and approvers",
+        ],
       },
       {
         area: "Notifications",

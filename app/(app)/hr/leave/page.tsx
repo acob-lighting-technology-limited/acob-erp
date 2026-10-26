@@ -53,6 +53,14 @@ export interface LeaveRequest {
   leave_request_segments?: { start_date: string; end_date: string; days_count: number; segment_order: number }[]
   lead_reconfirm_required?: boolean
   reliever_revision?: number
+  department_overlaps?: Array<{
+    id: string
+    user_id: string
+    full_name: string
+    start_date: string
+    end_date: string
+    status: string
+  }>
   created_at: string
   leave_type: {
     name: string

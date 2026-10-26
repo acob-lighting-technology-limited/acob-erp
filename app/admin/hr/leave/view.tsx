@@ -62,6 +62,14 @@ export interface LeaveItem {
   supervisor_id?: string | null
   requester_route_kind?: string | null
   route_snapshot?: RouteSnapshotStage[] | null
+  department_overlaps?: Array<{
+    id: string
+    user_id: string
+    full_name: string
+    start_date: string
+    end_date: string
+    status: string
+  }>
   created_at: string
   admin_manual?: boolean | null
   approved_at?: string | null

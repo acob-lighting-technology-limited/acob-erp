@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { CalendarDays, Plus, X } from "lucide-react"
+import { AlertCircle, CalendarDays, Plus, X } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import type { LeaveType, LeaveBalance } from "@/app/(app)/hr/leave/page"
 import {
@@ -117,7 +117,10 @@ export function LeaveRequestFormDialog({
   const holidaySet = useMemo(() => holidaySetFrom(leaveCalendar), [leaveCalendar])
   const holidayNames = useMemo(() => holidayNameMap(leaveCalendar), [leaveCalendar])
   const blackoutMonthSet = new Set((leaveCalendar.blackout_months || [12, 1]).map((month) => Number(month)))
-  const bookedMap = new Map((leaveCalendar.department_booked_dates || []).map((entry) => [entry.date, entry] as const))
+  const bookedMap = useMemo(
+    () => new Map((leaveCalendar.department_booked_dates || []).map((entry) => [entry.date, entry] as const)),
+    [leaveCalendar.department_booked_dates]
+  )
   const policyMaxDays = Number(selectedLeaveType?.max_days || 0)
   const currentAvailableDays = Math.max(0, Number(availableDays || 0))
   const maxDaysAllowed =
@@ -235,6 +238,49 @@ export function LeaveRequestFormDialog({
     ? [...formData.segments].sort((a, b) => a.end_date.localeCompare(b.end_date)).slice(-1)[0]?.end_date
     : null
   const selectedDateBooking = lastCommittedDate ? bookedMap.get(lastCommittedDate) : null
+
+  const departmentOverlapSummary = useMemo(() => {
+    const datesToCheck = new Set<string>()
+    for (const seg of formData.segments) {
+      let curr = parseIsoLocalDate(seg.start_date)
+      const end = parseIsoLocalDate(seg.end_date)
+      while (curr <= end) {
+        datesToCheck.add(toIsoLocalDate(curr))
+        curr = new Date(curr.getTime() + 24 * 60 * 60 * 1000)
+      }
+    }
+    if (pendingRangeStartIso) {
+      let curr = parseIsoLocalDate(pendingRangeStartIso)
+      const end = parseIsoLocalDate(pendingRangeEndIso || pendingRangeStartIso)
+      while (curr <= end) {
+        datesToCheck.add(toIsoLocalDate(curr))
+        curr = new Date(curr.getTime() + 24 * 60 * 60 * 1000)
+      }
+    }
+
+    const approvedNames = new Set<string>()
+    const pendingNames = new Set<string>()
+
+    for (const d of datesToCheck) {
+      const booking = bookedMap.get(d)
+      if (!booking) continue
+      if (booking.approved_employees) {
+        for (const name of booking.approved_employees) approvedNames.add(name)
+      }
+      if (booking.pending_employees) {
+        for (const name of booking.pending_employees) pendingNames.add(name)
+      }
+      if (!booking.approved_employees?.length && !booking.pending_employees?.length && booking.employees?.length) {
+        for (const name of booking.employees) pendingNames.add(name)
+      }
+    }
+
+    return {
+      approvedEmployees: Array.from(approvedNames),
+      pendingEmployees: Array.from(pendingNames),
+      hasOverlap: approvedNames.size > 0 || pendingNames.size > 0,
+    }
+  }, [formData.segments, pendingRangeStartIso, pendingRangeEndIso, bookedMap])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -406,29 +452,32 @@ export function LeaveRequestFormDialog({
                     />
                   </div>
 
-                  {selectedDateBooking ? (
-                    <div className="bg-muted/30 mt-2.5 space-y-0.5 rounded-md border p-2 text-xs">
-                      {selectedDateBooking.approved_employees && selectedDateBooking.approved_employees.length > 0 ? (
-                        <p className="text-red-700 dark:text-red-400">
-                          <span className="font-semibold">Approved leave:</span>{" "}
-                          {selectedDateBooking.approved_employees.join(", ")}
-                        </p>
-                      ) : null}
-                      {selectedDateBooking.pending_employees && selectedDateBooking.pending_employees.length > 0 ? (
-                        <p className="text-amber-700 dark:text-amber-400">
-                          <span className="font-semibold">Pending review:</span>{" "}
-                          {selectedDateBooking.pending_employees.join(", ")}
-                        </p>
-                      ) : null}
-                      {!selectedDateBooking.approved_employees?.length &&
-                      !selectedDateBooking.pending_employees?.length ? (
-                        <p className="text-amber-700 dark:text-amber-400">
-                          {selectedDateBooking.count} teammate(s) already booked this date:{" "}
-                          {selectedDateBooking.employees.join(", ")}
-                        </p>
-                      ) : null}
+                  {departmentOverlapSummary.hasOverlap && (
+                    <div className="mt-2.5 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div className="space-y-1">
+                          <p className="font-semibold">Department Overlap Notice</p>
+                          <p className="leading-relaxed">
+                            {departmentOverlapSummary.approvedEmployees.length > 0 && (
+                              <span>
+                                <strong className="font-medium">Approved leave:</strong>{" "}
+                                {departmentOverlapSummary.approvedEmployees.join(", ")}.{" "}
+                              </span>
+                            )}
+                            {departmentOverlapSummary.pendingEmployees.length > 0 && (
+                              <span>
+                                <strong className="font-medium">Pending review:</strong>{" "}
+                                {departmentOverlapSummary.pendingEmployees.join(", ")}.{" "}
+                              </span>
+                            )}
+                            You can still submit this request. Your Department Lead and approvers will review team
+                            coverage before deciding.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               </div>
 

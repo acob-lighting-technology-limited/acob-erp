@@ -20,6 +20,7 @@ import {
   History,
   Inbox,
   Wallet,
+  AlertCircle,
 } from "lucide-react"
 import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
@@ -453,9 +454,21 @@ export function LeaveContent({
         label: "Period",
         accessor: (r) => `${r.start_date} to ${r.end_date}`,
         render: (r) => (
-          <span className="font-mono text-xs whitespace-nowrap">
-            {r.start_date} to {r.end_date} <span className="text-muted-foreground">({r.days_count}d)</span>
-          </span>
+          <div className="space-y-1">
+            <span className="font-mono text-xs whitespace-nowrap">
+              {r.start_date} to {r.end_date} <span className="text-muted-foreground">({r.days_count}d)</span>
+            </span>
+            {r.department_overlaps && r.department_overlaps.length > 0 && (
+              <Badge
+                variant="outline"
+                className="flex w-fit items-center gap-1 border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                title={`Department overlap with ${r.department_overlaps.map((o) => o.full_name).join(", ")}`}
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                <span>Overlap ({r.department_overlaps.length})</span>
+              </Badge>
+            )}
+          </div>
         ),
       },
       {
@@ -1055,6 +1068,25 @@ export function LeaveContent({
         expandable={{
           render: (r) => (
             <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+              {r.department_overlaps && r.department_overlaps.length > 0 && (
+                <div className="space-y-1 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>Concurrent Department Leave Notice</span>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed dark:text-amber-300/80">
+                    The following colleague(s) in this department also have scheduled or pending leave during these
+                    dates:
+                  </p>
+                  <ul className="list-inside list-disc space-y-0.5 font-medium">
+                    {r.department_overlaps.map((overlap, idx) => (
+                      <li key={idx}>
+                        {overlap.full_name} ({overlap.status}) — {overlap.start_date} to {overlap.end_date}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
                   <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Leave Type</span>
@@ -1147,6 +1179,15 @@ export function LeaveContent({
                 <div className="flex items-center gap-1.5">
                   <Building2 className="h-3.5 w-3.5 shrink-0" />
                   <span>{row.user.department}</span>
+                </div>
+              )}
+              {row.department_overlaps && row.department_overlaps.length > 0 && (
+                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Overlap ({row.department_overlaps.length}):{" "}
+                    {row.department_overlaps.map((o) => o.full_name).join(", ")}
+                  </span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
