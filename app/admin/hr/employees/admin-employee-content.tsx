@@ -805,7 +805,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "name",
         label: "Name",
         sortable: true,
-        width: "min-w-[200px]",
+        width: "min-w-[260px]",
         accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
           <div className="flex items-center gap-2.5">
@@ -945,7 +945,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               label: "Employee Type",
               sortable: true,
               resizable: true,
-              initialWidth: 130,
+              initialWidth: 110,
               accessor: (r: Employee) => r.employment_type || "full_time",
               render: (r: Employee) => {
                 const type = r.employment_type || "full_time"
