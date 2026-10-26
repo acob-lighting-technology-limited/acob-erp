@@ -15,12 +15,18 @@ import type { AppealRow } from "./appeal-review-dialog"
 import { apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 interface AppealsViewProps {
   lockedDepartment?: string
 }
 
-function statusBadge(status: AppealRow["status"], stage?: AppealRow["stage"]) {
+function statusBadge(
+  status: AppealRow["status"],
+  stage?: AppealRow["stage"],
+  initiatedByRole?: AppealRow["initiated_by_role"]
+) {
   if (status === "approved") {
     return (
       <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Approved</Badge>
@@ -34,15 +40,20 @@ function statusBadge(status: AppealRow["status"], stage?: AppealRow["stage"]) {
     return <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
   }
   if (stage === "pending_lead") {
-    return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Awaiting Lead</Badge>
+    if (initiatedByRole === "admin_manual") {
+      return (
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
+      )
+    }
+    return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Both</Badge>
   }
   if (stage === "pending_admin") {
-    return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Awaiting Admin</Badge>
+    return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>
   }
   if (stage === "pending_hr_lead") {
     return (
       <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-        Awaiting HR Lead
+        Pending HR Lead
       </Badge>
     )
   }
@@ -50,6 +61,7 @@ function statusBadge(status: AppealRow["status"], stage?: AppealRow["stage"]) {
 }
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
+  const staffAvatars = useStaffAvatars()
   const [reviewAppeal, setReviewAppeal] = useState<AppealRow | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
@@ -103,13 +115,16 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         sortable: true,
         accessor: (r) => r.user_name,
         render: (r) => (
-          <div>
-            <div className="font-medium">{r.user_name}</div>
-            <div className="text-muted-foreground text-xs">{r.department}</div>
+          <div className="flex items-center gap-2.5">
+            <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+            <div className="min-w-0">
+              <div className="truncate font-medium">{r.user_name}</div>
+              <div className="text-muted-foreground text-xs">{r.department}</div>
+            </div>
           </div>
         ),
         resizable: true,
-        initialWidth: 180,
+        initialWidth: 220,
       },
       {
         key: "appeal_date",
@@ -176,10 +191,10 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         label: "Status / Stage",
         sortable: true,
         accessor: (r) => r.stage ?? r.status,
-        render: (r) => statusBadge(r.status, r.stage),
+        render: (r) => statusBadge(r.status, r.stage, r.initiated_by_role),
       },
     ],
-    []
+    [staffAvatars]
   )
 
   const filters = useMemo<DataTableFilter<AppealRow>[]>(
@@ -249,15 +264,18 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: (r) => (
+            <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+          ),
           title: (r) => `${r.user_name} · ${r.department}`,
           subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
           snippet: (r) => (r.appeal_reason ? `Reason: ${r.appeal_reason}` : null),
           expandInline: true,
-          trailing: (r) => statusBadge(r.status),
+          trailing: (r) => statusBadge(r.status, r.stage, r.initiated_by_role),
           detail: {
             title: (r) => `${r.user_name} (${r.department})`,
             subtitle: (r) => `Appeal for ${formatWATDate(r.appeal_date)}`,
-            badges: (r) => statusBadge(r.status),
+            badges: (r) => statusBadge(r.status, r.stage, r.initiated_by_role),
             fields: (r) => [
               { label: "Appeal Date", value: formatWATDate(r.appeal_date) },
               { label: "Current Status", value: r.current_status },
@@ -288,7 +306,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                 <p className="text-sm font-semibold">{r.user_name}</p>
                 <p className="text-muted-foreground text-xs">{r.department}</p>
               </div>
-              {statusBadge(r.status)}
+              {statusBadge(r.status, r.stage, r.initiated_by_role)}
             </div>
             <div className="text-muted-foreground flex items-center justify-between text-xs">
               <span>Date: {formatWATDate(r.appeal_date)}</span>

@@ -1040,10 +1040,12 @@ const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLay
 
   const card = boxes.continuation
   const mainW = card.w - PPTX_TASK_SIDE_COLUMN_W - PPTX_TASK_SIDE_COLUMN_GAP
-  // Two-thirds for the staff list, which grows with the department; action
-  // points never need more than three rows.
-  const tasksH = (card.h - PPTX_TASK_CARD_GAP) * (2 / 3)
-  const actionsH = card.h - PPTX_TASK_CARD_GAP - tasksH
+  // The column splits exactly where slide 2's Tasks for New Week / Challenges
+  // cards do, so Action Points lines up with Challenges there — and the split
+  // is the same on both slides, so it does not jump between them. Three
+  // action-point rows still fit the shorter card.
+  const tasksH = boxes.page2Top.h
+  const actionsH = boxes.page2Bottom.h
   const column = (y: number, h: number): WeeklyContentBox => ({
     x: card.x + mainW + PPTX_TASK_SIDE_COLUMN_GAP,
     y,
@@ -1052,10 +1054,13 @@ const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLay
     textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
     textH: Math.max(0.6, h - PPTX_TASK_CARD_HEADER_H - 0.1),
   })
+  // The same column repeats on the Tasks for the New Week slide, so both slides
+  // the room actually reads from keep the numbers in view.
+  const narrow = (box: WeeklyContentBox): WeeklyContentBox => ({ ...box, w: mainW, textW: mainW - 0.3 })
   return {
-    workDone: { ...card, w: mainW, textW: mainW - 0.3 },
-    tasks: boxes.page2Top,
-    challenges: boxes.page2Bottom,
+    workDone: narrow(card),
+    tasks: narrow(boxes.page2Top),
+    challenges: narrow(boxes.page2Bottom),
     taskCounts: column(card.y, tasksH),
     actionPoints: column(card.y + tasksH + PPTX_TASK_CARD_GAP, actionsH),
   }
@@ -1652,7 +1657,8 @@ const addActionPointsCard = (
         color: ap.notStarted > 0 ? getZeroTasksColor(theme) : colors.textPrimary,
       },
     ],
-    PPTX_TASK_SIDE_MAX_FONT,
+    // Largest size up to 12pt at which the three rows fit the card.
+    planTaskSummaryRows(3, box.h - bodyTop - 0.1).fontSize,
     colors.sectionText
   )
 }
@@ -1703,7 +1709,8 @@ const addTasksAndChallengesSlide = (
   pageNumber?: number,
   theme: WeeklyPptxTheme = "light",
   slidePosition?: { index: number; total: number },
-  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout()
+  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout(),
+  taskSummary?: WeeklyDeptTaskSummary
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
@@ -1736,6 +1743,10 @@ const addTasksAndChallengesSlide = (
     theme,
     challengesPlan.paraSpaceAfter
   )
+  if (taskSummary && layout.taskCounts && layout.actionPoints) {
+    addTaskCountsCard(pres, slide, layout.taskCounts, taskSummary, theme)
+    addActionPointsCard(pres, slide, layout.actionPoints, taskSummary, theme)
+  }
 
   return slide
 }
@@ -1814,7 +1825,8 @@ const renderDepartmentWeeklySlides = (
     pageCursor,
     theme,
     { index: 2, total: 2 },
-    layout
+    layout,
+    taskSummary
   )
   applyWeeklySlideTransition(tasksChallengesSlide)
 }

@@ -3,7 +3,7 @@ import { z } from "zod"
 import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { loadMenuById, loadVotesForMenu } from "@/lib/hr/lunch-menu-server"
+import { loadMenuById, loadVotesForMenu, maskVotesForViewer } from "@/lib/hr/lunch-menu-server"
 import { isVotingOpen, loadLunchSettings, lunchCostBreakdown, notEatingTally, tallyVotes } from "@/lib/hr/lunch-voting"
 import { logger } from "@/lib/logger"
 
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
         menuId: z.string().uuid("menuId is required"),
         eating: z.boolean().optional(),
         selections: z.record(z.string(), z.string()).optional(),
+        hideName: z.boolean().optional(),
       })
     )
     if (!parsed.ok) return parsed.response
@@ -90,7 +91,13 @@ export async function POST(request: NextRequest) {
     const { data: voteRow, error: voteError } = await dataClient
       .from("lunch_votes")
       .upsert(
-        { menu_id: menu.id, user_id: user.id, is_eating: eating, updated_at: new Date().toISOString() },
+        {
+          menu_id: menu.id,
+          user_id: user.id,
+          is_eating: eating,
+          ...(body.hideName !== undefined && { hide_name: body.hideName }),
+          updated_at: new Date().toISOString(),
+        },
         { onConflict: "menu_id,user_id" }
       )
       .select("id")
@@ -142,7 +149,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const votes = await loadVotesForMenu(dataClient, menu.id)
+    const votes = maskVotesForViewer(await loadVotesForMenu(dataClient, menu.id), user.id)
 
     return NextResponse.json({
       success: true,
@@ -192,7 +199,7 @@ export async function DELETE(request: NextRequest) {
       log.error({ err: logError.message, userId: user.id, date: menu.date }, "lunch register cleanup failed")
     }
 
-    const votes = await loadVotesForMenu(dataClient, menu.id)
+    const votes = maskVotesForViewer(await loadVotesForMenu(dataClient, menu.id), user.id)
 
     return NextResponse.json({
       success: true,
@@ -203,5 +210,56 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     log.error({ err: String(error) }, "Error in DELETE /api/hr/lunch/vote")
     return NextResponse.json({ error: "Failed to withdraw your vote" }, { status: 500 })
+  }
+}
+
+/**
+ * Shows or hides the caller's name on a vote they have already cast. Allowed
+ * after the deadline too — it changes who can see the vote, never the vote.
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const parsed = await parseJsonBody(
+      request,
+      z.object({
+        menuId: z.string().uuid("menuId is required"),
+        hideName: z.boolean(),
+      })
+    )
+    if (!parsed.ok) return parsed.response
+    const { menuId, hideName } = parsed.data
+
+    const dataClient = getServiceRoleClientOrFallback(supabase)
+    const menu = await loadMenuById(dataClient, menuId)
+    if (!menu) return NextResponse.json({ error: "Menu not found" }, { status: 404 })
+
+    const { data: updated, error: updateError } = await dataClient
+      .from("lunch_votes")
+      .update({ hide_name: hideName })
+      .eq("menu_id", menu.id)
+      .eq("user_id", user.id)
+      .select("id")
+    if (updateError) throw new Error(`Failed to update vote privacy: ${updateError.message}`)
+    if (!updated || updated.length === 0) {
+      return NextResponse.json({ error: "You have not voted on this menu" }, { status: 404 })
+    }
+
+    const votes = maskVotesForViewer(await loadVotesForMenu(dataClient, menu.id), user.id)
+
+    return NextResponse.json({
+      success: true,
+      votes,
+      tallies: [...tallyVotes(menu.groups, votes), notEatingTally(votes)],
+      myVote: votes.find((v) => v.user_id === user.id) || null,
+    })
+  } catch (error) {
+    log.error({ err: String(error) }, "Error in PATCH /api/hr/lunch/vote")
+    return NextResponse.json({ error: "Failed to update your vote" }, { status: 500 })
   }
 }

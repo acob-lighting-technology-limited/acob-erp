@@ -198,6 +198,30 @@ export async function GET(request: NextRequest) {
     >()
     for (const p of profileRows) profileMap.set(p.id, p)
 
+    // Query active pending appeals in date range to attach status indicators
+    const pendingAppealMap = new Map<
+      string,
+      { id: string; stage: string; requested_status: string; initiated_by_role: string }
+    >()
+    if (startDate && endDate) {
+      const { data: appeals } = await dataClient
+        .from("attendance_appeals")
+        .select("id, user_id, appeal_date, stage, requested_status, initiated_by_role")
+        .eq("status", "pending")
+        .gte("appeal_date", startDate)
+        .lte("appeal_date", endDate)
+      if (appeals) {
+        for (const a of appeals) {
+          pendingAppealMap.set(`${a.user_id}_${a.appeal_date}`, {
+            id: a.id,
+            stage: a.stage,
+            requested_status: a.requested_status,
+            initiated_by_role: a.initiated_by_role,
+          })
+        }
+      }
+    }
+
     const records = rows.map((r) => {
       const p = profileMap.get(r.user_id)
       const name = formatEmployeeName(p)
@@ -248,6 +272,7 @@ export async function GET(request: NextRequest) {
         editor_first_name: editorFirstName,
         early_closure_time: closeTime,
         late_resumption_time: lateRes,
+        pending_appeal: pendingAppealMap.get(`${r.user_id}_${r.date}`) ?? null,
       }
     })
 
@@ -346,6 +371,7 @@ export async function GET(request: NextRequest) {
             editor_first_name: missingEditorFirstName,
             early_closure_time: closeTime,
             late_resumption_time: lateRes,
+            pending_appeal: pendingAppealMap.get(`${p.id}_${day}`) ?? null,
           })
         }
       }

@@ -3,6 +3,8 @@ import { SidebarContent } from "@/components/sidebar-content"
 import { AcoBot } from "@/components/acobot/acobot"
 import { MissingAvatarBanner } from "@/components/profile/missing-avatar-banner"
 import { MissingAvatarDialog } from "@/components/profile/missing-avatar-dialog"
+import { WhatsNewDialog } from "@/components/whats-new-dialog"
+import { loadWhatsNewSeen } from "@/lib/whats-new-server"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { resolveDeptConsoles } from "@/lib/dept/consoles"
@@ -33,6 +35,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
   // dept = scoped view. A lead may hold several departments.
   const deptConsoles = await resolveDeptConsoles(typedSupabase, profile)
   const { data: isMdDeskMember } = await supabase.rpc("is_md_desk_member")
+  const whatsNewSeen = await loadWhatsNewSeen(supabase, data.user.id)
 
   const userData = {
     email: data.user.email,
@@ -51,6 +54,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
       <SidebarContent>
         <MissingAvatarBanner hasAvatar={Boolean(profile?.avatar_path)} />
         <MissingAvatarDialog hasAvatar={Boolean(profile?.avatar_path)} />
+        <WhatsNewDialog hasAvatar={Boolean(profile?.avatar_path)} seenIds={whatsNewSeen} />
         <div className="pb-[max(var(--fab-safe-area),env(safe-area-inset-bottom))]">{children}</div>
       </SidebarContent>
       <AcoBot userName={profile?.first_name ?? profile?.full_name ?? null} />

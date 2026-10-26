@@ -805,17 +805,16 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "name",
         label: "Name",
         sortable: true,
-        resizable: true,
-        initialWidth: 200,
+        width: "min-w-[260px]",
         accessor: (r) => `${r.last_name}, ${r.first_name} ${r.designation || ""}`,
         render: (r) => (
           <div className="flex items-center gap-2.5">
             <EmployeeAvatar employee={r} size="sm" />
             <div className="min-w-0 space-y-0.5">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <span
                   className={cn(
-                    "font-medium",
+                    "truncate font-medium whitespace-nowrap",
                     activeTab === "all" && r.employment_status === "exited" && "text-muted-foreground line-through"
                   )}
                 >
@@ -832,7 +831,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   </Badge>
                 )}
               </div>
-              {r.designation && <p className="text-muted-foreground truncate text-xs">{r.designation}</p>}
+              {r.designation && (
+                <p className="text-muted-foreground truncate text-xs whitespace-nowrap">{r.designation}</p>
+              )}
             </div>
           </div>
         ),
@@ -841,45 +842,52 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "email",
         label: "Email",
         resizable: true,
-        initialWidth: 180,
+        initialWidth: 230,
         accessor: (r) => r.company_email,
         hideOnMobile: true,
         render: (r) => (
-          <div className="flex min-w-0 flex-col gap-0.5 text-xs">
+          <div className="flex min-w-0 items-center gap-1.5 text-xs">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex max-w-full items-center gap-1.5 text-left transition-colors"
+                  className="text-muted-foreground hover:text-foreground inline-flex max-w-full min-w-0 items-center gap-1.5 text-left transition-colors"
                   onClick={() => void handleCopyEmail(r.company_email)}
                   aria-label="Copy email"
                 >
                   <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <span className="max-w-[150px] truncate">{r.company_email}</span>
+                  <span className="truncate">{r.company_email}</span>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Click to copy email</TooltipContent>
+              <TooltipContent side="top">
+                <p>Click to copy: {r.company_email}</p>
+                {r.additional_email && <p className="text-muted-foreground text-[10px]">Alt: {r.additional_email}</p>}
+              </TooltipContent>
             </Tooltip>
             {r.additional_email && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground/80 hover:text-foreground ml-5 text-left text-xs whitespace-nowrap transition-colors"
                     onClick={() => void handleCopyEmail(r.additional_email || "")}
                     aria-label="Copy additional email"
                   >
-                    <span>{r.additional_email}</span>
+                    <Badge
+                      variant="outline"
+                      className="text-muted-foreground/80 hover:text-foreground cursor-pointer px-1 py-0 text-[10px] font-normal"
+                    >
+                      +1
+                    </Badge>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top">Click to copy additional email</TooltipContent>
+                <TooltipContent side="top">Click to copy secondary email: {r.additional_email}</TooltipContent>
               </Tooltip>
             )}
             {r.mailbox_status === "failed" && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="ml-5 w-fit bg-red-100 text-[10px] font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                    Mailbox failed
+                  <Badge className="shrink-0 bg-red-100 text-[10px] font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                    Failed
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
@@ -895,10 +903,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         key: "department",
         label: "Department",
         sortable: true,
+        resizable: true,
+        initialWidth: 200,
         accessor: (r) => r.department,
         render: (r) => (
-          <div className="flex min-w-0 flex-col items-start gap-1">
-            <span className="max-w-[150px] truncate text-xs font-medium" title={r.department}>
+          <div className="flex min-w-0 flex-col items-start gap-0.5">
+            <span className="truncate text-xs font-medium" title={r.department}>
               {r.department}
             </span>
             {r.is_department_lead && (
@@ -920,7 +930,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               label: "Exit Date",
               sortable: true,
               resizable: true,
-              initialWidth: 110,
+              initialWidth: 120,
               accessor: (r: Employee) => r.separation_date || "",
               render: (r: Employee) => (
                 <span className="text-muted-foreground text-xs whitespace-nowrap">
@@ -934,6 +944,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
               key: "employment_type",
               label: "Employee Type",
               sortable: true,
+              resizable: true,
+              initialWidth: 110,
               accessor: (r: Employee) => r.employment_type || "full_time",
               render: (r: Employee) => {
                 const type = r.employment_type || "full_time"
@@ -989,6 +1001,8 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       {
         key: "actions",
         label: "Action",
+        align: "right",
+        width: "w-20",
         render: (r) => (
           <div className="flex items-center justify-end gap-1">
             {canManageUsers && (

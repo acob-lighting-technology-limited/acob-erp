@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -45,6 +46,8 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { orderRoster, rosterPhase } from "@/lib/hr/roster-order"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 function parseTimeToMinutes(value: string | null | undefined): number | null {
   if (!value) return null
@@ -136,6 +139,12 @@ export interface AttendanceRecord {
   manual_comment?: string | null
   early_closure_time?: string | null
   late_resumption_time?: string | null
+  pending_appeal?: {
+    id: string
+    stage: string
+    requested_status: string
+    initiated_by_role: string
+  } | null
 }
 
 interface DailyRosterViewProps {
@@ -154,7 +163,47 @@ function formatClock12(hhmm: string): string {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`
 }
 
+function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: string | null }) {
+  if (appeal.stage === "pending_lead") {
+    if (appeal.initiated_by_role === "admin_manual") {
+      return {
+        label: "Pending Lead",
+        tooltip: "Admin staged alteration — awaiting Department Lead confirmation",
+        className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+      }
+    }
+    return {
+      label: "Pending Both",
+      tooltip: "Employee appeal — awaiting Lead endorsement, then Admin approval",
+      className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+    }
+  }
+
+  if (appeal.stage === "pending_admin") {
+    return {
+      label: "Pending Admin",
+      tooltip: "Awaiting Admin & HR final approval",
+      className: "border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+    }
+  }
+
+  if (appeal.stage === "pending_hr_lead") {
+    return {
+      label: "Pending HR Lead",
+      tooltip: "Awaiting Admin & HR Lead final approval",
+      className: "border-purple-300 bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300",
+    }
+  }
+
+  return {
+    label: "Pending Review",
+    tooltip: "Awaiting approval",
+    className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  }
+}
+
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
+  const staffAvatars = useStaffAvatars()
   const deptCode = useDepartmentCodes()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
@@ -291,7 +340,11 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       }
       const payload = await res.json().catch(() => null)
       if (!res.ok) throw new Error(payload?.error ?? "Failed to save")
-      toast.success(isNew ? "Record created" : "Record updated")
+      if (payload?.staged) {
+        toast.info(payload.message || "Status alteration staged awaiting department lead confirmation.")
+      } else {
+        toast.success(isNew ? "Record created" : "Record updated")
+      }
       setEditRecord(null)
       void load()
     } catch (err) {
@@ -326,13 +379,16 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       sortable: true,
       accessor: (r) => r.user_name,
       render: (r) => (
-        <div>
-          <div className="font-medium">{r.user_name}</div>
-          <div className="text-muted-foreground text-xs">{r.department}</div>
+        <div className="flex items-center gap-2.5">
+          <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+          <div className="min-w-0">
+            <div className="truncate font-medium">{r.user_name}</div>
+            <div className="text-muted-foreground text-xs">{r.department}</div>
+          </div>
         </div>
       ),
       resizable: true,
-      initialWidth: 200,
+      initialWidth: 220,
     },
     {
       key: "clock_in",
@@ -443,13 +499,30 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       label: "Status",
       sortable: true,
       accessor: (r) => r.status,
-      render: (r) => (
-        <StatusBadge
-          status={r.status}
-          record={r}
-          earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
-        />
-      ),
+      render: (r) => {
+        const pendingBadge = r.pending_appeal ? getPendingAppealBadge(r.pending_appeal) : null
+        return (
+          <div className="flex flex-col items-center gap-1">
+            <StatusBadge
+              status={r.status}
+              record={r}
+              earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
+            />
+            {pendingBadge && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={`cursor-help px-1.5 py-0 text-xs ${pendingBadge.className}`}>
+                    {pendingBadge.label}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{pendingBadge.tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        )
+      },
     },
     {
       key: "source",
@@ -573,7 +646,8 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
   const { isOnTimePresent, options: statusOptions } = getManualStatusEditOptions(editRecord)
 
   const hasManualComment = editForm.manual_comment.trim().length >= 3
-  const cannotSave = saving || !editForm.status || !hasManualComment || isOnTimePresent
+  const hasPendingAppeal = Boolean(editRecord?.pending_appeal)
+  const cannotSave = saving || !editForm.status || !hasManualComment || isOnTimePresent || hasPendingAppeal
 
   const todayIso = toLocalISODate()
   function shiftDate(deltaDays: number) {
@@ -645,6 +719,9 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: (r) => (
+            <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+          ),
           title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
           subtitle: (r) => (
             <ClockTimes
@@ -756,6 +833,19 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {editRecord?.pending_appeal && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
+                {editRecord.pending_appeal.stage === "pending_lead" &&
+                editRecord.pending_appeal.initiated_by_role === "admin_manual"
+                  ? "An alteration is currently awaiting Department Lead confirmation (Pending Lead)."
+                  : editRecord.pending_appeal.stage === "pending_lead"
+                    ? "An appeal is currently pending both Department Lead endorsement and Admin approval (Pending Both)."
+                    : editRecord.pending_appeal.stage === "pending_admin"
+                      ? "An appeal is awaiting Admin & HR final approval (Pending Admin)."
+                      : "An alteration or appeal is already pending for this day."}{" "}
+                Please review or manage it in the Appeals tab.
+              </div>
+            )}
             {isOnTimePresent ? (
               <p className="text-muted-foreground text-sm">
                 This record is fully present and on-time. No overrides (LWP/AWP) are applicable.

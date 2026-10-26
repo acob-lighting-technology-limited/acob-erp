@@ -87,6 +87,13 @@ export interface LunchVoteRecord {
   updated_at: string
   /** group_id → option_id. Empty for a NO vote. */
   selections: Record<string, string>
+  /** The voter chose to hide their name from colleagues. */
+  hide_name: boolean
+  /**
+   * Set on a colleague's hidden vote after maskVotesForViewer: it still
+   * counts, but its name, photo and real user_id have been stripped.
+   */
+  is_masked?: boolean
 }
 
 export interface LunchVoter {
@@ -95,6 +102,8 @@ export interface LunchVoter {
   avatar_url: string | null
   /** When they voted — the avatar stack shows the most recent first. */
   voted_at: string
+  /** They hid their name from colleagues — only they and admins see this entry. */
+  hide_name: boolean
 }
 
 export interface LunchMenuViewRecord {
@@ -113,7 +122,10 @@ export interface LunchOptionTally {
   group_id: string
   name: string
   count: number
+  /** Named voters only — hidden votes are in count and private_count. */
   voters: LunchVoter[]
+  /** Votes for this option whose voter hid their name from the viewer. */
+  private_count: number
 }
 
 /**
@@ -130,21 +142,24 @@ export const LUNCH_LOOKBACK_DAYS = 1
 
 /** Builds the poll's "NO" row from the votes that answered it. */
 export function notEatingTally(votes: LunchVoteRecord[]): LunchOptionTally {
-  const voters = votes
-    .filter((vote) => !vote.is_eating)
+  const noVotes = votes.filter((vote) => !vote.is_eating)
+  const voters = noVotes
+    .filter((vote) => !vote.is_masked)
     .map((vote) => ({
       user_id: vote.user_id,
       full_name: vote.full_name,
       avatar_url: vote.avatar_url,
       voted_at: vote.updated_at,
+      hide_name: vote.hide_name,
     }))
 
   return {
     option_id: NOT_EATING_OPTION_ID,
     group_id: NOT_EATING_OPTION_ID,
     name: "NO — not eating",
-    count: voters.length,
+    count: noVotes.length,
     voters,
+    private_count: noVotes.length - voters.length,
   }
 }
 
@@ -269,6 +284,7 @@ export function tallyVotes(groups: LunchMenuGroup[], votes: LunchVoteRecord[]): 
         name: option.name,
         count: 0,
         voters: [],
+        private_count: 0,
       })
     }
   }
@@ -279,11 +295,16 @@ export function tallyVotes(groups: LunchMenuGroup[], votes: LunchVoteRecord[]): 
       const tally = tallies.get(optionId)
       if (!tally) continue
       tally.count += 1
+      if (vote.is_masked) {
+        tally.private_count += 1
+        continue
+      }
       tally.voters.push({
         user_id: vote.user_id,
         full_name: vote.full_name,
         avatar_url: vote.avatar_url,
         voted_at: vote.updated_at,
+        hide_name: vote.hide_name,
       })
     }
   }

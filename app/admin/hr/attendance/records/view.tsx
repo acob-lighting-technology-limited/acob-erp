@@ -142,7 +142,11 @@ export function AdminAttendanceRecordsPage({
       })
       const payload = await res.json().catch(() => null)
       if (!res.ok) throw new Error(payload?.error || "Failed to save")
-      toast.success("Record updated")
+      if (payload?.staged) {
+        toast.info(payload.message || "Status alteration staged awaiting department lead confirmation.")
+      } else {
+        toast.success("Record updated")
+      }
       setEditRecord(null)
       void load()
     } catch (err) {

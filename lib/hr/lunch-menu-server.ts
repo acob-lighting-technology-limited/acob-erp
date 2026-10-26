@@ -50,6 +50,7 @@ type VoteRow = {
   menu_id: string
   user_id: string
   is_eating: boolean
+  hide_name: boolean
   created_at: string
   updated_at: string
 }
@@ -139,18 +140,22 @@ export async function loadMenuById(client: SupabaseClient, menuId: string): Prom
 
 /**
  * Loads every vote on a menu with the voter's name attached. Names are always
- * included: the lunch poll deliberately shows who picked what.
+ * included here — this is what admins see. Staff surfaces must pass the
+ * result through maskVotesForViewer before it leaves the server.
  */
 export async function loadVotesForMenu(client: SupabaseClient, menuId: string): Promise<LunchVoteRecord[]> {
-  const { data: voteRows } = await client
+  // A failed read must surface. Swallowing it shows a poll with nobody on it,
+  // which looks like a real answer — staff then vote against a false picture.
+  const { data: voteRows, error: voteError } = await client
     .from("lunch_votes")
-    .select("id, menu_id, user_id, is_eating, created_at, updated_at")
+    .select("id, menu_id, user_id, is_eating, hide_name, created_at, updated_at")
     .eq("menu_id", menuId)
+  if (voteError) throw new Error(`Failed to load lunch votes: ${voteError.message}`)
 
   const votes = (voteRows || []) as VoteRow[]
   if (votes.length === 0) return []
 
-  const [{ data: selectionRows }, { data: profileRows }] = await Promise.all([
+  const [{ data: selectionRows, error: selectionError }, { data: profileRows }] = await Promise.all([
     client
       .from("lunch_vote_selections")
       .select("vote_id, group_id, option_id")
@@ -166,6 +171,7 @@ export async function loadVotesForMenu(client: SupabaseClient, menuId: string): 
         votes.map((v) => v.user_id)
       ),
   ])
+  if (selectionError) throw new Error(`Failed to load lunch vote selections: ${selectionError.message}`)
 
   const selections = (selectionRows || []) as SelectionRow[]
   const profiles = (profileRows || []) as {
@@ -198,9 +204,53 @@ export async function loadVotesForMenu(client: SupabaseClient, menuId: string): 
         created_at: vote.created_at,
         updated_at: vote.updated_at,
         selections: voteSelections,
+        hide_name: vote.hide_name === true,
       }
     })
     .sort((a, b) => a.full_name.localeCompare(b.full_name))
+}
+
+/**
+ * Strips who cast each hidden vote, for everyone but the voter. The vote keeps
+ * its answer so it still counts; its user_id is replaced, its timestamps
+ * cleared, and it moves to the end — the list is sorted by name, so leaving
+ * it in place would give away where the name falls alphabetically.
+ */
+export function maskVotesForViewer(votes: LunchVoteRecord[], viewerId: string): LunchVoteRecord[] {
+  const visible: LunchVoteRecord[] = []
+  const masked: LunchVoteRecord[] = []
+  for (const vote of votes) {
+    if (!vote.hide_name || vote.user_id === viewerId) {
+      visible.push(vote)
+      continue
+    }
+    masked.push({
+      ...vote,
+      user_id: `private-${masked.length + 1}`,
+      full_name: "Private",
+      department: null,
+      avatar_url: null,
+      created_at: "",
+      updated_at: "",
+      is_masked: true,
+    })
+  }
+  return [...visible, ...masked]
+}
+
+/**
+ * Whether this person hid their name on their most recent vote. The choice
+ * carries forward, so someone who wants privacy doesn't have to ask each day.
+ */
+export async function loadHideNamePreference(client: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await client
+    .from("lunch_votes")
+    .select("hide_name")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data?.hide_name === true
 }
 
 /** One category, as submitted by the menu builder form. */

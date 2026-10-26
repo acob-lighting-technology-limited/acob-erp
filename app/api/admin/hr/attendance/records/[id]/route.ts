@@ -8,10 +8,13 @@ import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals
 import { notifyAttendanceInApp } from "@/lib/hr/attendance-notify"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import {
+  ATTENDANCE_STATUS_LABELS,
   DB_WRITABLE_STATUSES,
   deriveUnifiedAttendanceStatus,
   isPermissionAttendanceStatus,
+  type UnifiedAttendanceStatus,
 } from "@/lib/hr/attendance-status"
+import { createNotification } from "@/lib/notifications/create"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { applyLunchBreak } from "@/lib/hr/attendance-ssot"
@@ -101,6 +104,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // Two-party rule: If an Admin alters an attendance record to LWP, AWP, IWP, or OOS,
     // it cannot be applied unilaterally — it stages as an appeal awaiting Lead confirmation.
     if (isPermissionStatus && isActorAdmin && isAlteringOther) {
+      // Check if an appeal is already active (pending or approved) for this user and date
+      const { data: existingAppeal } = await dataClient
+        .from("attendance_appeals")
+        .select("id, status, stage, requested_status")
+        .eq("user_id", record.user_id)
+        .eq("appeal_date", record.date)
+        .in("status", ["pending", "approved"])
+        .maybeSingle()
+
+      if (existingAppeal) {
+        if (existingAppeal.status === "pending") {
+          const stageLabel = existingAppeal.stage.replace(/_/g, " ")
+          return NextResponse.json(
+            {
+              error: `An alteration or appeal is already pending for this date (Stage: ${stageLabel}). Please review it in the Appeals tab.`,
+            },
+            { status: 409 }
+          )
+        }
+        return NextResponse.json({ error: "An approved appeal already exists for this date." }, { status: 409 })
+      }
+
       const { data: targetProfile } = await dataClient
         .from("profiles")
         .select("department, is_department_lead, full_name")
@@ -149,10 +174,55 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         metadata: { appeal_id: staged?.id, staged_stage: targetStage },
       })
 
+      // Send in-app notification to the required reviewer(s)
+      try {
+        let recipientIds: string[] = []
+        if (targetStage === "pending_lead" && targetProfile?.department) {
+          const { data: leads } = await dataClient
+            .from("profiles")
+            .select("id")
+            .eq("department", targetProfile.department)
+            .eq("is_department_lead", true)
+            .returns<{ id: string }[]>()
+          recipientIds = (leads ?? []).map((l) => l.id)
+        } else if (targetStage === "pending_hr_lead") {
+          const { data: hrLeads } = await dataClient
+            .from("profiles")
+            .select("id")
+            .eq("department", "Admin and HR")
+            .eq("is_department_lead", true)
+            .returns<{ id: string }[]>()
+          recipientIds = (hrLeads ?? []).map((l) => l.id)
+        }
+
+        const employeeName = targetProfile?.full_name ?? "an employee"
+        const statusLabelText = ATTENDANCE_STATUS_LABELS[nextStatus as UnifiedAttendanceStatus] ?? nextStatus
+
+        for (const recipientId of recipientIds) {
+          if (recipientId === auth.scope.userId) continue
+          await createNotification({
+            p_user_id: recipientId,
+            p_type: "approval_request",
+            p_category: "approvals",
+            p_title: "Attendance Alteration Staged",
+            p_message: `An attendance alteration to ${statusLabelText} for ${employeeName} on ${record.date} requires your confirmation.`,
+            p_priority: "normal",
+            p_link_url:
+              targetStage === "pending_lead" ? "/dept/hr/attendance?tab=appeals" : "/admin/hr/attendance?tab=appeals",
+            p_actor_id: auth.scope.userId,
+            p_entity_type: "attendance_appeal",
+            p_entity_id: staged?.id,
+          })
+        }
+      } catch (notifyErr) {
+        log.error({ err: String(notifyErr) }, "Failed to send staged alteration notification")
+      }
+
+      const statusLabel = ATTENDANCE_STATUS_LABELS[nextStatus as UnifiedAttendanceStatus] ?? nextStatus
       return NextResponse.json({
         data: record,
         staged: true,
-        message: `Status alteration to ${nextStatus} staged. Awaiting confirmation from ${isTargetLead ? "Admin & HR Lead" : "Department Lead"}.`,
+        message: `Status alteration to ${statusLabel} staged. Awaiting confirmation from ${isTargetLead ? "Admin & HR Lead" : "Department Lead"}.`,
       })
     }
 

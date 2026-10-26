@@ -441,9 +441,17 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
           body: JSON.stringify(body),
         })
       }
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      const payload = (await res.json().catch(() => null)) as {
+        error?: string
+        staged?: boolean
+        message?: string
+      } | null
       if (!res.ok) throw new Error(payload?.error ?? "Failed to save")
-      toast.success(editTarget.record ? "Record updated" : "Record created")
+      if (payload?.staged) {
+        toast.info(payload.message || "Status alteration staged awaiting department lead confirmation.")
+      } else {
+        toast.success(editTarget.record ? "Record updated" : "Record created")
+      }
       setEditTarget(null)
       loadDays()
       onRecordChanged?.(report.user_id)

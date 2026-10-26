@@ -4,7 +4,7 @@ import { parseJsonBody } from "@/lib/api/parse-body"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { getRequestScope } from "@/lib/admin/api-scope"
-import { loadMenuById, loadVotesForMenu } from "@/lib/hr/lunch-menu-server"
+import { loadHideNamePreference, loadMenuById, loadVotesForMenu } from "@/lib/hr/lunch-menu-server"
 import { loadLunchSettings, lunchCostBreakdown, notEatingTally, tallyVotes } from "@/lib/hr/lunch-voting"
 import { logger } from "@/lib/logger"
 
@@ -64,10 +64,18 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         }
       }
 
+      // A vote logged on someone's behalf keeps the privacy they last chose.
+      const hideName = await loadHideNamePreference(dataClient, userId)
       const { data: voteRow, error: voteError } = await dataClient
         .from("lunch_votes")
         .upsert(
-          { menu_id: menu.id, user_id: userId, is_eating: eating, updated_at: new Date().toISOString() },
+          {
+            menu_id: menu.id,
+            user_id: userId,
+            is_eating: eating,
+            hide_name: hideName,
+            updated_at: new Date().toISOString(),
+          },
           { onConflict: "menu_id,user_id" }
         )
         .select("id")
