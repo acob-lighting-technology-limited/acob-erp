@@ -1039,6 +1039,9 @@ function VoterRow({ voter, currentUserId }: { voter: LunchVoter; currentUserId: 
         <StaffAvatar name={voter.full_name} src={voter.avatar_url} size="xs" />
         <span className="text-muted-foreground group-hover:text-foreground truncate text-xs group-hover:underline">
           {isYou ? "You" : voter.full_name}
+          {/* Only your own hidden vote reaches this list by name — colleagues
+              see it as a private vote — so say so. */}
+          {voter.hide_name && <span className="italic"> (private)</span>}
         </span>
       </button>
       {cardOpen && (
@@ -1065,9 +1068,13 @@ function AvatarStack({ voters, total, currentUserId }: { voters: LunchVoter[]; t
   const shownDesktop = voters.slice(0, 4)
   const extraMobile = total - Math.min(voters.length, 3)
   const extraDesktop = total - shownDesktop.length
+  // Overlap with a start margin on everything after the first photo. Tailwind
+  // v4's -space-x puts a negative END margin on every child but the last, so
+  // when the "+N" chip is absent the 4th photo slid over the count beside it.
+  const chipOverlap = voters.length > 0 && "-ml-2"
 
   return (
-    <div className="flex items-center -space-x-2">
+    <div className="flex items-center">
       {shownDesktop.map((voter, idx) => (
         <StaffAvatar
           key={voter.user_id}
@@ -1076,18 +1083,29 @@ function AvatarStack({ voters, total, currentUserId }: { voters: LunchVoter[]; t
           size="xs"
           className={cn(
             "ring-background ring-2",
+            idx > 0 && "-ml-2",
             voter.user_id === currentUserId && "ring-primary",
             idx === 3 && "hidden sm:inline-flex"
           )}
         />
       ))}
       {extraMobile > 0 && (
-        <span className="bg-muted text-muted-foreground ring-background flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:hidden">
+        <span
+          className={cn(
+            "bg-muted text-muted-foreground ring-background flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:hidden",
+            chipOverlap
+          )}
+        >
           +{extraMobile}
         </span>
       )}
       {extraDesktop > 0 && (
-        <span className="bg-muted text-muted-foreground ring-background hidden h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:flex">
+        <span
+          className={cn(
+            "bg-muted text-muted-foreground ring-background hidden h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold ring-2 sm:flex",
+            chipOverlap
+          )}
+        >
           +{extraDesktop}
         </span>
       )}

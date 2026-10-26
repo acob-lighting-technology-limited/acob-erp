@@ -102,6 +102,8 @@ export interface LunchVoter {
   avatar_url: string | null
   /** When they voted — the avatar stack shows the most recent first. */
   voted_at: string
+  /** They hid their name from colleagues — only they and admins see this entry. */
+  hide_name: boolean
 }
 
 export interface LunchMenuViewRecord {
@@ -148,6 +150,7 @@ export function notEatingTally(votes: LunchVoteRecord[]): LunchOptionTally {
       full_name: vote.full_name,
       avatar_url: vote.avatar_url,
       voted_at: vote.updated_at,
+      hide_name: vote.hide_name,
     }))
 
   return {
@@ -301,6 +304,7 @@ export function tallyVotes(groups: LunchMenuGroup[], votes: LunchVoteRecord[]): 
         full_name: vote.full_name,
         avatar_url: vote.avatar_url,
         voted_at: vote.updated_at,
+        hide_name: vote.hide_name,
       })
     }
   }
