@@ -161,6 +161,45 @@ function formatClock12(hhmm: string): string {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`
 }
 
+function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: string | null }) {
+  if (appeal.stage === "pending_lead") {
+    if (appeal.initiated_by_role === "admin_manual") {
+      return {
+        label: "Pending Lead",
+        tooltip: "Admin staged alteration — awaiting Department Lead confirmation",
+        className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+      }
+    }
+    return {
+      label: "Pending Both",
+      tooltip: "Employee appeal — awaiting Lead endorsement, then Admin approval",
+      className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+    }
+  }
+
+  if (appeal.stage === "pending_admin") {
+    return {
+      label: "Pending Admin",
+      tooltip: "Awaiting Admin & HR final approval",
+      className: "border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+    }
+  }
+
+  if (appeal.stage === "pending_hr_lead") {
+    return {
+      label: "Pending HR Lead",
+      tooltip: "Awaiting Admin & HR Lead final approval",
+      className: "border-purple-300 bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300",
+    }
+  }
+
+  return {
+    label: "Pending Review",
+    tooltip: "Awaiting approval",
+    className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  }
+}
+
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
   const deptCode = useDepartmentCodes()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
@@ -454,23 +493,30 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       label: "Status",
       sortable: true,
       accessor: (r) => r.status,
-      render: (r) => (
-        <div className="flex flex-col items-center gap-1">
-          <StatusBadge
-            status={r.status}
-            record={r}
-            earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
-          />
-          {r.pending_appeal && (
-            <Badge
-              variant="outline"
-              className="border-amber-300 bg-amber-50 px-1.5 py-0 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-            >
-              {r.pending_appeal.stage === "pending_lead" ? "Pending Lead" : "Pending Review"}
-            </Badge>
-          )}
-        </div>
-      ),
+      render: (r) => {
+        const pendingBadge = r.pending_appeal ? getPendingAppealBadge(r.pending_appeal) : null
+        return (
+          <div className="flex flex-col items-center gap-1">
+            <StatusBadge
+              status={r.status}
+              record={r}
+              earlyClosure={r.early_closure_time ? { closeTime: r.early_closure_time } : null}
+            />
+            {pendingBadge && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={`cursor-help px-1.5 py-0 text-xs ${pendingBadge.className}`}>
+                    {pendingBadge.label}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{pendingBadge.tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        )
+      },
     },
     {
       key: "source",
@@ -780,8 +826,15 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
           <div className="space-y-4 py-2">
             {editRecord?.pending_appeal && (
               <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
-                An alteration or appeal is already pending for this day (
-                {editRecord.pending_appeal.stage.replace(/_/g, " ")}). Please review or manage it in the Appeals tab.
+                {editRecord.pending_appeal.stage === "pending_lead" &&
+                editRecord.pending_appeal.initiated_by_role === "admin_manual"
+                  ? "An alteration is currently awaiting Department Lead confirmation (Pending Lead)."
+                  : editRecord.pending_appeal.stage === "pending_lead"
+                    ? "An appeal is currently pending both Department Lead endorsement and Admin approval (Pending Both)."
+                    : editRecord.pending_appeal.stage === "pending_admin"
+                      ? "An appeal is awaiting Admin & HR final approval (Pending Admin)."
+                      : "An alteration or appeal is already pending for this day."}{" "}
+                Please review or manage it in the Appeals tab.
               </div>
             )}
             {isOnTimePresent ? (
