@@ -811,10 +811,10 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
           <div className="flex items-center gap-2.5">
             <EmployeeAvatar employee={r} size="sm" />
             <div className="min-w-0 space-y-0.5">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <span
                   className={cn(
-                    "font-medium",
+                    "truncate font-medium whitespace-nowrap",
                     activeTab === "all" && r.employment_status === "exited" && "text-muted-foreground line-through"
                   )}
                 >
@@ -831,7 +831,9 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   </Badge>
                 )}
               </div>
-              {r.designation && <p className="text-muted-foreground truncate text-xs">{r.designation}</p>}
+              {r.designation && (
+                <p className="text-muted-foreground truncate text-xs whitespace-nowrap">{r.designation}</p>
+              )}
             </div>
           </div>
         ),
@@ -844,12 +846,12 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         accessor: (r) => r.company_email,
         hideOnMobile: true,
         render: (r) => (
-          <div className="flex min-w-0 flex-col gap-0.5 text-xs">
+          <div className="flex min-w-0 items-center gap-1.5 text-xs">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex max-w-full items-center gap-1.5 text-left transition-colors"
+                  className="text-muted-foreground hover:text-foreground inline-flex max-w-full min-w-0 items-center gap-1.5 text-left transition-colors"
                   onClick={() => void handleCopyEmail(r.company_email)}
                   aria-label="Copy email"
                 >
@@ -857,28 +859,35 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   <span className="truncate">{r.company_email}</span>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="top">Click to copy email</TooltipContent>
+              <TooltipContent side="top">
+                <p>Click to copy: {r.company_email}</p>
+                {r.additional_email && <p className="text-muted-foreground text-[10px]">Alt: {r.additional_email}</p>}
+              </TooltipContent>
             </Tooltip>
             {r.additional_email && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    className="text-muted-foreground/80 hover:text-foreground ml-5 truncate text-left text-xs transition-colors"
                     onClick={() => void handleCopyEmail(r.additional_email || "")}
                     aria-label="Copy additional email"
                   >
-                    <span>{r.additional_email}</span>
+                    <Badge
+                      variant="outline"
+                      className="text-muted-foreground/80 hover:text-foreground cursor-pointer px-1 py-0 text-[10px] font-normal"
+                    >
+                      +1
+                    </Badge>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top">Click to copy additional email</TooltipContent>
+                <TooltipContent side="top">Click to copy secondary email: {r.additional_email}</TooltipContent>
               </Tooltip>
             )}
             {r.mailbox_status === "failed" && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="ml-5 w-fit bg-red-100 text-[10px] font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                    Mailbox failed
+                  <Badge className="shrink-0 bg-red-100 text-[10px] font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                    Failed
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
@@ -898,7 +907,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         initialWidth: 200,
         accessor: (r) => r.department,
         render: (r) => (
-          <div className="flex min-w-0 flex-col items-start gap-1">
+          <div className="flex min-w-0 items-center gap-1.5">
             <span className="truncate text-xs font-medium" title={r.department}>
               {r.department}
             </span>
@@ -908,7 +917,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:text-amber-400"
               >
                 <Shield className="h-2.5 w-2.5" />
-                Dept Lead
+                Lead
               </Badge>
             )}
           </div>
