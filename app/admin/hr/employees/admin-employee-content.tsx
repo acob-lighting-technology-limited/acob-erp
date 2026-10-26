@@ -907,7 +907,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         initialWidth: 200,
         accessor: (r) => r.department,
         render: (r) => (
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-col items-start gap-0.5">
             <span className="truncate text-xs font-medium" title={r.department}>
               {r.department}
             </span>
@@ -917,7 +917,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                 className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] font-medium whitespace-nowrap text-amber-600 dark:text-amber-400"
               >
                 <Shield className="h-2.5 w-2.5" />
-                Lead
+                Dept Lead
               </Badge>
             )}
           </div>
