@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { loadMenusInRange, loadVotesForMenu } from "@/lib/hr/lunch-menu-server"
+import {
+  loadHideNamePreference,
+  loadMenusInRange,
+  loadVotesForMenu,
+  maskVotesForViewer,
+} from "@/lib/hr/lunch-menu-server"
 import {
   isVotingOpen,
   loadLunchSettings,
@@ -46,7 +51,11 @@ export default async function LunchPage({ searchParams }: PageProps) {
   const selected =
     requested || menus.find((m) => m.date === today) || menus.find((m) => m.date > today) || menus.at(-1) || null
 
-  const votes = selected ? await loadVotesForMenu(dataClient, selected.id) : []
+  const [allVotes, hideNameDefault] = await Promise.all([
+    selected ? loadVotesForMenu(dataClient, selected.id) : Promise.resolve([]),
+    loadHideNamePreference(dataClient, user.id),
+  ])
+  const votes = maskVotesForViewer(allVotes, user.id)
   const { cost, companySubsidy, employeeDeduction } = lunchCostBreakdown(settings)
 
   const initialData: LunchPollData = {
@@ -64,6 +73,7 @@ export default async function LunchPage({ searchParams }: PageProps) {
     deadline: selected ? resolveVotingDeadline(selected, settings).toISOString() : null,
     pricing: { cost, company_subsidy: companySubsidy, employee_deduction: employeeDeduction },
     eatingDays: settings.eating_days,
+    hideNameDefault,
   }
 
   return <LunchContent initialData={initialData} currentUserId={user.id} initialTab={initialTab} />

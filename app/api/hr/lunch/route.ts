@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
-import { loadMenuForDate, loadMenusInRange, loadVotesForMenu } from "@/lib/hr/lunch-menu-server"
+import {
+  loadHideNamePreference,
+  loadMenuForDate,
+  loadMenusInRange,
+  loadVotesForMenu,
+  maskVotesForViewer,
+} from "@/lib/hr/lunch-menu-server"
 import {
   isVotingOpen,
   loadLunchSettings,
@@ -58,7 +64,11 @@ export async function GET(request: NextRequest) {
       ? await loadMenuForDate(dataClient, dateParam)
       : (menus.find((m) => m.date === today) ?? menus.find((m) => m.date > today) ?? menus.at(-1) ?? null)
 
-    const votes = selected ? await loadVotesForMenu(dataClient, selected.id) : []
+    const [allVotes, hideNameDefault] = await Promise.all([
+      selected ? loadVotesForMenu(dataClient, selected.id) : Promise.resolve([]),
+      loadHideNamePreference(dataClient, user.id),
+    ])
+    const votes = maskVotesForViewer(allVotes, user.id)
     const { cost, companySubsidy, employeeDeduction } = lunchCostBreakdown(settings)
 
     return NextResponse.json({
@@ -78,6 +88,7 @@ export async function GET(request: NextRequest) {
       deadline: selected ? resolveVotingDeadline(selected, settings).toISOString() : null,
       pricing: { cost, company_subsidy: companySubsidy, employee_deduction: employeeDeduction },
       eatingDays: settings.eating_days,
+      hideNameDefault,
     })
   } catch (error) {
     log.error({ err: String(error) }, "Error in GET /api/hr/lunch")

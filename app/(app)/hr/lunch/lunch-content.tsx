@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  EyeOff,
   Loader2,
   Star,
   Users,
@@ -21,6 +22,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { EmptyState } from "@/components/ui/patterns"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
@@ -62,6 +64,8 @@ export interface LunchPollData {
   deadline: string | null
   pricing: { cost: number; company_subsidy: number; employee_deduction: number }
   eatingDays: string[]
+  /** Whether this person hid their name on their last vote — the switch's starting point. */
+  hideNameDefault: boolean
 }
 
 interface HistoryRow {
@@ -126,9 +130,15 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
   const [draft, setDraft] = useState<Record<string, string>>(() => myVote?.selections || {})
   const [draftEating, setDraftEating] = useState<boolean>(() => myVote?.is_eating ?? true)
 
+  // Hiding your name is remembered: it starts from your last vote and is
+  // sent with every new one.
+  const [hideName, setHideName] = useState<boolean>(() => myVote?.hide_name ?? initialData.hideNameDefault)
+  const [savingPrivacy, setSavingPrivacy] = useState(false)
+
   useEffect(() => {
     setDraft(myVote?.selections || {})
     setDraftEating(myVote?.is_eating ?? true)
+    if (myVote) setHideName(myVote.hide_name)
   }, [myVote])
 
   // Which option rows have their voter list expanded.
@@ -262,7 +272,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
         const res = await apiFetch("/api/hr/lunch/vote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ menuId: menu.id, eating, selections }),
+          body: JSON.stringify({ menuId: menu.id, eating, selections, hideName }),
         })
         const payload = await res.json()
         if (!res.ok) throw new Error(payload.error || "Failed to save your vote")
@@ -274,7 +284,33 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
         setSubmitting(false)
       }
     },
-    [menu]
+    [menu, hideName]
+  )
+
+  /** Flips name visibility. Before voting it only sets what the next vote sends. */
+  const changeHideName = useCallback(
+    async (next: boolean) => {
+      setHideName(next)
+      if (!menu || !myVote) return
+      setSavingPrivacy(true)
+      try {
+        const res = await apiFetch("/api/hr/lunch/vote", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ menuId: menu.id, hideName: next }),
+        })
+        const payload = await res.json()
+        if (!res.ok) throw new Error(payload.error || "Failed to update your vote")
+
+        setData((prev) => ({ ...prev, votes: (payload.votes || []) as LunchVoteRecord[] }))
+      } catch (err) {
+        setHideName(!next)
+        toast.error(err instanceof Error ? err.message : "Failed to update your vote")
+      } finally {
+        setSavingPrivacy(false)
+      }
+    },
+    [menu, myVote]
   )
 
   const withdrawVote = useCallback(async () => {
@@ -671,8 +707,8 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
                   </div>
                 ))}
 
-                {/* The system's own answer. Opting out costs nothing, but
-                    saying so out loud is visible to everyone. */}
+                {/* The system's own answer. Opting out costs nothing, and is
+                    shown to colleagues like any other answer unless hidden. */}
                 <div className="border-t pt-3">
                   <PollRow
                     label="NO — Not taking lunch"
@@ -686,6 +722,25 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
                     expanded={expanded.has(NOT_EATING_OPTION_ID)}
                     onToggleExpanded={() => toggleExpanded(NOT_EATING_OPTION_ID)}
                     onSelect={pickNotEating}
+                  />
+                </div>
+
+                <div className="flex items-start justify-between gap-3 border-t pt-3">
+                  <label htmlFor="lunch-hide-name" className="min-w-0 cursor-pointer">
+                    <span className="text-foreground flex items-center gap-1.5 text-sm font-medium">
+                      <EyeOff className="text-muted-foreground h-3.5 w-3.5" />
+                      Hide my name from colleagues
+                    </span>
+                    <span className="text-muted-foreground mt-0.5 block text-xs leading-normal">
+                      Your vote still counts and shows as private. Admin &amp; HR can still see it.
+                    </span>
+                  </label>
+                  <Switch
+                    id="lunch-hide-name"
+                    checked={hideName}
+                    disabled={savingPrivacy || submitting}
+                    onCheckedChange={(checked) => void changeHideName(checked)}
+                    className="mt-0.5 shrink-0"
                   />
                 </div>
 
@@ -878,6 +933,7 @@ function PollRow({
 }) {
   const count = tally?.count ?? 0
   const voters = tally?.voters ?? []
+  const privateCount = tally?.private_count ?? 0
   const percent = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0
 
   return (
@@ -924,7 +980,7 @@ function PollRow({
           aria-expanded={expanded}
           aria-label={count > 0 ? `${count} voted — show who` : "No votes"}
         >
-          <AvatarStack voters={voters} currentUserId={currentUserId} />
+          <AvatarStack voters={voters} total={count} currentUserId={currentUserId} />
           <span className="text-foreground text-sm font-semibold tabular-nums">{count}</span>
           {count > 0 && (
             <ChevronDown
@@ -941,11 +997,19 @@ function PollRow({
         />
       </div>
 
-      {expanded && voters.length > 0 && (
+      {expanded && count > 0 && (
         <div className="mt-2 space-y-1 pl-8 sm:pl-9">
           {voters.map((voter) => (
             <VoterRow key={voter.user_id} voter={voter} currentUserId={currentUserId} />
           ))}
+          {privateCount > 0 && (
+            <div className="text-muted-foreground flex items-center gap-2 py-0.5 text-xs italic">
+              <span className="bg-muted flex h-6 w-6 shrink-0 items-center justify-center rounded-full">
+                <EyeOff className="h-3 w-3" />
+              </span>
+              {privateCount === 1 ? "1 private vote" : `${privateCount} private votes`}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -990,14 +1054,17 @@ function VoterRow({ voter, currentUserId }: { voter: LunchVoter; currentUserId: 
   )
 }
 
-/** Overlapping photos of the most recent voters, newest first. */
-function AvatarStack({ voters, currentUserId }: { voters: LunchVoter[]; currentUserId: string }) {
-  if (voters.length === 0) return null
+/**
+ * Overlapping photos of the most recent named voters, newest first. `total`
+ * includes private votes, which have no photo and only add to the "+N".
+ */
+function AvatarStack({ voters, total, currentUserId }: { voters: LunchVoter[]; total: number; currentUserId: string }) {
+  if (total === 0) return null
 
   // Show up to 3 avatars on mobile, 4 on desktop
   const shownDesktop = voters.slice(0, 4)
-  const extraMobile = voters.length - 3
-  const extraDesktop = voters.length - 4
+  const extraMobile = total - Math.min(voters.length, 3)
+  const extraDesktop = total - shownDesktop.length
 
   return (
     <div className="flex items-center -space-x-2">
