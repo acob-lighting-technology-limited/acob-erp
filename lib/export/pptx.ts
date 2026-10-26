@@ -1052,10 +1052,13 @@ const getWeeklyDepartmentLayout = (withTaskSummary = false): WeeklyDepartmentLay
     textW: PPTX_TASK_SIDE_COLUMN_W - 0.3,
     textH: Math.max(0.6, h - PPTX_TASK_CARD_HEADER_H - 0.1),
   })
+  // The same column repeats on the Tasks for the New Week slide, so both slides
+  // the room actually reads from keep the numbers in view.
+  const narrow = (box: WeeklyContentBox): WeeklyContentBox => ({ ...box, w: mainW, textW: mainW - 0.3 })
   return {
-    workDone: { ...card, w: mainW, textW: mainW - 0.3 },
-    tasks: boxes.page2Top,
-    challenges: boxes.page2Bottom,
+    workDone: narrow(card),
+    tasks: narrow(boxes.page2Top),
+    challenges: narrow(boxes.page2Bottom),
     taskCounts: column(card.y, tasksH),
     actionPoints: column(card.y + tasksH + PPTX_TASK_CARD_GAP, actionsH),
   }
@@ -1703,7 +1706,8 @@ const addTasksAndChallengesSlide = (
   pageNumber?: number,
   theme: WeeklyPptxTheme = "light",
   slidePosition?: { index: number; total: number },
-  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout()
+  layout: WeeklyDepartmentLayout = getWeeklyDepartmentLayout(),
+  taskSummary?: WeeklyDeptTaskSummary
 ) => {
   const colors = getWeeklyPptxThemeColors(theme)
   const slide = pres.addSlide()
@@ -1736,6 +1740,10 @@ const addTasksAndChallengesSlide = (
     theme,
     challengesPlan.paraSpaceAfter
   )
+  if (taskSummary && layout.taskCounts && layout.actionPoints) {
+    addTaskCountsCard(pres, slide, layout.taskCounts, taskSummary, theme)
+    addActionPointsCard(pres, slide, layout.actionPoints, taskSummary, theme)
+  }
 
   return slide
 }
@@ -1814,7 +1822,8 @@ const renderDepartmentWeeklySlides = (
     pageCursor,
     theme,
     { index: 2, total: 2 },
-    layout
+    layout,
+    taskSummary
   )
   applyWeeklySlideTransition(tasksChallengesSlide)
 }
