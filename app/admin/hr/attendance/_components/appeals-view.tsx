@@ -15,6 +15,8 @@ import type { AppealRow } from "./appeal-review-dialog"
 import { apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 interface AppealsViewProps {
   lockedDepartment?: string
@@ -59,6 +61,7 @@ function statusBadge(
 }
 
 export function AppealsView({ lockedDepartment }: AppealsViewProps) {
+  const staffAvatars = useStaffAvatars()
   const [reviewAppeal, setReviewAppeal] = useState<AppealRow | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
@@ -112,13 +115,16 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         sortable: true,
         accessor: (r) => r.user_name,
         render: (r) => (
-          <div>
-            <div className="font-medium">{r.user_name}</div>
-            <div className="text-muted-foreground text-xs">{r.department}</div>
+          <div className="flex items-center gap-2.5">
+            <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+            <div className="min-w-0">
+              <div className="truncate font-medium">{r.user_name}</div>
+              <div className="text-muted-foreground text-xs">{r.department}</div>
+            </div>
           </div>
         ),
         resizable: true,
-        initialWidth: 180,
+        initialWidth: 220,
       },
       {
         key: "appeal_date",
@@ -188,7 +194,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         render: (r) => statusBadge(r.status, r.stage, r.initiated_by_role),
       },
     ],
-    []
+    [staffAvatars]
   )
 
   const filters = useMemo<DataTableFilter<AppealRow>[]>(
@@ -258,6 +264,9 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: (r) => (
+            <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+          ),
           title: (r) => `${r.user_name} · ${r.department}`,
           subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
           snippet: (r) => (r.appeal_reason ? `Reason: ${r.appeal_reason}` : null),

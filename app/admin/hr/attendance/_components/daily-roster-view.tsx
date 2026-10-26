@@ -46,6 +46,8 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { orderRoster, rosterPhase } from "@/lib/hr/roster-order"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { StaffAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 function parseTimeToMinutes(value: string | null | undefined): number | null {
   if (!value) return null
@@ -201,6 +203,7 @@ function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: stri
 }
 
 export function DailyRosterView({ departments, lockedDepartment }: DailyRosterViewProps) {
+  const staffAvatars = useStaffAvatars()
   const deptCode = useDepartmentCodes()
   const [rosterDate, setRosterDate] = useState(toLocalISODate())
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
@@ -376,13 +379,16 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       sortable: true,
       accessor: (r) => r.user_name,
       render: (r) => (
-        <div>
-          <div className="font-medium">{r.user_name}</div>
-          <div className="text-muted-foreground text-xs">{r.department}</div>
+        <div className="flex items-center gap-2.5">
+          <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+          <div className="min-w-0">
+            <div className="truncate font-medium">{r.user_name}</div>
+            <div className="text-muted-foreground text-xs">{r.department}</div>
+          </div>
         </div>
       ),
       resizable: true,
-      initialWidth: 200,
+      initialWidth: 220,
     },
     {
       key: "clock_in",
@@ -713,6 +719,9 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
         stickyToolbar
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
         mobileRow={{
+          leading: (r) => (
+            <StaffAvatar name={r.user_name} profileId={r.user_id} src={staffAvatars[r.user_id]} size="sm" />
+          ),
           title: (r) => <NameWithDept name={r.user_name} code={deptCode(r.department)} />,
           subtitle: (r) => (
             <ClockTimes

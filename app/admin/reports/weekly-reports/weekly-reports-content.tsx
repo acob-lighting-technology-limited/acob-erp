@@ -34,6 +34,8 @@ import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display"
+import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
+import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
@@ -130,6 +132,7 @@ export function WeeklyReportsContent({
 
   const reports = useMemo(() => reportsData?.reports ?? [], [reportsData?.reports])
   const trackingData = useMemo(() => reportsData?.trackingData ?? [], [reportsData?.trackingData])
+  const staffAvatars = useStaffAvatars()
 
   const { data: lockState } = useAdminWeeklyReportLockState(weekFilter, yearFilter)
 
@@ -269,7 +272,12 @@ export function WeeklyReportsContent({
         },
         render: (report) => {
           const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
-          return profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
+          const name = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"
+          return report.user_id ? (
+            <StaffNameWithAvatar name={name} profileId={report.user_id} src={staffAvatars[report.user_id]} />
+          ) : (
+            name
+          )
         },
       },
       {
@@ -300,7 +308,7 @@ export function WeeklyReportsContent({
         },
       },
     ],
-    [meetingDate, trackingData]
+    [meetingDate, trackingData, staffAvatars]
   )
 
   const filters = useMemo<DataTableFilter<WeeklyReport>[]>(
@@ -682,7 +690,17 @@ export function WeeklyReportsContent({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{report.department}</p>
-                  <p className="text-muted-foreground text-sm">{submitterName}</p>
+                  <div className="mt-1">
+                    {report.user_id ? (
+                      <StaffNameWithAvatar
+                        name={submitterName}
+                        profileId={report.user_id}
+                        src={staffAvatars[report.user_id]}
+                      />
+                    ) : (
+                      <p className="text-muted-foreground text-sm">{submitterName}</p>
+                    )}
+                  </div>
                 </div>
                 <Badge className={trackerStatus.color}>{trackerStatus.label}</Badge>
               </div>
