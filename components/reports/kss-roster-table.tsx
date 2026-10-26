@@ -477,7 +477,11 @@ export function KssRosterTable({
       }
 
       if (file) {
-        const requiresConversion = [DOCX_MIME, PPTX_MIME].includes(file.type)
+        const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+        if (!isPdf) {
+          toast.error("Please export your presentation to PDF before uploading.")
+          return
+        }
         const fd = new FormData()
         fd.append("file", file)
         fd.append("meetingWeek", String(savedRoster?.meeting_week || weekNumber))
@@ -491,32 +495,22 @@ export function KssRosterTable({
         if (uploadPresenterName) fd.append("presenterName", String(uploadPresenterName))
         if (notes.trim()) fd.append("notes", notes.trim())
 
-        if (requiresConversion) {
-          setUploadPhase("converting")
-        } else {
-          setUploadPhase("uploading")
-        }
-
-        let phaseTimer: ReturnType<typeof setTimeout> | null = null
-        if (requiresConversion) {
-          phaseTimer = setTimeout(() => {
-            setUploadPhase("uploading")
-          }, 1200)
-        }
+        setUploadPhase("uploading")
 
         const uploadRes = await apiFetch("/api/reports/meeting-week-documents", {
           method: "POST",
           body: fd,
         })
-        if (phaseTimer) clearTimeout(phaseTimer)
-        setUploadPhase("uploading")
-        const uploadPayload = await uploadRes.json()
-        if (!uploadRes.ok) throw new Error(uploadPayload.error || "Failed to upload KSS file")
-        if (uploadPayload?.converted) {
-          toast.success("KSS file uploaded and converted to PDF")
-        } else {
-          toast.success(`KSS file uploaded in original ${getFileExtension(file.name, file.type).toUpperCase()} format`)
+        const uploadPayload = await uploadRes.json().catch(() => null)
+        if (!uploadRes.ok) {
+          if (uploadRes.status === 413) {
+            throw new Error(
+              `The presentation file is too large for the server (limit ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}). In PowerPoint, please use File > Export > Minimum size (publishing online) to reduce the PDF size.`
+            )
+          }
+          throw new Error(uploadPayload?.error || `Upload failed with status ${uploadRes.status}`)
         }
+        toast.success("KSS presentation PDF uploaded")
       } else {
         toast.success(editingId ? "KSS updated" : "KSS created")
       }
@@ -549,13 +543,13 @@ export function KssRosterTable({
       const doc = docByWeekYear.get(`${row.meeting_year}-${row.meeting_week}`)
       if (doc) {
         const docRes = await apiFetch(`/api/reports/meeting-week-documents?id=${doc.id}`, { method: "DELETE" })
-        const docPayload = await docRes.json()
-        if (!docRes.ok) throw new Error(docPayload.error || "Failed to delete KSS file")
+        const docPayload = await docRes.json().catch(() => null)
+        if (!docRes.ok) throw new Error(docPayload?.error || `Failed to delete KSS file (status ${docRes.status})`)
       }
 
       const res = await apiFetch(`/api/reports/kss-roster?id=${row.id}`, { method: "DELETE" })
-      const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Failed to delete KSS roster")
+      const payload = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(payload?.error || `Failed to delete KSS roster (status ${res.status})`)
       toast.success("KSS deleted")
       setPendingDeleteRow(null)
       await Promise.all([
@@ -1227,10 +1221,10 @@ export function KssRosterTable({
               </div>
 
               <div className="space-y-2">
-                <Label>Upload PDF, PPTX, or DOCX</Label>
+                <Label>Upload Presentation (PDF only)</Label>
                 <Input
                   type="file"
-                  accept=".pdf,.pptx,.docx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept=".pdf,application/pdf"
                   onChange={(e) => {
                     const selected = e.target.files?.[0] || null
                     if (selected && selected.size > REPORT_DOC_MAX_SIZE_BYTES) {
@@ -1239,16 +1233,21 @@ export function KssRosterTable({
                       setFile(null)
                       return
                     }
-                    if (selected?.type === PPTX_MIME || selected?.type === DOCX_MIME) {
-                      toast.info("This file will be converted to PDF before it is stored.")
+                    const isPdf =
+                      selected && (selected.type === "application/pdf" || selected.name.toLowerCase().endsWith(".pdf"))
+                    if (selected && !isPdf) {
+                      toast.error("Presentations must be in PDF format. In PowerPoint: File > Export > Create PDF.")
+                      e.currentTarget.value = ""
+                      setFile(null)
+                      return
                     }
                     setFile(selected)
                   }}
                   disabled={isFormLocked}
                 />
                 <p className="text-muted-foreground text-xs">
-                  Accepted: PDF, PPTX, DOCX. PPTX and DOCX uploads are converted to PDF before storage. Max file size:{" "}
-                  {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
+                  Accepted: PDF only. Export presentation as PDF in PowerPoint (File &gt; Export &gt; Create PDF). Max
+                  file size: {formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}
                 </p>
                 {isFormLocked ? (
                   <p className="text-muted-foreground text-xs">

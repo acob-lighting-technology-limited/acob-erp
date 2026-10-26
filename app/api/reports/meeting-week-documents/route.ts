@@ -395,9 +395,13 @@ export async function POST(request: Request) {
           { status: 400 }
         )
       }
-      if (!KSS_ALLOWED.has(file.type)) {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+      if (!isPdf) {
         return NextResponse.json(
-          { error: "Knowledge Sharing Session file must be PDF, PPTX, or DOCX" },
+          {
+            error:
+              "Knowledge Sharing Session presentations must be uploaded as PDF. Please export your presentation to PDF before uploading.",
+          },
           { status: 400 }
         )
       }

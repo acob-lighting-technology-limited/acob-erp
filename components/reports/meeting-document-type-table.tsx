@@ -243,8 +243,15 @@ export function MeetingDocumentTypeTable({
       const response = await apiFetch("/api/reports/meeting-week-documents", { method: "POST", body: formData })
       if (phaseTimer) clearTimeout(phaseTimer)
       setUploadPhase("uploading")
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Upload failed")
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        if (response.status === 413) {
+          throw new Error(
+            `The file exceeds the server limit of ${formatLimitMb(REPORT_DOC_MAX_SIZE_BYTES)}. Please compress the file and try again.`
+          )
+        }
+        throw new Error(payload?.error || `Upload failed with status ${response.status}`)
+      }
 
       toast.success(payload?.converted ? "Document uploaded and converted to PDF" : "Document uploaded")
       setShowCreate(false)
@@ -276,8 +283,8 @@ export function MeetingDocumentTypeTable({
     }
     try {
       const response = await apiFetch(`/api/reports/meeting-week-documents?id=${id}`, { method: "DELETE" })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error || "Delete failed")
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(payload?.error || `Delete failed with status ${response.status}`)
       toast.success("Document deleted")
       setPendingDeleteDoc(null)
       await refetch()
