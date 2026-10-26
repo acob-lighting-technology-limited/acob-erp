@@ -12,31 +12,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { apiFetch } from "@/lib/api-client"
 import { activeAnnouncements, type Announcement } from "@/lib/whats-new"
+import { logger } from "@/lib/logger"
 
-// Ids already shown on this device. Per-device by design: seeing a heads-up
-// once more on a second device is harmless, and it needs no table.
-const SEEN_KEY = "acob-whats-new-seen"
+const log = logger("whats-new-dialog")
+
 // The photo prompt's key — while that popup is due, this one waits a load
 // rather than stacking a second dialog on top of it.
 const AVATAR_DIALOG_KEY = "acob-avatar-dialog-dismissed-until"
 // `?whats-new=1` opens every active announcement, seen or not, for previewing.
 const PREVIEW_PARAM = "whats-new"
 
-function readSeen(): string[] {
-  try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(SEEN_KEY) || "[]")
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []
-  } catch {
-    return []
-  }
-}
-
 interface WhatsNewDialogProps {
   hasAvatar: boolean
+  /**
+   * Announcement ids this person has already dismissed, read server-side.
+   * Null when they could not be read — then nothing is shown, rather than
+   * risk repeating a heads-up on every load.
+   */
+  seenIds: string[] | null
 }
 
-export function WhatsNewDialog({ hasAvatar }: WhatsNewDialogProps) {
+export function WhatsNewDialog({ hasAvatar, seenIds }: WhatsNewDialogProps) {
   const [items, setItems] = useState<Announcement[]>([])
   const [open, setOpen] = useState(false)
   const [isPreview, setIsPreview] = useState(false)
@@ -51,6 +49,7 @@ export function WhatsNewDialog({ hasAvatar }: WhatsNewDialogProps) {
       return
     }
 
+    if (!seenIds) return
     if (!hasAvatar) {
       try {
         const until = Number(window.localStorage.getItem(AVATAR_DIALOG_KEY) || 0)
@@ -60,22 +59,21 @@ export function WhatsNewDialog({ hasAvatar }: WhatsNewDialogProps) {
       }
     }
 
-    const seen = new Set(readSeen())
+    const seen = new Set(seenIds)
     const unseen = active.filter((a) => !seen.has(a.id))
     setItems(unseen)
     setOpen(unseen.length > 0)
-  }, [hasAvatar])
+  }, [hasAvatar, seenIds])
 
   function dismiss() {
     setOpen(false)
-    if (isPreview) return
-    try {
-      const seen = new Set(readSeen())
-      for (const item of items) seen.add(item.id)
-      window.localStorage.setItem(SEEN_KEY, JSON.stringify([...seen]))
-    } catch {
-      // Storage unavailable: the heads-up simply shows again next load.
-    }
+    if (isPreview || items.length === 0) return
+    // Best-effort: if it fails, the heads-up simply shows once more.
+    void apiFetch("/api/whats-new/seen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: items.map((item) => item.id) }),
+    }).catch((err: unknown) => log.error({ err: String(err) }, "failed to record seen announcements"))
   }
 
   if (items.length === 0) return null

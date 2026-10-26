@@ -1,6 +1,7 @@
 /**
  * Staff-facing "what's new" heads-ups. Each entry is shown once, in a popup on
- * the first page load after it ships, then never again on that device.
+ * the first page load after it ships, then never again for that person on any
+ * device (dismissals are kept in public.whats_new_seen).
  *
  * To announce a change, add an entry at the TOP with a new, never-reused id.
  * Keep it to what staff will notice and what they can now do — not how it was
