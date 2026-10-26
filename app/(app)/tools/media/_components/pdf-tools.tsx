@@ -44,6 +44,32 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(exponent === 0 ? 0 : 2)} ${units[exponent]}`
 }
 
+/**
+ * Vercel rejects function request bodies over 4.5 MB with a plain-text 413
+ * before the route runs. Keep a margin for the multipart overhead.
+ */
+const MAX_UPLOAD_BYTES = 4.2 * 1024 * 1024
+
+/**
+ * POST to a PDF route and throw a readable message on failure. Checks the upload
+ * size first, and never assumes the error body is JSON: the platform's 413 is
+ * plain text, which previously surfaced as "Unexpected token 'R'…".
+ */
+async function postPdfTool(path: string, formData: FormData, fallbackError: string): Promise<Response> {
+  let totalBytes = 0
+  formData.forEach((value) => {
+    if (value instanceof File) totalBytes += value.size
+  })
+  const tooLarge = `Files are too large (${formatBytes(totalBytes)}). The limit is ${formatBytes(MAX_UPLOAD_BYTES)} per request — use smaller or fewer files.`
+  if (totalBytes > MAX_UPLOAD_BYTES) throw new Error(tooLarge)
+
+  const response = await apiFetch(path, { method: "POST", body: formData })
+  if (response.ok) return response
+  if (response.status === 413) throw new Error(tooLarge)
+  const payload = await response.json().catch(() => null)
+  throw new Error(payload?.error || `${fallbackError} (status ${response.status})`)
+}
+
 export function PdfTools() {
   const [toolType, setToolType] = useState<PdfToolType>("merge")
   const [pdfFiles, setPdfFiles] = useState<File[]>([])
@@ -140,11 +166,7 @@ export function PdfTools() {
       })
       formData.append("count", pdfFiles.length.toString())
 
-      const response = await apiFetch("/api/pdf/merge", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Merge failed")
-      }
+      const response = await postPdfTool("/api/pdf/merge", formData, "Merge failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -179,11 +201,7 @@ export function PdfTools() {
       formData.append("pages", splitPages)
       formData.append("pageRanges", splitPages)
 
-      const response = await apiFetch("/api/pdf/split", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Split failed")
-      }
+      const response = await postPdfTool("/api/pdf/split", formData, "Split failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -230,11 +248,7 @@ export function PdfTools() {
         formData.append("percentage", percentage)
       }
 
-      const response = await apiFetch("/api/pdf/compress", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Compression failed")
-      }
+      const response = await postPdfTool("/api/pdf/compress", formData, "Compression failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -284,11 +298,7 @@ export function PdfTools() {
       formData.append("file", singlePdfFile)
       formData.append("format", convertFormat)
 
-      const response = await apiFetch("/api/pdf/convert", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Conversion failed")
-      }
+      const response = await postPdfTool("/api/pdf/convert", formData, "Conversion failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -342,11 +352,7 @@ export function PdfTools() {
       })
       formData.append("count", imageFiles.length.toString())
 
-      const response = await apiFetch("/api/pdf/images-to-pdf", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Conversion failed")
-      }
+      const response = await postPdfTool("/api/pdf/images-to-pdf", formData, "Conversion failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -375,11 +381,7 @@ export function PdfTools() {
       const formData = new FormData()
       formData.append("file", singlePdfFile)
 
-      const response = await apiFetch("/api/pdf/extract-text", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Text extraction failed")
-      }
+      const response = await postPdfTool("/api/pdf/extract-text", formData, "Text extraction failed")
       const data = await response.json()
       setExtractedText(data.text || "No text found in PDF")
       toast.success("Text extracted successfully!", { id: toastId })
@@ -403,11 +405,7 @@ export function PdfTools() {
       formData.append("file", singlePdfFile)
       formData.append("format", "docx")
 
-      const response = await apiFetch("/api/pdf/to-doc", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Conversion failed")
-      }
+      const response = await postPdfTool("/api/pdf/to-doc", formData, "Conversion failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -459,11 +457,7 @@ export function PdfTools() {
         formData.append("y", watermarkY)
       }
 
-      const response = await apiFetch("/api/pdf/watermark", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Watermarking failed")
-      }
+      const response = await postPdfTool("/api/pdf/watermark", formData, "Watermarking failed")
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -498,11 +492,7 @@ export function PdfTools() {
       formData.append("action", passwordAction)
       formData.append("password", pdfPassword)
 
-      const response = await apiFetch("/api/pdf/password", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Password operation failed")
-      }
+      const response = await postPdfTool("/api/pdf/password", formData, "Password operation failed")
 
       const contentType = response.headers.get("content-type") || ""
       if (contentType.includes("application/json")) {
@@ -539,11 +529,7 @@ export function PdfTools() {
       formData.append("file", singlePdfFile)
       formData.append("outputFormat", ocrOutputFormat)
 
-      const response = await apiFetch("/api/pdf/ocr", { method: "POST", body: formData })
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "OCR failed")
-      }
+      const response = await postPdfTool("/api/pdf/ocr", formData, "OCR failed")
 
       if (ocrOutputFormat === "text") {
         const data = await response.json()
