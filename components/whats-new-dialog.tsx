@@ -80,13 +80,14 @@ export function WhatsNewDialog({ hasAvatar }: WhatsNewDialogProps) {
 
   if (items.length === 0) return null
   const single = items.length === 1 ? items[0] : null
+  const Icon = single?.icon ?? Sparkles
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : dismiss())}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="items-center text-center sm:items-center sm:text-center">
           <div className="bg-primary/10 text-primary mb-2 flex h-14 w-14 items-center justify-center rounded-full">
-            <Sparkles className="h-7 w-7" aria-hidden />
+            <Icon className="h-7 w-7" aria-hidden />
           </div>
           <DialogTitle>{single ? single.title : "What's new"}</DialogTitle>
           {single ? (

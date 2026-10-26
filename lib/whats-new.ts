@@ -8,6 +8,8 @@
  * so someone who joins months later isn't greeted with stale news.
  */
 
+import { EyeOff, type LucideIcon } from "lucide-react"
+
 export interface Announcement {
   /** Stable key recorded once seen. Never change or reuse one. */
   id: string
@@ -15,6 +17,8 @@ export interface Announcement {
   date: string
   title: string
   body: string
+  /** Shown above the title when this is the only heads-up. Defaults to a sparkle. */
+  icon?: LucideIcon
   /** Where to try it. */
   href?: string
   cta?: string
@@ -27,6 +31,7 @@ export const ANNOUNCEMENTS: Announcement[] = [
     id: "2026-10-lunch-hide-name",
     date: "2026-10-26",
     title: "Vote for lunch privately",
+    icon: EyeOff,
     body: "You can now hide your name on the lunch poll. Turn on “Hide my name from colleagues” and your vote still counts, but shows as private to everyone else. Admin & HR can still see it.",
     href: "/hr/lunch",
     cta: "Open Lunch",
