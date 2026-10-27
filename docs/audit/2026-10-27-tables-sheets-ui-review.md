@@ -52,8 +52,11 @@ browser**: the visual items below need a pass on localhost.
 - §11 header actions (More menu, Refresh buttons), §13 export consolidation, §16 stats as line badges,
   §23 back-link policy: these need your decisions in §8.
 - §14 the ~130 skeleton prop mismatches (`list="responsive"` etc.) and §28 missing `loading.tsx`.
-- §17 status colours, §18 empty states, §21 destructive styling, §22 `dark:` overrides, §27 hand-built
-  page frames, §30 mobile layout, §33 accessibility (drawer focus trap, skip link).
+- §17 status colour maps (14 files) and §18 empty states (25 files) still to move onto `StatusBadge` and
+  `EmptyState`; §27 hand-built page frames, §30 mobile layout, §33 accessibility (drawer focus trap,
+  skip link).
+- Done since: §22 `dark:` overrides now use the `success/warning/danger/info/purple` tone tokens
+  (about 1,000 pairs, 15 genuine one-offs left); §21 destructive styling on the two flagged tables.
 - §55 end-to-end tests in CI (needs a seeded test project; there is no staging database).
 - 81 pages still have no `metadata`; 63 pages are client-only `page.tsx`. The ratchet stops either growing.
 
