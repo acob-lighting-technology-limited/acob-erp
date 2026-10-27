@@ -183,6 +183,7 @@ export type LeaveRequestRow = LeaveRequestStageState & {
   reliever_id?: string | null
   supervisor_id?: string | null
   approved_by?: string | null
+  current_approver_user_id?: string | null
   reliever_decision_at?: string | null
   supervisor_decision_at?: string | null
   hr_decision_at?: string | null

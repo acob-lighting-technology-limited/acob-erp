@@ -157,6 +157,7 @@ export async function GET(request: NextRequest) {
       if (row.reliever_id) profileIdSet.add(row.reliever_id)
       if (row.supervisor_id) profileIdSet.add(row.supervisor_id)
       if (row.approved_by) profileIdSet.add(row.approved_by)
+      if (row.current_approver_user_id) profileIdSet.add(row.current_approver_user_id)
     }
     for (const approval of approvalRows) {
       if (approval.approver_id) profileIdSet.add(approval.approver_id)
@@ -247,6 +248,9 @@ export async function GET(request: NextRequest) {
           reliever: leaveRequest.reliever_id ? profileMap.get(leaveRequest.reliever_id) || null : null,
           supervisor: leaveRequest.supervisor_id ? profileMap.get(leaveRequest.supervisor_id) || null : null,
           approved_by_profile: leaveRequest.approved_by ? profileMap.get(leaveRequest.approved_by) || null : null,
+          current_approver: leaveRequest.current_approver_user_id
+            ? profileMap.get(leaveRequest.current_approver_user_id) || null
+            : null,
           leave_type:
             (leaveRequest.leave_type_id ? leaveTypeMap.get(leaveRequest.leave_type_id) : null) ??
             (leaveRequest as { leave_type?: LeaveTypeReferenceRow | null }).leave_type ??

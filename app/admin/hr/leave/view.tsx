@@ -173,18 +173,27 @@ export function expectedApproverLabel(item: LeaveItem) {
     return "-"
   }
   if (item.current_approver?.full_name) return item.current_approver.full_name
-  const stage = item.current_stage_code || item.approval_stage
-  const expectedByStage: Record<string, string> = {
-    pending_reliever: "Assigned Reliever",
-    reliever_pending: "Assigned Reliever",
-    pending_department_lead: "Department Lead",
-    supervisor_pending: "Department Lead",
-    pending_admin_hr_lead: "Admin and HR Lead",
-    hr_pending: "Admin and HR Lead",
-    pending_md: "Managing Director (MD)",
-    pending_hcs: "Head, Corporate Services (HCS)",
+  const stageKey = approvalStageKey(item.current_stage_code || item.approval_stage)
+  if (stageKey === "reliever") {
+    const name = resolvePersonName(item.reliever)
+    if (name) return name
   }
-  return expectedByStage[stage] || "Pending approver"
+  if (stageKey === "department_lead") {
+    const name = resolvePersonName(item.supervisor)
+    if (name) return name
+  }
+  if (stageKey === "admin_hr_lead") {
+    const name = resolvePersonName(item.approved_by_profile)
+    if (name) return name
+  }
+  const expectedByStage: Record<string, string> = {
+    reliever: "Assigned Reliever",
+    department_lead: "Department Lead",
+    admin_hr_lead: "Admin and HR Lead",
+    md: "Managing Director (MD)",
+    hcs: "Head, Corporate Services (HCS)",
+  }
+  return expectedByStage[stageKey] || "Pending approver"
 }
 
 export function getStageBadge(item: LeaveItem) {
@@ -385,10 +394,12 @@ export function LeaveApprovePage({
     },
   })
 
+  const myQueueIds = useMemo(() => new Set((data?.myQueue || []).map((x) => x.id)), [data?.myQueue])
+
   const handleAction = (id: string, action: "approve" | "reject") => {
     const list =
-      activeTab === "history" ? data?.history : activeTab === "pending" ? data?.allPendingQueue : data?.myQueue
-    const target = list?.find((item) => item.id === id)
+      activeTab === "history" ? data?.history : activeTab === "pending" ? data?.allPendingQueue : data?.allRequests
+    const target = list?.find((item) => item.id === id) || data?.allRequests?.find((item) => item.id === id)
     const needsOverride = action === "approve" && target && target.evidence_complete === false
 
     overrideEvidenceRef.current = needsOverride ?? false
@@ -407,7 +418,7 @@ export function LeaveApprovePage({
         label: "Employee",
         sortable: true,
         resizable: true,
-        initialWidth: 260,
+        initialWidth: 280,
         accessor: (r) => r.user?.full_name || "Employee",
         render: (r) => (
           <button
@@ -417,17 +428,25 @@ export function LeaveApprovePage({
               setSelectedLeaveDetail(r)
               setDetailDialogOpen(true)
             }}
-            className="group/emp flex max-w-[260px] min-w-0 flex-col text-left focus:outline-hidden"
+            className="group/emp flex max-w-[280px] min-w-0 items-center gap-3 text-left focus:outline-hidden"
           >
-            <span
-              className="text-foreground group-hover/emp:text-primary truncate font-medium group-hover/emp:underline"
-              title={r.user?.full_name || "Employee"}
-            >
-              {r.user?.full_name || "Employee"}
-            </span>
-            <span className="text-muted-foreground truncate text-xs" title={r.user?.company_email || undefined}>
-              {r.user?.company_email}
-            </span>
+            <StaffAvatar
+              name={r.user?.full_name || "Employee"}
+              src={staffAvatars[r.user_id]}
+              profileId={r.user_id}
+              className="h-8 w-8 shrink-0 text-xs shadow-xs"
+            />
+            <div className="flex min-w-0 flex-col">
+              <span
+                className="text-foreground group-hover/emp:text-primary truncate font-medium group-hover/emp:underline"
+                title={r.user?.full_name || "Employee"}
+              >
+                {r.user?.full_name || "Employee"}
+              </span>
+              <span className="text-muted-foreground truncate text-xs" title={r.user?.company_email || undefined}>
+                {r.user?.company_email}
+              </span>
+            </div>
           </button>
         ),
       },
@@ -476,20 +495,18 @@ export function LeaveApprovePage({
         render: (r) => <span className="text-sm">{expectedApproverLabel(r)}</span>,
       },
     ],
-    []
+    [staffAvatars]
   )
 
   const dynamicTabs = useMemo(() => {
-    const myCount = data?.myQueue.length ?? 0
     const globalCount = data?.allPendingQueue.length ?? 0
     const historyCount = data?.history.length ?? 0
     const allCount = data?.allRequests.length ?? 0
 
     return [
-      { key: "all", label: `All (${allCount})`, icon: CalendarCheck2 },
+      { key: "all", label: `All Requests (${allCount})`, icon: CalendarCheck2 },
+      { key: "pending", label: `Pending Queue (${globalCount})`, icon: Clock },
       { key: "calendar", label: "Calendar", icon: CalendarDays },
-      { key: "my-actions", label: `My Actions (${myCount})`, icon: AlertCircle },
-      { key: "pending", label: `Global Queue (${globalCount})`, icon: Clock },
       { key: "history", label: `History (${historyCount})`, icon: History },
     ]
   }, [data])
@@ -506,7 +523,6 @@ export function LeaveApprovePage({
 
   const activeData = useMemo(() => {
     if (!data) return []
-    if (activeTab === "my-actions") return data.myQueue
     if (activeTab === "pending") return data.allPendingQueue
     if (activeTab === "history") return data.history
     return data.allRequests
@@ -625,7 +641,7 @@ export function LeaveApprovePage({
         leave={selectedLeaveDetail}
         onApprove={(id) => handleAction(id, "approve")}
         onReject={(id) => handleAction(id, "reject")}
-        showActionButtons={activeTab === "my-actions"}
+        showActionButtons={selectedLeaveDetail ? myQueueIds.has(selectedLeaveDetail.id) : false}
       />
 
       <AddLeaveDialog
@@ -735,40 +751,29 @@ export function LeaveApprovePage({
             searchPlaceholder="Search employee name or leave type..."
             searchFn={(r, q) => `${r.user?.full_name} ${r.leave_type?.name} ${r.status}`.toLowerCase().includes(q)}
             filters={filters}
-            rowActions={
-              activeTab === "my-actions"
-                ? [
-                    {
-                      label: "View Detail",
-                      icon: Eye,
-                      onClick: (r) => {
-                        setSelectedLeaveDetail(r)
-                        setDetailDialogOpen(true)
-                      },
-                    },
-                    {
-                      label: "Endorse",
-                      icon: Check,
-                      onClick: (r) => handleAction(r.id, "approve"),
-                    },
-                    {
-                      label: "Reject",
-                      icon: X,
-                      variant: "destructive",
-                      onClick: (r) => handleAction(r.id, "reject"),
-                    },
-                  ]
-                : [
-                    {
-                      label: "View Detail",
-                      icon: Eye,
-                      onClick: (r) => {
-                        setSelectedLeaveDetail(r)
-                        setDetailDialogOpen(true)
-                      },
-                    },
-                  ]
-            }
+            rowActions={[
+              {
+                label: "View Detail",
+                icon: Eye,
+                onClick: (r) => {
+                  setSelectedLeaveDetail(r)
+                  setDetailDialogOpen(true)
+                },
+              },
+              {
+                label: "Endorse",
+                icon: Check,
+                hidden: (r) => !myQueueIds.has(r.id),
+                onClick: (r) => handleAction(r.id, "approve"),
+              },
+              {
+                label: "Reject",
+                icon: X,
+                variant: "destructive",
+                hidden: (r) => !myQueueIds.has(r.id),
+                onClick: (r) => handleAction(r.id, "reject"),
+              },
+            ]}
             expandable={{
               render: (r) => {
                 const timeline = [...(r.approvals || [])].sort((left, right) => {
@@ -1180,7 +1185,7 @@ export function LeaveApprovePage({
                       </div>
                     </div>
 
-                    {activeTab === "my-actions" && (
+                    {myQueueIds.has(r.id) && (
                       <div className="flex gap-2 border-t pt-3 md:col-span-2">
                         <Button onClick={() => handleAction(r.id, "approve")} className="gap-2">
                           <Check className="h-4 w-4" /> Endorse
