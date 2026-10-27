@@ -119,7 +119,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   const approveButtonText = () => {
     if (approvingLoad) return "Processing…"
     if (appeal?.stage === "pending_lead") {
-      return appeal.initiated_by_role === "admin_manual" ? "Confirm (Advance to HR)" : "Endorse (Advance to HR)"
+      return appeal.initiated_by_role === "admin_manual" ? "Confirm Alteration" : "Endorse (Advance to HR)"
     }
     if (appeal?.stage === "pending_hr_lead") {
       return "Final Approve (HR Lead)"

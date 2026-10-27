@@ -99,6 +99,16 @@ type AppealRecord = {
 function renderAppealPendingBadge(appeal: AppealRecord) {
   const stage = appeal.stage || "pending_lead"
   if (stage === "pending_lead") {
+    if (appeal.initiated_by_role === "admin_manual") {
+      return (
+        <Badge
+          variant="outline"
+          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
+        >
+          Pending Lead
+        </Badge>
+      )
+    }
     return (
       <div className="flex flex-col items-start gap-1">
         <Badge
@@ -823,7 +833,9 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                   ? `Awaiting Admin Review by ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}`
                                   : latestAppeal.stage === "pending_hr_lead"
                                     ? "Pending HR Lead"
-                                    : `Awaiting ${latestAppeal.department_lead_name || "Department Lead"} (then ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"})`
+                                    : latestAppeal.initiated_by_role === "admin_manual"
+                                      ? `Awaiting ${latestAppeal.department_lead_name || "Department Lead"}`
+                                      : `Awaiting ${latestAppeal.department_lead_name || "Department Lead"} (then ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"})`
                                 : latestAppeal.status === "approved"
                                   ? "Approved"
                                   : latestAppeal.status === "resolved"

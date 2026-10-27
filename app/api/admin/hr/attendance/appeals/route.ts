@@ -11,7 +11,6 @@ import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 import {
   findStagedLeaveRequest,
   isStagedLeaveAppeal,
-  leaveStageForAppealStage,
   liveAppealDayStatus,
   loadDepartmentLeads,
   notifyAppealReviewers,
@@ -357,8 +356,15 @@ export async function PATCH(request: NextRequest) {
       if (action === "reject") {
         nextStatus = "rejected"
         nextStage = "rejected"
+      } else if (appeal.initiated_by_role === "admin_manual") {
+        // An Admin Manual Alteration was made on the Admin & HR side (often by an admin
+        // acting for the Admin & HR Lead), so that entry is stage 1 and the Lead's
+        // confirmation is the final approval.
+        isFinalApproval = true
+        nextStatus = "approved"
+        nextStage = "approved"
       } else {
-        // Enforce 2 stages: All alterations and appeals endorsed by Lead advance to Stage 2 (Admin & HR Review)
+        // Employee appeal endorsed by Lead -> moves to Stage 2 (Admin)
         nextStatus = "pending"
         nextStage = "pending_admin"
       }
@@ -479,17 +485,6 @@ export async function PATCH(request: NextRequest) {
         { error: updateError ? "Failed to update appeal" : "This appeal was already decided by someone else" },
         { status: updateError ? 500 : 409 }
       )
-    }
-
-    // Keep a staged leave grant's stage label in step while it moves between reviewers.
-    if (stagedLeave && nextStatus === "pending" && nextStage !== "approved" && nextStage !== "rejected") {
-      const leaveStage = leaveStageForAppealStage(nextStage)
-      const { error: stageSyncError } = await dataClient
-        .from("leave_requests")
-        .update({ approval_stage: leaveStage, current_stage_code: leaveStage })
-        .eq("id", stagedLeave.id)
-        .eq("status", "pending")
-      if (stageSyncError) log.error({ err: stageSyncError }, "Failed to sync staged leave stage")
     }
 
     // Carry a final decision on a staged leave grant onto its leave_requests row. The appeal

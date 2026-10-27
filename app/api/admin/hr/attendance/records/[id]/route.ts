@@ -98,8 +98,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const isActorAdmin = auth.scope.isAdminLike && auth.scope.scopeMode !== "lead"
     const isAlteringOther = auth.scope.userId !== record.user_id
 
-    // Two-stage rule: an Admin who overrides another person's status cannot apply it
-    // unilaterally — it stages as an appeal for Department Lead endorsement, then Admin & HR.
+    // Two-stage rule: an Admin's override of another person's status is the Admin & HR
+    // stage; it applies only once the Department Lead (or, for a lead, the Admin & HR
+    // Lead) confirms it.
     // Only an explicit status choice (or waiver) counts: a clock-time correction that merely
     // re-derives the status applies directly, because the appeal carries a status and no
     // times, so staging it would drop the corrected punches on approval.
@@ -163,6 +164,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           status: "pending",
           stage: targetStage,
           initiated_by_role: "admin_manual",
+          // The admin's entry is the Admin & HR stage; the Lead's confirmation completes it.
+          admin_reviewed_by: auth.scope.userId,
+          admin_reviewed_at: new Date().toISOString(),
+          admin_resolution_note: parsed.data.manual_comment,
           created_by: auth.scope.userId,
         })
         .select("id")

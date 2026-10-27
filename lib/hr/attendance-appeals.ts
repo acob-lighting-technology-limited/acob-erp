@@ -380,7 +380,8 @@ export async function notifyAppealReviewers(
  * A manual (Attendance Manager) sick-leave grant is staged as ONE pending
  * `leave_requests` row plus ONE `admin_manual` appeal dated on the leave's first
  * working day. The leave row is the source of truth for the whole range — the
- * appeal only carries it through Department Lead and Admin & HR approval, and
+ * appeal carries it to the Lead's confirmation (the admin's entry is the Admin
+ * & HR stage), and
  * approving it never writes `attendance_records` (status derivation reads
  * `on_leave` from the approved leave, so real punches are never overwritten).
  */

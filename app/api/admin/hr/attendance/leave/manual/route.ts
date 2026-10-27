@@ -137,11 +137,11 @@ export async function POST(request: NextRequest) {
     const approverLabel = isTargetLead ? "Admin & HR Lead" : "Department Lead"
     const leaveTypeName = ltRow?.name || "Sick Leave"
 
-    // Two-stage rule: a manual sick-leave grant is staged, not applied. The pending
-    // leave_requests row holds the whole range (and reserves the balance); the single
-    // appeal below carries it through Department Lead, then Admin & HR approval.
-    // admin_manual rows are skipped by the stale-leave cron, so a back-dated grant
-    // is not auto-cancelled while it waits.
+    // Two-stage rule: recording the grant here is the Admin & HR stage; it applies only
+    // once the Department Lead (or, for a lead, the Admin & HR Lead) confirms it. The
+    // pending leave_requests row holds the whole range (and reserves the balance); the
+    // single appeal below carries it to that confirmation. admin_manual rows are skipped
+    // by the stale-leave and SLA crons, so a back-dated grant is not auto-cancelled.
     const { data: created, error } = await dataClient
       .from("leave_requests")
       .insert({
@@ -184,6 +184,10 @@ export async function POST(request: NextRequest) {
         status: "pending",
         stage: targetStage,
         initiated_by_role: "admin_manual",
+        // The admin's entry is the Admin & HR stage; the Lead's confirmation completes it.
+        admin_reviewed_by: scope.userId,
+        admin_reviewed_at: new Date().toISOString(),
+        admin_resolution_note: reason,
         created_by: scope.userId,
       })
       .select("id")

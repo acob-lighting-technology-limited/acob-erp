@@ -39,6 +39,11 @@ function renderStatusBadge(r: AppealRow) {
   }
 
   if (r.stage === "pending_lead") {
+    if (r.initiated_by_role === "admin_manual") {
+      return (
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
+      )
+    }
     return (
       <div className="flex flex-col items-start gap-1">
         <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
