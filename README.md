@@ -29,7 +29,7 @@ For how staff use the system, see [docs/MATRIX_USER_GUIDE.md](docs/MATRIX_USER_G
 - **Tailwind CSS 4** + shadcn/ui components
 - **Supabase** — Postgres with RLS, Auth, Storage, Edge Functions (`supabase/functions`), `pg_cron`
 - **Resend** for transactional email; **Upstash Redis** for rate limiting
-- **Vercel** for hosting; `services/document-service` for PDF/OCR tooling
+- **Vercel** for hosting; PDF tools (incl. OCR, passwords) run in the browser — `lib/pdf`
 
 ## Getting started
 
@@ -99,7 +99,6 @@ app/            Routes — (app) staff pages, admin, api, auth
 components/     Shared UI (components/ui = shadcn-based primitives)
 lib/            Domain logic, grouped by area (hr, tasks, starlink, …)
 supabase/       Migrations, edge functions, config
-services/       Out-of-process services (document-service)
 scripts/        Maintenance, audits, test campaigns
 docs/           Runbooks, audits, implementation notes, user guide
 tests/          Playwright end-to-end tests

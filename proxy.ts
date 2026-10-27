@@ -66,7 +66,9 @@ export const config = {
   // refuse a service worker script served via redirect, and fetch the manifest
   // without cookies — a redirect to /auth/login makes iOS save a plain bookmark
   // instead of installing the app, and iOS only exposes push to installed apps.
+  // vendor/pdf-engines and workers/ are open-source WebAssembly engines the
+  // browser PDF tools load (lib/pdf); nothing private, so skip the session check.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sw\\.js$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js$|manifest\\.webmanifest$|vendor/pdf-engines/|workers/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }

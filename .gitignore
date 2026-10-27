@@ -17,6 +17,9 @@
 # production
 /build
 
+# PDF engines copied from node_modules (scripts/copy-pdf-engines.mjs)
+/public/vendor/pdf-engines/
+
 # misc
 .DS_Store
 *.pem

@@ -29,13 +29,18 @@ export type AppealWithProfile = {
   status: "pending" | "approved" | "rejected" | "resolved"
   stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
   initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
+  created_by?: string | null
+  created_by_name?: string | null
   lead_reviewed_by?: string | null
+  lead_reviewer_name?: string | null
   lead_reviewed_at?: string | null
   lead_resolution_note?: string | null
   admin_reviewed_by?: string | null
+  admin_reviewer_name?: string | null
   admin_reviewed_at?: string | null
   admin_resolution_note?: string | null
   reviewed_by: string | null
+  reviewer_name?: string | null
   reviewed_at: string | null
   resolution_note: string | null
   created_at: string
@@ -53,6 +58,7 @@ type AppealRow = {
   status: "pending" | "approved" | "rejected" | "resolved"
   stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
   initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
+  created_by?: string | null
   lead_reviewed_by?: string | null
   lead_reviewed_at?: string | null
   lead_resolution_note?: string | null
@@ -103,7 +109,7 @@ export async function GET(request: NextRequest) {
     let appealsQuery = dataClient
       .from("attendance_appeals")
       .select(
-        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
+        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
       )
       .order("created_at", { ascending: false })
 
@@ -124,18 +130,34 @@ export async function GET(request: NextRequest) {
     const rows = appeals ?? []
     if (rows.length === 0) return NextResponse.json({ data: [] })
 
-    // Fetch profiles for enrichment
-    const uniqueUserIds = [...new Set(rows.map((r) => r.user_id))]
+    // Fetch profiles for enrichment (appellant, creator, reviewers)
+    const userIdsToFetch = new Set<string>()
+    for (const r of rows) {
+      if (r.user_id) userIdsToFetch.add(r.user_id)
+      if (r.created_by) userIdsToFetch.add(r.created_by)
+      if (r.lead_reviewed_by) userIdsToFetch.add(r.lead_reviewed_by)
+      if (r.admin_reviewed_by) userIdsToFetch.add(r.admin_reviewed_by)
+      if (r.reviewed_by) userIdsToFetch.add(r.reviewed_by)
+    }
+
     const { data: profiles } = await dataClient
       .from("profiles")
       .select("id, full_name, first_name, last_name, department, is_department_lead")
-      .in("id", uniqueUserIds)
+      .in("id", Array.from(userIdsToFetch))
       .returns<ProfileRow[]>()
 
     const profileMap = new Map<string, ProfileRow>()
     for (const p of profiles ?? []) profileMap.set(p.id, p)
 
+    const resolveProfileName = (id?: string | null): string | null => {
+      if (!id) return null
+      const p = profileMap.get(id)
+      if (!p) return null
+      return p.full_name?.trim() || [p.first_name, p.last_name].filter(Boolean).join(" ") || null
+    }
+
     const policy = await loadAttendancePolicy(dataClient)
+    const uniqueUserIds = [...new Set(rows.map((r) => r.user_id))]
     const appealDates = [...new Set(rows.map((r) => r.appeal_date))]
     const { data: dayRecords } = await dataClient
       .from("attendance_records")
@@ -156,11 +178,15 @@ export async function GET(request: NextRequest) {
 
     const data: AppealWithProfile[] = rows.map((r) => {
       const p = profileMap.get(r.user_id)
-      const user_name = p?.full_name?.trim() || [p?.first_name, p?.last_name].filter(Boolean).join(" ") || "Unknown"
+      const user_name = resolveProfileName(r.user_id) || "Unknown"
       return {
         ...r,
         user_name,
         department: p?.department ?? "",
+        created_by_name: resolveProfileName(r.created_by),
+        lead_reviewer_name: resolveProfileName(r.lead_reviewed_by),
+        admin_reviewer_name: resolveProfileName(r.admin_reviewed_by),
+        reviewer_name: resolveProfileName(r.reviewed_by),
         live_status: liveAppealDayStatus(
           recordByDay.get(`${r.user_id}::${r.appeal_date}`) ?? null,
           r.appeal_date,
@@ -207,7 +233,7 @@ export async function PATCH(request: NextRequest) {
     const { data: appeal, error: fetchError } = await dataClient
       .from("attendance_appeals")
       .select(
-        "id, user_id, appeal_date, current_status, requested_status, appeal_reason, attendance_record_id, status, stage, initiated_by_role, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note"
+        "id, user_id, appeal_date, current_status, requested_status, appeal_reason, attendance_record_id, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note"
       )
       .eq("id", appealId)
       .maybeSingle<AppealRow>()
@@ -259,6 +285,34 @@ export async function PATCH(request: NextRequest) {
 
     // ── STAGE 1: Department Lead Review ──────────────────────────────────────────
     if (currentStage === "pending_lead") {
+      const leadDepts =
+        scope.leadDepartments && scope.leadDepartments.length > 0
+          ? scope.leadDepartments
+          : scope.department
+            ? [scope.department]
+            : []
+      const isLeadOfAppellantDept = Boolean(
+        scope.isDepartmentLead && appellant?.department && leadDepts.includes(appellant.department)
+      )
+
+      // Separation of Duties: An initiator cannot confirm their own alteration
+      if (appeal.created_by && scope.userId === appeal.created_by) {
+        return NextResponse.json(
+          { error: "You cannot confirm an alteration you initiated. The employee's Department Lead must confirm it." },
+          { status: 403 }
+        )
+      }
+
+      // Guard: Admin Manual Alterations require the employee's actual Department Lead confirmation
+      if (appeal.initiated_by_role === "admin_manual" && !isLeadOfAppellantDept && scope.role !== "developer") {
+        return NextResponse.json(
+          {
+            error: `Only the Department Lead for ${appellant?.department || "this department"} can confirm this alteration.`,
+          },
+          { status: 403 }
+        )
+      }
+
       const scopedDepts = getScopedDepartments(scope)
       if (scopedDepts !== null && (!appellant?.department || !scopedDepts.includes(appellant.department))) {
         return NextResponse.json(

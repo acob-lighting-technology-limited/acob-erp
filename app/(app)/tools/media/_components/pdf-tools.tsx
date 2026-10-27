@@ -1,22 +1,20 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { saveAs } from "file-saver"
 import { toast } from "sonner"
-import { apiFetch, apiJson } from "@/lib/api-client"
-import { QUERY_KEYS } from "@/lib/query-keys"
 import {
   extractPdfText,
   imagesToPdf,
   mergePdfs,
   pdfToDocx,
+  pdfToImages,
   resizeImageToPng,
   splitPdf,
   toPdfBlob,
   watermarkPdf,
+  type PageImageFormat,
 } from "@/lib/pdf/client-tools"
-import type { PdfServerCapabilities } from "@/app/api/pdf/capabilities/route"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -58,37 +56,14 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(exponent === 0 ? 0 : 2)} ${units[exponent]}`
 }
 
-/** Tools that need native binaries, so they run on the server (document service). */
-const SERVER_TOOLS = ["compress", "convert", "password", "ocr"] as const
-type ServerTool = (typeof SERVER_TOOLS)[number]
-const isServerTool = (tool: PdfToolType): tool is ServerTool => (SERVER_TOOLS as readonly string[]).includes(tool)
-
 /**
- * Vercel rejects function request bodies over 4.5 MB with a plain-text 413
- * before the route runs. Keep a margin for the multipart overhead. Only the
- * server tools are subject to this; the rest run in the browser.
+ * Every tool runs on the user's device, so there is no upload limit — only the
+ * device's memory. Above this size, warn (never block) that a phone may run out.
  */
-const MAX_UPLOAD_BYTES = 4.2 * 1024 * 1024
+const LARGE_FILE_BYTES = 100 * 1024 * 1024
 
-/**
- * POST to a PDF route and throw a readable message on failure. Checks the upload
- * size first, and never assumes the error body is JSON: the platform's 413 is
- * plain text, which previously surfaced as "Unexpected token 'R'…".
- */
-async function postPdfTool(path: string, formData: FormData, fallbackError: string): Promise<Response> {
-  let totalBytes = 0
-  formData.forEach((value) => {
-    if (value instanceof File) totalBytes += value.size
-  })
-  const tooLarge = `Files are too large (${formatBytes(totalBytes)}). The limit is ${formatBytes(MAX_UPLOAD_BYTES)} per request — use smaller or fewer files.`
-  if (totalBytes > MAX_UPLOAD_BYTES) throw new Error(tooLarge)
-
-  const response = await apiFetch(path, { method: "POST", body: formData })
-  if (response.ok) return response
-  if (response.status === 413) throw new Error(tooLarge)
-  const payload = await response.json().catch(() => null)
-  throw new Error(payload?.error || `${fallbackError} (status ${response.status})`)
-}
+/** Outcome a tool can report instead of the default success toast. */
+type ToolOutcome = { message: string; warning?: boolean } | void
 
 export function PdfTools() {
   const [toolType, setToolType] = useState<PdfToolType>("merge")
@@ -100,13 +75,14 @@ export function PdfTools() {
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [splitPages, setSplitPages] = useState("")
-  const [convertFormat, setConvertFormat] = useState("jpg")
+  const [convertFormat, setConvertFormat] = useState<PageImageFormat>("jpg")
   const [compressionMode, setCompressionMode] = useState<"size" | "percentage">("size")
   const [compressionResult, setCompressionResult] = useState<{
     originalSize: number
     compressedSize: number
     targetBytes: number
     targetMissed: boolean
+    hadImages: boolean
   } | null>(null)
   const [targetSize, setTargetSize] = useState("")
   const [sizeUnit, setSizeUnit] = useState<"KB" | "MB" | "GB">("MB")
@@ -129,22 +105,28 @@ export function PdfTools() {
   const [ocrOutputFormat, setOcrOutputFormat] = useState<"text" | "pdf">("text")
   const [ocrText, setOcrText] = useState("")
 
-  const { data: serverCapabilities } = useQuery({
-    queryKey: QUERY_KEYS.pdfServerCapabilities(),
-    queryFn: () => apiJson<PdfServerCapabilities>("/api/pdf/capabilities"),
-    staleTime: 5 * 60 * 1000,
-  })
-  // Unknown while loading — treat as available so nothing flickers disabled.
-  const isToolUnavailable = (tool: PdfToolType) => isServerTool(tool) && serverCapabilities?.[tool] === false
-  const currentToolUnavailable = isToolUnavailable(toolType)
+  const selectedBytes =
+    pdfFiles.reduce((total, f) => total + f.size, 0) +
+    imageFiles.reduce((total, f) => total + f.size, 0) +
+    (singlePdfFile?.size ?? 0)
 
-  /** Run a browser-side tool with the shared processing state and toasts. */
-  const runInBrowser = async (loading: string, success: string, failure: string, work: () => Promise<void>) => {
+  /**
+   * Run a tool with the shared processing state and toasts. `work` gets a
+   * `progress` callback for long jobs (OCR, convert) and may return its own
+   * outcome message.
+   */
+  const runInBrowser = async (
+    loading: string,
+    success: string,
+    failure: string,
+    work: (progress: (message: string) => void) => Promise<ToolOutcome>
+  ) => {
     setProcessing(true)
     const toastId = toast.loading(loading)
     try {
-      await work()
-      toast.success(success, { id: toastId })
+      const outcome = await work((message) => toast.loading(message, { id: toastId }))
+      if (outcome?.warning) toast.warning(outcome.message, { id: toastId, duration: 8000 })
+      else toast.success(outcome?.message ?? success, { id: toastId })
     } catch (error) {
       toast.error(error instanceof Error && error.message ? error.message : failure, { id: toastId })
     } finally {
@@ -237,55 +219,29 @@ export function PdfTools() {
       toast.error("Please enter a valid percentage (1-99)")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Compressing PDF...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-      formData.append("mode", compressionMode)
-      if (compressionMode === "size") {
-        formData.append("targetSize", targetSize)
-        formData.append("sizeUnit", sizeUnit)
-      } else {
-        formData.append("percentage", percentage)
-      }
-
-      const response = await postPdfTool("/api/pdf/compress", formData, "Compression failed")
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `compressed_${singlePdfFile.name}`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-
-      // Report the sizes rather than a bare "success": when the server has no
-      // Ghostscript it can only re-serialise the file, which shaves ~1% and
-      // silently misses the target. Showing the numbers makes that visible.
+    setCompressionResult(null)
+    await runInBrowser("Compressing PDF...", "PDF compressed", "Compression failed", async (progress) => {
       const originalSize = singlePdfFile.size
-      const reduction = originalSize > 0 ? ((originalSize - blob.size) / originalSize) * 100 : 0
-      const sizeSummary = `${formatBytes(originalSize)} → ${formatBytes(blob.size)} (${reduction.toFixed(1)}% smaller)`
       const targetBytes =
         compressionMode === "size"
-          ? parseFloat(targetSize) *
-            (sizeUnit.toUpperCase() === "KB" ? 1024 : sizeUnit.toUpperCase() === "GB" ? 1024 ** 3 : 1024 ** 2)
+          ? parseFloat(targetSize) * (sizeUnit === "KB" ? 1024 : sizeUnit === "GB" ? 1024 ** 3 : 1024 ** 2)
           : originalSize * (1 - parseFloat(percentage) / 100)
-      const targetMissed = Number.isFinite(targetBytes) && blob.size > targetBytes
 
-      setCompressionResult({ originalSize, compressedSize: blob.size, targetBytes, targetMissed })
+      const { compressPdf } = await import("@/lib/pdf/compress")
+      const { bytes, hadImages } = await compressPdf(singlePdfFile, targetBytes, undefined, (level, total) =>
+        progress(`Compressing PDF... (pass ${level} of ${total})`)
+      )
+      saveAs(toPdfBlob(bytes), `compressed_${singlePdfFile.name}`)
 
-      if (targetMissed) {
-        toast.warning(`Target not reached. ${sizeSummary}`, { id: toastId, duration: 8000 })
-      } else {
-        toast.success(`PDF compressed. ${sizeSummary}`, { id: toastId })
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Compression failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+      // Report the sizes rather than a bare "success", so a missed target is visible.
+      const reduction = originalSize > 0 ? ((originalSize - bytes.length) / originalSize) * 100 : 0
+      const sizeSummary = `${formatBytes(originalSize)} → ${formatBytes(bytes.length)} (${reduction.toFixed(1)}% smaller)`
+      const targetMissed = bytes.length > targetBytes
+      setCompressionResult({ originalSize, compressedSize: bytes.length, targetBytes, targetMissed, hadImages })
+      return targetMissed
+        ? { message: `Target not reached. ${sizeSummary}`, warning: true }
+        : { message: `PDF compressed. ${sizeSummary}` }
+    })
   }
 
   const handleConvert = async () => {
@@ -293,29 +249,17 @@ export function PdfTools() {
       toast.error("Please select a PDF file")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Converting PDF to images...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-      formData.append("format", convertFormat)
-
-      const response = await postPdfTool("/api/pdf/convert", formData, "Conversion failed")
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `pdf_images_${Date.now()}.zip`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("PDF converted successfully!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Conversion failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    await runInBrowser(
+      "Converting PDF to images...",
+      "PDF converted successfully!",
+      "Conversion failed",
+      async (progress) => {
+        const zip = await pdfToImages(singlePdfFile, convertFormat, (page, total) =>
+          progress(`Converting page ${page} of ${total}...`)
+        )
+        saveAs(zip, `${singlePdfFile.name.replace(/\.pdf$/i, "")}_images.zip`)
+      }
+    )
   }
 
   // Thumbnails for the images-to-PDF picker. Page order follows array order,
@@ -424,37 +368,19 @@ export function PdfTools() {
       toast.error("Please enter a password")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading(passwordAction === "protect" ? "Protecting PDF..." : "Removing password...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-      formData.append("action", passwordAction)
-      formData.append("password", pdfPassword)
-
-      const response = await postPdfTool("/api/pdf/password", formData, "Password operation failed")
-
-      const contentType = response.headers.get("content-type") || ""
-      if (contentType.includes("application/json")) {
-        const data = await response.json()
-        throw new Error(data.error || "Password operation failed")
+    const protect = passwordAction === "protect"
+    await runInBrowser(
+      protect ? "Protecting PDF..." : "Removing password...",
+      protect ? "Password added" : "Password removed",
+      "Password operation failed",
+      async () => {
+        const { protectPdf, unlockPdf } = await import("@/lib/pdf/password")
+        const output = protect
+          ? await protectPdf(singlePdfFile, pdfPassword)
+          : await unlockPdf(singlePdfFile, pdfPassword)
+        saveAs(toPdfBlob(output), `${protect ? "protected" : "unprotected"}_${singlePdfFile.name}`)
       }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${passwordAction === "protect" ? "protected" : "unprotected"}_${singlePdfFile.name}`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      toast.success("Password operation complete!", { id: toastId })
-    } catch (error: any) {
-      toast.error(error.message || "Password operation failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    )
   }
 
   const handleOcr = async () => {
@@ -462,36 +388,16 @@ export function PdfTools() {
       toast.error("Please select a PDF file")
       return
     }
-    setProcessing(true)
-    const toastId = toast.loading("Performing OCR...")
-    try {
-      const formData = new FormData()
-      formData.append("file", singlePdfFile)
-      formData.append("outputFormat", ocrOutputFormat)
-
-      const response = await postPdfTool("/api/pdf/ocr", formData, "OCR failed")
-
-      if (ocrOutputFormat === "text") {
-        const data = await response.json()
-        setOcrText(data.text || "")
-        toast.success("OCR Text extracted!", { id: toastId })
-      } else {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `ocr_${singlePdfFile.name}`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        toast.success("OCR PDF generated successfully!", { id: toastId })
-      }
-    } catch (error: any) {
-      toast.error(error.message || "OCR failed", { id: toastId })
-    } finally {
-      setProcessing(false)
-    }
+    setOcrText("")
+    await runInBrowser("Loading OCR engine...", "OCR complete", "OCR failed", async (progress) => {
+      const { ocrPdf } = await import("@/lib/pdf/ocr")
+      const { text, pdf } = await ocrPdf(singlePdfFile, {
+        searchablePdf: ocrOutputFormat === "pdf",
+        onPage: (page, total) => progress(`Reading page ${page} of ${total}...`),
+      })
+      if (pdf) saveAs(toPdfBlob(pdf), `ocr_${singlePdfFile.name}`)
+      else setOcrText(text || "No text was recognised. The scan may be too faint or blurred.")
+    })
   }
 
   return (
@@ -525,7 +431,6 @@ export function PdfTools() {
             }}
           >
             {t.replace("-", " ")}
-            {isToolUnavailable(t) && <span className="text-muted-foreground ml-1 normal-case">(soon)</span>}
           </Button>
         ))}
       </div>
@@ -535,19 +440,16 @@ export function PdfTools() {
           <CardHeader>
             <CardTitle className="capitalize">{toolType.replace("-", " ")} PDF</CardTitle>
             <CardDescription>
-              {isServerTool(toolType)
-                ? `Processed on the server. Files up to ${formatBytes(MAX_UPLOAD_BYTES)}.`
-                : "Processed on your device — the file is not uploaded and there is no size limit."}
+              Processed on your device — the file is not uploaded and there is no size limit.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {currentToolUnavailable && (
+            {selectedBytes > LARGE_FILE_BYTES && (
               <div
                 role="status"
                 className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
               >
-                This tool is not available yet. It needs a document-processing server that is still being set up. Merge,
-                Split, Images to PDF, Extract Text, To Doc and Watermark work now.
+                This is a large file ({formatBytes(selectedBytes)}). If it fails on a phone, try a laptop or desktop.
               </div>
             )}
             {/* Input upload sections based on tool type */}
@@ -679,11 +581,7 @@ export function PdfTools() {
                     onChange={(e) => setPercentage(e.target.value)}
                   />
                 )}
-                <Button
-                  className="w-full"
-                  onClick={handleCompress}
-                  disabled={!singlePdfFile || processing || currentToolUnavailable}
-                >
+                <Button className="w-full" onClick={handleCompress} disabled={!singlePdfFile || processing}>
                   {processing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -706,8 +604,9 @@ export function PdfTools() {
                     </div>
                     {compressionResult.targetMissed && (
                       <p className="mt-2 text-amber-800 dark:text-amber-200">
-                        The target could not be reached. Real size reduction needs Ghostscript on the server; without it
-                        the file can only be re-saved, which reclaims very little on image-heavy PDFs.
+                        {compressionResult.hadImages
+                          ? "The target could not be reached. This is as small as the images can go and still be readable."
+                          : "This PDF has no photos or scans to shrink. Text-only PDFs are already compact."}
                       </p>
                     )}
                   </div>
@@ -730,7 +629,7 @@ export function PdfTools() {
                   <label className="text-sm font-medium">Image Format</label>
                   <select
                     value={convertFormat}
-                    onChange={(e) => setConvertFormat(e.target.value)}
+                    onChange={(e) => setConvertFormat(e.target.value as PageImageFormat)}
                     className="bg-background w-full rounded border p-2 text-sm"
                   >
                     <option value="jpg">JPEG (.jpg)</option>
@@ -738,11 +637,7 @@ export function PdfTools() {
                     <option value="webp">WebP (.webp)</option>
                   </select>
                 </div>
-                <Button
-                  className="w-full"
-                  onClick={handleConvert}
-                  disabled={!singlePdfFile || processing || currentToolUnavailable}
-                >
+                <Button className="w-full" onClick={handleConvert} disabled={!singlePdfFile || processing}>
                   {processing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -1039,7 +934,7 @@ export function PdfTools() {
                 <Button
                   className="w-full"
                   onClick={handlePassword}
-                  disabled={!singlePdfFile || !pdfPassword || processing || currentToolUnavailable}
+                  disabled={!singlePdfFile || !pdfPassword || processing}
                 >
                   {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Key className="mr-2 h-4 w-4" />}
                   Execute Password Security
@@ -1069,11 +964,7 @@ export function PdfTools() {
                     <option value="pdf">Searchable PDF Layer</option>
                   </select>
                 </div>
-                <Button
-                  className="w-full"
-                  onClick={handleOcr}
-                  disabled={!singlePdfFile || processing || currentToolUnavailable}
-                >
+                <Button className="w-full" onClick={handleOcr} disabled={!singlePdfFile || processing}>
                   {processing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -1122,12 +1013,15 @@ export function PdfTools() {
               <strong>Extract Text</strong>: Reads the selectable text in a PDF. Scanned pages have none — use OCR.
             </p>
             <p>
-              Merge, Split, Images to PDF, Extract Text, To Doc and Watermark run on your device, so large files work
-              and nothing is uploaded.
+              <strong>Compress</strong>: Shrinks the photos and scans inside a PDF; the text stays sharp and selectable.
+              Text-only PDFs barely shrink.
             </p>
             <p>
-              <strong>Compress</strong>, <strong>Convert</strong>, <strong>Password</strong> and <strong>OCR</strong>{" "}
-              run on the server, with a {formatBytes(MAX_UPLOAD_BYTES)} limit per file.
+              <strong>OCR</strong>: Reads scanned pages. Takes a few seconds per page, longer on a phone.
+            </p>
+            <p>
+              Every tool runs on your device: nothing is uploaded and there is no size limit. Very large files may be
+              too much for a phone — use a laptop for those.
             </p>
           </CardContent>
         </Card>
