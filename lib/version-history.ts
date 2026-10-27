@@ -75,6 +75,7 @@ export const RELEASES: Release[] = [
       {
         area: "Attendance",
         items: [
+          "Attendance appeals display full audit history including initiator, lead endorsement, and admin approval with timestamps, with separation of duties enforcing department lead confirmation on manual alterations",
           "Attendance change log showing every edit to a record",
           "Staff are told when the clock-in device is offline",
           "Attendance appeals now need both the lead and HR, with clear badges for who is pending",

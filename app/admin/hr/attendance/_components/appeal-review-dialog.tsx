@@ -34,12 +34,19 @@ export interface AppealRow {
   status: "pending" | "approved" | "rejected" | "resolved"
   stage?: "pending_lead" | "pending_admin" | "pending_hr_lead" | "approved" | "rejected" | "resolved"
   initiated_by_role?: "employee" | "lead_on_behalf" | "admin_manual"
+  created_by?: string | null
+  created_by_name?: string | null
   lead_reviewed_by?: string | null
+  lead_reviewer_name?: string | null
   lead_reviewed_at?: string | null
   lead_resolution_note?: string | null
   admin_reviewed_by?: string | null
+  admin_reviewer_name?: string | null
   admin_reviewed_at?: string | null
   admin_resolution_note?: string | null
+  reviewed_by?: string | null
+  reviewer_name?: string | null
+  reviewed_at?: string | null
   created_at: string
 }
 
@@ -125,11 +132,28 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
     return "Approve"
   }
 
+  const isPending = appeal?.status === "pending"
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Review Appeal</DialogTitle>
+          <div className="flex items-center justify-between pr-6">
+            <DialogTitle>{isPending ? "Review Appeal" : "Appeal Details"}</DialogTitle>
+            {appeal && appeal.status !== "pending" && (
+              <Badge
+                className={
+                  appeal.status === "approved"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    : appeal.status === "rejected"
+                      ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                      : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
+                }
+              >
+                {appeal.status.toUpperCase()}
+              </Badge>
+            )}
+          </div>
           <DialogDescription>
             {appeal ? `${appeal.user_name} — ${appeal.appeal_date}` : "No appeal selected"}
           </DialogDescription>
@@ -147,25 +171,39 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Date</span>
+                <span className="text-muted-foreground">Appeal Date</span>
                 <span className="font-medium">{appeal.appeal_date}</span>
               </div>
-              {appeal.initiated_by_role === "admin_manual" && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Origin</span>
-                  <Badge variant="outline" className="border-blue-200 text-blue-600">
-                    Admin Manual Alteration
-                  </Badge>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Submitted</span>
+                <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.created_at)}</span>
+              </div>
+              <div className="flex items-center justify-between border-t pt-2">
+                <span className="text-muted-foreground">Origin</span>
+                <div className="text-right">
+                  {appeal.initiated_by_role === "admin_manual" ? (
+                    <div>
+                      <Badge variant="outline" className="border-blue-200 text-blue-600">
+                        Admin Manual Alteration
+                      </Badge>
+                      <div className="text-muted-foreground mt-0.5 text-xs">By {appeal.created_by_name || "Admin"}</div>
+                    </div>
+                  ) : appeal.initiated_by_role === "lead_on_behalf" ? (
+                    <div>
+                      <Badge variant="outline" className="border-purple-200 text-purple-600">
+                        Lead on Behalf
+                      </Badge>
+                      <div className="text-muted-foreground mt-0.5 text-xs">
+                        By {appeal.created_by_name || "Department Lead"}
+                      </div>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="border-emerald-200 text-emerald-700 dark:text-emerald-400">
+                      Employee Appeal
+                    </Badge>
+                  )}
                 </div>
-              )}
-              {appeal.initiated_by_role === "lead_on_behalf" && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Origin</span>
-                  <Badge variant="outline" className="border-purple-200 text-purple-600">
-                    Lead on Behalf
-                  </Badge>
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Status change preview */}
@@ -198,60 +236,122 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                 {appeal.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Employee's Reason"}
               </p>
-              <p className="text-sm leading-relaxed">{appeal.appeal_reason}</p>
+              <p className="text-sm leading-relaxed">{appeal.appeal_reason || "No reason specified"}</p>
             </div>
 
-            {/* Previous endorsement note if in later stages */}
-            {appeal.lead_resolution_note && appeal.stage !== "pending_lead" && (
-              <div className="bg-muted/40 space-y-1 rounded border p-2.5 text-xs">
+            {/* Lead Endorsement card */}
+            {appeal.lead_reviewed_at ? (
+              <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
                 <div className="text-foreground flex items-center justify-between font-medium">
                   <span>Lead Endorsement</span>
-                  {appeal.lead_reviewed_at && (
-                    <span className="text-muted-foreground font-mono text-[11px]">
-                      {formatWATDateTime(appeal.lead_reviewed_at)}
-                    </span>
+                  <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.lead_reviewed_at)}</span>
+                </div>
+                <div className="text-muted-foreground">
+                  Endorsed by{" "}
+                  <span className="text-foreground font-medium">{appeal.lead_reviewer_name || "Department Lead"}</span>
+                </div>
+                {appeal.lead_resolution_note && (
+                  <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
+                    &ldquo;{appeal.lead_resolution_note}&rdquo;
+                  </p>
+                )}
+              </div>
+            ) : appeal.stage === "pending_lead" ? (
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+                Awaiting Department Lead endorsement
+              </div>
+            ) : null}
+
+            {/* Admin Review card */}
+            {appeal.admin_reviewed_at ? (
+              <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
+                <div className="text-foreground flex items-center justify-between font-medium">
+                  <span>Admin Review</span>
+                  <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.admin_reviewed_at)}</span>
+                </div>
+                <div className="text-muted-foreground">
+                  Reviewed by{" "}
+                  <span className="text-foreground font-medium">
+                    {appeal.admin_reviewer_name || appeal.reviewer_name || "Admin"}
+                  </span>
+                </div>
+                {(appeal.admin_resolution_note || appeal.resolution_note) && (
+                  <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
+                    &ldquo;{appeal.admin_resolution_note || appeal.resolution_note}&rdquo;
+                  </p>
+                )}
+              </div>
+            ) : appeal.status === "approved" || appeal.status === "rejected" ? (
+              <div className="bg-muted/40 space-y-1.5 rounded-lg border p-3 text-xs">
+                <div className="text-foreground flex items-center justify-between font-medium">
+                  <span>Admin Review</span>
+                  {appeal.reviewed_at && (
+                    <span className="text-muted-foreground text-xs">{formatWATDateTime(appeal.reviewed_at)}</span>
                   )}
                 </div>
-                <p className="text-muted-foreground italic">&ldquo;{appeal.lead_resolution_note}&rdquo;</p>
+                {appeal.reviewer_name && (
+                  <div className="text-muted-foreground">
+                    Reviewed by <span className="text-foreground font-medium">{appeal.reviewer_name}</span>
+                  </div>
+                )}
+                {appeal.resolution_note && (
+                  <p className="text-muted-foreground mt-1.5 border-t pt-1.5 italic">
+                    &ldquo;{appeal.resolution_note}&rdquo;
+                  </p>
+                )}
+              </div>
+            ) : appeal.stage === "pending_admin" ? (
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-2.5 text-xs text-blue-800 dark:text-blue-300">
+                Awaiting Admin & HR review
+              </div>
+            ) : null}
+
+            {/* Resolution note input for pending review */}
+            {isPending && (
+              <div className="space-y-2">
+                <Label htmlFor="resolution-note">
+                  Decision Note <span className="text-muted-foreground text-xs">(required for rejection)</span>
+                </Label>
+                <Textarea
+                  id="resolution-note"
+                  placeholder="Add a note explaining your decision…"
+                  value={displayNote}
+                  onChange={(e) => handleNoteChange(e.target.value)}
+                  rows={3}
+                  disabled={isLoading}
+                  className="resize-none"
+                />
               </div>
             )}
-
-            {/* Resolution note */}
-            <div className="space-y-2">
-              <Label htmlFor="resolution-note">
-                Decision Note <span className="text-muted-foreground text-xs">(required for rejection)</span>
-              </Label>
-              <Textarea
-                id="resolution-note"
-                placeholder="Add a note explaining your decision…"
-                value={displayNote}
-                onChange={(e) => handleNoteChange(e.target.value)}
-                rows={3}
-                disabled={isLoading}
-                className="resize-none"
-              />
-            </div>
           </div>
         )}
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => void handleAction("reject")}
-            disabled={isLoading || !appeal || !currentNote.trim()}
-          >
-            {rejectingLoad ? "Rejecting…" : "Reject"}
-          </Button>
-          <Button
-            className="bg-emerald-600 text-white hover:bg-emerald-700"
-            onClick={() => void handleAction("approve")}
-            disabled={isLoading || !appeal}
-          >
-            {approveButtonText()}
-          </Button>
+          {isPending ? (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={isLoading}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void handleAction("reject")}
+                disabled={isLoading || !appeal || !currentNote.trim()}
+              >
+                {rejectingLoad ? "Rejecting…" : "Reject"}
+              </Button>
+              <Button
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={() => void handleAction("approve")}
+                disabled={isLoading || !appeal}
+              >
+                {approveButtonText()}
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, CheckCircle2, XCircle, FileQuestion } from "lucide-react"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
 import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
-import { formatWATDate } from "@/lib/utils/date"
+import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { AppealReviewDialog } from "./appeal-review-dialog"
 import type { AppealRow } from "./appeal-review-dialog"
 import { apiJson } from "@/lib/api-client"
@@ -281,22 +281,44 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
               { label: "Current Status", value: r.current_status },
               { label: "Requested Status", value: r.requested_status },
               { label: "Status", value: r.status },
+              {
+                label: "Origin",
+                value: `${r.initiated_by_role === "admin_manual" ? "Admin Manual Alteration" : r.initiated_by_role === "lead_on_behalf" ? "Lead on Behalf" : "Employee Appeal"} by ${r.created_by_name || (r.initiated_by_role === "employee" ? r.user_name : "Admin")} (${formatWATDateTime(r.created_at)})`,
+                fullWidth: true,
+              },
+              {
+                label: "Lead Endorsement",
+                value: r.lead_reviewed_at
+                  ? `Endorsed by ${r.lead_reviewer_name || "Department Lead"} on ${formatWATDateTime(r.lead_reviewed_at)}${r.lead_resolution_note ? ` — "${r.lead_resolution_note}"` : ""}`
+                  : r.stage === "pending_lead"
+                    ? "Pending Lead Endorsement"
+                    : "Not required / Bypassed",
+                fullWidth: true,
+              },
+              {
+                label: "Admin Review",
+                value: r.admin_reviewed_at
+                  ? `Reviewed by ${r.admin_reviewer_name || r.reviewer_name || "Admin"} on ${formatWATDateTime(r.admin_reviewed_at)}${r.admin_resolution_note || r.resolution_note ? ` — "${r.admin_resolution_note || r.resolution_note}"` : ""}`
+                  : r.status === "approved" || r.status === "rejected"
+                    ? `Reviewed by ${r.reviewer_name || "Admin"}${r.reviewed_at ? ` on ${formatWATDateTime(r.reviewed_at)}` : ""}${r.resolution_note ? ` — "${r.resolution_note}"` : ""}`
+                    : r.stage === "pending_admin"
+                      ? "Pending Admin Review"
+                      : "Pending Lead stage",
+                fullWidth: true,
+              },
               { label: "Appeal Reason", value: r.appeal_reason || "No reason specified", fullWidth: true },
               ...(r.resolution_note ? [{ label: "Resolution Note", value: r.resolution_note, fullWidth: true }] : []),
             ],
-            actions: (r) =>
-              r.status === "pending"
-                ? [
-                    {
-                      label: "Review Appeal",
-                      variant: "default",
-                      onClick: () => setReviewAppeal(r),
-                    },
-                  ]
-                : [],
+            actions: (r) => [
+              {
+                label: r.status === "pending" ? "Review Appeal" : "View Details",
+                variant: r.status === "pending" ? "default" : "outline",
+                onClick: () => setReviewAppeal(r),
+              },
+            ],
           },
           onSelect: (r) => {
-            if (r.status === "pending") setReviewAppeal(r)
+            setReviewAppeal(r)
           },
         }}
         cardRenderer={(r) => (
@@ -315,7 +337,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
               </span>
             </div>
             {r.appeal_reason && (
-              <p className="text-muted-foreground line-clamp-2 border-t pt-2 text-[11px]">{r.appeal_reason}</p>
+              <p className="text-muted-foreground line-clamp-2 border-t pt-2 text-xs">{r.appeal_reason}</p>
             )}
           </div>
         )}
@@ -328,24 +350,106 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
             onClick: (row) => setReviewAppeal(row),
             hidden: (row) => row.status !== "pending",
           },
+          {
+            label: "View Details",
+            onClick: (row) => setReviewAppeal(row),
+            hidden: (row) => row.status === "pending",
+          },
         ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-3 border-y p-4 text-sm">
+            <div className="bg-muted/20 space-y-3.5 border-y p-4 text-sm">
               <div>
                 <span className="text-muted-foreground mb-1 block text-xs font-semibold tracking-wide uppercase">
-                  Appeal Reason
+                  {r.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Appeal Reason"}
                 </span>
-                <p className="text-foreground text-sm font-medium whitespace-pre-wrap">{r.appeal_reason}</p>
+                <p className="text-foreground text-sm font-medium whitespace-pre-wrap">
+                  {r.appeal_reason || "No reason specified"}
+                </p>
               </div>
-              {r.resolution_note && (
-                <div>
-                  <span className="text-muted-foreground mb-1 block text-xs font-semibold tracking-wide uppercase">
-                    Resolution Note
+
+              <div className="grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-3">
+                {/* 1. Origin */}
+                <div className="bg-background/80 space-y-1 rounded-lg border p-3 text-xs">
+                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                    Origin / Initiator
                   </span>
-                  <p className="text-muted-foreground text-sm font-medium whitespace-pre-wrap">{r.resolution_note}</p>
+                  <div className="text-foreground font-medium">
+                    {r.initiated_by_role === "admin_manual"
+                      ? "Admin Manual Alteration"
+                      : r.initiated_by_role === "lead_on_behalf"
+                        ? "Lead on Behalf"
+                        : "Employee Appeal"}
+                  </div>
+                  <div className="text-muted-foreground">
+                    By: {r.created_by_name || (r.initiated_by_role === "employee" ? r.user_name : "Admin")}
+                  </div>
+                  <div className="text-muted-foreground">{formatWATDateTime(r.created_at)}</div>
                 </div>
-              )}
+
+                {/* 2. Lead Endorsement */}
+                <div className="bg-background/80 space-y-1 rounded-lg border p-3 text-xs">
+                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                    Lead Endorsement
+                  </span>
+                  {r.lead_reviewed_at ? (
+                    <>
+                      <div className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</div>
+                      <div className="text-muted-foreground">By: {r.lead_reviewer_name || "Department Lead"}</div>
+                      <div className="text-muted-foreground">{formatWATDateTime(r.lead_reviewed_at)}</div>
+                      {r.lead_resolution_note && (
+                        <p className="text-muted-foreground mt-1 border-t pt-1 italic">
+                          &ldquo;{r.lead_resolution_note}&rdquo;
+                        </p>
+                      )}
+                    </>
+                  ) : r.stage === "pending_lead" ? (
+                    <div className="font-medium text-amber-600 dark:text-amber-400">Awaiting Lead endorsement</div>
+                  ) : (
+                    <div className="text-muted-foreground">Not required / Bypassed</div>
+                  )}
+                </div>
+
+                {/* 3. Admin Review */}
+                <div className="bg-background/80 space-y-1 rounded-lg border p-3 text-xs">
+                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                    Admin Review
+                  </span>
+                  {r.admin_reviewed_at ? (
+                    <>
+                      <div className="font-medium text-emerald-600 dark:text-emerald-400">
+                        {r.status === "rejected" ? "Rejected" : "Approved"}
+                      </div>
+                      <div className="text-muted-foreground">
+                        By: {r.admin_reviewer_name || r.reviewer_name || "Admin"}
+                      </div>
+                      <div className="text-muted-foreground">{formatWATDateTime(r.admin_reviewed_at)}</div>
+                      {(r.admin_resolution_note || r.resolution_note) && (
+                        <p className="text-muted-foreground mt-1 border-t pt-1 italic">
+                          &ldquo;{r.admin_resolution_note || r.resolution_note}&rdquo;
+                        </p>
+                      )}
+                    </>
+                  ) : r.status === "approved" || r.status === "rejected" ? (
+                    <>
+                      <div className="font-medium text-emerald-600 dark:text-emerald-400">
+                        {r.status === "rejected" ? "Rejected" : "Approved"}
+                      </div>
+                      {r.reviewer_name && <div className="text-muted-foreground">By: {r.reviewer_name}</div>}
+                      {r.reviewed_at && <div className="text-muted-foreground">{formatWATDateTime(r.reviewed_at)}</div>}
+                      {r.resolution_note && (
+                        <p className="text-muted-foreground mt-1 border-t pt-1 italic">
+                          &ldquo;{r.resolution_note}&rdquo;
+                        </p>
+                      )}
+                    </>
+                  ) : r.stage === "pending_admin" ? (
+                    <div className="font-medium text-blue-600 dark:text-blue-400">Awaiting Admin review</div>
+                  ) : (
+                    <div className="text-muted-foreground">Pending Lead stage</div>
+                  )}
+                </div>
+              </div>
             </div>
           ),
         }}
