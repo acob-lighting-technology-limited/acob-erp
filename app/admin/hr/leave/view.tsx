@@ -780,7 +780,7 @@ export function LeaveApprovePage({
             ]}
             expandable={{
               render: (r) => (
-                <div className="bg-muted/10 grid gap-x-8 gap-y-5 border-t p-4 md:grid-cols-2">
+                <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
                   <div className="space-y-3">
                     <SectionHeading
                       title="Leave overview"

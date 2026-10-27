@@ -86,7 +86,7 @@ export function LeaveDetailDialog({
                   <SheetTitle className="truncate text-base font-semibold">{formatName(employeeName)}</SheetTitle>
                   <Badge
                     variant="outline"
-                    className="border-blue-200 bg-blue-50/50 text-[11px] font-medium text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
+                    className="border-blue-200 bg-blue-50/50 text-xs font-medium text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
                   >
                     {leaveTypeName}
                   </Badge>
@@ -143,7 +143,7 @@ export function LeaveDetailDialog({
 
         {/* Sheet Footer */}
         <SheetFooter className="bg-muted/20 flex flex-row items-center justify-between gap-2 border-t px-5 py-3 sm:px-6">
-          <div className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <span className="hidden sm:inline">Request ID:</span>
             <Tooltip>
               <TooltipTrigger asChild>

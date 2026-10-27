@@ -73,8 +73,8 @@ function buildStageAudit(leave: LeaveItem) {
 export function SectionHeading({ title, aside }: { title: string; aside?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <h3 className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">{title}</h3>
-      {typeof aside === "string" ? <span className="text-muted-foreground text-[11px]">{aside}</span> : aside}
+      <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{title}</h3>
+      {typeof aside === "string" ? <span className="text-muted-foreground text-xs">{aside}</span> : aside}
     </div>
   )
 }
@@ -118,7 +118,7 @@ export function LeaveStatusStrip({ leave }: { leave: LeaveItem }) {
         <Clock className="mt-px h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium">{title}</p>
+        <p className="text-xs font-medium">{title}</p>
         {isRejected && strayRejectionReason && (
           <p className="mt-0.5 leading-relaxed">
             <span className="font-semibold">Reason: </span>&ldquo;{strayRejectionReason}&rdquo;
@@ -165,7 +165,7 @@ function DetailField({
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <dt className="text-muted-foreground text-[11px]">{label}</dt>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
       <dd className={cn("text-foreground mt-0.5 font-medium break-words", valueClassName)}>{value}</dd>
     </div>
   )
@@ -213,11 +213,11 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
           <div className="min-w-0 flex-1 text-xs">
             <div className="flex items-center justify-between gap-2">
               <span className="text-foreground font-medium">Direct admin approval</span>
-              <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600">
+              <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600">
                 Approved
               </Badge>
             </div>
-            <p className="text-muted-foreground mt-0.5 text-[11px]">
+            <p className="text-muted-foreground mt-0.5 text-xs">
               {leave.approved_by_profile ? resolvePersonName(leave.approved_by_profile) : "Authorized Admin"}
               {leave.approved_at && ` • ${formatWATDateTime(leave.approved_at)}`}
             </p>
@@ -278,7 +278,7 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
               <li key={stageKey} className="relative flex gap-3">
                 <div
                   className={cn(
-                    "relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold",
+                    "relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold",
                     nodeColor
                   )}
                 >
@@ -303,7 +303,7 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                       <Badge
                         variant={isStageRejected ? "destructive" : "outline"}
                         className={cn(
-                          "text-[10px] font-medium capitalize",
+                          "text-xs font-medium capitalize",
                           !isStageRejected &&
                             "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         )}
@@ -313,22 +313,22 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                     ) : isCurrent && isOpen ? (
                       <Badge
                         variant="outline"
-                        className="border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-600 dark:text-amber-400"
+                        className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-600 dark:text-amber-400"
                       >
                         Awaiting action
                       </Badge>
                     ) : (
-                      <span className="text-muted-foreground text-[10px]">{pendingLabel}</span>
+                      <span className="text-muted-foreground text-xs">{pendingLabel}</span>
                     )}
                   </div>
 
                   {item ? (
-                    <p className="text-muted-foreground mt-0.5 text-[11px]">
+                    <p className="text-muted-foreground mt-0.5 text-xs">
                       <span className="text-foreground/90">{stageActorName || "Authorized Approver"}</span>
                       {item.approved_at && ` • ${formatWATDateTime(item.approved_at)}`}
                     </p>
                   ) : (
-                    pendingNote && <p className="text-muted-foreground mt-0.5 text-[11px]">{pendingNote}</p>
+                    pendingNote && <p className="text-muted-foreground mt-0.5 text-xs">{pendingNote}</p>
                   )}
 
                   {item?.comments && (
@@ -382,7 +382,7 @@ function AttachmentRow({
           <p className="text-foreground truncate text-xs font-medium capitalize">{title}</p>
           {badge}
         </div>
-        {subtitle && <p className="text-muted-foreground truncate text-[11px]">{subtitle}</p>}
+        {subtitle && <p className="text-muted-foreground truncate text-xs">{subtitle}</p>}
       </div>
       <Button size="sm" variant="ghost" className="h-7 shrink-0 gap-1 px-2 text-xs" asChild>
         <a href={href} target="_blank" rel="noreferrer">
@@ -407,7 +407,7 @@ export function LeaveAttachments({ leave }: { leave: LeaveItem }) {
           <Badge
             variant={leave.evidence_complete ? "outline" : "secondary"}
             className={cn(
-              "text-[10px] font-medium",
+              "text-xs font-medium",
               leave.evidence_complete &&
                 "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
             )}
@@ -427,7 +427,7 @@ export function LeaveAttachments({ leave }: { leave: LeaveItem }) {
         />
       ) : handoverNote ? (
         <div className="bg-muted/30 rounded-md border px-3 py-2 text-xs">
-          <span className="text-muted-foreground block text-[11px]">Handover note</span>
+          <span className="text-muted-foreground block text-xs">Handover note</span>
           <p className="text-foreground/90 mt-0.5 leading-relaxed">{handoverNote}</p>
         </div>
       ) : null}
@@ -442,7 +442,7 @@ export function LeaveAttachments({ leave }: { leave: LeaveItem }) {
             <Badge
               variant="outline"
               className={cn(
-                "px-1.5 py-0 text-[9px] uppercase",
+                "px-1.5 py-0 text-xs uppercase",
                 doc.status === "verified"
                   ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                   : doc.status === "rejected"
@@ -466,9 +466,9 @@ export function LeaveAttachments({ leave }: { leave: LeaveItem }) {
 
       {leave.required_documents && leave.required_documents.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-          <span className="text-muted-foreground text-[11px]">Required:</span>
+          <span className="text-muted-foreground text-xs">Required:</span>
           {leave.required_documents.map((reqDoc) => (
-            <Badge key={reqDoc} variant="secondary" className="text-[11px] font-normal">
+            <Badge key={reqDoc} variant="secondary" className="text-xs font-normal">
               {reqDoc}
             </Badge>
           ))}
