@@ -1977,6 +1977,13 @@ interface ManualLeave {
   leave_type: string
   days_count: number | null
   notes: string | null
+  status: string
+}
+
+const MANUAL_LEAVE_STATUS_SUFFIX: Record<string, string> = {
+  pending: " • Awaiting approval",
+  rejected: " • Rejected",
+  cancelled: " • Cancelled",
 }
 
 interface LeaveTypeOption {
@@ -2130,12 +2137,17 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
           reason: reason.trim(),
         }),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string; days_count?: number } | null
+      const payload = (await res.json().catch(() => null)) as {
+        error?: string
+        days_count?: number
+        staged?: boolean
+        message?: string
+      } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to add leave")
         return
       }
-      toast.success(`Leave recorded (${payload?.days_count ?? previewDays ?? ""} day(s))`)
+      toast.success(payload?.message || `Leave recorded (${payload?.days_count ?? previewDays ?? ""} day(s))`)
       setReason("")
       setSelectedId(null)
       void loadEntries()
@@ -2190,12 +2202,12 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
           reason: eReason.trim(),
         }),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to update leave")
         return
       }
-      toast.success("Leave updated")
+      toast.success(payload?.message || "Leave updated")
       setEditing(null)
       void loadEntries()
       onDone()
@@ -2345,7 +2357,7 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
           <EntryRow
             key={entry.id}
             primary={entry.user_name}
-            badge={`${entry.leave_type} • ${formatRangeLabel(entry.start_date, entry.end_date)}${entry.days_count ? ` • ${entry.days_count}d` : ""}`}
+            badge={`${entry.leave_type} • ${formatRangeLabel(entry.start_date, entry.end_date)}${entry.days_count ? ` • ${entry.days_count}d` : ""}${MANUAL_LEAVE_STATUS_SUFFIX[entry.status] ?? ""}`}
             comment={entry.notes}
             onEdit={() => openEdit(entry)}
             onDelete={() => setConfirmEntry(entry)}

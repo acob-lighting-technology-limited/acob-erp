@@ -4,17 +4,15 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
+import { notifyAppealReviewers, resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
 import { notifyAttendanceInApp } from "@/lib/hr/attendance-notify"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import {
   ATTENDANCE_STATUS_LABELS,
   DB_WRITABLE_STATUSES,
   deriveUnifiedAttendanceStatus,
-  isPermissionAttendanceStatus,
   type UnifiedAttendanceStatus,
 } from "@/lib/hr/attendance-status"
-import { createNotification } from "@/lib/notifications/create"
 import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { applyLunchBreak } from "@/lib/hr/attendance-ssot"
@@ -97,13 +95,26 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           ))
     const isCoveredWithoutTimes =
       nextStatus === "waiver" || nextStatus === "absent_with_permission" || nextStatus === "out_of_station"
-    const isPermissionStatus = isPermissionAttendanceStatus(nextStatus)
     const isActorAdmin = auth.scope.isAdminLike && auth.scope.scopeMode !== "lead"
     const isAlteringOther = auth.scope.userId !== record.user_id
 
-    // Two-party rule: If an Admin alters an attendance record to LWP, AWP, IWP, or OOS,
-    // it cannot be applied unilaterally — it stages as an appeal awaiting Lead confirmation.
-    if (isPermissionStatus && isActorAdmin && isAlteringOther) {
+    // Two-stage rule: an Admin who overrides another person's status cannot apply it
+    // unilaterally — it stages as an appeal for Department Lead endorsement, then Admin & HR.
+    // Only an explicit status choice (or waiver) counts: a clock-time correction that merely
+    // re-derives the status applies directly, because the appeal carries a status and no
+    // times, so staging it would drop the corrected punches on approval.
+    const overrideStatus = explicitStatus ?? (parsed.data.waived === true ? "waiver" : undefined)
+    if (overrideStatus && overrideStatus !== record.status && isActorAdmin && isAlteringOther) {
+      if (parsed.data.clock_in !== undefined || parsed.data.clock_out !== undefined) {
+        return NextResponse.json(
+          {
+            error:
+              "A status change for another employee needs approval and can't carry clock times. Save the clock-time correction first, then change the status.",
+          },
+          { status: 400 }
+        )
+      }
+
       // Check if an appeal is already active (pending or approved) for this user and date
       const { data: existingAppeal } = await dataClient
         .from("attendance_appeals")
@@ -128,13 +139,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       const { data: targetProfile } = await dataClient
         .from("profiles")
-        .select("department, is_department_lead, full_name")
+        .select("department, department_id, is_department_lead, full_name")
         .eq("id", record.user_id)
-        .maybeSingle<{ department: string | null; is_department_lead: boolean; full_name: string | null }>()
+        .maybeSingle<{
+          department: string | null
+          department_id: string | null
+          is_department_lead: boolean
+          full_name: string | null
+        }>()
 
       const isTargetLead = Boolean(targetProfile?.is_department_lead)
       const targetStage = isTargetLead ? "pending_hr_lead" : "pending_lead"
-      const now = new Date().toISOString()
 
       const { data: staged, error: stageError } = await dataClient
         .from("attendance_appeals")
@@ -143,20 +158,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           user_id: record.user_id,
           appeal_date: record.date,
           current_status: record.status,
-          requested_status: nextStatus,
+          requested_status: overrideStatus,
           appeal_reason: parsed.data.manual_comment,
           status: "pending",
           stage: targetStage,
           initiated_by_role: "admin_manual",
-          admin_reviewed_by: auth.scope.userId,
-          admin_reviewed_at: now,
-          admin_resolution_note: parsed.data.manual_comment,
           created_by: auth.scope.userId,
         })
         .select("id")
-        .maybeSingle()
+        .single<{ id: string }>()
 
-      if (stageError) {
+      if (stageError || !staged) {
         log.error({ err: stageError }, "Failed to stage manual alteration")
         return NextResponse.json({ error: "Failed to stage alteration" }, { status: 500 })
       }
@@ -167,58 +179,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         eventType: "manual_update",
         attendanceRecordId: record.id,
         fromStatus: record.status,
-        toStatus: nextStatus,
+        toStatus: overrideStatus,
         source: "manual",
         comment: parsed.data.manual_comment,
         actorId: auth.scope.userId,
-        metadata: { appeal_id: staged?.id, staged_stage: targetStage },
+        metadata: { appeal_id: staged.id, staged_stage: targetStage },
       })
 
-      // Send in-app notification to the required reviewer(s)
-      try {
-        let recipientIds: string[] = []
-        if (targetStage === "pending_lead" && targetProfile?.department) {
-          const { data: leads } = await dataClient
-            .from("profiles")
-            .select("id")
-            .eq("department", targetProfile.department)
-            .eq("is_department_lead", true)
-            .returns<{ id: string }[]>()
-          recipientIds = (leads ?? []).map((l) => l.id)
-        } else if (targetStage === "pending_hr_lead") {
-          const { data: hrLeads } = await dataClient
-            .from("profiles")
-            .select("id")
-            .eq("department", "Admin and HR")
-            .eq("is_department_lead", true)
-            .returns<{ id: string }[]>()
-          recipientIds = (hrLeads ?? []).map((l) => l.id)
-        }
+      const statusLabel = ATTENDANCE_STATUS_LABELS[overrideStatus as UnifiedAttendanceStatus] ?? overrideStatus
+      await notifyAppealReviewers(dataClient, {
+        stage: targetStage,
+        department: targetProfile?.department ?? null,
+        departmentId: targetProfile?.department_id ?? null,
+        appealId: staged.id,
+        actorId: auth.scope.userId,
+        title: "Attendance Alteration Staged",
+        message: `An attendance alteration to ${statusLabel} for ${targetProfile?.full_name ?? "an employee"} on ${record.date} requires your confirmation.`,
+      })
 
-        const employeeName = targetProfile?.full_name ?? "an employee"
-        const statusLabelText = ATTENDANCE_STATUS_LABELS[nextStatus as UnifiedAttendanceStatus] ?? nextStatus
-
-        for (const recipientId of recipientIds) {
-          if (recipientId === auth.scope.userId) continue
-          await createNotification({
-            p_user_id: recipientId,
-            p_type: "approval_request",
-            p_category: "approvals",
-            p_title: "Attendance Alteration Staged",
-            p_message: `An attendance alteration to ${statusLabelText} for ${employeeName} on ${record.date} requires your confirmation.`,
-            p_priority: "normal",
-            p_link_url:
-              targetStage === "pending_lead" ? "/dept/hr/attendance?tab=appeals" : "/admin/hr/attendance?tab=appeals",
-            p_actor_id: auth.scope.userId,
-            p_entity_type: "attendance_appeal",
-            p_entity_id: staged?.id,
-          })
-        }
-      } catch (notifyErr) {
-        log.error({ err: String(notifyErr) }, "Failed to send staged alteration notification")
-      }
-
-      const statusLabel = ATTENDANCE_STATUS_LABELS[nextStatus as UnifiedAttendanceStatus] ?? nextStatus
       return NextResponse.json({
         data: record,
         staged: true,

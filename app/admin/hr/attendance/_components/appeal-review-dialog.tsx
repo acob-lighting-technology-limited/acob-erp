@@ -31,6 +31,7 @@ export interface AppealRow {
   created_by_name?: string | null
   lead_reviewed_by?: string | null
   lead_reviewer_name?: string | null
+  department_lead_name?: string | null
   lead_reviewed_at?: string | null
   lead_resolution_note?: string | null
   admin_reviewed_by?: string | null
@@ -118,7 +119,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   const approveButtonText = () => {
     if (approvingLoad) return "Processing…"
     if (appeal?.stage === "pending_lead") {
-      return appeal.initiated_by_role === "admin_manual" ? "Confirm Alteration" : "Endorse (Advance to HR)"
+      return appeal.initiated_by_role === "admin_manual" ? "Confirm (Advance to HR)" : "Endorse (Advance to HR)"
     }
     if (appeal?.stage === "pending_hr_lead") {
       return "Final Approve (HR Lead)"
@@ -255,7 +256,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               </div>
             ) : appeal.stage === "pending_lead" ? (
               <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
-                Awaiting {appeal.department} Department Lead endorsement
+                Awaiting {appeal.department_lead_name || `${appeal.department} Department Lead`}
               </div>
             ) : null}
 
@@ -300,8 +301,14 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
             ) : appeal.stage === "pending_admin" ? (
               <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-2.5 text-xs text-blue-800 dark:text-blue-300">
                 Awaiting Admin Review by{" "}
-                <span className="font-semibold">{appeal.admin_hr_lead_name || "Onyekachukwu Atishie"}</span> (Admin
-                &amp; HR Lead)
+                <span className="font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
+                {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
+              </div>
+            ) : appeal.stage === "pending_lead" ? (
+              <div className="border-muted bg-muted/30 text-muted-foreground rounded-lg border p-2.5 text-xs">
+                Pending lead then{" "}
+                <span className="text-foreground font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
+                {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
               </div>
             ) : null}
 

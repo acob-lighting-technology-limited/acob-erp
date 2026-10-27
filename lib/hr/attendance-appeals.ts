@@ -8,6 +8,8 @@ import {
 } from "@/lib/hr/attendance-status"
 import type { AttendancePolicy } from "@/lib/org-config"
 import { notifyAttendanceMail } from "@/lib/hr/attendance-notify"
+import { createNotification } from "@/lib/notifications/create"
+import { DEPT_ADMIN_HR } from "@/shared/departments"
 
 const log = logger("attendance-appeals")
 
@@ -248,4 +250,178 @@ export async function closeAppealsMadeMootByDevice(
   } catch (err) {
     log.error({ err: String(err) }, "Failed to close appeals made moot by device sync")
   }
+}
+
+type DepartmentLeadRow = {
+  id: string
+  full_name: string | null
+  first_name: string | null
+  last_name: string | null
+  department: string | null
+  lead_departments: string[] | null
+}
+
+export type DepartmentLeads = {
+  /** Lead ids per department they can endorse appeals for. */
+  idsByDepartment: Map<string, string[]>
+  /** Display name of a lead per department (first match). */
+  nameByDepartment: Map<string, string>
+  adminHrLeadIds: string[]
+  adminHrLeadName: string | null
+}
+
+/**
+ * Loads department leads keyed by the departments they actually lead.
+ *
+ * Mirrors the appeal endorsement check (and `scopeDepartments` in rbac): a
+ * non-empty `lead_departments` is the full list, otherwise the lead's own
+ * department. Using both would name or notify a lead who then gets a 403.
+ */
+export async function loadDepartmentLeads(client: SupabaseClient): Promise<DepartmentLeads> {
+  const { data, error } = await client
+    .from("profiles")
+    .select("id, full_name, first_name, last_name, department, lead_departments")
+    .eq("is_department_lead", true)
+    .returns<DepartmentLeadRow[]>()
+  if (error) log.error({ err: String(error.message) }, "Failed to load department leads")
+
+  const idsByDepartment = new Map<string, string[]>()
+  const nameByDepartment = new Map<string, string>()
+  for (const lead of data ?? []) {
+    const led =
+      Array.isArray(lead.lead_departments) && lead.lead_departments.length > 0
+        ? lead.lead_departments
+        : lead.department
+          ? [lead.department]
+          : []
+    const name = lead.full_name?.trim() || [lead.first_name, lead.last_name].filter(Boolean).join(" ") || null
+    for (const dept of led) {
+      if (!dept) continue
+      idsByDepartment.set(dept, [...(idsByDepartment.get(dept) ?? []), lead.id])
+      if (name && !nameByDepartment.has(dept)) nameByDepartment.set(dept, name)
+    }
+  }
+
+  return {
+    idsByDepartment,
+    nameByDepartment,
+    adminHrLeadIds: idsByDepartment.get(DEPT_ADMIN_HR) ?? [],
+    adminHrLeadName: nameByDepartment.get(DEPT_ADMIN_HR) ?? null,
+  }
+}
+
+export type AppealReviewStage = "pending_lead" | "pending_admin" | "pending_hr_lead"
+
+/**
+ * In-app notice to whoever must act on an appeal at `stage`. Leads review on
+ * their department console (/dept/[dept_id]/...), Admin & HR on /admin.
+ *
+ * Best-effort: never throws.
+ */
+export async function notifyAppealReviewers(
+  client: SupabaseClient,
+  params: {
+    stage: AppealReviewStage
+    /** Appellant's department and its id — used to find and link the lead. */
+    department: string | null
+    departmentId: string | null
+    appealId: string
+    actorId: string
+    title: string
+    message: string
+    priority?: "normal" | "high"
+  }
+): Promise<void> {
+  try {
+    let recipientIds: string[] = []
+    if (params.stage === "pending_lead") {
+      if (params.department) {
+        recipientIds = (await loadDepartmentLeads(client)).idsByDepartment.get(params.department) ?? []
+      }
+    } else if (params.stage === "pending_hr_lead") {
+      recipientIds = (await loadDepartmentLeads(client)).adminHrLeadIds
+    } else {
+      const { data: admins } = await client
+        .from("profiles")
+        .select("id")
+        .in("role", ["admin", "super_admin", "developer"])
+        .returns<Array<{ id: string }>>()
+      recipientIds = (admins ?? []).map((a) => a.id)
+    }
+
+    const linkUrl =
+      params.stage === "pending_lead"
+        ? params.departmentId
+          ? `/dept/${params.departmentId}/hr/attendance?tab=appeals`
+          : null
+        : "/admin/hr/attendance?tab=appeals"
+
+    for (const recipientId of new Set(recipientIds)) {
+      if (recipientId === params.actorId) continue
+      await createNotification({
+        p_user_id: recipientId,
+        p_type: "approval_request",
+        p_category: "approvals",
+        p_title: params.title,
+        p_message: params.message,
+        p_priority: params.priority ?? "normal",
+        p_link_url: linkUrl,
+        p_actor_id: params.actorId,
+        p_entity_type: "attendance_appeal",
+        p_entity_id: params.appealId,
+      })
+    }
+  } catch (err) {
+    log.error({ err: String(err), appealId: params.appealId }, "Failed to notify appeal reviewers")
+  }
+}
+
+/**
+ * A manual (Attendance Manager) sick-leave grant is staged as ONE pending
+ * `leave_requests` row plus ONE `admin_manual` appeal dated on the leave's first
+ * working day. The leave row is the source of truth for the whole range — the
+ * appeal only carries it through Department Lead and Admin & HR approval, and
+ * approving it never writes `attendance_records` (status derivation reads
+ * `on_leave` from the approved leave, so real punches are never overwritten).
+ */
+export function isStagedLeaveAppeal(appeal: { initiated_by_role?: string | null; requested_status: string }) {
+  return appeal.initiated_by_role === "admin_manual" && appeal.requested_status === "on_leave"
+}
+
+/**
+ * The leave-workflow stage code (see `stageCodeForRole`) mirroring a staged-leave
+ * appeal's stage, so the Leave screens label who holds the grant.
+ */
+export function leaveStageForAppealStage(stage: AppealReviewStage): string {
+  return stage === "pending_lead" ? "pending_department_lead" : "pending_admin_hr_lead"
+}
+
+export type StagedLeaveRequest = {
+  id: string
+  leave_type_id: string
+  start_date: string
+  end_date: string
+  days_count: number | null
+}
+
+/** The pending manual leave a staged-leave appeal stands for (matched on its first day). */
+export async function findStagedLeaveRequest(
+  client: SupabaseClient,
+  userId: string,
+  startDate: string
+): Promise<StagedLeaveRequest | null> {
+  const { data, error } = await client
+    .from("leave_requests")
+    .select("id, leave_type_id, start_date, end_date, days_count")
+    .eq("user_id", userId)
+    .eq("admin_manual", true)
+    .eq("status", "pending")
+    .eq("start_date", startDate)
+    .limit(1)
+    .returns<StagedLeaveRequest[]>()
+  if (error) {
+    log.error({ err: String(error.message), userId, startDate }, "Failed to look up staged leave")
+    return null
+  }
+  return data?.[0] ?? null
 }

@@ -39,11 +39,6 @@ function renderStatusBadge(r: AppealRow) {
   }
 
   if (r.stage === "pending_lead") {
-    if (r.initiated_by_role === "admin_manual") {
-      return (
-        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
-      )
-    }
     return (
       <div className="flex flex-col items-start gap-1">
         <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
@@ -296,7 +291,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                 value: r.lead_reviewed_at
                   ? `Endorsed by ${r.lead_reviewer_name || "Department Lead"} on ${formatWATDateTime(r.lead_reviewed_at)}${r.lead_resolution_note ? ` — "${r.lead_resolution_note}"` : ""}`
                   : r.stage === "pending_lead"
-                    ? "Pending Lead Endorsement"
+                    ? `Awaiting ${r.department_lead_name || "Department Lead"}`
                     : "Not required / Bypassed",
                 fullWidth: true,
               },
@@ -307,8 +302,8 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                   : r.status === "approved" || r.status === "rejected"
                     ? `Reviewed by ${r.reviewer_name || "Admin"}${r.reviewed_at ? ` on ${formatWATDateTime(r.reviewed_at)}` : ""}${r.resolution_note ? ` — "${r.resolution_note}"` : ""}`
                     : r.stage === "pending_admin"
-                      ? `Awaiting Admin Review by ${r.admin_hr_lead_name || "Onyekachukwu Atishie"} (Admin & HR Lead)`
-                      : "Pending Lead stage",
+                      ? `Awaiting Admin Review by ${r.admin_hr_lead_name ? `${r.admin_hr_lead_name} (Admin & HR Lead)` : "Admin & HR Lead"}`
+                      : `Pending lead then ${r.admin_hr_lead_name || "Admin & HR Lead"}`,
                 fullWidth: true,
               },
               { label: "Appeal Reason", value: r.appeal_reason || "No reason specified", fullWidth: true },
@@ -409,7 +404,9 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                         {r.lead_reviewed_at ? (
                           <span className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</span>
                         ) : r.stage === "pending_lead" ? (
-                          <span className="font-medium text-amber-600 dark:text-amber-400">Awaiting Endorsement</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-400">
+                            Awaiting {r.department_lead_name || "Department Lead"}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">Not required / Bypassed</span>
                         )}
@@ -453,16 +450,18 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                         ) : r.stage === "pending_admin" ? (
                           <span className="font-medium text-blue-600 dark:text-blue-400">Awaiting Admin Review</span>
                         ) : (
-                          <span className="text-muted-foreground">Pending Lead Stage</span>
+                          <span className="text-muted-foreground">
+                            Pending lead then {r.admin_hr_lead_name || "Admin & HR Lead"}
+                          </span>
                         )}
                       </div>
                       {r.stage === "pending_admin" && (
                         <span className="text-muted-foreground">
                           by{" "}
                           <strong className="text-foreground font-medium">
-                            {r.admin_hr_lead_name || "Onyekachukwu Atishie"}
-                          </strong>{" "}
-                          (Admin &amp; HR Lead)
+                            {r.admin_hr_lead_name || "Admin & HR Lead"}
+                          </strong>
+                          {r.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
                         </span>
                       )}
                       {(r.admin_reviewed_at ||

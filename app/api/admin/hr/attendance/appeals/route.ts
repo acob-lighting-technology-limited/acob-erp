@@ -8,7 +8,14 @@ import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { notifyAttendanceMail } from "@/lib/hr/attendance-notify"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
-import { liveAppealDayStatus } from "@/lib/hr/attendance-appeals"
+import {
+  findStagedLeaveRequest,
+  isStagedLeaveAppeal,
+  leaveStageForAppealStage,
+  liveAppealDayStatus,
+  loadDepartmentLeads,
+  notifyAppealReviewers,
+} from "@/lib/hr/attendance-appeals"
 import { logger } from "@/lib/logger"
 import { createNotification } from "@/lib/notifications/create"
 
@@ -33,6 +40,7 @@ export type AppealWithProfile = {
   created_by_name?: string | null
   lead_reviewed_by?: string | null
   lead_reviewer_name?: string | null
+  department_lead_name?: string | null
   lead_reviewed_at?: string | null
   lead_resolution_note?: string | null
   admin_reviewed_by?: string | null
@@ -157,19 +165,8 @@ export async function GET(request: NextRequest) {
       return p.full_name?.trim() || [p.first_name, p.last_name].filter(Boolean).join(" ") || null
     }
 
-    const { data: adminHrLeadProfiles } = await dataClient
-      .from("profiles")
-      .select("id, full_name, first_name, last_name, department, is_department_lead")
-      .eq("department", "Admin and HR")
-      .eq("is_department_lead", true)
-      .limit(1)
-      .returns<ProfileRow[]>()
-
-    const adminHrLeadRow = adminHrLeadProfiles?.[0]
-    const admin_hr_lead_name =
-      adminHrLeadRow?.full_name?.trim() ||
-      [adminHrLeadRow?.first_name, adminHrLeadRow?.last_name].filter(Boolean).join(" ") ||
-      "Onyekachukwu Atishie"
+    const departmentLeads = await loadDepartmentLeads(dataClient)
+    const admin_hr_lead_name = departmentLeads.adminHrLeadName
 
     const policy = await loadAttendancePolicy(dataClient)
     const uniqueUserIds = [...new Set(rows.map((r) => r.user_id))]
@@ -194,10 +191,13 @@ export async function GET(request: NextRequest) {
     const data: AppealWithProfile[] = rows.map((r) => {
       const p = profileMap.get(r.user_id)
       const user_name = resolveProfileName(r.user_id) || "Unknown"
+      const department = p?.department ?? ""
+      const department_lead_name = department ? (departmentLeads.nameByDepartment.get(department) ?? null) : null
       return {
         ...r,
         user_name,
-        department: p?.department ?? "",
+        department,
+        department_lead_name,
         created_by_name: resolveProfileName(r.created_by),
         lead_reviewer_name: resolveProfileName(r.lead_reviewed_by),
         admin_reviewer_name: resolveProfileName(r.admin_reviewed_by),
@@ -274,16 +274,28 @@ export async function PATCH(request: NextRequest) {
     // Fetch appellant's profile
     const { data: appellant } = await dataClient
       .from("profiles")
-      .select("id, department, is_department_lead, full_name, first_name, last_name")
+      .select("id, department, department_id, is_department_lead, full_name, first_name, last_name")
       .eq("id", appeal.user_id)
       .maybeSingle<{
         id: string
         department: string | null
+        department_id: string | null
         is_department_lead: boolean
         full_name: string | null
         first_name: string | null
         last_name: string | null
       }>()
+
+    // A staged sick-leave grant: the appeal decides the linked leave_requests row.
+    const stagedLeave = isStagedLeaveAppeal(appeal)
+      ? await findStagedLeaveRequest(dataClient, appeal.user_id, appeal.appeal_date)
+      : null
+    if (isStagedLeaveAppeal(appeal) && !stagedLeave) {
+      return NextResponse.json(
+        { error: "The leave this appeal stands for is no longer pending. It may have been removed or edited." },
+        { status: 409 }
+      )
+    }
 
     const currentStage = appeal.stage || "pending_lead"
     const isAppellantLead = Boolean(appellant?.is_department_lead)
@@ -346,16 +358,9 @@ export async function PATCH(request: NextRequest) {
         nextStatus = "rejected"
         nextStage = "rejected"
       } else {
-        // If this was an Admin Manual Alteration, Lead confirmation IS the final approval
-        if (appeal.initiated_by_role === "admin_manual") {
-          isFinalApproval = true
-          nextStatus = "approved"
-          nextStage = "approved"
-        } else {
-          // Employee appeal endorsed by Lead -> moves to Stage 2 (Admin)
-          nextStatus = "pending"
-          nextStage = "pending_admin"
-        }
+        // Enforce 2 stages: All alterations and appeals endorsed by Lead advance to Stage 2 (Admin & HR Review)
+        nextStatus = "pending"
+        nextStage = "pending_admin"
       }
     }
     // ── STAGE 2: Admin & HR Review ──────────────────────────────────────────────
@@ -417,8 +422,10 @@ export async function PATCH(request: NextRequest) {
 
     let approvedRecordId: string | null = appeal.attendance_record_id
 
-    // If this decision finalized an approval, write to attendance_records
-    if (isFinalApproval) {
+    // If this decision finalized an approval, write to attendance_records. A staged leave
+    // grant is the exception: the approved leave_requests row (updated below) is what
+    // derives on_leave for its whole range, without overwriting real punches.
+    if (isFinalApproval && !stagedLeave) {
       const quotaCheck = await validateLwpAwpMonthlyQuota({
         dataClient,
         userId: appeal.user_id,
@@ -474,6 +481,90 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    // Keep a staged leave grant's stage label in step while it moves between reviewers.
+    if (stagedLeave && nextStatus === "pending" && nextStage !== "approved" && nextStage !== "rejected") {
+      const leaveStage = leaveStageForAppealStage(nextStage)
+      const { error: stageSyncError } = await dataClient
+        .from("leave_requests")
+        .update({ approval_stage: leaveStage, current_stage_code: leaveStage })
+        .eq("id", stagedLeave.id)
+        .eq("status", "pending")
+      if (stageSyncError) log.error({ err: stageSyncError }, "Failed to sync staged leave stage")
+    }
+
+    // Carry a final decision on a staged leave grant onto its leave_requests row. The appeal
+    // update above is the concurrency guard, so this runs only for the winning reviewer; if
+    // it fails, the appeal is put back so the decision can be retried.
+    if (stagedLeave && (isFinalApproval || action === "reject")) {
+      const leaveUpdate = isFinalApproval
+        ? {
+            status: "approved",
+            approval_stage: "completed",
+            current_stage_code: "completed",
+            approved_by: scope.userId,
+            approved_at: now,
+            hr_decision_at: now,
+          }
+        : {
+            status: "rejected",
+            approval_stage: "rejected",
+            current_stage_code: "rejected",
+            rejected_reason: resolutionNote,
+            hr_decision_at: now,
+          }
+      const { data: decidedLeave, error: leaveError } = await dataClient
+        .from("leave_requests")
+        .update(leaveUpdate)
+        .eq("id", stagedLeave.id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle()
+
+      if (leaveError || !decidedLeave) {
+        log.error({ err: leaveError, leaveRequestId: stagedLeave.id }, "Failed to decide staged leave")
+        await dataClient
+          .from("attendance_appeals")
+          .update({
+            status: appeal.status,
+            stage: appeal.stage,
+            lead_reviewed_by: appeal.lead_reviewed_by,
+            lead_reviewed_at: appeal.lead_reviewed_at,
+            lead_resolution_note: appeal.lead_resolution_note,
+            admin_reviewed_by: appeal.admin_reviewed_by,
+            admin_reviewed_at: appeal.admin_reviewed_at,
+            admin_resolution_note: appeal.admin_resolution_note,
+            reviewed_by: null,
+            reviewed_at: null,
+            resolution_note: null,
+          })
+          .eq("id", appeal.id)
+        return NextResponse.json(
+          { error: "Could not update the leave request. The appeal was left unchanged — please try again." },
+          { status: 500 }
+        )
+      }
+
+      if (isFinalApproval) {
+        await recordAttendanceEvent(dataClient, {
+          userId: appeal.user_id,
+          eventDate: stagedLeave.start_date,
+          eventType: "leave_granted",
+          toStatus: "on_leave",
+          source: "manual",
+          comment: resolutionNote || null,
+          actorId: scope.userId,
+          metadata: {
+            leave_request_id: stagedLeave.id,
+            leave_type_id: stagedLeave.leave_type_id,
+            start_date: stagedLeave.start_date,
+            end_date: stagedLeave.end_date,
+            days_count: stagedLeave.days_count,
+            appeal_id: appeal.id,
+          },
+        })
+      }
+    }
+
     // Event provenance
     const eventType = action === "reject" ? "appeal_rejected" : isFinalApproval ? "appeal_approved" : "appeal_requested"
 
@@ -514,71 +605,52 @@ export async function PATCH(request: NextRequest) {
     )
 
     // Notifications
-    try {
-      const appellantName = appellant?.full_name || "Employee"
-      if (nextStage === "pending_admin") {
-        // Notify HR Admins that Lead endorsed and Stage 2 is ready
-        const { data: admins } = await dataClient
-          .from("profiles")
-          .select("id")
-          .in("role", ["admin", "super_admin", "developer"])
-          .returns<Array<{ id: string }>>()
-        for (const admin of admins ?? []) {
-          if (admin.id === scope.userId) continue
-          await createNotification({
-            p_user_id: admin.id,
-            p_type: "approval_request",
-            p_category: "approvals",
-            p_title: "Appeal Endorsed by Lead",
-            p_message: `${appellantName}'s appeal for ${appeal.appeal_date} was endorsed by their Department Lead. Ready for HR approval.`,
-            p_priority: "normal",
-            p_link_url: "/admin/hr/attendance?tab=appeals",
-            p_actor_id: scope.userId,
-            p_entity_type: "attendance_appeal",
-            p_entity_id: appeal.id,
-          })
-        }
-      } else if (nextStage === "pending_hr_lead") {
-        // Notify Admin & HR Lead that Dept Lead appeal needs final sign-off
-        const { data: hrLeads } = await dataClient
-          .from("profiles")
-          .select("id")
-          .eq("department", "Admin and HR")
-          .eq("is_department_lead", true)
-          .returns<Array<{ id: string }>>()
-        for (const hrLead of hrLeads ?? []) {
-          await createNotification({
-            p_user_id: hrLead.id,
-            p_type: "approval_request",
-            p_category: "approvals",
-            p_title: "Lead Appeal Awaiting HR Lead",
-            p_message: `${appellantName}'s appeal for ${appeal.appeal_date} was reviewed by Admin and is awaiting your final approval.`,
-            p_priority: "high",
-            p_link_url: "/admin/hr/attendance?tab=appeals",
-            p_actor_id: scope.userId,
-            p_entity_type: "attendance_appeal",
-            p_entity_id: appeal.id,
-          })
-        }
-      } else if (isFinalApproval || action === "reject") {
-        // Notify employee of final outcome
-        await createNotification({
-          p_user_id: appeal.user_id,
-          p_type: isFinalApproval ? "approval_granted" : "approval_rejected",
-          p_category: "approvals",
-          p_title: isFinalApproval ? "Attendance Appeal Approved" : "Attendance Appeal Rejected",
-          p_message: isFinalApproval
-            ? `Your attendance appeal for ${appeal.appeal_date} has received final approval. Status updated to ${appeal.requested_status}.`
-            : `Your attendance appeal for ${appeal.appeal_date} has been rejected.${resolutionNote ? ` Note: ${resolutionNote}` : ""}`,
-          p_priority: "normal",
-          p_link_url: "/hr/attendance",
-          p_actor_id: scope.userId,
-          p_entity_type: "attendance_appeal",
-          p_entity_id: appeal.id,
-        })
-      }
-    } catch (notifyErr) {
-      log.error({ err: String(notifyErr) }, "Failed to send notifications")
+    const appellantName = appellant?.full_name || "Employee"
+    const subject = stagedLeave
+      ? `${appellantName}'s leave (${stagedLeave.start_date} to ${stagedLeave.end_date})`
+      : `${appellantName}'s appeal for ${appeal.appeal_date}`
+    if (nextStage === "pending_admin") {
+      await notifyAppealReviewers(dataClient, {
+        stage: "pending_admin",
+        department: appellant?.department ?? null,
+        departmentId: appellant?.department_id ?? null,
+        appealId: appeal.id,
+        actorId: scope.userId,
+        title: "Appeal Endorsed by Lead",
+        message: `${subject} was endorsed by their Department Lead. Ready for HR approval.`,
+      })
+    } else if (nextStage === "pending_hr_lead") {
+      await notifyAppealReviewers(dataClient, {
+        stage: "pending_hr_lead",
+        department: appellant?.department ?? null,
+        departmentId: appellant?.department_id ?? null,
+        appealId: appeal.id,
+        actorId: scope.userId,
+        title: "Lead Appeal Awaiting HR Lead",
+        message: `${subject} was reviewed by Admin and is awaiting your final approval.`,
+        priority: "high",
+      })
+    } else if (isFinalApproval || action === "reject") {
+      // Notify employee of final outcome
+      const outcome = stagedLeave
+        ? isFinalApproval
+          ? `Your leave from ${stagedLeave.start_date} to ${stagedLeave.end_date} has received final approval.`
+          : `Your leave from ${stagedLeave.start_date} to ${stagedLeave.end_date} has been rejected.${resolutionNote ? ` Note: ${resolutionNote}` : ""}`
+        : isFinalApproval
+          ? `Your attendance appeal for ${appeal.appeal_date} has received final approval. Status updated to ${appeal.requested_status}.`
+          : `Your attendance appeal for ${appeal.appeal_date} has been rejected.${resolutionNote ? ` Note: ${resolutionNote}` : ""}`
+      await createNotification({
+        p_user_id: appeal.user_id,
+        p_type: isFinalApproval ? "approval_granted" : "approval_rejected",
+        p_category: "approvals",
+        p_title: isFinalApproval ? "Attendance Appeal Approved" : "Attendance Appeal Rejected",
+        p_message: outcome,
+        p_priority: "normal",
+        p_link_url: "/hr/attendance",
+        p_actor_id: scope.userId,
+        p_entity_type: "attendance_appeal",
+        p_entity_id: appeal.id,
+      })
     }
 
     if (isFinalApproval || action === "reject") {

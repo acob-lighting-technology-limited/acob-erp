@@ -186,6 +186,9 @@ export async function PATCH() {
         "id, user_id, status, leave_type_id, start_date, end_date, days_count, current_stage_code, current_approver_user_id, created_at"
       )
       .in("status", ["pending", "pending_evidence"])
+      // Attendance Manager sick-leave grants are back-dated by design and are approved
+      // through the attendance Appeals queue, not this route — never lapse or chase them.
+      .eq("admin_manual", false)
 
     if (error) return NextResponse.json({ error: "Failed to fetch pending leave requests" }, { status: 500 })
 

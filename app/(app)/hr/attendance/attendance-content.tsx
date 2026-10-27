@@ -79,6 +79,7 @@ type AppealRecord = {
   created_by_name?: string | null
   lead_reviewed_by?: string | null
   lead_reviewer_name?: string | null
+  department_lead_name?: string | null
   lead_reviewed_at?: string | null
   lead_resolution_note?: string | null
   admin_reviewed_by?: string | null
@@ -98,16 +99,6 @@ type AppealRecord = {
 function renderAppealPendingBadge(appeal: AppealRecord) {
   const stage = appeal.stage || "pending_lead"
   if (stage === "pending_lead") {
-    if (appeal.initiated_by_role === "admin_manual") {
-      return (
-        <Badge
-          variant="outline"
-          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
-        >
-          Pending Lead
-        </Badge>
-      )
-    }
     return (
       <div className="flex flex-col items-start gap-1">
         <Badge
@@ -829,12 +820,10 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                             value:
                               latestAppeal.status === "pending"
                                 ? latestAppeal.stage === "pending_admin"
-                                  ? "Pending Admin"
+                                  ? `Awaiting Admin Review by ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}`
                                   : latestAppeal.stage === "pending_hr_lead"
                                     ? "Pending HR Lead"
-                                    : latestAppeal.initiated_by_role === "admin_manual"
-                                      ? "Pending Lead"
-                                      : "Pending Lead (then Pending Admin)"
+                                    : `Awaiting ${latestAppeal.department_lead_name || "Department Lead"} (then ${latestAppeal.admin_hr_lead_name || "Admin & HR Lead"})`
                                 : latestAppeal.status === "approved"
                                   ? "Approved"
                                   : latestAppeal.status === "resolved"
@@ -1003,7 +992,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                     <span className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</span>
                                   ) : latestAppeal.stage === "pending_lead" ? (
                                     <span className="font-medium text-amber-600 dark:text-amber-400">
-                                      Awaiting Endorsement
+                                      Awaiting {latestAppeal.department_lead_name || "Department Lead"}
                                     </span>
                                   ) : (
                                     <span className="text-muted-foreground">Not required / Bypassed</span>
@@ -1054,16 +1043,18 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                       Awaiting Admin Review
                                     </span>
                                   ) : (
-                                    <span className="text-muted-foreground">Pending Lead Stage</span>
+                                    <span className="text-muted-foreground">
+                                      Pending lead then {latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}
+                                    </span>
                                   )}
                                 </div>
                                 {latestAppeal.stage === "pending_admin" && (
                                   <span className="text-muted-foreground">
                                     by{" "}
                                     <strong className="text-foreground font-medium">
-                                      {latestAppeal.admin_hr_lead_name || "Onyekachukwu Atishie"}
-                                    </strong>{" "}
-                                    (Admin &amp; HR Lead)
+                                      {latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}
+                                    </strong>
+                                    {latestAppeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}
                                   </span>
                                 )}
                                 {(latestAppeal.admin_reviewed_at ||
