@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/layout"
 import { EmptyState } from "@/components/ui/patterns"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { PageLoader } from "@/components/ui/query-states"
+import { JOB_DESCRIPTION_SKELETON } from "./skeleton-props"
 import Image from "next/image"
 
 import { logger } from "@/lib/logger"
@@ -83,7 +84,7 @@ export default function JobDescriptionPage() {
     setIsEditing(!profileData.job_description) // Auto-edit if empty
   }
 
-  if (isLoading) return <PageLoader variant="form" />
+  if (isLoading) return <PageLoader variant="form" {...JOB_DESCRIPTION_SKELETON} />
 
   const lastUpdated = profileData?.job_description_updated_at ?? null
   const profile = profileData

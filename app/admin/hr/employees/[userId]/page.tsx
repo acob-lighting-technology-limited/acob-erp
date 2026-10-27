@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { formatName } from "@/lib/utils"
 import { Edit } from "lucide-react"
 import { PageHeader } from "@/components/layout/page-header"
-import { PageLoader } from "@/components/ui/query-states"
+import { EmployeeDetailSkeleton } from "./_components/employee-detail-skeleton"
 import { EmployeeProfileCard } from "@/components/employees/EmployeeProfileCard"
 import { EmployeeDetailTabs } from "@/components/employees/EmployeeDetailTabs"
 import type { EmployeeDetailData } from "@/components/employees/employee-detail-types"
@@ -45,7 +45,7 @@ export default function UserDetailPage() {
   const feedback = data?.feedback ?? []
 
   if (isLoading) {
-    return <PageLoader />
+    return <EmployeeDetailSkeleton />
   }
 
   if (!profile) {

@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { PageLoader, QueryError } from "@/components/ui/query-states"
+import { NOTIFICATION_SETTINGS_SKELETON } from "./skeleton-props"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -143,7 +144,7 @@ export default function NotificationSettingsPage() {
     [modules]
   )
 
-  if (loading) return <PageLoader variant="form" />
+  if (loading) return <PageLoader variant="form" {...NOTIFICATION_SETTINGS_SKELETON} />
   if (isError) return <QueryError message="Could not load notification settings." onRetry={refetch} />
 
   return (

@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -30,13 +31,28 @@ export function CardSkeleton({ count = 3 }: { count?: number }) {
   )
 }
 
+type FormLoaderProps = { variant: "form" } & ComponentProps<typeof FormPageSkeleton>
+type DetailLoaderProps = { variant?: "detail" } & ComponentProps<typeof DetailPageSkeleton>
+
 /**
  * Initial load of a whole page: the page's skeleton, not a spinner (audit 8.3),
  * so the layout does not jump when the data arrives. `form` for settings and
  * edit pages, `detail` (default) for record pages.
+ *
+ * Pass the same props the route's `loading.tsx` passes. The two skeletons are shown back to back (the
+ * route's, then this one while the query runs), and if they differ the layout visibly changes shape.
  */
-export function PageLoader({ variant = "detail" }: { variant?: "detail" | "form" } = {}) {
-  return variant === "form" ? <FormPageSkeleton /> : <DetailPageSkeleton />
+export function PageLoader(props: FormLoaderProps | DetailLoaderProps = {}) {
+  if (props.variant === "form") {
+    return (
+      <FormPageSkeleton
+        sections={props.sections}
+        fieldsPerSection={props.fieldsPerSection}
+        showSidebar={props.showSidebar}
+      />
+    )
+  }
+  return <DetailPageSkeleton sections={props.sections} showSidebar={props.showSidebar} />
 }
 
 /** Inline error state with optional retry button */
