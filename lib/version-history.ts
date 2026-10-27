@@ -125,7 +125,7 @@ export const RELEASES: Release[] = [
       {
         area: "Tools",
         items: [
-          "Six PDF tools now run in the browser with no file size limit",
+          "All ten PDF tools, including compress, OCR and passwords, now work on your device with no file size limit",
           "Media downloads stream straight to the download manager",
         ],
       },

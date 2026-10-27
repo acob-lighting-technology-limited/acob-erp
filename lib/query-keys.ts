@@ -297,7 +297,4 @@ export const QUERY_KEYS = {
   // Projects
   portfolios: () => ["portfolios"],
   sites: (portfolioId: string | null = null) => ["sites", portfolioId ?? "all"],
-
-  // Tools
-  pdfServerCapabilities: () => ["pdf-server-capabilities"],
 } as const

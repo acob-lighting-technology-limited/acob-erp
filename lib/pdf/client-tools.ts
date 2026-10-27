@@ -4,8 +4,8 @@
  * These used to be API routes, which capped every file at Vercel's 4.5 MB
  * request/response body limit. pdf-lib, pdf.js and docx all run client-side, so
  * doing the work here removes the limit, the upload round trip, and the need
- * for the file to leave the user's device. Tools that need native binaries
- * (compress, PDF → image, password, OCR) still go through the document service.
+ * for the file to leave the user's device. Compression, OCR and passwords live
+ * beside this file (compress.ts, ocr.ts, password.ts).
  *
  * The pdf-lib functions also run under Node, which is what the tests use; the
  * canvas and pdf.js helpers are browser-only.
@@ -36,7 +36,7 @@ export function parsePageRanges(input: string, totalPages: number): number[] {
   return [...pages].sort((a, b) => a - b)
 }
 
-async function loadPdf(source: Blob | Uint8Array, name = "PDF"): Promise<PDFDocument> {
+export async function loadPdf(source: Blob | Uint8Array, name = "PDF"): Promise<PDFDocument> {
   const bytes = source instanceof Uint8Array ? source : new Uint8Array(await source.arrayBuffer())
   try {
     return await PDFDocument.load(bytes)
@@ -168,17 +168,14 @@ async function drawToCanvas(file: Blob, maxSide?: number): Promise<HTMLCanvasEle
   return canvas
 }
 
-function canvasToBytes(canvas: HTMLCanvasElement, type: "image/png" | "image/jpeg", quality?: number) {
-  return new Promise<Uint8Array>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return reject(new Error("Could not encode the image"))
-        blob.arrayBuffer().then((buffer) => resolve(new Uint8Array(buffer)), reject)
-      },
-      type,
-      quality
-    )
+export function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Could not encode the image"))), type, quality)
   })
+}
+
+export async function canvasToBytes(canvas: HTMLCanvasElement, type: "image/png" | "image/jpeg", quality?: number) {
+  return new Uint8Array(await (await canvasToBlob(canvas, type, quality)).arrayBuffer())
 }
 
 /** Fit an image inside maxSide × maxSide (never enlarging) and return PNG bytes. */
@@ -227,22 +224,77 @@ async function loadPdfjs() {
   return pdfjs
 }
 
-/**
- * Text of each page, with line breaks where the baseline moves and a blank line
- * where the vertical gap is larger than a normal line (a paragraph break).
- */
-export async function extractPdfText(data: Blob): Promise<{ pages: string[]; numPages: number }> {
+/** Open a PDF with pdf.js, turning its exceptions into messages staff can act on. */
+export async function openWithPdfjs(data: Blob) {
   const pdfjs = await loadPdfjs()
-  let document
   try {
-    document = await pdfjs.getDocument({ data: new Uint8Array(await data.arrayBuffer()) }).promise
+    return await pdfjs.getDocument({ data: new Uint8Array(await data.arrayBuffer()) }).promise
   } catch (error) {
     if (error instanceof Error && error.name === "PasswordException") {
       throw new Error("This PDF is password-protected. Remove the password first.")
     }
     throw new Error("This PDF could not be read. It may be damaged or not a real PDF.")
   }
+}
 
+/**
+ * Draw one page (1-based) onto a new canvas, `scale` × its size in points
+ * (1 = 72 dpi), capped so neither side exceeds `maxSide` pixels.
+ */
+export async function renderPdfPage(
+  document: Awaited<ReturnType<typeof openWithPdfjs>>,
+  pageNumber: number,
+  scale: number,
+  maxSide: number
+) {
+  const page = await document.getPage(pageNumber)
+  const base = page.getViewport({ scale: 1 })
+  const viewport = page.getViewport({ scale: Math.min(scale, maxSide / Math.max(base.width, base.height)) })
+  const canvas = globalThis.document.createElement("canvas")
+  canvas.width = Math.max(1, Math.floor(viewport.width))
+  canvas.height = Math.max(1, Math.floor(viewport.height))
+  await page.render({ canvas, viewport }).promise
+  page.cleanup()
+  return { canvas, viewport }
+}
+
+export type PageImageFormat = "jpg" | "png" | "webp"
+const IMAGE_MIME: Record<PageImageFormat, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" }
+
+/** Every page as an image (150 dpi), zipped. `onPage` reports progress. */
+export async function pdfToImages(
+  data: Blob,
+  format: PageImageFormat,
+  onPage?: (page: number, total: number) => void
+): Promise<Blob> {
+  const document = await openWithPdfjs(data)
+  try {
+    const { default: JSZip } = await import("jszip")
+    const zip = new JSZip()
+    const digits = String(document.numPages).length
+    for (let n = 1; n <= document.numPages; n++) {
+      onPage?.(n, document.numPages)
+      const { canvas } = await renderPdfPage(document, n, 150 / 72, 5000)
+      const image = await canvasToBlob(canvas, IMAGE_MIME[format], format === "png" ? undefined : 0.9)
+      canvas.width = canvas.height = 0
+      // Safari cannot encode WebP and silently hands back a PNG instead.
+      if (image.type !== IMAGE_MIME[format]) {
+        throw new Error(`This browser cannot create ${format.toUpperCase()} images. Choose JPEG or PNG.`)
+      }
+      zip.file(`page-${String(n).padStart(digits, "0")}.${format}`, image)
+    }
+    return zip.generateAsync({ type: "blob" })
+  } finally {
+    await document.destroy()
+  }
+}
+
+/**
+ * Text of each page, with line breaks where the baseline moves and a blank line
+ * where the vertical gap is larger than a normal line (a paragraph break).
+ */
+export async function extractPdfText(data: Blob): Promise<{ pages: string[]; numPages: number }> {
+  const document = await openWithPdfjs(data)
   try {
     const pages: string[] = []
     for (let n = 1; n <= document.numPages; n++) {
