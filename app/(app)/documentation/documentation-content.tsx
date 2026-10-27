@@ -16,7 +16,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
-import { DocViewDialog } from "@/components/documentation/doc-view-dialog"
+import { DocViewSheet } from "@/components/documentation/doc-view-sheet"
 import { DocFormDialog, type DocFormData } from "@/components/documentation/doc-form-dialog"
 import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
 
@@ -427,7 +427,7 @@ export function DocumentationContent({
             urlSync
           />
 
-          <DocViewDialog
+          <DocViewSheet
             open={isViewDialogOpen}
             onOpenChange={setIsViewDialogOpen}
             doc={selectedDoc}

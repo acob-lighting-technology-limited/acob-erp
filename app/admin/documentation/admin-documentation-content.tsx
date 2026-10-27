@@ -11,7 +11,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { DepartmentDocumentsBrowser } from "@/components/documentation/department-documents-browser"
-import { AdminDocViewDialog } from "@/components/documentation/admin-doc-view-dialog"
+import { AdminDocViewSheet } from "@/components/documentation/admin-doc-view-sheet"
 import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { AdminDocumentation, UserProfile, employeeMember } from "@/components/documentation/admin-doc-types"
 import { formatDate } from "@/lib/format"
@@ -361,7 +361,7 @@ export function AdminDocumentationContent({
             urlSync
           />
 
-          <AdminDocViewDialog
+          <AdminDocViewSheet
             open={isViewDialogOpen}
             onOpenChange={setIsViewDialogOpen}
             doc={selectedDoc}

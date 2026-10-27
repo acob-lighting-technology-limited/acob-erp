@@ -60,8 +60,6 @@
       "components/acobot/acobot.tsx": 1,
       "components/auth/auth-form-parts.tsx": 1,
       "components/dashboard/reports/weekly-report-dialog.tsx": 1,
-      "components/documentation/admin-doc-view-dialog.tsx": 1,
-      "components/documentation/doc-view-dialog.tsx": 1,
       "components/payments/print-receipt-dialog.tsx": 1,
       "components/payments/schedule-list.tsx": 1,
       "components/pms/cbt-upload-dialog.tsx": 1,

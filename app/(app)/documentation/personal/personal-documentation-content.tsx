@@ -11,7 +11,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { DocViewDialog } from "@/components/documentation/doc-view-dialog"
+import { DocViewSheet } from "@/components/documentation/doc-view-sheet"
 import { DocFormDialog, type DocFormData } from "@/components/documentation/doc-form-dialog"
 import { DocDeleteDialog } from "@/components/documentation/doc-delete-dialog"
 import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
@@ -490,7 +490,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
         urlSync
       />
 
-      <DocViewDialog
+      <DocViewSheet
         open={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}
         doc={selectedDoc}
