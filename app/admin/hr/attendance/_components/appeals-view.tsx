@@ -39,18 +39,38 @@ function renderStatusBadge(r: AppealRow) {
   }
 
   if (r.stage === "pending_lead") {
-    return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
+    if (r.initiated_by_role === "admin_manual") {
+      return (
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
+      )
+    }
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
+        <span className="text-muted-foreground pl-0.5 text-xs font-medium">Pending Admin</span>
+      </div>
+    )
   }
 
   if (r.stage === "pending_admin") {
-    return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>
+        {r.lead_reviewer_name ? (
+          <span className="pl-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Lead Endorsed ✓</span>
+        ) : null}
+      </div>
+    )
   }
 
   if (r.stage === "pending_hr_lead") {
     return (
-      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-        Pending HR Lead
-      </Badge>
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+          Pending HR Lead
+        </Badge>
+        <span className="text-muted-foreground pl-0.5 text-xs font-medium">Admin Endorsed ✓</span>
+      </div>
     )
   }
 
