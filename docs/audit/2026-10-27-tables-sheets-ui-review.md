@@ -65,7 +65,7 @@ browser**: the visual items below need a pass on localhost.
   (`EmployeeProfileSheet`, with the edit form split out to `employee-edit-form.tsx`), asset history, admin
   and staff document views (both on `DetailSheet`), role members, login-logs access profile, peer
   feedback, development plans, survey responses, acknowledgements.
-- Left as modals on purpose or still to do in §1: row 5 job descriptions (it prints a letterhead, which a
+- Left as modals on purpose or still to do in §1 (rows 11 and 12 are now one shared `ActionPointsSheet`): row 5 job descriptions (it prints a letterhead, which a
   sheet would clip), row 3 asset issues (has an add form), row 7 lunch viewers (custom 330-line layout),
   rows 11 and 12 action-tracker points (an editing view built twice; wants one shared sheet), and the
   booking review.

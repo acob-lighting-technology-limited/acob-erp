@@ -29,13 +29,13 @@ import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { type ActionItem } from "@/lib/export-utils"
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 import { DirectiveFormDialog, type EditableDirective } from "@/components/admin/action-tracker/directive-form-dialog"
 import { BlockerDialog, type BlockerTarget } from "@/components/admin/action-tracker/blocker-dialog"
+import { ActionPointsSheet } from "@/components/admin/action-tracker/action-points-sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAdminWeeklyReportLockState } from "@/hooks/use-weekly-report-lock"
 import {
@@ -1110,57 +1110,15 @@ export function ActionTrackerContent({
         canEdit={canGlobalEdit || (blockerTarget ? editableDepartments.includes(blockerTarget.department) : false)}
       />
 
-      <Dialog open={Boolean(viewingDepartment)} onOpenChange={(open) => !open && setViewingDepartment(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{viewingDepartment?.department || "Department"} Action Points</DialogTitle>
-            <DialogDescription>Update individual action point statuses.</DialogDescription>
-          </DialogHeader>
-          {viewingDepartment ? (
-            <div className="space-y-3">
-              {viewingDepartment.tasks.map((task, index) => (
-                <div key={task.id} className="rounded-lg border p-3">
-                  <div className="mb-2 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-muted-foreground text-xs">#{index + 1}</p>
-                      <p className="font-medium">{task.title}</p>
-                      {task.description ? <p className="text-muted-foreground text-xs">{task.description}</p> : null}
-                    </div>
-                    <div className="min-w-[170px]">
-                      <Select
-                        value={task.status}
-                        disabled={!canMutateTask(task)}
-                        onValueChange={(newStatus) => {
-                          void handleStatusChange(task.id, newStatus)
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs font-semibold uppercase">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="not_started">Not Started</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className={`text-xs ${getDueDateClassName(task)}`}>Due: {formatDueDate(task)}</p>
-                    {renderBlockerButton(task)}
-                  </div>
-                  {task.blocker_note ? (
-                    <p className="text-warning border-warning/30 bg-warning/5 mt-2 rounded border p-2 text-xs">
-                      {task.blocker_note}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <ActionPointsSheet
+        department={viewingDepartment}
+        week={weekFilter}
+        year={yearFilter}
+        onClose={() => setViewingDepartment(null)}
+        canMutateTask={canMutateTask}
+        onStatusChange={handleStatusChange}
+        renderBlockerButton={renderBlockerButton}
+      />
 
       <ExportOptionsDialog
         open={exportOptionsOpen}

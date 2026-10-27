@@ -31,8 +31,7 @@ import { Badge } from "@/components/ui/badge"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { DetailCallout, DetailSectionHeading } from "@/components/ui/detail-dialog"
+import { ActionPointsSheet, getDisabledEditReason } from "@/components/admin/action-tracker/action-points-sheet"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { fetchWeeklyReportLockState } from "@/lib/weekly-report-lock"
 import { type ActionItem } from "@/lib/export-utils"
@@ -52,17 +51,6 @@ import {
 } from "@/lib/reports/action-tracker-display"
 
 const log = logger("dashboard-reports-action-tracker")
-
-function getDisabledEditReason(task: {
-  department: string
-  origin?: string
-  assignees?: { id: string; name: string }[]
-}) {
-  if (task.origin === "management_directive" && (task.assignees || []).length > 0) {
-    return `Only assigned staff or members of ${task.department} can update this directive`
-  }
-  return `Only members or leads of ${task.department} can update this status`
-}
 
 interface DepartmentActionRow {
   id: string
@@ -1040,100 +1028,15 @@ export default function ActionTrackerPortal() {
         />
       )}
 
-      {/* The one place a department's action points are listed and edited. It
-          replaces both the old expandable row (a hand-rolled <table> nested inside
-          the data table) and this dialog's own earlier markup, which were two
-          implementations of the same list that had already drifted — only one of
-          them showed the blocker note. */}
-      <Dialog open={Boolean(viewingDepartment)} onOpenChange={(open) => !open && setViewingDepartment(null)}>
-        <DialogContent className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-          <DialogHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
-            {viewingDepartment && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge className={`${getSummaryBadgeClass(viewingDepartment.summaryStatus)} text-xs`}>
-                  {viewingDepartment.summaryStatus}
-                </Badge>
-                <Badge variant="outline" className="text-xs">
-                  Week {week} · {year}
-                </Badge>
-              </div>
-            )}
-            <DialogTitle className="text-base leading-snug font-semibold">
-              {viewingDepartment?.department || "Department"}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-xs">
-              {viewingDepartment
-                ? `${viewingDepartment.completedPoints} of ${viewingDepartment.totalPoints} action points completed · ${viewingDepartment.inProgressPoints} in progress · ${viewingDepartment.notStartedPoints} not started`
-                : "Update individual action point statuses."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="space-y-5 px-4 py-4 sm:px-6">
-              {viewingDepartment?.tasks.map((task, index) => (
-                <section key={task.id} className="space-y-2">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <DetailSectionHeading>{`${index + 1}. ${task.title}`}</DetailSectionHeading>
-                      {task.description ? (
-                        <p className="text-muted-foreground mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
-                          {task.description}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div className="w-full sm:w-44">
-                      {canMutateTask(task) ? (
-                        <Select
-                          value={task.status}
-                          onValueChange={(newStatus) => {
-                            void handleStatusChange(task.id, newStatus)
-                          }}
-                        >
-                          <SelectTrigger className="h-9 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="not_started">Not Started</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-block w-full cursor-not-allowed">
-                              <Select value={task.status} disabled>
-                                <SelectTrigger className="h-9 text-sm opacity-70">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </Select>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p>{getDisabledEditReason(task)}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </div>
-
-                  {task.blocker_note ? (
-                    <DetailCallout tone="amber" label="Hindrance">
-                      {task.blocker_note}
-                    </DetailCallout>
-                  ) : null}
-
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className={`text-xs ${getDueDateClassName(task)}`}>Due {formatDueDate(task)}</span>
-                    {renderBlockerButton(task)}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ActionPointsSheet
+        department={viewingDepartment}
+        week={week}
+        year={year}
+        onClose={() => setViewingDepartment(null)}
+        canMutateTask={canMutateTask}
+        onStatusChange={handleStatusChange}
+        renderBlockerButton={renderBlockerButton}
+      />
 
       <BlockerDialog
         isOpen={Boolean(blockerTarget)}

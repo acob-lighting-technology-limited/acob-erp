@@ -86,7 +86,6 @@
       "app/(app)/hr/leave/leave-content.tsx": 3,
       "app/(app)/hr/resources/fleet-content.tsx": 1,
       "app/(app)/pms/peer-feedback/page.tsx": 1,
-      "app/(app)/reports/action-tracker/page.tsx": 1,
       "app/(app)/reviews/reviews-content.tsx": 2,
       "app/(app)/tools/feedback/feedback-content.tsx": 1,
       "app/admin/hr/attendance/records/view.tsx": 1,
@@ -102,7 +101,6 @@
       "app/admin/pms/competencies/view.tsx": 2,
       "app/admin/pms/cycles/view.tsx": 1,
       "app/admin/pms/development-plans/view.tsx": 2,
-      "app/admin/reports/action-tracker/action-tracker-content.tsx": 1,
       "app/admin/tasks/management/admin-tasks-content.tsx": 1
     },
     "explicit-any": {
@@ -540,7 +538,7 @@
       "app/(app)/hr/attendance/attendance-content.tsx": 1257,
       "app/(app)/hr/leave/leave-content.tsx": 1335,
       "app/(app)/hr/lunch/lunch-content.tsx": 1112,
-      "app/(app)/reports/action-tracker/page.tsx": 1193,
+      "app/(app)/reports/action-tracker/page.tsx": 1096,
       "app/(app)/tools/media/_components/pdf-tools.tsx": 1029,
       "app/admin/assets/admin-assets-content.tsx": 1740,
       "app/admin/communications/_components/communications-composer.tsx": 1033,
@@ -552,7 +550,7 @@
       "app/admin/payroll/[id]/view.tsx": 1048,
       "app/admin/payroll/calculator/view.tsx": 1420,
       "app/admin/pms/reviews/view.tsx": 1094,
-      "app/admin/reports/action-tracker/action-tracker-content.tsx": 1226,
+      "app/admin/reports/action-tracker/action-tracker-content.tsx": 1184,
       "components/admin-sidebar.tsx": 1116,
       "components/documentation/department-documents-browser.tsx": 1827,
       "components/hr/manage-users-dialog.tsx": 1475,
