@@ -2,6 +2,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs"
 
+// Placeholders are a fixed count, so each gets a stable key of its own rather than its index.
+const slots = (prefix: string, count: number) => Array.from({ length: count }, (_, i) => `${prefix}-${i}`)
 export function EmployeeDetailSkeleton() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
@@ -19,8 +21,8 @@ export function EmployeeDetailSkeleton() {
                 <Skeleton className="h-5 w-32" />
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="space-y-1">
+                {slots("field", 6).map((key) => (
+                  <div key={key} className="space-y-1">
                     <Skeleton className="h-4 w-24" />
                     <Skeleton className="h-5 w-full" />
                   </div>
@@ -38,14 +40,14 @@ export function EmployeeDetailSkeleton() {
       {/* Tabs */}
       <Tabs defaultValue="tasks" className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
+          {slots("tab", 4).map((key) => (
+            <Skeleton key={key} className="h-10 w-full" />
           ))}
         </TabsList>
 
         <TabsContent value="tasks" className="space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
+          {slots("card", 3).map((key) => (
+            <Card key={key}>
               <CardContent className="p-6">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
