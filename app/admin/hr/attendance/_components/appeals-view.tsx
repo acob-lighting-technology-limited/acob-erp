@@ -22,46 +22,91 @@ interface AppealsViewProps {
   lockedDepartment?: string
 }
 
-function statusBadge(
-  status: AppealRow["status"],
-  stage?: AppealRow["stage"],
-  initiatedByRole?: AppealRow["initiated_by_role"]
-) {
-  if (status === "approved") {
-    return (
-      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Approved</Badge>
-    )
-  }
-  if (status === "rejected") {
-    return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Rejected</Badge>
-  }
-  // Closed because the day was changed directly rather than through the appeal.
-  if (status === "resolved") {
-    return <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
-  }
-  if (stage === "pending_lead") {
-    if (initiatedByRole === "admin_manual") {
-      return (
-        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
-      )
+function renderStatusAndReviewers(r: AppealRow) {
+  if (r.status === "approved") {
+    const hasLead = Boolean(r.lead_reviewer_name)
+    const adminName = r.admin_reviewer_name || r.reviewer_name
+    let reviewerText: string | null = null
+    if (hasLead && adminName) {
+      reviewerText = `Lead: ${r.lead_reviewer_name} · Admin: ${adminName}`
+    } else if (adminName) {
+      reviewerText = `By ${adminName}`
+    } else if (hasLead) {
+      reviewerText = `By ${r.lead_reviewer_name}`
     }
+
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
-        <span className="text-muted-foreground pl-0.5 text-xs">Pending Admin</span>
+        <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Approved</Badge>
+        {reviewerText && (
+          <span className="text-muted-foreground max-w-[220px] truncate text-xs" title={reviewerText}>
+            {reviewerText}
+          </span>
+        )}
       </div>
     )
   }
-  if (stage === "pending_admin") {
-    return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>
-  }
-  if (stage === "pending_hr_lead") {
+
+  if (r.status === "rejected") {
+    const reviewerName = r.admin_reviewer_name || r.reviewer_name || r.lead_reviewer_name
     return (
-      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-        Pending HR Lead
-      </Badge>
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Rejected</Badge>
+        {reviewerName && (
+          <span className="text-muted-foreground max-w-[220px] truncate text-xs" title={`By ${reviewerName}`}>
+            By {reviewerName}
+          </span>
+        )}
+      </div>
     )
   }
+
+  // Closed because the day was changed directly rather than through the appeal.
+  if (r.status === "resolved") {
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300">Resolved</Badge>
+        <span className="text-muted-foreground text-xs">Manual admin edit</span>
+      </div>
+    )
+  }
+
+  if (r.stage === "pending_lead") {
+    const subtext = r.initiated_by_role === "admin_manual" ? "Lead confirmation needed" : "Then Admin"
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
+        <span className="text-muted-foreground text-xs">{subtext}</span>
+      </div>
+    )
+  }
+
+  if (r.stage === "pending_admin") {
+    const subtext = r.lead_reviewer_name ? `Endorsed by ${r.lead_reviewer_name}` : "Awaiting Admin"
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>
+        <span className="text-muted-foreground max-w-[220px] truncate text-xs" title={subtext}>
+          {subtext}
+        </span>
+      </div>
+    )
+  }
+
+  if (r.stage === "pending_hr_lead") {
+    const subtext = r.admin_reviewer_name ? `Endorsed by ${r.admin_reviewer_name}` : "Awaiting HR Lead"
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+          Pending HR Lead
+        </Badge>
+        <span className="text-muted-foreground max-w-[220px] truncate text-xs" title={subtext}>
+          {subtext}
+        </span>
+      </div>
+    )
+  }
+
   return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending</Badge>
 }
 
@@ -180,43 +225,11 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         ),
       },
       {
-        key: "reviewers",
-        label: "Reviewers",
-        render: (r) => (
-          <div className="flex flex-col gap-0.5 text-xs">
-            <div className="flex items-center gap-1">
-              <span className="text-muted-foreground font-medium">Lead:</span>
-              <span
-                className={
-                  r.lead_reviewed_at
-                    ? "text-foreground max-w-[130px] truncate font-medium"
-                    : "text-muted-foreground max-w-[130px] truncate"
-                }
-              >
-                {r.lead_reviewer_name || (r.stage === "pending_lead" ? "Pending" : "—")}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-muted-foreground font-medium">Admin:</span>
-              <span
-                className={
-                  r.admin_reviewed_at || r.status === "approved" || r.status === "rejected"
-                    ? "text-foreground max-w-[130px] truncate font-medium"
-                    : "text-muted-foreground max-w-[130px] truncate"
-                }
-              >
-                {r.admin_reviewer_name || r.reviewer_name || (r.stage === "pending_admin" ? "Pending" : "—")}
-              </span>
-            </div>
-          </div>
-        ),
-      },
-      {
         key: "status",
         label: "Status / Stage",
         sortable: true,
         accessor: (r) => r.stage ?? r.status,
-        render: (r) => statusBadge(r.status, r.stage, r.initiated_by_role),
+        render: (r) => renderStatusAndReviewers(r),
       },
     ],
     [staffAvatars]
@@ -296,11 +309,11 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           subtitle: (r) => `${formatWATDate(r.appeal_date)} · ${r.current_status} ➔ ${r.requested_status}`,
           snippet: (r) => (r.appeal_reason ? `Reason: ${r.appeal_reason}` : null),
           expandInline: true,
-          trailing: (r) => statusBadge(r.status, r.stage, r.initiated_by_role),
+          trailing: (r) => renderStatusAndReviewers(r),
           detail: {
             title: (r) => `${r.user_name} (${r.department})`,
             subtitle: (r) => `Appeal for ${formatWATDate(r.appeal_date)}`,
-            badges: (r) => statusBadge(r.status, r.stage, r.initiated_by_role),
+            badges: (r) => renderStatusAndReviewers(r),
             fields: (r) => [
               { label: "Appeal Date", value: formatWATDate(r.appeal_date) },
               { label: "Current Status", value: r.current_status },
@@ -353,7 +366,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                 <p className="text-sm font-semibold">{r.user_name}</p>
                 <p className="text-muted-foreground text-xs">{r.department}</p>
               </div>
-              {statusBadge(r.status, r.stage, r.initiated_by_role)}
+              {renderStatusAndReviewers(r)}
             </div>
             <div className="text-muted-foreground flex items-center justify-between text-xs">
               <span>Date: {formatWATDate(r.appeal_date)}</span>
