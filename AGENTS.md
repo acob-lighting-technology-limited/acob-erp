@@ -700,6 +700,10 @@ table or filter bar. Use `ExportOptionsDialog` from
 `@/components/admin/export-options-dialog`. Export logic lives in
 `@/lib/<section>/export.ts`.
 
+**Header buttons.** A header shows one main button, Export when the page has one, and
+`HeaderMoreMenu` (`@/components/ui/patterns/header-more-menu`) for anything else. Do not add a
+Refresh button to a page whose data is a TanStack query: it refetches on window focus.
+
 `DataTable` has no built-in `export` prop (removed): two exports on one page, one in the toolbar and one in
 the header, confused users. A page that also needs a column picker opens `ExportColumnsDialog` from
 the `ExportOptionsDialog` choice; it is a second step, not a second export system.

@@ -22,6 +22,7 @@ import {
   Wallet,
   AlertCircle,
 } from "lucide-react"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
 import { LeaveTypesCard } from "@/components/leave/leave-types-card"
@@ -858,26 +859,18 @@ export function LeaveContent({
       }
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setIsOverviewOpen(true)}>
-            <CircleHelp className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Overview</span>
-          </Button>
-          {pendingReviewHistory.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setIsReviewHistoryOpen(true)}>
-              <History className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Review History</span>
-            </Button>
-          )}
-          <Button
-            size="sm"
-            onClick={() => {
-              if (hasPendingRequest) {
-                setIsCreateBlockedOpen(true)
-                return
-              }
-              openCreateDialog()
-            }}
-          >
+          <HeaderMoreMenu
+            items={[
+              { label: "Overview", icon: CircleHelp, onSelect: () => setIsOverviewOpen(true) },
+              {
+                label: "Review History",
+                icon: History,
+                onSelect: () => setIsReviewHistoryOpen(true),
+                hidden: pendingReviewHistory.length === 0,
+              },
+            ]}
+          />
+          <Button size="sm" onClick={() => (hasPendingRequest ? setIsCreateBlockedOpen(true) : openCreateDialog())}>
             <Plus className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">New Request</span>
           </Button>

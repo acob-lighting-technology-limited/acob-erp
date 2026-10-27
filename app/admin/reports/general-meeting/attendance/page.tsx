@@ -19,7 +19,6 @@ import {
   Laptop,
   Palmtree,
   QrCode,
-  RefreshCw,
   ShieldCheck,
   UserCheck,
   XCircle,
@@ -417,18 +416,6 @@ export default function AdminMeetingAttendancePage() {
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleExportCsv}>
             <Download className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Export CSV</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => {
-              refetchSession()
-              refetchAttendance()
-            }}
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", (attendanceLoading || sessionLoading) && "animate-spin")} />
           </Button>
         </div>
       }

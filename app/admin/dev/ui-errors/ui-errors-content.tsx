@@ -12,6 +12,7 @@ import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
 import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime, toLocalISODate } from "@/lib/utils/date"
 import { Bug, AlertTriangle, ShieldAlert, Download } from "lucide-react"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTablePage, DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table"
@@ -237,27 +238,20 @@ export function UiErrorsContent({
       icon={Bug}
       actions={
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy !== null}
-            onClick={() => {
-              void toggleAlerts()
-            }}
-          >
-            {alertsEnabled ? "Disable alerts" : "Notify me"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy !== null}
-            onClick={() => setShowCollectorSetup((open) => !open)}
-          >
-            {platformConfigured ? "Update Supabase token" : "Connect Supabase logs"}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => router.refresh()}>
-            Refresh
-          </Button>
+          <HeaderMoreMenu
+            items={[
+              {
+                label: alertsEnabled ? "Disable alerts" : "Notify me",
+                onSelect: () => void toggleAlerts(),
+                disabled: busy !== null,
+              },
+              {
+                label: platformConfigured ? "Update Supabase token" : "Connect Supabase logs",
+                onSelect: () => setShowCollectorSetup((open) => !open),
+                disabled: busy !== null,
+              },
+            ]}
+          />
           <Button size="sm" variant="outline" onClick={() => setExportOpen(true)} disabled={groupedRows.length === 0}>
             <Download className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>
