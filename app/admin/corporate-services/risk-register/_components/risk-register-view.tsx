@@ -53,6 +53,7 @@ import { RiskHeatMap } from "./risk-heat-map"
 import { RiskImportDialog } from "./risk-import-dialog"
 import { TimelineText, describeTimeline } from "./risk-timeline"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 interface RiskRegisterViewProps {
   departments: Array<{ name: string; code: string | null }>
   staff: StaffOption[]
@@ -90,6 +91,7 @@ export function RiskRegisterView({
   lockedDepartment,
   backLink,
 }: RiskRegisterViewProps) {
+  const shell = useShellBase()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState("register")
   const [formOpen, setFormOpen] = useState(false)
@@ -314,7 +316,7 @@ export function RiskRegisterView({
           : "Departmental risks, their inherent rating, control owners and mitigation plans."
       }
       icon={ShieldAlert}
-      backLink={backLink || { href: "/admin/corporate-services/scorecard", label: "Back to Scorecard" }}
+      backLink={backLink || { href: shell.backHref("/admin/corporate-services/scorecard"), label: "Back to Scorecard" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}

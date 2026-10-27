@@ -140,6 +140,7 @@ export const RELEASES: Release[] = [
           "Data tables can export what they show",
           "Tapping a row on a phone opens its sheet with every column, the row's own panel and all of its actions (edit, approve, delete), not just a single Open button",
           "The Cards view now appears only where a card shows more than the row does",
+          "Department leads' consoles keep every link inside the console: the dashboard's View all links, activity feed, back links and shortcuts no longer send them to admin pages they cannot open",
         ],
       },
     ],

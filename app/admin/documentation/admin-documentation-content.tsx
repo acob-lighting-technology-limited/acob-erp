@@ -16,6 +16,7 @@ import { MarkdownContent } from "@/components/ui/markdown-content"
 import type { AdminDocumentation, UserProfile, employeeMember } from "@/components/documentation/admin-doc-types"
 import { formatDate } from "@/lib/format"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 // Re-export types for consumers of this module
 export type { UserProfile, employeeMember }
 export type Documentation = AdminDocumentation
@@ -52,6 +53,7 @@ export function AdminDocumentationContent({
   backLinkHref = "/admin",
   backLinkLabel = "Back to Admin",
 }: AdminDocumentationContentProps) {
+  const shell = useShellBase()
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
@@ -208,7 +210,7 @@ export function AdminDocumentationContent({
         lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
         accessMode={departmentDocs.accessMode ?? "admin"}
         lockedDepartment={departmentDocs.lockedDepartment}
-        backLink={{ href: "/admin/documentation", label: "Back to Documentation" }}
+        backLink={{ href: shell.backHref("/admin/documentation"), label: "Back to Documentation" }}
       />
     )
   }
@@ -380,7 +382,7 @@ export function AdminDocumentationContent({
               lockToInitialPath={Boolean(departmentDocs.lockToInitialPath)}
               accessMode={departmentDocs.accessMode ?? "admin"}
               lockedDepartment={departmentDocs.lockedDepartment}
-              backLink={{ href: "/admin/documentation", label: "Back to Documentation" }}
+              backLink={{ href: shell.backHref("/admin/documentation"), label: "Back to Documentation" }}
             />
           ) : (
             <Card className="border-2">

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 type Employee = {
   id: string
   full_name: string
@@ -59,6 +60,8 @@ export function MeetingReminderForm({
   departmentOptions,
   presenterOptions,
 }: MeetingReminderFormProps) {
+  const shell = useShellBase()
+  const meetingDateHref = shell.href("/admin/reports/general-meeting")
   const VISITOR_ITEM_VALUE = "__visitor_presenter__"
   const presenterSelectValue =
     knowledgePresenterId !== "none" ? knowledgePresenterId : knowledgePresenterName.trim() ? VISITOR_ITEM_VALUE : "none"
@@ -103,9 +106,11 @@ export function MeetingReminderForm({
             The date updates automatically from the selected week&apos;s Admin Reports setup. This value is read-only
             here.
           </p>
-          <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
-            <Link href="/admin/reports/general-meeting">Manage Meeting Date</Link>
-          </Button>
+          {meetingDateHref && (
+            <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
+              <Link href={meetingDateHref}>Manage Meeting Date</Link>
+            </Button>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="meet-time">Meeting Time</Label>

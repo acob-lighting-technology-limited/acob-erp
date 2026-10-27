@@ -11,6 +11,7 @@ import { ArrowRight } from "lucide-react"
 import { formatWATDate } from "@/lib/utils/date"
 import { formatNumber } from "@/lib/format"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 export interface AdminAssetActivityRow {
   id: string
   asset_type: string | null
@@ -193,22 +194,23 @@ export function AdminActivityTabs({
   leave,
   attendance,
 }: AdminActivityTabsProps) {
+  const shell = useShellBase()
   const [activeTab, setActiveTab] = useState("assets")
 
   const viewAllMeta = useMemo(() => {
     const map: Record<string, { href: string; label: string }> = {
-      tasks: { href: "/admin/tasks", label: "View all tasks" },
-      documentation: { href: "/admin/documentation", label: "View all docs" },
-      feedback: { href: "/admin/feedback", label: "View all feedback" },
-      correspondence: { href: "/admin/correspondence", label: "View all correspondence" },
-      helpdesk: { href: "/admin/help-desk", label: "View all tickets" },
-      payments: { href: "/admin/accounts/payments", label: "View all payments" },
-      leave: { href: "/admin/hr/leave", label: "View all leave" },
-      attendance: { href: "/admin/hr/attendance", label: "View all attendance" },
-      assets: { href: "/admin/assets", label: "View all assets" },
+      tasks: { href: shell.href("/admin/tasks") ?? shell.base, label: "View all tasks" },
+      documentation: { href: shell.href("/admin/documentation") ?? shell.base, label: "View all docs" },
+      feedback: { href: shell.href("/admin/feedback") ?? shell.base, label: "View all feedback" },
+      correspondence: { href: shell.href("/admin/correspondence") ?? shell.base, label: "View all correspondence" },
+      helpdesk: { href: shell.href("/admin/help-desk") ?? shell.base, label: "View all tickets" },
+      payments: { href: shell.href("/admin/accounts/payments") ?? shell.base, label: "View all payments" },
+      leave: { href: shell.href("/admin/hr/leave") ?? shell.base, label: "View all leave" },
+      attendance: { href: shell.href("/admin/hr/attendance") ?? shell.base, label: "View all attendance" },
+      assets: { href: shell.href("/admin/assets") ?? shell.base, label: "View all assets" },
     }
     return map[activeTab] ?? map.assets
-  }, [activeTab])
+  }, [activeTab, shell])
 
   const listClass = "max-h-72 divide-y overflow-y-auto"
 

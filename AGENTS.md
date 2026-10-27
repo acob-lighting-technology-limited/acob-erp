@@ -138,6 +138,11 @@ Every rule here exists because breaking it already cost us something.
   build a read-only record view as a centred modal, and never hand-roll a sheet shell: the shared one
   keeps the width, header, divided sections and sticky footer the same everywhere, and keeps the header
   badges clear of the close button.
+- **Views shared by `/admin` and `/dept/<id>` never hard-code `/admin/…`.** A pure department lead cannot
+  open `/admin`. In a client component call `useShellBase()` (`@/hooks/use-shell-base`): `shell.href("/admin/x")`
+  gives the console's own link, or `null` when the console has no such page (leave the link out), and
+  `shell.backHref(...)` falls back to the nearest page the console has. A server component takes a `basePath`
+  prop. `lib/dept/shell-links.ts` lists the console's pages and a test fails if it drifts from `app/dept`.
 - **Name a component for what it renders.** A side sheet is `*-sheet.tsx`, a modal `*-dialog.tsx`.
 - **Every empty state** says what happened and offers one primary next action.
 

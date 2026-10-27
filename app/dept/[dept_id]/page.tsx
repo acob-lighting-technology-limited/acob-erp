@@ -390,7 +390,7 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
         </StatGrid>
       </Section>
 
-      <RecentActivityFeed activity={recentActivity} showViewAll={false} />
+      <RecentActivityFeed activity={recentActivity} showViewAll={false} basePath={`/dept/${dept_id}`} />
 
       <AdminActivityTabs
         assets={assetsActivity.data || []}

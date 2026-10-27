@@ -37,6 +37,7 @@ import { getDepartmentTrackerStatus } from "@/lib/reports/action-tracker-display
 import { StaffNameWithAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 interface AdminWeeklyReportsData {
   reports: WeeklyReport[]
   trackingData: TrackerStatus[]
@@ -83,6 +84,21 @@ export function WeeklyReportsContent({
   const currentOfficeWeek = getCurrentOfficeWeek()
   // Opens on the week being reported on — from Friday that is the next one, so
   // reports arriving ahead of Monday's meeting land in the week on screen.
+  const shell = useShellBase()
+  const trackerHrefFor = (report: { week_number: number; year: number; department: string }) =>
+    shell.href(
+      `/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${encodeURIComponent(report.department)}`
+    )
+  const renderTrackerLink = (report: { week_number: number; year: number; department: string }) => {
+    const href = trackerHrefFor(report)
+    return href ? (
+      <Link href={href} className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline">
+        View action tracker
+      </Link>
+    ) : (
+      <span />
+    )
+  }
   const reportingWeek = useMemo(() => getReportingOfficeWeek(), [])
   const [weekFilter, setWeekFilter] = useState(reportingWeek.week)
   const [yearFilter, setYearFilter] = useState(reportingWeek.year)
@@ -359,7 +375,7 @@ export function WeeklyReportsContent({
       title="Weekly Reports"
       description="Review and export departmental reports."
       icon={FileBarChart}
-      backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
+      backLink={{ href: shell.backHref("/admin/reports/general-meeting"), label: "Back to General Meeting" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -536,12 +552,7 @@ export function WeeklyReportsContent({
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 md:col-span-3">
-                <Link
-                  href={`/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${report.department}`}
-                  className="text-primary inline-flex items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  View action tracker
-                </Link>
+                {renderTrackerLink(report)}
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -630,7 +641,7 @@ export function WeeklyReportsContent({
                 {
                   label: "Action Tracker",
                   value: trackerStatus.label,
-                  href: `/admin/reports/general-meeting/action-tracker?week=${report.week_number}&year=${report.year}&dept=${encodeURIComponent(report.department)}`,
+                  href: trackerHrefFor(report) ?? undefined,
                 },
                 { label: "Submitted", value: formatWATTimeDate(report.created_at) },
                 {

@@ -76,6 +76,8 @@ import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
+import { useShellBase } from "@/hooks/use-shell-base"
+import { EmployeeAvatar } from "./_components/employee-avatar"
 const log = logger("hr-employees-admin-employee-content")
 
 type EmployeeGender = "male" | "female" | "prefer_not_to_say" | "unspecified"
@@ -160,29 +162,6 @@ function deriveLeadDepartments(department: string, isDepartmentLead: boolean, se
   return Array.from(new Set(source.map((name) => normalizeDepartmentName(name)).filter(Boolean)))
 }
 
-const AVATAR_SIZES = {
-  sm: "h-8 w-8 text-[10px]",
-  md: "h-10 w-10 text-xs",
-  lg: "h-12 w-12 text-sm",
-  xl: "h-16 w-16 text-lg",
-} as const
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return (name.slice(0, 2) || "AC").toUpperCase()
-}
-
-function EmployeeAvatar({ employee, size = "md" }: { employee: Employee; size?: keyof typeof AVATAR_SIZES }) {
-  const fullName = `${employee.first_name || ""} ${employee.last_name || ""}`.trim() || employee.company_email || "User"
-  return (
-    <Avatar className={cn("shrink-0", AVATAR_SIZES[size])}>
-      {employee.avatar_url ? <AvatarImage src={employee.avatar_url} alt={fullName} className="object-cover" /> : null}
-      <AvatarFallback className="bg-primary/10 text-primary font-bold">{getInitials(fullName)}</AvatarFallback>
-    </Avatar>
-  )
-}
-
 const roleList: UserRole[] = ["visitor", "employee", "admin", "super_admin", "developer"]
 const ELEVATED_ROLES: UserRole[] = ["super_admin", "admin", "developer"]
 
@@ -220,6 +199,7 @@ async function fetchEmployeeProfile(userId: string): Promise<EmployeeProfileReco
 }
 
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
+  const shell = useShellBase()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
 
@@ -1150,7 +1130,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       title="Employee Management"
       description="View and manage employee profiles, roles, and permissions."
       icon={Users}
-      backLink={{ href: "/admin/hr", label: "Back to HR" }}
+      backLink={{ href: shell.backHref("/admin/hr"), label: "Back to HR" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as DirectoryTab)}

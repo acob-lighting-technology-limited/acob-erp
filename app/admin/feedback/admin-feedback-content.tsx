@@ -19,6 +19,7 @@ import { cn, formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 
+import { useShellBase } from "@/hooks/use-shell-base"
 interface AdminFeedbackContentProps {
   initialFeedback: FeedbackRecord[]
   initialStats: {
@@ -64,6 +65,8 @@ async function fetchFilterData(): Promise<FilterData> {
 }
 
 export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFeedbackContentProps) {
+  const shell = useShellBase()
+  const surveysHref = shell.href("/admin/feedback/surveys")
   const router = useRouter()
   const [feedback, setFeedback] = useState(initialFeedback)
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackRecord | null>(null)
@@ -264,15 +267,17 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
       title="User Feedback"
       description="Centralized portal for managing employee concerns, suggestions and system praise."
       icon={MessageSquare}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
+      backLink={{ href: shell.backHref("/admin"), label: "Back to Admin" }}
       actions={
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-            <Link href="/admin/feedback/surveys">
-              <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-              Satisfaction Surveys
-            </Link>
-          </Button>
+          {surveysHref && (
+            <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+              <Link href={surveysHref}>
+                <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                Satisfaction Surveys
+              </Link>
+            </Button>
+          )}
         </div>
       }
       tabs={hasLeadFeedback ? tabs : undefined}
