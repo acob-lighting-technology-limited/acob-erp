@@ -488,6 +488,11 @@ export async function stageAttendanceChange(
     target?: StagingTarget | null
     /** Bulk callers send one summary notice per person instead. Default true. */
     notify?: boolean
+    /**
+     * A period change (open-ended OOS, exemption) applied as a whole on confirmation
+     * instead of writing this one day. Needs the 20261027120000 migration.
+     */
+    change?: { kind: "oos_period" | "exemption"; payload: unknown; summary: string }
   }
 ): Promise<StageChangeResult> {
   const { data: pending } = await client
@@ -537,11 +542,16 @@ export async function stageAttendanceChange(
       initiated_by_role: route.initiatedByRole,
       created_by: params.actor.userId,
       ...firstStage,
+      ...(params.change ? { change_kind: params.change.kind, change_payload: params.change.payload } : {}),
     })
     .select("id")
     .single<{ id: string }>()
 
   if (error || !staged) {
+    // A pending appeal created in the meantime trips the one-pending-per-day index.
+    if (error?.code === "23505") {
+      return { ok: false, status: 409, error: `An alteration or appeal is already pending for ${params.date}.` }
+    }
     log.error({ err: String(error?.message), userId: params.userId, date: params.date }, "Failed to stage change")
     return { ok: false, status: 500, error: "Failed to stage alteration" }
   }
@@ -567,7 +577,9 @@ export async function stageAttendanceChange(
       appealId: staged.id,
       actorId: params.actor.userId,
       title: "Attendance Alteration Staged",
-      message: `An attendance alteration to ${statusLabel(params.requestedStatus)} for ${target?.full_name ?? "an employee"} on ${params.date} requires your confirmation.`,
+      message: params.change
+        ? `${params.change.summary} for ${target?.full_name ?? "an employee"} requires your confirmation.`
+        : `An attendance alteration to ${statusLabel(params.requestedStatus)} for ${target?.full_name ?? "an employee"} on ${params.date} requires your confirmation.`,
     })
   }
 

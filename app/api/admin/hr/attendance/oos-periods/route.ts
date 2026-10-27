@@ -5,7 +5,8 @@ import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
-import { materializeOos, oosWorkdays } from "@/lib/hr/oos-materialize"
+import { stageAttendanceChange } from "@/lib/hr/attendance-appeals"
+import { type OosPeriodChange } from "@/lib/hr/oos-materialize"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { toLocalISODate } from "@/lib/utils/date"
 
@@ -15,10 +16,11 @@ export const dynamic = "force-dynamic"
 /**
  * Indefinite ("until stopped") Out-of-Station directives.
  *
- * Bounded OOS ranges are materialized immediately by /records/bulk. This endpoint
- * handles the open-ended case: it records the directive (attendance_oos_periods with a
- * NULL end_date), materializes OOS from the start date through today, and lets the
- * attendance cron extend it forward day by day. Stopping it closes end_date at today
+ * Bounded OOS ranges are staged per day by /records/bulk. This endpoint handles the
+ * open-ended case: it stages the directive for confirmation; once confirmed
+ * (openOosPeriod) it is recorded (attendance_oos_periods with a NULL end_date), OOS is
+ * materialized from the start date through today, and the attendance cron extends it
+ * forward day by day. Stopping it closes end_date at today
  * so past OOS days are preserved and no new ones are created.
  */
 
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "None of the selected employees are within your scope" }, { status: 403 })
     }
 
-    // Record the open directive (skip employees who already have an active open one).
+    // Skip employees who already have an active open directive.
     const { data: existingOpen } = await dataClient
       .from("attendance_oos_periods")
       .select("user_id")
@@ -79,26 +81,32 @@ export async function POST(request: NextRequest) {
     const alreadyOpen = new Set((existingOpen ?? []).map((r) => r.user_id))
     const toOpen = allowedIds.filter((id) => !alreadyOpen.has(id))
 
-    if (toOpen.length > 0) {
-      const rows = toOpen.map((user_id) => ({
-        user_id,
-        start_date: start,
-        end_date: null,
-        kind: "infinite",
-        reason,
-        status: "active",
-        created_by: scope.userId,
-      }))
-      const { error } = await dataClient.from("attendance_oos_periods").insert(rows)
-      if (error) {
-        log.error({ err: JSON.stringify(error) }, "Failed to create OOS periods")
-        return NextResponse.json({ error: "Failed to create indefinite OOS" }, { status: 500 })
-      }
+    // Two-stage rule: each directive is staged as one appeal on its start day and opened
+    // (with OOS filled in from the start date) only once it is confirmed.
+    const payload: OosPeriodChange = { start_date: start, reason }
+    const summary = `Out of Station from ${start} until stopped`
+    let staged = 0
+    const failures: string[] = []
+    for (const userId of toOpen) {
+      const { data: record } = await dataClient
+        .from("attendance_records")
+        .select("id, status")
+        .eq("user_id", userId)
+        .eq("date", start)
+        .maybeSingle<{ id: string; status: string | null }>()
+      const result = await stageAttendanceChange(dataClient, {
+        actor: scope,
+        userId,
+        date: start,
+        attendanceRecordId: record?.id ?? null,
+        currentStatus: record?.status || "absent",
+        requestedStatus: "out_of_station",
+        reason: `${summary}: ${reason}`,
+        change: { kind: "oos_period", payload, summary },
+      })
+      if (result.ok) staged++
+      else failures.push(result.error)
     }
-
-    // Materialize OOS from start through today so the roster reflects it right away.
-    const dates = oosWorkdays(start, today)
-    const result = await materializeOos(dataClient, allowedIds, dates, reason, scope.userId)
 
     await writeAuditLog(
       scopeResult.supabase,
@@ -106,16 +114,21 @@ export async function POST(request: NextRequest) {
         action: "create",
         entityType: "attendance_oos_period",
         entityId: `oos-indefinite-${start}`,
-        newValues: { user_ids: allowedIds, start_date: start, reason },
+        newValues: { user_ids: toOpen, start_date: start, reason, staged },
         context: { actorId: scope.userId, source: "api", route: "/api/admin/hr/attendance/oos-periods" },
       },
       { failOpen: true }
     )
 
+    if (staged === 0 && (failures.length > 0 || toOpen.length === 0)) {
+      return NextResponse.json(
+        { error: failures[0] ?? "These employees already have an open Out of Station directive" },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({
-      message: `Indefinite OOS applied to ${allowedIds.length} employee(s)`,
-      opened: toOpen.length,
-      ...result,
+      staged: true,
+      message: `Indefinite OOS staged for ${staged} employee(s), awaiting confirmation.${failures.length ? ` ${failures.length} not staged: ${failures[0]}` : ""}`,
     })
   } catch (error) {
     log.error({ err: String(error) }, "Error in POST /api/admin/hr/attendance/oos-periods")

@@ -8,6 +8,8 @@ import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { notifyAttendanceMail } from "@/lib/hr/attendance-notify"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
+import { applyExemptionChange, type ExemptionChange } from "@/lib/hr/exemptions"
+import { openOosPeriod, type OosPeriodChange } from "@/lib/hr/oos-materialize"
 import {
   findStagedLeaveRequest,
   isStagedLeaveAppeal,
@@ -78,6 +80,8 @@ type AppealRow = {
   resolution_note: string | null
   created_at: string
   updated_at: string
+  change_kind?: "oos_period" | "exemption" | null
+  change_payload?: unknown
 }
 
 type ProfileRow = {
@@ -248,9 +252,8 @@ export async function PATCH(request: NextRequest) {
     // Fetch the appeal
     const { data: appeal, error: fetchError } = await dataClient
       .from("attendance_appeals")
-      .select(
-        "id, user_id, appeal_date, current_status, requested_status, appeal_reason, attendance_record_id, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note"
-      )
+      // "*" so the period-change columns (20261027120000) come through when present.
+      .select("*")
       .eq("id", appealId)
       .maybeSingle<AppealRow>()
 
@@ -432,7 +435,7 @@ export async function PATCH(request: NextRequest) {
     // If this decision finalized an approval, write to attendance_records. A staged leave
     // grant is the exception: the approved leave_requests row (updated below) is what
     // derives on_leave for its whole range, without overwriting real punches.
-    if (isFinalApproval && !stagedLeave) {
+    if (isFinalApproval && !stagedLeave && !appeal.change_kind) {
       const quotaCheck = await validateLwpAwpMonthlyQuota({
         dataClient,
         userId: appeal.user_id,
@@ -490,6 +493,48 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    // Puts the appeal back to pending when its follow-on write fails, so it can be retried.
+    const revertAppeal = () =>
+      dataClient
+        .from("attendance_appeals")
+        .update({
+          status: appeal.status,
+          stage: appeal.stage,
+          lead_reviewed_by: appeal.lead_reviewed_by,
+          lead_reviewed_at: appeal.lead_reviewed_at,
+          lead_resolution_note: appeal.lead_resolution_note,
+          admin_reviewed_by: appeal.admin_reviewed_by,
+          admin_reviewed_at: appeal.admin_reviewed_at,
+          admin_resolution_note: appeal.admin_resolution_note,
+          reviewed_by: null,
+          reviewed_at: null,
+          resolution_note: null,
+        })
+        .eq("id", appeal.id)
+
+    // A confirmed period change (open-ended OOS, exemption) is applied as a whole. It runs
+    // after the appeal update: applying OOS closes pending appeals on its days, which would
+    // otherwise include this one.
+    if (isFinalApproval && appeal.change_kind) {
+      const applied =
+        appeal.change_kind === "oos_period"
+          ? await openOosPeriod(dataClient, appeal.user_id, appeal.change_payload as OosPeriodChange, scope.userId)
+          : await applyExemptionChange(
+              dataClient,
+              appeal.user_id,
+              appeal.change_payload as ExemptionChange,
+              scope.userId
+            )
+      if (applied.error) {
+        log.error({ err: applied.error, appealId: appeal.id }, "Failed to apply confirmed period change")
+        await revertAppeal()
+        return NextResponse.json(
+          { error: `${applied.error}. The appeal was left unchanged — please try again.` },
+          { status: 500 }
+        )
+      }
+    }
+
     // Carry a final decision on a staged leave grant onto its leave_requests row. The appeal
     // update above is the concurrency guard, so this runs only for the winning reviewer; if
     // it fails, the appeal is put back so the decision can be retried.
@@ -520,22 +565,7 @@ export async function PATCH(request: NextRequest) {
 
       if (leaveError || !decidedLeave) {
         log.error({ err: leaveError, leaveRequestId: stagedLeave.id }, "Failed to decide staged leave")
-        await dataClient
-          .from("attendance_appeals")
-          .update({
-            status: appeal.status,
-            stage: appeal.stage,
-            lead_reviewed_by: appeal.lead_reviewed_by,
-            lead_reviewed_at: appeal.lead_reviewed_at,
-            lead_resolution_note: appeal.lead_resolution_note,
-            admin_reviewed_by: appeal.admin_reviewed_by,
-            admin_reviewed_at: appeal.admin_reviewed_at,
-            admin_resolution_note: appeal.admin_resolution_note,
-            reviewed_by: null,
-            reviewed_at: null,
-            resolution_note: null,
-          })
-          .eq("id", appeal.id)
+        await revertAppeal()
         return NextResponse.json(
           { error: "Could not update the leave request. The appeal was left unchanged — please try again." },
           { status: 500 }

@@ -5,7 +5,12 @@ import { rateLimit, getClientId } from "@/lib/rate-limit"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
-import { freezeExemptionAtToday, recordExemptionChange, snapshotExemption } from "@/lib/hr/exemptions"
+import {
+  freezeExemptionAtToday,
+  recordExemptionChange,
+  snapshotExemption,
+  stageExemptionChange,
+} from "@/lib/hr/exemptions"
 
 const ExemptionSchema = z.object({
   user_id: z.string().uuid(),
@@ -18,31 +23,6 @@ const ExemptionSchema = z.object({
   months: z.array(z.string().regex(/^\d{4}-\d{2}$/)).optional(),
   reason: z.string().max(240).optional().nullable(),
 })
-
-function monthRange(yearMonth: string) {
-  const [year, month] = yearMonth.split("-").map(Number)
-  const start = new Date(Date.UTC(year, month - 1, 1))
-  const end = new Date(Date.UTC(year, month, 0))
-  return { start, end }
-}
-
-function formatDateUTC(date: Date) {
-  const year = date.getUTCFullYear()
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0")
-  const day = String(date.getUTCDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
-function weekRangeInMonth(yearMonth: string, weekIndex: number) {
-  const { start, end } = monthRange(yearMonth)
-  const rangeStart = new Date(start)
-  rangeStart.setUTCDate(start.getUTCDate() + (weekIndex - 1) * 7)
-  const rangeEnd = new Date(rangeStart)
-  rangeEnd.setUTCDate(rangeStart.getUTCDate() + 6)
-  if (rangeStart > end) return null
-  if (rangeEnd > end) rangeEnd.setTime(end.getTime())
-  return { start: formatDateUTC(rangeStart), end: formatDateUTC(rangeEnd) }
-}
 
 async function ensureAdmin(request: NextRequest) {
   const rl = await rateLimit(`admin-attendance-exemptions:${getClientId(request)}`, { limit: 30, windowSec: 60 })
@@ -234,43 +214,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // DB currently allows kind weekly|monthly; custom ranges persist as monthly-kind (mirrors bulk route).
-  const { error } = await dataClient
-    .from("attendance_exempt_periods")
-    .insert({ user_id, start_date, end_date, kind: "monthly", reason: reason || null, created_by: auth.user.id })
-  if (error) {
-    const { error: minimalError } = await dataClient
-      .from("attendance_exempt_periods")
-      .insert({ user_id, start_date, end_date, kind: "monthly" })
-    if (minimalError) {
-      return NextResponse.json({ error: "Failed to add exemption period" }, { status: 500 })
-    }
-  }
-
-  await writeAuditLog(
-    auth.supabase,
-    {
-      action: "create",
-      entityType: "attendance_exemption",
-      entityId: user_id,
-      newValues: { start_date, end_date, reason: reason || null, kind: "monthly" },
-      context: { actorId: auth.user.id, source: "api", route: "/api/admin/hr/attendance/exemptions" },
-    },
-    { failOpen: true }
-  )
-
-  await recordAttendanceEvent(dataClient, {
-    userId: user_id,
-    eventDate: start_date,
-    eventType: "exemption_added",
-    toStatus: "exempted",
-    source: "manual",
-    comment: reason || null,
-    actorId: auth.user.id,
-    metadata: { start_date, end_date },
+  // Two-stage rule: adding a window is staged and applied once confirmed. It is added
+  // alongside the person's other windows, not in place of them.
+  const staged = await stageExemptionChange(dataClient, auth.scope, user_id, {
+    mode: "period",
+    start_date,
+    end_date,
+    append: true,
+    reason: reason || null,
   })
-
-  return NextResponse.json({ message: "Exemption period added" })
+  if (!staged.ok) return NextResponse.json({ error: staged.error }, { status: staged.status })
+  return NextResponse.json({
+    staged: true,
+    message: `Exemption period staged. Awaiting confirmation from ${staged.awaiting}.`,
+  })
 }
 
 export async function PATCH(request: NextRequest) {
@@ -299,7 +256,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
   }
-  const attendance_exempt = mode === "infinite"
   const before = await snapshotExemption(dataClient, user_id)
 
   // "Off" freezes the exemption at today instead of wiping history: an open infinite
@@ -329,80 +285,19 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ message: "Exemption stopped — history preserved up to today" })
   }
 
-  const { error } = await dataClient
-    .from("profiles")
-    .update({
-      attendance_exempt,
-      attendance_exempt_until: null,
-      attendance_exempt_reason: reason || null,
-      attendance_exempt_set_at: new Date().toISOString(),
-      attendance_exempt_set_by: auth.user.id,
-    })
-    .eq("id", user_id)
-  if (error) return NextResponse.json({ error: "Failed to update exemption" }, { status: 500 })
-
-  // Reset existing windows each save for deterministic config.
-  await dataClient.from("attendance_exempt_periods").delete().eq("user_id", user_id)
-
-  if (mode === "weekly") {
-    const month = parsed.data.month
-    const weeks = parsed.data.weeks || []
-    if (!month || weeks.length === 0) {
-      return NextResponse.json({ error: "Select a month and at least one week" }, { status: 400 })
-    }
-    const rows = weeks
-      .map((w) => weekRangeInMonth(month, w))
-      .filter(Boolean)
-      .map((r) => ({
-        user_id,
-        start_date: r!.start,
-        end_date: r!.end,
-        kind: "weekly",
-        reason: reason || null,
-        created_by: auth.user.id,
-      }))
-    if (rows.length > 0) await dataClient.from("attendance_exempt_periods").insert(rows)
-  } else if (mode === "monthly") {
-    const months = parsed.data.months || []
-    if (months.length === 0) {
-      return NextResponse.json({ error: "Select at least one month" }, { status: 400 })
-    }
-    const rows = months.map((ym) => {
-      const range = monthRange(ym)
-      return {
-        user_id,
-        start_date: formatDateUTC(range.start),
-        end_date: formatDateUTC(range.end),
-        kind: "monthly",
-        reason: reason || null,
-        created_by: auth.user.id,
-      }
-    })
-    if (rows.length > 0) await dataClient.from("attendance_exempt_periods").insert(rows)
-  }
-
-  await recordExemptionChange(dataClient, {
-    userId: user_id,
-    actorId: auth.user.id,
+  // Two-stage rule: setting an exemption is staged and applied once confirmed.
+  const staged = await stageExemptionChange(dataClient, auth.scope, user_id, {
     mode,
+    month: parsed.data.month,
+    weeks: parsed.data.weeks,
+    months: parsed.data.months,
     reason,
-    before,
-    after: await snapshotExemption(dataClient, user_id),
   })
-
-  await writeAuditLog(
-    auth.supabase,
-    {
-      action: "update",
-      entityType: "attendance_exemption",
-      entityId: user_id,
-      newValues: { mode, attendance_exempt, reason: reason || null },
-      context: { actorId: auth.user.id, source: "api", route: "/api/admin/hr/attendance/exemptions" },
-    },
-    { failOpen: true }
-  )
-
-  return NextResponse.json({ message: "Exemption settings saved" })
+  if (!staged.ok) return NextResponse.json({ error: staged.error }, { status: staged.status })
+  return NextResponse.json({
+    staged: true,
+    message: `Exemption staged. Awaiting confirmation from ${staged.awaiting}.`,
+  })
 }
 
 export async function DELETE(request: NextRequest) {

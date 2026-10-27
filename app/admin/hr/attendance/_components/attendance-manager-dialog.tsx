@@ -460,7 +460,7 @@ function ExemptionTab({
             return
           }
         }
-        toast.success("Exemption saved")
+        toast.info(`Exemption staged for ${selectedIds.length} employee(s), awaiting confirmation`)
         setSelectedIds([])
         setReason("")
         void loadEntries()
@@ -484,12 +484,13 @@ function ExemptionTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to save exemption")
         return
       }
-      toast.success("Exemption saved")
+      // "Off" applies at once; every other mode is staged for confirmation.
+      toast.info(payload?.message || "Exemption saved")
       setSelectedIds([])
       setReason("")
       void loadEntries()
@@ -560,12 +561,12 @@ function ExemptionTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: editing.user_id, start_date: eStart, end_date: eEnd, reason: eReason.trim() }),
       })
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null
         toast.error(payload?.error || "Failed to update exemption")
         return
       }
-      toast.success("Exemption updated")
+      toast.info(payload?.message || "Exemption updated")
       setEditing(null)
       void loadEntries()
       onDone()
@@ -1636,14 +1637,12 @@ function ManualRecordsTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_ids: selectedIds, start_date: startDate, reason: comment.trim() }),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string; skipped?: number } | null
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to apply indefinite OOS")
         return
       }
-      toast.success(
-        `Indefinite OOS applied to ${selectedIds.length} employee(s)${payload?.skipped ? ` — ${payload.skipped} fully-present day(s) skipped` : ""}`
-      )
+      toast.info(payload?.message || "Indefinite OOS staged, awaiting confirmation")
       setSelectedIds([])
       setComment("")
       void loadEntries()

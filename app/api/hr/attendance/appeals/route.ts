@@ -328,6 +328,8 @@ export async function POST(request: NextRequest) {
       .eq("user_id", effectiveUserId)
       .eq("appeal_date", appealDate)
       .in("status", ["pending", "approved"])
+      // A day can hold several approved appeals (admin/lead changes re-staged later).
+      .limit(1)
       .maybeSingle()
 
     if (existingAppeal) {
