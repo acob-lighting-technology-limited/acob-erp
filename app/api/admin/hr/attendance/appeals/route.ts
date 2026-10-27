@@ -37,6 +37,7 @@ export type AppealWithProfile = {
   lead_resolution_note?: string | null
   admin_reviewed_by?: string | null
   admin_reviewer_name?: string | null
+  admin_hr_lead_name?: string | null
   admin_reviewed_at?: string | null
   admin_resolution_note?: string | null
   reviewed_by: string | null
@@ -156,6 +157,20 @@ export async function GET(request: NextRequest) {
       return p.full_name?.trim() || [p.first_name, p.last_name].filter(Boolean).join(" ") || null
     }
 
+    const { data: adminHrLeadProfiles } = await dataClient
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, department, is_department_lead")
+      .eq("department", "Admin and HR")
+      .eq("is_department_lead", true)
+      .limit(1)
+      .returns<ProfileRow[]>()
+
+    const adminHrLeadRow = adminHrLeadProfiles?.[0]
+    const admin_hr_lead_name =
+      adminHrLeadRow?.full_name?.trim() ||
+      [adminHrLeadRow?.first_name, adminHrLeadRow?.last_name].filter(Boolean).join(" ") ||
+      "Onyekachukwu Atishie"
+
     const policy = await loadAttendancePolicy(dataClient)
     const uniqueUserIds = [...new Set(rows.map((r) => r.user_id))]
     const appealDates = [...new Set(rows.map((r) => r.appeal_date))]
@@ -186,6 +201,7 @@ export async function GET(request: NextRequest) {
         created_by_name: resolveProfileName(r.created_by),
         lead_reviewer_name: resolveProfileName(r.lead_reviewed_by),
         admin_reviewer_name: resolveProfileName(r.admin_reviewed_by),
+        admin_hr_lead_name,
         reviewer_name:
           r.status === "pending" ? null : resolveProfileName(r.admin_reviewed_by) || resolveProfileName(r.reviewed_by),
         live_status: liveAppealDayStatus(

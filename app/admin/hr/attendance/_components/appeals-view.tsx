@@ -307,7 +307,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                   : r.status === "approved" || r.status === "rejected"
                     ? `Reviewed by ${r.reviewer_name || "Admin"}${r.reviewed_at ? ` on ${formatWATDateTime(r.reviewed_at)}` : ""}${r.resolution_note ? ` — "${r.resolution_note}"` : ""}`
                     : r.stage === "pending_admin"
-                      ? "Awaiting Admin & HR Lead Review"
+                      ? `Awaiting Admin Review by ${r.admin_hr_lead_name || "Onyekachukwu Atishie"} (Admin & HR Lead)`
                       : "Pending Lead stage",
                 fullWidth: true,
               },
@@ -451,13 +451,20 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                             {r.status === "rejected" ? "Rejected" : "Approved"}
                           </span>
                         ) : r.stage === "pending_admin" ? (
-                          <span className="font-medium text-blue-600 dark:text-blue-400">
-                            Awaiting Admin & HR Lead Review
-                          </span>
+                          <span className="font-medium text-blue-600 dark:text-blue-400">Awaiting Admin Review</span>
                         ) : (
                           <span className="text-muted-foreground">Pending Lead Stage</span>
                         )}
                       </div>
+                      {r.stage === "pending_admin" && (
+                        <span className="text-muted-foreground">
+                          by{" "}
+                          <strong className="text-foreground font-medium">
+                            {r.admin_hr_lead_name || "Onyekachukwu Atishie"}
+                          </strong>{" "}
+                          (Admin &amp; HR Lead)
+                        </span>
+                      )}
                       {(r.admin_reviewed_at ||
                         (r.status !== "pending" && (r.admin_reviewer_name || r.reviewer_name))) && (
                         <>

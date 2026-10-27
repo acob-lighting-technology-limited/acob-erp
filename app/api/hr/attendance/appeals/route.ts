@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     let query = dataClient
       .from("attendance_appeals")
       .select(
-        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
+        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
       )
       .eq("user_id", user.id)
       .order("appeal_date", { ascending: false })
@@ -80,13 +80,79 @@ export async function GET(request: NextRequest) {
       query = query.gte("appeal_date", start).lte("appeal_date", end)
     }
 
-    const { data, error } = await query
+    const { data: appealsData, error } = await query
     if (error) {
       log.error({ err: error }, "Failed to fetch appeals")
       return NextResponse.json({ error: "Failed to fetch appeals" }, { status: 500 })
     }
 
-    return NextResponse.json({ data: data ?? [] })
+    const rows = appealsData ?? []
+    if (rows.length === 0) return NextResponse.json({ data: [] })
+
+    const userIdsToFetch = new Set<string>()
+    for (const r of rows) {
+      if (r.user_id) userIdsToFetch.add(r.user_id)
+      if (r.created_by) userIdsToFetch.add(r.created_by)
+      if (r.lead_reviewed_by) userIdsToFetch.add(r.lead_reviewed_by)
+      if (r.admin_reviewed_by) userIdsToFetch.add(r.admin_reviewed_by)
+      if (r.reviewed_by) userIdsToFetch.add(r.reviewed_by)
+    }
+
+    type ProfileRow = {
+      id: string
+      full_name: string | null
+      first_name: string | null
+      last_name: string | null
+      department: string | null
+      is_department_lead?: boolean | null
+    }
+
+    const { data: profiles } = await dataClient
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, department, is_department_lead")
+      .in("id", Array.from(userIdsToFetch))
+      .returns<ProfileRow[]>()
+
+    const profileMap = new Map<string, ProfileRow>()
+    for (const p of profiles ?? []) profileMap.set(p.id, p)
+
+    const resolveProfileName = (id?: string | null): string | null => {
+      if (!id) return null
+      const p = profileMap.get(id)
+      if (!p) return null
+      return p.full_name?.trim() || [p.first_name, p.last_name].filter(Boolean).join(" ") || null
+    }
+
+    const { data: adminHrLeadProfiles } = await dataClient
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, department, is_department_lead")
+      .eq("department", "Admin and HR")
+      .eq("is_department_lead", true)
+      .limit(1)
+      .returns<ProfileRow[]>()
+
+    const adminHrLeadRow = adminHrLeadProfiles?.[0]
+    const admin_hr_lead_name =
+      adminHrLeadRow?.full_name?.trim() ||
+      [adminHrLeadRow?.first_name, adminHrLeadRow?.last_name].filter(Boolean).join(" ") ||
+      "Onyekachukwu Atishie"
+
+    const data = rows.map((r) => {
+      const p = profileMap.get(r.user_id)
+      return {
+        ...r,
+        user_name: resolveProfileName(r.user_id) || "Unknown",
+        department: p?.department ?? "",
+        created_by_name: resolveProfileName(r.created_by),
+        lead_reviewer_name: resolveProfileName(r.lead_reviewed_by),
+        admin_reviewer_name: resolveProfileName(r.admin_reviewed_by),
+        admin_hr_lead_name,
+        reviewer_name:
+          r.status === "pending" ? null : resolveProfileName(r.admin_reviewed_by) || resolveProfileName(r.reviewed_by),
+      }
+    })
+
+    return NextResponse.json({ data })
   } catch (err) {
     log.error({ err: String(err) }, "Error in GET /api/hr/attendance/appeals")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })

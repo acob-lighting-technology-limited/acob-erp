@@ -35,6 +35,7 @@ export interface AppealRow {
   lead_resolution_note?: string | null
   admin_reviewed_by?: string | null
   admin_reviewer_name?: string | null
+  admin_hr_lead_name?: string | null
   admin_reviewed_at?: string | null
   admin_resolution_note?: string | null
   reviewed_by?: string | null
@@ -298,7 +299,9 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               </div>
             ) : appeal.stage === "pending_admin" ? (
               <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-2.5 text-xs text-blue-800 dark:text-blue-300">
-                Awaiting Admin & HR Lead review
+                Awaiting Admin Review by{" "}
+                <span className="font-semibold">{appeal.admin_hr_lead_name || "Onyekachukwu Atishie"}</span> (Admin
+                &amp; HR Lead)
               </div>
             ) : null}
 
