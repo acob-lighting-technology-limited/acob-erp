@@ -142,3 +142,41 @@ export async function materializeOos(
 
   return { created, overrode, skipped }
 }
+
+/** A requested open-ended Out of Station directive, staged on an appeal until confirmed. */
+export type OosPeriodChange = { start_date: string; reason: string }
+
+/**
+ * Opens a confirmed open-ended OOS directive: records it (NULL end_date, active) unless
+ * one is already open, and materializes OOS from its start date through today. The
+ * attendance cron extends it forward from there.
+ */
+export async function openOosPeriod(
+  dataClient: SupabaseClient,
+  userId: string,
+  change: OosPeriodChange,
+  actorId: string
+): Promise<{ error: string | null }> {
+  const { data: open } = await dataClient
+    .from("attendance_oos_periods")
+    .select("id")
+    .eq("user_id", userId)
+    .is("end_date", null)
+    .eq("status", "active")
+    .limit(1)
+  if (!open?.length) {
+    const { error } = await dataClient.from("attendance_oos_periods").insert({
+      user_id: userId,
+      start_date: change.start_date,
+      end_date: null,
+      kind: "infinite",
+      reason: change.reason,
+      status: "active",
+      created_by: actorId,
+    })
+    if (error) return { error: "Failed to open the Out of Station directive" }
+  }
+  const today = toLocalISODate()
+  await materializeOos(dataClient, [userId], oosWorkdays(change.start_date, today), change.reason, actorId)
+  return { error: null }
+}

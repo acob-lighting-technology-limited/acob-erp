@@ -4,18 +4,20 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
+import {
+  loadStagingTarget,
+  resolvePendingAppealsOnManualStatus,
+  stageAttendanceChange,
+} from "@/lib/hr/attendance-appeals"
 import { notifyAttendanceInApp } from "@/lib/hr/attendance-notify"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
 import {
   ATTENDANCE_STATUS_LABELS,
   DB_WRITABLE_STATUSES,
   deriveUnifiedAttendanceStatus,
-  isPermissionAttendanceStatus,
   type UnifiedAttendanceStatus,
 } from "@/lib/hr/attendance-status"
-import { createNotification } from "@/lib/notifications/create"
-import { requireApiAdminScope } from "@/lib/admin/api-scope"
+import { getScopedDepartments, requireApiAdminScope } from "@/lib/admin/api-scope"
 import { loadAttendancePolicy } from "@/lib/hr/attendance-utils"
 import { applyLunchBreak } from "@/lib/hr/attendance-ssot"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
@@ -68,6 +70,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!record) return NextResponse.json({ error: "Record not found" }, { status: 404 })
 
+    const scopedDepts = getScopedDepartments(auth.scope)
+    if (scopedDepts !== null) {
+      const target = await loadStagingTarget(dataClient, record.user_id)
+      if (!target?.department || !scopedDepts.includes(target.department)) {
+        return NextResponse.json({ error: "Employee is not within your scope" }, { status: 403 })
+      }
+    }
+
     const updates: Record<string, unknown> = {
       ...parsed.data,
       source: "manual",
@@ -97,133 +107,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           ))
     const isCoveredWithoutTimes =
       nextStatus === "waiver" || nextStatus === "absent_with_permission" || nextStatus === "out_of_station"
-    const isPermissionStatus = isPermissionAttendanceStatus(nextStatus)
-    const isActorAdmin = auth.scope.isAdminLike && auth.scope.scopeMode !== "lead"
-    const isAlteringOther = auth.scope.userId !== record.user_id
-
-    // Two-party rule: If an Admin alters an attendance record to LWP, AWP, IWP, or OOS,
-    // it cannot be applied unilaterally — it stages as an appeal awaiting Lead confirmation.
-    if (isPermissionStatus && isActorAdmin && isAlteringOther) {
-      // Check if an appeal is already active (pending or approved) for this user and date
-      const { data: existingAppeal } = await dataClient
-        .from("attendance_appeals")
-        .select("id, status, stage, requested_status")
-        .eq("user_id", record.user_id)
-        .eq("appeal_date", record.date)
-        .in("status", ["pending", "approved"])
-        .maybeSingle()
-
-      if (existingAppeal) {
-        if (existingAppeal.status === "pending") {
-          const stageLabel = existingAppeal.stage.replace(/_/g, " ")
-          return NextResponse.json(
-            {
-              error: `An alteration or appeal is already pending for this date (Stage: ${stageLabel}). Please review it in the Appeals tab.`,
-            },
-            { status: 409 }
-          )
-        }
-        return NextResponse.json({ error: "An approved appeal already exists for this date." }, { status: 409 })
-      }
-
-      const { data: targetProfile } = await dataClient
-        .from("profiles")
-        .select("department, is_department_lead, full_name")
-        .eq("id", record.user_id)
-        .maybeSingle<{ department: string | null; is_department_lead: boolean; full_name: string | null }>()
-
-      const isTargetLead = Boolean(targetProfile?.is_department_lead)
-      const targetStage = isTargetLead ? "pending_hr_lead" : "pending_lead"
-      const now = new Date().toISOString()
-
-      const { data: staged, error: stageError } = await dataClient
-        .from("attendance_appeals")
-        .insert({
-          attendance_record_id: record.id,
-          user_id: record.user_id,
-          appeal_date: record.date,
-          current_status: record.status,
-          requested_status: nextStatus,
-          appeal_reason: parsed.data.manual_comment,
-          status: "pending",
-          stage: targetStage,
-          initiated_by_role: "admin_manual",
-          admin_reviewed_by: auth.scope.userId,
-          admin_reviewed_at: now,
-          admin_resolution_note: parsed.data.manual_comment,
-          created_by: auth.scope.userId,
-        })
-        .select("id")
-        .maybeSingle()
-
-      if (stageError) {
-        log.error({ err: stageError }, "Failed to stage manual alteration")
-        return NextResponse.json({ error: "Failed to stage alteration" }, { status: 500 })
-      }
-
-      await recordAttendanceEvent(dataClient, {
-        userId: record.user_id,
-        eventDate: record.date,
-        eventType: "manual_update",
-        attendanceRecordId: record.id,
-        fromStatus: record.status,
-        toStatus: nextStatus,
-        source: "manual",
-        comment: parsed.data.manual_comment,
-        actorId: auth.scope.userId,
-        metadata: { appeal_id: staged?.id, staged_stage: targetStage },
-      })
-
-      // Send in-app notification to the required reviewer(s)
-      try {
-        let recipientIds: string[] = []
-        if (targetStage === "pending_lead" && targetProfile?.department) {
-          const { data: leads } = await dataClient
-            .from("profiles")
-            .select("id")
-            .eq("department", targetProfile.department)
-            .eq("is_department_lead", true)
-            .returns<{ id: string }[]>()
-          recipientIds = (leads ?? []).map((l) => l.id)
-        } else if (targetStage === "pending_hr_lead") {
-          const { data: hrLeads } = await dataClient
-            .from("profiles")
-            .select("id")
-            .eq("department", "Admin and HR")
-            .eq("is_department_lead", true)
-            .returns<{ id: string }[]>()
-          recipientIds = (hrLeads ?? []).map((l) => l.id)
-        }
-
-        const employeeName = targetProfile?.full_name ?? "an employee"
-        const statusLabelText = ATTENDANCE_STATUS_LABELS[nextStatus as UnifiedAttendanceStatus] ?? nextStatus
-
-        for (const recipientId of recipientIds) {
-          if (recipientId === auth.scope.userId) continue
-          await createNotification({
-            p_user_id: recipientId,
-            p_type: "approval_request",
-            p_category: "approvals",
-            p_title: "Attendance Alteration Staged",
-            p_message: `An attendance alteration to ${statusLabelText} for ${employeeName} on ${record.date} requires your confirmation.`,
-            p_priority: "normal",
-            p_link_url:
-              targetStage === "pending_lead" ? "/dept/hr/attendance?tab=appeals" : "/admin/hr/attendance?tab=appeals",
-            p_actor_id: auth.scope.userId,
-            p_entity_type: "attendance_appeal",
-            p_entity_id: staged?.id,
-          })
-        }
-      } catch (notifyErr) {
-        log.error({ err: String(notifyErr) }, "Failed to send staged alteration notification")
-      }
-
-      const statusLabel = ATTENDANCE_STATUS_LABELS[nextStatus as UnifiedAttendanceStatus] ?? nextStatus
-      return NextResponse.json({
-        data: record,
-        staged: true,
-        message: `Status alteration to ${statusLabel} staged. Awaiting confirmation from ${isTargetLead ? "Admin & HR Lead" : "Department Lead"}.`,
-      })
+    // Only an explicit status choice (or waiver) is a status override. A clock-time
+    // correction that merely re-derives the status applies directly (no screen sends
+    // times any more), because a staged change carries a status and no times.
+    const overrideStatus = explicitStatus ?? (parsed.data.waived === true ? "waiver" : undefined)
+    const isStatusOverride = Boolean(overrideStatus && overrideStatus !== record.status)
+    if (isStatusOverride && (parsed.data.clock_in !== undefined || parsed.data.clock_out !== undefined)) {
+      return NextResponse.json(
+        {
+          error:
+            "A status change needs approval and can't carry clock times. Save the clock-time correction first, then change the status.",
+        },
+        { status: 400 }
+      )
     }
 
     const isLWP = nextStatus === "lateness_with_permission" || nextStatus === "incomplete_with_permission"
@@ -257,6 +153,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (nextStatus === "waiver" && !parsed.data.manual_comment.trim()) {
       return NextResponse.json({ error: "Waiver requires a reason or comment" }, { status: 400 })
+    }
+
+    // Two-stage rule: a status override never applies directly. Whoever makes it is
+    // stage 1 (an admin — including on their own day — or a Department Lead) and the
+    // other side confirms; the final approval writes the day.
+    if (isStatusOverride && overrideStatus) {
+      const staged = await stageAttendanceChange(dataClient, {
+        actor: auth.scope,
+        userId: record.user_id,
+        date: record.date,
+        attendanceRecordId: record.id,
+        currentStatus: record.status,
+        requestedStatus: overrideStatus,
+        reason: parsed.data.manual_comment,
+      })
+      if (!staged.ok) return NextResponse.json({ error: staged.error }, { status: staged.status })
+      const statusLabel = ATTENDANCE_STATUS_LABELS[overrideStatus as UnifiedAttendanceStatus] ?? overrideStatus
+      return NextResponse.json({
+        data: record,
+        staged: true,
+        message: `Status alteration to ${statusLabel} staged. Awaiting confirmation from ${staged.awaiting}.`,
+      })
     }
 
     if (clockIn && clockOut) {
@@ -364,6 +282,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       .maybeSingle()
 
     if (!record) return NextResponse.json({ error: "Record not found" }, { status: 404 })
+
+    const scopedDepts = getScopedDepartments(scope)
+    if (scopedDepts !== null) {
+      const target = await loadStagingTarget(dataClient, record.user_id)
+      if (!target?.department || !scopedDepts.includes(target.department)) {
+        return NextResponse.json({ error: "Employee is not within your scope" }, { status: 403 })
+      }
+    }
 
     const hasPunches = Boolean(record.clock_in || record.clock_out)
 

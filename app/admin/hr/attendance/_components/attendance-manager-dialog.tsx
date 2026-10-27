@@ -460,7 +460,7 @@ function ExemptionTab({
             return
           }
         }
-        toast.success("Exemption saved")
+        toast.info(`Exemption staged for ${selectedIds.length} employee(s), awaiting confirmation`)
         setSelectedIds([])
         setReason("")
         void loadEntries()
@@ -484,12 +484,13 @@ function ExemptionTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to save exemption")
         return
       }
-      toast.success("Exemption saved")
+      // "Off" applies at once; every other mode is staged for confirmation.
+      toast.info(payload?.message || "Exemption saved")
       setSelectedIds([])
       setReason("")
       void loadEntries()
@@ -560,12 +561,12 @@ function ExemptionTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: editing.user_id, start_date: eStart, end_date: eEnd, reason: eReason.trim() }),
       })
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null
         toast.error(payload?.error || "Failed to update exemption")
         return
       }
-      toast.success("Exemption updated")
+      toast.info(payload?.message || "Exemption updated")
       setEditing(null)
       void loadEntries()
       onDone()
@@ -1521,7 +1522,7 @@ function ManualRecordsTab({
     start: string,
     end: string,
     commentText: string
-  ): Promise<{ created: number; overrode: number; overridden: number; skipped: number } | null> {
+  ): Promise<{ message: string } | null> {
     const res = await apiFetch("/api/admin/hr/attendance/records/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1533,23 +1534,13 @@ function ManualRecordsTab({
         manual_comment: commentText,
       }),
     })
-    const payload = (await res.json().catch(() => null)) as {
-      error?: string
-      created?: number
-      overrode?: number
-      overridden?: number
-      skipped?: number
-    } | null
+    const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
     if (!res.ok) {
       toast.error(payload?.error || "Failed to apply")
       return null
     }
-    return {
-      created: payload?.created ?? 0,
-      overrode: payload?.overrode ?? 0,
-      overridden: payload?.overridden ?? 0,
-      skipped: payload?.skipped ?? 0,
-    }
+    // Bulk changes are staged for confirmation, not applied; the message says how many.
+    return { message: payload?.message || "Staged for confirmation" }
   }
 
   /**
@@ -1624,11 +1615,7 @@ function ManualRecordsTab({
     try {
       const result = await postRange(selectedIds, start, end, comment.trim())
       if (!result) return
-      const parts: string[] = []
-      if (result.overridden > 0) parts.push(`${result.overridden} incomplete day(s) overridden (restorable)`)
-      if (result.skipped > 0) parts.push(`${result.skipped} fully-present day(s) skipped`)
-      if (parts.length > 0) toast.warning(`Applied — ${parts.join("; ")}.`)
-      else toast.success(`Applied for ${selectedIds.length} employee(s)`)
+      toast.info(result.message)
       setSelectedIds([])
       setComment("")
       void loadEntries()
@@ -1650,14 +1637,12 @@ function ManualRecordsTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_ids: selectedIds, start_date: startDate, reason: comment.trim() }),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string; skipped?: number } | null
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to apply indefinite OOS")
         return
       }
-      toast.success(
-        `Indefinite OOS applied to ${selectedIds.length} employee(s)${payload?.skipped ? ` — ${payload.skipped} fully-present day(s) skipped` : ""}`
-      )
+      toast.info(payload?.message || "Indefinite OOS staged, awaiting confirmation")
       setSelectedIds([])
       setComment("")
       void loadEntries()
@@ -1710,7 +1695,7 @@ function ManualRecordsTab({
       if (!removed) return
       const result = await postRange([editing.user_id], eStart, eEnd, eComment.trim())
       if (!result) return
-      toast.success("Entry updated")
+      toast.info(result.message)
       setEditing(null)
       void loadEntries()
       onDone()
@@ -1977,6 +1962,13 @@ interface ManualLeave {
   leave_type: string
   days_count: number | null
   notes: string | null
+  status: string
+}
+
+const MANUAL_LEAVE_STATUS_SUFFIX: Record<string, string> = {
+  pending: " • Awaiting approval",
+  rejected: " • Rejected",
+  cancelled: " • Cancelled",
 }
 
 interface LeaveTypeOption {
@@ -2130,12 +2122,17 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
           reason: reason.trim(),
         }),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string; days_count?: number } | null
+      const payload = (await res.json().catch(() => null)) as {
+        error?: string
+        days_count?: number
+        staged?: boolean
+        message?: string
+      } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to add leave")
         return
       }
-      toast.success(`Leave recorded (${payload?.days_count ?? previewDays ?? ""} day(s))`)
+      toast.success(payload?.message || `Leave recorded (${payload?.days_count ?? previewDays ?? ""} day(s))`)
       setReason("")
       setSelectedId(null)
       void loadEntries()
@@ -2190,12 +2187,12 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
           reason: eReason.trim(),
         }),
       })
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
       if (!res.ok) {
         toast.error(payload?.error || "Failed to update leave")
         return
       }
-      toast.success("Leave updated")
+      toast.success(payload?.message || "Leave updated")
       setEditing(null)
       void loadEntries()
       onDone()
@@ -2345,7 +2342,7 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
           <EntryRow
             key={entry.id}
             primary={entry.user_name}
-            badge={`${entry.leave_type} • ${formatRangeLabel(entry.start_date, entry.end_date)}${entry.days_count ? ` • ${entry.days_count}d` : ""}`}
+            badge={`${entry.leave_type} • ${formatRangeLabel(entry.start_date, entry.end_date)}${entry.days_count ? ` • ${entry.days_count}d` : ""}${MANUAL_LEAVE_STATUS_SUFFIX[entry.status] ?? ""}`}
             comment={entry.notes}
             onEdit={() => openEdit(entry)}
             onDelete={() => setConfirmEntry(entry)}

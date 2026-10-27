@@ -4,20 +4,17 @@ import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { rateLimit, getClientId } from "@/lib/rate-limit"
-import { writeAuditLog } from "@/lib/audit/write-audit"
-import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
-import { resolvePendingAppealsOnManualStatus } from "@/lib/hr/attendance-appeals"
-import { notifyAttendanceInApp } from "@/lib/hr/attendance-notify"
+import { stageAttendanceChange } from "@/lib/hr/attendance-appeals"
 import { loadDayContext } from "@/lib/hr/attendance-day-context"
 import { formatEmployeeName } from "@/lib/hr/employee-name"
 import { toLocalISODate, loadAttendancePolicy } from "@/lib/hr/attendance-utils"
-import { applyLunchBreak } from "@/lib/hr/attendance-ssot"
 import { requireApiAdminScope, getScopedDepartments } from "@/lib/admin/api-scope"
 import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import {
+  ATTENDANCE_STATUS_LABELS,
   DB_WRITABLE_STATUSES,
   deriveUnifiedAttendanceStatus,
-  isPermissionAttendanceStatus,
+  type UnifiedAttendanceStatus,
 } from "@/lib/hr/attendance-status"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
 
@@ -441,22 +438,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "A record already exists for this date" }, { status: 409 })
     }
 
-    // Auto-determine status via the single shared deriver (unless an explicit status was provided)
-    const explicitStatus = parsed.data.status
-    const status =
-      explicitStatus ??
-      (waived
-        ? "waiver"
-        : deriveUnifiedAttendanceStatus(
-            {
-              record: { clock_in, clock_out, waived: false, status: explicitStatus },
-              recordDate: date,
-            },
-            policy
-          ))
-    const isCoveredWithoutTimes =
-      status === "waiver" || status === "absent_with_permission" || status === "out_of_station"
+    // A day with no record is usually a plain Absent day (absence is derived, not stored).
+    // Giving it a status is a status override, so it follows the two-stage rule like an
+    // edit: it is staged, and the final approval creates the record. A staged change
+    // carries a status and no times, so a status is required and times are refused.
+    const status = parsed.data.status ?? (waived ? "waiver" : undefined)
+    if (!status) {
+      return NextResponse.json({ error: "Choose a status for this day" }, { status: 400 })
+    }
+    if (clock_in || clock_out) {
+      return NextResponse.json(
+        { error: "A new day is staged for approval as a status only and can't carry clock times." },
+        { status: 400 }
+      )
+    }
     const isLWP = status === "lateness_with_permission" || status === "incomplete_with_permission"
+    if (isLWP) {
+      return NextResponse.json(
+        { error: "LWP/IWP requires at least one clock punch (clock in or clock out)" },
+        { status: 400 }
+      )
+    }
+    if (status === "waiver" && !manual_comment.trim()) {
+      return NextResponse.json({ error: "Waiver requires a reason or comment" }, { status: 400 })
+    }
 
     const quotaCheck = await validateLwpAwpMonthlyQuota({
       dataClient,
@@ -469,99 +474,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: quotaCheck.error }, { status: 403 })
     }
 
-    if (clock_in && clock_out && clock_out <= clock_in) {
-      return NextResponse.json({ error: "Clock out must be after clock in" }, { status: 400 })
-    }
-    if (!isCoveredWithoutTimes && !isLWP && !clock_in && !clock_out) {
-      return NextResponse.json({ error: "Provide both clock in and clock out before saving" }, { status: 400 })
-    }
-    if (!isCoveredWithoutTimes && !isLWP && ((clock_in && !clock_out) || (!clock_in && clock_out))) {
-      return NextResponse.json({ error: "Clock in and clock out must be provided together" }, { status: 400 })
-    }
-    if (isLWP && !clock_in && !clock_out) {
-      return NextResponse.json(
-        { error: "LWP/IWP requires at least one clock punch (clock in or clock out)" },
-        { status: 400 }
-      )
-    }
-    if (status === "waiver" && !manual_comment.trim()) {
-      return NextResponse.json({ error: "Waiver requires a reason or comment" }, { status: 400 })
-    }
-
-    const insert: Record<string, unknown> = {
-      user_id,
+    const currentStatus = deriveUnifiedAttendanceStatus({ record: null, recordDate: date }, policy)
+    const staged = await stageAttendanceChange(dataClient, {
+      actor: scope,
+      userId: user_id,
       date,
-      status,
-      source: "manual",
-      manual_comment,
-      waived: status === "waiver" ? true : Boolean(waived),
-    }
-    if (clock_in) {
-      insert.clock_in = clock_in
-      insert.clock_in_source = "manual"
-    }
-    if (clock_out) {
-      insert.clock_out = clock_out
-      insert.clock_out_source = "manual"
-    }
-    if (clock_in && clock_out) {
-      const inMs = new Date(`${date}T${clock_in}Z`).getTime()
-      const outMs = new Date(`${date}T${clock_out}Z`).getTime()
-      const rawHours = Math.max(0, (outMs - inMs) / (1000 * 60 * 60))
-      const { breakMinutes, workedHours } = applyLunchBreak(rawHours, policy)
-      insert.total_hours = workedHours
-      insert.break_duration = breakMinutes
-    }
+      attendanceRecordId: null,
+      currentStatus,
+      requestedStatus: status,
+      reason: manual_comment,
+    })
+    if (!staged.ok) return NextResponse.json({ error: staged.error }, { status: staged.status })
 
-    const { data: created, error } = await dataClient.from("attendance_records").insert(insert).select().single()
-
-    if (error) {
-      log.error({ err: JSON.stringify(error) }, "Failed to create attendance record")
-      return NextResponse.json({ error: "Failed to create record" }, { status: 500 })
-    }
-
-    await writeAuditLog(
-      supabase,
+    const statusLabel = ATTENDANCE_STATUS_LABELS[status as UnifiedAttendanceStatus] ?? status
+    return NextResponse.json(
       {
-        action: "create",
-        entityType: "attendance_record",
-        entityId: created.id,
-        newValues: insert,
-        context: { actorId: scope.userId, source: "api", route: "/api/admin/hr/attendance/records" },
+        staged: true,
+        message: `Status alteration to ${statusLabel} staged. Awaiting confirmation from ${staged.awaiting}.`,
       },
-      { failOpen: true }
+      { status: 201 }
     )
-
-    // Provenance + appeal auto-resolution (replaces the old DB trigger).
-    await recordAttendanceEvent(dataClient, {
-      userId: user_id,
-      eventDate: date,
-      eventType: "manual_create",
-      attendanceRecordId: created.id,
-      toStatus: status,
-      source: "manual",
-      comment: manual_comment,
-      actorId: scope.userId,
-      metadata: { clock_in: clock_in ?? null, clock_out: clock_out ?? null },
-    })
-    await resolvePendingAppealsOnManualStatus(dataClient, {
-      userId: user_id,
-      dates: [date],
-      status,
-      attendanceRecordId: created.id,
-      comment: manual_comment,
-      actorId: scope.userId,
-    })
-    await notifyAttendanceInApp(dataClient, {
-      affectedUserId: user_id,
-      actorId: scope.userId,
-      date,
-      toStatus: status,
-      action: "created",
-      entityId: created.id,
-    })
-
-    return NextResponse.json({ data: created, message: "Record created" }, { status: 201 })
   } catch (error) {
     log.error({ err: String(error) }, "Error in POST /api/admin/hr/attendance/records")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })

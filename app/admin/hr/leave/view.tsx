@@ -31,13 +31,19 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { PromptDialog } from "@/components/ui/prompt-dialog"
 import { LeaveDetailDialog } from "./_components/leave-detail-dialog"
+import {
+  LeaveApprovalStages,
+  LeaveAttachments,
+  LeaveDetailsList,
+  LeaveOverlapNotice,
+  LeaveStatusStrip,
+  SectionHeading,
+} from "./_components/leave-detail-sections"
 import { AddLeaveDialog } from "./_components/add-leave-dialog"
 import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { LeaveCalendarView } from "./_components/leave-calendar-view"
-import { formatName } from "@/lib/utils"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatName, cn } from "@/lib/utils"
 import { apiFetch, apiJson } from "@/lib/api-client"
-import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
 export { resolveLeaveRouteStages }
@@ -51,6 +57,7 @@ export interface LeaveItem {
   resume_date: string
   days_count: number
   reason: string
+  rejected_reason?: string | null
   handover_note?: string | null
   handover_checklist_url?: string | null
   status: string
@@ -170,18 +177,27 @@ export function expectedApproverLabel(item: LeaveItem) {
     return "-"
   }
   if (item.current_approver?.full_name) return item.current_approver.full_name
-  const stage = item.current_stage_code || item.approval_stage
-  const expectedByStage: Record<string, string> = {
-    pending_reliever: "Assigned Reliever",
-    reliever_pending: "Assigned Reliever",
-    pending_department_lead: "Department Lead",
-    supervisor_pending: "Department Lead",
-    pending_admin_hr_lead: "Admin and HR Lead",
-    hr_pending: "Admin and HR Lead",
-    pending_md: "Managing Director (MD)",
-    pending_hcs: "Head, Corporate Services (HCS)",
+  const stageKey = approvalStageKey(item.current_stage_code || item.approval_stage)
+  if (stageKey === "reliever") {
+    const name = resolvePersonName(item.reliever)
+    if (name) return name
   }
-  return expectedByStage[stage] || "Pending approver"
+  if (stageKey === "department_lead") {
+    const name = resolvePersonName(item.supervisor)
+    if (name) return name
+  }
+  if (stageKey === "admin_hr_lead") {
+    const name = resolvePersonName(item.approved_by_profile)
+    if (name) return name
+  }
+  const expectedByStage: Record<string, string> = {
+    reliever: "Assigned Reliever",
+    department_lead: "Department Lead",
+    admin_hr_lead: "Admin and HR Lead",
+    md: "Managing Director (MD)",
+    hcs: "Head, Corporate Services (HCS)",
+  }
+  return expectedByStage[stageKey] || "Pending approver"
 }
 
 export function getStageBadge(item: LeaveItem) {
@@ -382,10 +398,12 @@ export function LeaveApprovePage({
     },
   })
 
+  const myQueueIds = useMemo(() => new Set((data?.myQueue || []).map((x) => x.id)), [data?.myQueue])
+
   const handleAction = (id: string, action: "approve" | "reject") => {
     const list =
-      activeTab === "history" ? data?.history : activeTab === "pending" ? data?.allPendingQueue : data?.myQueue
-    const target = list?.find((item) => item.id === id)
+      activeTab === "history" ? data?.history : activeTab === "pending" ? data?.allPendingQueue : data?.allRequests
+    const target = list?.find((item) => item.id === id) || data?.allRequests?.find((item) => item.id === id)
     const needsOverride = action === "approve" && target && target.evidence_complete === false
 
     overrideEvidenceRef.current = needsOverride ?? false
@@ -404,17 +422,36 @@ export function LeaveApprovePage({
         label: "Employee",
         sortable: true,
         resizable: true,
-        initialWidth: 260,
+        initialWidth: 280,
         accessor: (r) => r.user?.full_name || "Employee",
         render: (r) => (
-          <div className="flex max-w-[260px] min-w-0 flex-col">
-            <span className="truncate font-medium" title={r.user?.full_name || "Employee"}>
-              {r.user?.full_name || "Employee"}
-            </span>
-            <span className="text-muted-foreground truncate text-xs" title={r.user?.company_email || undefined}>
-              {r.user?.company_email}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setSelectedLeaveDetail(r)
+              setDetailDialogOpen(true)
+            }}
+            className="group/emp flex max-w-[280px] min-w-0 items-center gap-3 text-left focus:outline-hidden"
+          >
+            <StaffAvatar
+              name={r.user?.full_name || "Employee"}
+              src={staffAvatars[r.user_id]}
+              profileId={r.user_id}
+              className="h-8 w-8 shrink-0 text-xs shadow-xs"
+            />
+            <div className="flex min-w-0 flex-col">
+              <span
+                className="text-foreground group-hover/emp:text-primary truncate font-medium group-hover/emp:underline"
+                title={r.user?.full_name || "Employee"}
+              >
+                {r.user?.full_name || "Employee"}
+              </span>
+              <span className="text-muted-foreground truncate text-xs" title={r.user?.company_email || undefined}>
+                {r.user?.company_email}
+              </span>
+            </div>
+          </button>
         ),
       },
       {
@@ -462,20 +499,18 @@ export function LeaveApprovePage({
         render: (r) => <span className="text-sm">{expectedApproverLabel(r)}</span>,
       },
     ],
-    []
+    [staffAvatars]
   )
 
   const dynamicTabs = useMemo(() => {
-    const myCount = data?.myQueue.length ?? 0
     const globalCount = data?.allPendingQueue.length ?? 0
     const historyCount = data?.history.length ?? 0
     const allCount = data?.allRequests.length ?? 0
 
     return [
-      { key: "all", label: `All (${allCount})`, icon: CalendarCheck2 },
+      { key: "all", label: `All Requests (${allCount})`, icon: CalendarCheck2 },
+      { key: "pending", label: `Pending Queue (${globalCount})`, icon: Clock },
       { key: "calendar", label: "Calendar", icon: CalendarDays },
-      { key: "my-actions", label: `My Actions (${myCount})`, icon: AlertCircle },
-      { key: "pending", label: `Global Queue (${globalCount})`, icon: Clock },
       { key: "history", label: `History (${historyCount})`, icon: History },
     ]
   }, [data])
@@ -492,7 +527,6 @@ export function LeaveApprovePage({
 
   const activeData = useMemo(() => {
     if (!data) return []
-    if (activeTab === "my-actions") return data.myQueue
     if (activeTab === "pending") return data.allPendingQueue
     if (activeTab === "history") return data.history
     return data.allRequests
@@ -611,7 +645,7 @@ export function LeaveApprovePage({
         leave={selectedLeaveDetail}
         onApprove={(id) => handleAction(id, "approve")}
         onReject={(id) => handleAction(id, "reject")}
-        showActionButtons={activeTab === "my-actions"}
+        showActionButtons={selectedLeaveDetail ? myQueueIds.has(selectedLeaveDetail.id) : false}
       />
 
       <AddLeaveDialog
@@ -721,270 +755,72 @@ export function LeaveApprovePage({
             searchPlaceholder="Search employee name or leave type..."
             searchFn={(r, q) => `${r.user?.full_name} ${r.leave_type?.name} ${r.status}`.toLowerCase().includes(q)}
             filters={filters}
-            forceRowActionsDropdown
-            rowActions={
-              activeTab === "my-actions"
-                ? [
-                    {
-                      label: "View Detail",
-                      icon: Eye,
-                      onClick: (r) => {
-                        setSelectedLeaveDetail(r)
-                        setDetailDialogOpen(true)
-                      },
-                    },
-                    {
-                      label: "Endorse",
-                      icon: Check,
-                      onClick: (r) => handleAction(r.id, "approve"),
-                    },
-                    {
-                      label: "Reject",
-                      icon: X,
-                      variant: "destructive",
-                      onClick: (r) => handleAction(r.id, "reject"),
-                    },
-                  ]
-                : [
-                    {
-                      label: "View Detail",
-                      icon: Eye,
-                      onClick: (r) => {
-                        setSelectedLeaveDetail(r)
-                        setDetailDialogOpen(true)
-                      },
-                    },
-                  ]
-            }
-            expandable={{
-              render: (r) => {
-                const timeline = [...(r.approvals || [])].sort((left, right) => {
-                  const leftOrder = Number(left.stage_order || left.approval_level || 999)
-                  const rightOrder = Number(right.stage_order || right.approval_level || 999)
-                  if (leftOrder !== rightOrder) return leftOrder - rightOrder
-                  return String(left.approved_at || "").localeCompare(String(right.approved_at || ""))
-                })
-
-                const stageAuditMap = new Map<string, (typeof timeline)[number]>()
-                for (const item of timeline) {
-                  const key = approvalStageKey(item.stage_code)
-                  const existing = stageAuditMap.get(key)
-                  if (!existing) {
-                    stageAuditMap.set(key, item)
-                    continue
-                  }
-
-                  const existingTime = existing.approved_at ? new Date(existing.approved_at).getTime() : 0
-                  const nextTime = item.approved_at ? new Date(item.approved_at).getTime() : 0
-                  if (nextTime >= existingTime) {
-                    stageAuditMap.set(key, item)
-                  }
-                }
-
-                const stageOrder = resolveLeaveRouteStages(r)
-                const stageName: Record<string, string> = {
-                  reliever: "Reliever",
-                  department_lead: "Department Lead",
-                  admin_hr_lead: "Admin and HR Lead",
-                  hcs: "HCS",
-                  md: "MD",
-                }
-                const currentStageKey = approvalStageKey(r.current_stage_code || r.approval_stage)
-                const hasRelieverAssignee = Boolean(r.reliever?.id || r.reliever_id)
-                const relieverHandledByLead =
-                  Boolean(r.reliever?.id || r.reliever_id) &&
-                  Boolean(r.supervisor?.id || r.supervisor_id) &&
-                  (r.reliever?.id || r.reliever_id) === (r.supervisor?.id || r.supervisor_id) &&
-                  Boolean(stageAuditMap.get("department_lead"))
-                const departmentLeadApproverName = resolvePersonName(stageAuditMap.get("department_lead")?.approver)
-                const advancedPastReliever = ["department_lead", "admin_hr_lead", "hcs", "md"].includes(currentStageKey)
-
-                return (
-                  <div className="grid gap-4 p-4 md:grid-cols-2">
-                    <div className="space-y-3 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Reliever:</span>{" "}
-                        <span className="font-medium">{resolvePersonName(r.reliever) || "Not assigned"}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Current Stage:</span>{" "}
-                        <span className="font-medium">
-                          {approvalStageLabel(r.current_stage_code || r.approval_stage)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Evidence:</span>{" "}
-                        <Badge variant={r.evidence_complete ? "default" : "secondary"}>
-                          {r.evidence_complete ? "Complete" : "Incomplete"}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Status:</span>{" "}
-                        <Badge
-                          variant={
-                            r.status === "approved" || r.status === "completed"
-                              ? "default"
-                              : r.status === "rejected" || r.status === "cancelled"
-                                ? "destructive"
-                                : "secondary"
-                          }
-                        >
-                          {r.status}
-                        </Badge>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Reason:</span>{" "}
-                        <span className="font-medium">{r.reason || "-"}</span>
-                      </div>
-                      {r.handover_checklist_url && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Handover Doc:</span>
-                          <a
-                            href={leaveHandoverHref(r.id, r.handover_checklist_url)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            View Attached Handover
-                          </a>
-                        </div>
-                      )}
-                      {r.handover_note && (!r.handover_checklist_url || !r.handover_note.startsWith("Attached:")) && (
-                        <div>
-                          <span className="text-muted-foreground">Handover Note:</span>{" "}
-                          <span className="font-medium">{r.handover_note}</span>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-muted-foreground">Resume Date:</span>{" "}
-                        <span className="font-medium">{r.resume_date || "-"}</span>
-                      </div>
-                      {r.required_documents && r.required_documents.length > 0 ? (
-                        <div>
-                          <span className="text-muted-foreground">Required Docs:</span>{" "}
-                          <span className="font-medium">{r.required_documents.join(", ")}</span>
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-3">
-                      <p className="text-muted-foreground text-xs">Approval Timeline</p>
-                      {stageAuditMap.size === 0 ? (
-                        r.admin_manual ? (
-                          <ul className="space-y-1">
-                            <li className="text-xs">
-                              <span className="font-medium">Manually Approved:</span>{" "}
-                              <span className="text-emerald-500 capitalize">approved</span>
-                              {r.approved_by_profile ? ` by ${resolvePersonName(r.approved_by_profile)}` : ""}
-                              {r.approved_at ? ` at ${formatWATDateTime(r.approved_at)}` : ""}
-                            </li>
-                          </ul>
-                        ) : (
-                          <p className="text-muted-foreground text-xs">No approvals recorded yet.</p>
-                        )
-                      ) : (
-                        <ul className="space-y-1">
-                          {stageOrder.map((stageKey) => {
-                            const item = stageAuditMap.get(stageKey)
-                            const stageActorName =
-                              resolvePersonName(item?.approver) ||
-                              (stageKey === "reliever"
-                                ? resolvePersonName(r.reliever) || null
-                                : stageKey === "department_lead"
-                                  ? resolvePersonName(r.supervisor) || null
-                                  : stageKey === "admin_hr_lead"
-                                    ? resolvePersonName(r.approved_by_profile) || null
-                                    : null)
-                            const statusLower = String(r.status || "").toLowerCase()
-                            const isApprovedOrCompleted = ["approved", "completed"].includes(statusLower)
-                            const isCancelled = statusLower === "cancelled"
-                            const isRejected = statusLower === "rejected"
-                            const expectedPersonName =
-                              stageKey === "reliever"
-                                ? resolvePersonName(r.reliever) || "Assigned Reliever"
-                                : stageKey === "department_lead"
-                                  ? resolvePersonName(r.supervisor) || "Department Lead"
-                                  : stageKey === "admin_hr_lead"
-                                    ? resolvePersonName(r.approved_by_profile) || "Admin and HR Lead"
-                                    : stageName[stageKey]
-
-                            return (
-                              <li key={stageKey} className="text-xs">
-                                <span className="font-medium">{stageName[stageKey]}:</span>{" "}
-                                {item ? (
-                                  <>
-                                    <span className="capitalize">{item.status}</span>
-                                    {stageActorName ? ` by ${stageActorName}` : ""}
-                                    {stageActorName ? ` (${stageName[stageKey]})` : ""}
-                                    {item.approved_at ? ` at ${formatWATDateTime(item.approved_at)}` : ""}
-                                  </>
-                                ) : stageKey === "reliever" && !hasRelieverAssignee ? (
-                                  <span className="text-muted-foreground">Not required for this request</span>
-                                ) : stageKey === "reliever" && relieverHandledByLead ? (
-                                  <span className="text-muted-foreground">
-                                    {`Handled by ${departmentLeadApproverName || resolvePersonName(r.supervisor) || "Department Lead"}`}
-                                  </span>
-                                ) : isCancelled ? (
-                                  <span className="text-muted-foreground">Not reached (Cancelled)</span>
-                                ) : isRejected ? (
-                                  <span className="text-muted-foreground">Not reached (Rejected)</span>
-                                ) : isApprovedOrCompleted ||
-                                  (stageKey === "reliever" &&
-                                    advancedPastReliever &&
-                                    currentStageKey !== "reliever") ? (
-                                  <span className="text-muted-foreground">Bypassed ({expectedPersonName})</span>
-                                ) : (
-                                  <span className="text-muted-foreground">Pending action ({expectedPersonName})</span>
-                                )}
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )}
-
-                      <div className="space-y-2 pt-1">
-                        <p className="text-muted-foreground text-xs">Evidence & Attachments</p>
-                        {r.evidence && r.evidence.length > 0 ? (
-                          r.evidence.map((doc) => (
-                            <div
-                              key={doc.id}
-                              className="bg-muted/20 flex items-center justify-between rounded-md border p-2"
-                            >
-                              <div className="flex flex-col">
-                                <span className="text-xs font-medium">{doc.document_type}</span>
-                                <Badge variant="outline" className="mt-1 w-fit text-[10px]">
-                                  {doc.status}
-                                </Badge>
-                              </div>
-                              <Button variant="ghost" size="sm" asChild>
-                                <a href={doc.file_url} target="_blank" rel="noreferrer">
-                                  View File
-                                </a>
-                              </Button>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-muted-foreground rounded-md border border-dashed p-2 text-xs italic">
-                            No evidence uploaded yet.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {activeTab === "my-actions" && (
-                      <div className="flex gap-2 border-t pt-3 md:col-span-2">
-                        <Button onClick={() => handleAction(r.id, "approve")} className="gap-2">
-                          <Check className="h-4 w-4" /> Endorse
-                        </Button>
-                        <Button variant="destructive" onClick={() => handleAction(r.id, "reject")} className="gap-2">
-                          <X className="h-4 w-4" /> Reject
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )
+            rowActions={[
+              {
+                label: "View Detail",
+                icon: Eye,
+                onClick: (r) => {
+                  setSelectedLeaveDetail(r)
+                  setDetailDialogOpen(true)
+                },
               },
+              {
+                label: "Endorse",
+                icon: Check,
+                hidden: (r) => !myQueueIds.has(r.id),
+                onClick: (r) => handleAction(r.id, "approve"),
+              },
+              {
+                label: "Reject",
+                icon: X,
+                variant: "destructive",
+                hidden: (r) => !myQueueIds.has(r.id),
+                onClick: (r) => handleAction(r.id, "reject"),
+              },
+            ]}
+            expandable={{
+              render: (r) => (
+                <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <SectionHeading
+                      title="Leave overview"
+                      aside={
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-xs"
+                          onClick={() => {
+                            setSelectedLeaveDetail(r)
+                            setDetailDialogOpen(true)
+                          }}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Open details
+                        </Button>
+                      }
+                    />
+                    <LeaveStatusStrip leave={r} />
+                    <LeaveOverlapNotice leave={r} />
+                    <LeaveDetailsList leave={r} />
+                  </div>
+
+                  <div className="space-y-5">
+                    <LeaveApprovalStages leave={r} />
+                    <LeaveAttachments leave={r} />
+                  </div>
+
+                  {myQueueIds.has(r.id) && (
+                    <div className="flex gap-2 border-t pt-3 md:col-span-2">
+                      <Button onClick={() => handleAction(r.id, "approve")} className="gap-2">
+                        <Check className="h-4 w-4" /> Endorse
+                      </Button>
+                      <Button variant="destructive" onClick={() => handleAction(r.id, "reject")} className="gap-2">
+                        <X className="h-4 w-4" /> Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ),
             }}
             viewToggle
             contactsView

@@ -42,6 +42,9 @@ export async function GET(request: NextRequest) {
     .in("status", ["pending", "pending_evidence"])
     // A request waiting only on the MD was taken as leave; it stays for the MD to sign off.
     .or("current_stage_code.is.null,current_stage_code.neq.pending_md")
+    // Attendance Manager sick-leave grants are recorded after the fact and wait in the
+    // Appeals queue for Lead + Admin & HR; a past end date is normal for them, not stale.
+    .eq("admin_manual", false)
     .lt("end_date", today)
     .select("id, user_id, start_date, end_date")
 

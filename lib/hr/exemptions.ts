@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { toLocalISODate } from "@/lib/utils/date"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
+import { stageAttendanceChange, type StageChangeResult, type StagingActor } from "@/lib/hr/attendance-appeals"
 
 /**
  * "Stop" an exemption without erasing history.
@@ -164,5 +165,177 @@ export async function recordExemptionChange(
       after: params.after,
       summary: `Exemption ${stopped ? "stopped" : `set (${params.mode})`}. Was: ${before}. Now: ${after}.`,
     },
+  })
+}
+
+/**
+ * A requested exemption setting. Every mode except "off" replaces the person's
+ * windows; `append` (the single "add a period" action) adds one window and leaves
+ * the rest alone. Staged on an appeal as JSON and applied once it is confirmed.
+ */
+export type ExemptionChange = {
+  mode: "infinite" | "weekly" | "monthly" | "period"
+  month?: string
+  weeks?: number[]
+  months?: string[]
+  start_date?: string
+  end_date?: string
+  append?: boolean
+  reason?: string | null
+}
+
+function monthRange(yearMonth: string) {
+  const [year, month] = yearMonth.split("-").map(Number)
+  return { start: new Date(Date.UTC(year, month - 1, 1)), end: new Date(Date.UTC(year, month, 0)) }
+}
+
+function formatDateUTC(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`
+}
+
+function weekRangeInMonth(yearMonth: string, weekIndex: number) {
+  const { start, end } = monthRange(yearMonth)
+  const rangeStart = new Date(start)
+  rangeStart.setUTCDate(start.getUTCDate() + (weekIndex - 1) * 7)
+  const rangeEnd = new Date(rangeStart)
+  rangeEnd.setUTCDate(rangeStart.getUTCDate() + 6)
+  if (rangeStart > end) return null
+  if (rangeEnd > end) rangeEnd.setTime(end.getTime())
+  return { start: formatDateUTC(rangeStart), end: formatDateUTC(rangeEnd) }
+}
+
+/** The dated windows a change creates, or an error message when it is incomplete. */
+export function exemptionWindows(
+  change: ExemptionChange
+): { windows: Array<{ start_date: string; end_date: string; kind: "weekly" | "monthly" }> } | { error: string } {
+  if (change.mode === "infinite") return { windows: [] }
+  if (change.mode === "weekly") {
+    if (!change.month || !change.weeks?.length) return { error: "Select a month and at least one week" }
+    const month = change.month
+    return {
+      windows: change.weeks
+        .map((w) => weekRangeInMonth(month, w))
+        .filter((r): r is { start: string; end: string } => r !== null)
+        .map((r) => ({ start_date: r.start, end_date: r.end, kind: "weekly" as const })),
+    }
+  }
+  if (change.mode === "monthly") {
+    if (!change.months?.length) return { error: "Select at least one month" }
+    return {
+      windows: change.months.map((ym) => {
+        const range = monthRange(ym)
+        return { start_date: formatDateUTC(range.start), end_date: formatDateUTC(range.end), kind: "monthly" as const }
+      }),
+    }
+  }
+  if (!change.start_date || !change.end_date || change.start_date > change.end_date) {
+    return { error: "Choose a valid start and end date" }
+  }
+  // DB only allows weekly/monthly kinds; a custom period persists as a monthly-kind range.
+  return { windows: [{ start_date: change.start_date, end_date: change.end_date, kind: "monthly" }] }
+}
+
+/** First day the change covers — the date its approval appeal sits on. */
+export function exemptionStartDate(change: ExemptionChange): string {
+  const result = exemptionWindows(change)
+  const first = "windows" in result ? result.windows.map((w) => w.start_date).sort()[0] : undefined
+  return first ?? toLocalISODate()
+}
+
+export function describeExemptionChange(change: ExemptionChange): string {
+  if (change.mode === "infinite") return "Exempt from clocking in, open-ended"
+  const result = exemptionWindows(change)
+  const ranges = "windows" in result ? result.windows.map((w) => `${w.start_date} to ${w.end_date}`).join(", ") : ""
+  return `Exempt from clocking in (${change.mode}): ${ranges}`
+}
+
+/**
+ * Applies a confirmed exemption change: sets the open-ended flag, replaces (or, with
+ * `append`, adds to) the dated windows, and logs the before/after on the timeline.
+ * Tolerates environments missing the newer profile/period columns.
+ */
+export async function applyExemptionChange(
+  dataClient: SupabaseClient,
+  userId: string,
+  change: ExemptionChange,
+  actorId: string
+): Promise<{ error: string | null }> {
+  const windows = exemptionWindows(change)
+  if ("error" in windows) return { error: windows.error }
+  const reason = change.reason || null
+  const before = await snapshotExemption(dataClient, userId)
+
+  if (!change.append) {
+    const attendance_exempt = change.mode === "infinite"
+    const { error: profileError } = await dataClient
+      .from("profiles")
+      .update({
+        attendance_exempt,
+        attendance_exempt_until: null,
+        attendance_exempt_reason: reason,
+        attendance_exempt_set_at: new Date().toISOString(),
+        attendance_exempt_set_by: actorId,
+      })
+      .eq("id", userId)
+    if (profileError) {
+      const { error: minimalError } = await dataClient.from("profiles").update({ attendance_exempt }).eq("id", userId)
+      if (minimalError) return { error: "Failed to update exemption" }
+    }
+    const { error: resetError } = await dataClient.from("attendance_exempt_periods").delete().eq("user_id", userId)
+    if (resetError) return { error: "Failed to reset exemption periods" }
+  }
+
+  for (const w of windows.windows) {
+    const { error } = await insertExemptPeriod(dataClient, {
+      user_id: userId,
+      start_date: w.start_date,
+      end_date: w.end_date,
+      kind: w.kind,
+      reason,
+      created_by: actorId,
+    })
+    if (error) return { error: "Failed to save exemption period" }
+  }
+
+  await recordExemptionChange(dataClient, {
+    userId,
+    actorId,
+    mode: change.mode,
+    reason,
+    before,
+    after: await snapshotExemption(dataClient, userId),
+  })
+  return { error: null }
+}
+
+/**
+ * Two-stage rule: an exemption change is staged as one appeal on its first day and
+ * applied by applyExemptionChange once the other side confirms it.
+ */
+export async function stageExemptionChange(
+  dataClient: SupabaseClient,
+  actor: StagingActor,
+  userId: string,
+  change: ExemptionChange
+): Promise<StageChangeResult> {
+  const windows = exemptionWindows(change)
+  if ("error" in windows) return { ok: false, status: 400, error: windows.error }
+  const date = exemptionStartDate(change)
+  const summary = describeExemptionChange(change)
+  const { data: record } = await dataClient
+    .from("attendance_records")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq("date", date)
+    .maybeSingle<{ id: string; status: string | null }>()
+  return stageAttendanceChange(dataClient, {
+    actor,
+    userId,
+    date,
+    attendanceRecordId: record?.id ?? null,
+    currentStatus: record?.status || "absent",
+    requestedStatus: "exempted",
+    reason: change.reason?.trim() ? `${summary}: ${change.reason.trim()}` : summary,
+    change: { kind: "exemption", payload: change, summary },
   })
 }

@@ -12,7 +12,7 @@ import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { notifyAppealSubmittedMail } from "@/lib/hr/attendance-notify"
 import { validateLwpAwpMonthlyQuota } from "@/lib/hr/attendance-quota"
-import { createNotification } from "@/lib/notifications/create"
+import { loadDepartmentLeads, notifyAppealReviewers } from "@/lib/hr/attendance-appeals"
 import { isAdminLikeRole } from "@/lib/admin/rbac"
 
 const log = logger("hr-attendance-appeals")
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     let query = dataClient
       .from("attendance_appeals")
       .select(
-        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
+        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at"
       )
       .eq("user_id", user.id)
       .order("appeal_date", { ascending: false })
@@ -80,13 +80,71 @@ export async function GET(request: NextRequest) {
       query = query.gte("appeal_date", start).lte("appeal_date", end)
     }
 
-    const { data, error } = await query
+    const { data: appealsData, error } = await query
     if (error) {
       log.error({ err: error }, "Failed to fetch appeals")
       return NextResponse.json({ error: "Failed to fetch appeals" }, { status: 500 })
     }
 
-    return NextResponse.json({ data: data ?? [] })
+    const rows = appealsData ?? []
+    if (rows.length === 0) return NextResponse.json({ data: [] })
+
+    const userIdsToFetch = new Set<string>()
+    for (const r of rows) {
+      if (r.user_id) userIdsToFetch.add(r.user_id)
+      if (r.created_by) userIdsToFetch.add(r.created_by)
+      if (r.lead_reviewed_by) userIdsToFetch.add(r.lead_reviewed_by)
+      if (r.admin_reviewed_by) userIdsToFetch.add(r.admin_reviewed_by)
+      if (r.reviewed_by) userIdsToFetch.add(r.reviewed_by)
+    }
+
+    type ProfileRow = {
+      id: string
+      full_name: string | null
+      first_name: string | null
+      last_name: string | null
+      department: string | null
+      is_department_lead?: boolean | null
+    }
+
+    const { data: profiles } = await dataClient
+      .from("profiles")
+      .select("id, full_name, first_name, last_name, department, is_department_lead")
+      .in("id", Array.from(userIdsToFetch))
+      .returns<ProfileRow[]>()
+
+    const profileMap = new Map<string, ProfileRow>()
+    for (const p of profiles ?? []) profileMap.set(p.id, p)
+
+    const resolveProfileName = (id?: string | null): string | null => {
+      if (!id) return null
+      const p = profileMap.get(id)
+      if (!p) return null
+      return p.full_name?.trim() || [p.first_name, p.last_name].filter(Boolean).join(" ") || null
+    }
+
+    const departmentLeads = await loadDepartmentLeads(dataClient)
+    const admin_hr_lead_name = departmentLeads.adminHrLeadName
+
+    const data = rows.map((r) => {
+      const p = profileMap.get(r.user_id)
+      const department = p?.department ?? ""
+      const department_lead_name = department ? (departmentLeads.nameByDepartment.get(department) ?? null) : null
+      return {
+        ...r,
+        user_name: resolveProfileName(r.user_id) || "Unknown",
+        department,
+        department_lead_name,
+        created_by_name: resolveProfileName(r.created_by),
+        lead_reviewer_name: resolveProfileName(r.lead_reviewed_by),
+        admin_reviewer_name: resolveProfileName(r.admin_reviewed_by),
+        admin_hr_lead_name,
+        reviewer_name:
+          r.status === "pending" ? null : resolveProfileName(r.admin_reviewed_by) || resolveProfileName(r.reviewed_by),
+      }
+    })
+
+    return NextResponse.json({ data })
   } catch (err) {
     log.error({ err: String(err) }, "Error in GET /api/hr/attendance/appeals")
     return NextResponse.json({ error: "An error occurred" }, { status: 500 })
@@ -270,6 +328,8 @@ export async function POST(request: NextRequest) {
       .eq("user_id", effectiveUserId)
       .eq("appeal_date", appealDate)
       .in("status", ["pending", "approved"])
+      // A day can hold several approved appeals (admin/lead changes re-staged later).
+      .limit(1)
       .maybeSingle()
 
     if (existingAppeal) {
@@ -349,11 +409,12 @@ export async function POST(request: NextRequest) {
     // Fetch effective user profile to check if they are a lead
     const { data: effectiveProfile } = await dataClient
       .from("profiles")
-      .select("id, department, is_department_lead, full_name, first_name, last_name")
+      .select("id, department, department_id, is_department_lead, full_name, first_name, last_name")
       .eq("id", effectiveUserId)
       .maybeSingle<{
         id: string
         department: string | null
+        department_id: string | null
         is_department_lead: boolean
         full_name: string | null
         first_name: string | null
@@ -425,64 +486,19 @@ export async function POST(request: NextRequest) {
     })
 
     // Notifications
-    try {
-      const employeeDept = effectiveProfile?.department ?? null
-      const employeeName =
-        effectiveProfile?.full_name?.trim() ||
-        [effectiveProfile?.first_name, effectiveProfile?.last_name].filter(Boolean).join(" ") ||
-        "An employee"
-
-      type ProfileRow = { id: string }
-      let recipientIds: string[] = []
-
-      if (initialStage === "pending_lead" && employeeDept) {
-        const { data: leads } = await dataClient
-          .from("profiles")
-          .select("id")
-          .eq("department", employeeDept)
-          .eq("is_department_lead", true)
-          .returns<ProfileRow[]>()
-        recipientIds = (leads ?? []).map((l) => l.id)
-      } else if (initialStage === "pending_admin") {
-        const { data: admins } = await dataClient
-          .from("profiles")
-          .select("id")
-          .in("role", ["admin", "super_admin", "developer"])
-          .returns<ProfileRow[]>()
-        recipientIds = (admins ?? []).map((a) => a.id)
-      } else if (initialStage === "pending_hr_lead") {
-        const { data: hrLeads } = await dataClient
-          .from("profiles")
-          .select("id")
-          .eq("department", "Admin and HR")
-          .eq("is_department_lead", true)
-          .returns<ProfileRow[]>()
-        recipientIds = (hrLeads ?? []).map((l) => l.id)
-      }
-
-      for (const recipientId of recipientIds) {
-        if (recipientId === user.id) continue
-        try {
-          await createNotification({
-            p_user_id: recipientId,
-            p_type: "approval_request",
-            p_category: "approvals",
-            p_title: isAdvance ? "Advance Permission Notice" : "Attendance Appeal Submitted",
-            p_message: `${employeeName} has ${isAdvance ? "requested advance permission" : "submitted an appeal"} for ${appealDate} (${requestedStatus}).`,
-            p_priority: "normal",
-            p_link_url:
-              initialStage === "pending_lead" ? "/dept/hr/attendance?tab=appeals" : "/admin/hr/attendance?tab=appeals",
-            p_actor_id: user.id,
-            p_entity_type: "attendance_appeal",
-            p_entity_id: appeal.id,
-          })
-        } catch (notifyErr) {
-          log.error({ err: String(notifyErr), recipientId }, "Failed to notify recipient")
-        }
-      }
-    } catch (notifyErr) {
-      log.error({ err: String(notifyErr) }, "Failed to send appeal notifications")
-    }
+    const employeeName =
+      effectiveProfile?.full_name?.trim() ||
+      [effectiveProfile?.first_name, effectiveProfile?.last_name].filter(Boolean).join(" ") ||
+      "An employee"
+    await notifyAppealReviewers(dataClient, {
+      stage: initialStage,
+      department: effectiveProfile?.department ?? null,
+      departmentId: effectiveProfile?.department_id ?? null,
+      appealId: appeal.id,
+      actorId: user.id,
+      title: isAdvance ? "Advance Permission Notice" : "Attendance Appeal Submitted",
+      message: `${employeeName} has ${isAdvance ? "requested advance permission" : "submitted an appeal"} for ${appealDate} (${requestedStatus}).`,
+    })
 
     if (!isAdvance) {
       await notifyAppealSubmittedMail(dataClient, {

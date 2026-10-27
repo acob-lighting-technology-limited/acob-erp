@@ -9,6 +9,7 @@ import { recordAttendanceEvent } from "@/lib/hr/attendance-events"
 import { requireApiAdminScope, getScopedDepartments, requireAttendanceAdmin } from "@/lib/admin/api-scope"
 import { formatLeaveReference, getHolidaySet, notifyUsers } from "@/lib/hr/leave-workflow"
 import { addIsoDays, countLeaveDays, nextWorkingDayAfter, trimRangeToWorkingDays } from "@/lib/hr/leave-days"
+import { leaveStageForAppealStage, notifyAppealReviewers } from "@/lib/hr/attendance-appeals"
 
 const log = logger("admin-hr-attendance-leave-manual")
 export const dynamic = "force-dynamic"
@@ -36,7 +37,7 @@ async function assertInScope(
   return Boolean(data && depts.includes(data.department || ""))
 }
 
-// ── Create an approved leave grant (bypasses the request workflow) ──────────────────────
+// ── Stage a sick-leave grant for Lead + Admin & HR approval (bypasses the request workflow) ──
 export async function POST(request: NextRequest) {
   const rl = await rateLimit(`admin-hr-leave-manual:${getClientId(request)}`, { limit: 15, windowSec: 60 })
   if (!rl.allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 })
@@ -99,8 +100,48 @@ export async function POST(request: NextRequest) {
     const effectiveEndDate = workingRange.end_date
     const days_count = countLeaveDays(effectiveStartDate, effectiveEndDate, holidays)
     const resume_date = nextWorkingDayAfter(effectiveEndDate, holidays)
-    const now = new Date().toISOString()
 
+    // One leave = one appeal, dated on its first working day. Refuse if that day
+    // already has a pending appeal, so the appeal maps back to exactly this leave.
+    // (A past approved appeal is history — e.g. the grant being edited — and is fine.)
+    const { data: pendingAppeal } = await dataClient
+      .from("attendance_appeals")
+      .select("id")
+      .eq("user_id", user_id)
+      .eq("appeal_date", effectiveStartDate)
+      .eq("status", "pending")
+      .limit(1)
+      .maybeSingle<{ id: string }>()
+    if (pendingAppeal) {
+      return NextResponse.json(
+        {
+          error: `An appeal or alteration is already pending for ${effectiveStartDate}. Resolve it in the Appeals tab before recording leave from that day.`,
+        },
+        { status: 409 }
+      )
+    }
+
+    const { data: targetProfile } = await dataClient
+      .from("profiles")
+      .select("department, department_id, is_department_lead, full_name")
+      .eq("id", user_id)
+      .maybeSingle<{
+        department: string | null
+        department_id: string | null
+        is_department_lead: boolean
+        full_name: string | null
+      }>()
+
+    const isTargetLead = Boolean(targetProfile?.is_department_lead)
+    const targetStage = isTargetLead ? "pending_hr_lead" : "pending_lead"
+    const approverLabel = isTargetLead ? "Admin & HR Lead" : "Department Lead"
+    const leaveTypeName = ltRow?.name || "Sick Leave"
+
+    // Two-stage rule: recording the grant here is the Admin & HR stage; it applies only
+    // once the Department Lead (or, for a lead, the Admin & HR Lead) confirms it. The
+    // pending leave_requests row holds the whole range (and reserves the balance); the
+    // single appeal below carries it to that confirmation. admin_manual rows are skipped
+    // by the stale-leave and SLA crons, so a back-dated grant is not auto-cancelled.
     const { data: created, error } = await dataClient
       .from("leave_requests")
       .insert({
@@ -111,12 +152,9 @@ export async function POST(request: NextRequest) {
         resume_date,
         days_count,
         reason,
-        status: "approved",
-        approval_stage: "completed",
-        current_stage_code: "completed",
-        approved_by: scope.userId,
-        approved_at: now,
-        hr_decision_at: now,
+        status: "pending",
+        approval_stage: leaveStageForAppealStage(targetStage),
+        current_stage_code: leaveStageForAppealStage(targetStage),
         admin_manual: true,
       })
       .select("id")
@@ -127,29 +165,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to add leave" }, { status: 500 })
     }
 
-    // No balance to draw down: the approved leave_requests row inserted above is itself what
-    // the remaining-days figure is derived from.
+    const { data: firstDayRecord } = await dataClient
+      .from("attendance_records")
+      .select("id, status")
+      .eq("user_id", user_id)
+      .eq("date", effectiveStartDate)
+      .maybeSingle<{ id: string; status: string | null }>()
 
-    // NOTE: we intentionally do NOT write on_leave rows into attendance_records. Status
-    // derivation already returns "on_leave" from the approved leave_requests row, so the
-    // roster reflects the leave without us overwriting (and destroying) any real punch
-    // records on those days. Removing the leave reverts the day to its real status.
+    const { data: appeal, error: appealError } = await dataClient
+      .from("attendance_appeals")
+      .insert({
+        attendance_record_id: firstDayRecord?.id ?? null,
+        user_id,
+        appeal_date: effectiveStartDate,
+        current_status: firstDayRecord?.status || "absent",
+        requested_status: "on_leave",
+        appeal_reason: `${leaveTypeName} ${effectiveStartDate} to ${effectiveEndDate} (${days_count} working day(s)): ${reason}`,
+        status: "pending",
+        stage: targetStage,
+        initiated_by_role: "admin_manual",
+        // The admin's entry is the Admin & HR stage; the Lead's confirmation completes it.
+        admin_reviewed_by: scope.userId,
+        admin_reviewed_at: new Date().toISOString(),
+        admin_resolution_note: reason,
+        created_by: scope.userId,
+      })
+      .select("id")
+      .single<{ id: string }>()
 
-    await recordAttendanceEvent(dataClient, {
-      userId: user_id,
-      eventDate: effectiveStartDate,
-      eventType: "leave_granted",
-      toStatus: "on_leave",
-      source: "manual",
-      comment: reason,
+    if (appealError || !appeal) {
+      log.error({ err: JSON.stringify(appealError) }, "Manual leave appeal insert failed")
+      // Without its appeal the leave could never be approved — undo it.
+      await dataClient.from("leave_requests").delete().eq("id", created.id)
+      return NextResponse.json({ error: "Failed to add leave" }, { status: 500 })
+    }
+
+    await notifyAppealReviewers(dataClient, {
+      stage: targetStage,
+      department: targetProfile?.department ?? null,
+      departmentId: targetProfile?.department_id ?? null,
+      appealId: appeal.id,
       actorId: scope.userId,
-      metadata: {
-        leave_request_id: created.id,
-        leave_type_id,
-        start_date: effectiveStartDate,
-        end_date: effectiveEndDate,
-        days_count,
-      },
+      title: `${leaveTypeName} Staged`,
+      message: `${leaveTypeName} for ${targetProfile?.full_name ?? "an employee"} (${effectiveStartDate} to ${effectiveEndDate}, ${days_count} day(s)) requires your confirmation.`,
     })
 
     await writeAuditLog(
@@ -164,7 +222,7 @@ export async function POST(request: NextRequest) {
           start_date: effectiveStartDate,
           end_date: effectiveEndDate,
           days_count,
-          status: "approved",
+          status: "pending",
           admin_manual: true,
         },
         context: { actorId: scope.userId, source: "api", route: "/api/admin/hr/attendance/leave/manual" },
@@ -173,10 +231,11 @@ export async function POST(request: NextRequest) {
     )
 
     try {
-      const [{ data: adminProfile }] = await Promise.all([
-        dataClient.from("profiles").select("full_name, first_name, last_name").eq("id", scope.userId).maybeSingle(),
-      ])
-      const leaveTypeName = ltRow?.name || "Sick Leave"
+      const { data: adminProfile } = await dataClient
+        .from("profiles")
+        .select("full_name, first_name, last_name")
+        .eq("id", scope.userId)
+        .maybeSingle()
       const adminName =
         adminProfile?.full_name ||
         `${adminProfile?.first_name || ""} ${adminProfile?.last_name || ""}`.trim() ||
@@ -186,18 +245,37 @@ export async function POST(request: NextRequest) {
 
       await notifyUsers(dataClient, {
         userIds: [user_id],
-        title: "Leave recorded on your behalf",
-        message: `Approved leave for ${leaveTypeName} was recorded on your behalf by ${adminName} for ${effectiveStartDate} to ${effectiveEndDate} (${days_count} day(s)).`,
+        title: `${leaveTypeName} recorded on your behalf`,
+        message: `${leaveTypeName} for ${effectiveStartDate} to ${effectiveEndDate} (${days_count} day(s)) was recorded on your behalf by ${adminName} and is awaiting ${approverLabel} approval.`,
         linkUrl: "/leave",
         entityId: created.id,
-        emailSubject: `Approved Leave Recorded: ${leaveTypeName}${refSuffix}`,
-        emailMessage: `Hello,\n\nApproved leave for ${leaveTypeName} from ${effectiveStartDate} to ${effectiveEndDate} (${days_count} working day(s)) has been recorded on your behalf by ${adminName}.${reason ? `\n\nReason: ${reason}` : ""}\n\nView details: ${process.env.NEXT_PUBLIC_APP_URL || ""}/leave`,
+        emailSubject: `${leaveTypeName} Awaiting Approval${refSuffix}`,
+        emailMessage: `Hello,
+
+${leaveTypeName} from ${effectiveStartDate} to ${effectiveEndDate} (${days_count} working day(s)) has been recorded on your behalf by ${adminName} and is awaiting ${approverLabel} approval.${
+          reason
+            ? `
+
+Reason: ${reason}`
+            : ""
+        }
+
+View details: ${process.env.NEXT_PUBLIC_APP_URL || ""}/leave`,
       })
     } catch (notifyErr) {
       log.error({ err: String(notifyErr) }, "Failed to send manual leave notification")
     }
 
-    return NextResponse.json({ success: true, id: created.id, days_count }, { status: 201 })
+    return NextResponse.json(
+      {
+        success: true,
+        id: created.id,
+        days_count,
+        staged: true,
+        message: `${leaveTypeName} for ${days_count} day(s) staged. Awaiting confirmation from ${approverLabel}.`,
+      },
+      { status: 201 }
+    )
   } catch (err) {
     log.error({ err: String(err) }, "Manual leave POST failed")
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -226,6 +304,7 @@ export async function GET(request: NextRequest) {
         end_date,
         days_count,
         reason,
+        status,
         created_at,
         admin_manual,
         profiles!leave_requests_user_id_fkey(id, full_name, first_name, last_name, department),
@@ -249,6 +328,7 @@ export async function GET(request: NextRequest) {
       end_date: string
       days_count: number | null
       reason: string | null
+      status: string
       profiles:
         | {
             id: string
@@ -289,6 +369,7 @@ export async function GET(request: NextRequest) {
         leave_type: lt?.name || "Leave",
         days_count: r.days_count,
         notes: r.reason,
+        status: r.status,
       }
     })
 
@@ -316,7 +397,7 @@ export async function DELETE(request: NextRequest) {
 
     const { data: leave, error: fetchErr } = await dataClient
       .from("leave_requests")
-      .select("id, user_id, leave_type_id, days_count, start_date, end_date, admin_manual")
+      .select("id, user_id, leave_type_id, days_count, start_date, end_date, admin_manual, status")
       .eq("id", id)
       .maybeSingle<{
         id: string
@@ -326,6 +407,7 @@ export async function DELETE(request: NextRequest) {
         start_date: string
         end_date: string
         admin_manual: boolean
+        status: string
       }>()
 
     if (fetchErr || !leave) {
@@ -349,16 +431,41 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Failed to delete leave" }, { status: 500 })
     }
 
-    await recordAttendanceEvent(dataClient, {
-      userId: leave.user_id,
-      eventDate: leave.start_date,
-      eventType: "leave_revoked",
-      fromStatus: "on_leave",
-      source: "manual",
-      comment: "Manual leave record removed by administrator",
-      actorId: scope.userId,
-      metadata: { leave_request_id: id },
-    })
+    // A still-pending grant has a staged appeal waiting on its first day; close it so
+    // nobody approves leave that no longer exists.
+    if (leave.status === "pending") {
+      const now = new Date().toISOString()
+      const { error: appealCloseErr } = await dataClient
+        .from("attendance_appeals")
+        .update({
+          status: "resolved",
+          stage: "resolved",
+          reviewed_by: scope.userId,
+          reviewed_at: now,
+          resolution_note: "Leave record removed by administrator",
+          updated_at: now,
+        })
+        .eq("user_id", leave.user_id)
+        .eq("appeal_date", leave.start_date)
+        .eq("initiated_by_role", "admin_manual")
+        .eq("requested_status", "on_leave")
+        .eq("status", "pending")
+      if (appealCloseErr) log.error({ err: JSON.stringify(appealCloseErr) }, "Failed to close staged leave appeal")
+    }
+
+    // Only an approved grant ever showed as on_leave; a pending/rejected one changed nothing.
+    if (leave.status === "approved") {
+      await recordAttendanceEvent(dataClient, {
+        userId: leave.user_id,
+        eventDate: leave.start_date,
+        eventType: "leave_revoked",
+        fromStatus: "on_leave",
+        source: "manual",
+        comment: "Manual leave record removed by administrator",
+        actorId: scope.userId,
+        metadata: { leave_request_id: id },
+      })
+    }
 
     await writeAuditLog(
       supabase,

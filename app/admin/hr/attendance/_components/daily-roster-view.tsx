@@ -173,8 +173,8 @@ function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: stri
       }
     }
     return {
-      label: "Pending Both",
-      tooltip: "Employee appeal — awaiting Lead endorsement, then Admin approval",
+      label: "Pending Lead",
+      tooltip: "Employee appeal — awaiting Department Lead endorsement, then Admin approval",
       className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
     }
   }
@@ -839,7 +839,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
                 editRecord.pending_appeal.initiated_by_role === "admin_manual"
                   ? "An alteration is currently awaiting Department Lead confirmation (Pending Lead)."
                   : editRecord.pending_appeal.stage === "pending_lead"
-                    ? "An appeal is currently pending both Department Lead endorsement and Admin approval (Pending Both)."
+                    ? "An appeal is currently awaiting Department Lead endorsement (Pending Lead), followed by Admin approval."
                     : editRecord.pending_appeal.stage === "pending_admin"
                       ? "An appeal is awaiting Admin & HR final approval (Pending Admin)."
                       : "An alteration or appeal is already pending for this day."}{" "}
