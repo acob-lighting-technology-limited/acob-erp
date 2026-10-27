@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server"
 import { WeeklyReportsContent } from "./weekly-reports-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Weekly Reports" }
+
 export default async function WeeklyReportsPage() {
   const supabase = await createClient()
 

@@ -14,6 +14,10 @@ import { loadAttendancePolicy, toLocalISODate, isWeekend } from "@/lib/hr/attend
 import { deriveUnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { addIsoDays } from "@/lib/hr/leave-days"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Dashboard" }
+
 export const dynamic = "force-dynamic"
 
 export type { Task }

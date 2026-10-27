@@ -6,6 +6,10 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { getCurrentUserAccountsData } from "./_lib"
 import { formatCurrency } from "@/lib/format"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Accounts" }
+
 const formatNaira = (amount: number | null | undefined) => formatCurrency(amount, { whole: true })
 
 export default async function AccountsPage() {

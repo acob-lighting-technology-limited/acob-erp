@@ -11,6 +11,10 @@ import { getControlledDocSummary } from "@/lib/documentation/controlled-summary"
 import { getDocumentationData } from "./data"
 import type { DocumentationAttachment } from "@/lib/documentation/sharepoint"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Documentation" }
+
 export interface Documentation {
   id: string
   title: string

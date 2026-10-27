@@ -9,6 +9,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 
 import { logger } from "@/lib/logger"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Audit Logs" }
+
 const log = logger("audit-logs")
 
 type AuditLogsRpcClient = {

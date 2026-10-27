@@ -7,6 +7,10 @@ import { ReviewsContent } from "./reviews-content"
 
 import { logger } from "@/lib/logger"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "My Performance Reviews" }
+
 const log = logger("dashboard-reviews")
 export const dynamic = "force-dynamic"
 

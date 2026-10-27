@@ -6,6 +6,10 @@ import type { HelpDeskTicket } from "@/components/help-desk/help-desk-types"
 
 import { logger } from "@/lib/logger"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Help Desk" }
+
 const log = logger("dashboard-help-desk")
 
 type DepartmentRow = {

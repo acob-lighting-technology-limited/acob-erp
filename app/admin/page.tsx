@@ -21,6 +21,10 @@ import { taskDeadline } from "@/lib/tasks/overdue"
 import { toLocalISODate } from "@/lib/utils/date"
 import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Dashboard" }
+
 const log = logger("")
 
 type ProfileIdRow = {

@@ -5,6 +5,10 @@ import { logger } from "@/lib/logger"
 import { notFound } from "next/navigation"
 import { PayrollCalculatorPage } from "./view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Payroll Gross Salary Calculator" }
+
 const log = logger("payroll-calculator-page")
 export const dynamic = "force-dynamic"
 

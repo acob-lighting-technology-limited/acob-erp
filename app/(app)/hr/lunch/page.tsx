@@ -18,6 +18,10 @@ import {
 import { toLocalISODate } from "@/lib/utils/date"
 import { LunchContent, type LunchPollData } from "./lunch-content"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Lunch" }
+
 export const dynamic = "force-dynamic"
 
 interface PageProps {

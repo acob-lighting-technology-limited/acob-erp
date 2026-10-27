@@ -10,6 +10,10 @@ import { IconFill } from "@/components/ui/icon-fill"
 import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
 import { canManageMaintenanceMode } from "@/lib/maintenance"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Settings" }
+
 export default async function AdminSettingsPage() {
   const supabase = await createClient()
 

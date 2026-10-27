@@ -3,6 +3,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 import { SecurityEventsContent, type AuditLogRow } from "./security-events-content"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Security Events" }
+
 function isSecurityEvent(log: AuditLogRow): boolean {
   const text =
     `${log.action || ""} ${log.operation || ""} ${log.entity_type || ""} ${log.status || ""} ` +

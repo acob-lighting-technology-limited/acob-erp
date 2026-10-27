@@ -3,6 +3,10 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { LunchRegisterPage } from "./view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Lunch Register" }
+
 export const dynamic = "force-dynamic"
 
 export default async function Page() {

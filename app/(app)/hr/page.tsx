@@ -5,6 +5,10 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { getCurrentUserHrData } from "./_lib"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "HR" }
+
 export default async function HrPage() {
   const { profile, todayAttendance, leave, lunch, bookings } = await getCurrentUserHrData()
 

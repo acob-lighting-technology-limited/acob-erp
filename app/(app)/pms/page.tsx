@@ -7,6 +7,10 @@ import { getCurrentUserPmsData } from "./_lib"
 import { CycleSelector } from "./_components/cycle-selector"
 import { formatScore } from "@/lib/format"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "PMS" }
+
 export default async function PmsPage({ searchParams }: { searchParams: Promise<{ cycle_id?: string }> }) {
   const { cycle_id } = await searchParams
   const { profile, score, cycles, activeCycleId, attendance, latestReview } = await getCurrentUserPmsData(cycle_id)

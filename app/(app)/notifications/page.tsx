@@ -4,6 +4,10 @@ import { NotificationContent } from "./notification-content"
 
 import { logger } from "@/lib/logger"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Notifications" }
+
 const log = logger("notification")
 
 export interface Notification {

@@ -10,6 +10,10 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { loadWorkLinkNames } from "@/lib/tasks/work-links"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Tasks" }
+
 interface GoalFilterOption {
   id: string
   title: string

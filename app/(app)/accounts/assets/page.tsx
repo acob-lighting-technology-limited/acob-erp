@@ -5,6 +5,10 @@ import { AssetsContent } from "./assets-content"
 
 import { logger } from "@/lib/logger"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "My Assets" }
+
 const log = logger("assets")
 
 export interface Asset {

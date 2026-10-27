@@ -6,6 +6,10 @@ import { ActionTrackerContent } from "./action-tracker-content"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { TablePageSkeleton } from "@/components/skeletons"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Action Tracker" }
+
 type DepartmentRow = {
   department: string | null
 }

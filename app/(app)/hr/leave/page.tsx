@@ -7,6 +7,10 @@ import { LeaveContent } from "./leave-content"
 import { toLocalISODate } from "@/lib/utils/date"
 import type { RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "My Leave Center" }
+
 export interface LeaveApprovalAudit {
   id: string
   approver_id?: string | null

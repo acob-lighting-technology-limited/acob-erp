@@ -5,6 +5,10 @@ import { AdminNotificationContent, type DynamicNotification } from "./admin-noti
 import { getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Notifications Center" }
+
 type ProfileIdRow = { id: string }
 type DepartmentIdRow = { id: string }
 

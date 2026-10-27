@@ -4,6 +4,10 @@ import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { logger } from "@/lib/logger"
 import { PayrollPeriodsPage } from "./view"
 
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Admin Payroll Management" }
+
 const log = logger("payroll-periods-page")
 export const dynamic = "force-dynamic"
 
