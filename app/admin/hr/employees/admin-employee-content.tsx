@@ -48,12 +48,8 @@ import {
 } from "@/components/employees/EmailChangeMailboxDialog"
 import { ORG_STAFF_DOMAIN } from "@/lib/org-config"
 import { normalizeDepartmentName } from "@/shared/departments"
-import {
-  EmployeeViewModal,
-  type EditForm,
-  SUSPENSION_REASONS,
-  EXIT_REASONS,
-} from "@/components/employees/EmployeeViewModal"
+import { EmployeeProfileSheet } from "@/components/employees/EmployeeProfileSheet"
+import { type EditForm, SUSPENSION_REASONS, EXIT_REASONS } from "@/components/employees/employee-edit-form"
 import { EmployeeDeletionDialog } from "@/components/employees/EmployeeDeletionDialog"
 import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
 import {
@@ -1472,7 +1468,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
         onConfirm={handleExportExecute}
       />
 
-      <EmployeeViewModal
+      <EmployeeProfileSheet
         isOpen={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}
         employee={viewEmployeeProfile}
