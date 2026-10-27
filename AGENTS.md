@@ -48,6 +48,24 @@ it on the merits and say what you actually think **before** acting.
 call.** State the trade-off once, then implement what they asked, fully and well. Do not
 re-litigate it, do not quietly implement a different thing, and do not sandbag the work.
 
+### This file can be wrong too
+
+The same honesty applies to `AGENTS.md`. It is written by people and agents, and parts
+of it go stale as the code moves on. Following a rule you believe is wrong is the same
+failure as agreeing with a user you believe is wrong.
+
+- When a rule here contradicts the code (it describes behaviour the code no longer has),
+  produces a worse result for the user, or departs from industry standard without a
+  stated reason, **say so plainly**. Name the rule, what is wrong with it, and what it
+  should say instead.
+- Do not silently ignore the rule, and do not silently follow it. Raise it in your
+  response before or alongside the work, and propose the exact edit to this file.
+- Check first. Search the history (`git log -S`) and any rationale next to the rule; a
+  rule that looks odd often exists because of a past incident. If you still think it
+  is wrong after that, raise it.
+- Once the user decides, update this file in the same change so the next agent does
+  not hit the same contradiction.
+
 ## Engineering Practices — Mandatory
 
 Distilled from the 2026-10 full-repo audit (`docs/audit/2026-10-01-full-repo-critique.md`).
