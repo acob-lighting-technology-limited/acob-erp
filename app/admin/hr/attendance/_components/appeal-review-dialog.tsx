@@ -4,14 +4,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ATTENDANCE_STATUS_COLORS, ATTENDANCE_STATUS_LABELS } from "@/lib/hr/attendance-status"
@@ -135,11 +128,14 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
   const isPending = appeal?.status === "pending"
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col justify-between overflow-y-auto p-6 sm:max-w-md md:max-w-lg"
+      >
+        <SheetHeader className="border-b pb-3">
           <div className="flex items-center justify-between pr-6">
-            <DialogTitle>{isPending ? "Review Appeal" : "Appeal Details"}</DialogTitle>
+            <SheetTitle>{isPending ? "Review Appeal" : "Appeal Details"}</SheetTitle>
             {appeal && appeal.status !== "pending" && (
               <Badge
                 className={
@@ -154,13 +150,13 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               </Badge>
             )}
           </div>
-          <DialogDescription>
+          <SheetDescription>
             {appeal ? `${appeal.user_name} — ${appeal.appeal_date}` : "No appeal selected"}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {appeal && (
-          <div className="space-y-4 py-2">
+          <div className="flex-1 space-y-4 py-2">
             {/* Employee & date summary */}
             <div className="bg-muted/50 space-y-2 rounded-lg border p-3 text-sm">
               <div className="flex items-center justify-between">
@@ -258,7 +254,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               </div>
             ) : appeal.stage === "pending_lead" ? (
               <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
-                Awaiting Department Lead endorsement
+                Awaiting {appeal.department} Department Lead endorsement
               </div>
             ) : null}
 
@@ -326,7 +322,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <SheetFooter className="mt-4 gap-2 border-t pt-4 sm:gap-2">
           {isPending ? (
             <>
               <Button variant="outline" onClick={onClose} disabled={isLoading}>
@@ -352,8 +348,8 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               Close
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }
