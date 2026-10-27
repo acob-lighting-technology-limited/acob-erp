@@ -92,14 +92,19 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
       )
     }
     return (
-      <div className="flex flex-col items-start gap-0.5">
+      <div className="flex flex-col items-start gap-1">
         <Badge
           variant="outline"
           className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
         >
           Pending Lead
         </Badge>
-        <span className="text-muted-foreground pl-0.5 text-xs">Pending Admin</span>
+        <Badge
+          variant="outline"
+          className="border-blue-500 bg-blue-500/10 font-medium text-blue-600 dark:text-blue-400"
+        >
+          Pending Admin
+        </Badge>
       </div>
     )
   }
