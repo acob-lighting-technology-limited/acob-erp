@@ -339,7 +339,7 @@ export function BillsPage({
           title: (bill) => `${bill.bill_number} · ${bill.supplier_name}`,
           subtitle: (bill) => `${formatCurrency(bill.total_amount, bill.currency)} · Due ${formatDate(bill.due_date)}`,
           trailing: (bill) => (
-            <Badge variant={statusColors[bill.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[bill.status]} className="text-xs capitalize">
               {bill.status}
             </Badge>
           ),

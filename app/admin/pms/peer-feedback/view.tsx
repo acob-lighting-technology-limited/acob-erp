@@ -367,7 +367,7 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
           subtitle: (row) =>
             `${row.subject?.department || "No dept"} · ${cycleNameMap.get(row.review_cycle_id) || "No cycle"} · Score: ${row.score}%`,
           trailing: (row) => (
-            <Badge variant={row.score >= 70 ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={row.score >= 70 ? "default" : "secondary"} className="text-xs">
               {row.score}%
             </Badge>
           ),

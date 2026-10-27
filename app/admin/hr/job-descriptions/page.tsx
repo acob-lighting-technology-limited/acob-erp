@@ -88,7 +88,7 @@ export default function AdminJobDescriptionsPage() {
               <span className="text-sm leading-none font-medium">
                 {r.first_name} {r.last_name}
               </span>
-              <span className="text-muted-foreground mt-1 text-[10px]">{r.company_email}</span>
+              <span className="text-muted-foreground mt-1 text-xs">{r.company_email}</span>
             </div>
           </div>
         ),
@@ -238,7 +238,7 @@ export default function AdminJobDescriptionsPage() {
           render: (r) => (
             <div className="bg-muted/20 space-y-4 border-t p-6">
               <div>
-                <h4 className="text-muted-foreground mb-2 flex items-center gap-2 text-[10px] font-black tracking-widest uppercase">
+                <h4 className="text-muted-foreground mb-2 flex items-center gap-2 text-xs font-black tracking-widest uppercase">
                   <UserCircle2 className="h-3 w-3" /> Designation Details
                 </h4>
                 <p className="text-sm font-medium">{r.designation || "No designation specified"}</p>
@@ -272,11 +272,11 @@ export default function AdminJobDescriptionsPage() {
           subtitle: (r) => [r.department, r.designation].filter(Boolean).join(" · ") || r.company_email,
           trailing: (r) =>
             r.job_description ? (
-              <Badge variant="outline" className="border-transparent bg-emerald-500/10 text-[9px] text-emerald-500">
+              <Badge variant="outline" className="border-transparent bg-emerald-500/10 text-xs text-emerald-500">
                 Completed
               </Badge>
             ) : (
-              <Badge variant="outline" className="border-transparent bg-amber-500/10 text-[9px] text-amber-500">
+              <Badge variant="outline" className="border-transparent bg-amber-500/10 text-xs text-amber-500">
                 Pending
               </Badge>
             ),
@@ -300,15 +300,12 @@ export default function AdminJobDescriptionsPage() {
               {r.job_description ? (
                 <Badge
                   variant="outline"
-                  className="border-transparent bg-emerald-500/10 px-1.5 text-[9px] text-emerald-500"
+                  className="border-transparent bg-emerald-500/10 px-1.5 text-xs text-emerald-500"
                 >
                   Completed
                 </Badge>
               ) : (
-                <Badge
-                  variant="outline"
-                  className="border-transparent bg-amber-500/10 px-1.5 text-[9px] text-amber-500"
-                >
+                <Badge variant="outline" className="border-transparent bg-amber-500/10 px-1.5 text-xs text-amber-500">
                   Pending
                 </Badge>
               )}
@@ -316,8 +313,8 @@ export default function AdminJobDescriptionsPage() {
             <h4 className="text-sm leading-tight font-semibold">
               {r.first_name} {r.last_name}
             </h4>
-            <p className="text-muted-foreground mt-1 line-clamp-1 text-[10px]">{r.designation || "No Designation"}</p>
-            <div className="text-muted-foreground mt-4 flex items-center gap-2 border-t pt-4 text-[10px] font-medium tracking-widest uppercase">
+            <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">{r.designation || "No Designation"}</p>
+            <div className="text-muted-foreground mt-4 flex items-center gap-2 border-t pt-4 text-xs font-medium tracking-widest uppercase">
               <Building2 className="h-3 w-3" /> {r.department}
             </div>
           </div>

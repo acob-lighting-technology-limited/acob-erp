@@ -179,7 +179,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       render: (row: DbPayrollEntry) => (
         <div>
           <p className="text-foreground font-medium">{row.payroll_periods?.name || "N/A"}</p>
-          <p className="text-muted-foreground text-[11px]">Pay Date: {row.payroll_periods?.pay_date || "N/A"}</p>
+          <p className="text-muted-foreground text-xs">Pay Date: {row.payroll_periods?.pay_date || "N/A"}</p>
         </div>
       ),
     },
@@ -441,7 +441,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             title: (row) => row.name,
             subtitle: (row) => `${row.start_date} - ${row.end_date} · Pay: ${row.pay_date || "N/A"}`,
             trailing: (row) => (
-              <Badge variant={row.status === "completed" ? "default" : "outline"} className="text-[10px]">
+              <Badge variant={row.status === "completed" ? "default" : "outline"} className="text-xs">
                 {row.status === "completed" ? "Completed" : "Draft"}
               </Badge>
             ),
@@ -461,7 +461,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   {row.status === "completed" ? "Completed" : "Draft"}
                 </Badge>
               </div>
-              <div className="text-muted-foreground flex justify-between border-t pt-2 text-[10px]">
+              <div className="text-muted-foreground flex justify-between border-t pt-2 text-xs">
                 <span>Start: {row.start_date}</span>
                 <span>End: {row.end_date}</span>
               </div>
@@ -507,7 +507,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 border-t pt-2 text-[11px]">
+              <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                 <div>Gross: ₦{Number(row.gross_salary || 0).toLocaleString("en-US")}</div>
                 <div>Tax: ₦{Number(row.tax_amount || 0).toLocaleString("en-US")}</div>
               </div>

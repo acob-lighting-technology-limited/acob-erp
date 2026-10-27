@@ -565,7 +565,7 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
           subtitle: (plan) =>
             `${plan.user?.department || "No dept"} · ${FOCUS_LABELS[plan.focus_area] || plan.focus_area} · Progress: ${plan.progress_pct}%`,
           trailing: (plan) => (
-            <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-[10px] capitalize">
+            <Badge variant={STATUS_VARIANTS[plan.status] || "outline"} className="text-xs capitalize">
               {plan.status.replace("_", " ")}
             </Badge>
           ),

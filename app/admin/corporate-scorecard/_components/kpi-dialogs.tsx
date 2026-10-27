@@ -290,7 +290,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
           {/* Department Ownership */}
           <div className="space-y-2 border-t pt-3">
             <Label className="text-xs font-semibold">Department Ownership (RACI)</Label>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Click a department to assign as <strong className="text-emerald-600">CORE</strong> (scored owner). Click
               again to switch to <strong className="text-foreground">SUPPORT</strong> (collaborator), or remove.
             </p>
@@ -633,7 +633,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-xs font-semibold">Department Quotas & Accountability (RACI)</Label>
-                <p className="text-muted-foreground text-[11px]">
+                <p className="text-muted-foreground text-xs">
                   Assign Core owners and Support contributors. Define explicit numerical quotas and action commitments.
                 </p>
               </div>
@@ -719,7 +719,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
 
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">
+                          <Label className="text-muted-foreground text-xs font-medium">
                             Department Quota / Target Value
                           </Label>
                           <Input
@@ -736,7 +736,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-muted-foreground text-[11px] font-medium">Target Unit</Label>
+                          <Label className="text-muted-foreground text-xs font-medium">Target Unit</Label>
                           <Input
                             placeholder="e.g. Projects, %, ₦"
                             className="h-8 text-xs"
@@ -747,7 +747,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-muted-foreground text-[11px] font-medium">
+                        <Label className="text-muted-foreground text-xs font-medium">
                           Action Commitment / Deliverable Plan
                         </Label>
                         <Input

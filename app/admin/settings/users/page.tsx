@@ -327,7 +327,7 @@ export default function UsersPage() {
           title: (u) => (u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email || "User"),
           subtitle: (u) => `${u.role.replace(/_/g, " ")} · ${u.department || "No department"} · ${u.email}`,
           trailing: (u) => (
-            <Badge variant={u.is_active ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={u.is_active ? "default" : "secondary"} className="text-xs">
               {u.employment_status === "exited" ? "Exited" : u.is_active ? "Active" : "Inactive"}
             </Badge>
           ),

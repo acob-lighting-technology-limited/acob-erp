@@ -96,7 +96,7 @@ export function useFundingCategoriesTab(): ExtraTab {
       render: (c) => (
         <div className="flex flex-col">
           <span className="text-xs font-semibold">{c.name}</span>
-          {c.description ? <span className="text-muted-foreground text-[11px]">{c.description}</span> : null}
+          {c.description ? <span className="text-muted-foreground text-xs">{c.description}</span> : null}
         </div>
       ),
       initialWidth: 260,
@@ -174,7 +174,7 @@ export function useFundingCategoriesTab(): ExtraTab {
             title: (c) => c.name,
             subtitle: (c) => `${c.code} · ${c.description || "No description"}`,
             trailing: (c) => (
-              <Badge variant={c.is_active ? "default" : "outline"} className="text-[10px]">
+              <Badge variant={c.is_active ? "default" : "outline"} className="text-xs">
                 {c.is_active ? "Active" : "Inactive"}
               </Badge>
             ),
@@ -185,7 +185,7 @@ export function useFundingCategoriesTab(): ExtraTab {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-semibold">{c.name}</p>
-                  <span className="text-muted-foreground font-mono text-[10px]">{c.code}</span>
+                  <span className="text-muted-foreground font-mono text-xs">{c.code}</span>
                 </div>
                 <Badge variant={c.is_active ? "default" : "outline"}>{c.is_active ? "Active" : "Inactive"}</Badge>
               </div>

@@ -253,7 +253,7 @@ export default function CbtDetailsLogPage() {
               row.status === "submitted" && typeof row.score === "number" ? ` · Score: ${row.score}%` : ""
             }`,
           trailing: (row) => (
-            <Badge variant={row.status === "submitted" ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={row.status === "submitted" ? "default" : "secondary"} className="text-xs">
               {row.status === "submitted" && typeof row.score === "number" ? `${row.score}%` : row.status}
             </Badge>
           ),
@@ -271,7 +271,7 @@ export default function CbtDetailsLogPage() {
                 {row.status === "submitted" && typeof row.score === "number" ? `${row.score}%` : row.status}
               </Badge>
             </div>
-            <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[10px]">
+            <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
               <span>{row.profiles?.department || "No dept"}</span>
               <span>{row.review_cycles?.name || "No cycle"}</span>
             </div>

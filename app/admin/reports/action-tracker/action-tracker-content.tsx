@@ -290,7 +290,7 @@ export function ActionTrackerContent({
         <TriangleAlert className="h-3.5 w-3.5" />
         <span className="text-xs">{hasBlocker ? "Hindrance" : "Add"}</span>
         {evidenceCount > 0 ? (
-          <span className="flex items-center gap-0.5 text-[11px]">
+          <span className="flex items-center gap-0.5 text-xs">
             <Paperclip className="h-3 w-3" />
             {evidenceCount}
           </span>
@@ -580,7 +580,7 @@ export function ActionTrackerContent({
           row.assignees && row.assignees.length > 0 ? (
             <div className="flex flex-wrap gap-1">
               {row.assignees.map((person) => (
-                <Badge key={person.id} variant="secondary" className="text-[11px] font-normal">
+                <Badge key={person.id} variant="secondary" className="text-xs font-normal">
                   {person.name}
                 </Badge>
               ))}
@@ -925,13 +925,13 @@ export function ActionTrackerContent({
             title: (row) => row.department,
             subtitle: (row) => `${row.totalPoints} action points · ${row.completedPoints} completed`,
             trailing: (row) => (
-              <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-[10px]`}>{row.summaryStatus}</Badge>
+              <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-xs`}>{row.summaryStatus}</Badge>
             ),
             detail: {
               title: (row) => row.department,
               subtitle: (row) => `${row.totalPoints} total action point${row.totalPoints === 1 ? "" : "s"}`,
               badges: (row) => (
-                <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-[10px]`}>{row.summaryStatus}</Badge>
+                <Badge className={`${getSummaryBadgeClass(row.summaryStatus)} text-xs`}>{row.summaryStatus}</Badge>
               ),
               fields: (row) => [
                 { label: "Department", value: row.department },
@@ -1021,7 +1021,7 @@ export function ActionTrackerContent({
             subtitle: (row) =>
               `${(row.assignees || []).map((person) => person.name).join(", ") || row.department} · ${row.timeline_text || "No timeline"}`,
             trailing: (row) => (
-              <Badge className={`${getItemStatusBadgeClass(row.status)} text-[10px] capitalize`}>
+              <Badge className={`${getItemStatusBadgeClass(row.status)} text-xs capitalize`}>
                 {row.status.replace(/_/g, " ")}
               </Badge>
             ),
@@ -1032,7 +1032,7 @@ export function ActionTrackerContent({
                   .filter(Boolean)
                   .join(" · "),
               badges: (row) => (
-                <Badge className={`${getItemStatusBadgeClass(row.status)} text-[10px] capitalize`}>
+                <Badge className={`${getItemStatusBadgeClass(row.status)} text-xs capitalize`}>
                   {row.status.replace(/_/g, " ")}
                 </Badge>
               ),

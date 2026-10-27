@@ -374,7 +374,7 @@ export default function CategoriesPage() {
           subtitle: (category) =>
             `${category.product_count || 0} products · ${category.description || "No description"}`,
           trailing: (category) => (
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="text-xs">
               {category.product_count || 0} items
             </Badge>
           ),

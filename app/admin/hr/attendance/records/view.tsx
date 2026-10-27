@@ -504,7 +504,7 @@ export function AdminAttendanceRecordsPage({
                   <span className="text-muted-foreground">Clock Out:</span> {formatTime(r.clock_out)}
                 </div>
               </div>
-              <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+              <div className="flex items-center justify-between border-t pt-2 text-xs">
                 <span>{formatDate(r.date)}</span>
                 <span className="font-semibold">{r.total_hours?.toFixed(1) ?? 0} hrs</span>
               </div>

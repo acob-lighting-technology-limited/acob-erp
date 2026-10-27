@@ -21,12 +21,12 @@ export function RiskCard({ risk, reference, today, canEdit, onEdit }: RiskCardPr
     <Card className="border-border/80 flex flex-col justify-between transition-shadow hover:shadow-md">
       <CardHeader className="space-y-2 p-4 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <Badge variant="secondary" className="font-mono text-[11px]">
+          <Badge variant="secondary" className="font-mono text-xs">
             {reference}
           </Badge>
           <div className="flex items-center gap-1.5">
-            <RatingBadge rating={risk.rating} score={risk.score} className="text-[11px]" />
-            <StatusBadge status={risk.status} className="text-[11px]" />
+            <RatingBadge rating={risk.rating} score={risk.score} className="text-xs" />
+            <StatusBadge status={risk.status} className="text-xs" />
           </div>
         </div>
         <h4 className="text-foreground line-clamp-2 text-sm leading-snug font-semibold">{risk.risk_name}</h4>
@@ -35,10 +35,10 @@ export function RiskCard({ risk, reference, today, canEdit, onEdit }: RiskCardPr
 
       <CardContent className="space-y-2 p-4 pt-1 pb-3 text-xs">
         <div className="bg-muted/40 rounded-md border p-2">
-          <span className="text-muted-foreground mb-0.5 block text-[10px] font-bold tracking-wider uppercase">
+          <span className="text-muted-foreground mb-0.5 block text-xs font-bold tracking-wider uppercase">
             Mitigation Plans
           </span>
-          <p className="text-muted-foreground line-clamp-2 text-[11px]">
+          <p className="text-muted-foreground line-clamp-2 text-xs">
             {risk.mitigation_plan || <span className="italic opacity-70">No mitigation plan yet</span>}
           </p>
         </div>

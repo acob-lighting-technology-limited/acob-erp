@@ -75,7 +75,7 @@ export function SurveyAnalyticsContent() {
             <span className="truncate text-xs font-medium">
               {r.is_anonymous ? "Anonymous Staff" : r.respondent_name || "Employee"}
             </span>
-            {r.role && <span className="text-muted-foreground truncate text-[10px]">{r.role}</span>}
+            {r.role && <span className="text-muted-foreground truncate text-xs">{r.role}</span>}
           </div>
         </div>
       ),
@@ -141,20 +141,20 @@ export function SurveyAnalyticsContent() {
         if (!r.training_rating) return <span className="text-muted-foreground text-xs">—</span>
         if (r.training_rating === "adequate") {
           return (
-            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-50 text-[10px] text-emerald-700">
+            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-50 text-xs text-emerald-700">
               Adequate
             </Badge>
           )
         }
         if (r.training_rating === "somewhat") {
           return (
-            <Badge variant="outline" className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700">
+            <Badge variant="outline" className="border-amber-500/30 bg-amber-50 text-xs text-amber-700">
               Somewhat
             </Badge>
           )
         }
         return (
-          <Badge variant="outline" className="border-rose-500/30 bg-rose-50 text-[10px] text-rose-700">
+          <Badge variant="outline" className="border-rose-500/30 bg-rose-50 text-xs text-rose-700">
             Inadequate
           </Badge>
         )
@@ -321,7 +321,7 @@ export function SurveyAnalyticsContent() {
           title: (r) => (r.is_anonymous ? "Anonymous Staff" : r.respondent_name || "Employee"),
           subtitle: (r) => `${r.department || "No Department"} · CSAT: ${r.overall_rating}/5`,
           trailing: (r) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {r.overall_rating} ★
             </Badge>
           ),
@@ -384,24 +384,22 @@ export function SurveyAnalyticsContent() {
             <div className="space-y-4 py-2 text-xs">
               <div className="bg-muted/20 grid grid-cols-2 gap-3 rounded-lg border p-3">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Respondent</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Respondent</span>
                   <span className="text-sm font-medium">
                     {selectedSurvey.is_anonymous ? "Anonymous Staff" : selectedSurvey.respondent_name || "Employee"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Department</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Department</span>
                   <span className="text-sm font-medium">{selectedSurvey.department || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Role</span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Role</span>
                   <span className="font-medium">{selectedSurvey.role || "—"}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Submission Type
-                  </span>
-                  <Badge variant="outline" className="text-[10px]">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Submission Type</span>
+                  <Badge variant="outline" className="text-xs">
                     {selectedSurvey.is_anonymous ? "Anonymous" : "Attributed"}
                   </Badge>
                 </div>
@@ -409,18 +407,18 @@ export function SurveyAnalyticsContent() {
 
               {/* Ratings Summary */}
               <div className="space-y-2 rounded-lg border p-3">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Core Metrics</span>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Core Metrics</span>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-muted/40 rounded-md p-2 text-center">
-                    <span className="text-muted-foreground block text-[10px]">Overall CSAT</span>
+                    <span className="text-muted-foreground block text-xs">Overall CSAT</span>
                     <span className="text-base font-bold text-amber-500">{selectedSurvey.overall_rating} / 5</span>
                   </div>
                   <div className="bg-muted/40 rounded-md p-2 text-center">
-                    <span className="text-muted-foreground block text-[10px]">Speed</span>
+                    <span className="text-muted-foreground block text-xs">Speed</span>
                     <span className="text-base font-bold text-emerald-500">{selectedSurvey.speed_rating} / 5</span>
                   </div>
                   <div className="bg-muted/40 rounded-md p-2 text-center">
-                    <span className="text-muted-foreground block text-[10px]">Usability</span>
+                    <span className="text-muted-foreground block text-xs">Usability</span>
                     <span className="text-base font-bold text-purple-500">{selectedSurvey.usability_rating} / 5</span>
                   </div>
                 </div>
@@ -429,13 +427,11 @@ export function SurveyAnalyticsContent() {
               {/* Module Ratings */}
               {selectedSurvey.module_ratings && Object.keys(selectedSurvey.module_ratings).length > 0 && (
                 <div className="space-y-2 rounded-lg border p-3">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Module Ratings
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Module Ratings</span>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(selectedSurvey.module_ratings).map(([mod, r]) => (
                       <div key={mod} className="bg-muted/40 flex items-center justify-between rounded px-2.5 py-1.5">
-                        <span className="text-[11px] font-medium capitalize">{mod.replace(/_/g, " ")}</span>
+                        <span className="text-xs font-medium capitalize">{mod.replace(/_/g, " ")}</span>
                         <span className="text-xs font-semibold text-amber-600">{r} ★</span>
                       </div>
                     ))}
@@ -445,16 +441,14 @@ export function SurveyAnalyticsContent() {
 
               {/* Training */}
               <div className="space-y-1 rounded-lg border p-3">
-                <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                  Training Adequacy
-                </span>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Training Adequacy</span>
                 <p className="font-medium capitalize">{selectedSurvey.training_rating || "Not specified"}</p>
               </div>
 
               {/* Qualitative Answers */}
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block flex items-center gap-1 text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground block flex items-center gap-1 text-xs font-semibold uppercase">
                     <AlertTriangle className="h-3 w-3 text-amber-500" /> Biggest Frustration / Blocker
                   </span>
                   <p className="bg-background rounded-md border p-2.5 leading-relaxed whitespace-pre-wrap">
@@ -463,7 +457,7 @@ export function SurveyAnalyticsContent() {
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block flex items-center gap-1 text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground block flex items-center gap-1 text-xs font-semibold uppercase">
                     <Sparkles className="h-3 w-3 text-purple-500" /> Desired Features / Improvements
                   </span>
                   <p className="bg-background rounded-md border p-2.5 leading-relaxed whitespace-pre-wrap">

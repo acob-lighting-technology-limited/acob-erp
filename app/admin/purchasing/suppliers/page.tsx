@@ -309,7 +309,7 @@ export default function SuppliersPage() {
           title: (supplier) => supplier.name,
           subtitle: (supplier) => `${supplier.code} · ${supplier.contact_person || supplier.email || "No contact"}`,
           trailing: (supplier) => (
-            <Badge variant={supplier.is_active ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={supplier.is_active ? "default" : "secondary"} className="text-xs">
               {supplier.is_active ? "Active" : "Inactive"}
             </Badge>
           ),

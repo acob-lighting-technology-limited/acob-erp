@@ -846,7 +846,7 @@ export function LeaveApprovePage({
                           ? "destructive"
                           : "secondary"
                     }
-                    className="text-[10px]"
+                    className="text-xs"
                   >
                     {r.status}
                   </Badge>
@@ -949,7 +949,7 @@ export function LeaveApprovePage({
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-xs">
                       {STAGE_LABELS[r.current_stage_code || r.approval_stage] || r.current_stage_code}
                     </Badge>
                   </div>

@@ -57,7 +57,7 @@ function formatTime(value: string | null): string {
 function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
   if (item.is_on_leave) {
     return (
-      <Badge variant="secondary" className="text-muted-foreground gap-1 text-[11px]">
+      <Badge variant="secondary" className="text-muted-foreground gap-1 text-xs">
         <Palmtree className="h-3 w-3" /> On Leave
       </Badge>
     )
@@ -71,14 +71,14 @@ function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
         return (
           <Badge
             variant="outline"
-            className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-[11px] font-medium text-emerald-800 dark:text-emerald-300"
+            className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-800 dark:text-emerald-300"
           >
             <Laptop className="h-3 w-3" /> Present (Virtual)
           </Badge>
         )
       }
       return (
-        <Badge className="gap-1 bg-emerald-600 text-[11px] text-white hover:bg-emerald-600">
+        <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
           <Building2 className="h-3 w-3" /> Present (In-Room)
         </Badge>
       )
@@ -87,32 +87,32 @@ function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
         return (
           <Badge
             variant="outline"
-            className="gap-1 border-amber-500/40 bg-amber-500/10 text-[11px] font-medium text-amber-800 dark:text-amber-300"
+            className="gap-1 border-amber-500/40 bg-amber-500/10 text-xs font-medium text-amber-800 dark:text-amber-300"
           >
             <Laptop className="h-3 w-3" /> Late (Virtual)
           </Badge>
         )
       }
       return (
-        <Badge className="gap-1 bg-amber-600 text-[11px] text-white hover:bg-amber-600">
+        <Badge className="gap-1 bg-amber-600 text-xs text-white hover:bg-amber-600">
           <Clock className="h-3 w-3" /> Late (In-Room)
         </Badge>
       )
     case "excused":
       return (
-        <Badge variant="secondary" className="gap-1 text-[11px]">
+        <Badge variant="secondary" className="gap-1 text-xs">
           <ShieldCheck className="h-3 w-3" /> Excused
         </Badge>
       )
     case "absent":
       return (
-        <Badge variant="destructive" className="gap-1 text-[11px]">
+        <Badge variant="destructive" className="gap-1 text-xs">
           <XCircle className="h-3 w-3" /> Absent
         </Badge>
       )
     default:
       return (
-        <Badge variant="outline" className="text-muted-foreground text-[11px]">
+        <Badge variant="outline" className="text-muted-foreground text-xs">
           Unrecorded
         </Badge>
       )
@@ -287,7 +287,7 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400"
                 >
                   <AlertTriangle className="h-3 w-3" /> Missed scan
                 </Badge>
@@ -510,7 +510,7 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-sky-400/50 bg-sky-500/10 text-[10px] text-sky-700 dark:text-sky-400"
+                  className="gap-1 border-sky-400/50 bg-sky-500/10 text-xs text-sky-700 dark:text-sky-400"
                 >
                   <Palmtree className="h-2.5 w-2.5" /> Leave
                 </Badge>
@@ -518,7 +518,7 @@ export default function AdminMeetingAttendancePage() {
             }
             if (r.meeting_clock_in) {
               return (
-                <Badge className="gap-1 bg-emerald-600 text-[10px] text-white hover:bg-emerald-600">
+                <Badge className="gap-1 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
                   <CheckCircle2 className="h-2.5 w-2.5" /> In Room
                 </Badge>
               )
@@ -527,14 +527,14 @@ export default function AdminMeetingAttendancePage() {
               return (
                 <Badge
                   variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-400"
+                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400"
                 >
                   <AlertTriangle className="h-2.5 w-2.5" /> Missed
                 </Badge>
               )
             }
             return (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
+              <Badge variant="outline" className="text-muted-foreground text-xs">
                 Unrecorded
               </Badge>
             )
@@ -621,7 +621,7 @@ export default function AdminMeetingAttendancePage() {
                 ) : r.office_clock_in && !r.is_on_leave ? (
                   <Badge
                     variant="outline"
-                    className="gap-1 border-amber-400/50 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-400"
+                    className="gap-1 border-amber-400/50 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400"
                   >
                     <AlertTriangle className="h-3 w-3" /> Missed scan
                   </Badge>

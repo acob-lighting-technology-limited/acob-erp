@@ -255,7 +255,7 @@ export default function AdminFleetPage() {
                 </p>
               )}
               {r.reviewed_at && (
-                <p className="text-muted-foreground text-[11px] whitespace-nowrap">{formatDateTime(r.reviewed_at)}</p>
+                <p className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(r.reviewed_at)}</p>
               )}
             </div>
           ) : (
@@ -419,11 +419,11 @@ export default function AdminFleetPage() {
             render: (r) => (
               <div className="grid gap-3 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                 <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Trip Purpose & Reason</span>
+                  <span className="text-muted-foreground block text-xs font-medium">Trip Purpose & Reason</span>
                   <p className="text-foreground mt-1 whitespace-pre-wrap">{r.reason || "No reason provided"}</p>
                 </div>
                 <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Schedule Details</span>
+                  <span className="text-muted-foreground block text-xs font-medium">Schedule Details</span>
                   <p className="text-foreground mt-1">
                     From: <span className="font-medium">{formatDateTime(r.start_at)}</span>
                   </p>
@@ -432,15 +432,15 @@ export default function AdminFleetPage() {
                   </p>
                 </div>
                 <div className="bg-muted/20 rounded-lg border p-2.5">
-                  <span className="text-muted-foreground block text-[11px] font-medium">Review & Decision</span>
+                  <span className="text-muted-foreground block text-xs font-medium">Review & Decision</span>
                   {r.reviewer?.full_name ? (
                     <div className="mt-1 space-y-0.5">
                       <p className="text-foreground font-medium">{r.reviewer.full_name}</p>
                       {r.reviewer.department && (
-                        <p className="text-muted-foreground text-[11px]">{r.reviewer.department}</p>
+                        <p className="text-muted-foreground text-xs">{r.reviewer.department}</p>
                       )}
                       {r.reviewed_at && (
-                        <p className="text-muted-foreground text-[11px]">{formatDateTime(r.reviewed_at)}</p>
+                        <p className="text-muted-foreground text-xs">{formatDateTime(r.reviewed_at)}</p>
                       )}
                     </div>
                   ) : (
@@ -470,7 +470,7 @@ export default function AdminFleetPage() {
                         ? "destructive"
                         : "outline"
                 }
-                className="text-[10px]"
+                className="text-xs"
               >
                 {r.status}
               </Badge>
@@ -499,7 +499,7 @@ export default function AdminFleetPage() {
                 </Badge>
               </div>
               <p className="text-muted-foreground line-clamp-2 text-xs">{r.reason}</p>
-              <div className="text-muted-foreground border-t pt-2 text-[10px]">
+              <div className="text-muted-foreground border-t pt-2 text-xs">
                 {formatDateTime(r.start_at)} – {formatDateTime(r.end_at)}
               </div>
             </div>
@@ -529,7 +529,7 @@ export default function AdminFleetPage() {
             title: (r) => r.name,
             subtitle: (r) => `${r.resource_type} · ${r.description || "No description"}`,
             trailing: (r) => (
-              <Badge variant={r.is_active ? "default" : "outline"} className="text-[10px]">
+              <Badge variant={r.is_active ? "default" : "outline"} className="text-xs">
                 {r.is_active ? "Active" : "Inactive"}
               </Badge>
             ),

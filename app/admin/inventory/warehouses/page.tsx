@@ -409,7 +409,7 @@ export default function WarehousesPage() {
           subtitle: (warehouse) =>
             `${warehouse.code} · ${getRegionFromAddress(warehouse.address)} · ${warehouse.address || "No address"}`,
           trailing: (warehouse) => (
-            <Badge variant={warehouse.is_active ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={warehouse.is_active ? "default" : "secondary"} className="text-xs">
               {warehouse.is_active ? "Active" : "Inactive"}
             </Badge>
           ),

@@ -360,7 +360,7 @@ export function DevAcobotLogsContent() {
           subtitle: (row) => `${isWebsite ? "Visitor" : row.full_name || "Unknown"} · ${formatWATDate(row.created_at)}`,
           trailing: (row) =>
             row.had_context ? (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 Live data
               </Badge>
             ) : null,

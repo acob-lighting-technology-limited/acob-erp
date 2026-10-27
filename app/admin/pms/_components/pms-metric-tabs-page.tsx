@@ -856,7 +856,7 @@ export function PmsMetricTabsPage({
               </div>
               <Badge variant="outline">{asString(row.metric_value ?? row.average_score ?? "-")}</Badge>
             </div>
-            <div className="text-muted-foreground flex justify-between border-t pt-2 text-[10px]">
+            <div className="text-muted-foreground flex justify-between border-t pt-2 text-xs">
               <span>Status: {asString(row.status ?? "recorded")}</span>
               <span>Cadence: {asString(row.cadence ?? "Quarterly")}</span>
             </div>

@@ -555,11 +555,11 @@ export function LeaveCalendarView({
                               <div className="border-border/40 flex items-start justify-between gap-2 border-b pb-1.5">
                                 <div>
                                   <h4 className="text-foreground text-sm leading-tight font-semibold">{empName}</h4>
-                                  {subtitle && <p className="text-muted-foreground text-[11px]">{subtitle}</p>}
+                                  {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
                                 </div>
                                 <Badge
                                   variant="outline"
-                                  className={`shrink-0 text-[10px] font-medium ${colorDef.badgeClass}`}
+                                  className={`shrink-0 text-xs font-medium ${colorDef.badgeClass}`}
                                 >
                                   {typeName}
                                 </Badge>
@@ -592,13 +592,13 @@ export function LeaveCalendarView({
                                   </div>
                                 )}
                                 {leave.reason && (
-                                  <div className="text-muted-foreground line-clamp-2 pt-1 text-[11px] italic">
+                                  <div className="text-muted-foreground line-clamp-2 pt-1 text-xs italic">
                                     &ldquo;{leave.reason}&rdquo;
                                   </div>
                                 )}
                               </div>
 
-                              <div className="border-border/40 text-primary/80 border-t pt-1 text-center text-[10px] font-medium">
+                              <div className="border-border/40 text-primary/80 border-t pt-1 text-center text-xs font-medium">
                                 Click to view complete details & history
                               </div>
                             </TooltipContent>
@@ -617,7 +617,7 @@ export function LeaveCalendarView({
                               holiday,
                             })
                           }
-                          className="bg-muted/60 py-0.2 text-muted-foreground hover:bg-muted hover:text-foreground mt-auto flex w-full cursor-pointer items-center justify-center rounded-xs text-[9px] font-medium transition-colors"
+                          className="bg-muted/60 py-0.2 text-muted-foreground hover:bg-muted hover:text-foreground mt-auto flex w-full cursor-pointer items-center justify-center rounded-xs text-xs font-medium transition-colors"
                         >
                           +{overflowCount} more
                         </button>
@@ -637,7 +637,7 @@ export function LeaveCalendarView({
             {Object.entries(LEAVE_TYPE_COLORS).map(([key, item]) => (
               <div key={key} className="flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${item.dot}`} />
-                <span className="text-foreground text-[11px]">{item.label}</span>
+                <span className="text-foreground text-xs">{item.label}</span>
               </div>
             ))}
           </div>
@@ -645,11 +645,11 @@ export function LeaveCalendarView({
           <div className="flex items-center gap-3 border-t pt-1.5 sm:border-t-0 sm:pt-0">
             <div className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-xs border border-dashed border-amber-500 bg-amber-500/20" />
-              <span className="text-muted-foreground text-[11px]">Pending</span>
+              <span className="text-muted-foreground text-xs">Pending</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-xs bg-amber-500/20" />
-              <span className="text-muted-foreground text-[11px]">Holiday</span>
+              <span className="text-muted-foreground text-xs">Holiday</span>
             </div>
           </div>
         </div>

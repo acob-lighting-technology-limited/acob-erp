@@ -157,43 +157,41 @@ export function LunchMenuViewersDialog({
           {/* Quick Metrics Grid */}
           <div className="grid grid-cols-2 gap-2 pt-3 sm:grid-cols-4">
             <div className="bg-muted/40 rounded-lg border p-2.5">
-              <span className="text-muted-foreground block text-[11px] font-medium">Total Viewed</span>
+              <span className="text-muted-foreground block text-xs font-medium">Total Viewed</span>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-foreground text-base font-bold">{totalViewers}</span>
                 <span className="text-muted-foreground text-xs">/ {totalStaff}</span>
-                <span className="ml-auto text-[11px] font-semibold text-blue-600">
+                <span className="ml-auto text-xs font-semibold text-blue-600">
                   {totalStaff > 0 ? Math.round((totalViewers / totalStaff) * 100) : 0}%
                 </span>
               </div>
             </div>
 
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5">
-              <span className="block text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
-                During Voting
-              </span>
+              <span className="block text-xs font-medium text-emerald-700 dark:text-emerald-400">During Voting</span>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-base font-bold text-emerald-600">{viewedDuringWindowCount}</span>
-                <span className="ml-auto text-[11px] font-semibold text-emerald-600">
+                <span className="ml-auto text-xs font-semibold text-emerald-600">
                   {totalStaff > 0 ? Math.round((viewedDuringWindowCount / totalStaff) * 100) : 0}%
                 </span>
               </div>
             </div>
 
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
-              <span className="block text-[11px] font-medium text-amber-700 dark:text-amber-400">After Deadline</span>
+              <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">After Deadline</span>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-base font-bold text-amber-600">{viewedAfterDeadlineCount}</span>
-                <span className="ml-auto text-[11px] font-semibold text-amber-600">
+                <span className="ml-auto text-xs font-semibold text-amber-600">
                   {totalStaff > 0 ? Math.round((viewedAfterDeadlineCount / totalStaff) * 100) : 0}%
                 </span>
               </div>
             </div>
 
             <div className="bg-muted/40 rounded-lg border p-2.5">
-              <span className="text-muted-foreground block text-[11px] font-medium">Not Viewed</span>
+              <span className="text-muted-foreground block text-xs font-medium">Not Viewed</span>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-muted-foreground text-base font-bold">{notViewedCount}</span>
-                <span className="text-muted-foreground ml-auto text-[11px] font-medium">
+                <span className="text-muted-foreground ml-auto text-xs font-medium">
                   {totalStaff > 0 ? Math.round((notViewedCount / totalStaff) * 100) : 0}%
                 </span>
               </div>
@@ -247,7 +245,7 @@ export function LunchMenuViewersDialog({
                 <div className="col-start-1 row-start-1">
                   <Avatar className="h-8 w-8 shrink-0">
                     {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.full_name} />}
-                    <AvatarFallback className="bg-muted text-[11px] font-semibold">
+                    <AvatarFallback className="bg-muted text-xs font-semibold">
                       {getInitials(row.full_name)}
                     </AvatarFallback>
                   </Avatar>
@@ -256,11 +254,9 @@ export function LunchMenuViewersDialog({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-foreground truncate font-semibold">{row.full_name}</span>
-                      <span className="text-muted-foreground shrink-0 font-mono text-[10px]">
-                        {row.employee_number}
-                      </span>
+                      <span className="text-muted-foreground shrink-0 font-mono text-xs">{row.employee_number}</span>
                     </div>
-                    <span className="text-muted-foreground block truncate text-[11px]">{row.department}</span>
+                    <span className="text-muted-foreground block truncate text-xs">{row.department}</span>
                   </div>
                 </div>
                 <div className="col-span-2 col-start-2 row-start-2 flex flex-wrap items-center justify-between gap-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:flex-nowrap sm:justify-end sm:gap-3">
@@ -272,18 +268,18 @@ export function LunchMenuViewersDialog({
                           variant="outline"
                           className={
                             row.viewedDuringWindow
-                              ? "border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-[10px] text-emerald-600"
-                              : "border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-600"
+                              ? "border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-xs text-emerald-600"
+                              : "border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-xs text-amber-600"
                           }
                         >
                           {row.viewedDuringWindow ? "During Voting" : "After Cut-off"}
                         </Badge>
-                        <span className="text-muted-foreground block text-[10px] sm:mt-0.5">
+                        <span className="text-muted-foreground block text-xs sm:mt-0.5">
                           {row.first_viewed_at ? formatWATTime(row.first_viewed_at) : ""}
                         </span>
                       </div>
                     ) : (
-                      <Badge variant="outline" className="border-gray-200 px-1.5 py-0 text-[10px] text-gray-400">
+                      <Badge variant="outline" className="border-gray-200 px-1.5 py-0 text-xs text-gray-400">
                         Not viewed
                       </Badge>
                     )}
@@ -294,17 +290,17 @@ export function LunchMenuViewersDialog({
                     {row.vote ? (
                       row.vote.is_eating ? (
                         <div>
-                          <Badge className="inline-block max-w-[180px] truncate border-0 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 sm:max-w-[150px]">
+                          <Badge className="inline-block max-w-[180px] truncate border-0 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 sm:max-w-[150px]">
                             {row.mealChoice}
                           </Badge>
                         </div>
                       ) : (
-                        <Badge className="border-0 bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-600">
+                        <Badge className="border-0 bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-600">
                           Said No
                         </Badge>
                       )
                     ) : (
-                      <span className="text-muted-foreground text-[11px] italic">No vote</span>
+                      <span className="text-muted-foreground text-xs italic">No vote</span>
                     )}
                   </div>
                 </div>
@@ -316,7 +312,7 @@ export function LunchMenuViewersDialog({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-muted-foreground hover:text-foreground h-7 px-2 text-[11px]"
+                          className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
                           onClick={() => onOverrideVote(row.id)}
                           aria-label="Change or set this employee's answer"
                         >

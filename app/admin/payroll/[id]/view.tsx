@@ -697,7 +697,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
                 {money(r.breakdown.netPay)}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 border-t pt-2 text-[11px]">
+            <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs">
               <div>Gross: {money(r.breakdown.monthlyGross)}</div>
               <div>Tax: {money(r.breakdown.monthlyTax)}</div>
             </div>
@@ -734,24 +734,24 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
                     className="object-contain"
                     unoptimized
                   />
-                  <p className="mt-1.5 text-[10px] text-gray-500">
+                  <p className="mt-1.5 text-xs text-gray-500">
                     Plot 2. Block 14 Extension, Federal Ministry of Works And Housing Sites and Services Scheme, Setraco
                     Gate, Gwarinpa, FCT, Nigeria.
                   </p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     Email: info@acoblighting.com &nbsp;|&nbsp; Web: www.acoblighting.com
                   </p>
                 </div>
                 <div className="min-w-[130px] text-right">
                   <p className="text-xs font-bold text-emerald-700 uppercase">Payslip</p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     Period: <span className="font-semibold whitespace-nowrap text-gray-700">{period.name}</span>
                   </p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     Pay Date: <span className="font-semibold whitespace-nowrap text-gray-700">{period.pay_date}</span>
                   </p>
                   <p
-                    className="mt-1 text-[10px] font-bold uppercase"
+                    className="mt-1 text-xs font-bold uppercase"
                     style={{ color: status === "completed" ? "#059669" : "#d97706" }}
                   >
                     ● {status === "completed" ? "Paid" : "Draft"}
@@ -760,29 +760,29 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
               </div>
 
               {/* Employee Info */}
-              <div className="grid grid-cols-2 gap-3 rounded border border-gray-100 bg-gray-50 px-4 py-2.5 text-[11px]">
+              <div className="grid grid-cols-2 gap-3 rounded border border-gray-100 bg-gray-50 px-4 py-2.5 text-xs">
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Employee Name</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Employee Name</p>
                   <p className="font-semibold text-gray-800">{viewRow.full_name}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Staff ID</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Staff ID</p>
                   <p className="font-mono font-semibold text-gray-800">{viewRow.employee_number}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Department</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Department</p>
                   <p className="font-semibold text-gray-800">{viewRow.department || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Designation</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Designation</p>
                   <p className="font-semibold text-gray-800">{viewRow.designation || "—"}</p>
                 </div>
               </div>
 
               {/* Earnings & Deductions */}
-              <div className="grid grid-cols-1 gap-4 text-[11px] sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
                 <div>
-                  <h3 className="mb-1.5 border-b border-emerald-200 pb-1 text-[9px] font-bold tracking-widest text-emerald-700 uppercase">
+                  <h3 className="mb-1.5 border-b border-emerald-200 pb-1 text-xs font-bold tracking-widest text-emerald-700 uppercase">
                     Earnings
                   </h3>
                   <table className="w-full">
@@ -821,7 +821,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
                 </div>
 
                 <div>
-                  <h3 className="mb-1.5 border-b border-red-200 pb-1 text-[9px] font-bold tracking-widest text-red-600 uppercase">
+                  <h3 className="mb-1.5 border-b border-red-200 pb-1 text-xs font-bold tracking-widest text-red-600 uppercase">
                     Deductions
                   </h3>
                   <table className="w-full">
@@ -874,9 +874,9 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
               </div>
 
               {/* Signature Lines */}
-              <div className="flex items-end justify-between pt-6 text-[10px] text-gray-400">
+              <div className="flex items-end justify-between pt-6 text-xs text-gray-400">
                 <div className="w-36 border-t border-gray-300 pt-1 text-center">Employee Signature</div>
-                <div className="text-center text-[9px] text-gray-300">
+                <div className="text-center text-xs text-gray-300">
                   This payslip is computer-generated and valid without a signature.
                 </div>
                 <div className="w-36 border-t border-gray-300 pt-1 text-center">Authorised Signatory</div>

@@ -552,7 +552,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
                     <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                       {details.map((d, i) => (
                         <div key={i} className="bg-background rounded border p-2">
-                          <span className="text-muted-foreground block text-[10px]">{d.label}</span>
+                          <span className="text-muted-foreground block text-xs">{d.label}</span>
                           <span className="font-semibold">{d.value}</span>
                         </div>
                       ))}
@@ -572,7 +572,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
           subtitle: (row) =>
             `${formatWATDateTime(row.created_at)} · By: ${row.actor ? `${row.actor.first_name} ${row.actor.last_name}` : "System"}`,
           trailing: (row) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {getBypassType(row)}
             </Badge>
           ),

@@ -770,7 +770,7 @@ export function LunchRegisterPage({
           {/* A stored value means this day was deliberately overridden; the
               rest simply follow the lunch settings deadline. */}
           {row.voting_deadline && (
-            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+            <Badge variant="outline" className="px-1.5 py-0 text-xs">
               custom
             </Badge>
           )}
@@ -1485,7 +1485,7 @@ export function LunchRegisterPage({
               subtitle: (row) => `${row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}`,
               trailing: (row) => {
                 const status = getMenuStatusInfo(row)
-                return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+                return <Badge className={cn("text-xs", status.tone)}>{status.label}</Badge>
               },
               detail: {
                 title: (row) =>
@@ -1496,7 +1496,7 @@ export function LunchRegisterPage({
                 },
                 badges: (row) => {
                   const status = getMenuStatusInfo(row)
-                  return <Badge className={cn("text-[10px]", status.tone)}>{status.label}</Badge>
+                  return <Badge className={cn("text-xs", status.tone)}>{status.label}</Badge>
                 },
                 fields: (row) => [
                   {
@@ -1545,26 +1545,21 @@ export function LunchRegisterPage({
                   <div className="text-muted-foreground line-clamp-2 text-xs">
                     {row.groups.map((g) => g.options.map((o) => o.name).join(", ")).join(" | ")}
                   </div>
-                  <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+                  <div className="flex items-center justify-between border-t pt-2 text-xs">
                     <span className="text-muted-foreground">{row.votes.length} votes cast</span>
                     <div className="flex items-center gap-1.5">
                       {canShareMenu(row) && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 gap-1 text-[10px] text-emerald-600"
+                          className="h-7 gap-1 text-xs text-emerald-600"
                           onClick={() => setShareMenu(row)}
                         >
                           <MessageCircle className="h-3 w-3" />
                           Share
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[10px]"
-                        onClick={() => setEditingMenu(row)}
-                      >
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingMenu(row)}>
                         Edit
                       </Button>
                     </div>
@@ -1969,13 +1964,13 @@ export function LunchRegisterPage({
                           <div className="flex min-w-0 items-center gap-2">
                             <Badge
                               variant="outline"
-                              className={cn("w-6 shrink-0 justify-center px-0 text-[10px]", rankBadgeClass(idx))}
+                              className={cn("w-6 shrink-0 justify-center px-0 text-xs", rankBadgeClass(idx))}
                             >
                               {idx + 1}
                             </Badge>
                             <div className="min-w-0">
                               <div className="truncate text-xs font-semibold">{row.full_name}</div>
-                              <div className="text-muted-foreground truncate text-[10px]">
+                              <div className="text-muted-foreground truncate text-xs">
                                 {row.department || "General"}
                               </div>
                             </div>
@@ -2013,13 +2008,13 @@ export function LunchRegisterPage({
                           <div className="flex min-w-0 items-center gap-2">
                             <Badge
                               variant="outline"
-                              className={cn("w-6 shrink-0 justify-center px-0 text-[10px]", rankBadgeClass(idx))}
+                              className={cn("w-6 shrink-0 justify-center px-0 text-xs", rankBadgeClass(idx))}
                             >
                               {idx + 1}
                             </Badge>
                             <div className="min-w-0">
                               <div className="truncate text-xs font-semibold">{row.full_name}</div>
-                              <div className="text-muted-foreground truncate text-[10px]">
+                              <div className="text-muted-foreground truncate text-xs">
                                 {row.department || "General"}
                               </div>
                             </div>
@@ -2057,13 +2052,13 @@ export function LunchRegisterPage({
                           <div className="flex min-w-0 items-center gap-2">
                             <Badge
                               variant="outline"
-                              className={cn("w-6 shrink-0 justify-center px-0 text-[10px]", rankBadgeClass(idx))}
+                              className={cn("w-6 shrink-0 justify-center px-0 text-xs", rankBadgeClass(idx))}
                             >
                               {idx + 1}
                             </Badge>
                             <div className="min-w-0">
                               <div className="truncate text-xs font-semibold">{row.full_name}</div>
-                              <div className="text-muted-foreground truncate text-[10px]">
+                              <div className="text-muted-foreground truncate text-xs">
                                 {row.department || "General"}
                               </div>
                             </div>
@@ -2350,7 +2345,7 @@ export function LunchRegisterPage({
               subtitle: (row) =>
                 `${row.review_count} reviews · Avg Rating: ${row.average_rating ? row.average_rating.toFixed(1) : "N/A"} ★`,
               trailing: (row) => (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-xs">
                   {row.average_rating ? `${row.average_rating.toFixed(1)} ★` : "No rating"}
                 </Badge>
               ),
@@ -2365,7 +2360,7 @@ export function LunchRegisterPage({
                     {row.average_rating ? `${row.average_rating.toFixed(1)} ★` : "No rating"}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between border-t pt-2 text-[10px]">
+                <div className="flex items-center justify-between border-t pt-2 text-xs">
                   <span className="text-muted-foreground">{row.review_count} reviews</span>
                   <span className="text-muted-foreground">{row.comments.length} comments</span>
                 </div>
@@ -2396,14 +2391,12 @@ function FeedbackExpandPanel({ entry }: { entry: LunchReviewSummary }) {
         <p className="text-muted-foreground text-xs font-semibold uppercase">
           Anonymous Staff Comments ({entry.comments.length})
         </p>
-        <span className="text-muted-foreground text-[11px]">
-          Feedback is submitted anonymously without employee names.
-        </span>
+        <span className="text-muted-foreground text-xs">Feedback is submitted anonymously without employee names.</span>
       </div>
       <div className="grid gap-2.5 sm:grid-cols-2">
         {entry.comments.map((comment) => (
           <div key={comment.id} className="bg-card space-y-1.5 rounded-lg border p-3 text-xs shadow-sm">
-            <div className="text-muted-foreground flex items-center justify-between text-[11px]">
+            <div className="text-muted-foreground flex items-center justify-between text-xs">
               <div className="flex items-center gap-1 font-semibold text-amber-500">
                 <Star className="h-3 w-3 fill-amber-500" />
                 {comment.rating} / 5
@@ -2601,7 +2594,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
         <p className="text-muted-foreground px-2 text-xs font-semibold uppercase">Menu</p>
         <div
           className={cn(
-            "text-muted-foreground grid items-center gap-3 px-2 text-[11px] font-semibold uppercase",
+            "text-muted-foreground grid items-center gap-3 px-2 text-xs font-semibold uppercase",
             menu.groups.length > 1 ? "grid-cols-[140px_1fr_80px]" : "grid-cols-[1fr_80px]"
           )}
         >
@@ -2666,7 +2659,7 @@ function MenuVotesPanel({ menu, totalStaff }: { menu: AdminLunchMenu; totalStaff
           <p className="text-muted-foreground px-2 text-xs">Nobody has chosen a meal yet.</p>
         ) : (
           <>
-            <div className="text-muted-foreground grid grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 px-2 text-[11px] font-semibold uppercase">
+            <div className="text-muted-foreground grid grid-cols-[40px_1fr_160px_1fr_130px] items-center gap-3 px-2 text-xs font-semibold uppercase">
               <span>S/N</span>
               <SortHeader
                 label="Employee"
@@ -2759,7 +2752,7 @@ function EmployeeLunchExpandPanel({
 
   return (
     <div className="bg-muted/20 space-y-1 border-b px-6 py-4">
-      <div className="text-muted-foreground grid grid-cols-[160px_120px_100px_120px_120px] items-center gap-3 border-b px-2 pb-2 text-[10px] font-bold tracking-wider uppercase">
+      <div className="text-muted-foreground grid grid-cols-[160px_120px_100px_120px_120px] items-center gap-3 border-b px-2 pb-2 text-xs font-bold tracking-wider uppercase">
         <span>Day</span>
         <span>Status</span>
         <span>Meal Price</span>

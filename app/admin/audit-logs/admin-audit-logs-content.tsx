@@ -151,16 +151,14 @@ export function AdminAuditLogsContent({
         accessor: (r) => getPerformedBy(r),
         render: (r) => (
           <div className="flex items-center gap-2">
-            <div className="bg-muted flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold">
+            <div className="bg-muted flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold">
               {r.user ? r.user.first_name.charAt(0) : "S"}
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-medium">
                 {r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"}
               </span>
-              {r.user?.company_email && (
-                <span className="text-muted-foreground text-[10px]">{r.user.company_email}</span>
-              )}
+              {r.user?.company_email && <span className="text-muted-foreground text-xs">{r.user.company_email}</span>}
             </div>
           </div>
         ),
@@ -329,12 +327,12 @@ export function AdminAuditLogsContent({
           render: (r) => (
             <div className="bg-muted/20 space-y-6 border-t p-6">
               <div className="space-y-2">
-                <h4 className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">Log Summary</h4>
+                <h4 className="text-muted-foreground text-xs font-black tracking-widest uppercase">Log Summary</h4>
                 <p className="text-sm font-medium">{getAuditLogSummary(r)}</p>
               </div>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 <div className="space-y-2">
-                  <h4 className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
+                  <h4 className="text-muted-foreground text-xs font-black tracking-widest uppercase">
                     Entity & Object Details
                   </h4>
                   <div className="space-y-1 text-sm">
@@ -353,7 +351,7 @@ export function AdminAuditLogsContent({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
+                  <h4 className="text-muted-foreground text-xs font-black tracking-widest uppercase">
                     Origin & Source
                   </h4>
                   <div className="space-y-1 text-sm">
@@ -364,9 +362,7 @@ export function AdminAuditLogsContent({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-muted-foreground text-[10px] font-black tracking-widest uppercase">
-                    Change Details
-                  </h4>
+                  <h4 className="text-muted-foreground text-xs font-black tracking-widest uppercase">Change Details</h4>
                   <div className="space-y-1 text-sm">
                     <p>
                       <span className="text-muted-foreground mr-2 font-medium">Fields Changed:</span>{" "}
@@ -418,7 +414,7 @@ export function AdminAuditLogsContent({
           >
             <div className="mb-2 flex items-start justify-between">
               <Badge className={getAuditActionColor(r.action || "update")}>{formatName(r.action || "update")}</Badge>
-              <span className="text-muted-foreground font-mono text-[10px]">
+              <span className="text-muted-foreground font-mono text-xs">
                 {new Date(r.created_at).toLocaleTimeString("en-NG", {
                   timeZone: "Africa/Lagos",
                   hour: "2-digit",
@@ -435,7 +431,7 @@ export function AdminAuditLogsContent({
                 {r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"}
               </span>
               <div className="ml-auto">
-                <Badge variant="outline" className="text-[9px] font-normal uppercase">
+                <Badge variant="outline" className="text-xs font-normal uppercase">
                   {r.entity_type}
                 </Badge>
               </div>

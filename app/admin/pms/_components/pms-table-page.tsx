@@ -508,7 +508,7 @@ export function PmsTablePage({
                                       <Badge
                                         variant={cfg.badgeVariant}
                                         className={cn(
-                                          "px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap capitalize shadow-none",
+                                          "px-2 py-0.5 text-xs font-semibold whitespace-nowrap capitalize shadow-none",
                                           cfg.color
                                         )}
                                       >
@@ -519,7 +519,7 @@ export function PmsTablePage({
                                       <Badge
                                         variant="outline"
                                         className={cn(
-                                          "px-2 py-0.5 text-[10px] font-medium capitalize shadow-none",
+                                          "px-2 py-0.5 text-xs font-medium capitalize shadow-none",
                                           task.assignmentType === "individual"
                                             ? "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400"
                                             : "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400"
@@ -535,7 +535,7 @@ export function PmsTablePage({
                                       <Badge
                                         variant="outline"
                                         className={cn(
-                                          "px-2 py-0.5 text-[10px] font-medium shadow-none",
+                                          "px-2 py-0.5 text-xs font-medium shadow-none",
                                           getTaskWeightBadgeClass(task.weight)
                                         )}
                                       >
@@ -546,7 +546,7 @@ export function PmsTablePage({
                                       {task.rating ? (
                                         <Badge
                                           variant="outline"
-                                          className="gap-1 border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 shadow-none dark:text-amber-400"
+                                          className="gap-1 border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 shadow-none dark:text-amber-400"
                                         >
                                           <Star className="h-3 w-3 shrink-0 fill-amber-500 text-amber-500" />
                                           <span>{task.rating}/5</span>
@@ -690,9 +690,7 @@ export function PmsTablePage({
                     if (val === "-") return null
                     return (
                       <div key={col.key}>
-                        <span className="text-muted-foreground block text-[10px] font-medium uppercase">
-                          {col.label}
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-medium uppercase">{col.label}</span>
                         <span className="text-foreground font-medium">{val}</span>
                       </div>
                     )

@@ -269,7 +269,7 @@ export function AdminHelpDeskContent({
         render: (r) => (
           <div className="flex max-w-[300px] flex-col">
             <span className="truncate font-medium">{r.title}</span>
-            <span className="text-muted-foreground text-[10px] tracking-widest uppercase">{r.request_type}</span>
+            <span className="text-muted-foreground text-xs tracking-widest uppercase">{r.request_type}</span>
           </div>
         ),
       },
@@ -327,7 +327,7 @@ export function AdminHelpDeskContent({
         label: "Assign Staff",
         render: (r) => {
           if (!canAssignTicket(r)) {
-            return <span className="text-muted-foreground text-[10px] italic">Restricted stage</span>
+            return <span className="text-muted-foreground text-xs italic">Restricted stage</span>
           }
           return (
             <div className="flex items-center gap-2">
@@ -458,7 +458,7 @@ export function AdminHelpDeskContent({
           render: (r) => (
             <div className="bg-muted/20 space-y-4 border-t p-6">
               <div>
-                <h4 className="text-muted-foreground mb-2 text-[10px] font-black tracking-widest uppercase">
+                <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
                   Requester Info
                 </h4>
                 <div className="flex gap-4 text-sm">
@@ -474,7 +474,7 @@ export function AdminHelpDeskContent({
               </div>
               {r.sla_target_at && (
                 <div>
-                  <h4 className="text-muted-foreground mb-2 text-[10px] font-black tracking-widest uppercase">
+                  <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
                     SLA Status
                   </h4>
                   <p className="text-sm">
@@ -547,16 +547,16 @@ export function AdminHelpDeskContent({
         cardRenderer={(r) => (
           <div className="bg-card space-y-4 rounded-xl border p-4 transition-shadow hover:shadow-md">
             <div className="flex items-start justify-between">
-              <span className="text-muted-foreground font-mono text-[10px]">{r.ticket_number}</span>
+              <span className="text-muted-foreground font-mono text-xs">{r.ticket_number}</span>
               <PriorityBadge priority={r.priority} />
             </div>
             <div>
               <h4 className="line-clamp-1 font-semibold">{r.title}</h4>
-              <p className="text-muted-foreground mt-1 text-[10px] uppercase">{r.service_department}</p>
+              <p className="text-muted-foreground mt-1 text-xs uppercase">{r.service_department}</p>
             </div>
             <div className="flex items-center justify-between border-t pt-2">
               <TicketStatusBadge status={r.status} />
-              <Badge variant="outline" className="text-[10px] font-normal">
+              <Badge variant="outline" className="text-xs font-normal">
                 {resolveCurrentStage(r)}
               </Badge>
             </div>

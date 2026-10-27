@@ -177,16 +177,16 @@ export function WeeklySummaryForm({
                     <div className="text-muted-foreground text-xs">{opt.desc}</div>
                     {opt.disabled ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <div className="text-destructive text-[11px]">Upload this in Reports first</div>
+                        <div className="text-destructive text-xs">Upload this in Reports first</div>
                         {opt.helperHref ? (
-                          <Button size="sm" variant="outline" asChild className="h-7 px-2 text-[11px]">
+                          <Button size="sm" variant="outline" asChild className="h-7 px-2 text-xs">
                             <Link href={opt.helperHref}>{opt.helperLabel || "Open Reports"}</Link>
                           </Button>
                         ) : null}
                       </div>
                     ) : opt.helperHref ? (
                       <div className="mt-2">
-                        <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-[11px]">
+                        <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-xs">
                           <Link href={opt.helperHref}>{opt.helperLabel || "Open Reports"}</Link>
                         </Button>
                       </div>

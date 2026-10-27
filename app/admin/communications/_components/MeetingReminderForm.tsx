@@ -107,7 +107,7 @@ export function MeetingReminderForm({
             here.
           </p>
           {meetingDateHref && (
-            <Button variant="outline" size="sm" asChild className="h-7 px-2 text-[11px]">
+            <Button variant="outline" size="sm" asChild className="h-7 px-2 text-xs">
               <Link href={meetingDateHref}>Manage Meeting Date</Link>
             </Button>
           )}

@@ -528,45 +528,45 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
     <>
       <div className="bg-muted/40 mb-4 grid max-w-4xl grid-cols-3 gap-2 rounded-lg border p-3 sm:grid-cols-5 lg:grid-cols-9">
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Late</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Late</span>
           <span className="mt-1 text-sm font-semibold text-yellow-600">{report.late_days}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Incomplete</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Incomplete</span>
           <span className="mt-1 text-sm font-semibold text-cyan-600">{report.incomplete_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Exempted</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Exempted</span>
           <span className="mt-1 text-sm font-semibold text-violet-600">{report.exempted_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">LWP</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">LWP</span>
           <span className="mt-1 text-sm font-semibold text-amber-600">{report.lateness_with_permission_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">OOS</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">OOS</span>
           <span className="mt-1 text-sm font-semibold text-indigo-600">{report.out_of_station_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">AWP</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">AWP</span>
           <span className="mt-1 text-sm font-semibold text-teal-600">{report.absent_with_permission_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Leave</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Leave</span>
           <span className="mt-1 text-sm font-semibold text-purple-600">{report.leave_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Holiday</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Holiday</span>
           <span className="mt-1 text-sm font-semibold text-sky-600">{report.holiday_days || 0}</span>
         </div>
         <div className="bg-background flex flex-col items-center justify-center rounded border p-2 text-center">
-          <span className="text-muted-foreground text-[10px] font-bold uppercase">Waiver</span>
+          <span className="text-muted-foreground text-xs font-bold uppercase">Waiver</span>
           <span className="mt-1 text-sm font-semibold text-blue-600">{report.waived_days || 0}</span>
         </div>
       </div>
 
       <div className="space-y-1 py-2">
-        <div className="text-muted-foreground grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 px-2 text-[11px] font-semibold uppercase">
+        <div className="text-muted-foreground grid grid-cols-[130px_90px_70px_70px_80px_80px_80px_90px_120px_60px] items-center gap-3 px-2 text-xs font-semibold uppercase">
           <span>Day</span>
           <span>Status</span>
           <span>In</span>
@@ -717,7 +717,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
                     onChange={(e) => setEditForm((f) => ({ ...f, manual_comment: e.target.value }))}
                   />
                   {!hasManualComment && (
-                    <p className="text-[11px] font-medium text-red-500">
+                    <p className="text-xs font-medium text-red-500">
                       A comment is required for all manual attendance alterations.
                     </p>
                   )}
@@ -1292,7 +1292,7 @@ export function AttendanceReportsPage({
             },
             trailing: (r) =>
               r.attendance_exempt ? (
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-xs">
                   Exempt
                 </Badge>
               ) : (
@@ -1312,13 +1312,13 @@ export function AttendanceReportsPage({
               </div>
               <div className="border-border/40 grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                 <div>
-                  <span className="text-muted-foreground block text-[10px] uppercase">Early / Present</span>
+                  <span className="text-muted-foreground block text-xs uppercase">Early / Present</span>
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                     {r.early_days ?? 0} early / {r.present_days} present
                   </span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px] uppercase">Absent</span>
+                  <span className="text-muted-foreground block text-xs uppercase">Absent</span>
                   <span className="font-semibold text-rose-600 dark:text-rose-400">{r.absent_days} days</span>
                 </div>
               </div>

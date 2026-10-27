@@ -343,7 +343,7 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
           title: (n) => n.title,
           subtitle: (n) => `${n.category} · ${n.priority} · ${n.timestamp}`,
           trailing: (n) => (
-            <Badge variant="outline" className={cn("text-[10px] capitalize", getPriorityBadgeClass(n.priority))}>
+            <Badge variant="outline" className={cn("text-xs capitalize", getPriorityBadgeClass(n.priority))}>
               {n.priority}
             </Badge>
           ),
@@ -386,19 +386,16 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
               </div>
               <div className="flex items-center justify-between pt-1">
                 <div className="flex gap-2">
-                  <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                  <Badge variant="outline" className="px-1.5 py-0 text-xs">
                     {n.category}
                   </Badge>
                   {n.priority !== "normal" && (
-                    <Badge
-                      variant="outline"
-                      className={cn("px-1.5 py-0 text-[10px]", getPriorityBadgeClass(n.priority))}
-                    >
+                    <Badge variant="outline" className={cn("px-1.5 py-0 text-xs", getPriorityBadgeClass(n.priority))}>
                       {n.priority}
                     </Badge>
                   )}
                 </div>
-                <span className="text-muted-foreground text-[10px]">{n.timestamp}</span>
+                <span className="text-muted-foreground text-xs">{n.timestamp}</span>
               </div>
             </div>
           )

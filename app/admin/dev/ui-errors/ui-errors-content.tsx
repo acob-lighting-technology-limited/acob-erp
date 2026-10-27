@@ -392,7 +392,7 @@ export function UiErrorsContent({
           title: (r) => r.message,
           subtitle: (r) => `${r.source} · ${r.route || "-"} · ${formatWATDateTime(r.created_at)}`,
           trailing: (r) => (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {r.source}
             </Badge>
           ),
@@ -406,7 +406,7 @@ export function UiErrorsContent({
               </div>
               <Badge variant="outline">{r.source}</Badge>
             </div>
-            <div className="text-muted-foreground flex justify-between border-t pt-2 text-[10px]">
+            <div className="text-muted-foreground flex justify-between border-t pt-2 text-xs">
               <span>{describeUsers(r)}</span>
               <span>{formatWATDateTime(r.created_at)}</span>
             </div>

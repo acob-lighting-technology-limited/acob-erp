@@ -207,14 +207,14 @@ export function LunchMenuBuilderDialog({
               keep when there are two lists to tell apart. */}
           <div className="bg-muted/30 grid gap-3 rounded-lg border p-3 text-xs sm:grid-cols-3">
             <div>
-              <p className="text-muted-foreground mb-1 text-[10px] font-bold tracking-wider uppercase">
+              <p className="text-muted-foreground mb-1 text-xs font-bold tracking-wider uppercase">
                 Fixed meal — one dish
               </p>
               <p className="text-muted-foreground">Spaghetti with peppered beef</p>
               <p className="text-muted-foreground/70 mt-1 italic">Voting = &ldquo;I&apos;m opting in&rdquo;</p>
             </div>
             <div>
-              <p className="text-muted-foreground mb-1 text-[10px] font-bold tracking-wider uppercase">
+              <p className="text-muted-foreground mb-1 text-xs font-bold tracking-wider uppercase">
                 A choice — one category
               </p>
               <p className="text-muted-foreground">White Rice</p>
@@ -222,7 +222,7 @@ export function LunchMenuBuilderDialog({
               <p className="text-muted-foreground">Fried Rice</p>
             </div>
             <div>
-              <p className="text-muted-foreground mb-1 text-[10px] font-bold tracking-wider uppercase">
+              <p className="text-muted-foreground mb-1 text-xs font-bold tracking-wider uppercase">
                 A pairing — two categories
               </p>
               <p className="font-semibold">Soup</p>
@@ -323,7 +323,7 @@ export function LunchMenuBuilderDialog({
               </div>
 
               <div className="space-y-2">
-                <Label className="text-muted-foreground text-[11px] font-bold tracking-wider uppercase">
+                <Label className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
                   {groups.length > 1
                     ? `Dishes under ${group.name.trim() || `category ${groupIndex + 1}`} — staff pick one`
                     : "Staff pick one of these"}

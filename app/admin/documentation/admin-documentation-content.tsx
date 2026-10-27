@@ -307,7 +307,7 @@ export function AdminDocumentationContent({
               subtitle: (doc) =>
                 `${doc.user ? `${doc.user.first_name} ${doc.user.last_name}` : "Unknown"} · ${doc.category || "General"} · ${formatDate(doc.updated_at)}`,
               trailing: (doc) => (
-                <Badge className={`text-[10px] ${getStatusColor(doc.is_draft)}`}>
+                <Badge className={`text-xs ${getStatusColor(doc.is_draft)}`}>
                   {doc.is_draft ? "Draft" : "Published"}
                 </Badge>
               ),

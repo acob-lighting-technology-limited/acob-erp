@@ -331,7 +331,7 @@ export default function ProductsPage() {
           subtitle: (product) =>
             `${product.sku} · ${product.category_name || "Uncategorized"} · Stock: ${product.quantity_on_hand}`,
           trailing: (product) => (
-            <Badge variant={statusColors[product.status]} className="text-[10px] capitalize">
+            <Badge variant={statusColors[product.status]} className="text-xs capitalize">
               {product.status}
             </Badge>
           ),

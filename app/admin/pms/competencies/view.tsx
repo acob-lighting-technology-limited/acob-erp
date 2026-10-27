@@ -488,7 +488,7 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
           title: (c) => c.label,
           subtitle: (c) => `${CATEGORY_LABELS[c.category] || c.category} · ${c.key}`,
           trailing: (c) => (
-            <Badge variant={c.is_active ? "default" : "secondary"} className="text-[10px]">
+            <Badge variant={c.is_active ? "default" : "secondary"} className="text-xs">
               {c.is_active ? "Active" : "Inactive"}
             </Badge>
           ),
