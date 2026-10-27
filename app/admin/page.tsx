@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getServiceRoleClientOrFallback } from "@/lib/supabase/admin"
 import { expandDepartmentScopeForQuery, getDepartmentScope, resolveAdminScope } from "@/lib/admin/rbac"
@@ -83,8 +84,13 @@ export default async function AdminDashboardPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const scope = user ? await resolveAdminScope(supabase, user.id) : null
-  const departmentScope = scope ? getDepartmentScope(scope, "general") : null
+  // The admin layout redirects these cases too, but layouts and pages render in parallel, so this
+  // page's service-role queries would still run. Below, a null department scope means "unrestricted",
+  // which a missing admin scope must never be mistaken for.
+  if (!user) redirect("/auth/login")
+  const scope = await resolveAdminScope(supabase, user.id)
+  if (!scope) redirect("/profile")
+  const departmentScope = getDepartmentScope(scope, "general")
   const queryDepartmentScope = departmentScope ? expandDepartmentScopeForQuery(departmentScope) : null
   const profileIdsInScope = departmentScope
     ? (queryDepartmentScope && queryDepartmentScope.length > 0
