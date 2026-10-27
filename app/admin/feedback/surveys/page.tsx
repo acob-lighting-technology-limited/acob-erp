@@ -4,7 +4,7 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { SurveyAnalyticsContent } from "./survey-analytics-content"
 
 export const metadata = {
-  title: "System Satisfaction Surveys | Admin | ACOB Matrix ERP",
+  title: "System Satisfaction Surveys | Admin",
   description: "View post-deployment user satisfaction, speed ratings, and usability feedback.",
 }
 

@@ -3,7 +3,7 @@ import { birthdayScript, birthdaySerif } from "./fonts"
 import "./birthday.css"
 
 export const metadata: Metadata = {
-  title: "Birthday Spotlight | ACOB Lighting Technology Limited",
+  title: "Birthday Spotlight",
   description: "Weekly birthday spotlight in the ERP",
 }
 

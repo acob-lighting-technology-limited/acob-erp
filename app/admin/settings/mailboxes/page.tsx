@@ -4,7 +4,7 @@ import { getRequestScope } from "@/lib/admin/api-scope"
 import { MailboxesPage } from "./view"
 
 export const metadata: Metadata = {
-  title: "Mailboxes | Matrix",
+  title: "Mailboxes",
   description: "Staff mailboxes on cPanel: storage, quotas and who they belong to.",
 }
 

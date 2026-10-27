@@ -894,6 +894,7 @@ the expected stats count, tabs, filter count, action count, and table density.
 | `click-div` | `<div onClick>` | `<button>` or `<Link>` |
 | `client-page` | `page.tsx` that starts with `"use client"` | server page, client child |
 | `page-missing-metadata` | server `page.tsx` without `metadata` | export a title |
+| `title-brand-suffix` | a page title that already ends in `| Matrix` or `| ACOB…` | the root layout adds the brand; write only the page name |
 | `file-lines` | a file over 1,000 lines, by its length | extract; never grow it |
 
 Working with it:
@@ -938,7 +939,8 @@ Rules for every type:
   same variant and props as the route's `loading.tsx`, never a second, different skeleton.
 - **The title comes from `PageHeader`.** Do not hand-write an `<h1>`.
 - **The browser tab names the page.** A server `page.tsx` exports
-  `metadata = { title: "<Page title> | ACOB Lighting Technology Limited" }`. Keep `page.tsx` a server
+  `metadata = { title: "<Page title>" }`: the root layout adds " | Matrix", so never write the brand
+  yourself. Keep `page.tsx` a server
   component and put interaction in a `"use client"` child; both are in the ratchet.
 - **Name the page like its sidebar entry.** Someone who clicks "Leave" should land on "Leave".
 

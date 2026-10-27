@@ -984,6 +984,9 @@
       "app/dept/[dept_id]/tasks/page.tsx": 1,
       "app/maintenance/page.tsx": 1
     },
+    "title-brand-suffix": {
+      "app/lunch/_components/lunch-share-view.tsx": 1
+    },
     "file-lines": {
       "app/(app)/hr/attendance/attendance-content.tsx": 1284,
       "app/(app)/hr/leave/leave-content.tsx": 1347,

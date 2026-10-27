@@ -6,7 +6,7 @@ import { leadsDepartment } from "@/lib/risk-register/server"
 import { RiskRegisterView } from "./_components/risk-register-view"
 
 export const metadata: Metadata = {
-  title: "Risk Register | Corporate Services | Matrix",
+  title: "Risk Register | Corporate Services",
   description: "Departmental risks, their inherent rating, control owners and mitigation plans.",
 }
 

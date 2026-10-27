@@ -120,6 +120,17 @@ test("file-lines counts only files over 1000 lines, by length", () => {
   assert.equal(countFile("lib/x.ts", "a\n".repeat(1500))["file-lines"], 1501)
 })
 
+test("title-brand-suffix flags a hand-written brand suffix in app/ but not a plain title", () => {
+  const bad = 'export const metadata = { title: "Leave | Matrix" }'
+  const longBad = 'export const metadata = { title: "Leave | ACOB Lighting Technology Limited" }'
+  const good = 'export const metadata = { title: "Leave" }'
+  assert.equal(countFile("app/hr/leave/page.tsx", bad)["title-brand-suffix"], 1)
+  assert.equal(countFile("app/hr/leave/page.tsx", longBad)["title-brand-suffix"], 1)
+  assert.equal(countFile("app/hr/leave/page.tsx", good)["title-brand-suffix"], undefined)
+  assert.equal(countFile("app/layout.tsx", 'title: "Matrix | Matrix"')["title-brand-suffix"], undefined)
+  assert.equal(countFile("components/x.tsx", bad)["title-brand-suffix"], undefined)
+})
+
 // --- the CLI, end to end, against a throwaway project ---------------------------------------
 
 function project(files) {

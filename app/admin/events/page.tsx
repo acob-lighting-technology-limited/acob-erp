@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { EventsWorkspace } from "@/components/events/events-workspace"
 
 export const metadata: Metadata = {
-  title: "Events | ACOB Lighting Technology Limited",
+  title: "Events",
   description: "Plan company meetings, workshops, webinars and activities.",
 }
 

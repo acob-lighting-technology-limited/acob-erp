@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { buildAccessContextV2, canAccessRouteV2, resolveAdminRouteKeyV2 } from "@/lib/admin/policy-v2"
 
-export const metadata: Metadata = { title: "IT | ACOB Lighting Technology Limited" }
+export const metadata: Metadata = { title: "IT" }
 
 // The same five destinations as the IT group in admin-sidebar.tsx. The sidebar item points at this
 // page, so it must exist; each card is shown only if the viewer can open its target.

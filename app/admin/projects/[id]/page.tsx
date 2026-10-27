@@ -6,7 +6,7 @@ import { loadAssignableStaff } from "@/lib/projects/staff-options"
 import { ProjectDetail } from "@/components/projects/project-detail"
 
 export const metadata: Metadata = {
-  title: "Project | Matrix",
+  title: "Project",
   description: "A project's progress, plans and charts.",
 }
 

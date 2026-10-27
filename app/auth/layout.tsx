@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Authentication | ACOB Lighting Technology Limited",
+  title: "Authentication",
   description: "Sign in or create an account for ACOB Lighting Technology Limited",
 }
 

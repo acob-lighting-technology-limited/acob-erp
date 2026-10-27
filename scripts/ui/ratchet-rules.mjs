@@ -19,6 +19,8 @@ const HINTS = {
   "click-div": "A clickable <div> is not reachable by keyboard. Use <button> or <Link>.",
   "client-page": 'Make page.tsx a server component and move the interactive part into a "use client" child.',
   "page-missing-metadata": "Export `metadata` (a title) from a server page so the browser tab names the page.",
+  "title-brand-suffix":
+    "The root layout appends | Matrix to every page title. Write only the page name, e.g. title: \"Leave\".",
   "file-lines": "Do not grow a file over 1,000 lines. Extract into _components/, a hook, or lib/.",
 }
 
@@ -117,6 +119,11 @@ export const RULES = [
       if (/\bredirect\s*\(/.test(text) && text.split("\n").length < 40) return 0
       return /export\s+(?:const\s+metadata\b|(?:async\s+)?function\s+generateMetadata\b)/.test(text) ? 0 : 1
     },
+  },
+  {
+    id: "title-brand-suffix",
+    applies: (f) => f.startsWith("app/") && f !== "app/layout.tsx",
+    count: (text) => count(text, /\btitle:\s*["'`][^"'`\n]*\|\s*(?:Matrix|ACOB)[^"'`\n]*["'`]/g),
   },
   {
     id: "file-lines",

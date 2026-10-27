@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { SitesContent } from "@/components/sites/sites-content"
 
 export const metadata: Metadata = {
-  title: "Sites | Matrix",
+  title: "Sites",
   description: "Signed and profiled sites, with the standing of their conveyance documents.",
 }
 

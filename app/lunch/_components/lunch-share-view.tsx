@@ -31,7 +31,7 @@ export function lunchShareMetadata(preview: LunchSharePreview | null, path: stri
   if (!preview) {
     return {
       metadataBase: new URL(SITE_URL),
-      title: "Lunch poll | Matrix",
+      title: "Lunch poll",
       description: "Vote for your lunch on Matrix.",
       openGraph: { title: "Lunch poll | Matrix", description: "Vote for your lunch on Matrix.", siteName: "Matrix" },
     }

@@ -3,7 +3,7 @@ import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { DepartmentCascadeContent } from "@/app/admin/corporate-scorecard/_components/department-cascade-content"
 
 export const metadata: Metadata = {
-  title: "Department Scorecard | Corporate Services | Matrix",
+  title: "Department Scorecard | Corporate Services",
   description: "Departmental KPI commitments, targets, and actual progress against the strategic plan.",
 }
 

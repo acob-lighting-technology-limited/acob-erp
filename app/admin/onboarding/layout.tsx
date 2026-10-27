@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 
 export const metadata: Metadata = {
-  title: "Onboarding | ACOB Lighting Technology Limited",
+  title: "Onboarding",
   description: "Track which staff accounts have signed in and which have never been used.",
 }
 

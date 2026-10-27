@@ -9,7 +9,7 @@ import { logger } from "@/lib/logger"
 const log = logger("app-admin-projects")
 
 export const metadata: Metadata = {
-  title: "Manage Projects | Matrix",
+  title: "Manage Projects",
   description: "Create, update, and track all company projects and their tasks.",
 }
 

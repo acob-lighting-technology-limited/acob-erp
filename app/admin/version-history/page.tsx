@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RELEASES, releaseMonthLabel } from "@/lib/version-history"
 
 export const metadata: Metadata = {
-  title: "Version History | ACOB Lighting Technology Limited",
+  title: "Version History",
   description: "What changed in Matrix, month by month.",
 }
 

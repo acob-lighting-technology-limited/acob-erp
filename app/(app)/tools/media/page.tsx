@@ -8,7 +8,7 @@ import { Download, RefreshCw, Minimize2, FileText, Wrench } from "lucide-react"
 import { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Media & PDF Suite | ACOB ERP",
+  title: "Media & PDF Suite",
   description: "A comprehensive media downloading, converting, compressing, and PDF management utility suite.",
 }
 

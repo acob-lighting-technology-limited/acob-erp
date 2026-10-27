@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { requireAdminSectionAccess } from "@/lib/admin/rbac"
 
 export const metadata: Metadata = {
-  title: "DEV Control Plane | ACOB Lighting Technology Limited",
+  title: "DEV Control Plane",
   description: "Developer-only control plane.",
 }
 

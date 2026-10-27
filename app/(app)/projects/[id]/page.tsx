@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { ProjectDetail } from "@/components/projects/project-detail"
 
 export const metadata: Metadata = {
-  title: "Project | Matrix",
+  title: "Project",
   description: "A project's progress, plans and charts.",
 }
 
