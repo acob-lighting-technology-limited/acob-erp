@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DetailSheet } from "@/components/ui/detail-sheet"
+import { DetailList } from "@/components/ui/detail-list"
 import { exportPmsRowsToExcel } from "@/lib/pms/export"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
 import { apiJson } from "@/lib/api-client"
@@ -380,48 +381,32 @@ export function AdminPeerFeedbackPage({ backLinkHref }: { backLinkHref?: string 
         skeletonRows={6}
       />
 
-      <Dialog open={Boolean(selectedRow)} onOpenChange={() => setSelectedRow(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Peer Feedback Details</DialogTitle>
-            <DialogDescription>
-              {selectedRow ? `${personName(selectedRow.subject)} reviewed by ${personName(selectedRow.reviewer)}` : ""}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedRow ? (
-            <div className="grid gap-4 text-sm sm:grid-cols-2">
-              <div>
-                <p className="text-muted-foreground text-xs">Department</p>
-                <p className="mt-1">{selectedRow.subject?.department || "-"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Quarter</p>
-                <p className="mt-1">{cycleNameMap.get(selectedRow.review_cycle_id) || "-"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Collaboration</p>
-                <p className="mt-1">{formatMetric(selectedRow.collaboration)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Communication</p>
-                <p className="mt-1">{formatMetric(selectedRow.communication)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Teamwork</p>
-                <p className="mt-1">{formatMetric(selectedRow.teamwork)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Professionalism</p>
-                <p className="mt-1">{formatMetric(selectedRow.professionalism)}</p>
-              </div>
-              <div className="sm:col-span-2">
-                <p className="text-muted-foreground text-xs">Comments</p>
-                <p className="mt-1 whitespace-pre-wrap">{selectedRow.comments || "No comments provided."}</p>
-              </div>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+      <DetailSheet
+        open={Boolean(selectedRow)}
+        onOpenChange={() => setSelectedRow(null)}
+        title="Peer feedback"
+        description={
+          selectedRow ? `${personName(selectedRow.subject)} reviewed by ${personName(selectedRow.reviewer)}` : ""
+        }
+      >
+        {selectedRow ? (
+          <>
+            <DetailList
+              items={[
+                { label: "Department", value: selectedRow.subject?.department },
+                { label: "Quarter", value: cycleNameMap.get(selectedRow.review_cycle_id) },
+                { label: "Collaboration", value: formatMetric(selectedRow.collaboration) },
+                { label: "Communication", value: formatMetric(selectedRow.communication) },
+                { label: "Teamwork", value: formatMetric(selectedRow.teamwork) },
+                { label: "Professionalism", value: formatMetric(selectedRow.professionalism) },
+              ]}
+            />
+            <DetailList
+              items={[{ label: "Comments", value: selectedRow.comments || "No comments provided.", wide: true }]}
+            />
+          </>
+        ) : null}
+      </DetailSheet>
     </DataTablePage>
   )
 }

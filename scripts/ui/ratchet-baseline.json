@@ -104,7 +104,6 @@
       "app/admin/pms/competencies/view.tsx": 2,
       "app/admin/pms/cycles/view.tsx": 1,
       "app/admin/pms/development-plans/view.tsx": 3,
-      "app/admin/pms/peer-feedback/view.tsx": 1,
       "app/admin/reports/action-tracker/action-tracker-content.tsx": 1,
       "app/admin/tasks/management/admin-tasks-content.tsx": 1
     },
