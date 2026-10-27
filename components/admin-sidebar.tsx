@@ -35,9 +35,6 @@ import {
   TrendingUp,
 } from "lucide-react"
 import { useState, useEffect, useMemo } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { useSidebar } from "@/components/sidebar-context"
 import {
   AlertDialog,
@@ -70,6 +67,7 @@ import {
 } from "@/lib/admin/policy-v2"
 import { useDepartmentCode } from "@/hooks/use-department-code"
 
+import { useLogout } from "@/hooks/use-logout"
 interface AdminSidebarProps {
   user?: {
     email?: string
@@ -565,14 +563,12 @@ export function AdminSidebar({
   showMdDesk = false,
 }: AdminSidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
   const { data: pendingRsvps } = usePendingRsvpCount()
-  const supabase = createClient()
 
   // Listen for toggle event from navbar
   useEffect(() => {
@@ -639,11 +635,7 @@ export function AdminSidebar({
     }
   }, [pathname, deptId])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    toast.success("Logged out successfully")
-    router.push("/auth/login")
-  }
+  const handleLogout = useLogout()
 
   const adminRoutes = useMemo(() => normalizeAdminRoutes(profile?.admin_routes), [profile?.admin_routes])
   const accessContext = useMemo<AccessContextV2 | null>(() => {

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import {
@@ -26,10 +26,8 @@ import {
   Layers,
 } from "lucide-react"
 
-import { toast } from "sonner"
 import { cn, formatName, getInitials } from "@/lib/utils"
 import { isActiveChild } from "@/lib/navigation/active-child"
-import { createClient } from "@/lib/supabase/client"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
@@ -56,6 +54,7 @@ import { useCalendarBadgeCount } from "@/components/events/use-events"
 import { useSidebar } from "./sidebar-context"
 import { useDepartmentCode } from "@/hooks/use-department-code"
 
+import { useLogout } from "@/hooks/use-logout"
 interface SidebarProps {
   user?: {
     email?: string
@@ -233,7 +232,6 @@ const NAV_ROUTE_ALIASES: RouteAliases = {}
 
 export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const departmentCode = useDepartmentCode(profile?.department)
@@ -300,12 +298,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
     }
   }, [pathname])
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    toast.success("Logged out successfully")
-    router.push("/auth/login")
-  }
+  const handleLogout = useLogout()
 
   const isLead = Boolean(
     profile?.is_department_lead || (profile?.lead_departments && profile.lead_departments.length > 0)

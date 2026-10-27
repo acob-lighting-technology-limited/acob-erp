@@ -10,6 +10,7 @@ import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { useLogout } from "@/hooks/use-logout"
 const REASON_LABELS: Record<string, string> = {
   temporary_access_hold: "Temporary Access Hold",
   policy_review: "Policy Review",
@@ -101,10 +102,7 @@ export default function SuspendedPage() {
     router.push("/profile")
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push("/auth/login")
-  }
+  const handleLogout = useLogout()
 
   const suspension = suspensionData ?? null
   const userName = suspensionData?.userName ?? ""
