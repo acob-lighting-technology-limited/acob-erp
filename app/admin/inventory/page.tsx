@@ -12,8 +12,9 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import { IconFill } from "@/components/ui/icon-fill"
 import { formatCurrency } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 async function fetchInventoryStats(): Promise<InventoryStats> {
-  const res = await fetch("/api/admin/inventory/stats", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/inventory/stats", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load inventory stats")
   return res.json()
 }

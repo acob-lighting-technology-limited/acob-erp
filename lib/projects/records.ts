@@ -7,6 +7,7 @@
 import { computeProjectHealth, type ProjectHealth, type ProjectHealthTask } from "@/lib/projects/health"
 import type { ChartProject } from "@/lib/projects/charts"
 
+import { apiFetch } from "@/lib/api-client"
 export type ProjectRecord = {
   id: string
   project_name: string
@@ -39,7 +40,7 @@ export type ProjectRecord = {
 export const PROJECTS_QUERY_KEY = ["projects"] as const
 
 export async function fetchProjectRecords(): Promise<ProjectRecord[]> {
-  const res = await fetch("/api/projects", { cache: "no-store" })
+  const res = await apiFetch("/api/projects", { cache: "no-store" })
   const payload = await res.json()
   if (!res.ok) throw new Error(payload?.error || `Failed to load projects (${res.status})`)
   return (payload?.data || []) as ProjectRecord[]

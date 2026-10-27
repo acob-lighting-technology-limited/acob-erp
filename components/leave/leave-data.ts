@@ -12,6 +12,7 @@ import {
 } from "@/lib/hr/leave-days"
 import { logger } from "@/lib/logger"
 
+import { apiFetch } from "@/lib/api-client"
 const log = logger("components-leave-leave-data")
 
 export type LeaveDepartmentBookedDate = {
@@ -78,11 +79,11 @@ export type LeaveReviewHistoryItem = {
 
 export async function fetchLeaveData(currentUserId: string) {
   const [requestRes, queueRes, typesRes, relieversRes, calendarRes] = await Promise.all([
-    fetch("/api/hr/leave/requests?limit=100").catch(() => null),
-    fetch("/api/hr/leave/queue").catch(() => null),
-    fetch("/api/hr/leave/types").catch(() => null),
-    fetch("/api/hr/leave/relievers").catch(() => null),
-    fetch("/api/hr/leave/calendar").catch(() => null),
+    apiFetch("/api/hr/leave/requests?limit=100").catch(() => null),
+    apiFetch("/api/hr/leave/queue").catch(() => null),
+    apiFetch("/api/hr/leave/types").catch(() => null),
+    apiFetch("/api/hr/leave/relievers").catch(() => null),
+    apiFetch("/api/hr/leave/calendar").catch(() => null),
   ])
 
   const parseJson = async (res: Response | null): Promise<LeaveApiPayload> => (res ? res.json().catch(() => ({})) : {})

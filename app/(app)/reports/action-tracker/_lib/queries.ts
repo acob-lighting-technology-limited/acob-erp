@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client"
 
+import { apiFetch } from "@/lib/api-client"
 export interface ActionTask {
   id: string
   title: string
@@ -73,7 +74,7 @@ export async function fetchActionTrackerTasks(
   deptFilter: string
 ): Promise<ActionTrackerTasksResult> {
   const params = new URLSearchParams({ week: String(week), year: String(year), dept: deptFilter })
-  const response = await fetch(`/api/reports/action-tracker?${params.toString()}`, { cache: "no-store" })
+  const response = await apiFetch(`/api/reports/action-tracker?${params.toString()}`, { cache: "no-store" })
   const payload = (await response.json().catch(() => null)) as { data?: ActionTask[]; error?: string } | null
   if (!response.ok) throw new Error(payload?.error || "Failed to fetch action items")
   return { tasks: payload?.data || [] }

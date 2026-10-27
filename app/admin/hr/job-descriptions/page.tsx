@@ -14,6 +14,7 @@ import { Briefcase, User, CheckCircle, XCircle, Eye, Building2, UserCircle2 } fr
 import type { UserRole } from "@/types/database"
 import { JobDescriptionDialog } from "./_components/job-description-dialog"
 
+import { apiFetch } from "@/lib/api-client"
 interface Profile {
   id: string
   first_name: string
@@ -40,7 +41,7 @@ interface JobDescriptionsData {
 }
 
 async function fetchJobDescriptionsData(): Promise<JobDescriptionsData> {
-  const res = await fetch("/api/admin/job-descriptions", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/job-descriptions", { cache: "no-store" })
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) return { profiles: [], userProfile: null }
     throw new Error((await res.json().catch(() => null))?.error || "Failed to load job descriptions")

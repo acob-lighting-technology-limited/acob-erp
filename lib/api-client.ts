@@ -1,5 +1,6 @@
-"use client"
-
+// Plain module on purpose, not "use client": it has no React in it and guards every browser global,
+// and lib code that is shared with route handlers imports it. Calling it on the server just sends a
+// plain fetch.
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
 /**

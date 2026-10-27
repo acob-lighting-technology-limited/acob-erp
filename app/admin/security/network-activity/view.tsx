@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNumber } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface ArchivedDay {
   date: string
   files: number
@@ -42,14 +43,14 @@ function formatDay(date: string): string {
 }
 
 async function fetchArchive(): Promise<ArchiveResponse> {
-  const res = await fetch("/api/admin/security/network-activity", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/security/network-activity", { cache: "no-store" })
   const body = await res.json().catch(() => null)
   if (!res.ok) throw new Error(body?.error ?? "Failed to load the network log archive")
   return body.data as ArchiveResponse
 }
 
 async function downloadDay(date: string) {
-  const res = await fetch(`/api/admin/security/network-activity/download?date=${date}`, { cache: "no-store" })
+  const res = await apiFetch(`/api/admin/security/network-activity/download?date=${date}`, { cache: "no-store" })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
     throw new Error(body?.error ?? "Download failed")

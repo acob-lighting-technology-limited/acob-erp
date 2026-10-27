@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/patterns"
 import { Badge } from "@/components/ui/badge"
 import { formatCurrency } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface FinancePaymentRow {
   id: string
   title: string
@@ -38,7 +39,7 @@ interface FinanceReportData {
 async function fetchFinanceReportData(): Promise<FinanceReportData> {
   // Department scoping is resolved server-side from the caller's admin/dept scope
   // (getScopedDepartments) — no client-side lock parameter needed.
-  const res = await fetch("/api/admin/finance/reports", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/finance/reports", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load finance reports")
   const json = await res.json()
   const rows = (json.data || []) as FinanceReportData["rows"]

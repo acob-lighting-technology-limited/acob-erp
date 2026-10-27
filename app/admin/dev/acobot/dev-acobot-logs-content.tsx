@@ -11,6 +11,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Bot, Database, Download, Globe, MessageSquare, RefreshCw, Users } from "lucide-react"
 
+import { apiFetch } from "@/lib/api-client"
 type AcobotSource = "erp" | "website"
 
 type AcobotLogRow = {
@@ -59,7 +60,7 @@ function toCsv(rows: AcobotLogRow[]) {
 }
 
 async function fetchAcobotLogs(source: AcobotSource): Promise<AcobotLogRow[]> {
-  const response = await fetch(`/api/admin/dev/acobot?source=${source}`, {
+  const response = await apiFetch(`/api/admin/dev/acobot?source=${source}`, {
     method: "GET",
     credentials: "include",
     cache: "no-store",

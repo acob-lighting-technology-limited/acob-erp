@@ -4,12 +4,13 @@ import { useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 
+import { apiFetch } from "@/lib/api-client"
 type StaffAvatarMap = Record<string, string>
 
 const EMPTY: StaffAvatarMap = {}
 
 async function fetchStaffAvatars(): Promise<StaffAvatarMap> {
-  const response = await fetch("/api/staff/avatars", { credentials: "same-origin" })
+  const response = await apiFetch("/api/staff/avatars", { credentials: "same-origin" })
   if (!response.ok) throw new Error("Failed to load staff avatars")
   const payload = (await response.json()) as { data?: StaffAvatarMap }
   return payload.data ?? EMPTY

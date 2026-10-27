@@ -38,7 +38,7 @@ export function usePaymentProcessorsTab(): ExtraTab {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/requisitions/payment-processors")
+      const res = await apiFetch("/api/requisitions/payment-processors")
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "Failed to load payment processors")
       setRows(json.data || [])

@@ -11,6 +11,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { formatDate } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface StockMovement {
   id: string
   product_id: string
@@ -40,7 +41,7 @@ const typeIcons = {
 } satisfies Record<StockMovement["movement_type"], typeof ArrowUpDown>
 
 async function fetchMovementsList(): Promise<StockMovement[]> {
-  const res = await fetch("/api/admin/inventory/movements", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/inventory/movements", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load movements")
   const json = await res.json()
   return (json.data || []) as StockMovement[]

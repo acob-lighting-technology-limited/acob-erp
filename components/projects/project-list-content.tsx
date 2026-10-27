@@ -72,6 +72,7 @@ import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import { PROJECTS_QUERY_KEY } from "@/lib/projects/records"
 import { ProjectDialogs } from "@/app/admin/projects/_components/project-dialogs"
 
+import { apiFetch } from "@/lib/api-client"
 // Define user-facing project type (includes tasks count payload)
 export interface ProjectRow {
   id: string
@@ -117,7 +118,7 @@ export interface ProjectContentProps {
 }
 
 async function fetchUserProjects(): Promise<ProjectRow[]> {
-  const res = await fetch("/api/projects", { cache: "no-store" })
+  const res = await apiFetch("/api/projects", { cache: "no-store" })
   const payload = await res.json()
   if (!res.ok) {
     throw new Error(payload?.error || `Failed to load projects (${res.status})`)

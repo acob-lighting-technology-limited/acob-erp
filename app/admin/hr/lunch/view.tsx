@@ -315,7 +315,7 @@ export function LunchRegisterPage({
   const loadDateLogs = useCallback(async (date: string) => {
     setFetchingLogs(true)
     try {
-      const res = await fetch(`/api/admin/hr/lunch?date=${date}`)
+      const res = await apiFetch(`/api/admin/hr/lunch?date=${date}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load logs")
 
@@ -350,7 +350,7 @@ export function LunchRegisterPage({
     async function loadMonthlyData() {
       setFetchingSummary(true)
       try {
-        const res = await fetch(`/api/admin/hr/lunch?month=${selectedMonth}`)
+        const res = await apiFetch(`/api/admin/hr/lunch?month=${selectedMonth}`)
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Failed to load monthly summary")
 
@@ -391,7 +391,7 @@ export function LunchRegisterPage({
           url += "?all_time=true"
         }
 
-        const res = await fetch(url)
+        const res = await apiFetch(url)
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Failed to load leaderboard data")
 
@@ -411,7 +411,7 @@ export function LunchRegisterPage({
     setFetchingMenus(true)
     setMenusError(null)
     try {
-      const res = await fetch("/api/admin/hr/lunch/menus")
+      const res = await apiFetch("/api/admin/hr/lunch/menus")
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load menus")
       const loaded = (data.menus || []) as AdminLunchMenu[]

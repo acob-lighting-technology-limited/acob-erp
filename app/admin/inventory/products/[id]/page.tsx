@@ -14,6 +14,7 @@ import { PageLoader } from "@/components/ui/query-states"
 import { ProductFormDialog } from "../_components/product-form-dialog"
 import { formatCurrency } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface Product {
   id: string
   sku: string
@@ -30,7 +31,7 @@ interface Product {
 }
 
 async function fetchProduct(id: string): Promise<Product> {
-  const res = await fetch(`/api/admin/inventory/products/${id}`, { cache: "no-store" })
+  const res = await apiFetch(`/api/admin/inventory/products/${id}`, { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load product")
   const json = await res.json()
   return json.data as Product

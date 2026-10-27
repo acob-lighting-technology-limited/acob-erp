@@ -15,10 +15,11 @@ import type { EmployeeDetailData } from "@/components/employees/employee-detail-
 
 import { logger } from "@/lib/logger"
 
+import { apiFetch } from "@/lib/api-client"
 const log = logger("hr-employees-[userId]")
 
 async function fetchEmployeeDetail(userId: string): Promise<EmployeeDetailData> {
-  const res = await fetch(`/api/admin/hr/employees/${userId}`, { cache: "no-store" })
+  const res = await apiFetch(`/api/admin/hr/employees/${userId}`, { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Employee not found")
   const json = await res.json()
   return json.data as EmployeeDetailData

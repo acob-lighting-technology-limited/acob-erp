@@ -14,6 +14,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { PurchaseOrderFormDialog } from "./_components/purchase-order-form-dialog"
 import { formatCurrency, formatDate } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface PurchaseOrder {
   id: string
   po_number: string
@@ -38,7 +39,7 @@ const statusColors: Record<PurchaseOrder["status"], BadgeVariant> = {
 }
 
 async function fetchPurchaseOrdersList(): Promise<PurchaseOrder[]> {
-  const res = await fetch("/api/admin/purchasing/orders", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/purchasing/orders", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load purchase orders")
   const json = await res.json()
   return (json.data || []) as PurchaseOrder[]

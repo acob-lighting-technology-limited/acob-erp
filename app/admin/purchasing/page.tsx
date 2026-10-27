@@ -11,6 +11,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { formatCurrency } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface PurchasingStats {
   totalSuppliers: number
   activeOrders: number
@@ -19,7 +20,7 @@ interface PurchasingStats {
 }
 
 async function fetchPurchasingStats(): Promise<PurchasingStats> {
-  const res = await fetch("/api/admin/purchasing/stats", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/purchasing/stats", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load purchasing stats")
   return res.json()
 }

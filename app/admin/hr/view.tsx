@@ -24,6 +24,7 @@ import { IconFill } from "@/components/ui/icon-fill"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useAdminScope } from "@/components/admin-scope-context"
 
+import { apiFetch } from "@/lib/api-client"
 interface DashboardStats {
   pendingLeaveRequests: number
   todayAttendance: number
@@ -44,7 +45,7 @@ interface HRAdminDashboardProps {
 async function fetchHrDashboardStats(): Promise<DashboardStats> {
   // Department scoping is resolved server-side via getScopedDepartments() —
   // no client-side scope derivation needed.
-  const res = await fetch("/api/admin/hr/dashboard-stats", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/hr/dashboard-stats", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load HR dashboard stats")
   return res.json()
 }

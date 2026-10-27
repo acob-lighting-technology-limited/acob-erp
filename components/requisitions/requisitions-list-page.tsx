@@ -46,6 +46,7 @@ import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeVariant } from "./requisition-detail"
 import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
 
+import { apiFetch } from "@/lib/api-client"
 export type RequisitionsSurface = "staff" | "admin" | "dept"
 
 type View = "mine" | "action" | "payment" | "all" | "department"
@@ -133,7 +134,7 @@ export function RequisitionsListPage({
     try {
       const params = new URLSearchParams({ view })
       if (view === "department" && deptName) params.set("department", deptName)
-      const res = await fetch(`/api/requisitions?${params}`)
+      const res = await apiFetch(`/api/requisitions?${params}`)
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(json?.error || "Could not load requisitions")
       setRows(json.data || [])

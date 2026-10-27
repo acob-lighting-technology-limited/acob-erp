@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input"
 import { apiJson } from "@/lib/api-client"
 import { formatNumber } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 type DevLoginLogRow = {
   id: string
   user_id: string | null
@@ -75,7 +76,7 @@ type DevLoginLogsPayload = {
 }
 
 async function fetchDevLoginLogs(days: string): Promise<DevLoginLogsPayload> {
-  const response = await fetch(`/api/admin/dev/login-logs?days=${days}`, {
+  const response = await apiFetch(`/api/admin/dev/login-logs?days=${days}`, {
     method: "GET",
     credentials: "include",
     cache: "no-store",
@@ -92,7 +93,7 @@ async function fetchDevLoginLogs(days: string): Promise<DevLoginLogsPayload> {
 
 async function fetchDashboardAuditLogs(department: string, userId: string | null): Promise<any[]> {
   const url = `/api/admin/dev/login-logs?type=dashboard-audit&department=${department}&user_id=${userId || "all"}`
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method: "GET",
     credentials: "include",
     cache: "no-store",

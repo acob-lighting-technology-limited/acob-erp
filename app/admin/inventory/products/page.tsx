@@ -15,6 +15,7 @@ import type { BadgeProps } from "@/components/ui/badge"
 import { ProductFormDialog } from "./_components/product-form-dialog"
 import { formatCurrency } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface Product {
   id: string
   sku: string
@@ -37,7 +38,7 @@ const statusColors: Record<Product["status"], BadgeProps["variant"]> = {
 }
 
 async function fetchProductsList(): Promise<Product[]> {
-  const res = await fetch("/api/admin/inventory/products", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/inventory/products", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load products")
   const json = await res.json()
   return (json.data || []) as Product[]

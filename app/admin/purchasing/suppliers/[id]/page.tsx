@@ -17,6 +17,7 @@ import { PageLoader } from "@/components/ui/query-states"
 import { SupplierFormDialog } from "../_components/supplier-form-dialog"
 import { formatCurrency, formatDate } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface Supplier {
   id: string
   name: string
@@ -43,7 +44,7 @@ interface SupplierPageData {
 }
 
 async function fetchSupplierDetail(id: string): Promise<SupplierPageData> {
-  const res = await fetch(`/api/admin/purchasing/suppliers/${id}`, { cache: "no-store" })
+  const res = await apiFetch(`/api/admin/purchasing/suppliers/${id}`, { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Supplier not found")
   const json = await res.json()
   return json.data as SupplierPageData

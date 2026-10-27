@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-client"
 /**
  * Browser-side Web Push helpers.
  *
@@ -103,7 +104,7 @@ export async function subscribeToPush(vapidPublicKey: string): Promise<PushSubsc
       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
     }))
 
-  const response = await fetch("/api/push/subscribe", {
+  const response = await apiFetch("/api/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ subscription: subscription.toJSON() }),
@@ -122,7 +123,7 @@ export async function unsubscribeFromPush(): Promise<void> {
   const subscription = await getExistingSubscription()
   if (!subscription) return
 
-  await fetch("/api/push/unsubscribe", {
+  await apiFetch("/api/push/unsubscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint: subscription.endpoint }),

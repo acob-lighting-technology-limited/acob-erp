@@ -27,6 +27,7 @@ import {
   UserX,
 } from "lucide-react"
 
+import { apiFetch } from "@/lib/api-client"
 export interface OnboardingRow {
   id: string
   employee_number: string | null
@@ -80,7 +81,7 @@ interface OnboardingPayload {
 }
 
 async function fetchOnboarding(): Promise<OnboardingPayload> {
-  const response = await fetch("/api/admin/onboarding", {
+  const response = await apiFetch("/api/admin/onboarding", {
     method: "GET",
     credentials: "include",
     cache: "no-store",

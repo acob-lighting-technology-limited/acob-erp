@@ -11,6 +11,7 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { formatDate } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 interface Receipt {
   id: string
   receipt_number: string
@@ -22,7 +23,7 @@ interface Receipt {
 }
 
 async function fetchReceipts(): Promise<Receipt[]> {
-  const res = await fetch("/api/admin/purchasing/receipts", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/purchasing/receipts", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load receipts")
   const json = await res.json()
   return (json.data || []) as Receipt[]

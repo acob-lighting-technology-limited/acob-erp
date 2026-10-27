@@ -191,7 +191,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch(`/api/admin/payroll/run?payroll_period_id=${period.id}`)
+        const res = await apiFetch(`/api/admin/payroll/run?payroll_period_id=${period.id}`)
         const payload = await res.json()
         if (!res.ok) throw new Error(payload.error || "Failed to load worksheet")
         setRows(payload.data || [])

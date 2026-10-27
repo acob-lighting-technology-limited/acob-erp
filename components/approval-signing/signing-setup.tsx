@@ -376,7 +376,7 @@ export function SigningSetup() {
 
   useEffect(() => {
     let active = true
-    fetch("/api/profile/signing")
+    apiFetch("/api/profile/signing")
       .then(async (res) => {
         if (!res.ok) throw new Error(await readError(res, "Could not load your signing setup"))
         return res.json()

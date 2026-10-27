@@ -156,7 +156,7 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
   const load = useCallback(async () => {
     setError(null)
     try {
-      const res = await fetch(`/api/requisitions/${id}`)
+      const res = await apiFetch(`/api/requisitions/${id}`)
       const json = await res.json().catch(() => null)
       if (!res.ok) throw new Error(json?.error || "Could not load this requisition")
       setRequisition(json.data)

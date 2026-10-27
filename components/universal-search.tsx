@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useRouter, usePathname } from "next/navigation"
 
+import { apiFetch } from "@/lib/api-client"
 type SearchType =
   | "profile"
   | "device"
@@ -88,7 +89,7 @@ const typeLabels: Record<SearchType, string> = {
 async function performSearch(q: string, deptId?: string): Promise<SearchResult[]> {
   const params = new URLSearchParams({ q })
   if (deptId) params.set("dept", deptId)
-  const response = await fetch(`/api/search?${params.toString()}`)
+  const response = await apiFetch(`/api/search?${params.toString()}`)
   if (!response.ok) throw new Error("Search failed")
   const data = await response.json()
   return data.results || []

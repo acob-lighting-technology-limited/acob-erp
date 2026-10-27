@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { EmployeeRecipientPicker, type DirectoryEmployee } from "@/components/admin/employee-recipient-picker"
 import { formatDate } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 export type MeetingSource = {
   id: string
   label: string
@@ -96,7 +97,7 @@ export function MeetingSourceDialog({ open, onOpenChange, editing, onSaved }: Pr
     queryKey: ["meeting-artifact-calendar", organizerToLoad],
     enabled: Boolean(organizerToLoad),
     queryFn: async (): Promise<CalendarMeeting[]> => {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/reports/meeting-artifacts/calendar?organizer=${encodeURIComponent(organizerToLoad)}`
       )
       const payload = await res.json()
@@ -111,7 +112,7 @@ export function MeetingSourceDialog({ open, onOpenChange, editing, onSaved }: Pr
       const body = editing
         ? { id: editing.id, label, joinWebUrl, organizerEmail, recipients, emailEnabled, isActive }
         : { label, joinWebUrl, organizerEmail, recipients, emailEnabled, isActive }
-      const res = await fetch("/api/reports/meeting-artifacts/sources", {
+      const res = await apiFetch("/api/reports/meeting-artifacts/sources", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

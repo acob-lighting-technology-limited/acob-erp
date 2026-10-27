@@ -14,6 +14,7 @@ import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-tabl
 import { InvoiceFormDialog } from "./_components/invoice-form-dialog"
 import { formatCurrency, formatDate } from "@/lib/format"
 
+import { apiFetch } from "@/lib/api-client"
 export interface Invoice {
   id: string
   invoice_number: string
@@ -40,7 +41,7 @@ const statusColors: Record<Invoice["status"], InvoiceStatusVariant> = {
 }
 
 async function fetchInvoicesList(): Promise<Invoice[]> {
-  const res = await fetch("/api/admin/finance/invoices", { cache: "no-store" })
+  const res = await apiFetch("/api/admin/finance/invoices", { cache: "no-store" })
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load invoices")
   const json = await res.json()
   return (json.data || []) as Invoice[]

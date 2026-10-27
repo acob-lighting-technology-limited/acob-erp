@@ -189,7 +189,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
   const selectDay = useCallback(async (date: string) => {
     setLoadingDay(true)
     try {
-      const res = await fetch(`/api/hr/lunch?date=${date}`)
+      const res = await apiFetch(`/api/hr/lunch?date=${date}`)
       const payload = await res.json()
       if (!res.ok) throw new Error(payload.error || "Failed to load that day's menu")
       setData(payload as LunchPollData)
