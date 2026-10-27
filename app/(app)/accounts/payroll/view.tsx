@@ -240,11 +240,11 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
             </div>
             <div className="grid grid-cols-2 gap-1.5 text-xs">
               <div>
-                <p className="text-muted-foreground text-[10px] font-medium uppercase">Gross</p>
+                <p className="text-muted-foreground text-xs font-medium uppercase">Gross</p>
                 <p className="font-medium">{fmt(Number(e.gross_salary) + Number(e.bonus))}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-[10px] font-medium uppercase">Deductions</p>
+                <p className="text-muted-foreground text-xs font-medium uppercase">Deductions</p>
                 <p className="font-medium">{fmtEntry(e.total_deductions)}</p>
               </div>
             </div>
@@ -279,57 +279,57 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
                     className="object-contain"
                     unoptimized
                   />
-                  <p className="mt-1.5 text-[10px] text-gray-500">
+                  <p className="mt-1.5 text-xs text-gray-500">
                     Plot 2. Block 14 Extension, Federal Ministry of Works And Housing Sites and Services Scheme, Setraco
                     Gate, Gwarinpa, FCT, Nigeria.
                   </p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     Email: info@acoblighting.com &nbsp;|&nbsp; Web: www.acoblighting.com
                   </p>
                 </div>
                 <div className="min-w-[130px] text-right">
                   <p className="text-xs font-bold text-emerald-700 uppercase">Payslip</p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     Period:{" "}
                     <span className="font-semibold whitespace-nowrap text-gray-700">
                       {selectedEntry.payroll_periods?.name}
                     </span>
                   </p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-gray-500">
                     Pay Date:{" "}
                     <span className="font-semibold whitespace-nowrap text-gray-700">
                       {selectedEntry.payroll_periods?.pay_date}
                     </span>
                   </p>
-                  <p className="mt-1 text-[10px] font-bold text-emerald-600 uppercase">● Paid</p>
+                  <p className="mt-1 text-xs font-bold text-emerald-600 uppercase">● Paid</p>
                 </div>
               </div>
 
               {/* Employee Info */}
-              <div className="grid grid-cols-2 gap-3 rounded border border-gray-100 bg-gray-50 px-4 py-2.5 text-[11px]">
+              <div className="grid grid-cols-2 gap-3 rounded border border-gray-100 bg-gray-50 px-4 py-2.5 text-xs">
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Employee Name</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Employee Name</p>
                   <p className="font-semibold text-gray-800">{profile?.full_name}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Staff ID</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Staff ID</p>
                   <p className="font-mono font-semibold text-gray-800">{profile?.employee_number}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Department</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Department</p>
                   <p className="font-semibold text-gray-800">{profile?.department || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[9px] tracking-wide text-gray-400 uppercase">Designation</p>
+                  <p className="text-xs tracking-wide text-gray-400 uppercase">Designation</p>
                   <p className="font-semibold text-gray-800">{profile?.designation || "—"}</p>
                 </div>
               </div>
 
               {/* Earnings & Deductions */}
-              <div className="grid grid-cols-2 gap-4 text-[11px]">
+              <div className="grid grid-cols-2 gap-4 text-xs">
                 {/* Earnings */}
                 <div>
-                  <h3 className="mb-1.5 border-b border-emerald-200 pb-1 text-[9px] font-bold tracking-widest text-emerald-700 uppercase">
+                  <h3 className="mb-1.5 border-b border-emerald-200 pb-1 text-xs font-bold tracking-widest text-emerald-700 uppercase">
                     Earnings
                   </h3>
                   <table className="w-full">
@@ -369,7 +369,7 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
 
                 {/* Deductions */}
                 <div>
-                  <h3 className="mb-1.5 border-b border-red-200 pb-1 text-[9px] font-bold tracking-widest text-red-600 uppercase">
+                  <h3 className="mb-1.5 border-b border-red-200 pb-1 text-xs font-bold tracking-widest text-red-600 uppercase">
                     Deductions
                   </h3>
                   <table className="w-full">
@@ -420,9 +420,9 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
               </div>
 
               {/* Signature Lines */}
-              <div className="flex items-end justify-between pt-6 text-[10px] text-gray-400">
+              <div className="flex items-end justify-between pt-6 text-xs text-gray-400">
                 <div className="w-36 border-t border-gray-300 pt-1 text-center">Employee Signature</div>
-                <div className="text-center text-[9px] text-gray-300">
+                <div className="text-center text-xs text-gray-300">
                   This payslip is computer-generated and valid without a signature.
                 </div>
                 <div className="w-36 border-t border-gray-300 pt-1 text-center">Authorised Signatory</div>

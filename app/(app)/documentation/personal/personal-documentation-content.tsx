@@ -486,7 +486,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
               <h4 className="line-clamp-1 text-sm font-semibold">{doc.title}</h4>
               <Badge className={getStatusColor(doc.is_draft)}>{doc.is_draft ? "Draft" : "Published"}</Badge>
             </div>
-            <p className="text-muted-foreground text-[11px]">{doc.category || "-"}</p>
+            <p className="text-muted-foreground text-xs">{doc.category || "-"}</p>
             <p className="text-muted-foreground mt-2 line-clamp-3 text-xs">{doc.content}</p>
           </div>
         )}

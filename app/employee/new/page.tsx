@@ -356,7 +356,7 @@ export default function EmployeeOnboardingForm() {
                         <strong className="text-foreground font-mono font-semibold">{companyEmail}</strong>
                       </span>
                     </div>
-                    <span className="text-muted-foreground/80 text-[11px] sm:text-right">
+                    <span className="text-muted-foreground/80 text-xs sm:text-right">
                       Format: [Surname initial].[First name]@org.acoblighting.com
                     </span>
                   </div>

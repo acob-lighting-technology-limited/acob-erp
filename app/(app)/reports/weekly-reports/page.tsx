@@ -406,7 +406,7 @@ export default function WeeklyReportsPortal() {
           return (
             <div className="flex flex-col">
               <span>{created}</span>
-              {wasEdited ? <span className="text-muted-foreground text-[11px]">(edited)</span> : null}
+              {wasEdited ? <span className="text-muted-foreground text-xs">(edited)</span> : null}
             </div>
           )
         },
@@ -643,7 +643,7 @@ export default function WeeklyReportsPortal() {
           render: (report) => (
             <div className="grid gap-6 md:grid-cols-3">
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
+                <h4 className="text-xs font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
                 <div className="space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm dark:border-blue-900/30">
                   {autoNumberLines(report.work_done)
                     .split("\n")
@@ -653,9 +653,7 @@ export default function WeeklyReportsPortal() {
                 </div>
               </div>
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">
-                  Tasks for New Week
-                </h4>
+                <h4 className="text-xs font-black tracking-widest text-emerald-600 uppercase">Tasks for New Week</h4>
                 <div className="space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm dark:border-emerald-900/30">
                   {autoNumberLines(report.tasks_new_week)
                     .split("\n")
@@ -665,7 +663,7 @@ export default function WeeklyReportsPortal() {
                 </div>
               </div>
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
+                <h4 className="text-xs font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
                 <div className="space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm dark:border-rose-900/30">
                   {autoNumberLines(report.challenges)
                     .split("\n")
@@ -737,11 +735,11 @@ export default function WeeklyReportsPortal() {
             return (
               <>
                 {formattedMeeting && (
-                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium">
+                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium">
                     📅 {formattedMeeting}
                   </span>
                 )}
-                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs">
                   🕒 {formatWATTimeDate(report.created_at)}
                 </span>
               </>

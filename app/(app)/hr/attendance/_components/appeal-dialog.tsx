@@ -355,9 +355,7 @@ export function AppealDialog({
                       disabled={submitting}
                       className="resize-none text-xs"
                     />
-                    <p className="text-muted-foreground text-[11px]">
-                      {oosReason.trim().length} / 10 minimum characters
-                    </p>
+                    <p className="text-muted-foreground text-xs">{oosReason.trim().length} / 10 minimum characters</p>
                   </div>
                 )}
               </div>
@@ -393,7 +391,7 @@ export function AppealDialog({
                             disabled={submitting}
                             className="resize-none text-xs"
                           />
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-xs">
                             {lwpReason.trim().length} / 10 minimum characters
                           </p>
                         </div>
@@ -430,7 +428,7 @@ export function AppealDialog({
                             disabled={submitting}
                             className="resize-none text-xs"
                           />
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-xs">
                             {iwpReason.trim().length} / 10 minimum characters
                           </p>
                         </div>

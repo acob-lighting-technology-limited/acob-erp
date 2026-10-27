@@ -287,7 +287,7 @@ function CheckInContent() {
                     />
                     <QrCode className="text-muted-foreground/60 pointer-events-none absolute top-3.5 right-3.5 h-5 w-5" />
                   </div>
-                  <p className="text-muted-foreground text-center text-[11px]">
+                  <p className="text-muted-foreground text-center text-xs">
                     Shown on the printed sheet or QR poster in the conference room.
                   </p>
                 </div>
@@ -304,7 +304,7 @@ function CheckInContent() {
                       <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                       <span>No Office Clock-In Recorded Today</span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-amber-700/90 dark:text-amber-300/90">
+                    <p className="text-xs leading-relaxed text-amber-700/90 dark:text-amber-300/90">
                       You haven&apos;t clocked in at the front entrance biometric machine yet today. If you just punched
                       seconds ago, please wait 30 seconds for device sync.
                     </p>
@@ -315,7 +315,7 @@ function CheckInContent() {
                       <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       <span>Office Entrance Punch Verified</span>
                     </div>
-                    <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90">
+                    <p className="text-xs text-emerald-700/90 dark:text-emerald-300/90">
                       Punched in at {formatClockTime(userStatus.officeClockIn)} (
                       {userStatus.officeClockInSource || "Biometric"}).
                     </p>
@@ -404,7 +404,7 @@ function CheckInContent() {
             </div>
 
             {sessionData?.holidayInfo?.isMondayHoliday && (
-              <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-900 dark:text-amber-200">
+              <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
                 <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>Public Holiday Notice</span>
@@ -437,7 +437,7 @@ function CheckInContent() {
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Front Entrance Biometric Punch</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   Clock in at the main office entrance machine first. Attendance records require an active morning
                   biometric punch.
                 </p>
@@ -450,7 +450,7 @@ function CheckInContent() {
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Room Poster or 6-Digit Code</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   Scan the sign-in poster QR code with your phone camera or enter the 6-digit code shown on the
                   conference room sheet.
                 </p>
@@ -463,7 +463,7 @@ function CheckInContent() {
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Automated Anti-Proxy Verification</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   The system verifies that you are physically in the building before recording your attendance for the
                   session.
                 </p>
@@ -476,7 +476,7 @@ function CheckInContent() {
               </div>
               <div className="space-y-0.5">
                 <p className="text-foreground font-semibold">Virtual / Off-Site Attendance</p>
-                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   Colleagues joining remotely or from branch offices are marked present by the session coordinator.
                 </p>
               </div>

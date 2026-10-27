@@ -355,7 +355,7 @@ export function FleetContent() {
               ? "destructive"
               : "outline"
       }
-      className="text-[10px] whitespace-nowrap capitalize"
+      className="text-xs whitespace-nowrap capitalize"
     >
       {row.status}
     </Badge>
@@ -631,7 +631,7 @@ export function FleetContent() {
             <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">
                     Booking Reason / Purpose
                   </span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">
@@ -639,7 +639,7 @@ export function FleetContent() {
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">
                     Admin Decision Note
                   </span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">
@@ -650,7 +650,7 @@ export function FleetContent() {
 
               {row.attachments && row.attachments.length > 0 && (
                 <div className="border-t pt-2.5">
-                  <span className="text-muted-foreground mb-1.5 block text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground mb-1.5 block text-xs font-semibold uppercase">
                     Attachments ({row.attachments.length})
                   </span>
                   <div className="flex flex-wrap gap-2">

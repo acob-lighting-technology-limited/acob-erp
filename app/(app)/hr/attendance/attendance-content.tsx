@@ -418,7 +418,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         render: (row) => (
           <div className="whitespace-nowrap">
             <span className="text-foreground block text-xs font-semibold sm:text-sm">{row.dayLabel}</span>
-            <span className="text-muted-foreground block text-[11px]">
+            <span className="text-muted-foreground block text-xs">
               {formatWATDate(row.date, { day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
@@ -922,27 +922,21 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                   <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Clock In
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock In</span>
                         <span className="font-mono font-medium">{formatClockTime(row.clock_in)}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Clock Out
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock Out</span>
                         <span className="font-mono font-medium">{getClockOutLabel(row)}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                          Work Hours
-                        </span>
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">Work Hours</span>
                         <span className="font-medium">
                           {row.workHours != null ? `${row.workHours.toFixed(2)} hrs` : "-"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                        <span className="text-muted-foreground block text-xs font-semibold uppercase">
                           Missed Hours
                         </span>
                         <span className="font-medium">

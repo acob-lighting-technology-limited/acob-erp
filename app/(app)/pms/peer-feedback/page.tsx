@@ -313,14 +313,12 @@ export default function PeerFeedbackPage() {
             render: (f) => (
               <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                    Feedback Comments
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Feedback Comments</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">
                     {f.comments || "No comments left."}
                   </p>
                 </div>
-                <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-[10px]">
+                <div className="text-muted-foreground flex items-center justify-between border-t pt-2 text-xs">
                   <span>
                     Submitted to {personName(f.subject)} ({f.subject?.department || "—"})
                   </span>
@@ -374,13 +372,13 @@ export default function PeerFeedbackPage() {
               <div className="grid grid-cols-2 gap-1.5 text-xs">
                 {f.collaboration !== null && (
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Collaboration</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Collaboration</p>
                     <p className="font-medium">{f.collaboration}%</p>
                   </div>
                 )}
                 {f.teamwork !== null && (
                   <div>
-                    <p className="text-muted-foreground text-[10px] font-medium uppercase">Teamwork</p>
+                    <p className="text-muted-foreground text-xs font-medium uppercase">Teamwork</p>
                     <p className="font-medium">{f.teamwork}%</p>
                   </div>
                 )}
@@ -396,31 +394,25 @@ export default function PeerFeedbackPage() {
               <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div>
-                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                      Collaboration
-                    </span>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Collaboration</span>
                     <span className="font-medium">{f.collaboration !== null ? `${f.collaboration}%` : "—"}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">Teamwork</span>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Teamwork</span>
                     <span className="font-medium">{f.teamwork !== null ? `${f.teamwork}%` : "—"}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                      Communication
-                    </span>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Communication</span>
                     <span className="font-medium">{f.communication !== null ? `${f.communication}%` : "—"}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
-                      Professionalism
-                    </span>
+                    <span className="text-muted-foreground block text-xs font-semibold uppercase">Professionalism</span>
                     <span className="font-medium">{f.professionalism !== null ? `${f.professionalism}%` : "—"}</span>
                   </div>
                 </div>
 
                 <div className="space-y-1 border-t pt-3">
-                  <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold uppercase">
                     Qualitative Feedback
                   </span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">
