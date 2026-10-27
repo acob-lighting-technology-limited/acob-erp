@@ -138,6 +138,8 @@ export const RELEASES: Release[] = [
           "Detail views open as a side panel instead of a pop-up",
           "Every dialog becomes a bottom sheet on phones",
           "Data tables can export what they show",
+          "Tapping a row on a phone opens its sheet with every column, the row's own panel and all of its actions (edit, approve, delete), not just a single Open button",
+          "The Cards view now appears only where a card shows more than the row does",
         ],
       },
     ],

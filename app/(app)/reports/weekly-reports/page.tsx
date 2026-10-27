@@ -827,6 +827,7 @@ export default function WeeklyReportsPortal() {
             },
           },
         }}
+        cards
         cardRenderer={(report) => {
           const profileInfo = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
           const submitterName = profileInfo ? `${profileInfo.first_name} ${profileInfo.last_name}` : "Unknown"

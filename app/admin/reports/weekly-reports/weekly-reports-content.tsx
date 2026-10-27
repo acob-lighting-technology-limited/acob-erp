@@ -680,6 +680,7 @@ export function WeeklyReportsContent({
             },
           },
         }}
+        cards
         cardRenderer={(report) => {
           const profile = Array.isArray(report.profiles) ? report.profiles[0] : report.profiles
           const submitterName = profile ? `${profile.first_name} ${profile.last_name}` : "Unknown"

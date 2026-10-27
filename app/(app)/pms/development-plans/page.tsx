@@ -326,6 +326,7 @@ export default function DevelopmentPlansPage() {
             ],
           },
         }}
+        cards
         cardRenderer={(plan) => {
           const totalActions = plan.actions?.length || 0
           const doneActions = (plan.actions || []).filter((a) => a.status === "completed").length

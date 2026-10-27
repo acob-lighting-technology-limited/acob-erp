@@ -152,7 +152,7 @@
       "components/tasks/TaskStatusControl.tsx": 3,
       "components/tasks/UserTaskDetailsDialog.tsx": 6,
       "components/ui/admin-routes-picker.tsx": 1,
-      "components/ui/data-table/data-table.tsx": 2,
+      "components/ui/data-table/data-table.tsx": 1,
       "components/ui/detail-dialog.tsx": 4,
       "components/ui/searchable-multi-select.tsx": 1,
       "components/ui/staff-avatar.tsx": 3,
@@ -1009,7 +1009,7 @@
       "components/hr/manage-users-dialog.tsx": 1475,
       "components/payments/payments-table.tsx": 1176,
       "components/reports/kss-roster-table.tsx": 1528,
-      "components/ui/data-table/data-table.tsx": 2010,
+      "components/ui/data-table/data-table.tsx": 1895,
       "lib/assets/handover-pdf-generator.ts": 1096,
       "lib/export/pptx.ts": 1998
     }

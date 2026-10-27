@@ -203,6 +203,7 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
         pagination={{ pageSize: 25 }}
         viewToggle
         defaultViewMode={{ mobile: "card", desktop: "list" }}
+        cards
         cardRenderer={(t) => (
           <div className="bg-card flex h-full flex-col gap-3 rounded-xl border p-4">
             <div className="flex items-start justify-between gap-3">

@@ -440,6 +440,7 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
             )
           },
         }}
+        cards
         cardRenderer={(row) => <AnalyticsCard row={row} />}
         emptyTitle="No analytics rows found"
         emptyDescription="Performance analytics will appear here once reviews have been created and scored."

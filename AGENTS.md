@@ -603,8 +603,8 @@ const filters: DataTableFilter<MyRow>[] = [
 | Row actions | ✅ | Pass `rowActions` |
 | Bulk select + actions toolbar | ✅ | Pass `selectable` + `bulkActions` |
 | Keyboard navigation ↑↓ / Enter | ✅ | Always on |
-| List / card view toggle | ✅ | Pass `viewToggle` + `cardRenderer` |
-| List / card view toggle (mobile) | ✅ | Mobile defaults to list view with horizontal scroll; users opt into card view via the toggle |
+| List / table view toggle | ✅ | Pass `viewToggle` + `mobileRow` (+ `contactsView`). The `mobileRow` list stands in for the table below `md` |
+| Card view | opt-in | Pass `cards` **and** `cardRenderer`. Off by default: on most tables a card repeats the list row. Use it only where a card shows what a row cannot (a summary, a chart, a progress bar), or where a page has no `mobileRow` and cards are its phone view |
 | URL-synced filters | ✅ | Pass `urlSync` — search + filters write to query params |
 
 ### Stats cards — required on every table page
@@ -789,10 +789,20 @@ width. Put the modal behind a **button in the sheet** instead — pass `onSelect
 and it becomes the sheet's primary action.
 
 `mobileRow.detail` is optional. Omit it and `DataTable` synthesizes the sheet from
-`columns` — every column with an `accessor` becomes a field (`hideOnMobile` ones
+`columns`: every column with an `accessor` becomes a field (`hideOnMobile` ones
 included; the sheet is exactly where data too wide for the mobile table belongs),
-and `onSelect` becomes the footer button. Supply `detail` explicitly only to
-curate which fields show or to add more actions.
+and a column with only a `render` (a status badge, an amount) shows its rendered cell.
+Mechanical columns (`actions`, `select`, `expand`, S/N) are skipped, and a column can
+opt out with `sheet: false`. Supply `detail` explicitly only to curate which fields
+show.
+
+The sheet carries **everything the table can do**. Its footer is built from `rowActions`:
+hidden actions drop out per row, destructive ones go last, and `onSelect` becomes a
+leading "Open". Up to three show as buttons; with more, the rest sit behind **More**.
+An explicit `detail.actions` wins over the derived ones. So a page does not repeat its
+row actions inside `detail`, and a phone can approve, edit or delete what the desktop
+menu can. If the table is `expandable`, that panel renders inside the sheet under the
+fields; the row stays closed unless `mobileRow.expandInline` is set.
 
 - ❌ `onSelect` that opens a dialog and no `detail` — that *was* the bug on 42
   tables: the tap flew past the sheet straight into the modal.
@@ -811,10 +821,11 @@ table on a phone). The toggle's pressed state is resolved the same way. This
 applies only while the reader has made no choice; after that a single mode
 renders. Any other pair falls back to the JS breakpoint.
 
-`contactsView` removes the desktop table from view, and `expandable` never fires in
-it. Anything the expandable row used to show — an attachment link, a timeline, a
-"returned for correction" instruction — has to move into `detail.fields`, or it is
-simply gone. Fields that open something take `href`, not `copyable`.
+`contactsView` removes the desktop table from view. The `expandable` panel is not
+lost: a tap on a list row opens the sheet and the panel renders inside it, under the
+fields, so an attachment link, a timeline or a "returned for correction" instruction
+still reaches a phone. Keep that panel free of its own outer padding and border, as it
+now sits in two containers. Fields that open something take `href`, not `copyable`.
 
 ### Stats parity
 

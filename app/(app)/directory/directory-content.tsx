@@ -525,6 +525,7 @@ export function DirectoryContent() {
         viewToggle
         contactsView
         defaultViewMode={{ mobile: "contacts", desktop: "list" }}
+        cards
         cardRenderer={(r) => (
           <div className="group bg-card text-card-foreground border-border/60 hover:border-primary/40 space-y-3 rounded-xl border p-4 shadow-sm transition-all">
             <div className="flex items-start justify-between gap-3">
