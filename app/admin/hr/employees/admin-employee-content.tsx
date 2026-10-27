@@ -1125,7 +1125,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
 
   return (
     <DataTablePage
-      title="Employee Management"
+      title="Employees"
       description="View and manage employee profiles, roles, and permissions."
       icon={Users}
       tabs={tabs}

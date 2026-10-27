@@ -5,7 +5,7 @@ import { BypassOverrideContent, type EnrichedBypassLog, type AuditLogRow } from 
 
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "Admin Bypass & Override Audit Logs" }
+export const metadata: Metadata = { title: "Admin Bypass & Override" }
 
 export const dynamic = "force-dynamic"
 

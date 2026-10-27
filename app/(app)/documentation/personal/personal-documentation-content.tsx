@@ -351,7 +351,7 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
 
   return (
     <DataTablePage
-      title="Personal Documentation"
+      title="Personal"
       description="Create and manage your work documentation."
       icon={FileText}
       tabs={tabs}

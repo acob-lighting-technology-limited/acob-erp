@@ -275,7 +275,7 @@ export default function RolesPage() {
 
   return (
     <DataTablePage
-      title="Roles & Permissions"
+      title="Roles"
       description="Configure access control for your organization."
       icon={Shield}
       stats={

@@ -252,7 +252,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
 
   return (
     <DataTablePage
-      title="Corporate Scorecard"
+      title="Scorecard"
       description={`The ${planYear} strategic plan's master corporate KPIs and which departments own them. Use Add Corporate KPI to register new strategic measures.`}
       icon={Target}
       tabs={tabs}

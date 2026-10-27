@@ -322,7 +322,7 @@ export function ChallengesView({
 
   return (
     <DataTablePage
-      title="Departmental Challenges"
+      title="Challenges"
       description={
         isAdminContext
           ? "Manage and track resolution notes for departmental operational challenges raised during general meetings."

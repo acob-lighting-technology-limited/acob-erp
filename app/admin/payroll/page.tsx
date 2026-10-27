@@ -6,7 +6,7 @@ import { PayrollPeriodsPage } from "./view"
 
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "Admin Payroll Management" }
+export const metadata: Metadata = { title: "Admin Payroll" }
 
 const log = logger("payroll-periods-page")
 export const dynamic = "force-dynamic"

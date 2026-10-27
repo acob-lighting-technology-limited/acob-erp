@@ -161,7 +161,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
 
   return (
     <DataTablePage
-      title="Feedback & Suggestions"
+      title="Feedback"
       description="Share concerns, complaints, suggestions, or required items with management."
       icon={MessageSquare}
       tabs={tabs}

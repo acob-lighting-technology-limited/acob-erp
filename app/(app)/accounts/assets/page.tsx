@@ -7,7 +7,7 @@ import { logger } from "@/lib/logger"
 
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "My Assets" }
+export const metadata: Metadata = { title: "Assets" }
 
 const log = logger("assets")
 

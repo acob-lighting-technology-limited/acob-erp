@@ -1121,7 +1121,7 @@ export function AttendanceReportsPage({
 
   return (
     <DataTablePage
-      title="Attendance Reports"
+      title="Attendance"
       description={
         activeTab === "summary"
           ? "Monthly attendance performance by employee."

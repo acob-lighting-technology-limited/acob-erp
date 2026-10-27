@@ -225,7 +225,7 @@ export default function MovementsPage() {
 
   return (
     <DataTablePage
-      title="Stock Movements"
+      title="Movements"
       description="Review stock inflows, outflows, adjustments, and transfer activity."
       icon={Boxes}
       stats={

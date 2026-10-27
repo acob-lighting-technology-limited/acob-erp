@@ -435,7 +435,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
 
   return (
     <DataTablePage
-      title="Bypass & Override Audit Logs"
+      title="Bypass & Override"
       description="Centralized audit trail of manual policy alterations, emergency bypasses, and validation overrides."
       icon={ShieldAlert}
       actions={

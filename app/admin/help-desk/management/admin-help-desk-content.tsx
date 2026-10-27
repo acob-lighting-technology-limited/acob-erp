@@ -365,7 +365,7 @@ export function AdminHelpDeskContent({
 
   return (
     <DataTablePage
-      title="Help Desk Workflow"
+      title="Help Desk"
       description="Manage ticket routing, department approvals, and technical escalations."
       icon={Headset}
       tabs={TABS}

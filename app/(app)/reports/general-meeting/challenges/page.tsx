@@ -5,7 +5,7 @@ import { ChallengesView } from "@/components/reports/challenges/challenges-view"
 
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "Departmental Challenges" }
+export const metadata: Metadata = { title: "Challenges" }
 
 export default async function PortalChallengesPage() {
   const supabase = await createClient()

@@ -289,7 +289,7 @@ export function DocumentationContent({
 
       <TabsContent value="knowledge-docs" className="space-y-4">
         <DataTablePage
-          title="My Documentation"
+          title="Department"
           description="Create and manage your work documentation"
           icon={FileText}
           spacing="tight"

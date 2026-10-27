@@ -335,7 +335,7 @@ export function DirectoryContent() {
 
   return (
     <DataTablePage
-      title="Staff Directory"
+      title="Directory"
       description="Contact details for everyone at ACOB — search by name, department or office."
       tabs={tabs}
       activeTab={activeTab}

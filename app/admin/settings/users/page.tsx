@@ -248,7 +248,7 @@ export default function UsersPage() {
 
   return (
     <DataTablePage
-      title="User Management"
+      title="Users"
       description="Manage user accounts and roles."
       icon={Users}
       actions={

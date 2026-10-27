@@ -217,7 +217,7 @@ export function AdminDocumentationContent({
 
   return (
     <DataTablePage
-      title="Employee Documentation"
+      title="Documentation"
       description="Manage and view staff personal work docs and departmental files."
       icon={FileText}
       tabs={hideTabList ? undefined : TABS}

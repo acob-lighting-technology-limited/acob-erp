@@ -473,7 +473,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
   return (
     <DataTablePage
-      title="My Tasks"
+      title="Tasks"
       description="Manage your operational tasks, track deadlines, and submit completed work for review."
       icon={ClipboardList}
       spacing="tight"

@@ -335,7 +335,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
 
   return (
     <DataTablePage
-      title="Project Portfolios"
+      title="Portfolios"
       description="Groups of related projects. Progress is counted from each project's tasks."
       icon={Layers}
       tabs={tabs}

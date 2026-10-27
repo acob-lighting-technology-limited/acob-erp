@@ -806,7 +806,7 @@ export function LeaveContent({
 
   return (
     <DataTablePage
-      title="My Leave Center"
+      title="Leave"
       description="Track eligibility, submit requests, and manage approvals in one view."
       icon={CalendarDays}
       tabs={tabs}

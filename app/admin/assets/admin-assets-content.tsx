@@ -1341,7 +1341,7 @@ export function AdminAssetsContent({
 
   return (
     <DataTablePage
-      title="Asset Management"
+      title="Assets"
       description="Manage asset inventory, assignments, history, and issue tracking."
       icon={Package}
       actions={

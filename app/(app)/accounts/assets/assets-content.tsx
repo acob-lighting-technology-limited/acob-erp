@@ -149,7 +149,7 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
 
   return (
     <DataTablePage
-      title="My Assets"
+      title="Assets"
       description="View your currently assigned personal assets and equipment."
       icon={Package}
       spacing="tight"

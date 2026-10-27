@@ -660,7 +660,7 @@ export function LeaveApprovePage({
       />
 
       <DataTablePage
-        title="Leave Approvals & Scheduling"
+        title="Leave"
         description="Review leave applications, manage approval workflows, and view organizational leave calendar."
         icon={CalendarCheck2}
         actions={

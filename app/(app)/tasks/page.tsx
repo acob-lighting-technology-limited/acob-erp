@@ -6,7 +6,7 @@ import type { Task, TaskUserProfile } from "@/types/task"
 
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "My Tasks" }
+export const metadata: Metadata = { title: "Tasks" }
 
 /**
  * The task list is loaded by `loadUserTasks` here and on every client refresh,

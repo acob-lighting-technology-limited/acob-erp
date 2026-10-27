@@ -414,7 +414,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
 
   return (
     <DataTablePage
-      title="Payroll Management"
+      title="Payroll"
       description="Create monthly payroll periods, then open a period's worksheet to run the bulk calculation and publish payslips."
       icon={FileText}
       tabs={TABS}

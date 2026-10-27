@@ -287,7 +287,7 @@ export function DevAcobotLogsContent() {
 
   return (
     <DataTablePage
-      title="ACOBot Conversations"
+      title="ACOBot"
       description="Every question staff and website visitors asked ACOBot, its answer, and who asked it."
       tabs={TABS}
       activeTab={tab}

@@ -151,7 +151,7 @@ export function MeetingRecordsContent() {
 
   return (
     <DataTablePage
-      title="Meeting Records"
+      title="Records"
       description="Teams attendance reports and transcripts, auto-synced per meeting week."
       icon={Users}
       tabs={TABS}

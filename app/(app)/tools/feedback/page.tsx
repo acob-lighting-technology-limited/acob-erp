@@ -4,7 +4,7 @@ import { FeedbackContent } from "./feedback-content"
 
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "Feedback & Suggestions" }
+export const metadata: Metadata = { title: "Feedback" }
 
 export interface Feedback {
   id: string

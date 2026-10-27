@@ -9,7 +9,7 @@ import type { RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "My Leave Center" }
+export const metadata: Metadata = { title: "Leave" }
 
 export interface LeaveApprovalAudit {
   id: string

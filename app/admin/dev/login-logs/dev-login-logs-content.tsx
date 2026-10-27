@@ -730,7 +730,7 @@ export function DevLoginLogsContent() {
 
   return (
     <DataTablePage
-      title="Developer Login Logs"
+      title="Login Logs"
       description="Monitor successful sign-ins with network and actor context."
       actions={
         <div className="flex items-center gap-2">

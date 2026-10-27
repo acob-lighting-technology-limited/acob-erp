@@ -7,7 +7,7 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { DirectoryContent } from "./directory-content"
 
 export const metadata: Metadata = {
-  title: "Staff Directory",
+  title: "Directory",
   description: "Find any colleague's contact details — email, phone, department and office.",
 }
 

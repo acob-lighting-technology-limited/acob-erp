@@ -474,7 +474,7 @@ export function FleetContent() {
 
   return (
     <DataTablePage
-      title="Resource Booking Center"
+      title="Resource Booking"
       description="Book shared resources like transport and spaces without time clashes."
       icon={Car}
       tabs={FLEET_TABS}

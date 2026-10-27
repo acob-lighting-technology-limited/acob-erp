@@ -182,7 +182,7 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
 
   return (
     <DataTablePage
-      title="My Payroll & Payslips"
+      title="Payroll"
       description="View and print your monthly payslips, tax assessments, and pension contributions."
       icon={FileText}
       spacing="tight"

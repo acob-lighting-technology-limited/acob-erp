@@ -356,7 +356,7 @@ export default function AdminFleetPage() {
 
   return (
     <DataTablePage
-      title="Resource Booking Admin"
+      title="Resource Booking"
       description="Manage bookable resources and review booking applications"
       icon={CalendarCheck2}
       tabs={TABS}

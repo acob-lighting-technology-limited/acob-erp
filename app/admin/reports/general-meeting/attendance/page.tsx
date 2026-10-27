@@ -413,7 +413,7 @@ export default function AdminMeetingAttendancePage() {
 
   return (
     <DataTablePage
-      title="General Meeting Attendance"
+      title="Attendance"
       description="Real-time biometric-verified attendance tracking for General Meeting & KSS."
       icon={UserCheck}
       actions={
