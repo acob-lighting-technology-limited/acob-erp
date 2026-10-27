@@ -5,17 +5,17 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function Loading() {
   return (
     <TablePageSkeleton
-      tabs={3}
+      statCards={4}
       filters={3}
       columns={5}
       rows={9}
-      showStats
-      statCards={4}
+      showStats={true}
+      tabs={3}
+      actions={2}
+      statBadges={4}
       spacing="tight"
       inlineActions
-      actions={2}
       list="responsive"
-      groups={3}
     />
   )
 }

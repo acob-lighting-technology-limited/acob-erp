@@ -3,14 +3,16 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function OnboardingLoading() {
   return (
     <TablePageSkeleton
-      tabs={3}
+      statCards={3}
       filters={3}
-      columns={7}
+      columns={8}
       rows={10}
       showStats={true}
-      statCards={3}
+      tabs={3}
       actions={2}
-      showBackLink={true}
+      showBackLink={false}
+      statBadges={3}
+      list="responsive"
     />
   )
 }

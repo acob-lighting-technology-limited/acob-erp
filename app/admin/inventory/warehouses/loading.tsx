@@ -1,5 +1,16 @@
 import { TablePageSkeleton } from "@/components/skeletons"
 
 export default function WarehousesLoading() {
-  return <TablePageSkeleton filters={1} columns={5} rows={6} showStats={true} statCards={4} actions={2} />
+  return (
+    <TablePageSkeleton
+      statCards={4}
+      filters={2}
+      columns={5}
+      rows={6}
+      showStats={true}
+      actions={3}
+      statBadges={4}
+      list="responsive"
+    />
+  )
 }

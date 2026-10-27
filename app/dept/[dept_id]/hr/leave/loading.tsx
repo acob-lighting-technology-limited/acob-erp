@@ -1,5 +1,7 @@
 import { TablePageSkeleton } from "@/components/skeletons"
 
 export default function LeaveApproveLoading() {
-  return <TablePageSkeleton filters={0} columns={7} rows={6} showStats={true} statCards={3} />
+  return (
+    <TablePageSkeleton statCards={3} filters={4} columns={6} rows={6} showStats={true} tabs={4} list="responsive" />
+  )
 }

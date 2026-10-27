@@ -6,18 +6,18 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function RequisitionLoading() {
   return (
     <TablePageSkeleton
-      filters={4}
-      columns={6}
-      rows={8}
-      showStats
       statCards={4}
-      spacing="tight"
-      showBackLink
-      inlineActions
-      actions={2}
+      filters={2}
+      columns={7}
+      rows={8}
+      showStats={true}
       tabs={3}
+      actions={2}
+      showBackLink={false}
+      statBadges={4}
+      spacing="tight"
+      inlineActions
       list="responsive"
-      groups={1}
     />
   )
 }

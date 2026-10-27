@@ -1,5 +1,17 @@
 import { TablePageSkeleton } from "@/components/skeletons"
 
 export default function Loading() {
-  return <TablePageSkeleton filters={2} columns={5} rows={6} showStats={true} statCards={4} tabs={2} actions={0} />
+  return (
+    <TablePageSkeleton
+      statCards={4}
+      filters={2}
+      columns={3}
+      rows={6}
+      showStats={true}
+      tabs={2}
+      actions={0}
+      spacing="tight"
+      list="responsive"
+    />
+  )
 }

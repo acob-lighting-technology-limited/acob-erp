@@ -1,5 +1,17 @@
 import { TablePageSkeleton } from "@/components/skeletons"
 
 export default function PmsCbtQuestionLoading() {
-  return <TablePageSkeleton statCards={3} filters={2} columns={6} rows={8} showStats={true} showBackLink />
+  return (
+    <TablePageSkeleton
+      statCards={4}
+      filters={2}
+      columns={6}
+      rows={8}
+      showStats={true}
+      actions={4}
+      showBackLink
+      statBadges={4}
+      list="responsive"
+    />
+  )
 }

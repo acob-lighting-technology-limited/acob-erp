@@ -5,16 +5,16 @@ import { TablePageSkeleton } from "@/components/skeletons"
 export default function TasksLoading() {
   return (
     <TablePageSkeleton
-      filters={2}
-      columns={6}
+      statCards={6}
+      filters={3}
+      columns={8}
       rows={8}
-      showStats
-      statCards={5}
-      spacing="tight"
-      showBackLink
+      showStats={true}
       actions={0}
+      showBackLink={false}
+      statBadges={6}
+      spacing="tight"
       list="responsive"
-      groups={1}
     />
   )
 }
