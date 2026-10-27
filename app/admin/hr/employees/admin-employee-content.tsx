@@ -76,7 +76,6 @@ import { EmployeeStatusBadge } from "@/components/hr/employee-status-badge"
 import { apiFetch } from "@/lib/api-client"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-import { useShellBase } from "@/hooks/use-shell-base"
 import { EmployeeAvatar } from "./_components/employee-avatar"
 const log = logger("hr-employees-admin-employee-content")
 
@@ -199,7 +198,6 @@ async function fetchEmployeeProfile(userId: string): Promise<EmployeeProfileReco
 }
 
 export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmployeeContentProps) {
-  const shell = useShellBase()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
 
@@ -1130,7 +1128,6 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
       title="Employee Management"
       description="View and manage employee profiles, roles, and permissions."
       icon={Users}
-      backLink={{ href: shell.backHref("/admin/hr"), label: "Back to HR" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as DirectoryTab)}

@@ -354,7 +354,6 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
       title="Personal Documentation"
       description="Create and manage your work documentation."
       icon={FileText}
-      backLink={{ href: "/documentation", label: "Back to Documentation" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}

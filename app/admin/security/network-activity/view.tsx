@@ -137,7 +137,6 @@ export function AdminSecurityNetworkActivityPage({ backLinkHref }: { backLinkHre
       title="Network Activity"
       description={`Office network logs, archived daily to SharePoint and kept for ${data?.retentionMonths ?? 12} months. Download a day to investigate it in Excel.`}
       icon={ShieldCheck}
-      backLink={{ href: backLinkHref ?? "/admin/security", label: "Back to Security" }}
       statBadgeStyle="line"
       statBadges={[
         { label: `${days.length} days archived`, icon: CalendarDays },

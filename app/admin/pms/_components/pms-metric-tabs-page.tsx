@@ -690,7 +690,6 @@ export function PmsMetricTabsPage({
       title={title}
       description={description}
       icon={Icon}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       tabs={pageTabs}
       activeTab={tab}
       onTabChange={(value) => setTab(value as TabKey)}

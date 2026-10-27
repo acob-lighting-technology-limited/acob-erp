@@ -1344,7 +1344,6 @@ export function AdminAssetsContent({
       title="Asset Management"
       description="Manage asset inventory, assignments, history, and issue tracking."
       icon={Package}
-      backLink={{ href: shell.backHref("/admin"), label: "Back to Admin" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {issuesHref && (

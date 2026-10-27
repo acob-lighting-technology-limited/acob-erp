@@ -773,7 +773,6 @@ export function AdminPmsReviewsPage({
       title="PMS Reviews"
       description="Manage quarterly performance reviews by individual, department, or cycle."
       icon={FileText}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(t) => setTab(t as TabMode)}

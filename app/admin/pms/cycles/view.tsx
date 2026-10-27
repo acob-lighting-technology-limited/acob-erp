@@ -323,7 +323,6 @@ export function ReviewCyclesPage({ backLinkHref }: { backLinkHref?: string } = {
       title="Review Cycles"
       description="Create and manage performance review cycles. Only one cycle can be active at a time."
       icon={RefreshCw}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       actions={
         <Button onClick={() => setIsCreateOpen(true)} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />

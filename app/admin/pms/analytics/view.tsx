@@ -309,7 +309,6 @@ export function PmsAnalyticsPage({ backLinkHref }: { backLinkHref?: string } = {
       title="PMS Analytics"
       description="Performance distribution, review outcomes, and department benchmarking in one unified analytics table."
       icon={BarChart3}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       actions={
         <Button
           variant="outline"

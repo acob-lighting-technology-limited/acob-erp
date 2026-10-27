@@ -663,7 +663,6 @@ export function LeaveApprovePage({
         title="Leave Approvals & Scheduling"
         description="Review leave applications, manage approval workflows, and view organizational leave calendar."
         icon={CalendarCheck2}
-        backLink={backLinkHref ? { href: backLinkHref, label: "Back" } : undefined}
         actions={
           canAddLeave ? (
             <Button size="sm" onClick={() => setAddLeaveOpen(true)} className="gap-1.5">

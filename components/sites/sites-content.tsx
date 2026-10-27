@@ -45,9 +45,6 @@ export function SitesContent({ isAdmin }: { isAdmin: boolean }) {
       title="Sites"
       description="Every signed and profiled site, and whether its conveyance documents are still valid."
       icon={MapPin}
-      backLink={
-        isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/portfolios", label: "Back to Portfolios" }
-      }
       actions={
         <div className="flex items-center gap-2">
           <Button

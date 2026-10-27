@@ -417,7 +417,6 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       title="Payroll Management"
       description="Create monthly payroll periods, then open a period's worksheet to run the bulk calculation and publish payslips."
       icon={FileText}
-      backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}

@@ -220,7 +220,6 @@ export function AdminDocumentationContent({
       title="Employee Documentation"
       description="Manage and view staff personal work docs and departmental files."
       icon={FileText}
-      backLink={{ href: backLinkHref, label: backLinkLabel }}
       tabs={hideTabList ? undefined : TABS}
       activeTab={activeTab}
       onTabChange={handleTabChange}

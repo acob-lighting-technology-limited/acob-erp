@@ -98,7 +98,6 @@ export function MdDeskDelegates({ basePath }: { basePath: string }) {
         canManage ? "" : " Only the MD can change this list."
       }`}
       icon={Users}
-      backLink={{ href: basePath, label: "Back to MD's Desk" }}
       actions={
         canManage ? (
           <Button size="sm" onClick={() => setAddOpen(true)}>

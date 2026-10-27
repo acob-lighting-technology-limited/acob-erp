@@ -368,10 +368,6 @@ export function AdminHelpDeskContent({
       title="Help Desk Workflow"
       description="Manage ticket routing, department approvals, and technical escalations."
       icon={Headset}
-      backLink={{
-        href: backLinkHref,
-        label: lockedDepartment ? "Back to Department" : "Back to Admin",
-      }}
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}

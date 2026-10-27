@@ -477,7 +477,6 @@ export function FleetContent() {
       title="Resource Booking Center"
       description="Book shared resources like transport and spaces without time clashes."
       icon={Car}
-      backLink={{ href: "/profile", label: "Back to Dashboard" }}
       tabs={FLEET_TABS}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as "all" | "my")}

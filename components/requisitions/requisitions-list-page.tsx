@@ -296,13 +296,6 @@ export function RequisitionsListPage({
       title={title}
       description={description}
       icon={FileCheck2}
-      backLink={
-        surface === "admin"
-          ? { href: "/admin/accounts", label: "Back to Accounts" }
-          : surface === "dept"
-            ? undefined
-            : { href: "/profile", label: "Back to Home" }
-      }
       tabs={tabs}
       activeTab={tab}
       onTabChange={setTab}

@@ -438,7 +438,6 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
       title="Bypass & Override Audit Logs"
       description="Centralized audit trail of manual policy alterations, emergency bypasses, and validation overrides."
       icon={ShieldAlert}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => router.refresh()}>

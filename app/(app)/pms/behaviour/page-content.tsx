@@ -97,7 +97,6 @@ export function BehaviourContent({
       title="PMS Behaviour"
       description="Your behaviour review by competency with manager notes."
       icon={ShieldCheck}
-      backLink={{ href: "/pms", label: "Back to PMS" }}
       spacing="tight"
       actions={headerActions}
       stats={

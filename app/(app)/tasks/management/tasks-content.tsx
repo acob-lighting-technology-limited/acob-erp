@@ -476,7 +476,6 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       title="My Tasks"
       description="Manage your operational tasks, track deadlines, and submit completed work for review."
       icon={ClipboardList}
-      backLink={{ href: "/profile", label: "Back to Home" }}
       spacing="tight"
       stats={
         <StatGrid>

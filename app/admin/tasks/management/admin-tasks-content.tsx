@@ -604,7 +604,6 @@ export function AdminTasksContent({
           : "Operational task tracking, multi-user assignment, and PMS review governance."
       }
       icon={activeTab === "user_plan" ? Users : ClipboardList}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={TASK_TABS}
       activeTab={activeTab}
       onTabChange={(t) => setActiveTab(t as "tasks" | "user_plan")}

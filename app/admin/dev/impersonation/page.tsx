@@ -10,11 +10,7 @@ export default async function DevImpersonationPage() {
   await requireAdminSectionAccess("dev")
 
   return (
-    <DataTablePage
-      title="Session Impersonation"
-      description="Developer-only account switching for flow testing."
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
-    >
+    <DataTablePage title="Session Impersonation" description="Developer-only account switching for flow testing.">
       <DevImpersonationContent />
     </DataTablePage>
   )

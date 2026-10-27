@@ -255,7 +255,6 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
       title="Corporate Scorecard"
       description={`The ${planYear} strategic plan's master corporate KPIs and which departments own them. Use Add Corporate KPI to register new strategic measures.`}
       icon={Target}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}

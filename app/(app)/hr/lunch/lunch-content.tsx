@@ -492,7 +492,6 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
       spacing="tight"
       description="Vote for what you want to eat and see what everyone else picked."
       icon={Utensils}
-      backLink={{ href: "/profile", label: "Back to Home" }}
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}

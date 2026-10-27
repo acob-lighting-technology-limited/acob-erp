@@ -243,7 +243,6 @@ export default function CategoriesPage() {
       title="Categories"
       description="Organize products by category and track how each category is being used."
       icon={Boxes}
-      backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       actions={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>

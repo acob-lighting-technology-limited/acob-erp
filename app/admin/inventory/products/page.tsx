@@ -223,7 +223,6 @@ export default function ProductsPage() {
       title="Products"
       description="Manage the product catalog, pricing, and stock posture across inventory."
       icon={Package}
-      backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       actions={
         <Button size="sm" onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4 sm:mr-2" />

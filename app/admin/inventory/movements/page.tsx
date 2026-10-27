@@ -228,7 +228,6 @@ export default function MovementsPage() {
       title="Stock Movements"
       description="Review stock inflows, outflows, adjustments, and transfer activity."
       icon={Boxes}
-      backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       stats={
         <StatGrid>
           <StatCard

@@ -732,7 +732,6 @@ export function DevLoginLogsContent() {
     <DataTablePage
       title="Developer Login Logs"
       description="Monitor successful sign-ins with network and actor context."
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       actions={
         <div className="flex items-center gap-2">
           <Button

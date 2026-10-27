@@ -183,7 +183,6 @@ export default function AdminJobDescriptionsPage() {
       title="Job Descriptions"
       description="Centralized registry for employee JD documentation and updates."
       icon={Briefcase}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       stats={
         <StatGrid>
           <StatCard

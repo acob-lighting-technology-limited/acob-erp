@@ -289,7 +289,6 @@ export function DevAcobotLogsContent() {
     <DataTablePage
       title="ACOBot Conversations"
       description="Every question staff and website visitors asked ACOBot, its answer, and who asked it."
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(t) => setTab(t as AcobotSource)}

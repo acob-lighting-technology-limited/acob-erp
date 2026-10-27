@@ -164,7 +164,6 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
       title="Feedback & Suggestions"
       description="Share concerns, complaints, suggestions, or required items with management."
       icon={MessageSquare}
-      backLink={{ href: "/profile", label: "Back to Dashboard" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as "non_anonymous" | "anonymous")}

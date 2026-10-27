@@ -515,7 +515,6 @@ export function DepartmentsPage({
       title="Departments"
       description="Manage company departments and organizational structure."
       icon={Building}
-      backLink={{ href: backLinkHref ?? "/admin/hr", label: "Back to HR" }}
       actions={
         canManageDepartments ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

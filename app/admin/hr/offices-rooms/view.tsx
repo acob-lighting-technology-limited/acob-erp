@@ -384,7 +384,6 @@ export function OfficeLocationsPage({
       title="Offices & Rooms"
       description="Manage company office spaces, rooms, and employee seat allocations."
       icon={MapPin}
-      backLink={{ href: backLinkHref ?? "/admin/hr", label: "Back to HR" }}
       actions={
         canManageLocations ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

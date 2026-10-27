@@ -278,7 +278,6 @@ export default function RolesPage() {
       title="Roles & Permissions"
       description="Configure access control for your organization."
       icon={Shield}
-      backLink={{ href: "/admin/settings", label: "Back to Settings" }}
       stats={
         <StatGrid>
           <StatCard

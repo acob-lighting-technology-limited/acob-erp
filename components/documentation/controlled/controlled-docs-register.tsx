@@ -260,7 +260,6 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
       title={meta.plural}
       description={description}
       icon={Icon}
-      backLink={backLink}
       actions={
         permissions.canCreate ? (
           <Button size="sm" onClick={() => setIsCreateOpen(true)}>

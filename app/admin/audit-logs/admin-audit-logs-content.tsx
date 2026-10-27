@@ -237,7 +237,6 @@ export function AdminAuditLogsContent({
       title="Audit Logs"
       description="Comprehensive system activity trail for security and transparency."
       icon={ScrollText}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 gap-2" onClick={() => setExportOptionsOpen(true)}>

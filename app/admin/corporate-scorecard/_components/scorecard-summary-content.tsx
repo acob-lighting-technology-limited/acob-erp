@@ -148,7 +148,6 @@ export function ScorecardSummaryContent({
       title={tabs ? "Corporate Scorecard" : "Scorecard Summary"}
       description={`Company-wide attainment against the ${planYear} plan. Departments are scored on CORE ownership only.`}
       icon={BarChart3}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}

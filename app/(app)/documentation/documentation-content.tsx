@@ -292,7 +292,6 @@ export function DocumentationContent({
           title="My Documentation"
           description="Create and manage your work documentation"
           icon={FileText}
-          backLink={{ href: backLinkHref, label: backLinkLabel }}
           spacing="tight"
           actionsPlacement="inline-always"
           actions={

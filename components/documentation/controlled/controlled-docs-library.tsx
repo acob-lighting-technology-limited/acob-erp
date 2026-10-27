@@ -192,7 +192,6 @@ export function ControlledDocsLibrary({ type }: { type: ControlledDocType }) {
           : "Step-by-step procedures for your work — company-wide ones plus your department's own."
       }
       icon={Icon}
-      backLink={{ href: "/documentation", label: "Back to Documentation" }}
       statBadgeStyle="line"
       statBadges={[
         { label: `${rows.length} ${meta.shortPlural.toLowerCase()}`, icon: FileText },

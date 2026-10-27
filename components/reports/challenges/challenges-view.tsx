@@ -329,7 +329,6 @@ export function ChallengesView({
           : "View weekly departmental challenges and their resolution progress."
       }
       icon={AlertTriangle}
-      backLink={{ href: backHref, label: backLabel }}
       stats={
         <StatGrid>
           <StatCard

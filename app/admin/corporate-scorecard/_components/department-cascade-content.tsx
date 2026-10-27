@@ -398,7 +398,6 @@ export function DepartmentCascadeContent({
       title={tabs ? "Corporate Scorecard" : "Department KPIs"}
       description={`Each department's assigned KPIs, confirmed targets, proposed action plans, and recorded actual progress against the ${planYear} plan.`}
       icon={Target}
-      backLink={backLink || { href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}

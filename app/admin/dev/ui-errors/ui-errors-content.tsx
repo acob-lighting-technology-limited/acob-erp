@@ -235,7 +235,6 @@ export function UiErrorsContent({
       title="Error Monitor"
       description="Latest 500 browser, failed request, server and Supabase errors. Refreshes every minute while visible."
       icon={Bug}
-      backLink={{ href: "/admin/dev", label: "Back to DEV" }}
       actions={
         <div className="flex gap-2">
           <Button

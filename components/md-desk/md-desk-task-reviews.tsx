@@ -148,7 +148,6 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
       title="Task Reviews"
       description="Tasks that leads and admins assigned to themselves. Nobody rates their own work, so they wait for the MD."
       icon={ClipboardCheck}
-      backLink={{ href: `${basePath}/overview`, label: "Back to MD's Desk" }}
       stats={
         <StatGrid>
           <StatCard

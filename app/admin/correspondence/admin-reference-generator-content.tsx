@@ -466,10 +466,6 @@ export function AdminReferenceGeneratorContent({
       title="Correspondence"
       description="Manage correspondence references and tracking."
       icon={ListFilter}
-      backLink={{
-        href: backLinkHref,
-        label: lockedDepartment ? "Back to Department" : "Back to Admin",
-      }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => {

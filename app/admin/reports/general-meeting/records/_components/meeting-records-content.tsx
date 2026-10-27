@@ -154,7 +154,6 @@ export function MeetingRecordsContent() {
       title="Meeting Records"
       description="Teams attendance reports and transcripts, auto-synced per meeting week."
       icon={Users}
-      backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(key) => setTab(key as ArtifactTab)}

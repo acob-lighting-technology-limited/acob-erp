@@ -428,7 +428,6 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
           ? "Overview and detailed task status tracking for all company ongoing installations."
           : "View ongoing mini-grid electrification and solar installations progress and task milestones."
       }
-      backLink={admin ? { href: "/admin", label: "Back to Admin" } : undefined}
       spacing="tight"
       tabs={tabs}
       activeTab={activeTab}

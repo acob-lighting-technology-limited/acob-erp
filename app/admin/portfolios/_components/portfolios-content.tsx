@@ -338,7 +338,6 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
       title="Project Portfolios"
       description="Groups of related projects. Progress is counted from each project's tasks."
       icon={Layers}
-      backLink={isAdmin ? { href: "/admin", label: "Back to Admin" } : { href: "/projects", label: "Back to Projects" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}

@@ -251,7 +251,6 @@ export default function UsersPage() {
       title="User Management"
       description="Manage user accounts and roles."
       icon={Users}
-      backLink={{ href: "/admin/settings", label: "Back to Settings" }}
       actions={
         <div className="flex flex-wrap gap-2">
           {roleFilter !== "all" && (

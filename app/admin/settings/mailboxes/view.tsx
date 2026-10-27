@@ -323,7 +323,6 @@ export function MailboxesPage() {
       title="Mailboxes"
       description="Staff and project mailboxes on cPanel, matched against employee and project records. Usage is read live from cPanel."
       icon={HardDrive}
-      backLink={{ href: "/admin/settings", label: "Back to Settings" }}
       actions={
         <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
           <Plus className="h-4 w-4" />

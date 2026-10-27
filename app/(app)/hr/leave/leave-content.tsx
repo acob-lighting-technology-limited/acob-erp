@@ -809,7 +809,6 @@ export function LeaveContent({
       title="My Leave Center"
       description="Track eligibility, submit requests, and manage approvals in one view."
       icon={CalendarDays}
-      backLink={{ href: "/profile", label: "Back to Home" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab === "reviews" ? "reviews" : "my-requests")}

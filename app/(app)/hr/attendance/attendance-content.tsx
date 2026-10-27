@@ -652,7 +652,6 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         title="Attendance"
         description="Track your work hours and attendance records."
         icon={Clock}
-        backLink={{ href: "/profile", label: "Back to Dashboard" }}
         tabs={ATTENDANCE_TABS}
         activeTab={activeTab}
         onTabChange={(t) => setActiveTab(t as "log" | "calendar")}

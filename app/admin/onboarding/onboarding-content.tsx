@@ -338,7 +338,6 @@ export function OnboardingContent() {
       title="Onboarding"
       description="Every staff profile, including not-yet-onboarded placeholders, and whether the person has ever signed in."
       icon={UserCheck}
-      backLink={{ href: "/admin", label: "Back to Admin" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as OnboardingTab)}

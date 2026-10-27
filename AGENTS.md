@@ -659,15 +659,16 @@ import { StatGrid } from "@/components/ui/stat-grid"
 </StatGrid>
 ```
 
-**The mobile rule `StatGrid` enforces: one row, three cards maximum.** Columns
-are `min(cardCount, 3)` below `sm`; a fourth card and beyond is hidden on phones
-and returns from `sm` up. A stats band must never cost a phone two rows before
-the data starts.
+**The mobile rule `StatGrid` enforces: a single line, not cards.** Below `sm` the cards become one
+scrolling line of metrics (`12 Staff  3 Pending  1 Overdue`) derived from the cards' own `title` and
+`value`, so a page writes each metric once and the two renderings cannot disagree. From `sm` up the cards
+return as a grid. A stats band must never cost a phone more than one line before the data starts. (A grid
+whose children are not plain `StatCard`s cannot be reduced to a line and keeps the old rule: one row of
+three cards.)
 
-**Priority is source order.** The first three children are the ones a phone
-keeps. There is deliberately no `priority` prop — a page that wants a different
-card on mobile **reorders its JSX**, so the code reads in the same order the
-reader sees.
+**Priority is source order.** The first metrics are the ones a phone shows first, and the line scrolls
+sideways for the rest. There is deliberately no `priority` prop — a page that wants a different metric
+first **reorders its JSX**, so the code reads in the same order the reader sees.
 
 This matters more than it looks. Pages naturally list metrics in workflow order
 (`Total → In Progress → Submitted → Overdue`), which puts the exception state
@@ -701,11 +702,10 @@ table or filter bar. Use `ExportOptionsDialog` from
 
 ### Back link convention
 
-| Page location | Back link |
-|--------------|-----------|
-| `/admin/hr/pms/…` | `{ href: "/admin/hr/pms", label: "Back to PMS" }` |
-| `/admin/hr/…` | `{ href: "/admin/hr", label: "Back to HR" }` |
-| `/admin/…` | `{ href: "/admin", label: "Back to Admin" }` |
+**A page the sidebar opens directly has no back link.** The sidebar is the way back; a second control
+for the same job costs a header line and drifts into eight different wordings. A **nested** page (a record
+detail, a cycle, a worksheet) links to its parent, labelled "Back to <the parent's sidebar name>", for
+example "Back to Leave" or "Back to Payroll".
 
 ### Colour / design token standards
 

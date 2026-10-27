@@ -259,7 +259,6 @@ export default function WarehousesPage() {
       title="Warehouses"
       description="Manage storage locations, operating status, and warehouse coverage."
       icon={WarehouseIcon}
-      backLink={{ href: "/admin/inventory", label: "Back to Inventory" }}
       actions={
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>

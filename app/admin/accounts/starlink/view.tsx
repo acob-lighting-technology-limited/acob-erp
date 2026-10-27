@@ -266,7 +266,6 @@ export function StarlinkKitsPage() {
       title="Starlink Kits"
       description="Each Starlink kit, the project it serves and how its bills stand. Bills are read from the ict mailbox every hour."
       icon={Satellite}
-      backLink={{ href: "/admin/accounts", label: "Back to Accounts" }}
       tabs={TABS.map((t) => (t.key === "new" ? { ...t, label: `New accounts (${unmatched.length})` } : t))}
       activeTab={tab}
       onTabChange={(next) => router.replace(next === "new" ? "?tab=new" : "?", { scroll: false })}

@@ -372,7 +372,6 @@ export function PortalReferenceGeneratorContent({
       title="Correspondence"
       description="Create and manage correspondence references."
       icon={FileCode2}
-      backLink={{ href: "/profile", label: "Back to Home" }}
       actions={
         <>
           <CreateReferenceDialog

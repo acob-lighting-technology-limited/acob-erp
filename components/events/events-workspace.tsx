@@ -407,7 +407,6 @@ export function EventsWorkspace({
       title={title}
       description={description}
       icon={icon}
-      backLink={backLink}
       tabs={tabDefs}
       activeTab={tab}
       onTabChange={(key) => setTab(key as TabKey)}

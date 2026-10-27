@@ -1241,7 +1241,6 @@ export function LunchRegisterPage({
               : "Individual employee lunch calendar view."
       }
       icon={Utensils}
-      backLink={{ href: "/admin/hr", label: "Back to HR" }}
       tabs={LUNCH_TABS}
       activeTab={activeTab}
       onTabChange={(t) => setActiveTab(t as LunchTab)}

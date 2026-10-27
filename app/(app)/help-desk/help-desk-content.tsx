@@ -504,7 +504,6 @@ export function HelpDeskContent({
       title="Help Desk"
       description="Submit and track support tickets."
       icon={Headset}
-      backLink={{ href: "/profile", label: "Back to Dashboard" }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as TicketTab)}

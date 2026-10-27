@@ -400,7 +400,6 @@ export function AdminCompetenciesPage({ backLinkHref }: { backLinkHref?: string 
       title="Competency Frameworks"
       description="Manage the scoring competencies used across performance reviews."
       icon={BookOpen}
-      backLink={{ href: backLinkHref ?? "/admin/pms", label: "Back to PMS" }}
       actions={
         <Button onClick={openCreate} size="sm" className="gap-2">
           <Plus className="h-4 w-4" />

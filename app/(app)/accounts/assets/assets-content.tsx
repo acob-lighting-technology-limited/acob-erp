@@ -152,7 +152,6 @@ export function AssetsContent({ initialAssignments, initialError }: AssetsConten
       title="My Assets"
       description="View your currently assigned personal assets and equipment."
       icon={Package}
-      backLink={{ href: "/profile", label: "Back to Dashboard" }}
       spacing="tight"
       stats={
         <StatGrid>

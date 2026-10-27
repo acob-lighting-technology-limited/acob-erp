@@ -288,7 +288,6 @@ export function PmsTablePage({
       title={title}
       description={description}
       icon={Icon}
-      backLink={{ href: backHref, label: backLabel }}
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={onTabChange}

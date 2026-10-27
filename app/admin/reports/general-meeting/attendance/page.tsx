@@ -416,7 +416,6 @@ export default function AdminMeetingAttendancePage() {
       title="General Meeting Attendance"
       description="Real-time biometric-verified attendance tracking for General Meeting & KSS."
       icon={UserCheck}
-      backLink={{ href: "/admin/reports/general-meeting", label: "Back to General Meeting" }}
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowPrintSheet(true)}>

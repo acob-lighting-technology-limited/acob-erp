@@ -685,7 +685,6 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
       title="PMS CBT"
       description="Review CBT results by employee, department, or cycle, then open the question manager to add or edit CBT tests."
       icon={Brain}
-      backLink={{ href: deptId ? `/dept/${deptId}/pms` : "/admin/pms", label: "Back to PMS" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={(value) => setTab(value as TabKey)}

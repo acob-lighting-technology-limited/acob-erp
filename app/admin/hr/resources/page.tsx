@@ -359,7 +359,6 @@ export default function AdminFleetPage() {
       title="Resource Booking Admin"
       description="Manage bookable resources and review booking applications"
       icon={CalendarCheck2}
-      backLink={{ href: "/admin/hr", label: "Back to HR Dashboard" }}
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}

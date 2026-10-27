@@ -1136,7 +1136,6 @@ export function AttendanceReportsPage({
                   : "Records needing attention — late arrivals, missing clock-outs, absences."
       }
       icon={BarChart3}
-      backLink={{ href: backLinkHref ?? "/admin/hr", label: "Back to HR" }}
       tabs={ATTENDANCE_TABS}
       activeTab={activeTab}
       onTabChange={(t) => setActiveTab(t as AttendanceTab)}
