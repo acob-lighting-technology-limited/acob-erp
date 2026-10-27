@@ -31,4 +31,12 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "Running UI guard (audit + ratchet) before push..."
+npm run ui:guard
+
+if [ $? -ne 0 ]; then
+  echo "UI guard failed! Push aborted."
+  exit 1
+fi
+
 echo "Checks passed. Proceeding with push..."
