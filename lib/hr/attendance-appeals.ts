@@ -426,3 +426,150 @@ export async function findStagedLeaveRequest(
   }
   return data?.[0] ?? null
 }
+
+export type StagingActor = { userId: string; isAdminLike: boolean; scopeMode?: string | null }
+
+export type StagingTarget = {
+  department: string | null
+  department_id: string | null
+  is_department_lead: boolean
+  full_name: string | null
+}
+
+export async function loadStagingTarget(client: SupabaseClient, userId: string): Promise<StagingTarget | null> {
+  const { data } = await client
+    .from("profiles")
+    .select("department, department_id, is_department_lead, full_name")
+    .eq("id", userId)
+    .maybeSingle<StagingTarget>()
+  return data ?? null
+}
+
+/**
+ * Two-stage rule for manual attendance changes: whoever makes the change is stage 1
+ * and the other side confirms it.
+ *
+ * - An admin (any admin, including on their own day) is the Admin & HR stage; the
+ *   person's Department Lead confirms — or the Admin & HR Lead when the person is a lead.
+ * - A Department Lead is the lead stage; Admin & HR confirms (then the Admin & HR Lead
+ *   when the person is a lead — see the appeals PATCH route).
+ */
+export function stagingRoute(
+  actor: StagingActor,
+  target: StagingTarget | null
+): { initiatedByRole: "admin_manual" | "lead_on_behalf"; stage: AppealReviewStage; awaiting: string } {
+  const isAdmin = actor.isAdminLike && actor.scopeMode !== "lead"
+  if (!isAdmin) return { initiatedByRole: "lead_on_behalf", stage: "pending_admin", awaiting: "Admin & HR" }
+  return target?.is_department_lead
+    ? { initiatedByRole: "admin_manual", stage: "pending_hr_lead", awaiting: "Admin & HR Lead" }
+    : { initiatedByRole: "admin_manual", stage: "pending_lead", awaiting: "Department Lead" }
+}
+
+export type StageChangeResult =
+  | { ok: true; appealId: string; stage: AppealReviewStage; awaiting: string }
+  | { ok: false; status: number; error: string }
+
+/**
+ * Stages one manual status change for one day as an appeal instead of writing it.
+ * The final approval in the appeals PATCH route writes the day (creating the record
+ * when there is none).
+ */
+export async function stageAttendanceChange(
+  client: SupabaseClient,
+  params: {
+    actor: StagingActor
+    userId: string
+    date: string
+    attendanceRecordId: string | null
+    currentStatus: string
+    requestedStatus: string
+    reason: string
+    /** Pass when already loaded (bulk), to skip a profile read per day. */
+    target?: StagingTarget | null
+    /** Bulk callers send one summary notice per person instead. Default true. */
+    notify?: boolean
+  }
+): Promise<StageChangeResult> {
+  const { data: pending } = await client
+    .from("attendance_appeals")
+    .select("id, stage")
+    .eq("user_id", params.userId)
+    .eq("appeal_date", params.date)
+    .eq("status", "pending")
+    .limit(1)
+    .maybeSingle<{ id: string; stage: string | null }>()
+  if (pending) {
+    const stageLabel = (pending.stage ?? "pending").replace(/_/g, " ")
+    return {
+      ok: false,
+      status: 409,
+      error: `An alteration or appeal is already pending for ${params.date} (Stage: ${stageLabel}). Please review it in the Appeals tab.`,
+    }
+  }
+
+  const target = params.target !== undefined ? params.target : await loadStagingTarget(client, params.userId)
+  const route = stagingRoute(params.actor, target)
+  const now = new Date().toISOString()
+  const firstStage =
+    route.initiatedByRole === "admin_manual"
+      ? {
+          admin_reviewed_by: params.actor.userId,
+          admin_reviewed_at: now,
+          admin_resolution_note: params.reason,
+        }
+      : {
+          lead_reviewed_by: params.actor.userId,
+          lead_reviewed_at: now,
+          lead_resolution_note: params.reason,
+        }
+
+  const { data: staged, error } = await client
+    .from("attendance_appeals")
+    .insert({
+      attendance_record_id: params.attendanceRecordId,
+      user_id: params.userId,
+      appeal_date: params.date,
+      current_status: params.currentStatus,
+      requested_status: params.requestedStatus,
+      appeal_reason: params.reason,
+      status: "pending",
+      stage: route.stage,
+      initiated_by_role: route.initiatedByRole,
+      created_by: params.actor.userId,
+      ...firstStage,
+    })
+    .select("id")
+    .single<{ id: string }>()
+
+  if (error || !staged) {
+    log.error({ err: String(error?.message), userId: params.userId, date: params.date }, "Failed to stage change")
+    return { ok: false, status: 500, error: "Failed to stage alteration" }
+  }
+
+  await recordAttendanceEvent(client, {
+    userId: params.userId,
+    eventDate: params.date,
+    eventType: "manual_update",
+    attendanceRecordId: params.attendanceRecordId,
+    fromStatus: params.currentStatus,
+    toStatus: params.requestedStatus,
+    source: "manual",
+    comment: params.reason,
+    actorId: params.actor.userId,
+    metadata: { appeal_id: staged.id, staged_stage: route.stage },
+  })
+
+  if (params.notify !== false) {
+    await notifyAppealReviewers(client, {
+      stage: route.stage,
+      department: target?.department ?? null,
+      departmentId: target?.department_id ?? null,
+      appealId: staged.id,
+      actorId: params.actor.userId,
+      title: "Attendance Alteration Staged",
+      message: `An attendance alteration to ${statusLabel(params.requestedStatus)} for ${target?.full_name ?? "an employee"} on ${params.date} requires your confirmation.`,
+    })
+  }
+
+  return { ok: true, appealId: staged.id, stage: route.stage, awaiting: route.awaiting }
+}

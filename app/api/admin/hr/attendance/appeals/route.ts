@@ -270,6 +270,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "You cannot review or approve your own appeal." }, { status: 403 })
     }
 
+    // Separation of duties: whoever made a manual change is its first stage and can never
+    // also confirm it, at any stage.
+    if (appeal.created_by && appeal.created_by === scope.userId && appeal.initiated_by_role !== "employee") {
+      return NextResponse.json(
+        { error: "You cannot confirm an alteration you made. Another reviewer must confirm it." },
+        { status: 403 }
+      )
+    }
+
     // Fetch appellant's profile
     const { data: appellant } = await dataClient
       .from("profiles")
@@ -322,14 +331,6 @@ export async function PATCH(request: NextRequest) {
       const isLeadOfAppellantDept = Boolean(
         scope.isDepartmentLead && appellant?.department && leadDepts.includes(appellant.department)
       )
-
-      // Separation of Duties: An initiator cannot confirm their own alteration
-      if (appeal.created_by && scope.userId === appeal.created_by) {
-        return NextResponse.json(
-          { error: "You cannot confirm an alteration you initiated. The employee's Department Lead must confirm it." },
-          { status: 403 }
-        )
-      }
 
       // Guard: Admin Manual Alterations require the employee's actual Department Lead confirmation
       if (appeal.initiated_by_role === "admin_manual" && !isLeadOfAppellantDept && scope.role !== "developer") {
@@ -452,6 +453,8 @@ export async function PATCH(request: NextRequest) {
             user_id: appeal.user_id,
             date: appeal.appeal_date,
             status: appeal.requested_status,
+            // Derivation reads waived before most statuses, so keep it in step either way.
+            waived: appeal.requested_status === "waiver",
             manual_comment: resolutionNote || `Appeal approved: ${appeal.requested_status}`,
             source: "manual",
           },

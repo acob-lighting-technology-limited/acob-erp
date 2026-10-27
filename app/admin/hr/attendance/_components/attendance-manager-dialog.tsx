@@ -1521,7 +1521,7 @@ function ManualRecordsTab({
     start: string,
     end: string,
     commentText: string
-  ): Promise<{ created: number; overrode: number; overridden: number; skipped: number } | null> {
+  ): Promise<{ message: string } | null> {
     const res = await apiFetch("/api/admin/hr/attendance/records/bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1533,23 +1533,13 @@ function ManualRecordsTab({
         manual_comment: commentText,
       }),
     })
-    const payload = (await res.json().catch(() => null)) as {
-      error?: string
-      created?: number
-      overrode?: number
-      overridden?: number
-      skipped?: number
-    } | null
+    const payload = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
     if (!res.ok) {
       toast.error(payload?.error || "Failed to apply")
       return null
     }
-    return {
-      created: payload?.created ?? 0,
-      overrode: payload?.overrode ?? 0,
-      overridden: payload?.overridden ?? 0,
-      skipped: payload?.skipped ?? 0,
-    }
+    // Bulk changes are staged for confirmation, not applied; the message says how many.
+    return { message: payload?.message || "Staged for confirmation" }
   }
 
   /**
@@ -1624,11 +1614,7 @@ function ManualRecordsTab({
     try {
       const result = await postRange(selectedIds, start, end, comment.trim())
       if (!result) return
-      const parts: string[] = []
-      if (result.overridden > 0) parts.push(`${result.overridden} incomplete day(s) overridden (restorable)`)
-      if (result.skipped > 0) parts.push(`${result.skipped} fully-present day(s) skipped`)
-      if (parts.length > 0) toast.warning(`Applied — ${parts.join("; ")}.`)
-      else toast.success(`Applied for ${selectedIds.length} employee(s)`)
+      toast.info(result.message)
       setSelectedIds([])
       setComment("")
       void loadEntries()
@@ -1710,7 +1696,7 @@ function ManualRecordsTab({
       if (!removed) return
       const result = await postRange([editing.user_id], eStart, eEnd, eComment.trim())
       if (!result) return
-      toast.success("Entry updated")
+      toast.info(result.message)
       setEditing(null)
       void loadEntries()
       onDone()

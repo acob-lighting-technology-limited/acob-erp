@@ -12,7 +12,8 @@ import type { UnifiedAttendanceStatus } from "@/lib/hr/attendance-status"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { AppealReviewDialog } from "./appeal-review-dialog"
 import type { AppealRow } from "./appeal-review-dialog"
-import { apiJson } from "@/lib/api-client"
+import { apiFetch, apiJson } from "@/lib/api-client"
+import { toast } from "sonner"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
@@ -102,6 +103,41 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
   })
   const load = async (..._args: unknown[]) => {
     await refetch()
+  }
+
+  // A bulk change stages one appeal per person per day, so reviewers confirm a batch
+  // at once. Each is still decided by the server's normal per-appeal rules; ones this
+  // reviewer may not confirm come back as failures and are left pending.
+  const [confirmingMany, setConfirmingMany] = useState(false)
+  const confirmSelected = async (rows: AppealRow[]) => {
+    const pending = rows.filter((r) => r.status === "pending")
+    if (pending.length === 0) {
+      toast.info("None of the selected appeals are pending")
+      return
+    }
+    setConfirmingMany(true)
+    let confirmed = 0
+    const failures: string[] = []
+    try {
+      for (const row of pending) {
+        const res = await apiFetch("/api/admin/hr/attendance/appeals", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: row.id, action: "approve", resolution_note: null }),
+        })
+        if (res.ok) {
+          confirmed++
+        } else {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null
+          failures.push(payload?.error || "Failed")
+        }
+      }
+    } finally {
+      setConfirmingMany(false)
+      await load()
+    }
+    if (failures.length === 0) toast.success(`Confirmed ${confirmed} appeal(s)`)
+    else toast.warning(`Confirmed ${confirmed}, ${failures.length} not confirmed: ${failures[0]}`)
   }
 
   const stats = useMemo(() => {
@@ -260,6 +296,14 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         columns={columns}
         filters={filters}
         getRowId={(r) => r.id}
+        selectable
+        bulkActions={[
+          {
+            label: confirmingMany ? "Confirming…" : "Confirm selected",
+            icon: CheckCircle2,
+            onClick: (rows) => void confirmSelected(rows),
+          },
+        ]}
         searchPlaceholder="Search employee or department…"
         searchFn={(r, q) => [r.user_name, r.department].join(" ").toLowerCase().includes(q)}
         pagination={{ pageSize: 50 }}
