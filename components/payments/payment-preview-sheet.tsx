@@ -30,7 +30,7 @@ import {
   addQuarters,
 } from "date-fns"
 
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -416,76 +416,88 @@ export function PaymentPreviewSheet({
   const fullPageHref = paymentId ? `${basePath}/${paymentId}` : "#"
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-2xl md:max-w-3xl">
-        <SheetHeader className="space-y-3 border-b p-5 pb-4">
-          {payment ? (
+    <>
+      <DetailSheet
+        wide
+        flush
+        open={open}
+        onOpenChange={onOpenChange}
+        title={payment ? payment.title : "Payment details"}
+        description={
+          payment ? (
             <>
-              <div className="flex flex-wrap items-center gap-2 pr-8">
-                <Badge variant="outline" className="text-xs font-semibold">
-                  {payment.category}
-                </Badge>
-                <Badge variant="outline" className={`text-xs capitalize ${getStatusBadgeClass(realStatus)}`}>
-                  {realStatus}
-                </Badge>
-                {payment.payment_type === "recurring" && payment.next_payment_due && (
-                  <Badge variant="secondary" className="text-xs">
-                    Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <SheetTitle className="text-xl font-bold">{payment.title}</SheetTitle>
-                  <SheetDescription className="text-xs">
-                    {payment.payment_type === "recurring"
-                      ? `Recurring (${payment.recurrence_period || "monthly"})`
-                      : `One-time payment · ${payment.payment_date ? format(parseISO(payment.payment_date), "MMM d, yyyy") : "N/A"}`}
-                    {payment.department?.name && ` · ${payment.department.name}`}
-                  </SheetDescription>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Button asChild variant="outline" size="sm" className="h-8 gap-1">
-                    <Link href={fullPageHref}>
-                      <span>Full page</span>
-                      <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-                    </Link>
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button aria-label="More actions" variant="outline" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleEditClick}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Payment
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setPrintDialogOpen(true)}>
-                        <Printer className="mr-2 h-4 w-4" />
-                        Download Receipt
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
-                        onClick={() => setDeleteDialogOpen(true)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete Payment
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+              {payment.payment_type === "recurring"
+                ? `Recurring (${payment.recurrence_period || "monthly"})`
+                : `One-time payment · ${payment.payment_date ? format(parseISO(payment.payment_date), "MMM d, yyyy") : "N/A"}`}
+              {payment.department?.name && ` · ${payment.department.name}`}
             </>
           ) : (
-            <div className="space-y-2">
-              <SheetTitle>Payment Details</SheetTitle>
-              <SheetDescription>Loading payment information...</SheetDescription>
-            </div>
-          )}
-        </SheetHeader>
-
+            "Loading payment information..."
+          )
+        }
+        badges={
+          payment ? (
+            <>
+              <Badge variant="outline" className="text-xs font-semibold">
+                {payment.category}
+              </Badge>
+              <Badge variant="outline" className={`text-xs capitalize ${getStatusBadgeClass(realStatus)}`}>
+                {realStatus}
+              </Badge>
+              {payment.payment_type === "recurring" && payment.next_payment_due && (
+                <Badge variant="secondary" className="text-xs">
+                  Next Due: {format(parseISO(payment.next_payment_due), "MMM d, yyyy")}
+                </Badge>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Button asChild variant="outline" size="sm" className="h-8 gap-1">
+                  <Link href={fullPageHref}>
+                    <span>Full page</span>
+                    <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                  </Link>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button aria-label="More actions" variant="outline" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleEditClick}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Payment
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPrintDialogOpen(true)}>
+                      <Printer className="mr-2 h-4 w-4" />
+                      Download Receipt
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Payment
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </>
+          ) : null
+        }
+        footer={
+          payment ? (
+            <>
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+              <Button size="sm" variant="default" onClick={handleEditClick} className="gap-1.5">
+                <Edit className="h-3.5 w-3.5" />
+                Edit Payment
+              </Button>
+            </>
+          ) : null
+        }
+      >
         <div className="flex-1 space-y-6 overflow-y-auto p-5">
           {isLoading && (
             <div className="text-muted-foreground flex min-h-[300px] flex-col items-center justify-center gap-3">
@@ -613,19 +625,7 @@ export function PaymentPreviewSheet({
             </>
           )}
         </div>
-
-        {payment && (
-          <SheetFooter className="bg-muted/20 flex flex-row items-center justify-between border-t p-4 sm:justify-between">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-            <Button size="sm" variant="default" onClick={handleEditClick} className="gap-1.5">
-              <Edit className="h-3.5 w-3.5" />
-              Edit Payment
-            </Button>
-          </SheetFooter>
-        )}
-      </SheetContent>
+      </DetailSheet>
 
       {/* Nested Dialogs */}
       <PaymentEditDialog
@@ -676,6 +676,6 @@ export function PaymentPreviewSheet({
         schedule={schedule}
         onDownloadDocument={downloadPaymentDocument}
       />
-    </Sheet>
+    </>
   )
 }

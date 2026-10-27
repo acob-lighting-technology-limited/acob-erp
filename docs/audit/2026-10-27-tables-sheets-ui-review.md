@@ -69,6 +69,11 @@ browser**: the visual items below need a pass on localhost.
   sheet would clip), row 3 asset issues (has an add form), row 7 lunch viewers (custom 330-line layout),
   rows 11 and 12 action-tracker points (an editing view built twice; wants one shared sheet), and the
   booking review.
+- Done since (4): every record side sheet except the employee profile now sits on `DetailSheet` (audit log,
+  appeal review, requisition and payment previews, MD queue, feedback, task, help-desk ticket, controlled
+  document, event). `DetailSheet` gained a `toolbar` slot and a `flush` mode for tabbed bodies. The
+  `*Dialog` file names of the task, ticket, appeal, controlled-doc and audit sheets were not renamed, to
+  avoid resetting their ratchet baselines.
 - Decided not to change: staff `/profile` is an intentional dashboard, not a table page, so it keeps its
   own frame.
 - Done since: §22 `dark:` overrides now use the `success/warning/danger/info/purple` tone tokens

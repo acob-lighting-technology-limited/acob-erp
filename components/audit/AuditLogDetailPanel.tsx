@@ -4,7 +4,7 @@ import { useCallback, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Calendar, ChevronDown, ChevronRight, Copy, Globe, MapPin, Route, User } from "lucide-react"
 import { toast } from "sonner"
 import { getAuditActionColor } from "@/lib/audit/action-colors"
@@ -107,263 +107,260 @@ export function AuditLogDetailPanel({ log, open, onClose }: AuditLogDetailPanelP
   }, [])
 
   return (
-    <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl md:max-w-2xl">
-        <SheetHeader className="border-b p-5 pb-4">
-          <SheetTitle className="text-xl font-bold">Audit Log Details</SheetTitle>
-          <SheetDescription>Complete compliance evidence for this audit event</SheetDescription>
-        </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto p-5">
-          {log && (
-            <div className="space-y-6">
-              {/* ── 1. Event identity ── */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">Action</Label>
-                  <div>
-                    <Badge className={getAuditActionColor(log.action)}>{getActionDisplay(log)}</Badge>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">Module</Label>
-                  <div className="text-sm font-medium">{getNormalizedEntityTypeDisplay(log.entity_type)}</div>
-                </div>
+    <DetailSheet
+      wide
+      open={open}
+      onOpenChange={onClose}
+      title="Audit log details"
+      description="Complete compliance evidence for this audit event"
+    >
+      {log && (
+        <div className="space-y-6">
+          {/* ── 1. Event identity ── */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold">Action</Label>
+              <div>
+                <Badge className={getAuditActionColor(log.action)}>{getActionDisplay(log)}</Badge>
               </div>
-
-              {/* ── 2. Timestamp ── */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">Date &amp; Time</Label>
-                <div className="bg-muted/50 rounded-lg border p-3">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="text-muted-foreground h-4 w-4" />
-                    <span className="text-sm">{formatAuditDate(log.created_at)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── 3. Who did it ── */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">Performed By</Label>
-                <div className="bg-muted/50 rounded-lg border p-3">
-                  <div className="flex items-center gap-2">
-                    <User className="text-muted-foreground h-4 w-4" />
-                    <span
-                      className={`text-sm font-medium ${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : ""}`}
-                    >
-                      {getPerformedBy(log)}
-                    </span>
-                  </div>
-                  {!(log.entity_type === "feedback" && log.new_values?.is_anonymous) && log.user?.company_email && (
-                    <div className="mt-1 flex items-center gap-1">
-                      <p className="text-muted-foreground text-xs">{log.user.company_email}</p>
-                      <Button
-                        aria-label="Copy"
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => void handleCopy(log.user!.company_email, "Email copied")}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                  {log.user?.employee_number && (
-                    <p className="text-muted-foreground mt-0.5 text-xs">Emp #: {log.user.employee_number}</p>
-                  )}
-                  {log.user?.department && (
-                    <p className="text-muted-foreground mt-0.5 text-xs">Dept: {log.user.department}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* ── 4. Object ── */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">Object</Label>
-                <div className="bg-muted/50 rounded-lg border p-3">
-                  <p className="text-sm font-medium">{getObjectIdentifier(log)}</p>
-                  {log.entity_id && (
-                    <div className="mt-1 flex items-center gap-1">
-                      <code className="text-muted-foreground font-mono text-xs break-all">{log.entity_id}</code>
-                      <Button
-                        aria-label="Copy"
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => void handleCopy(log.entity_id!, "Entity ID copied")}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ── 5. Target ── */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">Target / Affected</Label>
-                <div className="bg-muted/50 space-y-1 rounded-lg border p-3">
-                  <p className="text-sm font-medium">{getTargetDescription(log)}</p>
-                  {log.target_user && (
-                    <div className="flex items-center gap-1">
-                      <p className="text-muted-foreground text-xs">{log.target_user.company_email}</p>
-                      <Button
-                        aria-label="Copy"
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => void handleCopy(log.target_user!.company_email, "Email copied")}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                  {log.target_user?.employee_number && (
-                    <p className="text-muted-foreground text-xs">Emp #: {log.target_user.employee_number}</p>
-                  )}
-                  {log.task_info && (
-                    <div className="mt-2 border-t pt-2">
-                      <p className="text-muted-foreground text-xs">Task: {log.task_info.title}</p>
-                      {log.task_info.assigned_to_user && (
-                        <p className="text-muted-foreground text-xs">
-                          Assigned to: {formatName(log.task_info.assigned_to_user.first_name)}{" "}
-                          {formatName(log.task_info.assigned_to_user.last_name)}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {log.device_info && (
-                    <div className="mt-2 border-t pt-2">
-                      <p className="text-muted-foreground text-xs">Device: {log.device_info.device_name}</p>
-                      {log.device_info.assigned_to_user && (
-                        <p className="text-muted-foreground text-xs">
-                          Assigned to: {formatName(log.device_info.assigned_to_user.first_name)}{" "}
-                          {formatName(log.device_info.assigned_to_user.last_name)}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ── 6. Department / Location ── */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">Department / Location</Label>
-                <div className="bg-muted/50 flex items-center gap-2 rounded-lg border p-3">
-                  <MapPin className="text-muted-foreground h-4 w-4 shrink-0" />
-                  <span className="text-sm">{getDepartmentLocation(log)}</span>
-                </div>
-              </div>
-
-              {/* ── 7. Changed fields — primary diff view ── */}
-              {(() => {
-                const diffs = getAuditFieldDiffs(log)
-                if (diffs.length === 0) {
-                  return (
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold">Changed Fields</Label>
-                      <div className="bg-muted/50 rounded-lg border p-3">
-                        <p className="text-muted-foreground text-sm italic">No field diff captured</p>
-                      </div>
-                    </div>
-                  )
-                }
-                return (
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold">Changed Fields ({diffs.length})</Label>
-                    <div className="overflow-hidden rounded-lg border">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-muted/80 border-b">
-                            <th className="w-1/3 px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">
-                              Field
-                            </th>
-                            <th className="w-1/3 px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">
-                              Before
-                            </th>
-                            <th className="w-1/3 px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">
-                              After
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {diffs.map((d, i) => (
-                            <tr key={d.field} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
-                              <td className="px-3 py-2 text-xs font-medium">{formatAuditFieldLabel(d.field)}</td>
-                              <td className="text-muted-foreground px-3 py-2 font-mono text-xs break-all">
-                                {formatAuditValue(d.before === "Empty" ? undefined : d.before)}
-                              </td>
-                              <td className="px-3 py-2 font-mono text-xs break-all">
-                                {formatAuditValue(d.after === "Empty" ? undefined : d.after)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* ── 8. Request metadata ── */}
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">Request Metadata</Label>
-                <div className="bg-muted/50 space-y-2 rounded-lg border p-3">
-                  <SectionLabel>Origin</SectionLabel>
-                  <div className="space-y-1.5">
-                    <div className="flex items-start gap-2">
-                      <Globe className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      <DetailRow label="Source" value={getAuditSource(log)} />
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Route className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      <DetailRow label="Route" value={getAuditRoute(log)} mono />
-                    </div>
-                  </div>
-
-                  <div className="mt-2 border-t pt-2">
-                    <SectionLabel>Identifiers</SectionLabel>
-                    <div className="space-y-1.5">
-                      <DetailRow label="Request ID" value={getAuditRequestId(log)} mono />
-                      <DetailRow label="IP Address" value={getAuditIpAddress(log)} mono />
-                      {getAuditSiteId(log) !== "Not captured" && (
-                        <DetailRow label="Site ID" value={getAuditSiteId(log)} mono />
-                      )}
-                    </div>
-                  </div>
-
-                  {getAuditUserAgent(log) !== "Not captured" && (
-                    <div className="mt-2 border-t pt-2">
-                      <SectionLabel>User Agent</SectionLabel>
-                      <p className="text-muted-foreground font-mono text-xs break-all">{getAuditUserAgent(log)}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ── 9. Raw JSON evidence (collapsible) ── */}
-              {(log.old_values && Object.keys(log.old_values).length > 0) ||
-              (log.new_values && Object.keys(log.new_values).length > 0) ||
-              (log.metadata && Object.keys(log.metadata).length > 0) ? (
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Raw Evidence (JSON)</Label>
-                  <div className="space-y-2">
-                    {log.old_values && Object.keys(log.old_values).length > 0 && (
-                      <CollapsibleJson label="Old Values" value={log.old_values} />
-                    )}
-                    {log.new_values && Object.keys(log.new_values).length > 0 && (
-                      <CollapsibleJson label="New Values" value={log.new_values} />
-                    )}
-                    {log.metadata && Object.keys(log.metadata).length > 0 && (
-                      <CollapsibleJson label="Metadata" value={log.metadata} />
-                    )}
-                  </div>
-                </div>
-              ) : null}
             </div>
-          )}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold">Module</Label>
+              <div className="text-sm font-medium">{getNormalizedEntityTypeDisplay(log.entity_type)}</div>
+            </div>
+          </div>
+
+          {/* ── 2. Timestamp ── */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Date &amp; Time</Label>
+            <div className="bg-muted/50 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="text-muted-foreground h-4 w-4" />
+                <span className="text-sm">{formatAuditDate(log.created_at)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 3. Who did it ── */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Performed By</Label>
+            <div className="bg-muted/50 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <User className="text-muted-foreground h-4 w-4" />
+                <span
+                  className={`text-sm font-medium ${log.entity_type === "feedback" && log.new_values?.is_anonymous ? "text-muted-foreground italic" : ""}`}
+                >
+                  {getPerformedBy(log)}
+                </span>
+              </div>
+              {!(log.entity_type === "feedback" && log.new_values?.is_anonymous) && log.user?.company_email && (
+                <div className="mt-1 flex items-center gap-1">
+                  <p className="text-muted-foreground text-xs">{log.user.company_email}</p>
+                  <Button
+                    aria-label="Copy"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    onClick={() => void handleCopy(log.user!.company_email, "Email copied")}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {log.user?.employee_number && (
+                <p className="text-muted-foreground mt-0.5 text-xs">Emp #: {log.user.employee_number}</p>
+              )}
+              {log.user?.department && (
+                <p className="text-muted-foreground mt-0.5 text-xs">Dept: {log.user.department}</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── 4. Object ── */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Object</Label>
+            <div className="bg-muted/50 rounded-lg border p-3">
+              <p className="text-sm font-medium">{getObjectIdentifier(log)}</p>
+              {log.entity_id && (
+                <div className="mt-1 flex items-center gap-1">
+                  <code className="text-muted-foreground font-mono text-xs break-all">{log.entity_id}</code>
+                  <Button
+                    aria-label="Copy"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    onClick={() => void handleCopy(log.entity_id!, "Entity ID copied")}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── 5. Target ── */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Target / Affected</Label>
+            <div className="bg-muted/50 space-y-1 rounded-lg border p-3">
+              <p className="text-sm font-medium">{getTargetDescription(log)}</p>
+              {log.target_user && (
+                <div className="flex items-center gap-1">
+                  <p className="text-muted-foreground text-xs">{log.target_user.company_email}</p>
+                  <Button
+                    aria-label="Copy"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    onClick={() => void handleCopy(log.target_user!.company_email, "Email copied")}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {log.target_user?.employee_number && (
+                <p className="text-muted-foreground text-xs">Emp #: {log.target_user.employee_number}</p>
+              )}
+              {log.task_info && (
+                <div className="mt-2 border-t pt-2">
+                  <p className="text-muted-foreground text-xs">Task: {log.task_info.title}</p>
+                  {log.task_info.assigned_to_user && (
+                    <p className="text-muted-foreground text-xs">
+                      Assigned to: {formatName(log.task_info.assigned_to_user.first_name)}{" "}
+                      {formatName(log.task_info.assigned_to_user.last_name)}
+                    </p>
+                  )}
+                </div>
+              )}
+              {log.device_info && (
+                <div className="mt-2 border-t pt-2">
+                  <p className="text-muted-foreground text-xs">Device: {log.device_info.device_name}</p>
+                  {log.device_info.assigned_to_user && (
+                    <p className="text-muted-foreground text-xs">
+                      Assigned to: {formatName(log.device_info.assigned_to_user.first_name)}{" "}
+                      {formatName(log.device_info.assigned_to_user.last_name)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── 6. Department / Location ── */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Department / Location</Label>
+            <div className="bg-muted/50 flex items-center gap-2 rounded-lg border p-3">
+              <MapPin className="text-muted-foreground h-4 w-4 shrink-0" />
+              <span className="text-sm">{getDepartmentLocation(log)}</span>
+            </div>
+          </div>
+
+          {/* ── 7. Changed fields — primary diff view ── */}
+          {(() => {
+            const diffs = getAuditFieldDiffs(log)
+            if (diffs.length === 0) {
+              return (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-semibold">Changed Fields</Label>
+                  <div className="bg-muted/50 rounded-lg border p-3">
+                    <p className="text-muted-foreground text-sm italic">No field diff captured</p>
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold">Changed Fields ({diffs.length})</Label>
+                <div className="overflow-hidden rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/80 border-b">
+                        <th className="w-1/3 px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">
+                          Field
+                        </th>
+                        <th className="w-1/3 px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">
+                          Before
+                        </th>
+                        <th className="w-1/3 px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">
+                          After
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diffs.map((d, i) => (
+                        <tr key={d.field} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                          <td className="px-3 py-2 text-xs font-medium">{formatAuditFieldLabel(d.field)}</td>
+                          <td className="text-muted-foreground px-3 py-2 font-mono text-xs break-all">
+                            {formatAuditValue(d.before === "Empty" ? undefined : d.before)}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs break-all">
+                            {formatAuditValue(d.after === "Empty" ? undefined : d.after)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── 8. Request metadata ── */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold">Request Metadata</Label>
+            <div className="bg-muted/50 space-y-2 rounded-lg border p-3">
+              <SectionLabel>Origin</SectionLabel>
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <Globe className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <DetailRow label="Source" value={getAuditSource(log)} />
+                </div>
+                <div className="flex items-start gap-2">
+                  <Route className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <DetailRow label="Route" value={getAuditRoute(log)} mono />
+                </div>
+              </div>
+
+              <div className="mt-2 border-t pt-2">
+                <SectionLabel>Identifiers</SectionLabel>
+                <div className="space-y-1.5">
+                  <DetailRow label="Request ID" value={getAuditRequestId(log)} mono />
+                  <DetailRow label="IP Address" value={getAuditIpAddress(log)} mono />
+                  {getAuditSiteId(log) !== "Not captured" && (
+                    <DetailRow label="Site ID" value={getAuditSiteId(log)} mono />
+                  )}
+                </div>
+              </div>
+
+              {getAuditUserAgent(log) !== "Not captured" && (
+                <div className="mt-2 border-t pt-2">
+                  <SectionLabel>User Agent</SectionLabel>
+                  <p className="text-muted-foreground font-mono text-xs break-all">{getAuditUserAgent(log)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── 9. Raw JSON evidence (collapsible) ── */}
+          {(log.old_values && Object.keys(log.old_values).length > 0) ||
+          (log.new_values && Object.keys(log.new_values).length > 0) ||
+          (log.metadata && Object.keys(log.metadata).length > 0) ? (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Raw Evidence (JSON)</Label>
+              <div className="space-y-2">
+                {log.old_values && Object.keys(log.old_values).length > 0 && (
+                  <CollapsibleJson label="Old Values" value={log.old_values} />
+                )}
+                {log.new_values && Object.keys(log.new_values).length > 0 && (
+                  <CollapsibleJson label="New Values" value={log.new_values} />
+                )}
+                {log.metadata && Object.keys(log.metadata).length > 0 && (
+                  <CollapsibleJson label="Metadata" value={log.metadata} />
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
-      </SheetContent>
-    </Sheet>
+      )}
+    </DetailSheet>
   )
 }
