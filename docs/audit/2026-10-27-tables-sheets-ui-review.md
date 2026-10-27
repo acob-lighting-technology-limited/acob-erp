@@ -55,6 +55,14 @@ browser**: the visual items below need a pass on localhost.
 - §17 status colour maps (14 files) and §18 empty states (25 files) still to move onto `StatusBadge` and
   `EmptyState`; §27 hand-built page frames, §30 mobile layout, §33 accessibility (drawer focus trap,
   skip link).
+- Done since (2): §17 local status colours (8 files) now use the tone tokens; §18 centred empty text
+  uses `EmptyState compact` (small inline hints stay as text); §13 one export system (the built-in
+  `DataTable` export is removed; every page exports through `ExportOptionsDialog` in the header);
+  §11 Refresh buttons removed on 6 query-driven pages, `HeaderMoreMenu` added and used on leave and UI
+  errors (the other header-button pages still need it); §1 rows 2, 6 and 14 (asset history, role
+  members, acknowledgements) are side sheets.
+- Decided not to change: staff `/profile` is an intentional dashboard, not a table page, so it keeps its
+  own frame.
 - Done since: §22 `dark:` overrides now use the `success/warning/danger/info/purple` tone tokens
   (about 1,000 pairs, 15 genuine one-offs left); §21 destructive styling on the two flagged tables.
 - §55 end-to-end tests in CI (needs a seeded test project; there is no staging database).
