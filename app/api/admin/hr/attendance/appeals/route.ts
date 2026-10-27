@@ -186,7 +186,8 @@ export async function GET(request: NextRequest) {
         created_by_name: resolveProfileName(r.created_by),
         lead_reviewer_name: resolveProfileName(r.lead_reviewed_by),
         admin_reviewer_name: resolveProfileName(r.admin_reviewed_by),
-        reviewer_name: resolveProfileName(r.reviewed_by),
+        reviewer_name:
+          r.status === "pending" ? null : resolveProfileName(r.admin_reviewed_by) || resolveProfileName(r.reviewed_by),
         live_status: liveAppealDayStatus(
           recordByDay.get(`${r.user_id}::${r.appeal_date}`) ?? null,
           r.appeal_date,
@@ -392,9 +393,11 @@ export async function PATCH(request: NextRequest) {
 
     updates.status = nextStatus
     updates.stage = nextStage
-    updates.reviewed_by = scope.userId
-    updates.reviewed_at = now
-    updates.resolution_note = resolutionNote || null
+    if (isFinalApproval || action === "reject") {
+      updates.reviewed_by = scope.userId
+      updates.reviewed_at = now
+      updates.resolution_note = resolutionNote || null
+    }
 
     let approvedRecordId: string | null = appeal.attendance_record_id
 

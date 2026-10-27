@@ -298,7 +298,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               </div>
             ) : appeal.stage === "pending_admin" ? (
               <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-2.5 text-xs text-blue-800 dark:text-blue-300">
-                Awaiting Admin & HR review
+                Awaiting Admin & HR Lead review
               </div>
             ) : null}
 

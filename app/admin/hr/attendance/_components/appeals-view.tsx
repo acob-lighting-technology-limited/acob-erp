@@ -307,7 +307,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                   : r.status === "approved" || r.status === "rejected"
                     ? `Reviewed by ${r.reviewer_name || "Admin"}${r.reviewed_at ? ` on ${formatWATDateTime(r.reviewed_at)}` : ""}${r.resolution_note ? ` — "${r.resolution_note}"` : ""}`
                     : r.stage === "pending_admin"
-                      ? "Pending Admin Review"
+                      ? "Awaiting Admin & HR Lead Review"
                       : "Pending Lead stage",
                 fullWidth: true,
               },
@@ -451,26 +451,33 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                             {r.status === "rejected" ? "Rejected" : "Approved"}
                           </span>
                         ) : r.stage === "pending_admin" ? (
-                          <span className="font-medium text-blue-600 dark:text-blue-400">Awaiting Admin Review</span>
+                          <span className="font-medium text-blue-600 dark:text-blue-400">
+                            Awaiting Admin & HR Lead Review
+                          </span>
                         ) : (
                           <span className="text-muted-foreground">Pending Lead Stage</span>
                         )}
                       </div>
-                      {(r.admin_reviewer_name || r.reviewer_name) && (
-                        <span className="text-muted-foreground">
-                          by{" "}
-                          <strong className="text-foreground font-medium">
-                            {r.admin_reviewer_name || r.reviewer_name}
-                          </strong>
-                        </span>
-                      )}
-                      {(r.admin_resolution_note || r.resolution_note) && (
-                        <span className="text-muted-foreground truncate italic">
-                          &ldquo;{r.admin_resolution_note || r.resolution_note}&rdquo;
-                        </span>
+                      {(r.admin_reviewed_at ||
+                        (r.status !== "pending" && (r.admin_reviewer_name || r.reviewer_name))) && (
+                        <>
+                          {(r.admin_reviewer_name || r.reviewer_name) && (
+                            <span className="text-muted-foreground">
+                              by{" "}
+                              <strong className="text-foreground font-medium">
+                                {r.admin_reviewer_name || r.reviewer_name}
+                              </strong>
+                            </span>
+                          )}
+                          {(r.admin_resolution_note || r.resolution_note) && (
+                            <span className="text-muted-foreground truncate italic">
+                              &ldquo;{r.admin_resolution_note || r.resolution_note}&rdquo;
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
-                    {(r.admin_reviewed_at || r.reviewed_at) && (
+                    {(r.admin_reviewed_at || (r.status !== "pending" && r.reviewed_at)) && (
                       <span className="text-muted-foreground shrink-0 whitespace-nowrap">
                         {formatWATDateTime(r.admin_reviewed_at || r.reviewed_at!)}
                       </span>
