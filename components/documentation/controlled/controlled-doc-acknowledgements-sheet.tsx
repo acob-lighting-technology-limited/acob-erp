@@ -68,8 +68,8 @@ export function ControlledDocAcknowledgementsSheet({ doc, onOpenChange }: Contro
     >
       {isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-10 w-full" />
+          {["a", "b", "c", "d", "e", "f"].map((id) => (
+            <Skeleton key={id} className="h-10 w-full" />
           ))}
         </div>
       ) : error ? (
