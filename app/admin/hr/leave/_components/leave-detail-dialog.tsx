@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, type ReactNode } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,6 @@ import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
 import {
   Clock,
-  User,
   FileCheck,
   FileText,
   CheckCircle2,
@@ -18,12 +17,9 @@ import {
   Copy,
   Check,
   X,
-  Layers,
   ExternalLink,
-  ShieldCheck,
   MessageSquare,
   Paperclip,
-  CalendarDays,
 } from "lucide-react"
 import { LeaveItem, approvalStageKey, resolvePersonName, getStageBadge, resolveLeaveRouteStages } from "../view"
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
@@ -136,31 +132,40 @@ export function LeaveDetailDialog({
   const hasHandover = Boolean(leave.handover_checklist_url || leave.handover_note)
   const hasEvidence = Boolean(leave.evidence && leave.evidence.length > 0)
 
+  const recordedStages = stageOrder.filter((stageKey) => stageAuditMap.has(stageKey)).length
+  const statusTitle = isApproved
+    ? "Approved — all endorsements complete"
+    : isRejected
+      ? "Rejected during approval"
+      : isCancelled
+        ? "Cancelled"
+        : `Awaiting ${stageName[currentStageKey] || currentStageKey.replace(/_/g, " ")}`
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex h-full w-full flex-col gap-0 p-0 sm:max-w-xl">
-        {/* Sheet Header */}
-        <SheetHeader className="bg-muted/20 border-b px-5 py-4 sm:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Sheet Header — right padding keeps the badges clear of the close button */}
+        <SheetHeader className="bg-muted/20 space-y-0 border-b py-3.5 pr-12 pl-4 sm:pl-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <StaffAvatar
                 name={employeeName}
                 src={staffAvatars[leave.user_id]}
                 profileId={leave.user_id}
                 initials={getInitials(employeeName)}
-                className="h-11 w-11 border text-xs shadow-xs"
+                className="h-10 w-10 border text-xs shadow-xs"
               />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <SheetTitle className="truncate text-base font-semibold">{formatName(employeeName)}</SheetTitle>
                   <Badge
                     variant="outline"
-                    className="border-blue-200 bg-blue-50/50 font-mono text-[11px] font-medium text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
+                    className="border-blue-200 bg-blue-50/50 text-[11px] font-medium text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
                   >
                     {leaveTypeName}
                   </Badge>
                 </div>
-                <SheetDescription className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                <SheetDescription className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
                   <span>{employeeDept}</span>
                   <span>•</span>
                   <span>
@@ -171,12 +176,11 @@ export function LeaveDetailDialog({
               </div>
             </div>
 
-            {/* Quick Status Badges in Header */}
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {getStageBadge(leave)}
               <Badge
                 className={cn(
-                  "px-2.5 py-0.5 text-xs font-medium capitalize",
+                  "px-2 py-0.5 text-xs font-medium capitalize",
                   isApproved
                     ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
                     : isRejected || isCancelled
@@ -191,168 +195,90 @@ export function LeaveDetailDialog({
           </div>
         </SheetHeader>
 
-        {/* Scrollable Content Body — Unified Single View */}
+        {/* Scrollable body — flat sections divided by rules, no nested cards */}
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-5 p-5 sm:p-6">
-            {/* Status Callout Banner */}
-            <div
-              className={cn(
-                "flex items-start gap-3 rounded-lg border p-3.5 text-xs shadow-xs",
-                isApproved
-                  ? "border-emerald-200 bg-emerald-50/50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300"
-                  : isRejected
-                    ? "border-red-200 bg-red-50/60 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
-                    : isCancelled
-                      ? "border-muted bg-muted/40 text-muted-foreground"
-                      : "border-amber-200 bg-amber-50/50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300"
-              )}
-            >
-              {isApproved ? (
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              ) : isRejected ? (
-                <XCircle className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
-              ) : isCancelled ? (
-                <AlertCircle className="text-muted-foreground h-5 w-5 shrink-0" />
-              ) : (
-                <Clock className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">
-                  {isApproved
-                    ? "Leave Request Approved"
+          <div className="divide-y px-4 sm:px-5">
+            <div className="space-y-2.5 py-4">
+              {/* Status strip */}
+              <div
+                className={cn(
+                  "flex items-start gap-2.5 rounded-md border px-3 py-2 text-xs",
+                  isApproved
+                    ? "border-emerald-200 bg-emerald-50/50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300"
                     : isRejected
-                      ? "Leave Request Rejected"
+                      ? "border-red-200 bg-red-50/60 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
                       : isCancelled
-                        ? "Leave Request Cancelled"
-                        : `Currently in Progress: Awaiting ${currentStageKey.replace(/_/g, " ").toUpperCase()}`}
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed opacity-90">
-                  {isApproved
-                    ? "All required endorsements have been completed. The employee is scheduled for leave."
-                    : isRejected
-                      ? "This application was rejected during the approval workflow and will not proceed."
-                      : isCancelled
-                        ? "This application was cancelled by the requester or administrator."
-                        : "This leave request is progressing through the organizational endorsement hierarchy."}
-                </p>
-                {isRejected && rejectionReason && (
-                  <div className="mt-2.5 rounded-md border border-red-300/80 bg-red-100/70 p-2.5 text-xs text-red-900 dark:border-red-800 dark:bg-red-950/60 dark:text-red-200">
-                    <span className="mb-0.5 block font-semibold">Rejection Reason:</span>
-                    <span>&ldquo;{rejectionReason}&rdquo;</span>
-                  </div>
+                        ? "border-muted bg-muted/40 text-muted-foreground"
+                        : "border-amber-200 bg-amber-50/50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300"
                 )}
+              >
+                {isApproved ? (
+                  <CheckCircle2 className="mt-px h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                ) : isRejected ? (
+                  <XCircle className="mt-px h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+                ) : isCancelled ? (
+                  <AlertCircle className="text-muted-foreground mt-px h-4 w-4 shrink-0" />
+                ) : (
+                  <Clock className="mt-px h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium">{statusTitle}</p>
+                  {isRejected && rejectionReason && (
+                    <p className="mt-0.5 leading-relaxed">
+                      <span className="font-semibold">Reason: </span>&ldquo;{rejectionReason}&rdquo;
+                    </p>
+                  )}
+                </div>
               </div>
+
+              {/* Concurrent Department Leave Notice */}
+              {leave.department_overlaps && leave.department_overlaps.length > 0 && (
+                <div className="space-y-1.5 rounded-md border border-amber-300/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>Also off in this department during these dates</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {leave.department_overlaps.map((overlap) => (
+                      <Badge
+                        key={overlap.id}
+                        variant="outline"
+                        className="border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                      >
+                        {overlap.full_name} ({safeDateDisplay(overlap.start_date)} to{" "}
+                        {safeDateDisplay(overlap.end_date)})
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Details — dates and duration already live in the header */}
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 pt-1 text-xs sm:grid-cols-3">
+                <DetailField label="Resume date" value={safeDateDisplay(leave.resume_date)} />
+                <DetailField label="Reliever" value={resolvePersonName(leave.reliever) || "Not assigned"} />
+                <DetailField label="Department lead" value={resolvePersonName(leave.supervisor) || "—"} />
+                <DetailField
+                  className="col-span-full"
+                  label="Reason"
+                  value={leave.reason || "No reason provided."}
+                  valueClassName="font-normal leading-relaxed"
+                />
+              </dl>
             </div>
 
-            {/* Concurrent Department Leave Notice */}
-            {leave.department_overlaps && leave.department_overlaps.length > 0 && (
-              <div className="space-y-1.5 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <span>Concurrent Department Leave Notice</span>
-                </div>
-                <p className="text-muted-foreground leading-relaxed dark:text-amber-300/80">
-                  The following colleague(s) in this department also have scheduled or pending leave during these dates:
-                </p>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {leave.department_overlaps.map((overlap) => (
-                    <Badge
-                      key={overlap.id}
-                      variant="outline"
-                      className="border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                    >
-                      {overlap.full_name} ({safeDateDisplay(overlap.start_date)} to {safeDateDisplay(overlap.end_date)})
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Section 1: Leave Details & Application Reason */}
-            <div className="bg-card space-y-3 rounded-lg border p-4 shadow-xs">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase">
-                  <CalendarDays className="text-primary h-3.5 w-3.5" /> Leave Details & Application
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[11px]">Start Date</span>
-                  <span className="text-foreground font-medium">{safeDateDisplay(leave.start_date)}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[11px]">End Date</span>
-                  <span className="text-foreground font-medium">{safeDateDisplay(leave.end_date)}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[11px]">Duration</span>
-                  <span className="text-foreground font-medium">
-                    {leave.days_count} {leave.days_count === 1 ? "day" : "days"}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[11px]">Resume Date</span>
-                  <span className="text-foreground font-medium">{safeDateDisplay(leave.resume_date)}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 border-t pt-3 text-xs sm:grid-cols-2">
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[11px]">Assigned Reliever</span>
-                  <span className="text-foreground font-medium">
-                    {resolvePersonName(leave.reliever) || "Not assigned"}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block text-[11px]">Department Lead</span>
-                  <span className="text-foreground font-medium">
-                    {resolvePersonName(leave.supervisor) || "Department Lead"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Applicant's Reason / Justification */}
-              <div className="border-t pt-3">
-                <span className="text-muted-foreground block text-[11px] font-medium">
-                  Applicant&apos;s Justification
-                </span>
-                <div className="bg-muted/40 text-foreground/90 mt-1 rounded-md border p-2.5 text-xs leading-relaxed italic">
-                  &ldquo;{leave.reason || "No explicit reason provided."}&rdquo;
-                </div>
-              </div>
-
-              {/* Handover Notes (if present as text) */}
-              {leave.handover_note &&
-                (!leave.handover_checklist_url || !leave.handover_note.startsWith("Attached:")) && (
-                  <div className="border-t pt-2.5">
-                    <span className="text-muted-foreground block text-[11px] font-medium">Handover Notes</span>
-                    <div className="bg-muted/40 text-foreground/90 mt-1 rounded-md border p-2.5 text-xs leading-relaxed">
-                      {leave.handover_note}
-                    </div>
-                  </div>
-                )}
-            </div>
-
-            {/* Section 2: Approval Timeline & Audit Log */}
-            <div className="bg-card space-y-4 rounded-lg border p-4 shadow-xs sm:p-5">
-              <div className="flex items-center justify-between border-b pb-3">
-                <span className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase">
-                  <Layers className="text-primary h-3.5 w-3.5" /> Approval Stages & Audit Log
-                </span>
-                <span className="text-muted-foreground text-[11px]">
-                  {timeline.length} stage{timeline.length === 1 ? "" : "s"} recorded
-                </span>
-              </div>
+            {/* Approval stages */}
+            <section className="space-y-3 py-4">
+              <SectionHeading title="Approval stages" aside={`${recordedStages} of ${stageOrder.length} recorded`} />
 
               {stageAuditMap.size === 0 && leave.admin_manual ? (
-                <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3.5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                  <div className="rounded-full bg-emerald-500 p-1 text-white shadow-xs">
-                    <Check className="h-3.5 w-3.5" />
+                <div className="flex items-start gap-3">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                    <Check className="h-3 w-3 stroke-[3]" />
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-foreground text-xs font-semibold">Direct Admin Manual Approval</span>
+                  <div className="min-w-0 flex-1 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-foreground font-medium">Direct admin approval</span>
                       <Badge
                         variant="outline"
                         className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600"
@@ -360,21 +286,14 @@ export function LeaveDetailDialog({
                         Approved
                       </Badge>
                     </div>
-                    <p className="text-muted-foreground text-xs">
-                      Approved by{" "}
-                      <span className="text-foreground font-medium">
-                        {leave.approved_by_profile ? resolvePersonName(leave.approved_by_profile) : "Authorized Admin"}
-                      </span>
+                    <p className="text-muted-foreground mt-0.5 text-[11px]">
+                      {leave.approved_by_profile ? resolvePersonName(leave.approved_by_profile) : "Authorized Admin"}
+                      {leave.approved_at && ` • ${formatWATDateTime(leave.approved_at)}`}
                     </p>
-                    {leave.approved_at && (
-                      <p className="text-muted-foreground font-mono text-[11px]">
-                        {formatWATDateTime(leave.approved_at)}
-                      </p>
-                    )}
                   </div>
                 </div>
               ) : (
-                <div className="before:bg-muted-foreground/20 relative space-y-5 pl-6 before:absolute before:top-2 before:bottom-2 before:left-2.5 before:w-[2px]">
+                <ol className="before:bg-border relative space-y-3 before:absolute before:top-2.5 before:bottom-2.5 before:left-[9px] before:w-px">
                   {stageOrder.map((stageKey, idx) => {
                     const item = stageAuditMap.get(stageKey)
                     const stageActorName =
@@ -397,15 +316,24 @@ export function LeaveDetailDialog({
                     } else if (isCompleted) {
                       nodeColor = "border-emerald-500 bg-emerald-500 text-white"
                     } else if (isCurrent) {
-                      nodeColor = "border-amber-500 bg-amber-500 text-white animate-pulse"
+                      nodeColor = "border-amber-500 bg-amber-500 text-white"
                     }
 
+                    // Only say something under a pending stage when it adds information
+                    const pendingNote =
+                      stageKey === "reliever" && !hasRelieverAssignee
+                        ? "No reliever assigned for this application"
+                        : stageKey === "reliever" && relieverHandledByLead
+                          ? `Handled by ${departmentLeadApproverName || resolvePersonName(leave.supervisor) || "Department Lead"}`
+                          : isRejected || isApproved
+                            ? null
+                            : stageActorName
+
                     return (
-                      <div key={stageKey} className="group relative">
-                        {/* Timeline Node Point */}
+                      <li key={stageKey} className="relative flex gap-3">
                         <div
                           className={cn(
-                            "absolute top-0.5 -left-[27px] flex h-5 w-5 items-center justify-center rounded-full border-2 text-[10px] font-bold shadow-xs transition-colors",
+                            "relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold",
                             nodeColor
                           )}
                         >
@@ -418,15 +346,16 @@ export function LeaveDetailDialog({
                           )}
                         </div>
 
-                        {/* Stage Card */}
-                        <div
-                          className={cn(
-                            "bg-card space-y-2 rounded-lg border p-3.5 shadow-xs transition-colors",
-                            isStageRejected && "border-red-200 bg-red-50/20 dark:border-red-950 dark:bg-red-950/10"
-                          )}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-1.5">
-                            <span className="text-foreground text-xs font-semibold">{stageName[stageKey]}</span>
+                        <div className="min-w-0 flex-1 text-xs">
+                          <div className="flex min-h-5 flex-wrap items-center justify-between gap-1.5">
+                            <span
+                              className={cn(
+                                "font-medium",
+                                item || isCurrent ? "text-foreground" : "text-muted-foreground"
+                              )}
+                            >
+                              {stageName[stageKey]}
+                            </span>
 
                             {item ? (
                               <Badge
@@ -444,7 +373,7 @@ export function LeaveDetailDialog({
                                 variant="outline"
                                 className="border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-600 dark:text-amber-400"
                               >
-                                Awaiting Action
+                                Awaiting action
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground text-[10px]">
@@ -460,200 +389,118 @@ export function LeaveDetailDialog({
                           </div>
 
                           {item ? (
-                            <div className="space-y-1.5 text-xs">
-                              <div className="text-muted-foreground flex flex-wrap items-center gap-1.5">
-                                <span className="text-foreground font-medium">
-                                  {stageActorName ? stageActorName : "Authorized Approver"}
-                                </span>
-                                {item.approved_at && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="font-mono text-[11px]">{formatWATDateTime(item.approved_at)}</span>
-                                  </>
-                                )}
-                              </div>
-
-                              {item.comments && (
-                                <div
-                                  className={cn(
-                                    "flex items-start gap-2 rounded border p-2.5 text-xs",
-                                    isStageRejected
-                                      ? "border-red-200 bg-red-50/70 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
-                                      : "bg-muted/40 text-foreground/90 italic"
-                                  )}
-                                >
-                                  <MessageSquare
-                                    className={cn(
-                                      "mt-0.5 h-3.5 w-3.5 shrink-0",
-                                      isStageRejected ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
-                                    )}
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    {isStageRejected && (
-                                      <span className="mb-0.5 block font-semibold not-italic">Rejection Reason:</span>
-                                    )}
-                                    <span>&ldquo;{item.comments}&rdquo;</span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                            <p className="text-muted-foreground mt-0.5 text-[11px]">
+                              <span className="text-foreground/90">{stageActorName || "Authorized Approver"}</span>
+                              {item.approved_at && ` • ${formatWATDateTime(item.approved_at)}`}
+                            </p>
                           ) : (
-                            <div className="text-muted-foreground text-xs">
-                              {stageKey === "reliever" && !hasRelieverAssignee ? (
-                                <span className="italic">No reliever assigned for this application</span>
-                              ) : stageKey === "reliever" && relieverHandledByLead ? (
-                                <span className="italic">
-                                  Handled by{" "}
-                                  {departmentLeadApproverName ||
-                                    resolvePersonName(leave.supervisor) ||
-                                    "Department Lead"}
-                                </span>
-                              ) : isRejected ? (
-                                <span className="italic">Stage not reached due to prior rejection</span>
-                              ) : isApproved ? (
-                                <span className="italic">Bypassed during final authorization</span>
-                              ) : (
-                                <span className="italic">Pending review by assigned approver</span>
+                            pendingNote && <p className="text-muted-foreground mt-0.5 text-[11px]">{pendingNote}</p>
+                          )}
+
+                          {item?.comments && (
+                            <div
+                              className={cn(
+                                "mt-1.5 flex items-start gap-1.5 rounded-md border px-2.5 py-1.5",
+                                isStageRejected
+                                  ? "border-red-200 bg-red-50/70 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+                                  : "bg-muted/40 text-foreground/90"
                               )}
+                            >
+                              <MessageSquare
+                                className={cn(
+                                  "mt-0.5 h-3 w-3 shrink-0",
+                                  isStageRejected ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
+                                )}
+                              />
+                              <span className="min-w-0 flex-1">&ldquo;{item.comments}&rdquo;</span>
                             </div>
                           )}
                         </div>
-                      </div>
+                      </li>
                     )
                   })}
-                </div>
+                </ol>
               )}
-            </div>
+            </section>
 
-            {/* Section 3: Evidence & Attachments */}
-            <div className="bg-card space-y-3.5 rounded-lg border p-4 shadow-xs">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase">
-                  <ShieldCheck className="text-primary h-3.5 w-3.5" /> Evidence & Attachments
-                </span>
-                <Badge
-                  variant={leave.evidence_complete ? "outline" : "secondary"}
-                  className={cn(
-                    "text-[10px] font-medium",
-                    leave.evidence_complete
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                      : ""
-                  )}
-                >
-                  {leave.evidence_complete ? "All Evidence Complete" : "Pending Evidence"}
-                </Badge>
-              </div>
+            {/* Evidence & attachments */}
+            <section className="space-y-2.5 py-4">
+              <SectionHeading
+                title="Attachments"
+                aside={
+                  <Badge
+                    variant={leave.evidence_complete ? "outline" : "secondary"}
+                    className={cn(
+                      "text-[10px] font-medium",
+                      leave.evidence_complete &&
+                        "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    )}
+                  >
+                    {leave.evidence_complete ? "Evidence complete" : "Evidence pending"}
+                  </Badge>
+                }
+              />
 
-              {/* Handover Document / Note */}
               {leave.handover_checklist_url ? (
-                <div className="bg-muted/20 flex flex-col items-start justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-blue-500/10 p-2 text-blue-600 dark:text-blue-400">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-foreground text-xs font-semibold">Handover Document</p>
-                        <Badge variant="outline" className="border-blue-300 text-[9px] text-blue-600 uppercase">
-                          Handover
-                        </Badge>
-                      </div>
-                      <p className="text-muted-foreground mt-0.5 text-[11px]">
-                        {leave.handover_note ? leave.handover_note : "Official handover document submission"}
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" className="h-7.5 shrink-0 gap-1.5 text-xs" asChild>
-                    <a
-                      href={leaveHandoverHref(leave.id, leave.handover_checklist_url)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      View Document
-                    </a>
-                  </Button>
-                </div>
+                <AttachmentRow
+                  icon={<FileText className="h-4 w-4" />}
+                  iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  title="Handover document"
+                  subtitle={
+                    leave.handover_note && !leave.handover_note.startsWith("Attached:") ? leave.handover_note : null
+                  }
+                  href={leaveHandoverHref(leave.id, leave.handover_checklist_url)}
+                />
               ) : leave.handover_note ? (
-                <div className="bg-muted/20 rounded-lg border p-3 text-xs">
-                  <span className="text-muted-foreground block text-[11px] font-semibold uppercase">Handover Note</span>
-                  <p className="text-foreground/90 mt-1">{leave.handover_note}</p>
+                <div className="bg-muted/30 rounded-md border px-3 py-2 text-xs">
+                  <span className="text-muted-foreground block text-[11px]">Handover note</span>
+                  <p className="text-foreground/90 mt-0.5 leading-relaxed">{leave.handover_note}</p>
                 </div>
               ) : null}
 
-              {/* Uploaded Evidence Files */}
-              {leave.evidence && leave.evidence.length > 0 ? (
-                <div className="space-y-2">
-                  {leave.evidence.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="bg-muted/20 flex flex-col items-start justify-between gap-3 rounded-lg border p-3 sm:flex-row sm:items-center"
+              {leave.evidence?.map((doc) => (
+                <AttachmentRow
+                  key={doc.id}
+                  icon={<FileCheck className="h-4 w-4" />}
+                  iconClassName="bg-primary/10 text-primary"
+                  title={doc.document_type.replace(/_/g, " ")}
+                  badge={
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "px-1.5 py-0 text-[9px] uppercase",
+                        doc.status === "verified"
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : doc.status === "rejected"
+                            ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+                            : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                      )}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 text-primary rounded-lg p-2">
-                          <FileCheck className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-foreground text-xs font-semibold capitalize">
-                              {doc.document_type.replace(/_/g, " ")}
-                            </p>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "px-1.5 py-0 text-[9px] uppercase",
-                                doc.status === "verified"
-                                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                  : doc.status === "rejected"
-                                    ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
-                                    : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                              )}
-                            >
-                              {doc.status}
-                            </Badge>
-                          </div>
-                          {doc.notes && <p className="text-muted-foreground mt-0.5 text-[11px] italic">{doc.notes}</p>}
-                        </div>
-                      </div>
+                      {doc.status}
+                    </Badge>
+                  }
+                  subtitle={doc.notes}
+                  href={leaveEvidenceHref(doc.id, doc.file_url)}
+                />
+              ))}
 
-                      <Button size="sm" variant="outline" className="h-7.5 shrink-0 gap-1.5 text-xs" asChild>
-                        <a href={leaveEvidenceHref(doc.id, doc.file_url)} target="_blank" rel="noreferrer">
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          View File
-                        </a>
-                      </Button>
-                    </div>
+              {!hasHandover && !hasEvidence && (
+                <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                  <Paperclip className="h-3.5 w-3.5" /> No handover document or evidence uploaded.
+                </p>
+              )}
+
+              {leave.required_documents && leave.required_documents.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-muted-foreground text-[11px]">Required:</span>
+                  {leave.required_documents.map((reqDoc) => (
+                    <Badge key={reqDoc} variant="secondary" className="text-[11px] font-normal">
+                      {reqDoc}
+                    </Badge>
                   ))}
                 </div>
-              ) : null}
-
-              {/* Clean Empty State when neither handover nor evidence was uploaded */}
-              {!hasHandover && !hasEvidence && (
-                <div className="rounded-lg border border-dashed p-5 text-center">
-                  <Paperclip className="text-muted-foreground/40 mx-auto mb-1.5 h-6 w-6" />
-                  <p className="text-foreground text-xs font-medium">No attachments or evidence uploaded</p>
-                  <p className="text-muted-foreground mt-0.5 text-[11px]">
-                    Handover documents or required supporting evidence appear here once submitted.
-                  </p>
-                </div>
               )}
-
-              {/* Required Documents Policy Pills */}
-              {leave.required_documents && leave.required_documents.length > 0 && (
-                <div className="border-t pt-2.5">
-                  <span className="text-muted-foreground block text-[10px] font-semibold tracking-wider uppercase">
-                    Required Policy Checklist
-                  </span>
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {leave.required_documents.map((reqDoc) => (
-                      <Badge key={reqDoc} variant="secondary" className="text-[11px] font-normal">
-                        {reqDoc}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            </section>
           </div>
         </div>
 
@@ -709,5 +556,68 @@ export function LeaveDetailDialog({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  )
+}
+
+function SectionHeading({ title, aside }: { title: string; aside?: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <h3 className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">{title}</h3>
+      {typeof aside === "string" ? <span className="text-muted-foreground text-[11px]">{aside}</span> : aside}
+    </div>
+  )
+}
+
+function DetailField({
+  label,
+  value,
+  className,
+  valueClassName,
+}: {
+  label: string
+  value: string
+  className?: string
+  valueClassName?: string
+}) {
+  return (
+    <div className={cn("min-w-0", className)}>
+      <dt className="text-muted-foreground text-[11px]">{label}</dt>
+      <dd className={cn("text-foreground mt-0.5 font-medium break-words", valueClassName)}>{value}</dd>
+    </div>
+  )
+}
+
+function AttachmentRow({
+  icon,
+  iconClassName,
+  title,
+  badge,
+  subtitle,
+  href,
+}: {
+  icon: ReactNode
+  iconClassName: string
+  title: string
+  badge?: ReactNode
+  subtitle?: string | null
+  href: string
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-md border px-2.5 py-2">
+      <div className={cn("shrink-0 rounded-md p-1.5", iconClassName)}>{icon}</div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <p className="text-foreground truncate text-xs font-medium capitalize">{title}</p>
+          {badge}
+        </div>
+        {subtitle && <p className="text-muted-foreground truncate text-[11px]">{subtitle}</p>}
+      </div>
+      <Button size="sm" variant="ghost" className="h-7 shrink-0 gap-1 px-2 text-xs" asChild>
+        <a href={href} target="_blank" rel="noreferrer">
+          <ExternalLink className="h-3.5 w-3.5" />
+          View
+        </a>
+      </Button>
+    </div>
   )
 }
