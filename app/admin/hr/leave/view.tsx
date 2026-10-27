@@ -19,6 +19,8 @@ import {
   Building2,
   Mail,
   User,
+  ExternalLink,
+  MessageSquare,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -34,10 +36,10 @@ import { LeaveDetailDialog } from "./_components/leave-detail-dialog"
 import { AddLeaveDialog } from "./_components/add-leave-dialog"
 import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { LeaveCalendarView } from "./_components/leave-calendar-view"
-import { formatName } from "@/lib/utils"
+import { formatName, cn } from "@/lib/utils"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch, apiJson } from "@/lib/api-client"
-import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
+import { leaveEvidenceHref, leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages, type RouteSnapshotStage } from "@/lib/hr/leave-stages"
 
 export { resolveLeaveRouteStages }
@@ -51,6 +53,7 @@ export interface LeaveItem {
   resume_date: string
   days_count: number
   reason: string
+  rejected_reason?: string | null
   handover_note?: string | null
   handover_checklist_url?: string | null
   status: string
@@ -407,14 +410,25 @@ export function LeaveApprovePage({
         initialWidth: 260,
         accessor: (r) => r.user?.full_name || "Employee",
         render: (r) => (
-          <div className="flex max-w-[260px] min-w-0 flex-col">
-            <span className="truncate font-medium" title={r.user?.full_name || "Employee"}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setSelectedLeaveDetail(r)
+              setDetailDialogOpen(true)
+            }}
+            className="group/emp flex max-w-[260px] min-w-0 flex-col text-left focus:outline-hidden"
+          >
+            <span
+              className="text-foreground group-hover/emp:text-primary truncate font-medium group-hover/emp:underline"
+              title={r.user?.full_name || "Employee"}
+            >
               {r.user?.full_name || "Employee"}
             </span>
             <span className="text-muted-foreground truncate text-xs" title={r.user?.company_email || undefined}>
               {r.user?.company_email}
             </span>
-          </div>
+          </button>
         ),
       },
       {
@@ -721,7 +735,6 @@ export function LeaveApprovePage({
             searchPlaceholder="Search employee name or leave type..."
             searchFn={(r, q) => `${r.user?.full_name} ${r.leave_type?.name} ${r.status}`.toLowerCase().includes(q)}
             filters={filters}
-            forceRowActionsDropdown
             rowActions={
               activeTab === "my-actions"
                 ? [
@@ -799,24 +812,52 @@ export function LeaveApprovePage({
                 const departmentLeadApproverName = resolvePersonName(stageAuditMap.get("department_lead")?.approver)
                 const advancedPastReliever = ["department_lead", "admin_hr_lead", "hcs", "md"].includes(currentStageKey)
 
+                const rejectionStageItem = timeline.find(
+                  (item) => String(item.status || "").toLowerCase() === "rejected"
+                )
+                const rejectionReason = r.rejected_reason || rejectionStageItem?.comments || null
+
+                const hasHandover = Boolean(r.handover_checklist_url || r.handover_note)
+                const hasEvidence = Boolean(r.evidence && r.evidence.length > 0)
+
                 return (
-                  <div className="grid gap-4 p-4 md:grid-cols-2">
+                  <div className="bg-muted/10 grid gap-6 border-t p-4 md:grid-cols-2">
                     <div className="space-y-3 text-sm">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                          Leave Overview
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-xs"
+                          onClick={() => {
+                            setSelectedLeaveDetail(r)
+                            setDetailDialogOpen(true)
+                          }}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View Full Side Sheet
+                        </Button>
+                      </div>
+
                       <div>
                         <span className="text-muted-foreground">Reliever:</span>{" "}
-                        <span className="font-medium">{resolvePersonName(r.reliever) || "Not assigned"}</span>
+                        <span className="text-foreground font-medium">
+                          {resolvePersonName(r.reliever) || "Not assigned"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Department Lead:</span>{" "}
+                        <span className="text-foreground font-medium">
+                          {resolvePersonName(r.supervisor) || "Department Lead"}
+                        </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Current Stage:</span>{" "}
-                        <span className="font-medium">
+                        <span className="text-foreground font-medium">
                           {approvalStageLabel(r.current_stage_code || r.approval_stage)}
                         </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Evidence:</span>{" "}
-                        <Badge variant={r.evidence_complete ? "default" : "secondary"}>
-                          {r.evidence_complete ? "Complete" : "Incomplete"}
-                        </Badge>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Status:</span>{" "}
@@ -832,141 +873,308 @@ export function LeaveApprovePage({
                           {r.status}
                         </Badge>
                       </div>
+
+                      {/* Explicit Rejection Reason callout */}
+                      {r.status === "rejected" && rejectionReason && (
+                        <div className="rounded-md border border-red-200 bg-red-50/70 p-2.5 text-xs text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                          <span className="mb-0.5 block font-semibold">Rejection Reason:</span>
+                          <span>&ldquo;{rejectionReason}&rdquo;</span>
+                        </div>
+                      )}
+
                       <div>
-                        <span className="text-muted-foreground">Reason:</span>{" "}
-                        <span className="font-medium">{r.reason || "-"}</span>
+                        <span className="text-muted-foreground">Applicant&apos;s Justification:</span>{" "}
+                        <span className="text-foreground font-medium italic">&ldquo;{r.reason || "-"}&rdquo;</span>
                       </div>
-                      {r.handover_checklist_url && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Handover Doc:</span>
-                          <a
-                            href={leaveHandoverHref(r.id, r.handover_checklist_url)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                            View Attached Handover
-                          </a>
-                        </div>
-                      )}
-                      {r.handover_note && (!r.handover_checklist_url || !r.handover_note.startsWith("Attached:")) && (
-                        <div>
-                          <span className="text-muted-foreground">Handover Note:</span>{" "}
-                          <span className="font-medium">{r.handover_note}</span>
-                        </div>
-                      )}
                       <div>
                         <span className="text-muted-foreground">Resume Date:</span>{" "}
-                        <span className="font-medium">{r.resume_date || "-"}</span>
+                        <span className="text-foreground font-medium">{r.resume_date || "-"}</span>
                       </div>
                       {r.required_documents && r.required_documents.length > 0 ? (
                         <div>
                           <span className="text-muted-foreground">Required Docs:</span>{" "}
-                          <span className="font-medium">{r.required_documents.join(", ")}</span>
+                          <span className="text-foreground font-medium">{r.required_documents.join(", ")}</span>
                         </div>
                       ) : null}
                     </div>
 
-                    <div className="space-y-3">
-                      <p className="text-muted-foreground text-xs">Approval Timeline</p>
-                      {stageAuditMap.size === 0 ? (
-                        r.admin_manual ? (
-                          <ul className="space-y-1">
-                            <li className="text-xs">
-                              <span className="font-medium">Manually Approved:</span>{" "}
-                              <span className="text-emerald-500 capitalize">approved</span>
+                    <div className="space-y-4">
+                      {/* Robust Approval Timeline */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between border-b pb-2">
+                          <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                            Approval Timeline
+                          </p>
+                        </div>
+                        {stageAuditMap.size === 0 ? (
+                          r.admin_manual ? (
+                            <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-2.5 text-xs dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                              <span className="text-foreground font-semibold">Direct Admin Manual Approval:</span>{" "}
+                              <Badge className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600">
+                                Approved
+                              </Badge>
                               {r.approved_by_profile ? ` by ${resolvePersonName(r.approved_by_profile)}` : ""}
                               {r.approved_at ? ` at ${formatWATDateTime(r.approved_at)}` : ""}
-                            </li>
-                          </ul>
-                        ) : (
-                          <p className="text-muted-foreground text-xs">No approvals recorded yet.</p>
-                        )
-                      ) : (
-                        <ul className="space-y-1">
-                          {stageOrder.map((stageKey) => {
-                            const item = stageAuditMap.get(stageKey)
-                            const stageActorName =
-                              resolvePersonName(item?.approver) ||
-                              (stageKey === "reliever"
-                                ? resolvePersonName(r.reliever) || null
-                                : stageKey === "department_lead"
-                                  ? resolvePersonName(r.supervisor) || null
-                                  : stageKey === "admin_hr_lead"
-                                    ? resolvePersonName(r.approved_by_profile) || null
-                                    : null)
-                            const statusLower = String(r.status || "").toLowerCase()
-                            const isApprovedOrCompleted = ["approved", "completed"].includes(statusLower)
-                            const isCancelled = statusLower === "cancelled"
-                            const isRejected = statusLower === "rejected"
-                            const expectedPersonName =
-                              stageKey === "reliever"
-                                ? resolvePersonName(r.reliever) || "Assigned Reliever"
-                                : stageKey === "department_lead"
-                                  ? resolvePersonName(r.supervisor) || "Department Lead"
-                                  : stageKey === "admin_hr_lead"
-                                    ? resolvePersonName(r.approved_by_profile) || "Admin and HR Lead"
-                                    : stageName[stageKey]
-
-                            return (
-                              <li key={stageKey} className="text-xs">
-                                <span className="font-medium">{stageName[stageKey]}:</span>{" "}
-                                {item ? (
-                                  <>
-                                    <span className="capitalize">{item.status}</span>
-                                    {stageActorName ? ` by ${stageActorName}` : ""}
-                                    {stageActorName ? ` (${stageName[stageKey]})` : ""}
-                                    {item.approved_at ? ` at ${formatWATDateTime(item.approved_at)}` : ""}
-                                  </>
-                                ) : stageKey === "reliever" && !hasRelieverAssignee ? (
-                                  <span className="text-muted-foreground">Not required for this request</span>
-                                ) : stageKey === "reliever" && relieverHandledByLead ? (
-                                  <span className="text-muted-foreground">
-                                    {`Handled by ${departmentLeadApproverName || resolvePersonName(r.supervisor) || "Department Lead"}`}
-                                  </span>
-                                ) : isCancelled ? (
-                                  <span className="text-muted-foreground">Not reached (Cancelled)</span>
-                                ) : isRejected ? (
-                                  <span className="text-muted-foreground">Not reached (Rejected)</span>
-                                ) : isApprovedOrCompleted ||
-                                  (stageKey === "reliever" &&
-                                    advancedPastReliever &&
-                                    currentStageKey !== "reliever") ? (
-                                  <span className="text-muted-foreground">Bypassed ({expectedPersonName})</span>
-                                ) : (
-                                  <span className="text-muted-foreground">Pending action ({expectedPersonName})</span>
-                                )}
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )}
-
-                      <div className="space-y-2 pt-1">
-                        <p className="text-muted-foreground text-xs">Evidence & Attachments</p>
-                        {r.evidence && r.evidence.length > 0 ? (
-                          r.evidence.map((doc) => (
-                            <div
-                              key={doc.id}
-                              className="bg-muted/20 flex items-center justify-between rounded-md border p-2"
-                            >
-                              <div className="flex flex-col">
-                                <span className="text-xs font-medium">{doc.document_type}</span>
-                                <Badge variant="outline" className="mt-1 w-fit text-[10px]">
-                                  {doc.status}
-                                </Badge>
-                              </div>
-                              <Button variant="ghost" size="sm" asChild>
-                                <a href={doc.file_url} target="_blank" rel="noreferrer">
-                                  View File
-                                </a>
-                              </Button>
                             </div>
-                          ))
+                          ) : (
+                            <p className="text-muted-foreground text-xs italic">No approvals recorded yet.</p>
+                          )
                         ) : (
-                          <p className="text-muted-foreground rounded-md border border-dashed p-2 text-xs italic">
-                            No evidence uploaded yet.
+                          <div className="space-y-2">
+                            {stageOrder.map((stageKey) => {
+                              const item = stageAuditMap.get(stageKey)
+                              const stageActorName =
+                                resolvePersonName(item?.approver) ||
+                                (stageKey === "reliever"
+                                  ? resolvePersonName(r.reliever) || null
+                                  : stageKey === "department_lead"
+                                    ? resolvePersonName(r.supervisor) || null
+                                    : stageKey === "admin_hr_lead"
+                                      ? resolvePersonName(r.approved_by_profile) || null
+                                      : null)
+                              const statusLower = String(r.status || "").toLowerCase()
+                              const isApprovedOrCompleted = ["approved", "completed"].includes(statusLower)
+                              const isCancelled = statusLower === "cancelled"
+                              const isRejected = statusLower === "rejected"
+                              const isStageRejected = item && String(item.status || "").toLowerCase() === "rejected"
+                              const expectedPersonName =
+                                stageKey === "reliever"
+                                  ? resolvePersonName(r.reliever) || "Assigned Reliever"
+                                  : stageKey === "department_lead"
+                                    ? resolvePersonName(r.supervisor) || "Department Lead"
+                                    : stageKey === "admin_hr_lead"
+                                      ? resolvePersonName(r.approved_by_profile) || "Admin and HR Lead"
+                                      : stageName[stageKey]
+
+                              return (
+                                <div
+                                  key={stageKey}
+                                  className={cn(
+                                    "space-y-1 rounded-md border p-2.5 text-xs transition-colors",
+                                    isStageRejected
+                                      ? "border-red-200 bg-red-50/30 dark:border-red-900/40 dark:bg-red-950/20"
+                                      : item
+                                        ? "bg-card border-border/70"
+                                        : "bg-muted/10 border-dashed"
+                                  )}
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                    <span className="text-foreground font-semibold">{stageName[stageKey]}</span>
+                                    {item ? (
+                                      <Badge
+                                        variant={isStageRejected ? "destructive" : "outline"}
+                                        className={cn(
+                                          "text-[10px] font-medium capitalize",
+                                          !isStageRejected &&
+                                            "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                        )}
+                                      >
+                                        {item.status || "Approved"}
+                                      </Badge>
+                                    ) : stageKey === "reliever" && !hasRelieverAssignee ? (
+                                      <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                                        Not Required
+                                      </Badge>
+                                    ) : stageKey === "reliever" && relieverHandledByLead ? (
+                                      <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                                        Handled by Lead
+                                      </Badge>
+                                    ) : isCancelled ? (
+                                      <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                                        Cancelled
+                                      </Badge>
+                                    ) : isRejected ? (
+                                      <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                                        Not Reached
+                                      </Badge>
+                                    ) : isApprovedOrCompleted ||
+                                      (stageKey === "reliever" &&
+                                        advancedPastReliever &&
+                                        currentStageKey !== "reliever") ? (
+                                      <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                                        Bypassed
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant="outline"
+                                        className="border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-600 dark:text-amber-400"
+                                      >
+                                        Awaiting Action
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {item ? (
+                                    <div className="text-muted-foreground space-y-1">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-foreground font-medium">
+                                          {stageActorName ? stageActorName : "Authorized Approver"}
+                                        </span>
+                                        {item.approved_at && (
+                                          <>
+                                            <span>•</span>
+                                            <span className="font-mono text-[11px]">
+                                              {formatWATDateTime(item.approved_at)}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+
+                                      {item.comments && (
+                                        <div
+                                          className={cn(
+                                            "flex items-start gap-1.5 rounded border p-2 text-xs",
+                                            isStageRejected
+                                              ? "border-red-200 bg-red-50/70 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+                                              : "bg-muted/40 text-foreground/90 italic"
+                                          )}
+                                        >
+                                          <MessageSquare
+                                            className={cn(
+                                              "mt-0.5 h-3.5 w-3.5 shrink-0",
+                                              isStageRejected
+                                                ? "text-red-600 dark:text-red-400"
+                                                : "text-muted-foreground"
+                                            )}
+                                          />
+                                          <div className="min-w-0 flex-1">
+                                            {isStageRejected && (
+                                              <span className="mb-0.5 block font-semibold not-italic">
+                                                Rejection Reason:
+                                              </span>
+                                            )}
+                                            <span>&ldquo;{item.comments}&rdquo;</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <p className="text-muted-foreground text-[11px] italic">
+                                      {stageKey === "reliever" && !hasRelieverAssignee
+                                        ? "Not required for this request"
+                                        : stageKey === "reliever" && relieverHandledByLead
+                                          ? `Handled by ${departmentLeadApproverName || resolvePersonName(r.supervisor) || "Department Lead"}`
+                                          : isCancelled
+                                            ? "Not reached (Request cancelled)"
+                                            : isRejected
+                                              ? "Not reached due to prior rejection"
+                                              : isApprovedOrCompleted
+                                                ? `Bypassed (${expectedPersonName})`
+                                                : `Pending action (${expectedPersonName})`}
+                                    </p>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Unified Evidence & Attachments */}
+                      <div className="space-y-2 border-t pt-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                            Evidence & Attachments
+                          </p>
+                          <Badge
+                            variant={r.evidence_complete ? "outline" : "secondary"}
+                            className={cn(
+                              "text-[10px]",
+                              r.evidence_complete &&
+                                "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            )}
+                          >
+                            {r.evidence_complete ? "Evidence Complete" : "Pending Evidence"}
+                          </Badge>
+                        </div>
+
+                        {/* Handover Document */}
+                        {r.handover_checklist_url && (
+                          <div className="bg-muted/20 flex items-center justify-between rounded-md border p-2">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 shrink-0 text-blue-500" />
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-medium">Handover Document</span>
+                                  <Badge
+                                    variant="outline"
+                                    className="border-blue-300 text-[9px] text-blue-600 uppercase"
+                                  >
+                                    Handover
+                                  </Badge>
+                                </div>
+                                <span className="text-muted-foreground text-[10px]">
+                                  {r.handover_note || "Attached handover document"}
+                                </span>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" asChild>
+                              <a
+                                href={leaveHandoverHref(r.id, r.handover_checklist_url)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                View
+                              </a>
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Handover Note (without document) */}
+                        {!r.handover_checklist_url && r.handover_note && !r.handover_note.startsWith("Attached:") && (
+                          <div className="bg-muted/20 rounded-md border p-2 text-xs">
+                            <span className="text-muted-foreground block text-[10px] font-semibold uppercase">
+                              Handover Note
+                            </span>
+                            <span className="text-foreground/90">{r.handover_note}</span>
+                          </div>
+                        )}
+
+                        {/* Supporting Evidence Documents */}
+                        {r.evidence && r.evidence.length > 0
+                          ? r.evidence.map((doc) => (
+                              <div
+                                key={doc.id}
+                                className="bg-muted/20 flex items-center justify-between rounded-md border p-2"
+                              >
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-medium capitalize">
+                                      {doc.document_type.replace(/_/g, " ")}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "px-1 py-0 text-[9px] uppercase",
+                                        doc.status === "verified"
+                                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                          : doc.status === "rejected"
+                                            ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+                                            : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                      )}
+                                    >
+                                      {doc.status}
+                                    </Badge>
+                                  </div>
+                                  {doc.notes && (
+                                    <span className="text-muted-foreground text-[10px] italic">{doc.notes}</span>
+                                  )}
+                                </div>
+                                <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" asChild>
+                                  <a href={leaveEvidenceHref(doc.id, doc.file_url)} target="_blank" rel="noreferrer">
+                                    <ExternalLink className="h-3 w-3" />
+                                    View
+                                  </a>
+                                </Button>
+                              </div>
+                            ))
+                          : null}
+
+                        {/* Clean Empty State only if neither handover nor evidence was uploaded */}
+                        {!hasHandover && !hasEvidence && (
+                          <p className="text-muted-foreground rounded-md border border-dashed p-2.5 text-center text-xs italic">
+                            No evidence or handover documents uploaded.
                           </p>
                         )}
                       </div>
