@@ -224,9 +224,14 @@ feature or fix.
 
 - Format commits as `type: description`.
 - Use a single-line, lowercase subject.
-- Keep the full message to 72 characters or fewer.
+- Keep the **subject line** to 72 characters or fewer.
 - Do not end the subject with a period.
+- A body is optional: leave a blank line after the subject, and keep **every body line to 100 characters or
+  fewer** (commitlint `body-max-line-length`).
 - Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `ci`, `build`, `revert`.
+- The commit-msg hook prints one generic "invalid format" message whatever the cause. To see the real reason,
+  run the message through `npx --no -- commitlint`. For a multi-line message, write it to a file and use
+  `git commit -F <file>`; backslashes in `-m` strings are eaten by Git Bash.
 
 Examples:
 
@@ -835,14 +840,82 @@ reflow on mount. Use the canonical skeletons from
 Do not hand-roll a single bar or generic card placeholder for a table page. Match
 the expected stats count, tabs, filter count, action count, and table density.
 
-### UI audit tooling
+### UI guard — audit and ratchet
 
-- Run `npm run ui:audit` after table, skeleton, or page-shell changes.
-- Run `npm run ui:ensure-loading` only when intentionally adding missing route
-  loading files.
-- Review generated loading files manually before committing them.
-- UI audit scripts must normalize Windows paths with `toPosix()` before route
-  matching.
+`npm run ui:guard` runs in the pre-push hook and in CI. It is two checks:
+
+- **`ui:audit`** (`scripts/ui/audit-reusables.mjs`): every page has a `loading.tsx` (a page that only
+  redirects is exempt), uses the shared page header, and tables, stat cards and dialogs use the shared
+  components. Intentional exceptions (standalone public pages) live in `scripts/ui/ui-audit-allowlist.json`.
+- **`ui:ratchet`** (`scripts/ui/ratchet.mjs`): for each rule below, a file's count of the pattern may not
+  rise above `scripts/ui/ratchet-baseline.json`. The baseline is **per file**, so fixing one file cannot
+  pay for a new violation in another, and a new file starts at zero.
+
+| Rule | Counts | Do this instead |
+|------|--------|-----------------|
+| `tiny-text` | `text-[9px]` to `text-[11px]` | `text-xs` is the minimum |
+| `locale-without-en-ng` | `toLocale*String()` without `en-NG` | `@/lib/utils/date` helpers |
+| `raw-img` | `<img>` outside email/PDF/OG renderers | `next/image` |
+| `window-dialogs` | `window.confirm/alert/prompt`, bare `alert()` | `AlertDialog`, sonner |
+| `key-index` | `key={i}`, `key={idx}`, `key={index}` | a stable id |
+| `dialog-in-page` | `<DialogContent>` in a page/view/`*-content` file | move to `_components/` |
+| `explicit-any` | `: any`, `as any`, `any[]` | a real type or `unknown` |
+| `eslint-disable` | disable comments | fix the cause |
+| `select-star` | `.select("*")` | list the columns |
+| `inline-query-key` | `queryKey: ["literal"...]` | `QUERY_KEYS` in `lib/query-keys.ts` |
+| `dark-color-override` | `dark:bg-*`, `dark:text-*`, `dark:border-*` | a theme token or `StatusBadge` |
+| `local-status-colour` | `bg-*-100 text-*` status pairs | `StatusBadge` |
+| `fixed-px-width` | `w-[400px]` or wider | `w-full` with `max-w-*` |
+| `click-div` | `<div onClick>` | `<button>` or `<Link>` |
+| `client-page` | `page.tsx` that starts with `"use client"` | server page, client child |
+| `page-missing-metadata` | server `page.tsx` without `metadata` | export a title |
+| `file-lines` | a file over 1,000 lines, by its length | extract; never grow it |
+
+Working with it:
+
+- **The check fails:** fix the new occurrence. Do not edit the baseline to make it pass.
+- **You removed violations:** run `npm run ui:ratchet:update` and commit the lowered baseline in the same
+  change. It refuses to write a baseline in which any count is higher.
+- **Adding a rule:** add it (with a test) in `scripts/ui/ratchet-rules.mjs`, generate the baseline once with
+  `node scripts/ui/ratchet.mjs --update --allow-increase`, and review the totals in the PR. That flag is
+  for this case only.
+- `npm run ui:ratchet -- --summary` prints today's totals per rule.
+- Run `npm run ui:ensure-loading` only when intentionally adding missing route loading files, and review
+  what it generates before committing.
+- UI audit scripts must normalize Windows paths with `toPosix()` before route matching.
+
+The baseline is today's debt, not a target. `docs/audit/2026-10-27-tables-sheets-ui-review.md` lists
+every file behind it and the fix for each.
+
+---
+
+## Page Types Standard — Mandatory for every `page.tsx`
+
+Every page is exactly one of these types. The type decides its frame, its width and its loading skeleton,
+so pages of the same type look and load the same way.
+
+| Type | For | Frame | `PageWrapper` width | `loading.tsx` |
+|------|-----|-------|---------------------|---------------|
+| Table | a list of records | `DataTablePage` | `full` | `TablePageSkeleton` |
+| Dashboard | KPIs, queues, activity | `PageWrapper` + `PageHeader` + `Section` | `full` | `DashboardSkeleton` |
+| Hub | links into sub-modules | `PageWrapper` + `PageHeader` + `ModuleHubGrid` | `full` | `CardGridPageSkeleton` |
+| Detail | one record | `PageWrapper` + `PageHeader` with a back link | `content` or `full` | `DetailPageSkeleton` |
+| Form | create, edit, settings | `PageWrapper` + `PageHeader` | `form` | `FormPageSkeleton` |
+| Auth | sign-in and recovery | `AuthShell` | its own | `AuthPageSkeleton` |
+| Standalone | public, print or share pages with their own layout | its own | its own | none; list it in `ui-audit-allowlist.json` |
+
+Rules for every type:
+
+- **The skeleton mirrors the page.** Pass the same stat count, tabs, filter count and action count the page
+  renders, and `list="responsive"` when the page opens as a phone list. A skeleton that differs from the page
+  makes the layout jump when the data arrives.
+- **One loading shape.** If a client page shows a full-page loader while its query runs, `PageLoader` uses the
+  same variant and props as the route's `loading.tsx`, never a second, different skeleton.
+- **The title comes from `PageHeader`.** Do not hand-write an `<h1>`.
+- **The browser tab names the page.** A server `page.tsx` exports
+  `metadata = { title: "<Page title> | ACOB Lighting Technology Limited" }`. Keep `page.tsx` a server
+  component and put interaction in a `"use client"` child; both are in the ratchet.
+- **Name the page like its sidebar entry.** Someone who clicks "Leave" should land on "Leave".
 
 ---
 
