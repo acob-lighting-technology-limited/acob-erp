@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Layers,
   Plus,
-  RefreshCw,
   Trash2,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -341,15 +340,6 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
       onTabChange={setActiveTab}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.portfolios() })}
-            disabled={isLoading}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {isAdmin && (
             <Button size="sm" onClick={() => setIsAddOpen(true)}>
               <Plus className="h-4 w-4 sm:mr-2" />

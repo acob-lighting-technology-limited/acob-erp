@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -24,7 +24,6 @@ import {
   Mail,
   MapPin,
   Phone,
-  RefreshCw,
   ShieldCheck,
   Users,
 } from "lucide-react"
@@ -151,7 +150,6 @@ function displayName(row: DirectoryRow): string {
 const fetchDirectory = () => fetchDirectoryRows<DirectoryRow>()
 
 export function DirectoryContent() {
-  const queryClient = useQueryClient()
   const [exportOpen, setExportOpen] = useState(false)
   // Rows currently visible in the table (after search + filters + sort).
   const [processedRows, setProcessedRows] = useState<DirectoryRow[]>([])
@@ -345,15 +343,6 @@ export function DirectoryContent() {
       }}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.directory() })}
-            disabled={isLoading}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           <Button variant="outline" size="sm" onClick={() => setExportOpen(true)} disabled={rows.length === 0}>
             <Download className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>

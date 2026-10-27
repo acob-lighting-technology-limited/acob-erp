@@ -1,8 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
-import { AlertTriangle, CalendarClock, FileQuestion, MapPin, Plus, RefreshCw } from "lucide-react"
+import { AlertTriangle, CalendarClock, FileQuestion, MapPin, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DataTablePage } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -19,7 +18,6 @@ import { SitesTable, type SiteDialogState } from "./sites-table"
  * /admin/portfolios/sites; the API decides who may edit.
  */
 export function SitesContent({ isAdmin }: { isAdmin: boolean }) {
-  const queryClient = useQueryClient()
   const [dialog, setDialog] = useState<SiteDialogState>({ mode: "closed" })
   const [deleting, setDeleting] = useState<SiteRecord | null>(null)
   const { data, isLoading } = useSites()
@@ -47,15 +45,6 @@ export function SitesContent({ isAdmin }: { isAdmin: boolean }) {
       icon={MapPin}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ["sites"] })}
-            disabled={isLoading}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {canEdit && (
             <Button size="sm" onClick={() => setDialog({ mode: "add" })}>
               <Plus className="h-4 w-4 sm:mr-2" />

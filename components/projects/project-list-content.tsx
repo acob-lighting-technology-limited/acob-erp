@@ -14,7 +14,6 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import {
   FolderGit2,
   FolderKanban,
-  RefreshCw,
   Calendar,
   MapPin,
   Wrench,
@@ -435,15 +434,6 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
       actionsPlacement="inline-always"
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })}
-            disabled={isLoading}
-          >
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           {admin && (
             <Button size="sm" onClick={() => setIsAddOpen(true)}>
               <Plus className="h-4 w-4 sm:mr-2" />

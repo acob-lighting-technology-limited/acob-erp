@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { formatWATDateTime, formatWATRelative, toLocalISODate } from "@/lib/utils/date"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,7 +20,6 @@ import {
   Download,
   IdCard,
   Mail,
-  RefreshCw,
   Shield,
   UserCheck,
   Users,
@@ -135,8 +134,6 @@ function toCsv(rows: OnboardingRow[]) {
 }
 
 export function OnboardingContent() {
-  const queryClient = useQueryClient()
-
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: QUERY_KEYS.adminOnboarding(),
     queryFn: fetchOnboarding,
@@ -343,16 +340,6 @@ export function OnboardingContent() {
       onTabChange={(tab) => setActiveTab(tab as OnboardingTab)}
       actions={
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminOnboarding() })}
-            disabled={isLoading}
-            className="h-8 gap-1.5 sm:gap-2"
-          >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
           <Button size="sm" onClick={exportCsv} disabled={scopedRows.length === 0} className="h-8 gap-1.5 sm:gap-2">
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export CSV</span>
