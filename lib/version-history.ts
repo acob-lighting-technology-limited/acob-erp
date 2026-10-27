@@ -91,6 +91,7 @@ export const RELEASES: Release[] = [
           "Multiple employees in the same department can now apply for overlapping leave without being blocked, with soft overlap notices shown to applicants and approvers",
           "Leave details now open in a unified side sheet with complete approval timelines, prominent rejection reasons, and handover attachments",
           "Admin leave queue shows staff avatars, resolves approver names by stage, and streamlines approval queues",
+          "Leave side sheet and expanded rows redesigned: tighter layout, no repeated dates, and the rejection reason shown once on the stage that rejected",
         ],
       },
       {
