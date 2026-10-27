@@ -167,7 +167,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No tasks assigned to this user</p>
+              <EmptyState compact title="No tasks assigned to this user" />
             )}
           </CardContent>
         </Card>
@@ -217,7 +217,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No devices assigned to this user</p>
+              <EmptyState compact title="No devices assigned to this user" />
             )}
           </CardContent>
         </Card>
@@ -267,7 +267,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No assets assigned to this user</p>
+              <EmptyState compact title="No assets assigned to this user" />
             )}
           </CardContent>
         </Card>
@@ -311,7 +311,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No documentation created by this user</p>
+              <EmptyState compact title="No documentation created by this user" />
             )}
           </CardContent>
         </Card>
@@ -359,7 +359,7 @@ export function EmployeeDetailTabs({
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-muted-foreground py-8 text-center">No feedback submitted by this user</p>
+              <EmptyState compact title="No feedback submitted by this user" />
             )}
           </CardContent>
         </Card>

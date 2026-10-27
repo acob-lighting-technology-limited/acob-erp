@@ -78,6 +78,7 @@ import {
 } from "@/lib/hr/lunch-voting"
 import { formatWATDate, formatWATTime } from "@/lib/utils/date"
 import { CalendarGridSkeleton, RowsSkeleton } from "@/components/skeletons/section-skeletons"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 export interface LunchEmployee {
   id: string
@@ -1979,9 +1980,7 @@ export function LunchRegisterPage({
                           </span>
                         </div>
                       ))}
-                      {sortedLeaderboard.length === 0 && (
-                        <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
-                      )}
+                      {sortedLeaderboard.length === 0 && <EmptyState compact title="No data for this period" />}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -2023,9 +2022,7 @@ export function LunchRegisterPage({
                           </span>
                         </div>
                       ))}
-                      {sortedLeaderboard.length === 0 && (
-                        <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
-                      )}
+                      {sortedLeaderboard.length === 0 && <EmptyState compact title="No data for this period" />}
                     </div>
                   </ScrollArea>
                 </CardContent>
@@ -2065,9 +2062,7 @@ export function LunchRegisterPage({
                           <span className="shrink-0 text-xs font-semibold text-amber-600">{row.lunch_count} meals</span>
                         </div>
                       ))}
-                      {sortedLeaderboard.length === 0 && (
-                        <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
-                      )}
+                      {sortedLeaderboard.length === 0 && <EmptyState compact title="No data for this period" />}
                     </div>
                   </ScrollArea>
                 </CardContent>

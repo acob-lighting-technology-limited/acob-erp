@@ -21,6 +21,7 @@ import { apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 interface LeaderboardReport {
   user_id: string
@@ -335,7 +336,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {loading ? (
             <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">No data for this period.</p>
+            <EmptyState compact title="No data for this period" />
           ) : (
             <ScrollArea className="h-64">
               <div className="space-y-1 pr-3">
@@ -387,7 +388,7 @@ export function LeaderboardView({ departments, lockedDepartment }: LeaderboardVi
           {loading ? (
             <RowsSkeleton rows={5} />
           ) : rows.length === 0 ? (
-            <p className="text-muted-foreground py-4 text-center text-xs">No department data for this period.</p>
+            <EmptyState compact title="No department data for this period" />
           ) : (
             <ScrollArea className="h-64">
               <div className="space-y-1 pr-3">

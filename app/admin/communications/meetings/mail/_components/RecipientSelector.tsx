@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, UserPlus, Mail, Plus, Search, X, RotateCcw } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 type Employee = {
   id: string
@@ -152,9 +153,7 @@ export function RecipientSelector({
                   )}
                 </label>
               ))}
-              {filteredEmployees.length === 0 && (
-                <div className="text-muted-foreground py-8 text-center text-sm">No employees found</div>
-              )}
+              {filteredEmployees.length === 0 && <EmptyState compact title="No employees found" />}
             </div>
             <p className="text-muted-foreground text-xs">
               {selectedEmployeeIds.size} of {employees.length} selected

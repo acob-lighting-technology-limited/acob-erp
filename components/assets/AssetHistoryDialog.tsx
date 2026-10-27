@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { UserPlus, History, ArrowUpDown, AlertCircle, CheckCircle2, Calendar, FileText } from "lucide-react"
 import type { Asset } from "@/app/admin/assets/admin-assets-content"
 import { formatDateTime } from "@/lib/format"
+import { EmptyState } from "@/components/ui/patterns/empty-state"
 
 interface AssetActivity {
   id: string
@@ -64,7 +65,7 @@ export function AssetHistoryDialog({ isOpen, onOpenChange, selectedAsset, assetH
         </DialogHeader>
         <div className="mt-4 space-y-4">
           {assetHistory.length === 0 ? (
-            <div className="text-muted-foreground py-12 text-center">No activity history found for this asset.</div>
+            <EmptyState compact title="No activity history found for this asset" />
           ) : (
             assetHistory.map((activity, index) => (
               <div
