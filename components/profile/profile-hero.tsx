@@ -333,14 +333,14 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 <Badge
                   variant="outline"
-                  className={`px-2 py-0.5 text-[11px] font-medium ${getRoleBadgeColor(profile.role as UserRole)}`}
+                  className={`px-2 py-0.5 text-xs font-medium ${getRoleBadgeColor(profile.role as UserRole)}`}
                 >
                   {getRoleDisplayName(profile.role as UserRole)}
                 </Badge>
                 {profile.is_department_lead && (
                   <Badge
                     variant="outline"
-                    className="border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400"
+                    className="border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400"
                   >
                     Dept Lead
                   </Badge>
@@ -348,14 +348,14 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {confirmationDate ? (
                   <Badge
                     variant="outline"
-                    className="border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+                    className="border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400"
                   >
                     Confirmed
                   </Badge>
                 ) : profile.employment_date ? (
                   <Badge
                     variant="outline"
-                    className="border-border text-muted-foreground px-2 py-0.5 text-[11px] font-medium"
+                    className="border-border text-muted-foreground px-2 py-0.5 text-xs font-medium"
                   >
                     Probation (Pending Confirmation)
                   </Badge>

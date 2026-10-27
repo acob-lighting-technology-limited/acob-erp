@@ -564,7 +564,7 @@ export function TaskFormDialog({
                 <Scale className="text-primary h-3.5 w-3.5" />
                 Task Weight
               </Label>
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-xs">
                 Required
               </Badge>
             </div>
@@ -586,7 +586,7 @@ export function TaskFormDialog({
                 )}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               How much this task matters relative to the assignee&apos;s other work. A weight-4 task counts twice as
               much as a weight-2 one. Weights do not need to add up to anything.
             </p>
@@ -627,7 +627,7 @@ export function TaskFormDialog({
                     <Target className="text-primary h-3.5 w-3.5" />
                     Department Goal
                   </Label>
-                  <Badge variant="secondary" className="text-[10px] font-normal">
+                  <Badge variant="secondary" className="text-xs font-normal">
                     Auto-selected from KPI
                   </Badge>
                 </div>
@@ -638,14 +638,14 @@ export function TaskFormDialog({
                   className="bg-background/80 text-foreground h-8 cursor-not-allowed text-xs font-medium"
                 />
                 {selectedKpi.strategic_priority && (
-                  <p className="text-muted-foreground text-[11px]">
+                  <p className="text-muted-foreground text-xs">
                     🎯 Strategic Pillar:{" "}
                     <span className="text-foreground font-medium">{selectedKpi.strategic_priority}</span>
                   </p>
                 )}
               </div>
             )}
-            <p className="text-muted-foreground text-[11px]">
+            <p className="text-muted-foreground text-xs">
               Which corporate target this work serves. Every task must link to an approved Corporate KPI.
             </p>
           </div>
@@ -680,7 +680,7 @@ export function TaskFormDialog({
                   <FolderKanban className="text-primary h-3.5 w-3.5" />
                   Project
                 </Label>
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-xs">
                   {lockedProjectId ? "Fixed" : "Optional"}
                 </Badge>
               </div>
@@ -712,7 +712,7 @@ export function TaskFormDialog({
                   </SelectContent>
                 </Select>
               )}
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 A project task is rated by that project&apos;s manager, and counts toward the project&apos;s progress.
               </p>
             </div>
@@ -792,9 +792,7 @@ export function TaskFormDialog({
               {isCreating && (
                 <p
                   id="due_date_hint"
-                  className={
-                    deadlineError ? "text-destructive mt-1 text-[11px]" : "text-muted-foreground mt-1 text-[11px]"
-                  }
+                  className={deadlineError ? "text-destructive mt-1 text-xs" : "text-muted-foreground mt-1 text-xs"}
                 >
                   {deadlineError ??
                     `Within ${TASK_MAX_WORKING_DAYS} working days of the start date — latest ${formatWATDate(maxDueDate!)}.`}

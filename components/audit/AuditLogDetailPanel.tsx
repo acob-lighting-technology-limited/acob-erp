@@ -37,7 +37,7 @@ interface AuditLogDetailPanelProps {
 
 /** Inline section label */
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h4 className="text-muted-foreground mb-2 text-[10px] font-black tracking-widest uppercase">{children}</h4>
+  return <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">{children}</h4>
 }
 
 /** A single key→value row inside a detail block */

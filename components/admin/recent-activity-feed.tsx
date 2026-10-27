@@ -79,7 +79,7 @@ export function RecentActivityFeed({
                       <span className="font-medium">{item.actorName}</span> <span>{item.actionLabel}</span>
                     </p>
                     <div className="mt-0.5 flex items-center gap-1.5">
-                      <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                      <Badge variant="secondary" className="px-1.5 py-0 text-xs">
                         {item.moduleLabel}
                       </Badge>
                       <span className="text-muted-foreground text-xs" suppressHydrationWarning>

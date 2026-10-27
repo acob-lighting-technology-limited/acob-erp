@@ -64,7 +64,7 @@ export function MdDeskTaskReviews({ basePath }: { basePath: string }) {
   )
 
   const weightBadge = (t: Task) => (
-    <Badge variant="outline" className={cn("font-mono text-[11px] font-medium", getTaskWeightBadgeClass(t.weight))}>
+    <Badge variant="outline" className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(t.weight))}>
       W{t.weight || TASK_WEIGHT_DEFAULT}
     </Badge>
   )

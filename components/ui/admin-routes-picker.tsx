@@ -162,9 +162,7 @@ export function AdminRoutesPicker({ values, onChange }: AdminRoutesPickerProps) 
                   />
                   <span className="flex flex-col">
                     <span>{route.label}</span>
-                    {route.hint && (
-                      <span className="text-muted-foreground text-[10px] leading-tight">{route.hint}</span>
-                    )}
+                    {route.hint && <span className="text-muted-foreground text-xs leading-tight">{route.hint}</span>}
                   </span>
                 </label>
               ))}

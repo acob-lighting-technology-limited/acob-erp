@@ -86,26 +86,26 @@ export function UserTaskDetailsDialog({
         <SheetHeader className="space-y-2 border-b px-4 py-4 text-left sm:px-6">
           <div className="flex flex-wrap items-center gap-1.5">
             {selectedTask.work_item_number && (
-              <Badge variant="outline" className="font-mono text-[11px]">
+              <Badge variant="outline" className="font-mono text-xs">
                 {selectedTask.work_item_number}
               </Badge>
             )}
             {(() => {
               const cfg = TASK_STATUS_CONFIG[selectedTask.status as TaskStatus] || TASK_STATUS_CONFIG.pending
               return (
-                <Badge variant={cfg.badgeVariant} className={cn("text-[11px] capitalize", cfg.color)}>
+                <Badge variant={cfg.badgeVariant} className={cn("text-xs capitalize", cfg.color)}>
                   {cfg.label}
                 </Badge>
               )
             })()}
             <Badge
               variant="outline"
-              className={cn("font-mono text-[11px] font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
+              className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
             >
               Weight {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
             </Badge>
             {isOverdue && (
-              <Badge variant="destructive" className="gap-1 text-[11px]">
+              <Badge variant="destructive" className="gap-1 text-xs">
                 <AlertTriangle className="h-3 w-3" />
                 Overdue
               </Badge>
@@ -146,7 +146,7 @@ export function UserTaskDetailsDialog({
               <TabsTrigger value="activity" className="gap-1.5">
                 <span>Activity</span>
                 {taskUpdates.length > 0 && (
-                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+                  <Badge variant="secondary" className="h-5 px-1.5 text-xs font-normal">
                     {taskUpdates.length}
                   </Badge>
                 )}
@@ -203,7 +203,7 @@ export function UserTaskDetailsDialog({
                       <div className="flex flex-col gap-0.5">
                         <span className="font-medium">{selectedTask.kpi_measure}</span>
                         {selectedTask.kpi_pillar && (
-                          <span className="text-muted-foreground text-[11px]">🎯 {selectedTask.kpi_pillar}</span>
+                          <span className="text-muted-foreground text-xs">🎯 {selectedTask.kpi_pillar}</span>
                         )}
                       </div>
                     ) : (

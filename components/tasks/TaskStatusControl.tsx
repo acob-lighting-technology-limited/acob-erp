@@ -210,7 +210,7 @@ export function TaskStatusControl({
               <span className="flex flex-col">
                 <span>{getStatusOptionLabel(option.value, current)}</span>
                 {option.blockedReason && (
-                  <span className="text-muted-foreground text-[11px] leading-tight">{option.blockedReason}</span>
+                  <span className="text-muted-foreground text-xs leading-tight">{option.blockedReason}</span>
                 )}
               </span>
             </SelectItem>
@@ -260,7 +260,7 @@ export function TaskStatusControl({
                   )
                 )}
               </div>
-              <p className="text-muted-foreground text-[11px]">
+              <p className="text-muted-foreground text-xs">
                 Weight {weight}, so this task is worth up to {weight} point{weight === 1 ? "" : "s"}
                 {rating
                   ? ` — this rating earns ${Math.round(((weight * rating) / TASK_RATING_MAX) * 100) / 100}.`
@@ -318,7 +318,7 @@ export function TaskStatusControl({
 export function TaskStatusBadge({ status }: { status: string }) {
   const config = TASK_STATUS_CONFIG[status as TaskStatus]
   return (
-    <Badge variant={config?.badgeVariant ?? "outline"} className={cn("text-[11px]", config?.color)}>
+    <Badge variant={config?.badgeVariant ?? "outline"} className={cn("text-xs", config?.color)}>
       {statusLabel(status)}
     </Badge>
   )

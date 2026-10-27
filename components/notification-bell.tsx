@@ -332,7 +332,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
             {unreadActionCount > 0 ? (
               <Badge
                 variant="destructive"
-                className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center p-0 text-[10px] font-bold"
+                className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center p-0 text-xs font-bold"
               >
                 {unreadActionCount > 99 ? "99+" : unreadActionCount}
               </Badge>
@@ -494,7 +494,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 px-2 text-[11px]"
+                                    className="h-6 px-2 text-xs"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       markAsRead(notification.id)
@@ -508,7 +508,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-[11px]"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-6 px-2 text-xs"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setPendingDeleteId(notification.id)

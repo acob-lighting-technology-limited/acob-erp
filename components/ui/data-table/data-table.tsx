@@ -929,7 +929,7 @@ export function DataTable<TData>({
                 <Button variant="outline" size="icon" className="relative h-9 w-9 md:hidden" aria-label="Filters">
                   <FiltersIcon className="h-4 w-4" />
                   {sheetFilterCount > 0 && (
-                    <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold">
+                    <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold">
                       {sheetFilterCount}
                     </span>
                   )}

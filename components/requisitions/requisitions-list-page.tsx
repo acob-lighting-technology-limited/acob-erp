@@ -192,7 +192,7 @@ export function RequisitionsListPage({
       render: (r) => (
         <div className="flex flex-col">
           <span className="text-xs font-medium">{r.requester?.full_name || "—"}</span>
-          <span className="text-muted-foreground text-[11px]">{r.department}</span>
+          <span className="text-muted-foreground text-xs">{r.department}</span>
         </div>
       ),
       initialWidth: 170,
@@ -220,11 +220,11 @@ export function RequisitionsListPage({
       accessor: (r) => r.status,
       render: (r) => (
         <div className="flex flex-col gap-1">
-          <Badge variant={statusBadgeVariant(r.status)} className="w-fit text-[11px]">
+          <Badge variant={statusBadgeVariant(r.status)} className="w-fit text-xs">
             {STATUS_LABELS[r.status]}
           </Badge>
           {r.status === "pending" || r.status === "partly_paid" ? (
-            <span className="text-muted-foreground text-[11px]">{progressLabel(r)}</span>
+            <span className="text-muted-foreground text-xs">{progressLabel(r)}</span>
           ) : null}
         </div>
       ),

@@ -105,7 +105,7 @@ function ContactRow({
     <>
       <Icon className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="text-muted-foreground block text-[11px] font-medium tracking-wide uppercase">{label}</span>
+        <span className="text-muted-foreground block text-xs font-medium tracking-wide uppercase">{label}</span>
         <span className={cn("block text-sm", value ? "truncate" : "text-muted-foreground")}>
           {value || "Not provided"}
         </span>

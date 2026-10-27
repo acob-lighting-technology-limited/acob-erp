@@ -248,11 +248,11 @@ export function WaitingOnMd() {
           trailing: (i) => (
             <div className="flex items-center gap-1.5">
               {i.urgent && (
-                <Badge variant="destructive" className="text-[10px]">
+                <Badge variant="destructive" className="text-xs">
                   Emergency
                 </Badge>
               )}
-              <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+              <Badge variant="outline" className={`border-transparent text-xs ${KIND_CLASSES[i.kind]}`}>
                 {MD_DESK_QUEUE_LABELS[i.kind]}
               </Badge>
             </div>
@@ -266,11 +266,11 @@ export function WaitingOnMd() {
             badges: (i) => (
               <div className="flex flex-wrap items-center gap-1.5">
                 {i.urgent && (
-                  <Badge variant="destructive" className="text-[10px]">
+                  <Badge variant="destructive" className="text-xs">
                     Emergency
                   </Badge>
                 )}
-                <Badge variant="outline" className={`border-transparent text-[10px] ${KIND_CLASSES[i.kind]}`}>
+                <Badge variant="outline" className={`border-transparent text-xs ${KIND_CLASSES[i.kind]}`}>
                   {MD_DESK_QUEUE_LABELS[i.kind]}
                 </Badge>
               </div>

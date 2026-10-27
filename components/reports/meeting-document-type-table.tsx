@@ -754,11 +754,11 @@ export function MeetingDocumentTypeTable({
             return (
               <>
                 {submittedBy && (
-                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]">
+                  <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs">
                     👤 {submittedBy}
                   </span>
                 )}
-                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px]">
+                <span className="bg-muted/60 text-muted-foreground inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-xs">
                   📄 {row.file_name}
                 </span>
               </>

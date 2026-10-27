@@ -179,7 +179,7 @@ function ChartCard({
           </>
         )}
         {notes.map((note) => (
-          <p key={note} className="text-muted-foreground text-[11px]">
+          <p key={note} className="text-muted-foreground text-xs">
             {note}
           </p>
         ))}

@@ -186,7 +186,7 @@ export function ManageContractCategoriesDialog({ isOpen, onOpenChange }: ManageC
                 required
                 disabled={!!editingId}
               />
-              <p className="text-muted-foreground text-[10px]">Must be letters/numbers (unique prefix code).</p>
+              <p className="text-muted-foreground text-xs">Must be letters/numbers (unique prefix code).</p>
             </div>
 
             <div className="space-y-1.5">

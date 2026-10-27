@@ -440,7 +440,7 @@ export function LeaveRequestFormDialog({
                       <Label htmlFor="calendar-emergency-override" className="cursor-pointer text-xs font-medium">
                         Emergency leave override
                       </Label>
-                      <p className="text-muted-foreground text-[11px]">
+                      <p className="text-muted-foreground text-xs">
                         Allow selecting dates during the Dec/Jan blocked period
                       </p>
                     </div>
