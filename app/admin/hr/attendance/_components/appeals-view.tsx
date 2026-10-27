@@ -124,35 +124,50 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
           </div>
         ),
         resizable: true,
-        initialWidth: 220,
+        initialWidth: 200,
       },
       {
         key: "appeal_date",
-        label: "Date",
+        label: "Day Appealed",
         sortable: true,
         accessor: (r) => r.appeal_date,
         render: (r) => (
-          <span className="font-medium">
-            {formatWATDate(r.appeal_date, { day: "2-digit", month: "short", year: "numeric" })}
-          </span>
+          <div>
+            <span className="font-medium">
+              {formatWATDate(r.appeal_date, { day: "2-digit", month: "short", year: "numeric" })}
+            </span>
+            <div className="text-muted-foreground text-xs">
+              Submitted {formatWATDate(r.created_at, { day: "2-digit", month: "short" })}
+            </div>
+          </div>
         ),
       },
       {
-        key: "current_status",
-        label: "Status when appealed",
-        accessor: (r) => r.current_status,
+        key: "requested_status",
+        label: "Status Change",
+        accessor: (r) => `${r.current_status} -> ${r.requested_status}`,
         render: (r) => (
           <div className="flex flex-col items-start gap-1">
-            <Badge
-              className={
-                ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
-              }
-            >
-              {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge
+                className={
+                  ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
+                }
+              >
+                {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
+              </Badge>
+              <span className="text-muted-foreground text-xs font-semibold">→</span>
+              <Badge
+                className={
+                  ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-blue-100 text-blue-800"
+                }
+              >
+                {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}
+              </Badge>
+            </div>
             {/* The snapshot can go stale when device punches arrive late. */}
             {r.status === "pending" && r.live_status && r.live_status !== r.current_status && (
-              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+              <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
                 Now: {ATTENDANCE_STATUS_LABELS[r.live_status as UnifiedAttendanceStatus] ?? r.live_status}
               </span>
             )}
@@ -160,31 +175,36 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         ),
       },
       {
-        key: "requested_status",
-        label: "Requesting",
-        accessor: (r) => r.requested_status,
+        key: "reviewers",
+        label: "Reviewers",
         render: (r) => (
-          <Badge
-            className={
-              ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-blue-100 text-blue-800"
-            }
-          >
-            {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}
-          </Badge>
+          <div className="flex flex-col gap-0.5 text-xs">
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground font-medium">Lead:</span>
+              <span
+                className={
+                  r.lead_reviewed_at
+                    ? "text-foreground max-w-[130px] truncate font-medium"
+                    : "text-muted-foreground max-w-[130px] truncate"
+                }
+              >
+                {r.lead_reviewer_name || (r.stage === "pending_lead" ? "Pending" : "—")}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground font-medium">Admin:</span>
+              <span
+                className={
+                  r.admin_reviewed_at || r.status === "approved" || r.status === "rejected"
+                    ? "text-foreground max-w-[130px] truncate font-medium"
+                    : "text-muted-foreground max-w-[130px] truncate"
+                }
+              >
+                {r.admin_reviewer_name || r.reviewer_name || (r.stage === "pending_admin" ? "Pending" : "—")}
+              </span>
+            </div>
+          </div>
         ),
-      },
-
-      {
-        key: "created_at",
-        label: "Submitted",
-        sortable: true,
-        accessor: (r) => r.created_at,
-        render: (r) => (
-          <span className="text-muted-foreground text-sm">
-            {formatWATDate(r.created_at, { day: "2-digit", month: "short", year: "numeric" })}
-          </span>
-        ),
-        hideOnMobile: true,
       },
       {
         key: "status",
@@ -368,86 +388,109 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 border-t pt-3 md:grid-cols-3">
-                {/* 1. Origin */}
-                <div className="bg-background/80 space-y-1 rounded-lg border p-3 text-xs">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                    Origin / Initiator
-                  </span>
-                  <div className="text-foreground font-medium">
-                    {r.initiated_by_role === "admin_manual"
-                      ? "Admin Manual Alteration"
-                      : r.initiated_by_role === "lead_on_behalf"
-                        ? "Lead on Behalf"
-                        : "Employee Appeal"}
+              <div className="border-t pt-3">
+                <span className="text-muted-foreground mb-2 block text-xs font-semibold tracking-wide uppercase">
+                  Audit History
+                </span>
+                <div className="bg-background/80 divide-y rounded-lg border text-xs">
+                  {/* 1. Origin */}
+                  <div className="flex flex-col justify-between gap-1 p-3 sm:flex-row sm:items-center">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-muted-foreground w-28 shrink-0 font-semibold">Initiated By</span>
+                      <span className="text-foreground font-medium">
+                        {r.initiated_by_role === "admin_manual"
+                          ? "Admin Manual Alteration"
+                          : r.initiated_by_role === "lead_on_behalf"
+                            ? "Lead on Behalf"
+                            : "Employee Appeal"}
+                      </span>
+                      <span className="text-muted-foreground">
+                        by{" "}
+                        <strong className="text-foreground font-medium">
+                          {r.created_by_name || (r.initiated_by_role === "employee" ? r.user_name : "Admin")}
+                        </strong>
+                      </span>
+                    </div>
+                    <span className="text-muted-foreground shrink-0 whitespace-nowrap">
+                      {formatWATDateTime(r.created_at)}
+                    </span>
                   </div>
-                  <div className="text-muted-foreground">
-                    By: {r.created_by_name || (r.initiated_by_role === "employee" ? r.user_name : "Admin")}
-                  </div>
-                  <div className="text-muted-foreground">{formatWATDateTime(r.created_at)}</div>
-                </div>
 
-                {/* 2. Lead Endorsement */}
-                <div className="bg-background/80 space-y-1 rounded-lg border p-3 text-xs">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                    Lead Endorsement
-                  </span>
-                  {r.lead_reviewed_at ? (
-                    <>
-                      <div className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</div>
-                      <div className="text-muted-foreground">By: {r.lead_reviewer_name || "Department Lead"}</div>
-                      <div className="text-muted-foreground">{formatWATDateTime(r.lead_reviewed_at)}</div>
+                  {/* 2. Lead Endorsement */}
+                  <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 flex-col flex-wrap gap-2 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground w-28 shrink-0 font-semibold">Lead Endorsement</span>
+                        {r.lead_reviewed_at ? (
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</span>
+                        ) : r.stage === "pending_lead" ? (
+                          <span className="font-medium text-amber-600 dark:text-amber-400">Awaiting Endorsement</span>
+                        ) : (
+                          <span className="text-muted-foreground">Not required / Bypassed</span>
+                        )}
+                      </div>
+                      {r.lead_reviewed_at && (
+                        <span className="text-muted-foreground">
+                          by{" "}
+                          <strong className="text-foreground font-medium">
+                            {r.lead_reviewer_name || "Department Lead"}
+                          </strong>
+                        </span>
+                      )}
                       {r.lead_resolution_note && (
-                        <p className="text-muted-foreground mt-1 border-t pt-1 italic">
+                        <span className="text-muted-foreground truncate italic">
                           &ldquo;{r.lead_resolution_note}&rdquo;
-                        </p>
+                        </span>
                       )}
-                    </>
-                  ) : r.stage === "pending_lead" ? (
-                    <div className="font-medium text-amber-600 dark:text-amber-400">Awaiting Lead endorsement</div>
-                  ) : (
-                    <div className="text-muted-foreground">Not required / Bypassed</div>
-                  )}
-                </div>
+                    </div>
+                    {r.lead_reviewed_at && (
+                      <span className="text-muted-foreground shrink-0 whitespace-nowrap">
+                        {formatWATDateTime(r.lead_reviewed_at)}
+                      </span>
+                    )}
+                  </div>
 
-                {/* 3. Admin Review */}
-                <div className="bg-background/80 space-y-1 rounded-lg border p-3 text-xs">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                    Admin Review
-                  </span>
-                  {r.admin_reviewed_at ? (
-                    <>
-                      <div className="font-medium text-emerald-600 dark:text-emerald-400">
-                        {r.status === "rejected" ? "Rejected" : "Approved"}
+                  {/* 3. Admin Review */}
+                  <div className="flex flex-col gap-1 p-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 flex-col flex-wrap gap-2 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground w-28 shrink-0 font-semibold">Admin Review</span>
+                        {r.admin_reviewed_at || r.status === "approved" || r.status === "rejected" ? (
+                          <span
+                            className={
+                              r.status === "rejected"
+                                ? "font-medium text-red-600 dark:text-red-400"
+                                : "font-medium text-emerald-600 dark:text-emerald-400"
+                            }
+                          >
+                            {r.status === "rejected" ? "Rejected" : "Approved"}
+                          </span>
+                        ) : r.stage === "pending_admin" ? (
+                          <span className="font-medium text-blue-600 dark:text-blue-400">Awaiting Admin Review</span>
+                        ) : (
+                          <span className="text-muted-foreground">Pending Lead Stage</span>
+                        )}
                       </div>
-                      <div className="text-muted-foreground">
-                        By: {r.admin_reviewer_name || r.reviewer_name || "Admin"}
-                      </div>
-                      <div className="text-muted-foreground">{formatWATDateTime(r.admin_reviewed_at)}</div>
+                      {(r.admin_reviewer_name || r.reviewer_name) && (
+                        <span className="text-muted-foreground">
+                          by{" "}
+                          <strong className="text-foreground font-medium">
+                            {r.admin_reviewer_name || r.reviewer_name}
+                          </strong>
+                        </span>
+                      )}
                       {(r.admin_resolution_note || r.resolution_note) && (
-                        <p className="text-muted-foreground mt-1 border-t pt-1 italic">
+                        <span className="text-muted-foreground truncate italic">
                           &ldquo;{r.admin_resolution_note || r.resolution_note}&rdquo;
-                        </p>
+                        </span>
                       )}
-                    </>
-                  ) : r.status === "approved" || r.status === "rejected" ? (
-                    <>
-                      <div className="font-medium text-emerald-600 dark:text-emerald-400">
-                        {r.status === "rejected" ? "Rejected" : "Approved"}
-                      </div>
-                      {r.reviewer_name && <div className="text-muted-foreground">By: {r.reviewer_name}</div>}
-                      {r.reviewed_at && <div className="text-muted-foreground">{formatWATDateTime(r.reviewed_at)}</div>}
-                      {r.resolution_note && (
-                        <p className="text-muted-foreground mt-1 border-t pt-1 italic">
-                          &ldquo;{r.resolution_note}&rdquo;
-                        </p>
-                      )}
-                    </>
-                  ) : r.stage === "pending_admin" ? (
-                    <div className="font-medium text-blue-600 dark:text-blue-400">Awaiting Admin review</div>
-                  ) : (
-                    <div className="text-muted-foreground">Pending Lead stage</div>
-                  )}
+                    </div>
+                    {(r.admin_reviewed_at || r.reviewed_at) && (
+                      <span className="text-muted-foreground shrink-0 whitespace-nowrap">
+                        {formatWATDateTime(r.admin_reviewed_at || r.reviewed_at!)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
