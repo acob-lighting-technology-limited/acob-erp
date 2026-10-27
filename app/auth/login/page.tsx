@@ -21,6 +21,7 @@ import {
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
+import { getSafeNextPath } from "@/lib/auth/safe-next-path"
 
 const log = logger("auth-login")
 
@@ -354,20 +355,4 @@ export default function LoginPage() {
       </Card>
     </AuthShell>
   )
-}
-
-function getSafeNextPath(next: string | null): string {
-  if (!next) return "/profile"
-
-  if (
-    next.startsWith("/") &&
-    !next.startsWith("//") &&
-    !next.includes(":") &&
-    !/https?:\/\//i.test(next) &&
-    !/[\r\n]/.test(next)
-  ) {
-    return next
-  }
-
-  return "/profile"
 }

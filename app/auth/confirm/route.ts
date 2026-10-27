@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getSafeNextPath } from "@/lib/auth/safe-next-path"
 
 import { logger } from "@/lib/logger"
 import { writeLoginLog } from "@/lib/auth/login-log"
@@ -19,7 +20,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const tokenHash = searchParams.get("token_hash")
   const rawType = searchParams.get("type")
-  const rawNext = searchParams.get("next") || "/profile"
 
   // Validate type parameter
   const ALLOWED_TYPES = new Set(["invite", "recovery", "email", "signup", "magiclink"])
@@ -27,18 +27,8 @@ export async function GET(request: Request) {
     ? (rawType as "invite" | "recovery" | "email" | "signup" | "magiclink")
     : "signup"
 
-  // Validate and sanitize 'next' to prevent open redirects
-  let safeNext = "/profile"
-  if (
-    rawNext &&
-    rawNext.startsWith("/") &&
-    !rawNext.startsWith("//") &&
-    !rawNext.includes(":") &&
-    !/https?:\/\//i.test(rawNext) &&
-    !/[\r\n]/.test(rawNext) // Extra validation for CRLF
-  ) {
-    safeNext = rawNext
-  }
+  // Validated by parsing, not string checks: see lib/auth/safe-next-path.ts
+  const safeNext = getSafeNextPath(searchParams.get("next"))
 
   if (!tokenHash || !rawType) {
     return NextResponse.redirect(new URL("/auth/error?message=Missing+confirmation+parameters", request.url))

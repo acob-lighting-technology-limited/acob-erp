@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getSafeNextPath } from "@/lib/auth/safe-next-path"
 import { logger } from "@/lib/logger"
 import { writeLoginLog } from "@/lib/auth/login-log"
 
@@ -8,20 +9,8 @@ const log = logger("auth-callback")
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get("code")
-  const next = searchParams.get("next") || "/profile"
-
-  // Validate and sanitize 'next' to prevent open redirects
-  let safeNext = "/profile"
-  if (
-    next &&
-    typeof next === "string" &&
-    next.startsWith("/") &&
-    !next.startsWith("//") &&
-    !next.includes(":") && // Prevent scheme/host characters
-    !/https?:\/\//i.test(next) // Extra check for explicit http/https
-  ) {
-    safeNext = next
-  }
+  // Validated by parsing, not string checks: see lib/auth/safe-next-path.ts
+  const safeNext = getSafeNextPath(searchParams.get("next"))
 
   if (code) {
     const supabase = await createClient()
