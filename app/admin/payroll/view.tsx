@@ -348,7 +348,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             <Plus className="mr-1.5 h-4 w-4" /> Create Period
           </Button>
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <form onSubmit={handleCreatePeriod}>
             <DialogHeader>
               <DialogTitle>Create Payroll Period</DialogTitle>

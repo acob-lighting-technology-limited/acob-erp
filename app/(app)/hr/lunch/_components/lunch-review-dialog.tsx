@@ -118,7 +118,7 @@ export function LunchReviewDialog({ open, onOpenChange, menuId, date, onSaved }:
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{hasExistingReview ? "Edit your review" : "Review this meal"}</DialogTitle>
           <DialogDescription>

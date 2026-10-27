@@ -122,16 +122,23 @@ async function main() {
   const pageFiles = tsxFiles.filter((f) => toPosix(f).endsWith("/page.tsx"))
 
   const missingLoading = []
+  const allowlist = JSON.parse(await readText(ALLOWLIST_PATH))
+  const allowLoading = new Set(allowlist.missingLoading || [])
+
   for (const pagePath of pageFiles) {
     const dir = path.dirname(pagePath)
     try {
       await fs.access(path.join(dir, "loading.tsx"))
     } catch {
-      missingLoading.push(toPosix(path.relative(ROOT, dir)))
+      // A page that only redirects renders nothing, so it has nothing to show a skeleton for.
+      const pageContent = await readText(pagePath)
+      if (/\bredirect\s*\(/.test(pageContent) && pageContent.split(/\n/).length < 40) continue
+      const dirRel = toPosix(path.relative(ROOT, dir))
+      if (allowLoading.has(dirRel)) continue
+      missingLoading.push(dirRel)
     }
   }
 
-  const allowlist = JSON.parse(await readText(ALLOWLIST_PATH))
   const allowHeader = new Set(allowlist.header || [])
   const allowTable = new Set(allowlist.table || [])
   const allowStats = new Set(allowlist.stats || [])
@@ -267,6 +274,7 @@ async function main() {
 
   if (WRITE_ALLOWLIST) {
     const updatedAllowlist = {
+      missingLoading: normalizeArray([...(allowlist.missingLoading || []), ...missingLoading]),
       header: normalizeArray([...(allowlist.header || []), ...headerViolations]),
       table: normalizeArray([...(allowlist.table || []), ...tableViolations]),
       stats: normalizeArray([...(allowlist.stats || []), ...statsViolations]),
