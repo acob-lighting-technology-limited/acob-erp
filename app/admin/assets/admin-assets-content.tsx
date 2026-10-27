@@ -43,7 +43,7 @@ import { logger } from "@/lib/logger"
 
 import { AssetFormDialog } from "@/components/assets/AssetFormDialog"
 import { AssetAssignDialog } from "@/components/assets/AssetAssignDialog"
-import { AssetHistoryDialog } from "@/components/assets/AssetHistoryDialog"
+import { AssetHistorySheet } from "@/components/assets/asset-history-sheet"
 import { AssetIssuesDialog } from "@/components/assets/AssetIssuesDialog"
 import { AssetTypeDialog } from "@/components/assets/AssetTypeDialog"
 import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
@@ -1650,8 +1650,8 @@ export function AdminAssetsContent({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* asset History Dialog */}
-      <AssetHistoryDialog
+      {/* Asset history sheet */}
+      <AssetHistorySheet
         isOpen={isHistoryOpen}
         onOpenChange={setIsHistoryOpen}
         selectedAsset={selectedAsset}

@@ -36,7 +36,7 @@ import {
   type ControlledDocType,
 } from "@/lib/documentation/controlled"
 import { AcknowledgementProgress, ControlledDocStatusBadge, ReviewDateBadge } from "./controlled-doc-badges"
-import { ControlledDocAcknowledgementsDialog } from "./controlled-doc-acknowledgements-dialog"
+import { ControlledDocAcknowledgementsSheet } from "./controlled-doc-acknowledgements-sheet"
 import { ControlledDocActionDialog, type ControlledDocAction } from "./controlled-doc-action-dialog"
 import { ControlledDocFormDialog } from "./controlled-doc-form-dialog"
 import { ControlledDocVersionDialog } from "./controlled-doc-version-dialog"
@@ -432,7 +432,7 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
         onSaved={refresh}
       />
       <ControlledDocViewDialog documentId={viewingId} onOpenChange={(open) => !open && setViewingId(null)} />
-      <ControlledDocAcknowledgementsDialog doc={ackDoc} onOpenChange={(open) => !open && setAckDoc(null)} />
+      <ControlledDocAcknowledgementsSheet doc={ackDoc} onOpenChange={(open) => !open && setAckDoc(null)} />
       <ControlledDocActionDialog
         action={pendingAction?.action ?? null}
         doc={pendingAction?.doc ?? null}

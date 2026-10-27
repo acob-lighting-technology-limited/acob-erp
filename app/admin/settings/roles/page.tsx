@@ -23,10 +23,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ASSIGNABLE_ROLES } from "@/lib/role-management"
 import { RoleFormDialog } from "./_components/role-form-dialog"
-import { RoleUsersDialog } from "./_components/role-users-dialog"
+import { RoleUsersSheet } from "./_components/role-users-sheet"
 import { DEFAULT_ROLES, fetchRolesData } from "./_components/roles-data"
 import type { Role, RoleFormData } from "./_components/role-form-dialog"
-import type { RoleMember } from "./_components/role-users-dialog"
+import type { RoleMember } from "./_components/role-users-sheet"
 
 import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
@@ -459,7 +459,7 @@ export default function RolesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <RoleUsersDialog
+      <RoleUsersSheet
         open={roleUsersOpen}
         onOpenChange={setRoleUsersOpen}
         selectedRoleName={selectedRoleName}
