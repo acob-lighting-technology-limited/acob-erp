@@ -700,6 +700,10 @@ table or filter bar. Use `ExportOptionsDialog` from
 `@/components/admin/export-options-dialog`. Export logic lives in
 `@/lib/<section>/export.ts`.
 
+`DataTable` has no built-in `export` prop (removed): two exports on one page, one in the toolbar and one in
+the header, confused users. A page that also needs a column picker opens `ExportColumnsDialog` from
+the `ExportOptionsDialog` choice; it is a second step, not a second export system.
+
 ### Back link convention
 
 **A page the sidebar opens directly has no back link.** The sidebar is the way back; a second control

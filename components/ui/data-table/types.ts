@@ -1,4 +1,3 @@
-import type { TableExportOptions } from "@/lib/export/table-export"
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 
@@ -186,8 +185,6 @@ export interface DataTableProps<TData> {
   data: TData[]
   columns: DataTableColumn<TData>[]
   getRowId: (row: TData) => string
-  /** Opt-in export of visible accessor columns and all filtered, sorted rows. */
-  export?: TableExportOptions | false
 
   // ── Search ───────────────────────────────────────────────────────────────
   searchPlaceholder?: string

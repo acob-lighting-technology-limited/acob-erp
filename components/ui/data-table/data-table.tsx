@@ -1,6 +1,5 @@
 "use client"
 
-import { TableExportButton } from "./export-button"
 import {
   Fragment,
   useState,
@@ -315,7 +314,6 @@ export function DataTable<TData>({
   showRowNumbers = true,
   columnToggle = true,
   stickyToolbar = false,
-  export: exportConfig = false,
   skeletonRows = 8,
   // State
   isLoading = false,
@@ -565,10 +563,6 @@ export function DataTable<TData>({
   const visibleColumns = useMemo(
     () => orderedColumns.filter((c) => !hiddenColumns.has(c.key)),
     [orderedColumns, hiddenColumns]
-  )
-  const exportColumns = useMemo(
-    () => visibleColumns.map((c) => ({ label: c.label, accessor: c.accessor })),
-    [visibleColumns]
   )
 
   // ─── DnD sensors ─────────────────────────────────────────────────────────
@@ -852,7 +846,7 @@ export function DataTable<TData>({
   ]
   const showViewToggle = viewToggle && viewOptions.length > 1
 
-  const showToolbar = !searchDisabled || filters.length > 0 || columnToggle || showViewToggle || Boolean(exportConfig)
+  const showToolbar = !searchDisabled || filters.length > 0 || columnToggle || showViewToggle
 
   const pinnedFilters = filters.filter((filter) => filter.pinned)
   const sheetFilters = filters.filter((filter) => !filter.pinned)
@@ -960,8 +954,6 @@ export function DataTable<TData>({
               </SheetContent>
             </Sheet>
           )}
-
-          {exportConfig && <TableExportButton rows={sortedData} columns={exportColumns} config={exportConfig} />}
 
           {columnToggle && columns.length > 1 && (
             <DropdownMenu>

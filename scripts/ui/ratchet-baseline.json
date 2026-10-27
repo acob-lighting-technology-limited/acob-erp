@@ -568,7 +568,7 @@
       "components/hr/manage-users-dialog.tsx": 1475,
       "components/payments/payments-table.tsx": 1176,
       "components/reports/kss-roster-table.tsx": 1524,
-      "components/ui/data-table/data-table.tsx": 1895,
+      "components/ui/data-table/data-table.tsx": 1888,
       "lib/assets/handover-pdf-generator.ts": 1096,
       "lib/export/pptx.ts": 1998
     }

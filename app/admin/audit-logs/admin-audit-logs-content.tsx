@@ -283,7 +283,6 @@ export function AdminAuditLogsContent({
       }
     >
       <DataTable<AuditLog>
-        export={{ filename: "audit-logs", title: "Audit Logs" }}
         data={filteredData}
         onProcessedDataChange={setProcessedLogs}
         columns={columns}
