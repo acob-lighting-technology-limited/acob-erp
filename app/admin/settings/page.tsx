@@ -52,7 +52,7 @@ export default async function AdminSettingsPage() {
               <IconFill
                 icon={Users}
                 fillColor="bg-blue-500"
-                className="h-8 w-8 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-600 transition-transform duration-200 group-hover:scale-105 dark:text-blue-400"
+                className="text-info border-info/20 bg-info/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                 iconClassName="h-4 w-4"
               />
               <span className="transition-colors group-hover:text-blue-500">User Management</span>
@@ -78,7 +78,7 @@ export default async function AdminSettingsPage() {
               <IconFill
                 icon={Shield}
                 fillColor="bg-purple-500"
-                className="h-8 w-8 rounded-lg border border-purple-500/20 bg-purple-500/10 text-purple-600 transition-transform duration-200 group-hover:scale-105 dark:text-purple-400"
+                className="border-purple/20 bg-purple/10 text-purple h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                 iconClassName="h-4 w-4"
               />
               <span className="transition-colors group-hover:text-purple-500">Roles & Permissions</span>
@@ -98,7 +98,7 @@ export default async function AdminSettingsPage() {
               <IconFill
                 icon={Building2}
                 fillColor="bg-teal-500"
-                className="h-8 w-8 rounded-lg border border-teal-500/20 bg-teal-500/10 text-teal-600 transition-transform duration-200 group-hover:scale-105 dark:text-teal-400"
+                className="text-success h-8 w-8 rounded-lg border border-teal-500/20 bg-teal-500/10 transition-transform duration-200 group-hover:scale-105"
                 iconClassName="h-4 w-4"
               />
               <span className="transition-colors group-hover:text-teal-500">Company Settings</span>
@@ -121,7 +121,7 @@ export default async function AdminSettingsPage() {
                 <IconFill
                   icon={Settings}
                   fillColor="bg-amber-500"
-                  className="h-8 w-8 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-600 transition-transform duration-200 group-hover:scale-105 dark:text-amber-400"
+                  className="text-warning border-warning/20 bg-warning/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-amber-500">Maintenance Control</span>
@@ -143,7 +143,7 @@ export default async function AdminSettingsPage() {
                 <IconFill
                   icon={Mail}
                   fillColor="bg-indigo-500"
-                  className="h-8 w-8 rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-600 transition-transform duration-200 group-hover:scale-105 dark:text-indigo-400"
+                  className="text-info h-8 w-8 rounded-lg border border-indigo-500/20 bg-indigo-500/10 transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-indigo-500">Mail Settings</span>
@@ -165,7 +165,7 @@ export default async function AdminSettingsPage() {
                 <IconFill
                   icon={HardDrive}
                   fillColor="bg-sky-500"
-                  className="h-8 w-8 rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-600 transition-transform duration-200 group-hover:scale-105 dark:text-sky-400"
+                  className="text-info border-info/20 bg-info/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-sky-500">Mailboxes</span>
@@ -189,7 +189,7 @@ export default async function AdminSettingsPage() {
                 <IconFill
                   icon={Brain}
                   fillColor="bg-violet-500"
-                  className="h-8 w-8 rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-600 transition-transform duration-200 group-hover:scale-105 dark:text-violet-400"
+                  className="border-purple/20 bg-purple/10 text-purple h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-violet-500">CBT Assessment Settings</span>
@@ -211,7 +211,7 @@ export default async function AdminSettingsPage() {
                 <IconFill
                   icon={Clock}
                   fillColor="bg-emerald-500"
-                  className="h-8 w-8 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 transition-transform duration-200 group-hover:scale-105 dark:text-emerald-400"
+                  className="text-success border-success/20 bg-success/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-emerald-500">Attendance Policy</span>
@@ -233,7 +233,7 @@ export default async function AdminSettingsPage() {
                 <IconFill
                   icon={Settings}
                   fillColor="bg-orange-500"
-                  className="h-8 w-8 rounded-lg border border-orange-500/20 bg-orange-500/10 text-orange-600 transition-transform duration-200 group-hover:scale-105 dark:text-orange-400"
+                  className="text-warning border-warning/20 bg-warning/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-orange-500">Developer Control Plane</span>

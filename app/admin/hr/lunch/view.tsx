@@ -151,7 +151,7 @@ export function getMenuStatusInfo(menu: { status: string; archived_at?: string |
   return {
     key: "deadline_passed",
     label: "Deadline passed",
-    tone: "border-0 bg-amber-500/10 text-amber-600 dark:text-amber-500 hover:bg-amber-500/20 shadow-none",
+    tone: "border-0 bg-warning/10 text-warning hover:bg-amber-500/20 shadow-none",
     accentClass: "bg-amber-500",
   }
 }

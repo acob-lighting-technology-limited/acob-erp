@@ -51,7 +51,7 @@ const DECISIONS: Array<{
     description: "Accept the work and rate it — this is what turns its weight into a score.",
     unavailableReason: "Requires submission",
     icon: CheckCircle2,
-    className: "border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400",
+    className: "border-success/30 text-success hover:bg-emerald-500/10",
     available: (task) => ["submitted_for_review", "in_progress", "pending", "unable_to_complete"].includes(task.status),
   },
   {
@@ -60,7 +60,7 @@ const DECISIONS: Array<{
     description: "Send it back to the assignee with instructions. Still open, not yet scored.",
     unavailableReason: "Requires submission",
     icon: RotateCcw,
-    className: "border-purple-500/30 text-purple-700 hover:bg-purple-500/10 dark:text-purple-400",
+    className: "border-purple/30 text-purple hover:bg-purple-500/10",
     available: (task) => ["submitted_for_review", "unable_to_complete"].includes(task.status),
   },
   {
@@ -69,7 +69,7 @@ const DECISIONS: Array<{
     description: "Move the work to someone else. Neutral for the original assignee's score.",
     unavailableReason: "Task closed",
     icon: UserCheck,
-    className: "border-sky-500/30 text-sky-700 hover:bg-sky-500/10 dark:text-sky-400",
+    className: "border-info/30 text-info hover:bg-sky-500/10",
     available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
   },
   {
@@ -78,7 +78,7 @@ const DECISIONS: Array<{
     description: "Give more time, with a reason kept on the task.",
     unavailableReason: "Task closed",
     icon: Calendar,
-    className: "border-blue-500/30 text-blue-700 hover:bg-blue-500/10 dark:text-blue-400",
+    className: "border-info/30 text-info hover:bg-blue-500/10",
     available: (task) => !["completed", "reassigned", "cancelled"].includes(task.status),
   },
   {
@@ -87,7 +87,7 @@ const DECISIONS: Array<{
     description: "Reopen a previously failed task back to in-progress with an updated deadline.",
     unavailableReason: "Only failed tasks",
     icon: RotateCcw,
-    className: "border-amber-500/30 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400",
+    className: "border-warning/30 text-warning hover:bg-amber-500/10",
     available: (task) => task.status === "failed",
   },
   {
@@ -96,7 +96,7 @@ const DECISIONS: Array<{
     description: "Terminal write-off. The task scores zero at its full weight.",
     unavailableReason: "Task closed",
     icon: XCircle,
-    className: "border-rose-500/30 text-rose-700 hover:bg-rose-500/10 dark:text-rose-400",
+    className: "border-danger/30 text-danger hover:bg-rose-500/10",
     available: (task) => !["completed", "reassigned", "cancelled", "failed"].includes(task.status),
   },
 ]
@@ -261,7 +261,7 @@ export function TaskReviewDecisionDialog({
             </div>
 
             {isUnableToComplete && task.unable_to_complete_reason && (
-              <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+              <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5 text-xs">
                 <span className="mb-0.5 block font-semibold">Reported Issue / Reason:</span>
                 {task.unable_to_complete_reason}
               </div>

@@ -50,15 +50,13 @@ export function SchedulingOptions({
           onClick={() => setSendTiming("now")}
           className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "now"
-              ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
+              ? "border-warning/30 bg-warning/15"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
           }`}
         >
           <Send className={`h-5 w-5 ${sendTiming === "now" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div className={`font-semibold ${sendTiming === "now" ? "text-orange-700 dark:text-orange-400" : ""}`}>
-              Send Immediately
-            </div>
+            <div className={`font-semibold ${sendTiming === "now" ? "text-warning" : ""}`}>Send Immediately</div>
             <div className="text-muted-foreground text-xs">Email will be sent right away</div>
           </div>
         </button>
@@ -67,17 +65,13 @@ export function SchedulingOptions({
           onClick={() => setSendTiming("scheduled")}
           className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "scheduled"
-              ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
+              ? "border-warning/30 bg-warning/15"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
           }`}
         >
           <Clock className={`h-5 w-5 ${sendTiming === "scheduled" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div
-              className={`font-semibold ${sendTiming === "scheduled" ? "text-orange-700 dark:text-orange-400" : ""}`}
-            >
-              Schedule
-            </div>
+            <div className={`font-semibold ${sendTiming === "scheduled" ? "text-warning" : ""}`}>Schedule</div>
             <div className="text-muted-foreground text-xs">One-time, pick a date &amp; time</div>
           </div>
         </button>
@@ -86,17 +80,13 @@ export function SchedulingOptions({
           onClick={() => setSendTiming("recurring")}
           className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 transition-all ${
             sendTiming === "recurring"
-              ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
+              ? "border-warning/30 bg-warning/15"
               : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
           }`}
         >
           <Repeat className={`h-5 w-5 ${sendTiming === "recurring" ? "text-orange-600" : "text-muted-foreground"}`} />
           <div className="text-left">
-            <div
-              className={`font-semibold ${sendTiming === "recurring" ? "text-orange-700 dark:text-orange-400" : ""}`}
-            >
-              Recurring
-            </div>
+            <div className={`font-semibold ${sendTiming === "recurring" ? "text-warning" : ""}`}>Recurring</div>
             <div className="text-muted-foreground text-xs">Automatic every week (server-side)</div>
           </div>
         </button>

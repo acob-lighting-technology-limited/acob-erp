@@ -677,9 +677,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
           subtitle: (r) =>
             `${r.department || "General"} · Gross: ${money(r.breakdown.monthlyGross)} · Net: ${money(r.breakdown.netPay)}`,
           trailing: (r) => (
-            <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              {money(r.breakdown.netPay)}
-            </span>
+            <span className="text-success font-mono text-xs font-bold">{money(r.breakdown.netPay)}</span>
           ),
           onSelect: (r) => setViewRow(r),
         }}
@@ -693,9 +691,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
                 <p className="text-sm font-semibold">{formatEmployeeName(r)}</p>
                 <p className="text-muted-foreground text-xs">{r.department || "General"}</p>
               </div>
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                {money(r.breakdown.netPay)}
-              </span>
+              <span className="text-success font-mono text-xs font-bold">{money(r.breakdown.netPay)}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs">
               <div>Gross: {money(r.breakdown.monthlyGross)}</div>
@@ -721,7 +717,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
           {viewRow && vb && (
             <div
               id="payslip-print-area"
-              className="space-y-4 rounded-lg border bg-white p-5 text-sm text-gray-800 shadow-sm dark:bg-white dark:text-gray-800"
+              className="text-foreground space-y-4 rounded-lg border bg-white p-5 text-sm shadow-sm dark:bg-white"
             >
               {/* Header: Logo + Company Info + Payslip Label */}
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-200 pb-3">
@@ -945,7 +941,7 @@ export function PayrollWorksheetPage({ initialData }: WorksheetPageProps) {
             </label>
 
             {status !== "completed" && (
-              <p className="text-xs text-amber-600 dark:text-amber-500">
+              <p className="text-warning text-xs">
                 This period is still a draft, so the payslip will be marked <strong>DRAFT</strong>. Figures are
                 recomputed at send time; unsaved bonus or loan edits in the table are not included.
               </p>

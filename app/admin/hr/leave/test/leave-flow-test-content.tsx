@@ -263,8 +263,8 @@ export function LeaveFlowTestContent() {
                   key={i}
                   className={cn(
                     "flex items-start gap-3 rounded-md border px-3 py-2 text-sm",
-                    step.status === "ok" && "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30",
-                    step.status === "error" && "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30",
+                    step.status === "ok" && "border-success/30 bg-success/15",
+                    step.status === "error" && "border-danger/30 bg-danger/15",
                     step.status === "skipped" && "bg-muted/40 border-dashed"
                   )}
                 >
@@ -351,9 +351,7 @@ export function LeaveFlowTestContent() {
                           key={i}
                           className={cn(
                             "rounded-md border px-3 py-2 text-xs",
-                            row.resolved
-                              ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-                              : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                            row.resolved ? "border-success/30 bg-success/15" : "border-danger/30 bg-danger/15"
                           )}
                         >
                           <div className="flex items-start gap-2">
@@ -372,9 +370,9 @@ export function LeaveFlowTestContent() {
                                 </span>
                               ) : (
                                 <div className="mt-1 space-y-1">
-                                  <p className="text-red-600 dark:text-red-400">{row.fail_reason}</p>
+                                  <p className="text-danger">{row.fail_reason}</p>
                                   {FIX_HINTS[row.approver_role_code] && (
-                                    <p className="text-amber-700 dark:text-amber-400">
+                                    <p className="text-warning">
                                       <strong>Fix:</strong> {FIX_HINTS[row.approver_role_code]}
                                     </p>
                                   )}

@@ -161,7 +161,7 @@ export function WeeklySummaryForm({
                     opt.disabled
                       ? "bg-muted/20 opacity-70"
                       : checked
-                        ? "text-foreground border-emerald-500 bg-emerald-50 shadow-sm dark:bg-emerald-950/20"
+                        ? "text-foreground bg-success/15 border-emerald-500 shadow-sm"
                         : "hover:bg-muted/40"
                   }`}
                 >

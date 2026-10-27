@@ -114,7 +114,7 @@ export function EmployeeMailboxSection({
       ) : !mailbox?.email ? (
         <p className="text-muted-foreground">No company email on this profile.</p>
       ) : mailbox.error ? (
-        <p className="text-amber-600 dark:text-amber-400">
+        <p className="text-warning">
           Could not reach cPanel ({mailbox.error}). The status will still change; update the mailbox in cPanel.
         </p>
       ) : !mailbox.managed ? (
@@ -167,7 +167,7 @@ export function EmployeeMailboxSection({
                     className="h-8 font-mono text-xs"
                     aria-invalid={forwardInvalid}
                   />
-                  <p className={forwardInvalid ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}>
+                  <p className={forwardInvalid ? "text-danger" : "text-muted-foreground"}>
                     {!forwardInvalid
                       ? "Defaults to their department lead."
                       : forwardTo.trim() === "" && !mailbox.suggestedForward

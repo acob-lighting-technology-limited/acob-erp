@@ -340,7 +340,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {profile.is_department_lead && (
                   <Badge
                     variant="outline"
-                    className="border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400"
+                    className="text-warning border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium"
                   >
                     Dept Lead
                   </Badge>
@@ -348,7 +348,7 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                 {confirmationDate ? (
                   <Badge
                     variant="outline"
-                    className="border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400"
+                    className="text-success border-success/30 bg-success/10 px-2 py-0.5 text-xs font-medium"
                   >
                     Confirmed
                   </Badge>
@@ -419,18 +419,12 @@ export function ProfileHero({ profile, avatarUrl, attendance, todayStatus, onAva
                   {getRoleDisplayName(profile.role as UserRole)}
                 </Badge>
                 {profile.is_department_lead && (
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-600 dark:text-amber-400"
-                  >
+                  <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs font-medium">
                     Dept Lead
                   </Badge>
                 )}
                 {confirmationDate ? (
-                  <Badge
-                    variant="outline"
-                    className="border-emerald-500/30 bg-emerald-500/10 text-xs font-medium text-emerald-700 dark:text-emerald-400"
-                  >
+                  <Badge variant="outline" className="text-success border-success/30 bg-success/10 text-xs font-medium">
                     Confirmed
                   </Badge>
                 ) : profile.employment_date ? (

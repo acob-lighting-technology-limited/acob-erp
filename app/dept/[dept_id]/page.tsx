@@ -348,8 +348,8 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             value={employeeStats.count || 0}
             description="Active profiles in dept"
             icon={Users}
-            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconBgColor="bg-info/15"
+            iconColor="text-info"
           />
           <StatCard
             variant="compact"
@@ -357,8 +357,8 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             value={assetStats.count || 0}
             description="Tracked dept inventory"
             icon={Package}
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            iconColor="text-purple-600 dark:text-purple-400"
+            iconBgColor="bg-purple/15"
+            iconColor="text-purple"
           />
           <StatCard
             variant="compact"
@@ -366,8 +366,8 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             value={taskStats.count || 0}
             description="Tasks in dept"
             icon={ClipboardList}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-success/15"
+            iconColor="text-success"
           />
           <StatCard
             variant="compact"
@@ -375,8 +375,8 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             value={docStats.count || 0}
             description="Team documentation"
             icon={FileText}
-            iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-            iconColor="text-orange-600 dark:text-orange-400"
+            iconBgColor="bg-warning/15"
+            iconColor="text-warning"
           />
           <StatCard
             variant="compact"
@@ -384,8 +384,8 @@ export default async function DeptOverviewPage({ params }: DeptOverviewPageProps
             value={feedbackStats.count || 0}
             description="Submitted by team"
             icon={MessageSquare}
-            iconBgColor="bg-cyan-100 dark:bg-cyan-900/30"
-            iconColor="text-cyan-600 dark:text-cyan-400"
+            iconBgColor="bg-info/15"
+            iconColor="text-info"
           />
         </StatGrid>
       </Section>

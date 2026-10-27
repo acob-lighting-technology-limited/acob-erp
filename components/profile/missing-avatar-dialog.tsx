@@ -83,7 +83,7 @@ export function MissingAvatarDialog({ hasAvatar }: MissingAvatarDialogProps) {
     <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : dismiss())}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="items-center text-center sm:items-center sm:text-center">
-          <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+          <div className="bg-warning/15 text-warning mb-2 flex h-14 w-14 items-center justify-center rounded-full">
             <Camera className="h-7 w-7" aria-hidden />
           </div>
           <DialogTitle>Add your profile photo</DialogTitle>

@@ -69,10 +69,7 @@ function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
     case "present":
       if (isVirtual) {
         return (
-          <Badge
-            variant="outline"
-            className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-800 dark:text-emerald-300"
-          >
+          <Badge variant="outline" className="text-success border-success/40 bg-success/10 gap-1 text-xs font-medium">
             <Laptop className="h-3 w-3" /> Present (Virtual)
           </Badge>
         )
@@ -85,10 +82,7 @@ function AttendanceStatusBadge({ item }: { item: AttendanceRosterItem }) {
     case "late":
       if (isVirtual) {
         return (
-          <Badge
-            variant="outline"
-            className="gap-1 border-amber-500/40 bg-amber-500/10 text-xs font-medium text-amber-800 dark:text-amber-300"
-          >
+          <Badge variant="outline" className="text-warning border-warning/40 bg-warning/10 gap-1 text-xs font-medium">
             <Laptop className="h-3 w-3" /> Late (Virtual)
           </Badge>
         )
@@ -285,10 +279,7 @@ export default function AdminMeetingAttendancePage() {
           if (!r.meeting_clock_in) {
             if (r.office_clock_in && !r.is_on_leave) {
               return (
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400"
-                >
+                <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
                   <AlertTriangle className="h-3 w-3" /> Missed scan
                 </Badge>
               )
@@ -334,7 +325,7 @@ export default function AdminMeetingAttendancePage() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleQuickConfirm(r)}
-                    className="h-7 shrink-0 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    className="bg-success/15 text-success border-success/40 h-7 shrink-0 px-2 text-xs hover:bg-emerald-100"
                   >
                     {r.office_clock_in ? (
                       <>
@@ -444,8 +435,8 @@ export default function AdminMeetingAttendancePage() {
       stats={
         <div className="space-y-3">
           {holidayInfo?.isMondayHoliday && (
-            <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-warning border-warning/30 bg-warning/10 flex items-center gap-2.5 rounded-lg border p-3 text-xs">
+              <AlertTriangle className="text-warning h-4 w-4 shrink-0" />
               <div className="flex-1">
                 <span className="font-semibold">Public Holiday Notice: </span>
                 <span>{holidayInfo.mondayHolidayName} falls on Monday of this week.</span>
@@ -507,10 +498,7 @@ export default function AdminMeetingAttendancePage() {
           trailing: (r) => {
             if (r.is_on_leave) {
               return (
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-sky-400/50 bg-sky-500/10 text-xs text-sky-700 dark:text-sky-400"
-                >
+                <Badge variant="outline" className="text-info border-info/50 bg-info/10 gap-1 text-xs">
                   <Palmtree className="h-2.5 w-2.5" /> Leave
                 </Badge>
               )
@@ -524,10 +512,7 @@ export default function AdminMeetingAttendancePage() {
             }
             if (r.office_clock_in) {
               return (
-                <Badge
-                  variant="outline"
-                  className="gap-1 border-amber-400/50 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400"
-                >
+                <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
                   <AlertTriangle className="h-2.5 w-2.5" /> Missed
                 </Badge>
               )
@@ -614,14 +599,9 @@ export default function AdminMeetingAttendancePage() {
                   Meeting Check-In:
                 </span>
                 {r.meeting_clock_in ? (
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {formatTime(r.meeting_clock_in)}
-                  </span>
+                  <span className="text-success font-semibold">{formatTime(r.meeting_clock_in)}</span>
                 ) : r.office_clock_in && !r.is_on_leave ? (
-                  <Badge
-                    variant="outline"
-                    className="gap-1 border-amber-400/50 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-400"
-                  >
+                  <Badge variant="outline" className="text-warning border-warning/50 bg-warning/10 gap-1 text-xs">
                     <AlertTriangle className="h-3 w-3" /> Missed scan
                   </Badge>
                 ) : (
@@ -651,7 +631,7 @@ export default function AdminMeetingAttendancePage() {
                   size="sm"
                   variant="outline"
                   onClick={() => handleQuickConfirm(r)}
-                  className="h-7 border-emerald-500/40 bg-emerald-50 px-2 text-xs text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  className="bg-success/15 text-success border-success/40 h-7 px-2 text-xs hover:bg-emerald-100"
                 >
                   {r.office_clock_in ? (
                     <>

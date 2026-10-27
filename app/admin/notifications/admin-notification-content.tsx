@@ -49,17 +49,17 @@ const typeIcons = {
 
 // Type colors
 const typeColors = {
-  info: "bg-blue-50/50 dark:bg-blue-950/10",
-  warning: "bg-yellow-50/50 dark:bg-yellow-950/10",
-  success: "bg-green-50/50 dark:bg-green-950/10",
-  error: "bg-red-50/50 dark:bg-red-950/10",
+  info: "bg-info/50",
+  warning: "bg-warning/50",
+  success: "bg-success/50",
+  error: "bg-danger/50",
 }
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {
-  urgent: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  high: "border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300",
-  normal: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  low: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  urgent: "border-danger/40 bg-danger/10 text-danger",
+  high: "border-warning/40 bg-warning/10 text-warning",
+  normal: "border-info/40 bg-info/10 text-info",
+  low: "border-success/40 bg-success/10 text-success",
 }
 
 function getPriorityBadgeClass(priority: string | null | undefined): string {

@@ -516,8 +516,8 @@ export function SignatureCreator({
           </div>
 
           {activeVariant === "anniversary-hosted" && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
-              <p className="text-xs text-amber-800 dark:text-amber-300">
+            <div className="border-warning/30 bg-warning/15 rounded-md border p-3">
+              <p className="text-warning text-xs">
                 <strong>Hosted Images Edition</strong> — This signature uses absolute HTTPS URLs for all images instead
                 of embedded base64 data. Images will only display correctly when the receiving email client can reach{" "}
                 <code>{HOSTED_IMAGES_BASE || window?.location?.origin}</code>.

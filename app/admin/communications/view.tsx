@@ -19,9 +19,9 @@ export function CommunicationsPage({
       description: "Send department-branded broadcast emails with rich text content.",
       href: `${base}/communications/broadcast`,
       icon: Megaphone,
-      color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+      color: "bg-warning/10 text-warning border-warning/20",
       fill: "bg-orange-500",
-      hoverBorder: "hover:border-orange-500/60 dark:hover:border-orange-400/60",
+      hoverBorder: "hover:border-warning/50",
       hoverText: "group-hover:text-orange-500",
     },
     ...(showMeetings
@@ -31,9 +31,9 @@ export function CommunicationsPage({
             description: "Open general meeting communication tools (reports and reminders).",
             href: `${base}/communications/meetings`,
             icon: Mail,
-            color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+            color: "bg-indigo-500/10 text-info border-indigo-500/20",
             fill: "bg-indigo-500",
-            hoverBorder: "hover:border-indigo-500/60 dark:hover:border-indigo-400/60",
+            hoverBorder: "hover:border-info/50",
             hoverText: "group-hover:text-indigo-500",
           },
         ]

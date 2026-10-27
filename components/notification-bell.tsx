@@ -434,7 +434,7 @@ export function NotificationBell({ isAdmin = false }: NotificationBellProps) {
                           key={notification.id}
                           className={cn(
                             "group hover:bg-muted/30 relative cursor-pointer px-3 py-2.5 transition-all",
-                            !notification.read && "bg-blue-50/30 dark:bg-blue-950/10"
+                            !notification.read && "bg-info/30"
                           )}
                           onClick={() => handleNotificationClick(notification)}
                         >

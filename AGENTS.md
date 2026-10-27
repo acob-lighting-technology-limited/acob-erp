@@ -725,6 +725,12 @@ These five icon tints are the **only** sanctioned raw palette classes. Status co
 hand-picked `bg-green-100 text-green-700`. Never add `dark:` overrides to fix a colour;
 if a token is wrong in one theme, fix the token in `app/globals.css`.
 
+**Status tones.** For a colour that means something (done, late, warning, info), use the tone
+tokens in `app/globals.css`: `text-success`, `text-warning`, `text-danger`, `text-info`,
+`text-purple`, with `bg-success/15` and `border-success/30` for the tint. Each token carries
+its own light and dark value, so a call site never writes `dark:`. A status shown as a badge
+uses `<StatusBadge status=... tone=... />`, whose `TONE_CLASSES` is the single map of these.
+
 ### Hard prohibitions
 
 - ❌ Raw `<Table>` / `<TableHeader>` inside a page component

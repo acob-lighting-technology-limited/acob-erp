@@ -462,7 +462,7 @@ export function CreateMailboxDialog({
                   className="w-full min-w-0 text-sm"
                 />
                 {selectedEmployee?.companyEmail && (
-                  <p className="text-xs break-words text-amber-600 dark:text-amber-400">
+                  <p className="text-warning text-xs break-words">
                     Will update {selectedEmployee.name}&apos;s company email from {selectedEmployee.companyEmail} to{" "}
                     {fullEmail}.
                   </p>

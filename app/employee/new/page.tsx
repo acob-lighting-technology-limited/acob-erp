@@ -258,8 +258,8 @@ export default function EmployeeOnboardingForm() {
       <div className="bg-background flex min-h-screen items-center justify-center p-4">
         <Card className="border-border bg-card w-full max-w-md py-12 text-center shadow-xl">
           <CardContent>
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 p-4 dark:bg-green-900/30">
-              <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-500" />
+            <div className="bg-success/15 mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full p-4">
+              <CheckCircle2 className="text-success h-10 w-10" />
             </div>
             <h2 className="text-foreground mb-3 text-3xl font-bold">Application Received!</h2>
             <p className="text-muted-foreground mx-auto mb-8 max-w-sm leading-relaxed">

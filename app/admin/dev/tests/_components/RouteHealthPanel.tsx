@@ -108,12 +108,9 @@ export function RouteHealthPanel() {
                         key={route.path}
                         className={cn(
                           "flex items-center justify-between rounded-md border px-3 py-2 text-xs",
-                          result?.outcome === "ok" &&
-                            "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30",
-                          result?.outcome === "warn" &&
-                            "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30",
-                          result?.outcome === "fail" &&
-                            "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                          result?.outcome === "ok" && "border-success/30 bg-success/15",
+                          result?.outcome === "warn" && "border-warning/30 bg-warning/15",
+                          result?.outcome === "fail" && "border-danger/30 bg-danger/15"
                         )}
                       >
                         <div className="flex min-w-0 items-center gap-2">

@@ -13,19 +13,19 @@ import type { ScheduleItem, PaymentDocument } from "./payment-types"
 const STARLINK_BADGES: Record<StarlinkMonth["status"], { label: string; className: string }> = {
   confirmed: {
     label: "Paid · confirmed by Starlink",
-    className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    className: "bg-success/15 text-success",
   },
   autopay: {
     label: "Paid · autopay",
-    className: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400",
+    className: "bg-success/15 text-success",
   },
   failed: {
     label: "Payment failed",
-    className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    className: "bg-danger/15 text-danger",
   },
   pending: {
     label: "Awaiting payment",
-    className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    className: "bg-warning/15 text-warning",
   },
 }
 
@@ -80,7 +80,7 @@ export function ScheduleList({
             key={index}
             className={cn(
               "flex flex-col justify-between gap-3 p-3 sm:flex-row sm:items-center",
-              item.status === "overdue" && "bg-red-50 dark:bg-red-950/20"
+              item.status === "overdue" && "bg-danger/15"
             )}
           >
             <div className="flex items-start gap-3">
@@ -88,12 +88,12 @@ export function ScheduleList({
                 className={cn(
                   "rounded-full p-2",
                   item.status === "paid"
-                    ? "bg-green-100 text-green-600 dark:bg-green-900/30"
+                    ? "bg-success/15 text-green-600"
                     : item.status === "overdue"
-                      ? "bg-red-100 text-red-600 dark:bg-red-900/30"
+                      ? "bg-danger/15 text-red-600"
                       : item.status === "due"
-                        ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30"
-                        : "bg-gray-100 text-gray-600 dark:bg-gray-800"
+                        ? "bg-warning/15 text-yellow-600"
+                        : "bg-muted text-gray-600"
                 )}
               >
                 {item.status === "paid" ? (

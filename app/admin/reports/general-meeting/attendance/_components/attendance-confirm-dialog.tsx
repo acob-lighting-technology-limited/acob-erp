@@ -126,7 +126,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
         <DialogHeader>
           <div className="flex items-center gap-2">
             {isPhysical ? (
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <div className="text-success bg-success/10 flex h-9 w-9 items-center justify-center rounded-lg">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
             ) : (
@@ -156,10 +156,7 @@ export function AttendanceConfirmDialog({ open, onOpenChange, item, meetingDate,
               </div>
             </div>
             {isPhysical ? (
-              <Badge
-                variant="outline"
-                className="shrink-0 border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-700 dark:text-emerald-400"
-              >
+              <Badge variant="outline" className="text-success border-success/30 bg-success/10 shrink-0 text-xs">
                 Physical
               </Badge>
             ) : (

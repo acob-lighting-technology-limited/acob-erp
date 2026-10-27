@@ -122,8 +122,8 @@ function IndividualCard({ row }: { row: IndividualRow }) {
           <Badge
             className={
               hasTaken
-                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 shadow-none dark:text-emerald-400"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                ? "text-success border-success/20 bg-success/10 shadow-none"
+                : "text-warning border-warning/30 bg-warning/10"
             }
           >
             {hasTaken ? "Taken" : "Not Taken"}
@@ -144,7 +144,7 @@ function IndividualCard({ row }: { row: IndividualRow }) {
             variant="outline"
             className={
               row.tab_switch_count > 0
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                ? "text-warning border-warning/30 bg-warning/10"
                 : "border-border text-muted-foreground"
             }
           >
@@ -401,7 +401,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           type === "full_time"
             ? "bg-blue-500/10 text-blue-500 hover:bg-blue-500/10 border-transparent shadow-none"
             : type === "part_time"
-              ? "bg-purple-500/10 text-purple-500 hover:bg-purple-500/10 border-transparent shadow-none"
+              ? "bg-purple/10 text-purple-500 hover:bg-purple/10 border-transparent shadow-none"
               : "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"
         return <Badge className={badgeColor}>{display}</Badge>
       },
@@ -415,11 +415,9 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
       render: (row) => {
         const hasTaken = typeof row.cbt_score === "number"
         return hasTaken ? (
-          <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 shadow-none hover:bg-emerald-500/10 dark:text-emerald-400">
-            Taken
-          </Badge>
+          <Badge className="text-success border-success/20 bg-success/10 hover:bg-success/10 shadow-none">Taken</Badge>
         ) : (
-          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10">
             Not Taken
           </Badge>
         )
@@ -456,7 +454,7 @@ export default function AdminPmsCbtPage({ deptId }: { deptId?: string } = {}) {
           variant="outline"
           className={
             row.tab_switch_count > 0
-              ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              ? "text-warning border-warning/30 bg-warning/10"
               : "border-border text-muted-foreground"
           }
         >

@@ -266,7 +266,7 @@ export function UserPayrollPage({ initialData }: UserPayrollPageProps) {
           {selectedEntry && (
             <div
               id="payslip-print-area"
-              className="space-y-4 rounded-lg border bg-white p-5 text-sm text-gray-800 shadow-sm dark:bg-white dark:text-gray-800"
+              className="text-foreground space-y-4 rounded-lg border bg-white p-5 text-sm shadow-sm dark:bg-white"
             >
               {/* Header: Logo + Company Info + Payslip Label */}
               <div className="flex items-start justify-between border-b border-gray-200 pb-3">

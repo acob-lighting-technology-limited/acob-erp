@@ -142,10 +142,10 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
               <Badge
                 className={
                   appeal.status === "approved"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    ? "bg-success/15 text-success"
                     : appeal.status === "rejected"
-                      ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                      : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300"
+                      ? "bg-danger/15 text-danger"
+                      : "bg-info/15 text-info"
                 }
               >
                 {appeal.status.toUpperCase()}
@@ -196,7 +196,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                       </div>
                     </div>
                   ) : (
-                    <Badge variant="outline" className="border-emerald-200 text-emerald-700 dark:text-emerald-400">
+                    <Badge variant="outline" className="text-success border-emerald-200">
                       Employee Appeal
                     </Badge>
                   )}
@@ -255,7 +255,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 )}
               </div>
             ) : appeal.stage === "pending_lead" ? (
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+              <div className="text-warning border-warning/20 bg-warning/10 rounded-lg border p-2.5 text-xs">
                 Awaiting {appeal.department_lead_name || `${appeal.department} Department Lead`}
               </div>
             ) : null}
@@ -299,7 +299,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 )}
               </div>
             ) : appeal.stage === "pending_admin" ? (
-              <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-2.5 text-xs text-blue-800 dark:text-blue-300">
+              <div className="text-info border-info/20 bg-info/10 rounded-lg border p-2.5 text-xs">
                 Awaiting Admin Review by{" "}
                 <span className="font-semibold">{appeal.admin_hr_lead_name || "Admin & HR Lead"}</span>
                 {appeal.admin_hr_lead_name ? " (Admin & HR Lead)" : ""}

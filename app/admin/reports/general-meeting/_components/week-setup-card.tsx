@@ -347,14 +347,12 @@ export function WeekSetupCard() {
             <span className="text-muted-foreground">{`Grace window: ${lockState.graceHours}h`}</span>
             <span className="text-muted-foreground">{`Deadline: ${computedDeadlineLabel || formatWATDateTime(lockState.lockDeadline)}`}</span>
             {lockState.hasOverrideRole && (
-              <span className="text-emerald-700 dark:text-emerald-300">
+              <span className="text-success">
                 Your developer/super-admin role can still create, update, and delete after the grace period.
               </span>
             )}
             {!lockState.hasOverrideRole && lockState.unlockUntil && !lockState.isLocked && (
-              <span className="text-amber-700 dark:text-amber-300">
-                This week is open through a temporary unlock window.
-              </span>
+              <span className="text-warning">This week is open through a temporary unlock window.</span>
             )}
             {!lockState.hasOverrideRole && lockState.isLocked && (
               <span className="text-muted-foreground">This week is read-only because the grace period has ended.</span>
@@ -377,7 +375,7 @@ export function WeekSetupCard() {
         {showWeekSetup && (
           <div className="space-y-4">
             {weekSetupData?.isMondayHoliday && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-500/10 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="border-warning/30 bg-warning/10 text-warning flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-xs">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold">⚠️ Public Holiday Notice:</span>
                   <span>
@@ -389,7 +387,7 @@ export function WeekSetupCard() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-6 border-amber-500/40 text-xs text-amber-800 hover:bg-amber-100 dark:text-amber-200"
+                    className="text-warning border-warning/40 h-6 text-xs hover:bg-amber-100"
                     onClick={() => setMeetingDateInput(tuesdayIso)}
                     disabled={isWeekSetupLocked}
                   >

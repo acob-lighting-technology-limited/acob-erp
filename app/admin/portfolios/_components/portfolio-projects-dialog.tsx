@@ -232,7 +232,7 @@ export function PortfolioProjectsDialog({
               </ul>
             )}
             {movingCount > 0 && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-warning text-xs">
                 {movingCount} selected project{movingCount === 1 ? " is" : "s are"} in another portfolio and will be
                 moved here.
               </p>

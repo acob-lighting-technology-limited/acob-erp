@@ -74,19 +74,19 @@ export const EVENT_RSVP_LABELS: Record<EventRsvp, string> = {
 
 /** Semantic badge colours, one per type — also used for calendar chips. */
 export const EVENT_TYPE_BADGE_CLASSES: Record<EventType, string> = {
-  meeting: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  workshop: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
-  webinar: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
-  activity: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  training: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  holiday: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  meeting: "bg-info/10 text-info",
+  workshop: "bg-purple/10 text-purple",
+  webinar: "bg-cyan-500/10 text-info",
+  activity: "bg-success/10 text-success",
+  training: "bg-warning/10 text-warning",
+  holiday: "bg-danger/10 text-danger",
 }
 
 export const EVENT_STATUS_BADGE_CLASSES: Record<EventStatus, string> = {
   draft: "bg-muted text-muted-foreground",
-  scheduled: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  cancelled: "bg-red-500/10 text-red-700 dark:text-red-300",
-  completed: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  scheduled: "bg-info/10 text-info",
+  cancelled: "bg-danger/10 text-danger",
+  completed: "bg-success/10 text-success",
 }
 
 export type EventAttendee = {

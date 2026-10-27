@@ -747,21 +747,21 @@ export function AdminTasksContent({
                   </div>
 
                   {r.unable_to_complete_reason && (
-                    <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-800 dark:text-amber-300">
+                    <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
                       {r.unable_to_complete_reason}
                     </div>
                   )}
 
                   {r.failure_reason && (
-                    <div className="rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-rose-800 dark:text-rose-300">
+                    <div className="text-danger border-danger/30 bg-danger/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Failure Note:</span>
                       {r.failure_reason}
                     </div>
                   )}
 
                   {r.extension_reason && (
-                    <div className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-blue-800 dark:text-blue-300">
+                    <div className="text-info border-info/30 bg-info/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Extension Reason:</span>
                       {r.extension_reason}
                     </div>

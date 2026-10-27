@@ -146,15 +146,15 @@ function getAssetStatusColor(status: string | null | undefined): string {
     case "resolved":
     case "completed":
     case "approved":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success/15 text-success"
     case "in_progress":
     case "under_review":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info/15 text-info"
     case "pending":
     case "open":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning/15 text-warning"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-muted text-foreground"
   }
 }
 
@@ -172,29 +172,29 @@ function StaffTypeBadge({
   const isContract = normType === "contract"
 
   let label = normType.replace(/_/g, " ")
-  let colorClasses = "border-blue-200 bg-blue-500/10 text-blue-600 dark:border-blue-800"
+  let colorClasses = "border-info/30 bg-blue-500/10 text-blue-600"
 
   if (isPartTime) {
     label = "Part Time"
-    colorClasses = "border-slate-200 bg-slate-500/10 text-slate-600 dark:border-slate-800"
+    colorClasses = "border-border bg-slate-500/10 text-slate-600"
   } else if (categoryName) {
     label = categoryName
     const catUpper = categoryName.toUpperCase()
     if (catUpper.includes("NYSC")) {
-      colorClasses = "border-purple-200 bg-purple-500/10 text-purple-600 dark:border-purple-800"
+      colorClasses = "border-purple/30 bg-purple/10 text-purple-600"
     } else if (catUpper.includes("SIWES") || catUpper.includes("INTERN")) {
-      colorClasses = "border-cyan-200 bg-cyan-500/10 text-cyan-600 dark:border-cyan-800"
+      colorClasses = "border-info/30 bg-cyan-500/10 text-cyan-600"
     } else if (catUpper.includes("NEXT") || catUpper.includes("GEN")) {
-      colorClasses = "border-emerald-200 bg-emerald-500/10 text-emerald-600 dark:border-emerald-800"
+      colorClasses = "border-success/30 bg-emerald-500/10 text-emerald-600"
     } else {
-      colorClasses = "border-orange-200 bg-orange-500/10 text-orange-600 dark:border-orange-800"
+      colorClasses = "border-warning/30 bg-orange-500/10 text-orange-600"
     }
   } else if (isContract) {
     label = "Contract Staff"
-    colorClasses = "border-orange-200 bg-orange-500/10 text-orange-600 dark:border-orange-800"
+    colorClasses = "border-warning/30 bg-orange-500/10 text-orange-600"
   } else {
     label = "Full Time"
-    colorClasses = "border-blue-200 bg-blue-500/10 text-blue-600 dark:border-blue-800"
+    colorClasses = "border-info/30 bg-blue-500/10 text-blue-600"
   }
 
   return (
@@ -534,7 +534,7 @@ export function EmployeeViewModal({
                           !viewEmployeeProfile.mailbox_credentials_sent_at && (
                             <Badge
                               variant="outline"
-                              className="border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 shadow-none dark:text-amber-400"
+                              className="text-warning border-warning/20 bg-warning/10 px-2 py-0.5 text-xs font-semibold shadow-none"
                             >
                               Mailbox Pending
                             </Badge>
@@ -547,7 +547,7 @@ export function EmployeeViewModal({
                         {viewEmployeeProfile.nysc_cds_day && (
                           <Badge
                             variant="outline"
-                            className="border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-xs font-semibold text-teal-700 capitalize shadow-none dark:text-teal-300"
+                            className="text-success border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-xs font-semibold capitalize shadow-none"
                           >
                             CDS: {viewEmployeeProfile.nysc_cds_day}
                           </Badge>
@@ -984,7 +984,7 @@ export function EmployeeViewModal({
 
                     {editForm.employment_status === "suspended" && (
                       <>
-                        <div className="flex items-start gap-2 rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 sm:col-span-2 dark:text-amber-300">
+                        <div className="text-warning border-warning/30 bg-warning/10 flex items-start gap-2 rounded border p-2.5 text-xs sm:col-span-2">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                           <span>
                             <strong>Disciplinary Action / Access Hold:</strong> Suspending this employee immediately
@@ -1076,7 +1076,7 @@ export function EmployeeViewModal({
 
                   <div className="bg-muted/30 rounded border p-2.5 text-xs">
                     {isTypeOrCategoryChanged ? (
-                      <div className="space-y-1 text-amber-800 dark:text-amber-300">
+                      <div className="text-warning space-y-1">
                         <span className="flex items-center gap-1 text-xs font-semibold uppercase">
                           <AlertTriangle className="h-3 w-3 text-amber-600" /> Staff ID Conversion Notice
                         </span>
@@ -1124,7 +1124,7 @@ export function EmployeeViewModal({
                         placeholder="user@acoblighting.com"
                         className="mt-1 h-8 font-mono text-xs"
                       />
-                      <p className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                      <p className="text-warning mt-1 flex items-center gap-1 text-xs">
                         <AlertCircle className="inline h-3 w-3 shrink-0" />
                         Changing this email updates the employee&apos;s login credentials.
                       </p>

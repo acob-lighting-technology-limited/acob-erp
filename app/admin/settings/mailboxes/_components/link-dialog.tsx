@@ -207,7 +207,7 @@ export function LinkDialog({
                 className="w-full min-w-0 text-sm"
               />
               {selectedEmployee?.companyEmail && selectedEmployee.companyEmail !== mailbox.email && (
-                <p className="text-xs break-words text-amber-600 dark:text-amber-400">
+                <p className="text-warning text-xs break-words">
                   Will change {selectedEmployee.name}&apos;s company email from {selectedEmployee.companyEmail} to{" "}
                   {mailbox.email}.
                 </p>

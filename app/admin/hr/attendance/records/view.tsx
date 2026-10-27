@@ -237,9 +237,7 @@ export function AdminAttendanceRecordsPage({
           (r.status === "late" || r.status === "lateness_with_permission" || isLate(r.clock_in)) && r.status !== "early"
         return (
           <span className="flex items-center gap-1">
-            <Clock
-              className={cn("h-3 w-3", isLateArrival ? "text-yellow-600 dark:text-yellow-500" : "text-green-600")}
-            />
+            <Clock className={cn("h-3 w-3", isLateArrival ? "text-warning" : "text-green-600")} />
             {formatTime(r.clock_in)}
           </span>
         )

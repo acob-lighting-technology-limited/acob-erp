@@ -98,7 +98,7 @@ export function QuotaDialog({
               </SelectContent>
             </Select>
             {belowUsage && (
-              <p className="text-xs text-red-600 dark:text-red-400">
+              <p className="text-danger text-xs">
                 This is less than the {formatBytes(mailbox.usedBytes)} already stored — the mailbox would be over quota
                 and start rejecting mail.
               </p>

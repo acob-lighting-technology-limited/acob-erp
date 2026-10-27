@@ -461,7 +461,7 @@ export function LeaveContent({
             {r.department_overlaps && r.department_overlaps.length > 0 && (
               <Badge
                 variant="outline"
-                className="flex w-fit items-center gap-1 border-amber-300 bg-amber-50 px-1.5 py-0 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                className="border-warning/30 bg-warning/15 text-warning flex w-fit items-center gap-1 px-1.5 py-0 text-xs"
                 title={`Department overlap with ${r.department_overlaps.map((o) => o.full_name).join(", ")}`}
               >
                 <AlertCircle className="h-3 w-3 shrink-0" />
@@ -1068,9 +1068,9 @@ export function LeaveContent({
           render: (r) => (
             <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
               {r.department_overlaps && r.department_overlaps.length > 0 && (
-                <div className="space-y-1 rounded-md border border-amber-300/80 bg-amber-50/70 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                  <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="border-warning/80 bg-warning/70 text-warning space-y-1 rounded-md border p-3 text-xs">
+                  <div className="text-warning flex items-center gap-1.5 font-semibold">
+                    <AlertCircle className="text-warning h-4 w-4 shrink-0" />
                     <span>Concurrent Department Leave Notice</span>
                   </div>
                   <p className="text-muted-foreground leading-relaxed dark:text-amber-300/80">
@@ -1177,7 +1177,7 @@ export function LeaveContent({
                 </div>
               )}
               {row.department_overlaps && row.department_overlaps.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                <div className="text-warning flex items-center gap-1.5 text-xs font-medium">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>
                     Overlap ({row.department_overlaps.length}):{" "}

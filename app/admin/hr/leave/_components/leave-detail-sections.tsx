@@ -92,22 +92,22 @@ export function LeaveStatusStrip({ leave }: { leave: LeaveItem }) {
       className={cn(
         "flex items-start gap-2.5 rounded-md border px-3 py-2 text-xs",
         isApproved
-          ? "border-emerald-200 bg-emerald-50/50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300"
+          ? "border-success/30 bg-success/50 text-success"
           : isRejected
-            ? "border-red-200 bg-red-50/60 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+            ? "border-danger/30 bg-danger/60 text-danger"
             : isCancelled
               ? "border-muted bg-muted/40 text-muted-foreground"
-              : "border-amber-200 bg-amber-50/50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300"
+              : "border-warning/30 bg-warning/50 text-warning"
       )}
     >
       {isApproved ? (
-        <CheckCircle2 className="mt-px h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <CheckCircle2 className="text-success mt-px h-4 w-4 shrink-0" />
       ) : isRejected ? (
-        <XCircle className="mt-px h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+        <XCircle className="text-danger mt-px h-4 w-4 shrink-0" />
       ) : isCancelled ? (
         <AlertCircle className="text-muted-foreground mt-px h-4 w-4 shrink-0" />
       ) : (
-        <Clock className="mt-px h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <Clock className="text-warning mt-px h-4 w-4 shrink-0" />
       )}
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium">{title}</p>
@@ -124,18 +124,14 @@ export function LeaveStatusStrip({ leave }: { leave: LeaveItem }) {
 export function LeaveOverlapNotice({ leave }: { leave: LeaveItem }) {
   if (!leave.department_overlaps || leave.department_overlaps.length === 0) return null
   return (
-    <div className="space-y-1.5 rounded-md border border-amber-300/80 bg-amber-50/70 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+    <div className="border-warning/80 bg-warning/70 text-warning space-y-1.5 rounded-md border px-3 py-2 text-xs">
       <div className="flex items-center gap-1.5 font-medium">
-        <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <AlertCircle className="text-warning h-3.5 w-3.5 shrink-0" />
         <span>Also off in this department during these dates</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {leave.department_overlaps.map((overlap) => (
-          <Badge
-            key={overlap.id}
-            variant="outline"
-            className="border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-          >
+          <Badge key={overlap.id} variant="outline" className="border-warning/30 bg-warning/15 text-warning">
             {overlap.full_name} ({safeDateDisplay(overlap.start_date)} to {safeDateDisplay(overlap.end_date)})
           </Badge>
         ))}
@@ -274,17 +270,13 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                         variant={isStageRejected ? "destructive" : "outline"}
                         className={cn(
                           "text-xs font-medium capitalize",
-                          !isStageRejected &&
-                            "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          !isStageRejected && "text-success border-success/30 bg-success/10"
                         )}
                       >
                         {item.status || "Approved"}
                       </Badge>
                     ) : isCurrent && isOpen ? (
-                      <Badge
-                        variant="outline"
-                        className="border-amber-500/30 bg-amber-500/10 text-xs text-amber-600 dark:text-amber-400"
-                      >
+                      <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 text-xs">
                         Awaiting action
                       </Badge>
                     ) : (
@@ -305,15 +297,13 @@ export function LeaveApprovalStages({ leave }: { leave: LeaveItem }) {
                     <div
                       className={cn(
                         "mt-1.5 flex items-start gap-1.5 rounded-md border px-2.5 py-1.5",
-                        isStageRejected
-                          ? "border-red-200 bg-red-50/70 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
-                          : "bg-muted/40 text-foreground/90"
+                        isStageRejected ? "border-danger/30 bg-danger/70 text-danger" : "bg-muted/40 text-foreground/90"
                       )}
                     >
                       <MessageSquare
                         className={cn(
                           "mt-0.5 h-3 w-3 shrink-0",
-                          isStageRejected ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
+                          isStageRejected ? "text-danger" : "text-muted-foreground"
                         )}
                       />
                       <span className="min-w-0 flex-1">&ldquo;{item.comments}&rdquo;</span>
@@ -378,8 +368,7 @@ export function LeaveAttachments({ leave }: { leave: LeaveItem }) {
             variant={leave.evidence_complete ? "outline" : "secondary"}
             className={cn(
               "text-xs font-medium",
-              leave.evidence_complete &&
-                "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              leave.evidence_complete && "text-success border-success/30 bg-success/10"
             )}
           >
             {leave.evidence_complete ? "Evidence complete" : "Evidence pending"}
@@ -390,7 +379,7 @@ export function LeaveAttachments({ leave }: { leave: LeaveItem }) {
       {leave.handover_checklist_url ? (
         <AttachmentRow
           icon={<FileText className="h-4 w-4" />}
-          iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+          iconClassName="bg-info/10 text-info"
           title="Handover document"
           subtitle={handoverNote}
           href={leaveHandoverHref(leave.id, leave.handover_checklist_url)}
@@ -414,10 +403,10 @@ export function LeaveAttachments({ leave }: { leave: LeaveItem }) {
               className={cn(
                 "px-1.5 py-0 text-xs uppercase",
                 doc.status === "verified"
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  ? "text-success border-success/30 bg-success/10"
                   : doc.status === "rejected"
-                    ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
-                    : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                    ? "text-danger border-danger/30 bg-danger/10"
+                    : "text-warning border-warning/30 bg-warning/10"
               )}
             >
               {doc.status}

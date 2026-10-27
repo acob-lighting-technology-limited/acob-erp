@@ -419,7 +419,7 @@ export function TaskFormDialog({
         </DialogHeader>
 
         {lockLevel === "full" && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <div className="text-warning border-warning/30 bg-warning/10 rounded-md border px-3 py-2 text-xs">
             {statusLabel(selectedTask?.status || "")} work is locked. Use the status control to reopen it, or the review
             decision dialog to reassign it or extend its deadline.
           </div>

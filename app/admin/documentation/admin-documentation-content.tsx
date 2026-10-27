@@ -39,10 +39,7 @@ interface AdminDocumentationContentProps {
   backLinkLabel?: string
 }
 
-const getStatusColor = (isDraft: boolean) =>
-  isDraft
-    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+const getStatusColor = (isDraft: boolean) => (isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success")
 
 export function AdminDocumentationContent({
   initialDocumentation,

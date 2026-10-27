@@ -453,9 +453,9 @@ export default function CbtPage() {
             </div>
             {session.is_completed && (
               <div className="text-foreground flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
-                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <AlertCircle className="text-success mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="font-semibold text-emerald-800 dark:text-emerald-300">Assessment Completed</p>
+                  <p className="text-success font-semibold">Assessment Completed</p>
                   <p className="text-muted-foreground mt-0.5">
                     You have already completed and submitted your test for this review cycle.
                   </p>
@@ -464,9 +464,9 @@ export default function CbtPage() {
             )}
             {session.is_resume && !session.is_completed && (
               <div className="text-foreground flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
-                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <AlertCircle className="text-warning mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="font-semibold text-amber-800 dark:text-amber-300">Active Session Detected</p>
+                  <p className="text-warning font-semibold">Active Session Detected</p>
                   <p className="text-muted-foreground mt-0.5">
                     You have an active test session in progress. You can resume your test starting from where you
                     stopped.
@@ -497,7 +497,7 @@ export default function CbtPage() {
                 </div>
                 <div className="border-border/60 flex justify-between border-b pb-2">
                   <span>{resumeTimeLeftSeconds !== null ? "Time Remaining" : "Total Time Allowed"}</span>
-                  <span className="font-mono font-medium text-amber-600 dark:text-amber-400">
+                  <span className="text-warning font-mono font-medium">
                     {resumeTimeLeftSeconds !== null
                       ? formatTimeLeft(resumeTimeLeftSeconds)
                       : `${((session.cbt_settings?.total_time_seconds ?? session.questions.length * 45) / 60)
@@ -513,7 +513,7 @@ export default function CbtPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Session Status</span>
-                      <span className="font-medium text-emerald-600 dark:text-emerald-400">Completed</span>
+                      <span className="text-success font-medium">Completed</span>
                     </div>
                   </>
                 ) : !session.is_resume ? (
@@ -529,7 +529,7 @@ export default function CbtPage() {
                     </div>
                     <div className="border-border/60 flex justify-between border-b pb-2">
                       <span>Session Status</span>
-                      <span className="font-medium text-amber-600 dark:text-amber-400">In Progress (Resuming)</span>
+                      <span className="text-warning font-medium">In Progress (Resuming)</span>
                     </div>
                     <div className="border-border/60 flex justify-between border-b pb-2">
                       <span>Resume Point</span>
@@ -606,8 +606,8 @@ export default function CbtPage() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 font-mono text-sm font-semibold text-amber-600 dark:text-amber-400">
-                <Clock className="h-4 w-4 animate-pulse text-amber-600 dark:text-amber-400" />
+              <div className="text-warning border-warning/30 bg-warning/10 flex items-center gap-1.5 rounded-full border px-4 py-2 font-mono text-sm font-semibold">
+                <Clock className="text-warning h-4 w-4 animate-pulse" />
                 <span>
                   {formatTimeLeft(
                     timeLeftSeconds ?? session.cbt_settings?.total_time_seconds ?? session.questions.length * 45
@@ -619,7 +619,7 @@ export default function CbtPage() {
                 answered
               </div>
               {tabSwitchCount > 0 && (
-                <div className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-600 dark:text-red-400">
+                <div className="text-danger border-danger/30 bg-danger/10 flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold">
                   <AlertCircle className="h-4 w-4" />
                   <span>
                     {tabSwitchCount} tab {tabSwitchCount === 1 ? "switch" : "switches"} recorded

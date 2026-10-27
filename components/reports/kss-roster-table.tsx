@@ -764,11 +764,7 @@ export function KssRosterTable({
               </Tooltip>
             )
           }
-          return (
-            <Badge className="bg-emerald-100 text-xs text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-              Uploaded
-            </Badge>
-          )
+          return <Badge className="bg-success/15 text-success text-xs">Uploaded</Badge>
         },
       },
       {
@@ -1255,7 +1251,7 @@ export function KssRosterTable({
                   </p>
                 ) : null}
                 {hasGraceOverride && editingId && isSelectedWeekLocked ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <p className="text-warning text-xs">
                     Override active: you are editing this KSS entry outside the normal grace period.
                   </p>
                 ) : null}

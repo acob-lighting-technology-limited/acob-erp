@@ -61,11 +61,7 @@ async function fetchReport(): Promise<MailboxReport> {
 
 function LoginBadge({ row }: { row: MailboxReportRow }) {
   if (row.inactiveOwnerCanLogIn) {
-    return (
-      <Badge className="bg-red-100 font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
-        Should be suspended
-      </Badge>
-    )
+    return <Badge className="bg-danger/15 text-danger font-normal">Should be suspended</Badge>
   }
   if (row.suspendedLogin && row.suspendedIncoming) return <Badge variant="secondary">Login + incoming suspended</Badge>
   if (row.suspendedLogin) return <Badge variant="secondary">Login suspended</Badge>
@@ -266,10 +262,7 @@ export function MailboxesPage() {
         accessor: (r) => (r.provisioningError ? "failed" : "none"),
         render: (r) =>
           r.provisioningError ? (
-            <Badge
-              className="bg-red-100 font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400"
-              title={r.provisioningError}
-            >
+            <Badge className="bg-danger/15 text-danger font-normal" title={r.provisioningError}>
               Failed: {r.provisioningError}
             </Badge>
           ) : (

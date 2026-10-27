@@ -104,65 +104,65 @@ interface LeaveTypeColorDef {
 
 const LEAVE_TYPE_COLORS: Record<string, LeaveTypeColorDef> = {
   annual: {
-    bg: "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60",
-    text: "text-emerald-800 dark:text-emerald-300",
-    border: "border-emerald-300 dark:border-emerald-800",
+    bg: "bg-success/15 hover:bg-success/25",
+    text: "text-success",
+    border: "border-success/30",
     dot: "bg-emerald-500",
     badgeClass: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
     label: "Annual Leave",
   },
   sick: {
-    bg: "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/60",
-    text: "text-rose-800 dark:text-rose-300",
-    border: "border-rose-300 dark:border-rose-800",
+    bg: "bg-danger/15 hover:bg-danger/25",
+    text: "text-danger",
+    border: "border-danger/30",
     dot: "bg-rose-500",
     badgeClass: "bg-rose-500/10 text-rose-600 border-rose-500/20",
     label: "Sick Leave",
   },
   casual: {
-    bg: "bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/40 dark:hover:bg-sky-950/60",
-    text: "text-sky-800 dark:text-sky-300",
-    border: "border-sky-300 dark:border-sky-800",
+    bg: "bg-info/15 hover:bg-info/25",
+    text: "text-info",
+    border: "border-info/30",
     dot: "bg-sky-500",
     badgeClass: "bg-sky-500/10 text-sky-600 border-sky-500/20",
     label: "Casual / Personal",
   },
   maternity: {
-    bg: "bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-950/60",
-    text: "text-purple-800 dark:text-purple-300",
-    border: "border-purple-300 dark:border-purple-800",
+    bg: "bg-purple/15 hover:bg-purple/25",
+    text: "text-purple",
+    border: "border-purple/30",
     dot: "bg-purple-500",
-    badgeClass: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+    badgeClass: "bg-purple/10 text-purple-600 border-purple/20",
     label: "Maternity / Paternity",
   },
   study: {
-    bg: "bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/60",
-    text: "text-indigo-800 dark:text-indigo-300",
-    border: "border-indigo-300 dark:border-indigo-800",
+    bg: "bg-info/15 hover:bg-info/25",
+    text: "text-info",
+    border: "border-info/30",
     dot: "bg-indigo-500",
     badgeClass: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
     label: "Study / Exam",
   },
   compassionate: {
-    bg: "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-950/60",
-    text: "text-amber-800 dark:text-amber-300",
-    border: "border-amber-300 dark:border-amber-800",
+    bg: "bg-warning/15 hover:bg-warning/25",
+    text: "text-warning",
+    border: "border-warning/30",
     dot: "bg-amber-500",
     badgeClass: "bg-amber-500/10 text-amber-600 border-amber-500/20",
     label: "Compassionate",
   },
   unpaid: {
-    bg: "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-800",
-    text: "text-slate-800 dark:text-slate-300",
-    border: "border-slate-300 dark:border-slate-700",
+    bg: "bg-muted hover:bg-muted/25",
+    text: "text-foreground",
+    border: "border-border",
     dot: "bg-slate-500",
     badgeClass: "bg-slate-500/10 text-slate-600 border-slate-500/20",
     label: "Unpaid / LWOP",
   },
   default: {
-    bg: "bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-950/60",
-    text: "text-teal-800 dark:text-teal-300",
-    border: "border-teal-300 dark:border-teal-800",
+    bg: "bg-success/15 hover:bg-success/25",
+    text: "text-success",
+    border: "border-success/30",
     dot: "bg-teal-500",
     badgeClass: "bg-teal-500/10 text-teal-600 border-teal-500/20",
     label: "Other Leave",
@@ -507,7 +507,7 @@ export function LeaveCalendarView({
 
                       {holiday && (
                         <span
-                          className="py-0.2 max-w-[80px] truncate rounded-xs bg-amber-500/15 px-1 text-[8px] font-semibold text-amber-700 dark:text-amber-400"
+                          className="py-0.2 text-warning bg-warning/15 max-w-[80px] truncate rounded-xs px-1 text-[8px] font-semibold"
                           title={holiday.name}
                         >
                           {holiday.name}
@@ -533,17 +533,11 @@ export function LeaveCalendarView({
                                 onClick={() => onSelectLeave?.(leave)}
                                 className={`group flex h-4.5 w-full cursor-pointer items-center gap-1 rounded border px-1 py-0 text-left text-[10px] leading-tight transition-all ${
                                   colorDef.bg
-                                } ${colorDef.text} ${
-                                  isPending
-                                    ? "border-dashed border-amber-400/80 dark:border-amber-600/80"
-                                    : colorDef.border
-                                }`}
+                                } ${colorDef.text} ${isPending ? "border-warning/80 border-dashed" : colorDef.border}`}
                               >
                                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${colorDef.dot}`} />
                                 <span className="flex-1 truncate font-medium">{empName}</span>
-                                {isPending && (
-                                  <Clock className="h-2.5 w-2.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                                )}
+                                {isPending && <Clock className="text-warning h-2.5 w-2.5 shrink-0" />}
                               </button>
                             </TooltipTrigger>
                             <TooltipContent

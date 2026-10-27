@@ -320,7 +320,7 @@ export function PinSection({ status, onSaved }: { status: SigningStatus; onSaved
       <CardContent className="space-y-4">
         <StatusLine done={status.has_pin} text={status.has_pin ? "PIN set" : "No PIN yet"} />
         {locked ? (
-          <p className="text-sm text-amber-700 dark:text-amber-400">
+          <p className="text-warning text-sm">
             Too many wrong PINs. Signing is locked until {locked}. You can reset it below.
           </p>
         ) : null}

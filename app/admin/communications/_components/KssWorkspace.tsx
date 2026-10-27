@@ -101,9 +101,7 @@ const EMPTY_SETTINGS: RotationSettings = {
 const tileClass = (active: boolean) =>
   cn(
     "flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border-2 p-4 text-left transition-all",
-    active
-      ? "border-orange-600 bg-orange-50 dark:border-orange-500 dark:bg-orange-950/30"
-      : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
+    active ? "border-warning/30 bg-warning/15" : "hover:border-muted-foreground/30 bg-muted/30 border-transparent"
   )
 
 function dateToWeek(dateIso: string): { week: number; year: number } | null {
@@ -313,12 +311,7 @@ export function KssWorkspace() {
                       )}
                     />
                     <div className="min-w-0 flex-1">
-                      <div
-                        className={cn(
-                          "truncate font-semibold",
-                          selectedKey === key && "text-orange-700 dark:text-orange-400"
-                        )}
-                      >
+                      <div className={cn("truncate font-semibold", selectedKey === key && "text-warning")}>
                         {row.department ?? "No session"}
                       </div>
                       <div className="text-muted-foreground truncate text-xs">
@@ -385,11 +378,7 @@ export function KssWorkspace() {
                   className={cn("h-5 w-5", !draft.heads_up_enabled ? "text-orange-600" : "text-muted-foreground")}
                 />
                 <div>
-                  <div
-                    className={cn("font-semibold", !draft.heads_up_enabled && "text-orange-700 dark:text-orange-400")}
-                  >
-                    Manual
-                  </div>
+                  <div className={cn("font-semibold", !draft.heads_up_enabled && "text-warning")}>Manual</div>
                   <div className="text-muted-foreground text-xs">Only when you press Send</div>
                 </div>
               </button>
@@ -402,11 +391,7 @@ export function KssWorkspace() {
                   className={cn("h-5 w-5", draft.heads_up_enabled ? "text-orange-600" : "text-muted-foreground")}
                 />
                 <div>
-                  <div
-                    className={cn("font-semibold", draft.heads_up_enabled && "text-orange-700 dark:text-orange-400")}
-                  >
-                    Automatic
-                  </div>
+                  <div className={cn("font-semibold", draft.heads_up_enabled && "text-warning")}>Automatic</div>
                   <div className="text-muted-foreground text-xs">Every week, for the next session</div>
                 </div>
               </button>
@@ -455,7 +440,7 @@ export function KssWorkspace() {
             {/* Reordering only edits the draft; without a save here it was easy to reload and lose it. */}
             {isDirty && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Unsaved changes</span>
+                <span className="text-warning text-xs font-medium">Unsaved changes</span>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => setDraft(savedSettings)}>
                     Discard
@@ -595,7 +580,7 @@ export function KssWorkspace() {
 
       {/* ── RIGHT: Summary & Send ─────────────────────────────────────── */}
       <aside className="space-y-6 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
-        <Card className="border-orange-200 dark:border-orange-900">
+        <Card className="border-warning/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Summary</CardTitle>
           </CardHeader>

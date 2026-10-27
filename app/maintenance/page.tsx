@@ -6,8 +6,8 @@ export default function MaintenancePage() {
     <div className="bg-background flex min-h-screen items-center justify-center p-4 sm:p-6">
       <Card className="w-full max-w-xl text-center">
         <CardHeader className="pb-4">
-          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
-            <Wrench className="h-10 w-10 text-yellow-600 dark:text-yellow-400" />
+          <div className="bg-warning/15 mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+            <Wrench className="text-warning h-10 w-10" />
           </div>
           <CardTitle className="text-3xl">Under Maintenance</CardTitle>
           <CardDescription className="mx-auto max-w-lg text-base">

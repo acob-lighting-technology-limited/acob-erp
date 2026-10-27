@@ -15,8 +15,8 @@ export function StepList({ steps }: { steps: StepResult[] }) {
           key={i}
           className={cn(
             "flex items-start gap-3 rounded-md border px-3 py-2 text-sm",
-            step.status === "ok" && "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30",
-            step.status === "error" && "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30",
+            step.status === "ok" && "border-success/30 bg-success/15",
+            step.status === "error" && "border-danger/30 bg-danger/15",
             step.status === "skipped" && "bg-muted/40 border-dashed"
           )}
         >

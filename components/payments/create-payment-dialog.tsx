@@ -296,7 +296,7 @@ export function CreatePaymentDialog({
           )}
 
           {values.payment_type === "one-time" && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+            <div className="border-success/30 bg-success/15 rounded-lg border p-4">
               <div className="space-y-2">
                 <Label htmlFor="receipt" className="flex items-center gap-2">
                   <Receipt className="h-4 w-4 text-green-600" />
@@ -312,9 +312,7 @@ export function CreatePaymentDialog({
                   onChange={(e) => onReceiptFileChange(e.target.files?.[0] || null)}
                   className="cursor-pointer"
                 />
-                {receiptFile && (
-                  <p className="text-sm text-green-600 dark:text-green-400">Selected: {receiptFile.name}</p>
-                )}
+                {receiptFile && <p className="text-success text-sm">Selected: {receiptFile.name}</p>}
               </div>
             </div>
           )}

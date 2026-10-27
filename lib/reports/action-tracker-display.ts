@@ -25,9 +25,9 @@ export function formatDueDate(task: TrackedItem) {
 
 /** Green when done, red when overdue, amber otherwise. */
 export function getDueDateClassName(task: TrackedItem) {
-  if (task.status.toLowerCase() === "completed") return "font-medium text-green-600 dark:text-green-400"
-  if (resolveDueDate(task).getTime() < Date.now()) return "font-semibold text-red-600 dark:text-red-400"
-  return "font-semibold text-yellow-600 dark:text-yellow-400"
+  if (task.status.toLowerCase() === "completed") return "font-medium text-success"
+  if (resolveDueDate(task).getTime() < Date.now()) return "font-semibold text-danger"
+  return "font-semibold text-warning"
 }
 
 /** One status for a department's whole list of items. */
@@ -40,17 +40,17 @@ export function getDeptSummaryStatus(tasks: Array<{ status: string }>): Departme
 }
 
 export function getItemStatusBadgeClass(status: string) {
-  if (status === "completed") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "in_progress") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "not_started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
+  if (status === "completed") return "bg-success/15 text-success"
+  if (status === "in_progress") return "bg-info/15 text-info"
+  if (status === "not_started") return "bg-warning/15 text-warning"
+  return "bg-muted text-muted-foreground"
 }
 
 export function getSummaryBadgeClass(status: DepartmentSummaryStatus) {
-  if (status === "Finished") return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-  if (status === "Started") return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-  if (status === "Not Started") return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-  return "bg-slate-100 text-slate-600 dark:bg-slate-900/40 dark:text-slate-400"
+  if (status === "Finished") return "bg-success/15 text-success"
+  if (status === "Started") return "bg-info/15 text-info"
+  if (status === "Not Started") return "bg-warning/15 text-warning"
+  return "bg-muted text-muted-foreground"
 }
 
 /** A department's action-tracker status for the week, with its badge colour (weekly-report tables). */

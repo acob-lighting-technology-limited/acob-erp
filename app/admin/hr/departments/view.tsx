@@ -51,20 +51,14 @@ const TABS: DataTableTab[] = [
 export function DepartmentStatusBadge({ isActive }: { isActive: boolean }) {
   if (isActive) {
     return (
-      <Badge
-        variant="outline"
-        className="border-emerald-200 bg-emerald-50 font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-      >
+      <Badge variant="outline" className="border-success/30 bg-success/15 text-success font-medium">
         Active
       </Badge>
     )
   }
 
   return (
-    <Badge
-      variant="outline"
-      className="border-slate-300 bg-slate-100 font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400"
-    >
+    <Badge variant="outline" className="border-border bg-muted text-foreground font-medium">
       Inactive
     </Badge>
   )
@@ -564,7 +558,7 @@ export function DepartmentsPage({
                     {editingDepartment &&
                       originalCode &&
                       formData.department_code.trim().toUpperCase() !== originalCode && (
-                        <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                        <div className="border-warning/30 bg-warning/15 text-warning flex gap-2 rounded-md border p-3 text-xs">
                           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           <div className="space-y-1">
                             <p className="font-semibold">Code change — reference counter will restart</p>
@@ -807,7 +801,7 @@ export function DepartmentsPage({
                 Are you sure you want to deactivate <strong>{deletingDepartment?.name}</strong>?
               </span>
               {(deletingDepartment?.employee_count ?? 0) > 0 ? (
-                <span className="block font-medium text-amber-600 dark:text-amber-400">
+                <span className="text-warning block font-medium">
                   Warning: This department currently has {deletingDepartment?.employee_count} employee(s). You must
                   reassign all employees before deactivating.
                 </span>

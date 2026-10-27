@@ -168,7 +168,7 @@ export function LunchMenuViewersDialog({
             </div>
 
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5">
-              <span className="block text-xs font-medium text-emerald-700 dark:text-emerald-400">During Voting</span>
+              <span className="text-success block text-xs font-medium">During Voting</span>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-base font-bold text-emerald-600">{viewedDuringWindowCount}</span>
                 <span className="ml-auto text-xs font-semibold text-emerald-600">
@@ -178,7 +178,7 @@ export function LunchMenuViewersDialog({
             </div>
 
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5">
-              <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">After Deadline</span>
+              <span className="text-warning block text-xs font-medium">After Deadline</span>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-base font-bold text-amber-600">{viewedAfterDeadlineCount}</span>
                 <span className="ml-auto text-xs font-semibold text-amber-600">

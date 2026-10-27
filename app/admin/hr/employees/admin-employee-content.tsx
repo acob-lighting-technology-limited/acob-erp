@@ -864,9 +864,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             {r.mailbox_status === "failed" && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className="shrink-0 bg-red-100 text-xs font-normal text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                    Failed
-                  </Badge>
+                  <Badge className="bg-danger/15 text-danger shrink-0 text-xs font-normal">Failed</Badge>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   {r.mailbox_error || "Matrix could not create this mailbox on cPanel."} Use Send Webmail Credentials to
@@ -892,7 +890,7 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
             {r.is_department_lead && (
               <Badge
                 variant="outline"
-                className="shrink-0 gap-1 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-xs font-medium whitespace-nowrap text-amber-600 dark:text-amber-400"
+                className="text-warning border-warning/40 bg-warning/10 shrink-0 gap-1 px-1.5 py-0 text-xs font-medium whitespace-nowrap"
               >
                 <Shield className="h-2.5 w-2.5" />
                 Dept Lead
@@ -937,14 +935,11 @@ export function AdminEmployeeContent({ initialEmployees, userProfile }: AdminEmp
                   display = r.contract_categories.name
                   const catUpper = display.toUpperCase()
                   if (catUpper.includes("NYSC")) {
-                    badgeColor =
-                      "bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 border-transparent shadow-none"
+                    badgeColor = "bg-purple/10 text-purple hover:bg-purple/10 border-transparent shadow-none"
                   } else if (catUpper.includes("SIWES") || catUpper.includes("INTERN")) {
-                    badgeColor =
-                      "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 border-transparent shadow-none"
+                    badgeColor = "bg-cyan-500/10 text-info hover:bg-cyan-500/10 border-transparent shadow-none"
                   } else if (catUpper.includes("NEXT") || catUpper.includes("GEN")) {
-                    badgeColor =
-                      "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border-transparent shadow-none"
+                    badgeColor = "bg-success/10 text-success hover:bg-success/10 border-transparent shadow-none"
                   } else {
                     badgeColor =
                       "bg-orange-500/10 text-orange-500 hover:bg-orange-500/10 border-transparent shadow-none"

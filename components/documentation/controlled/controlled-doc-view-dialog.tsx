@@ -181,7 +181,7 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
               {doc.doc_type === "policy" && doc.status === "published" && current && (
                 <div className="space-y-3 rounded-lg border p-3">
                   {doc.my_acknowledged_at ? (
-                    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                    <div className="text-success flex items-center gap-2 text-sm">
                       <CheckCircle2 className="h-4 w-4" />
                       You acknowledged version {current.version_number} on {formatDocDate(doc.my_acknowledged_at)}.
                     </div>

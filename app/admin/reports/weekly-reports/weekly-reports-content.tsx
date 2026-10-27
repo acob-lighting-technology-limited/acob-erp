@@ -521,7 +521,7 @@ export function WeeklyReportsContent({
             <div className="grid gap-6 md:grid-cols-3">
               <div className="space-y-3">
                 <h4 className="text-xs font-black tracking-widest text-blue-600 uppercase">Work Done</h4>
-                <div className="space-y-1.5 border-l-2 border-blue-100 pl-3 text-sm dark:border-blue-900/30">
+                <div className="border-info/30 space-y-1.5 border-l-2 pl-3 text-sm">
                   {autoNumberLines(report.work_done)
                     .split("\n")
                     .map((line, index) => (
@@ -531,7 +531,7 @@ export function WeeklyReportsContent({
               </div>
               <div className="space-y-3">
                 <h4 className="text-xs font-black tracking-widest text-emerald-600 uppercase">Tasks for New Week</h4>
-                <div className="space-y-1.5 border-l-2 border-emerald-100 pl-3 text-sm dark:border-emerald-900/30">
+                <div className="border-success/30 space-y-1.5 border-l-2 pl-3 text-sm">
                   {autoNumberLines(report.tasks_new_week)
                     .split("\n")
                     .map((line, index) => (
@@ -541,7 +541,7 @@ export function WeeklyReportsContent({
               </div>
               <div className="space-y-3">
                 <h4 className="text-xs font-black tracking-widest text-rose-600 uppercase">Challenges</h4>
-                <div className="space-y-1.5 border-l-2 border-rose-100 pl-3 text-sm dark:border-rose-900/30">
+                <div className="border-danger/30 space-y-1.5 border-l-2 pl-3 text-sm">
                   {autoNumberLines(report.challenges)
                     .split("\n")
                     .map((line, index) => (

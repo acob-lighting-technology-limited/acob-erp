@@ -48,11 +48,7 @@ export function AddUserToRoleDialog({
               </SelectContent>
             </Select>
           </FormFieldGroup>
-          {addUserWarning && (
-            <div className="rounded-md bg-yellow-100 p-3 text-sm text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
-              {addUserWarning}
-            </div>
-          )}
+          {addUserWarning && <div className="bg-warning/15 text-warning rounded-md p-3 text-sm">{addUserWarning}</div>}
           <div className="text-muted-foreground text-xs">Note: Users can only have one role at a time.</div>
         </div>
         <DialogFooter>

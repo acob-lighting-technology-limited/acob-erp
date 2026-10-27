@@ -175,14 +175,14 @@ export function DispatchCredentialsDialog({ employee, open, onOpenChange, onSucc
           </div>
 
           {!employee.personal_email && (
-            <div className="flex items-center gap-2 rounded-md bg-amber-500/10 p-2 text-xs text-amber-600 dark:text-amber-400">
+            <div className="text-warning bg-warning/10 flex items-center gap-2 rounded-md p-2 text-xs">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>Cannot dispatch: This employee does not have a personal email on file.</span>
             </div>
           )}
 
           {employee.mailbox_status === "failed" && (
-            <div className="flex items-start gap-2 rounded-md bg-red-500/10 p-2 text-xs text-red-600 dark:text-red-400">
+            <div className="text-danger bg-danger/10 flex items-start gap-2 rounded-md p-2 text-xs">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 The last automatic attempt to create this mailbox failed

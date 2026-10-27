@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils"
  */
 
 const REASON_CLASSES: Record<AwayTodayItem["reason"], string> = {
-  leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  out_of_station: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
+  leave: "bg-purple/15 text-purple",
+  out_of_station: "bg-info/15 text-info",
 }
 
 function untilLabel(item: AwayTodayItem, todayIso: string): string {

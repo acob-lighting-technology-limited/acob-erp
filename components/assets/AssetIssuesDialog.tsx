@@ -161,9 +161,7 @@ export function AssetIssuesDialog({
                   <div
                     key={issue.id}
                     className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${
-                      issue.resolved
-                        ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20"
-                        : "border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/20"
+                      issue.resolved ? "border-success/30 bg-success/15" : "border-warning/30 bg-warning/15"
                     }`}
                   >
                     <Tooltip>
@@ -216,7 +214,7 @@ export function AssetIssuesDialog({
                           variant="ghost"
                           size="sm"
                           onClick={() => onDeleteIssue(issue.id)}
-                          className="h-7 w-7 p-0 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                          className="hover:bg-danger/25 h-7 w-7 p-0 text-red-500 hover:text-red-700"
                           aria-label="Delete issue"
                         >
                           <X className="h-4 w-4" />

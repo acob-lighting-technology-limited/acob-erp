@@ -638,10 +638,10 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                 </p>
               </div>
               <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40">
+                <Badge variant="outline" className="bg-success/15 text-emerald-700">
                   {assignments.filter((a) => a.role === "core").length} Core
                 </Badge>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950/40">
+                <Badge variant="outline" className="bg-info/15 text-blue-700">
                   {assignments.filter((a) => a.role === "support").length} Support
                 </Badge>
               </div>
@@ -659,9 +659,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                     <div
                       key={assignment.department}
                       className={`space-y-2.5 rounded-lg border p-3 text-xs transition-colors ${
-                        isCore
-                          ? "border-emerald-200/80 bg-emerald-50/20 dark:border-emerald-900/60 dark:bg-emerald-950/10"
-                          : "border-border/70 bg-card"
+                        isCore ? "border-success/80 bg-success/20" : "border-border/70 bg-card"
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -669,9 +667,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                           <span className="text-foreground text-xs font-semibold">{assignment.department}</span>
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase ${
-                              isCore
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
-                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300"
+                              isCore ? "bg-success/15 text-success" : "bg-info/15 text-info"
                             }`}
                           >
                             {isCore ? "Core Owner" : "Support"}
@@ -683,9 +679,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             size="sm"
                             variant="ghost"
                             className={`h-7 px-2 text-[11px] ${
-                              isCore
-                                ? "bg-emerald-100/50 font-bold text-emerald-700 dark:bg-emerald-900/40"
-                                : "text-muted-foreground"
+                              isCore ? "bg-success/50 font-bold text-emerald-700" : "text-muted-foreground"
                             }`}
                             onClick={() => updateAssignment(index, { role: "core" })}
                           >
@@ -696,9 +690,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
                             size="sm"
                             variant="ghost"
                             className={`h-7 px-2 text-[11px] ${
-                              !isCore
-                                ? "bg-blue-100/50 font-bold text-blue-700 dark:bg-blue-900/40"
-                                : "text-muted-foreground"
+                              !isCore ? "bg-info/50 font-bold text-blue-700" : "text-muted-foreground"
                             }`}
                             onClick={() => updateAssignment(index, { role: "support" })}
                           >

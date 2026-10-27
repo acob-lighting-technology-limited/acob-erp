@@ -13,7 +13,7 @@ export interface ModuleHubCard {
   tag?: string | number | null
   /** Muted text in the card footer. */
   footer?: string | null
-  /** Icon chip + tag tint, e.g. "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20". */
+  /** Icon chip + tag tint, e.g. "bg-indigo-500/10 text-info border-indigo-500/20". */
   color: string
   /** Solid fill shown behind the icon on hover, e.g. "bg-indigo-500". */
   fill: string

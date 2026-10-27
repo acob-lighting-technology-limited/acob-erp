@@ -408,9 +408,9 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
       <div className="space-y-6">
         {/* Status Alert Banner */}
         {approvedStatus === "approved" && (
-          <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-700 dark:text-emerald-300">
+          <div className="text-success border-success/30 bg-success/10 flex items-center justify-between rounded-lg border p-4">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="text-success h-5 w-5" />
               <div>
                 <p className="text-sm font-semibold">Calculation Approved for Simulation</p>
                 <p className="text-xs opacity-90">
@@ -421,10 +421,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                 </p>
               </div>
             </div>
-            <Badge
-              variant="outline"
-              className="border-emerald-500/40 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-            >
+            <Badge variant="outline" className="text-success border-success/40 bg-success/20">
               Approved
             </Badge>
           </div>
@@ -539,7 +536,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(-10)}
-                    className="h-7 text-xs text-red-600 dark:text-red-400"
+                    className="text-danger h-7 text-xs"
                   >
                     <Minus className="mr-1 h-3 w-3" /> 10%
                   </Button>
@@ -548,7 +545,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(-5)}
-                    className="h-7 text-xs text-red-600 dark:text-red-400"
+                    className="text-danger h-7 text-xs"
                   >
                     <Minus className="mr-1 h-3 w-3" /> 5%
                   </Button>
@@ -557,7 +554,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(5)}
-                    className="h-7 text-xs text-emerald-600 dark:text-emerald-400"
+                    className="text-success h-7 text-xs"
                   >
                     <Plus className="mr-1 h-3 w-3" /> 5%
                   </Button>
@@ -566,7 +563,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(10)}
-                    className="h-7 text-xs text-emerald-600 dark:text-emerald-400"
+                    className="text-success h-7 text-xs"
                   >
                     <Plus className="mr-1 h-3 w-3" /> 10%
                   </Button>
@@ -575,7 +572,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePercentageAdjust(15)}
-                    className="h-7 text-xs text-emerald-600 dark:text-emerald-400"
+                    className="text-success h-7 text-xs"
                   >
                     <Plus className="mr-1 h-3 w-3" /> 15%
                   </Button>
@@ -755,9 +752,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               <TableHeader>
                 <TableRow className="bg-muted/80">
                   <TableHead className="font-semibold">Payroll Element</TableHead>
-                  <TableHead className="text-right font-semibold text-amber-700 dark:text-amber-300">
-                    Current PITA System
-                  </TableHead>
+                  <TableHead className="text-warning text-right font-semibold">Current PITA System</TableHead>
                   <TableHead className="text-primary text-right font-semibold">Proposed New Tax Reform</TableHead>
                   <TableHead className="text-right font-semibold">Reform Impact (Delta)</TableHead>
                 </TableRow>
@@ -837,7 +832,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* Deductions */}
                 <TableRow>
-                  <TableCell className="text-xs font-medium text-red-600 sm:text-sm dark:text-red-400">
+                  <TableCell className="text-danger text-xs font-medium sm:text-sm">
                     Employee Pension (8% Basic)
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs">
@@ -851,10 +846,8 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* PAYE Tax Comparison */}
                 <TableRow className="bg-amber-500/10">
-                  <TableCell className="text-xs font-semibold text-amber-700 sm:text-sm dark:text-amber-300">
-                    PAYE Income Tax
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  <TableCell className="text-warning text-xs font-semibold sm:text-sm">PAYE Income Tax</TableCell>
+                  <TableCell className="text-warning text-right font-mono text-xs font-semibold">
                     {money(currentBreakdown.monthlyTax)}
                   </TableCell>
                   <TableCell className="text-primary text-right font-mono text-xs font-bold">
@@ -866,9 +859,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     ) : (
                       <span
                         className={
-                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400"
+                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "text-success" : "text-danger"
                         }
                       >
                         {reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "-" : "+"}
@@ -891,13 +882,13 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* Total Deductions */}
                 <TableRow className="bg-red-500/5">
-                  <TableCell className="text-xs font-semibold text-red-600 sm:text-sm dark:text-red-400">
+                  <TableCell className="text-danger text-xs font-semibold sm:text-sm">
                     Total Monthly Deductions
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-semibold text-red-600 dark:text-red-400">
+                  <TableCell className="text-danger text-right font-mono text-xs font-semibold">
                     {money(currentBreakdown.totalDeductions)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-bold text-red-600 dark:text-red-400">
+                  <TableCell className="text-danger text-right font-mono text-xs font-bold">
                     {money(currentBreakdown.totalDeductions - currentBreakdown.monthlyTax + reformTaxDetail.monthlyTax)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs font-bold">
@@ -906,9 +897,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     ) : (
                       <span
                         className={
-                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400"
+                          reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "text-success" : "text-danger"
                         }
                       >
                         {reformTaxDetail.monthlyTax < currentBreakdown.monthlyTax ? "-" : "+"}
@@ -920,13 +909,11 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
                 {/* Net Take-Home Pay */}
                 <TableRow className="border-t-2 border-emerald-500/30 bg-emerald-500/10">
-                  <TableCell className="text-sm font-bold text-emerald-700 sm:text-base dark:text-emerald-300">
-                    Net Take-Home Pay
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                  <TableCell className="text-success text-sm font-bold sm:text-base">Net Take-Home Pay</TableCell>
+                  <TableCell className="text-success text-right font-mono text-sm font-bold">
                     {money(currentBreakdown.netPay)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-base font-extrabold text-emerald-600 dark:text-emerald-400">
+                  <TableCell className="text-success text-right font-mono text-base font-extrabold">
                     {money(
                       currentBreakdown.monthlyGross -
                         (currentBreakdown.totalDeductions - currentBreakdown.monthlyTax + reformTaxDetail.monthlyTax)
@@ -939,8 +926,8 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       <span
                         className={
                           currentBreakdown.monthlyTax - reformTaxDetail.monthlyTax > 0
-                            ? "font-bold text-emerald-600 dark:text-emerald-400"
-                            : "font-bold text-red-600 dark:text-red-400"
+                            ? "text-success font-bold"
+                            : "text-danger font-bold"
                         }
                       >
                         {currentBreakdown.monthlyTax - reformTaxDetail.monthlyTax > 0 ? "+" : "-"}
@@ -971,9 +958,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
             {/* COLUMN 1: Current PITA Reliefs */}
             <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
               <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                  Current PITA Relief Structure
-                </span>
+                <span className="text-warning text-xs font-semibold">Current PITA Relief Structure</span>
                 <Badge variant="outline" className="font-mono text-xs">
                   PITA Act
                 </Badge>
@@ -1036,7 +1021,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     : "border-amber-500/40 bg-amber-500/10 hover:border-amber-500"
                 }`}
               >
-                <div className="flex items-center justify-between text-xs font-semibold text-amber-700 dark:text-amber-300">
+                <div className="text-warning flex items-center justify-between text-xs font-semibold">
                   <span>PITA Chargeable Income (Annual)</span>
                   {isReliefExpanded("chargeable") ? (
                     <ChevronUp className="h-3.5 w-3.5" />
@@ -1044,9 +1029,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                     <ChevronDown className="h-3.5 w-3.5" />
                   )}
                 </div>
-                <p className="font-mono text-sm font-bold text-amber-700 dark:text-amber-300">
-                  {money(taxDetail.chargeableIncome)}
-                </p>
+                <p className="text-warning font-mono text-sm font-bold">{money(taxDetail.chargeableIncome)}</p>
               </div>
 
               {/* PITA Dropdown Accordion Content */}
@@ -1169,7 +1152,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       <ChevronDown className="h-3.5 w-3.5" />
                     )}
                   </div>
-                  <p className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">₦500,000.00</p>
+                  <p className="text-success font-mono text-xs font-bold">₦500,000.00</p>
                   <span className="text-primary text-xs underline">
                     {isReliefExpanded("reform-static") ? "Hide ▲" : "Rule info ▼"}
                   </span>
@@ -1261,10 +1244,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               <h4 className="text-foreground text-xs font-bold tracking-wider uppercase">
                 Tax Bracket Computation (2-Column Schedule Comparison):
               </h4>
-              <Badge
-                variant="outline"
-                className="w-fit border-amber-500/30 bg-amber-500/10 font-mono text-xs text-amber-700 dark:text-amber-300"
-              >
+              <Badge variant="outline" className="text-warning border-warning/30 bg-warning/10 w-fit font-mono text-xs">
                 PITA vs New Tax Reform Act
               </Badge>
             </div>
@@ -1273,9 +1253,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
               {/* Column 1: Current Tax Schedule (PITA) */}
               <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                 <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                    Column 1: Current PITA Tax Schedule
-                  </span>
+                  <span className="text-warning text-xs font-semibold">Column 1: Current PITA Tax Schedule</span>
                   <Badge variant="secondary" className="font-mono text-xs">
                     7% – 24%
                   </Badge>
@@ -1295,13 +1273,13 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                       </div>
                       <div className="flex items-center gap-2 font-mono text-xs">
                         <span className="text-muted-foreground">{money(b.amount)}</span>
-                        <span className="font-bold text-amber-600 dark:text-amber-400">{money(b.tax)}</span>
+                        <span className="text-warning font-bold">{money(b.tax)}</span>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-2 flex items-center justify-between rounded border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs font-bold text-amber-700 dark:text-amber-300">
+                <div className="text-warning border-warning/40 bg-warning/10 mt-2 flex items-center justify-between rounded border p-2.5 text-xs font-bold">
                   <span>Current Monthly Tax:</span>
                   <span className="font-mono text-sm">{money(currentBreakdown.monthlyTax)}</span>
                 </div>
@@ -1363,7 +1341,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
 
               <div className="font-mono text-xs font-bold">
                 Take-Home Net (New Reform):{" "}
-                <span className="text-emerald-600 dark:text-emerald-400">
+                <span className="text-success">
                   {money(
                     currentBreakdown.monthlyGross -
                       (currentBreakdown.totalDeductions - currentBreakdown.monthlyTax + reformTaxDetail.monthlyTax)

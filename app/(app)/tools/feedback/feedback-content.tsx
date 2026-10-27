@@ -215,17 +215,11 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold">ACOB Matrix ERP Experience Pulse</h3>
                 {userSurvey ? (
-                  <Badge
-                    variant="outline"
-                    className="border-emerald-500/30 bg-emerald-50 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  >
+                  <Badge variant="outline" className="bg-success/15 text-success border-success/30 text-xs">
                     Completed
                   </Badge>
                 ) : (
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500/30 bg-amber-50 text-xs text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                  >
+                  <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30 text-xs">
                     Pending Feedback
                   </Badge>
                 )}

@@ -25,27 +25,17 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
           li: ({ children }) => <li>{children}</li>,
           strong: ({ children }) => <strong className="text-foreground font-semibold">{children}</strong>,
           em: ({ children }) => <em className="italic">{children}</em>,
-          code: ({ children }) => (
-            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">{children}</code>
-          ),
-          pre: ({ children }) => (
-            <pre className="mb-2 overflow-x-auto rounded-md bg-slate-100 p-3 text-xs dark:bg-slate-800">{children}</pre>
-          ),
+          code: ({ children }) => <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">{children}</code>,
+          pre: ({ children }) => <pre className="bg-muted mb-2 overflow-x-auto rounded-md p-3 text-xs">{children}</pre>,
           table: ({ children }) => <table className="mb-2 w-full border-collapse text-xs">{children}</table>,
-          thead: ({ children }) => <thead className="bg-slate-100 dark:bg-slate-800">{children}</thead>,
+          thead: ({ children }) => <thead className="bg-muted">{children}</thead>,
           tbody: ({ children }) => <tbody>{children}</tbody>,
-          tr: ({ children }) => <tr className="border border-slate-200 dark:border-slate-700">{children}</tr>,
-          th: ({ children }) => (
-            <th className="border border-slate-200 px-2 py-1 text-left font-semibold dark:border-slate-700">
-              {children}
-            </th>
-          ),
-          td: ({ children }) => <td className="border border-slate-200 px-2 py-1 dark:border-slate-700">{children}</td>,
-          hr: () => <hr className="my-3 border-slate-200 dark:border-slate-700" />,
+          tr: ({ children }) => <tr className="border-border border">{children}</tr>,
+          th: ({ children }) => <th className="border-border border px-2 py-1 text-left font-semibold">{children}</th>,
+          td: ({ children }) => <td className="border-border border px-2 py-1">{children}</td>,
+          hr: () => <hr className="border-border my-3" />,
           blockquote: ({ children }) => (
-            <blockquote className="mb-2 border-l-2 border-slate-300 pl-3 italic dark:border-slate-600">
-              {children}
-            </blockquote>
+            <blockquote className="border-border mb-2 border-l-2 pl-3 italic">{children}</blockquote>
           ),
         }}
       >

@@ -169,13 +169,13 @@ function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: stri
       return {
         label: "Pending Lead",
         tooltip: "Admin staged alteration — awaiting Department Lead confirmation",
-        className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+        className: "border-amber-300 bg-warning/15 text-warning",
       }
     }
     return {
       label: "Pending Lead",
       tooltip: "Employee appeal — awaiting Department Lead endorsement, then Admin approval",
-      className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+      className: "border-amber-300 bg-warning/15 text-warning",
     }
   }
 
@@ -183,7 +183,7 @@ function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: stri
     return {
       label: "Pending Admin",
       tooltip: "Awaiting Admin & HR final approval",
-      className: "border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+      className: "border-blue-300 bg-info/15 text-info",
     }
   }
 
@@ -191,14 +191,14 @@ function getPendingAppealBadge(appeal: { stage: string; initiated_by_role?: stri
     return {
       label: "Pending HR Lead",
       tooltip: "Awaiting Admin & HR Lead final approval",
-      className: "border-purple-300 bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300",
+      className: "border-purple-300 bg-purple/15 text-purple",
     }
   }
 
   return {
     label: "Pending Review",
     tooltip: "Awaiting approval",
-    className: "border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+    className: "border-amber-300 bg-warning/15 text-warning",
   }
 }
 
@@ -402,12 +402,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
           <span className="flex items-center justify-center gap-1 text-sm">
             {r.clock_in ? (
               <>
-                <Clock
-                  className={cn(
-                    "h-3 w-3 shrink-0",
-                    isLateArrival ? "text-yellow-600 dark:text-yellow-500" : "text-green-600"
-                  )}
-                />
+                <Clock className={cn("h-3 w-3 shrink-0", isLateArrival ? "text-warning" : "text-green-600")} />
                 <span>{formatTime(r.clock_in)}</span>
               </>
             ) : (
@@ -486,7 +481,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
       render: (r) => {
         const { overtime } = getHourBreakdown(r, policy)
         return overtime != null && overtime >= 0.05 ? (
-          <span className="font-medium text-orange-600 dark:text-orange-400">+{overtime.toFixed(1)}h</span>
+          <span className="text-warning font-medium">+{overtime.toFixed(1)}h</span>
         ) : (
           <span className="text-muted-foreground">—</span>
         )
@@ -834,7 +829,7 @@ export function DailyRosterView({ departments, lockedDepartment }: DailyRosterVi
           </DialogHeader>
           <div className="space-y-4 py-2">
             {editRecord?.pending_appeal && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-700/50 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="border-warning/30 bg-warning/15 text-warning rounded-md border p-2.5 text-xs">
                 {editRecord.pending_appeal.stage === "pending_lead" &&
                 editRecord.pending_appeal.initiated_by_role === "admin_manual"
                   ? "An alteration is currently awaiting Department Lead confirmation (Pending Lead)."

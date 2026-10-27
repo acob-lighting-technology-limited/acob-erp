@@ -115,7 +115,7 @@ export function EmployeeRecipientPicker({
             <label
               key={emp.id}
               className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                selectedIds.includes(emp.id) ? "bg-green-50 dark:bg-green-950/20" : "hover:bg-muted/50"
+                selectedIds.includes(emp.id) ? "bg-success/15" : "hover:bg-muted/50"
               }`}
             >
               <Checkbox checked={selectedIds.includes(emp.id)} onCheckedChange={() => toggle(emp.id)} />

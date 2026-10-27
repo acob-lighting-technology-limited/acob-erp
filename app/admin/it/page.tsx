@@ -19,7 +19,7 @@ const IT_ITEMS = [
     href: "/admin/onboarding",
     icon: UserPlus,
     color: "text-blue-500",
-    bgColor: "bg-blue-50 dark:bg-blue-950/30",
+    bgColor: "bg-info/15",
   },
   {
     name: "Mailboxes",
@@ -27,7 +27,7 @@ const IT_ITEMS = [
     href: "/admin/settings/mailboxes",
     icon: Mail,
     color: "text-emerald-500",
-    bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
+    bgColor: "bg-success/15",
   },
   {
     name: "Starlink Kits",
@@ -35,7 +35,7 @@ const IT_ITEMS = [
     href: "/admin/accounts/starlink",
     icon: Satellite,
     color: "text-indigo-500",
-    bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
+    bgColor: "bg-info/15",
   },
   {
     name: "Network Activity",
@@ -43,7 +43,7 @@ const IT_ITEMS = [
     href: "/admin/security/network-activity",
     icon: Network,
     color: "text-teal-500",
-    bgColor: "bg-teal-50 dark:bg-teal-950/30",
+    bgColor: "bg-success/15",
   },
   {
     name: "Bypass & Override",
@@ -51,7 +51,7 @@ const IT_ITEMS = [
     href: "/admin/security/bypass-override",
     icon: ShieldAlert,
     color: "text-amber-600",
-    bgColor: "bg-amber-50 dark:bg-amber-950/30",
+    bgColor: "bg-warning/15",
   },
 ] as const
 

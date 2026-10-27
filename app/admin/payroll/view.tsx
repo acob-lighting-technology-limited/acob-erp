@@ -199,7 +199,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "gross_salary",
       label: "Gross Pay",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
+        <span className="text-info font-mono text-xs font-semibold">
           ₦
           {Number(row.gross_salary || row.breakdown?.monthlyGross || 0).toLocaleString("en-US", {
             minimumFractionDigits: 2,
@@ -211,7 +211,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "tax_amount",
       label: "PAYE Tax",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs text-amber-600 dark:text-amber-400">
+        <span className="text-warning font-mono text-xs">
           ₦{Number(row.tax_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -220,7 +220,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "total_deductions",
       label: "Deductions",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs text-red-600 dark:text-red-400">
+        <span className="text-danger font-mono text-xs">
           ₦{Number(row.total_deductions || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -229,7 +229,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
       key: "net_salary",
       label: "Net Take-Home",
       render: (row: DbPayrollEntry) => (
-        <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+        <span className="text-success font-mono text-xs font-bold">
           ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
         </span>
       ),
@@ -242,7 +242,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           variant={row.payroll_periods?.status === "completed" ? "default" : "outline"}
           className={
             row.payroll_periods?.status === "completed"
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              ? "text-success bg-success/10"
               : "border-amber-500/30 text-amber-600"
           }
         >
@@ -490,7 +490,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
             subtitle: (row) =>
               `${row.user?.department || "General"} · ${row.payroll_periods?.name || "N/A"} · Net: ₦${Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
             trailing: (row) => (
-              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="text-success font-mono text-xs font-bold">
                 ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 0 })}
               </span>
             ),
@@ -502,7 +502,7 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
                   <p className="text-sm font-semibold">{row.user?.full_name || "Unknown"}</p>
                   <p className="text-muted-foreground text-xs">{row.user?.department || "General"}</p>
                 </div>
-                <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <span className="text-success font-mono text-xs font-bold">
                   ₦{Number(row.net_salary || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </div>

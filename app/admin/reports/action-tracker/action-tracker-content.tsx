@@ -284,7 +284,7 @@ export function ActionTrackerContent({
       <Button
         size="sm"
         variant={hasBlocker ? "secondary" : "ghost"}
-        className={`h-8 gap-1.5 ${hasBlocker ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}
+        className={`h-8 gap-1.5 ${hasBlocker ? "text-warning" : "text-muted-foreground"}`}
         onClick={() => openBlockerDialog(task)}
       >
         <TriangleAlert className="h-3.5 w-3.5" />
@@ -442,21 +442,21 @@ export function ActionTrackerContent({
             parts.push({
               label: "Done",
               count: row.completedPoints,
-              colorClass: "text-green-600 dark:text-green-400 font-medium",
+              colorClass: "text-success font-medium",
             })
           }
           if (row.inProgressPoints > 0) {
             parts.push({
               label: "In Progress",
               count: row.inProgressPoints,
-              colorClass: "text-blue-600 dark:text-blue-400 font-medium",
+              colorClass: "text-info font-medium",
             })
           }
           if (row.notStartedPoints > 0) {
             parts.push({
               label: "Not Started",
               count: row.notStartedPoints,
-              colorClass: "text-orange-600 dark:text-orange-400 font-medium",
+              colorClass: "text-warning font-medium",
             })
           }
           if (row.pendingPoints > 0) {
@@ -1008,9 +1008,7 @@ export function ActionTrackerContent({
               label: "Delete",
               icon: Trash2,
               variant: "destructive",
-              onClick: (row) => {
-                void handleDeleteDirective(row)
-              },
+              onClick: (row) => void handleDeleteDirective(row),
             },
           ]}
           viewToggle
@@ -1153,7 +1151,7 @@ export function ActionTrackerContent({
                     {renderBlockerButton(task)}
                   </div>
                   {task.blocker_note ? (
-                    <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/5 p-2 text-xs text-amber-800 dark:text-amber-300">
+                    <p className="text-warning border-warning/30 bg-warning/5 mt-2 rounded border p-2 text-xs">
                       {task.blocker_note}
                     </p>
                   ) : null}

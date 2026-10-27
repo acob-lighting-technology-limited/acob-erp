@@ -94,11 +94,11 @@ async function fetchPaymentPageData(id: string): Promise<PaymentPageData> {
 function getStatusBadgeClass(status: string) {
   switch (status) {
     case "paid":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+      return "bg-success/10 text-success border-success/20"
     case "due":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20"
+      return "bg-warning/10 text-warning border-warning/20"
     case "overdue":
-      return "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20"
+      return "bg-danger/10 text-danger border-danger/20"
     case "cancelled":
       return "bg-muted text-muted-foreground border-transparent"
     default:

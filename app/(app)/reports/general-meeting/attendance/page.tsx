@@ -197,7 +197,7 @@ function CheckInContent() {
         <Card className="border shadow-md">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <div className="text-success bg-success/10 flex h-11 w-11 items-center justify-center rounded-xl">
                 <UserCheck className="h-6 w-6" />
               </div>
               <div>
@@ -211,13 +211,11 @@ function CheckInContent() {
 
           <CardContent>
             {successResult ? (
-              <div className="space-y-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center text-emerald-950 dark:text-emerald-200">
-                <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600 dark:text-emerald-400" />
+              <div className="text-success border-success/30 bg-success/10 space-y-4 rounded-xl border p-6 text-center">
+                <CheckCircle2 className="text-success mx-auto h-12 w-12" />
                 <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-emerald-900 dark:text-emerald-100">Attendance Confirmed!</h3>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                    Your general meeting presence has been recorded and verified.
-                  </p>
+                  <h3 className="text-success text-lg font-bold">Attendance Confirmed!</h3>
+                  <p className="text-success text-xs">Your general meeting presence has been recorded and verified.</p>
                 </div>
 
                 <div className="bg-background/80 mt-4 space-y-2 rounded-lg border border-emerald-500/20 p-3.5 text-left text-xs">
@@ -237,7 +235,7 @@ function CheckInContent() {
                   )}
                   <div className="flex justify-between border-t pt-1.5">
                     <span className="text-muted-foreground">Verification Gate:</span>
-                    <span className="flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-success flex items-center gap-1 font-semibold">
                       <ShieldCheck className="h-3.5 w-3.5" /> Biometrics Validated
                     </span>
                   </div>
@@ -295,27 +293,27 @@ function CheckInContent() {
                 {/* Biometric status notice */}
                 {sessionLoading ? (
                   <div className="bg-muted/40 text-muted-foreground flex items-center justify-center gap-2 rounded-lg border p-3 text-xs">
-                    <Loader2 className="h-4 w-4 animate-spin text-emerald-600 dark:text-emerald-400" />
+                    <Loader2 className="text-success h-4 w-4 animate-spin" />
                     <span>Checking office entrance clock-in status...</span>
                   </div>
                 ) : userStatus && !userStatus.hasOfficeClockIn ? (
-                  <div className="space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
-                    <div className="flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
-                      <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="text-warning border-warning/30 bg-warning/10 space-y-1.5 rounded-lg border p-3 text-xs">
+                    <div className="text-warning flex items-center gap-2 font-semibold">
+                      <AlertCircle className="text-warning h-4 w-4 shrink-0" />
                       <span>No Office Clock-In Recorded Today</span>
                     </div>
-                    <p className="text-xs leading-relaxed text-amber-700/90 dark:text-amber-300/90">
+                    <p className="text-warning text-xs leading-relaxed">
                       You haven&apos;t clocked in at the front entrance biometric machine yet today. If you just punched
                       seconds ago, please wait 30 seconds for device sync.
                     </p>
                   </div>
                 ) : userStatus && userStatus.hasOfficeClockIn ? (
-                  <div className="space-y-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-950 dark:text-emerald-200">
-                    <div className="flex items-center gap-2 font-semibold text-emerald-800 dark:text-emerald-300">
-                      <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="text-success border-success/30 bg-success/10 space-y-1 rounded-lg border p-3 text-xs">
+                    <div className="text-success flex items-center gap-2 font-semibold">
+                      <ShieldCheck className="text-success h-4 w-4 shrink-0" />
                       <span>Office Entrance Punch Verified</span>
                     </div>
-                    <p className="text-xs text-emerald-700/90 dark:text-emerald-300/90">
+                    <p className="text-success text-xs">
                       Punched in at {formatClockTime(userStatus.officeClockIn)} (
                       {userStatus.officeClockInSource || "Biometric"}).
                     </p>
@@ -344,7 +342,7 @@ function CheckInContent() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <div className="text-success bg-success/10 flex h-8 w-8 items-center justify-center rounded-lg">
                   <Calendar className="h-4 w-4" />
                 </div>
                 <div>
@@ -352,10 +350,7 @@ function CheckInContent() {
                   <CardDescription className="text-xs">Schedule and attendance status</CardDescription>
                 </div>
               </div>
-              <Badge
-                variant="outline"
-                className="border-emerald-500/40 bg-emerald-500/10 text-xs text-emerald-700 dark:text-emerald-300"
-              >
+              <Badge variant="outline" className="text-success border-success/40 bg-success/10 text-xs">
                 Week {week}
               </Badge>
             </div>
@@ -372,7 +367,7 @@ function CheckInContent() {
               <span className="text-muted-foreground flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" /> Session Status
               </span>
-              <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="text-success flex items-center gap-1.5 font-medium">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                 Active for Check-In
               </span>
@@ -383,17 +378,11 @@ function CheckInContent() {
                 <UserCheck className="h-3.5 w-3.5" /> Your Status
               </span>
               {successResult || userStatus?.alreadyCheckedIn ? (
-                <Badge
-                  variant="outline"
-                  className="border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                >
+                <Badge variant="outline" className="text-success border-success/40 bg-success/10">
                   <CheckCircle2 className="mr-1 h-3 w-3" /> Checked In
                 </Badge>
               ) : userStatus && !userStatus.hasOfficeClockIn ? (
-                <Badge
-                  variant="outline"
-                  className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                >
+                <Badge variant="outline" className="text-warning border-warning/40 bg-warning/10">
                   <AlertCircle className="mr-1 h-3 w-3" /> Punch Required
                 </Badge>
               ) : (
@@ -404,12 +393,12 @@ function CheckInContent() {
             </div>
 
             {sessionData?.holidayInfo?.isMondayHoliday && (
-              <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
-                <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-300">
+              <div className="text-warning border-warning/30 bg-warning/10 mt-2 rounded-lg border p-2.5 text-xs">
+                <div className="text-warning flex items-center gap-1.5 font-semibold">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                   <span>Public Holiday Notice</span>
                 </div>
-                <p className="mt-0.5 leading-tight text-amber-700/90 dark:text-amber-300/90">
+                <p className="text-warning mt-0.5 leading-tight">
                   Monday is marked as a holiday ({sessionData.holidayInfo.mondayHolidayName || "Public Holiday"}).
                 </p>
               </div>
@@ -421,7 +410,7 @@ function CheckInContent() {
         <Card className="border shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <div className="text-success bg-success/10 flex h-8 w-8 items-center justify-center rounded-lg">
                 <Info className="h-4 w-4" />
               </div>
               <div>
@@ -432,7 +421,7 @@ function CheckInContent() {
           </CardHeader>
           <CardContent className="space-y-3 text-xs">
             <div className="flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <div className="text-success bg-success/10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold">
                 1
               </div>
               <div className="space-y-0.5">
@@ -445,7 +434,7 @@ function CheckInContent() {
             </div>
 
             <div className="flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <div className="text-success bg-success/10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold">
                 2
               </div>
               <div className="space-y-0.5">
@@ -458,7 +447,7 @@ function CheckInContent() {
             </div>
 
             <div className="flex gap-3">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <div className="text-success bg-success/10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold">
                 3
               </div>
               <div className="space-y-0.5">

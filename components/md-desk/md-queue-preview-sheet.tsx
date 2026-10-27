@@ -10,10 +10,10 @@ import { formatWATDate, formatWATRelative } from "@/lib/utils/date"
 import { MD_DESK_QUEUE_LABELS, type MdDeskQueueItem, type MdDeskQueueKind } from "@/lib/md-desk/types"
 
 const KIND_CLASSES: Record<MdDeskQueueKind, string> = {
-  leave: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
-  requisition: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
-  correspondence: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
-  task_rating: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20",
+  leave: "bg-success/10 text-success border-success/20",
+  requisition: "bg-warning/10 text-warning border-warning/20",
+  correspondence: "bg-info/10 text-info border-info/20",
+  task_rating: "bg-purple/10 text-purple border-purple/20",
 }
 
 const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 })

@@ -208,7 +208,7 @@ export function ManageGrossSalaryDialog() {
                               setEdits((prev) => ({ ...prev, [emp.user_id]: formatWithCommas(e.target.value) }))
                             }
                             className={`h-8 w-32 font-mono text-xs font-bold ${
-                              isDirty ? "border-emerald-500/50 text-emerald-600 dark:text-emerald-400" : ""
+                              isDirty ? "text-success border-success/50" : ""
                             }`}
                           />
                         </TableCell>

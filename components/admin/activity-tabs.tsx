@@ -123,39 +123,39 @@ function statusColor(status: string | null): string {
     case "approved":
     case "paid":
     case "present":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success/15 text-success"
     case "in_progress":
     case "under_review":
     case "assigned":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info/15 text-info"
     case "pending":
     case "open":
     case "new":
     case "due":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning/15 text-warning"
     case "urgent":
     case "overdue":
     case "rejected":
     case "absent":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+      return "bg-danger/15 text-danger"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-muted text-foreground"
   }
 }
 
 function priorityColor(priority: string | null): string {
   switch (priority?.toLowerCase()) {
     case "urgent":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+      return "bg-danger/15 text-danger"
     case "high":
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+      return "bg-warning/15 text-warning"
     case "medium":
     case "normal":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info/15 text-info"
     case "low":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success/15 text-success"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-muted text-foreground"
   }
 }
 

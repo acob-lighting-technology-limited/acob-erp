@@ -61,8 +61,8 @@ export default function PurchasingDashboard() {
           title="Pending Receipts"
           value={stats.pendingReceipts}
           icon={Clock}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600 dark:text-orange-400"
+          iconBgColor="bg-warning/15"
+          iconColor="text-warning"
           description="Awaiting delivery"
         />
         <StatCard
@@ -137,16 +137,16 @@ export default function PurchasingDashboard() {
       </Section>
 
       {/* Info Banner */}
-      <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+      <Card className="border-warning/30 bg-warning/15">
         <CardContent className="flex items-start gap-4 p-6">
           <AlertTriangle className="mt-1 h-6 w-6 text-orange-600" />
           <div>
-            <h3 className="font-semibold text-orange-800 dark:text-orange-200">Database Tables Required</h3>
-            <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+            <h3 className="text-warning font-semibold">Database Tables Required</h3>
+            <p className="text-warning mt-1 text-sm">
               Required tables:
-              <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">suppliers</code>,
-              <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">purchase_orders</code>,
-              <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">purchase_order_items</code>.
+              <code className="bg-warning/15 mx-1 rounded px-1">suppliers</code>,
+              <code className="bg-warning/15 mx-1 rounded px-1">purchase_orders</code>,
+              <code className="bg-warning/15 mx-1 rounded px-1">purchase_order_items</code>.
             </p>
           </div>
         </CardContent>

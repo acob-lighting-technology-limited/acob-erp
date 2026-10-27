@@ -108,7 +108,7 @@ export function RecipientSelector({
               <label
                 key={emp.id}
                 className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                  selectedEmployeeIds.has(emp.id) ? "bg-orange-50 dark:bg-orange-950/20" : "hover:bg-muted/50"
+                  selectedEmployeeIds.has(emp.id) ? "bg-warning/15" : "hover:bg-muted/50"
                 }`}
               >
                 <Checkbox checked={selectedEmployeeIds.has(emp.id)} onCheckedChange={() => toggleEmployee(emp.id)} />

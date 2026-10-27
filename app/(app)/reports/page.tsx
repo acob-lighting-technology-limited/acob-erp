@@ -12,9 +12,9 @@ export default function PortalReportsPage() {
       icon: Users,
       tag: "Hub",
       subLabel: "4 meeting tools",
-      color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+      color: "bg-indigo-500/10 text-info border-indigo-500/20",
       fill: "bg-indigo-500",
-      hoverBorder: "hover:border-indigo-500/60 dark:hover:border-indigo-400/60",
+      hoverBorder: "hover:border-info/50",
       hoverText: "group-hover:text-indigo-500",
     },
   ]

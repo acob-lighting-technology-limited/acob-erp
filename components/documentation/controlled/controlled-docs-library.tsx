@@ -200,7 +200,7 @@ export function ControlledDocsLibrary({ type }: { type: ControlledDocType }) {
               {
                 label: `${pendingCount} to acknowledge`,
                 icon: CircleAlert,
-                tone: pendingCount > 0 ? "text-amber-600 dark:text-amber-400" : undefined,
+                tone: pendingCount > 0 ? "text-warning" : undefined,
               },
             ]
           : []),

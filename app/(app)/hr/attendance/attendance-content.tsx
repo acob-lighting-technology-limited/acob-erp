@@ -101,26 +101,17 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
   if (stage === "pending_lead") {
     if (appeal.initiated_by_role === "admin_manual") {
       return (
-        <Badge
-          variant="outline"
-          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
-        >
+        <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
           Pending Lead
         </Badge>
       )
     }
     return (
       <div className="flex flex-col items-start gap-1">
-        <Badge
-          variant="outline"
-          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
-        >
+        <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
           Pending Lead
         </Badge>
-        <Badge
-          variant="outline"
-          className="border-blue-500 bg-blue-500/10 font-medium text-blue-600 dark:text-blue-400"
-        >
+        <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
           Pending Admin
         </Badge>
       </div>
@@ -128,26 +119,20 @@ function renderAppealPendingBadge(appeal: AppealRecord) {
   }
   if (stage === "pending_admin") {
     return (
-      <Badge variant="outline" className="border-blue-500 bg-blue-500/10 font-medium text-blue-600 dark:text-blue-400">
+      <Badge variant="outline" className="text-info bg-info/10 border-blue-500 font-medium">
         Pending Admin
       </Badge>
     )
   }
   if (stage === "pending_hr_lead") {
     return (
-      <Badge
-        variant="outline"
-        className="border-purple-500 bg-purple-500/10 font-medium text-purple-600 dark:text-purple-400"
-      >
+      <Badge variant="outline" className="bg-purple/10 text-purple border-purple-500 font-medium">
         Pending HR Lead
       </Badge>
     )
   }
   return (
-    <Badge
-      variant="outline"
-      className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
-    >
+    <Badge variant="outline" className="text-warning bg-warning/10 border-amber-500 font-medium">
       Pending
     </Badge>
   )
@@ -455,7 +440,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                 <span>{getClockOutLabel(row)}</span>
               </>
             ) : row.clock_in && row.date === toLocalISODate() ? (
-              <span className="font-medium text-blue-600 dark:text-blue-400">{getClockOutLabel(row)}</span>
+              <span className="text-info font-medium">{getClockOutLabel(row)}</span>
             ) : (
               <span className="text-muted-foreground">—</span>
             )}
@@ -527,7 +512,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 gap-1 border-red-200 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/20"
+                className="border-danger/30 text-danger hover:bg-danger/25 h-7 gap-1 px-2 text-xs hover:text-red-700"
                 onClick={() => {
                   setEditAppeal(null)
                   setAppealDialogRow(row)
@@ -994,9 +979,9 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                     Lead Endorsement
                                   </span>
                                   {latestAppeal.lead_reviewed_at ? (
-                                    <span className="font-medium text-emerald-600 dark:text-emerald-400">Endorsed</span>
+                                    <span className="text-success font-medium">Endorsed</span>
                                   ) : latestAppeal.stage === "pending_lead" ? (
-                                    <span className="font-medium text-amber-600 dark:text-amber-400">
+                                    <span className="text-warning font-medium">
                                       Awaiting {latestAppeal.department_lead_name || "Department Lead"}
                                     </span>
                                   ) : (
@@ -1037,16 +1022,14 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                                     <span
                                       className={
                                         latestAppeal.status === "rejected"
-                                          ? "font-medium text-red-600 dark:text-red-400"
-                                          : "font-medium text-emerald-600 dark:text-emerald-400"
+                                          ? "text-danger font-medium"
+                                          : "text-success font-medium"
                                       }
                                     >
                                       {latestAppeal.status === "rejected" ? "Rejected" : "Approved"}
                                     </span>
                                   ) : latestAppeal.stage === "pending_admin" ? (
-                                    <span className="font-medium text-blue-600 dark:text-blue-400">
-                                      Awaiting Admin Review
-                                    </span>
+                                    <span className="text-info font-medium">Awaiting Admin Review</span>
                                   ) : (
                                     <span className="text-muted-foreground">
                                       Pending lead then {latestAppeal.admin_hr_lead_name || "Admin & HR Lead"}
@@ -1265,10 +1248,7 @@ function StatusBadge({ status }: { status: AttendanceRow["normalizedStatus"] }) 
   const norm = normalizeStoredAttendanceStatus(status) || status
   return (
     <Badge
-      className={
-        ATTENDANCE_STATUS_COLORS[norm as keyof typeof ATTENDANCE_STATUS_COLORS] ??
-        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
-      }
+      className={ATTENDANCE_STATUS_COLORS[norm as keyof typeof ATTENDANCE_STATUS_COLORS] ?? "bg-muted text-foreground"}
     >
       {ATTENDANCE_STATUS_LABELS[norm as keyof typeof ATTENDANCE_STATUS_LABELS] ?? norm}
     </Badge>

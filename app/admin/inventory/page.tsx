@@ -58,8 +58,8 @@ export default function InventoryDashboard() {
           title="Low Stock"
           value={stats.lowStockItems}
           icon={AlertTriangle}
-          iconBgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600 dark:text-orange-400"
+          iconBgColor="bg-warning/15"
+          iconColor="text-warning"
           description="Items need reorder"
         />
         <StatCard
@@ -88,7 +88,7 @@ export default function InventoryDashboard() {
                 <IconFill
                   icon={Package}
                   fillColor="bg-blue-500"
-                  className="h-8 w-8 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-600 transition-transform duration-200 group-hover:scale-105 dark:text-blue-400"
+                  className="text-info border-info/20 bg-info/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-blue-500">Products</span>
@@ -114,7 +114,7 @@ export default function InventoryDashboard() {
                 <IconFill
                   icon={Boxes}
                   fillColor="bg-purple-500"
-                  className="h-8 w-8 rounded-lg border border-purple-500/20 bg-purple-500/10 text-purple-600 transition-transform duration-200 group-hover:scale-105 dark:text-purple-400"
+                  className="border-purple/20 bg-purple/10 text-purple h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-purple-500">Categories</span>
@@ -135,7 +135,7 @@ export default function InventoryDashboard() {
                 <IconFill
                   icon={Warehouse}
                   fillColor="bg-teal-500"
-                  className="h-8 w-8 rounded-lg border border-teal-500/20 bg-teal-500/10 text-teal-600 transition-transform duration-200 group-hover:scale-105 dark:text-teal-400"
+                  className="text-success h-8 w-8 rounded-lg border border-teal-500/20 bg-teal-500/10 transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-teal-500">Warehouses</span>
@@ -156,7 +156,7 @@ export default function InventoryDashboard() {
                 <IconFill
                   icon={ArrowUpDown}
                   fillColor="bg-emerald-500"
-                  className="h-8 w-8 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 transition-transform duration-200 group-hover:scale-105 dark:text-emerald-400"
+                  className="text-success border-success/20 bg-success/10 h-8 w-8 rounded-lg border transition-transform duration-200 group-hover:scale-105"
                   iconClassName="h-4 w-4"
                 />
                 <span className="transition-colors group-hover:text-emerald-500">Stock Movements</span>
@@ -175,17 +175,17 @@ export default function InventoryDashboard() {
       </Section>
 
       {/* Info Banner */}
-      <Card className="border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+      <Card className="border-warning/30 bg-warning/15">
         <CardContent className="flex items-start gap-4 p-6">
           <AlertTriangle className="mt-1 h-6 w-6 text-orange-600" />
           <div>
-            <h3 className="font-semibold text-orange-800 dark:text-orange-200">Database Tables Required</h3>
-            <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
+            <h3 className="text-warning font-semibold">Database Tables Required</h3>
+            <p className="text-warning mt-1 text-sm">
               To use the Inventory module, you need to create the following database tables:
-              <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">products</code>,
-              <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">product_categories</code>,
-              <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">warehouses</code>, and
-              <code className="mx-1 rounded bg-orange-100 px-1 dark:bg-orange-900">stock_movements</code>.
+              <code className="bg-warning/15 mx-1 rounded px-1">products</code>,
+              <code className="bg-warning/15 mx-1 rounded px-1">product_categories</code>,
+              <code className="bg-warning/15 mx-1 rounded px-1">warehouses</code>, and
+              <code className="bg-warning/15 mx-1 rounded px-1">stock_movements</code>.
             </p>
           </div>
         </CardContent>

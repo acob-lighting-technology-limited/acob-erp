@@ -713,7 +713,7 @@ function ExemptionTab({
         {saving ? "Saving…" : mode === "off" ? "Remove Exemption" : "Apply Exemption"}
       </Button>
       {mode !== "off" && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="border-warning/30 bg-warning/15 text-warning rounded-md border px-3 py-2 text-xs">
           ⚠ Exemption takes precedence in the roster even on days the employee clocked in. Their attendance is kept —
           removing the exemption restores it.
         </p>
@@ -1792,7 +1792,7 @@ function ManualRecordsTab({
         </Label>
         <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={placeholder} rows={2} />
       </div>
-      <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      <p className="border-warning/30 bg-warning/15 text-warning rounded-md border px-3 py-2 text-xs">
         {status === "out_of_station" ? (
           <>
             ⚠ Days the employee was <strong>fully present</strong> (clocked in and out) are skipped — you can&apos;t be
@@ -2307,7 +2307,7 @@ function LeaveTab({ reports, onDone }: { reports: AttendanceReport[]; onDone: ()
           rows={2}
         />
       </div>
-      <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      <p className="border-warning/30 bg-warning/15 text-warning rounded-md border px-3 py-2 text-xs">
         ⚠ If the employee clocked in on these days, the leave takes precedence in the roster. Their attendance is kept
         — removing the leave restores it.
       </p>

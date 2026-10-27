@@ -78,10 +78,7 @@ function TaskStatusPill({ task }: { task: Task }) {
 
   if (isEscalated) {
     return (
-      <Badge
-        variant="destructive"
-        className="border-rose-500/30 bg-rose-500/15 text-xs whitespace-nowrap text-rose-700 dark:text-rose-400"
-      >
+      <Badge variant="destructive" className="text-danger border-danger/30 bg-danger/15 text-xs whitespace-nowrap">
         {cfg.label} · Escalated
       </Badge>
     )
@@ -89,10 +86,7 @@ function TaskStatusPill({ task }: { task: Task }) {
 
   if (isOverdue) {
     return (
-      <Badge
-        variant="outline"
-        className="border-amber-500/30 bg-amber-500/15 text-xs whitespace-nowrap text-amber-700 dark:text-amber-400"
-      >
+      <Badge variant="outline" className="text-warning border-warning/30 bg-warning/15 text-xs whitespace-nowrap">
         {cfg.label} · Grace
       </Badge>
     )
@@ -710,21 +704,21 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                   </div>
 
                   {t.unable_to_complete_reason && (
-                    <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-amber-800 dark:text-amber-300">
+                    <div className="text-warning border-warning/30 bg-warning/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Reported Blocker / Issue:</span>
                       {t.unable_to_complete_reason}
                     </div>
                   )}
 
                   {t.failure_reason && (
-                    <div className="rounded border border-rose-500/30 bg-rose-500/10 p-2.5 text-rose-800 dark:text-rose-300">
+                    <div className="text-danger border-danger/30 bg-danger/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Failure Note:</span>
                       {t.failure_reason}
                     </div>
                   )}
 
                   {t.extension_reason && (
-                    <div className="rounded border border-blue-500/30 bg-blue-500/10 p-2.5 text-blue-800 dark:text-blue-300">
+                    <div className="text-info border-info/30 bg-info/10 rounded border p-2.5">
                       <span className="mb-0.5 block font-semibold">Extension Reason:</span>
                       {t.extension_reason}
                     </div>

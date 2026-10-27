@@ -30,20 +30,20 @@ function statusBadgeClass(status: string): string {
     case "completed":
     case "resolved":
     case "approved":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      return "bg-success/15 text-success"
     case "in_progress":
     case "under_review":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+      return "bg-info/15 text-info"
     case "pending":
     case "open":
     case "new":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+      return "bg-warning/15 text-warning"
     case "assigned":
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400"
+      return "bg-purple/15 text-purple"
     case "rejected":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+      return "bg-danger/15 text-danger"
     default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+      return "bg-muted text-foreground"
   }
 }
 
@@ -97,11 +97,11 @@ function Row({ href, children }: { href: string; children: React.ReactNode }) {
 function TaskDueBadge({ task, now }: { task: Task; now: Date }) {
   const urgency = getTaskUrgency(task, now)
   if (urgency.kind === "overdue") {
-    return <span className="text-xs font-medium text-red-600 dark:text-red-400">{urgency.days}d overdue</span>
+    return <span className="text-danger text-xs font-medium">{urgency.days}d overdue</span>
   }
   if (urgency.kind === "due_soon") {
     return (
-      <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+      <span className="text-warning text-xs font-medium">
         {urgency.days === 0 ? "Due today" : `Due in ${urgency.days}d`}
       </span>
     )
@@ -178,10 +178,10 @@ const LEAVE_STATE_LABELS: Record<LeaveState, string> = {
 }
 
 const LEAVE_STATE_CLASSES: Record<LeaveState, string> = {
-  on_leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  upcoming: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  pending_evidence: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  on_leave: "bg-purple/15 text-purple",
+  upcoming: "bg-success/15 text-success",
+  pending: "bg-warning/15 text-warning",
+  pending_evidence: "bg-warning/15 text-warning",
 }
 
 // Ongoing leave first, then anything waiting on the employee, then the queue.
@@ -340,7 +340,7 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
                 : ATTENDANCE_STATUS_LABELS[statusKey] || humanizeStatus(item.status)
             const statusColor =
               item.status === "not_clocked_in"
-                ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                ? "bg-muted text-foreground border-border"
                 : ATTENDANCE_STATUS_COLORS[statusKey] || statusBadgeClass(item.status)
 
             return (
@@ -373,13 +373,13 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
                         </span>
                       </>
                     ) : item.status === "on_leave" || item.status === "lwop" ? (
-                      <span className="text-purple-600 dark:text-purple-400">{item.leave_type || "On Leave"}</span>
+                      <span className="text-purple">{item.leave_type || "On Leave"}</span>
                     ) : item.status === "exempted" ? (
-                      <span className="text-violet-600 dark:text-violet-400">Attendance exempt</span>
+                      <span className="text-purple">Attendance exempt</span>
                     ) : isToday ? (
                       <span className="text-muted-foreground">Not clocked in yet</span>
                     ) : (
-                      <span className="text-red-600 dark:text-red-400">No clock-in</span>
+                      <span className="text-danger">No clock-in</span>
                     )}
                   </span>
                 </div>

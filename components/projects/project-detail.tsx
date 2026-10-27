@@ -268,7 +268,7 @@ export function ProjectDetail({
               <PriorityBadge priority={project.priority} />
               <ProjectStatusBadge status={project.status} />
               {health.overdueCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 dark:text-red-400">
+                <span className="text-danger inline-flex items-center gap-1 text-xs font-medium">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {plural(health.overdueCount, "task")} past due
                 </span>

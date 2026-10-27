@@ -66,7 +66,7 @@ export function SummarySidebarCard({
   const sortedWeeks = Array.from(selectedWeeks).sort((a, b) => a - b)
 
   return (
-    <Card className="border-green-200 dark:border-green-900">
+    <Card className="border-success/30">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">Summary</CardTitle>
       </CardHeader>

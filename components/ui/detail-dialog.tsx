@@ -52,10 +52,10 @@ export function DetailFieldGrid({ children }: { children: React.ReactNode }) {
 export type DetailCalloutTone = "amber" | "rose" | "blue" | "emerald"
 
 const CALLOUT_TONES: Record<DetailCalloutTone, string> = {
-  amber: "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300",
-  rose: "border-rose-500/30 bg-rose-500/10 text-rose-800 dark:text-rose-300",
-  blue: "border-blue-500/30 bg-blue-500/10 text-blue-800 dark:text-blue-300",
-  emerald: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
+  amber: "border-warning/30 bg-warning/10 text-warning",
+  rose: "border-danger/30 bg-danger/10 text-danger",
+  blue: "border-info/30 bg-info/10 text-info",
+  emerald: "border-success/30 bg-success/10 text-success",
 }
 
 /**

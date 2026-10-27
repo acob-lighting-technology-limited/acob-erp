@@ -507,8 +507,8 @@ export default async function AdminDashboardPage() {
             value={clockedIn.count || 0}
             description={`of ${activeStaff.count || 0} active staff`}
             icon={Clock}
-            iconBgColor="bg-blue-100 dark:bg-blue-900/30"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconBgColor="bg-info/15"
+            iconColor="text-info"
           />
           <StatCard
             variant="compact"
@@ -516,8 +516,8 @@ export default async function AdminDashboardPage() {
             value={overdueTaskCount}
             description={overdueTaskCount > 0 ? "Past their deadline" : "Nothing overdue"}
             icon={AlertTriangle}
-            iconBgColor={overdueTaskCount > 0 ? "bg-red-100 dark:bg-red-900/30" : "bg-muted"}
-            iconColor={overdueTaskCount > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}
+            iconBgColor={overdueTaskCount > 0 ? "bg-danger/15" : "bg-muted"}
+            iconColor={overdueTaskCount > 0 ? "text-danger" : "text-muted-foreground"}
           />
           <StatCard
             variant="compact"
@@ -525,8 +525,8 @@ export default async function AdminDashboardPage() {
             value={pendingLeave.count || 0}
             description="Requests not yet decided"
             icon={CalendarClock}
-            iconBgColor="bg-amber-100 dark:bg-amber-900/30"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconBgColor="bg-warning/15"
+            iconColor="text-warning"
           />
           <StatCard
             variant="compact"
@@ -534,8 +534,8 @@ export default async function AdminDashboardPage() {
             value={openTaskRows.length}
             description="Pending, in progress, in review or blocked"
             icon={ClipboardList}
-            iconBgColor="bg-green-100 dark:bg-green-900/30"
-            iconColor="text-green-600 dark:text-green-400"
+            iconBgColor="bg-success/15"
+            iconColor="text-success"
           />
           <StatCard
             variant="compact"
@@ -543,8 +543,8 @@ export default async function AdminDashboardPage() {
             value={activeStaff.count || 0}
             description="Current employees"
             icon={Users}
-            iconBgColor="bg-purple-100 dark:bg-purple-900/30"
-            iconColor="text-purple-600 dark:text-purple-400"
+            iconBgColor="bg-purple/15"
+            iconColor="text-purple"
           />
         </StatGrid>
       </Section>

@@ -430,9 +430,7 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
             </div>
             <div className="border-border/40 flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground">Final Score</span>
-              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                {formatMetric(r.final_score)}%
-              </span>
+              <span className="text-success font-mono font-bold">{formatMetric(r.final_score)}%</span>
             </div>
           </div>
         )}

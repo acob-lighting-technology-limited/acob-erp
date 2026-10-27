@@ -19,12 +19,12 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 const log = logger("admin-attendance-change-log-view")
 
 const CATEGORY_CLASSES: Record<ChangeLogCategory, string> = {
-  edits: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  bulk: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
-  appeals: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
-  leave: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-  exemptions: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
-  out_of_station: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300",
+  edits: "bg-info/15 text-info",
+  bulk: "bg-info/15 text-info",
+  appeals: "bg-info/15 text-info",
+  leave: "bg-purple/15 text-purple",
+  exemptions: "bg-purple/15 text-purple",
+  out_of_station: "bg-info/15 text-info",
 }
 
 const APPEAL_OUTCOME_LABELS: Record<string, string> = {
@@ -301,7 +301,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
   return (
     <>
       {truncated && (
-        <p className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300">
+        <p className="text-warning border-warning/40 bg-warning/10 mb-3 rounded-md border p-2 text-xs">
           Showing the most recent 5,000 changes this month. Filter by type or person to export the rest in parts.
         </p>
       )}

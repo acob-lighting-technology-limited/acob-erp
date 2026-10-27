@@ -24,9 +24,9 @@ export default async function AccountsPage() {
       badge:
         requisitions.pendingCount > 0 ? `${requisitions.pendingCount} In Review` : `${requisitions.totalCount} Total`,
       subLabel: "Funding & Approvals",
-      color: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      color: "bg-warning/10 text-warning border-warning/20",
       fill: "bg-amber-500",
-      hoverBorder: "hover:border-amber-500/60 dark:hover:border-amber-400/60",
+      hoverBorder: "hover:border-warning/50",
       hoverText: "group-hover:text-amber-500",
     },
     {
@@ -37,9 +37,9 @@ export default async function AccountsPage() {
       icon: CreditCard,
       badge: `${payments.totalCount} Vouchers`,
       subLabel: "Disbursements & Receipts",
-      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      color: "bg-success/10 text-success border-success/20",
       fill: "bg-emerald-500",
-      hoverBorder: "hover:border-emerald-500/60 dark:hover:border-emerald-400/60",
+      hoverBorder: "hover:border-success/50",
       hoverText: "group-hover:text-emerald-500",
     },
     {
@@ -50,9 +50,9 @@ export default async function AccountsPage() {
       icon: Wallet,
       badge: payroll.latestStatus ? payroll.latestStatus.toUpperCase() : "Payslips",
       subLabel: payroll.latestPeriodName || "Salary & Pay Slips",
-      color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+      color: "bg-cyan-500/10 text-info border-cyan-500/20",
       fill: "bg-cyan-500",
-      hoverBorder: "hover:border-cyan-500/60 dark:hover:border-cyan-400/60",
+      hoverBorder: "hover:border-info/50",
       hoverText: "group-hover:text-cyan-500",
     },
     {
@@ -63,9 +63,9 @@ export default async function AccountsPage() {
       icon: Building2,
       badge: `${assets.assignedCount} Assets`,
       subLabel: "Equipment & Custody",
-      color: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+      color: "bg-info/10 text-info border-info/20",
       fill: "bg-sky-500",
-      hoverBorder: "hover:border-sky-500/60 dark:hover:border-sky-400/60",
+      hoverBorder: "hover:border-info/50",
       hoverText: "group-hover:text-sky-500",
     },
   ]

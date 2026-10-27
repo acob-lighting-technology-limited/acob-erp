@@ -58,7 +58,7 @@ export function SendSummary({
 }: SendSummaryProps) {
   return (
     <aside className="space-y-6 lg:sticky lg:top-[120px] lg:max-h-[calc(100vh-136px)] lg:self-start lg:overflow-y-auto lg:pr-1">
-      <Card className="border-orange-200 dark:border-orange-900">
+      <Card className="border-warning/30">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Summary</CardTitle>
         </CardHeader>
@@ -252,7 +252,7 @@ export function SendSummary({
                 <div
                   key={i}
                   className={`flex items-center justify-between rounded px-2 py-1.5 text-sm ${
-                    r.success ? "bg-green-50 dark:bg-green-950/20" : "bg-red-50 dark:bg-red-950/20"
+                    r.success ? "bg-success/15" : "bg-danger/15"
                   }`}
                 >
                   <span className="truncate">{r.to}</span>

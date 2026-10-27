@@ -611,7 +611,7 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
                         day.status === "late" ||
                           day.status === "lateness_with_permission" ||
                           (day.status !== "present" && isLate(day.record.clock_in))
-                          ? "text-yellow-600 dark:text-yellow-500"
+                          ? "text-warning"
                           : "text-green-600"
                       )}
                     />
@@ -765,18 +765,16 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
           {historyContext && (historyContext.holiday || historyContext.on_leave || historyContext.exempt) && (
             <div className="flex flex-wrap gap-2">
               {historyContext.holiday && (
-                <Badge className="bg-sky-100 text-xs text-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+                <Badge className="bg-info/15 text-info text-xs">
                   Holiday — {historyContext.holiday}
                   {historyContext.holiday_added_by ? ` · added by ${historyContext.holiday_added_by}` : ""}
                 </Badge>
               )}
               {historyContext.on_leave && (
-                <Badge className="bg-purple-100 text-xs text-purple-800 dark:bg-purple-950/40 dark:text-purple-300">
-                  On leave — {historyContext.on_leave}
-                </Badge>
+                <Badge className="bg-purple/15 text-purple text-xs">On leave — {historyContext.on_leave}</Badge>
               )}
               {historyContext.exempt && (
-                <Badge className="bg-violet-100 text-xs text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
+                <Badge className="bg-purple/15 text-purple text-xs">
                   Exempt{historyContext.exempt_reason ? ` — ${historyContext.exempt_reason}` : ""}
                 </Badge>
               )}
@@ -1277,13 +1275,13 @@ export function AttendanceReportsPage({
                       </span>
                     </>
                   )}
-                  <span className="text-blue-600 dark:text-blue-400">
+                  <span className="text-info">
                     <span className="font-semibold tabular-nums">{r.present_days}</span> present
                   </span>
-                  <span className="text-amber-600 dark:text-amber-400">
+                  <span className="text-warning">
                     <span className="font-semibold tabular-nums">{r.late_days}</span> late
                   </span>
-                  <span className="text-red-600 dark:text-red-400">
+                  <span className="text-danger">
                     <span className="font-semibold tabular-nums">{r.absent_days}</span> absent
                   </span>
                 </span>
@@ -1295,9 +1293,7 @@ export function AttendanceReportsPage({
                   Exempt
                 </Badge>
               ) : (
-                <span className="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  {r.total_hours} hrs
-                </span>
+                <span className="text-success font-mono text-xs font-semibold">{r.total_hours} hrs</span>
               ),
           }}
           cardRenderer={(r) => (
@@ -1312,13 +1308,13 @@ export function AttendanceReportsPage({
               <div className="border-border/40 grid grid-cols-2 gap-2 border-t pt-2 text-xs">
                 <div>
                   <span className="text-muted-foreground block text-xs uppercase">Early / Present</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-success font-semibold">
                     {r.early_days ?? 0} early / {r.present_days} present
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-xs uppercase">Absent</span>
-                  <span className="font-semibold text-rose-600 dark:text-rose-400">{r.absent_days} days</span>
+                  <span className="text-danger font-semibold">{r.absent_days} days</span>
                 </div>
               </div>
             </div>

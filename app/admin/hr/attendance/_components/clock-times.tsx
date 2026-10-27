@@ -20,10 +20,7 @@ export function ClockTimes({
   return (
     <span className="inline-flex items-center gap-3 tabular-nums">
       <span className="inline-flex items-center gap-1">
-        <Clock
-          className={cn("h-3 w-3 shrink-0", late ? "text-yellow-600 dark:text-yellow-500" : "text-green-600")}
-          aria-label="Clock in"
-        />
+        <Clock className={cn("h-3 w-3 shrink-0", late ? "text-warning" : "text-green-600")} aria-label="Clock in" />
         {clockIn ? formatTime(clockIn) : "—"}
       </span>
       <span className="inline-flex items-center gap-1">

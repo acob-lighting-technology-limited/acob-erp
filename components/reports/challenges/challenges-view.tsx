@@ -70,14 +70,12 @@ function getStatusBadge(status: ChallengeItem["status"]) {
   switch (status) {
     case "resolved":
     case "closed":
-      return (
-        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Resolved</Badge>
-      )
+      return <Badge className="bg-success/15 text-success">Resolved</Badge>
     case "mitigating":
-      return <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Mitigating</Badge>
+      return <Badge className="bg-info/15 text-info">Mitigating</Badge>
     case "open":
     default:
-      return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Open</Badge>
+      return <Badge className="bg-warning/15 text-warning">Open</Badge>
   }
 }
 
@@ -337,7 +335,7 @@ export function ChallengesView({
             value={totalCount}
             icon={AlertTriangle}
             iconBgColor="bg-slate-500/10"
-            iconColor="text-slate-600 dark:text-slate-400"
+            iconColor="text-muted-foreground"
           />
           <StatCard
             variant="compact"
@@ -345,7 +343,7 @@ export function ChallengesView({
             value={openCount}
             icon={Flame}
             iconBgColor="bg-amber-500/10"
-            iconColor="text-amber-600 dark:text-amber-400"
+            iconColor="text-warning"
           />
           <StatCard
             variant="compact"
@@ -353,7 +351,7 @@ export function ChallengesView({
             value={mitigatingCount}
             icon={Clock}
             iconBgColor="bg-blue-500/10"
-            iconColor="text-blue-600 dark:text-blue-400"
+            iconColor="text-info"
           />
           <StatCard
             variant="compact"
@@ -361,7 +359,7 @@ export function ChallengesView({
             value={resolvedCount}
             icon={CheckCircle2}
             iconBgColor="bg-emerald-500/10"
-            iconColor="text-emerald-600 dark:text-emerald-400"
+            iconColor="text-success"
           />
         </StatGrid>
       }

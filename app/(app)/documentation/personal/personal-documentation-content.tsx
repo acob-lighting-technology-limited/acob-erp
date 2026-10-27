@@ -46,9 +46,7 @@ interface PersonalDocumentationContentProps {
 }
 
 function getStatusColor(isDraft: boolean) {
-  return isDraft
-    ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-    : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+  return isDraft ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
 }
 
 export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDocumentationContentProps) {
@@ -166,9 +164,9 @@ export function PersonalDocumentationContent({ initialDocs, userId }: PersonalDo
         accessor: (row) => row.visibility ?? "private",
         render: (row) =>
           (row.visibility ?? "private") === "general" ? (
-            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">General</Badge>
+            <Badge className="bg-info/15 text-info">General</Badge>
           ) : (
-            <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300">Private</Badge>
+            <Badge className="bg-muted text-foreground">Private</Badge>
           ),
         hideOnMobile: true,
       },
