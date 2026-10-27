@@ -9,7 +9,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { apiJson } from "@/lib/api-client"
 import { formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import type { SurveyMetrics } from "@/types/survey"
@@ -365,109 +365,103 @@ export function SurveyAnalyticsContent() {
 
       {/* Survey Detail Dialog */}
       {selectedSurvey && (
-        <Dialog open={Boolean(selectedSurvey)} onOpenChange={(open) => !open && setSelectedSurvey(null)}>
-          <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
-            <DialogHeader>
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
-                  <Star className="h-4 w-4 fill-amber-500" />
+        <DetailSheet
+          open={Boolean(selectedSurvey)}
+          onOpenChange={(open) => !open && setSelectedSurvey(null)}
+          title="Survey response"
+          description={`Submitted on ${formatWATDate(selectedSurvey.created_at)}`}
+          leading={
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500">
+              <Star className="h-4 w-4 fill-amber-500" />
+            </span>
+          }
+        >
+          <div className="space-y-4 py-2 text-xs">
+            <div className="bg-muted/20 grid grid-cols-2 gap-3 rounded-lg border p-3">
+              <div>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Respondent</span>
+                <span className="text-sm font-medium">
+                  {selectedSurvey.is_anonymous ? "Anonymous Staff" : selectedSurvey.respondent_name || "Employee"}
                 </span>
-                <div>
-                  <DialogTitle className="text-base">Survey Response Details</DialogTitle>
-                  <DialogDescription className="text-xs">
-                    Submitted on {formatWATDate(selectedSurvey.created_at)}
-                  </DialogDescription>
-                </div>
               </div>
-            </DialogHeader>
-
-            <div className="space-y-4 py-2 text-xs">
-              <div className="bg-muted/20 grid grid-cols-2 gap-3 rounded-lg border p-3">
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Respondent</span>
-                  <span className="text-sm font-medium">
-                    {selectedSurvey.is_anonymous ? "Anonymous Staff" : selectedSurvey.respondent_name || "Employee"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Department</span>
-                  <span className="text-sm font-medium">{selectedSurvey.department || "—"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Role</span>
-                  <span className="font-medium">{selectedSurvey.role || "—"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Submission Type</span>
-                  <Badge variant="outline" className="text-xs">
-                    {selectedSurvey.is_anonymous ? "Anonymous" : "Attributed"}
-                  </Badge>
-                </div>
+              <div>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Department</span>
+                <span className="text-sm font-medium">{selectedSurvey.department || "—"}</span>
               </div>
-
-              {/* Ratings Summary */}
-              <div className="space-y-2 rounded-lg border p-3">
-                <span className="text-muted-foreground block text-xs font-semibold uppercase">Core Metrics</span>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-muted/40 rounded-md p-2 text-center">
-                    <span className="text-muted-foreground block text-xs">Overall CSAT</span>
-                    <span className="text-base font-bold text-amber-500">{selectedSurvey.overall_rating} / 5</span>
-                  </div>
-                  <div className="bg-muted/40 rounded-md p-2 text-center">
-                    <span className="text-muted-foreground block text-xs">Speed</span>
-                    <span className="text-base font-bold text-emerald-500">{selectedSurvey.speed_rating} / 5</span>
-                  </div>
-                  <div className="bg-muted/40 rounded-md p-2 text-center">
-                    <span className="text-muted-foreground block text-xs">Usability</span>
-                    <span className="text-base font-bold text-purple-500">{selectedSurvey.usability_rating} / 5</span>
-                  </div>
-                </div>
+              <div>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Role</span>
+                <span className="font-medium">{selectedSurvey.role || "—"}</span>
               </div>
-
-              {/* Module Ratings */}
-              {selectedSurvey.module_ratings && Object.keys(selectedSurvey.module_ratings).length > 0 && (
-                <div className="space-y-2 rounded-lg border p-3">
-                  <span className="text-muted-foreground block text-xs font-semibold uppercase">Module Ratings</span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(selectedSurvey.module_ratings).map(([mod, r]) => (
-                      <div key={mod} className="bg-muted/40 flex items-center justify-between rounded px-2.5 py-1.5">
-                        <span className="text-xs font-medium capitalize">{mod.replace(/_/g, " ")}</span>
-                        <span className="text-xs font-semibold text-amber-600">{r} ★</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Training */}
-              <div className="space-y-1 rounded-lg border p-3">
-                <span className="text-muted-foreground block text-xs font-semibold uppercase">Training Adequacy</span>
-                <p className="font-medium capitalize">{selectedSurvey.training_rating || "Not specified"}</p>
+              <div>
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Submission Type</span>
+                <Badge variant="outline" className="text-xs">
+                  {selectedSurvey.is_anonymous ? "Anonymous" : "Attributed"}
+                </Badge>
               </div>
+            </div>
 
-              {/* Qualitative Answers */}
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block flex items-center gap-1 text-xs font-semibold uppercase">
-                    <AlertTriangle className="h-3 w-3 text-amber-500" /> Biggest Frustration / Blocker
-                  </span>
-                  <p className="bg-background rounded-md border p-2.5 leading-relaxed whitespace-pre-wrap">
-                    {selectedSurvey.biggest_frustration || "No frustration reported."}
-                  </p>
+            {/* Ratings Summary */}
+            <div className="space-y-2 rounded-lg border p-3">
+              <span className="text-muted-foreground block text-xs font-semibold uppercase">Core Metrics</span>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-muted/40 rounded-md p-2 text-center">
+                  <span className="text-muted-foreground block text-xs">Overall CSAT</span>
+                  <span className="text-base font-bold text-amber-500">{selectedSurvey.overall_rating} / 5</span>
                 </div>
-
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block flex items-center gap-1 text-xs font-semibold uppercase">
-                    <Sparkles className="h-3 w-3 text-purple-500" /> Desired Features / Improvements
-                  </span>
-                  <p className="bg-background rounded-md border p-2.5 leading-relaxed whitespace-pre-wrap">
-                    {selectedSurvey.desired_features || "No feature requests reported."}
-                  </p>
+                <div className="bg-muted/40 rounded-md p-2 text-center">
+                  <span className="text-muted-foreground block text-xs">Speed</span>
+                  <span className="text-base font-bold text-emerald-500">{selectedSurvey.speed_rating} / 5</span>
+                </div>
+                <div className="bg-muted/40 rounded-md p-2 text-center">
+                  <span className="text-muted-foreground block text-xs">Usability</span>
+                  <span className="text-base font-bold text-purple-500">{selectedSurvey.usability_rating} / 5</span>
                 </div>
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
+
+            {/* Module Ratings */}
+            {selectedSurvey.module_ratings && Object.keys(selectedSurvey.module_ratings).length > 0 && (
+              <div className="space-y-2 rounded-lg border p-3">
+                <span className="text-muted-foreground block text-xs font-semibold uppercase">Module Ratings</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(selectedSurvey.module_ratings).map(([mod, r]) => (
+                    <div key={mod} className="bg-muted/40 flex items-center justify-between rounded px-2.5 py-1.5">
+                      <span className="text-xs font-medium capitalize">{mod.replace(/_/g, " ")}</span>
+                      <span className="text-xs font-semibold text-amber-600">{r} ★</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Training */}
+            <div className="space-y-1 rounded-lg border p-3">
+              <span className="text-muted-foreground block text-xs font-semibold uppercase">Training Adequacy</span>
+              <p className="font-medium capitalize">{selectedSurvey.training_rating || "Not specified"}</p>
+            </div>
+
+            {/* Qualitative Answers */}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <span className="text-muted-foreground block flex items-center gap-1 text-xs font-semibold uppercase">
+                  <AlertTriangle className="h-3 w-3 text-amber-500" /> Biggest Frustration / Blocker
+                </span>
+                <p className="bg-background rounded-md border p-2.5 leading-relaxed whitespace-pre-wrap">
+                  {selectedSurvey.biggest_frustration || "No frustration reported."}
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-muted-foreground block flex items-center gap-1 text-xs font-semibold uppercase">
+                  <Sparkles className="h-3 w-3 text-purple-500" /> Desired Features / Improvements
+                </span>
+                <p className="bg-background rounded-md border p-2.5 leading-relaxed whitespace-pre-wrap">
+                  {selectedSurvey.desired_features || "No feature requests reported."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </DetailSheet>
       )}
     </DataTablePage>
   )

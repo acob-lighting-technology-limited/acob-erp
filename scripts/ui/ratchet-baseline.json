@@ -90,7 +90,6 @@
       "app/(app)/reviews/reviews-content.tsx": 2,
       "app/(app)/tools/feedback/feedback-content.tsx": 1,
       "app/admin/dev/login-logs/dev-login-logs-content.tsx": 1,
-      "app/admin/feedback/surveys/survey-analytics-content.tsx": 1,
       "app/admin/hr/attendance/records/view.tsx": 1,
       "app/admin/hr/attendance/view.tsx": 2,
       "app/admin/hr/departments/view.tsx": 1,
@@ -103,7 +102,7 @@
       "app/admin/payroll/view.tsx": 1,
       "app/admin/pms/competencies/view.tsx": 2,
       "app/admin/pms/cycles/view.tsx": 1,
-      "app/admin/pms/development-plans/view.tsx": 3,
+      "app/admin/pms/development-plans/view.tsx": 2,
       "app/admin/reports/action-tracker/action-tracker-content.tsx": 1,
       "app/admin/tasks/management/admin-tasks-content.tsx": 1
     },

@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useHrProfiles } from "@/hooks/use-hr-profiles"
@@ -773,55 +774,52 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(viewingPlan)} onOpenChange={() => setViewingPlan(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{viewingPlan?.title || "Plan Details"}</DialogTitle>
-            <DialogDescription>
-              {viewingPlan ? `${personName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
-            </DialogDescription>
-          </DialogHeader>
-          {viewingPlan ? (
-            <div className="grid gap-4 text-sm sm:grid-cols-2">
-              <div>
-                <p className="text-muted-foreground text-xs">Quarter</p>
-                <p className="mt-1">{cycleNameMap.get(viewingPlan.review_cycle_id || "") || "-"}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Due Date</p>
-                <p className="mt-1">{formatDate(viewingPlan.target_date)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Priority</p>
-                <p className="mt-1 capitalize">{viewingPlan.priority}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Progress</p>
-                <p className="mt-1">{viewingPlan.progress_pct || 0}%</p>
-              </div>
-              <div className="sm:col-span-2">
-                <p className="text-muted-foreground text-xs">Description</p>
-                <p className="mt-1 whitespace-pre-wrap">{viewingPlan.description || "No description provided."}</p>
-              </div>
-              <div className="sm:col-span-2">
-                <p className="text-muted-foreground text-xs">Action Steps</p>
-                <div className="mt-1 space-y-2">
-                  {(viewingPlan.actions || []).length > 0 ? (
-                    (viewingPlan.actions || []).map((action, index) => (
-                      <div key={action.id || `${action.title}-${index}`} className="rounded-lg border p-3">
-                        <p className="font-medium">{action.title}</p>
-                        <p className="text-muted-foreground text-xs">{action.status || "pending"}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p>No action steps added.</p>
-                  )}
-                </div>
+      <DetailSheet
+        open={Boolean(viewingPlan)}
+        onOpenChange={() => setViewingPlan(null)}
+        title={viewingPlan?.title || "Plan Details"}
+        description={viewingPlan ? `${personName(viewingPlan.user)} • ${viewingPlan.user?.department || "-"}` : ""}
+      >
+        {viewingPlan ? (
+          <div className="grid gap-4 text-sm sm:grid-cols-2">
+            <div>
+              <p className="text-muted-foreground text-xs">Quarter</p>
+              <p className="mt-1">{cycleNameMap.get(viewingPlan.review_cycle_id || "") || "-"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Due Date</p>
+              <p className="mt-1">{formatDate(viewingPlan.target_date)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Priority</p>
+              <p className="mt-1 capitalize">{viewingPlan.priority}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Progress</p>
+              <p className="mt-1">{viewingPlan.progress_pct || 0}%</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-muted-foreground text-xs">Description</p>
+              <p className="mt-1 whitespace-pre-wrap">{viewingPlan.description || "No description provided."}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-muted-foreground text-xs">Action Steps</p>
+              <div className="mt-1 space-y-2">
+                {(viewingPlan.actions || []).length > 0 ? (
+                  (viewingPlan.actions || []).map((action, index) => (
+                    <div key={action.id || `${action.title}-${index}`} className="rounded-lg border p-3">
+                      <p className="font-medium">{action.title}</p>
+                      <p className="text-muted-foreground text-xs">{action.status || "pending"}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p>No action steps added.</p>
+                )}
               </div>
             </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+          </div>
+        ) : null}
+      </DetailSheet>
     </DataTablePage>
   )
 }
