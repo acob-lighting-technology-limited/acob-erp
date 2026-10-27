@@ -61,6 +61,14 @@ browser**: the visual items below need a pass on localhost.
   §11 Refresh buttons removed on 6 query-driven pages, `HeaderMoreMenu` added and used on leave and UI
   errors (the other header-button pages still need it); §1 rows 2, 6 and 14 (asset history, role
   members, acknowledgements) are side sheets.
+- Done since (3): §1 rows 1, 2, 4, 6, 8, 9, 10, 13 and 14 are sheets: the employee profile
+  (`EmployeeProfileSheet`, with the edit form split out to `employee-edit-form.tsx`), asset history, admin
+  and staff document views (both on `DetailSheet`), role members, login-logs access profile, peer
+  feedback, development plans, survey responses, acknowledgements.
+- Left as modals on purpose or still to do in §1: row 5 job descriptions (it prints a letterhead, which a
+  sheet would clip), row 3 asset issues (has an add form), row 7 lunch viewers (custom 330-line layout),
+  rows 11 and 12 action-tracker points (an editing view built twice; wants one shared sheet), and the
+  booking review.
 - Decided not to change: staff `/profile` is an intentional dashboard, not a table page, so it keeps its
   own frame.
 - Done since: §22 `dark:` overrides now use the `success/warning/danger/info/purple` tone tokens
