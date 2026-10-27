@@ -1,6 +1,6 @@
-# Tables, list views, sheets and modals: defaulter report (2026-10-27)
+# Matrix UI / UX / front-end review: defaulter report (2026-10-27)
 
-Replaces the shorter review committed earlier today. Part 1 (§0–§9) covers tables, list rows, sheets and modals; Part 2 (§10–§25) covers each table page as a whole; Part 3 (§26–§35) covers every page in the app and how to keep it fixed.
+Replaces the shorter review committed earlier today. Part 1 (§0–§9) covers tables, list rows, sheets and modals; Part 2 (§10–§25) covers each table page as a whole; Part 3 (§26–§35) covers every page in the app and how to keep it fixed; Part 4 (§36–§60) covers sidebars, dashboards, UX and the wider front end, with a phased roadmap.
 
 **Scope:** every `DataTable` (120 instances in 104 files), its list row
 (`mobileRow`), slide-up sheet (`mobileRow.detail` or the auto-built one), expanded panel and
@@ -2622,3 +2622,339 @@ copy today's patterns.
 | 10 | Card view / export / back links | Three decisions pending in §8 that every future page will copy | Decide them once, write them into AGENTS.md, update the `DataTable` defaults so the right thing is the default |
 | 11 | Design review checklist | New pages are reviewed for types and lint, not for UI | PR template checkbox list: phone width checked · skeleton matches · empty state written · title matches sidebar · actions ≤2 + More |
 
+
+
+---
+
+# Part 4: navigation, dashboards, UX and the wider front end (sections 36–60)
+
+Unlike Parts 1–3, these findings were **traced by hand** through the code: sidebars, the three
+dashboards, the auth flow, the API client and the query layer. Where a claim depends on something
+I could not see from the front end (server validation, live data), the row says **verify**.
+Priority: **P0** fix now (security or broken), **P1** next (wrong data or a dead end people hit),
+**P2** quality, **P3** polish.
+
+Two claims were corrected during the trace, and both corrections are kept in the rows:
+- **Logout cache.** I first thought the next user inherits the previous user's cached data. They
+  don't: login does a full page load (`window.location.href`), which creates a fresh cache. What
+  remains is the Back button after logout (§42).
+- **Dept PMS links.** `app/admin/pms/view.tsx` looked like it hard-coded `/admin` links into the
+  dept shell. It rewrites them to the dept base (`href.replace("/admin", base)`), so it is **not**
+  listed in §38.
+
+| Section | Rows |
+|---|---|
+| 36. Staff sidebar | 9 |
+| 37. Admin sidebar | 6 |
+| 38. Dept shell and its links | 13 |
+| 39. Dashboards: staff, admin, dept | 14 |
+| 40. Cross-shell routing and dead ends | 7 |
+| 41. Data fetching and cache | 7 |
+| 42. Session and auth UX | 5 |
+| 43. Front-end security | 5 |
+| 44. Errors and feedback | 5 |
+| 45. Performance | 8 |
+| 46. Forms UX | 5 |
+| 47. Wayfinding and search | 4 |
+| 48. Mobile and PWA | 5 |
+| 49. Global accessibility | 5 |
+| 50. Dates, money and locale | 4 |
+| 51. State and component communication | 3 |
+| 52. Freshness and realtime | 3 |
+| 53. Notifications UX | 3 |
+| 54. Type safety and code health | 5 |
+| 55. Testing | 4 |
+| 56. Dependencies | 3 |
+| 57. Observability | 3 |
+| 58. Microcopy | 4 |
+| 59. First-run, help and empty states | 3 |
+| 60. Roadmap | — |
+
+---
+
+## 36. Staff sidebar ([sidebar.tsx](../../components/sidebar.tsx))
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P1 | **Mobile drawer is not a real dialog.** No focus trap, no Escape to close, no `role="dialog"`/`aria-modal`, page behind still scrolls | No `Escape`/`keydown`/`aria-modal` in the file; drawer is a plain `<aside>` + overlay `<div onClick>` | Render the mobile drawer with the `Sheet` primitive (side="left"), which already handles all four |
+| 2 | P2 | Expand buttons say "Expand"/"Collapse" with no item name and no `aria-expanded` | L394–404, L479–490 | `aria-label={\`Expand ${item.name}\`}` + `aria-expanded={isOpen}` |
+| 3 | P2 | Open/close is signalled through **window custom events** (`toggle-mobile-sidebar`, `sidebar-state-change`) listened to on both `window` and `document`, while a `SidebarProvider` context already exists | L245–264 | Move `isMobileMenuOpen` into `sidebar-context`; delete the events |
+| 4 | P2 | **The dashboard lives at `/profile`**, while the profile itself is at `/settings/profile`. URLs and the browser history say "profile" for the dashboard | L111 | Serve the dashboard at `/dashboard` (keep `/profile` redirecting); profile stays in Settings |
+| 5 | P2 | Accordion allows one open section, but the route effect *adds* to the set, so after navigating two sections can be open and the next click collapses both | `toggleSection` replaces the set; L289/L295 add to it | One rule: opening a section closes others in both paths |
+| 6 | P3 | `adminOnly` is defined and filtered but **no item uses it** | L95, L332 | Remove, or use it |
+| 7 | P3 | Section labels `text-[11px]`, badge `text-[10px]` | L368, L432 | `text-xs` |
+| 8 | P2 | "Payments" is reachable from the dashboard's **Needs attention** tile (`/accounts/payments`) but **not listed** under Accounts in the sidebar | needs-attention.tsx L96 vs sidebar L148–152 | Add "Payments" under Accounts (for the roles that can see it), or don't link the tile |
+| 9 | P2 | Logout is implemented **four times** (staff sidebar, admin sidebar, navbar, `/suspended`) | `signOut()` in 4 files | One `useLogout()` hook (see §42) |
+
+## 37. Admin sidebar ([admin-sidebar.tsx](../../components/admin-sidebar.tsx))
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | **P0** | **"IT" links to `/admin/it`, which does not exist (404).** It is a parent item; clicking its label (not the chevron) navigates there | L321; no `app/admin/it/page.tsx` | Create an `/admin/it` hub page (like `/admin/hr`), or point the parent at its first child |
+| 2 | P2 | 25 `roles: [...]` arrays are **dead data**. The code ignores them (`void requiredRoles`, "no longer authoritative under RBAC V2") but they still read like access rules | L297–530, L681–688 | Delete the `roles` field; access comes only from `canAccessRouteV2` |
+| 3 | P1 | Same mobile drawer defects as §36.1 (focus trap, Escape, aria-modal) | 0 matches for Escape/aria-modal | Same fix |
+| 4 | P2 | Collapse buttons have `aria-expanded` in only 2 places | grep | Same as §36.2 |
+| 5 | P2 | Parent items **retarget** to their first permitted child when the parent is forbidden. Good for access, but the label still says the parent's name, so "Accounts" can open "Starlink Kits" | L702–735 | When retargeted, render the parent as a non-link group header (chevron only) |
+| 6 | P3 | Staff calls it "Calendar", admin "Events", staff "Lunch", admin "Lunch Register": deliberate (commented), but the **page titles** don't follow either name (Part 2 §12) | comments L113–133 | Keep the deliberate pairs; make page titles match their own sidebar |
+
+## 38. Dept shell (`/dept/[dept_id]`) and its links
+
+The dept shell reuses ~60 admin views. Pure department leads **cannot enter `/admin`**
+(`admin-layout.tsx` sends them away), so any hard-coded `/admin/…` link rendered inside the dept
+shell takes a lead out of their shell or bounces them. Found by following every dept page's
+imports three levels deep, then checking each file for base-path rewriting. Four files rewrite
+correctly (`accounts/view.tsx`, `pms/view.tsx`, `pms/reviews/[cycleId]/view.tsx`,
+`cbt-question-manager.tsx`) and are excluded.
+
+| # | Pri | File | Hard-coded link(s) | Shown on | Fix |
+|---|---|---|---|---|---|
+| 1 | P1 | [activity-tabs.tsx](../../components/admin/activity-tabs.tsx) | `/admin/tasks`, `/admin/documentation`, `/admin/feedback`, `/admin/correspondence`, `/admin/help-desk`, `/admin/accounts/payments`, `/admin/hr/leave`, `/admin/hr/attendance`, `/admin/assets` ("View all …") | **Dept dashboard** | Take a `basePath` prop |
+| 2 | P1 | [recent-activity-feed.tsx](../../components/admin/recent-activity-feed.tsx) | `/admin/audit-logs` | Dept dashboard | `basePath`; hide for leads if audit logs are admin-only |
+| 3 | P1 | [requisitions-list-page.tsx](../../components/requisitions/requisitions-list-page.tsx) | `/admin/accounts` | /dept/…/accounts/requisitions | `basePath` |
+| 4 | P1 | [admin-assets-content.tsx](../../app/admin/assets/admin-assets-content.tsx) | `/admin/assets/issues` | /dept/…/assets | `basePath` |
+| 5 | P2 | [admin-employee-content.tsx](../../app/admin/hr/employees/admin-employee-content.tsx) | `/admin/hr` (back link) | /dept/…/hr/employees | `basePath` |
+| 6 | P2 | [admin-documentation-content.tsx](../../app/admin/documentation/admin-documentation-content.tsx) | `/admin/documentation` | /dept/…/documentation/* | `basePath` |
+| 7 | P2 | [admin-feedback-content.tsx](../../app/admin/feedback/admin-feedback-content.tsx) | `/admin/feedback/surveys` | /dept/…/feedback | `basePath`, or hide Surveys for leads |
+| 8 | P2 | [risk-register-view.tsx](../../app/admin/corporate-services/risk-register/_components/risk-register-view.tsx) | `/admin/corporate-services/scorecard` | /dept/…/risk-register | `basePath` |
+| 9 | P2 | [MeetingReminderForm.tsx](../../app/admin/communications/_components/MeetingReminderForm.tsx) | `/admin/reports/general-meeting` | /dept/…/communications/broadcast | `basePath` |
+| 10 | P2 | [weekly-reports-content.tsx](../../app/admin/reports/weekly-reports/weekly-reports-content.tsx) | `/admin/reports/general-meeting`, `/admin/reports/general-meeting/action-tracker?week=` | /dept/…/reports/weekly-reports | `basePath` |
+| 11 | P2 | [pms/reviews/view.tsx](../../app/admin/pms/reviews/view.tsx) | `/admin/pms/reviews/` | /dept/…/pms/reviews | Same rewrite its `[cycleId]` sibling already does |
+| 12 | P2 | [payment-meta-card.tsx](../../components/payments/payment-meta-card.tsx) | `/admin/projects/` | /dept/…/accounts/payments | `basePath` |
+| 13 | P1 | **Root cause** | Each view decides its own links | — | One `useShellBase()` hook (`/admin` or `/dept/<id>`) + a lint rule banning string literals starting `"/admin/` in `components/` and `app/admin/**/_components` |
+
+Also in the dept shell: the dept sidebar **skips client-side filtering entirely** and relies on
+server guards (`admin-sidebar.tsx` L690–720), so a lead can see links the server then refuses.
+Filter with the same `canAccessRouteV2` in `lead` context.
+
+## 39. Dashboards
+
+### Staff dashboard (`/profile`, [page.tsx](../../app/(app)/profile/page.tsx) + `components/profile/*`)
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | Loads **15+ datasets** server-side on every visit (profile, department, tasks, leave entitlements, payments, assets, documentation, feedback, correspondence, tickets, leave, attendance ×2, lunch, audit) before anything paints | L195–400 | Stream sections with `Suspense` (hero first, cards after); cache entitlements |
+| 2 | P2 | `feedback` fetched with `select("*")` (AGENTS.md: explicit columns) | L341 | Select the 4 columns the card shows |
+| 3 | P2 | Runs on the **service-role client**, so per-user safety rests on every query remembering `.eq("user_id", userId)` | `getServiceRoleClientOrFallback` L3 | Use the user's client where RLS allows; keep service role for the few cross-user reads |
+| 4 | P2 | Hand-built page frame (no `PageHeader`), 2 `<h1>`s, 98 raw colours, 14 sub-12px classes (Part 3 §27, §32) | — | Rebuild on `PageWrapper` + `Section` |
+| 5 | P2 | "Needs attention" links go to the **unfiltered** page (`/tasks`, `/hr/leave`, `/help-desk`) | needs-attention.tsx L69–105 | Link with the filter that produced the count (`/tasks?status=overdue`) |
+| 6 | P3 | `MissingAvatarBanner` **and** `MissingAvatarDialog` both mount in `app-layout.tsx` for the same condition | app-layout L55–56 | Verify they don't both show; keep one |
+
+### Admin dashboard (`/admin`, [page.tsx](../../app/admin/page.tsx))
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 7 | **P0 (verify)** | **Fails open.** Counts run on the service-role client; department scoping is applied only `if (departmentScope)`. If `resolveAdminScope` returns null, every count becomes **org-wide**. The layout normally prevents that, but the page itself has no guard | L82–89, L158 | `if (!scope) redirect("/profile")` at the top of the page; scope filters applied unconditionally |
+| 8 | P1 | **Counts don't match where they lead.** "Overdue tasks", "Awaiting review", "Blocked" all link to plain `/admin/tasks`; "Pending leave" and "My approvals" both to `/admin/hr/leave`; "Pending users" to `/admin/hr/employees`. Only appeals passes `?tab=appeals` | L355–456 | Each tile links with the filter/tab that reproduces its number |
+| 9 | P2 | Fetches **every open task row** to count overdue/blocked/review in JS | L121–125, L246–253 | Three `count: "exact", head: true` queries |
+| 10 | P2 | Sequential awaits before the parallel batch (user → scope → profile ids → profile → department ids) | L83–101, L179 | Resolve scope + profile in one `Promise.all` |
+| 11 | P2 | `profiles.select("*")` for the viewer | L101 | Explicit columns |
+
+### Dept dashboard (`/dept/[dept_id]`, [page.tsx](../../app/dept/[dept_id]/page.tsx))
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 12 | P1 | Its "View all" links (activity tabs, recent activity) leave the dept shell for `/admin/…` (§38.1–2) | — | `basePath` |
+| 13 | P2 | 26 sub-12px classes, 30 `dark:` overrides (Part 3 §32) | — | Tokens + `text-xs` |
+| 14 | P2 | The three dashboards share no widget code: "pending leave", "open tasks", "recent activity" are queried and rendered three different ways | three page files | Shared `lib/dashboard/metrics.ts` (one definition per metric, scoped by viewer) + shared tiles |
+
+## 40. Cross-shell routing and dead ends
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | **P0** | `/admin/it` 404 from the sidebar | §37.1 | — |
+| 2 | P2 | **Two live URLs per report**: `/reports/action-tracker` *and* `/reports/general-meeting/action-tracker` (same for kss, minutes-of-meeting, weekly-reports). The sidebar highlights only the second | the `general-meeting/*` pages re-export the old ones | Move the code under `general-meeting/`; make the old routes `redirect()` |
+| 3 | P2 | Two notification-settings screens (`/notifications/settings`, `/settings/notifications`) | Part 3 §34 | Merge |
+| 4 | P2 | `/auth/error` shows **Sign up** → disabled sign-up | Part 3 §34 | Remove |
+| 5 | P2 | Payment detail as full page + intercepted modal + side sheet | Part 3 §34 | Sheet + page only |
+| 6 | P2 | Shell switching ("Go to Admin", "Go to Dept") lives only in the account dropdown at the bottom of the sidebar, so admins+leads can't see which shell they're in at a glance | sidebar.tsx L606–621 | A shell switcher at the top of the sidebar, showing the current shell |
+| 7 | P3 | Old links survive in emails/WhatsApp (`/lunch` handled well; others unknown) | — | Keep a redirect map in `next.config` for every moved route |
+
+## 41. Data fetching and cache
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | **P0 (verify)** | **Dept console data leak for admin+leads.** `apiFetch` sends `x-dept-context` so the API narrows to the console's department. **40 client calls use raw `fetch()` instead** and send no context. In the dept console these include bills, invoices, finance reports, requisitions list/detail, HR dashboard stats, projects, inventory, purchasing. `api-client.ts` itself says an admin+lead "would otherwise be served every department's data" | `lib/api-client.ts` L18–31; raw `fetch` list in this audit | Replace every client `fetch("/api…")` with `apiFetch`; lint-ban `fetch("/api` in client files |
+| 2 | P1 | 80 inline `queryKey: ["…"]` arrays despite AGENTS.md's `lib/query-keys.ts` rule, so invalidations miss them | grep: 80 inline vs 257 `QUERY_KEYS` | Move to `QUERY_KEYS`; lint rule |
+| 3 | P1 | **Writes bypass `useMutation`**: 19 `useMutation` vs 171 `apiFetch` call sites. Most writes are hand-rolled (`setSaving`, try/catch, manual `invalidateQueries` ×155), so pending, error and retry behaviour differs on every screen | grep | `useMutation` everywhere, with a shared `onError` toast and the right invalidations |
+| 4 | P2 | Optimistic updates in **1** place; toggles (mark read, resolve, approve) wait a round trip | `onMutate` ×1 | Optimistic update for one-tap actions |
+| 5 | P2 | Query errors toast **only when** a query opts in with `meta.errorMessage`; otherwise a failed load is silent unless the page renders `error` | query-provider.tsx | Default error UI via `QueryError`; keep the toast opt-in |
+| 6 | P2 | 21 `router.refresh()` calls mixed with query invalidation, so some screens refresh server components and client caches separately | grep | One pattern per page type |
+| 7 | P3 | `retry: 2` on every query, including 403/404 | query-provider.tsx | Don't retry 4xx |
+
+## 42. Session and auth UX
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | **P0** | **Open redirect on login.** `getSafeNextPath` (login page L358) and the same checks in `auth/callback` and `auth/confirm` accept `/\evil.com`: it starts with `/`, not `//`, and has no `:`. Browsers and the WHATWG URL parser treat `\` as `/`, so it resolves to `//evil.com` | login/page.tsx L358–368; callback/route.ts L14–22; confirm/route.ts L34 | Parse with `new URL(next, origin)` and require `url.origin === origin`; one shared helper |
+| 2 | P1 | **Session expiry is invisible.** `apiFetch` has no 401 handling, so when the session lapses mid-use every action fails with a generic toast and the user isn't sent to log in | api-client.ts | On 401: clear cache, redirect to `/auth/login?next=<current>` once |
+| 3 | P2 | **Logout leaves the query cache** (`router.push`, no `queryClient.clear()`). The next user is safe (login does a full reload), but **Back** after logout can re-show the previous user's pages on a shared device | 4 logout copies; no `.clear()` anywhere | `useLogout()`: `signOut` → `queryClient.clear()` → `window.location.replace("/auth/login")` |
+| 4 | P3 | "Are you sure you want to logout?" confirmation on every logout | sidebar L662–673 | Drop the confirm (logout is safe and reversible) |
+| 5 | P2 | `apiFetch` has **no timeout**: a hung request leaves buttons spinning forever on bad mobile data | api-client.ts | `AbortSignal.timeout(20_000)` default |
+
+## 43. Front-end security
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | **P0** | Open redirect | §42.1 | — |
+| 2 | **P1 (verify)** | **Stored XSS via email signatures.** `buildDefaultSignatureHtml` interpolates name, title, emails and phone into HTML **without escaping**, and it is rendered with `dangerouslySetInnerHTML` in `signature-creator.tsx` L548 and `email-setup-dialog.tsx` L252. Admins open any employee's signature at `/admin/hr/employees/signature/[userId]`, so if an employee can save `<img onerror=…>` in their own name or designation, it runs in the admin's session. `escapeHtml` already exists in `lib/email-templates/utils.ts` | lib/signature/default-signature.ts L55–115 | Escape every interpolated value; verify server-side validation of profile text fields |
+| 3 | P2 | 4 `dangerouslySetInnerHTML`: the two `<style>` ones are safe; the two signature ones are §43.2 | grep | — |
+| 4 | P3 | `target="_blank"` without `rel` in ~12 places. Modern browsers imply `noopener`, so low risk | grep | Add `rel="noreferrer"` for consistency |
+| 5 | P2 | 34 `localStorage` uses: confirm none store personal data on shared devices | grep | Audit; clear app keys on logout |
+
+## 44. Errors and feedback
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P1 | Hand-rolled writes (§41.3) each phrase errors differently; some swallow them | — | Shared mutation `onError` |
+| 2 | P2 | Error boundaries exist per route group (good) and `global-error.tsx` exists (good); none offers "Report this" linking to the in-house error monitor | app/error.tsx etc. | Show the error id + a "Copy details" button |
+| 3 | P2 | Success toasts on nearly every action ("Logged out successfully", etc.) | 222 sonner files | Toast only what isn't visible on screen; rely on the UI change otherwise |
+| 4 | P2 | Network failure vs server failure look the same | apiFetch | Distinguish "You're offline" from server errors |
+| 5 | P3 | `ConfirmProvider` exists alongside per-page `AlertDialog`s | providers/confirm-provider.tsx | One confirm API |
+
+## 45. Performance
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P1 | **63 `page.tsx` files are `"use client"`**: whole pages ship as JS and fetch after hydration (spinner/skeleton, then data) | grep | Server page loads first data; client islands for interaction |
+| 2 | P2 | 26 source files over 1,000 lines (largest views 2,000–2,600), slow to parse on low-end Android | find | Split per Part 3 §31 |
+| 3 | P2 | Dashboards run 15+ queries per visit with no caching (§39) | — | `unstable_cache`/tags for slow-moving counts |
+| 4 | P2 | `framer-motion` in 15 files, including the sidebar width animation on every page | grep | CSS transitions for simple width/opacity; lazy-load motion where needed |
+| 5 | P2 | 7 `setInterval` polls + `refetchOnWindowFocus` on every query | grep | `refetchInterval` only where freshness matters; pause when hidden |
+| 6 | P2 | Two PDF libraries (`jspdf` ×15 files, `pdf-lib` ×12) | package.json | Settle on one per job (generate vs edit), lazy-load both |
+| 7 | P3 | No web-vitals reporting beyond `@vercel/analytics` page views | layout.tsx | Add `@vercel/speed-insights` or `useReportWebVitals` |
+| 8 | P2 | `select("*")` on hot paths (dashboards, admin layout profile) | §39 | Explicit columns |
+
+## 46. Forms UX
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P1 | Only **19 files** use react-hook-form + zod; ~100 form modals and pages hand-roll state, so validation timing, error placement and required markers differ per form | grep | Migrate on touch (AGENTS.md); shared `FormFieldGroup` |
+| 2 | P2 | Long forms in modals (employee edit 25 fields, manage users 32) with no sections or sticky footer | Part 1 §7 | Sheet or page with sections + sticky footer |
+| 3 | P2 | No "unsaved changes" guard on long forms | none found | `beforeunload` + dialog-close guard when dirty |
+| 4 | P2 | Disabled submit buttons with no reason shown | pattern | Show the first validation error instead of silently disabling |
+| 5 | P3 | Date inputs mix native `<input type="date">` and calendar popovers | pattern | One date-picker component |
+
+## 47. Wayfinding and search
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | `cmdk` is installed but **no code imports it**; universal search exists in the navbar but has no keyboard shortcut or "jump to page" | package.json; grep | ⌘K palette on `cmdk`: pages from the sidebar config + `/api/search` results; or remove `cmdk` |
+| 2 | P2 | Breadcrumbs used in only 2 places; nested pages (detail pages, PMS cycle, payroll worksheet) rely on inconsistent back links | grep | Breadcrumb from the sidebar tree for nested pages (pairs with Part 2 §23) |
+| 3 | P3 | Deep links like `/tasks?taskId=` open the item; most other modules have no shareable link to one record | profile work-lists | `?id=` deep links that open the record's sheet |
+| 4 | P3 | NProgress top bar exists (good); no "you are here" in the mobile header | navbar | Page title in the mobile header |
+
+## 48. Mobile and PWA
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P1 | Drawer a11y and scroll lock (§36.1) | — | `Sheet` |
+| 2 | P1 | List/sheet defects that push phone users to Table view (Part 1 §0, §4–5) | — | — |
+| 3 | P2 | Web push exists (`lib/push`), ~75% of staff are on iPhone, where push needs the app **installed to the home screen**. No in-app "Install Matrix" prompt was found | memory: device mix; lib/push/client.ts | A one-time "Add to Home Screen" guide for iOS Safari users |
+| 4 | P2 | No offline page: `sw.js` exists but a dropped connection shows the browser error | public/sw.js | Cache an offline fallback page |
+| 5 | P3 | Tap targets under 40px in sidebar sub-items (`min-h-[28px]`) | sidebar L516 | ≥ 40px on touch |
+
+## 49. Global accessibility
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P1 | **No skip link** to main content: keyboard users tab through the whole sidebar on every page | grep: none | "Skip to content" link in the layouts |
+| 2 | P1 | Drawer focus trap / Escape (§36.1) | — | — |
+| 3 | P2 | Status shown by colour only in several badges/dots (sidebar badge dot, calendar dots) | sidebar L423 | Text or icon alongside colour |
+| 4 | P2 | `prefers-reduced-motion` not respected by the framer-motion sidebar spring | sidebar L634–637 | `useReducedMotion()` |
+| 5 | P2 | Per-page issues in Part 3 §33 (icon buttons, clickable divs, `<img>`) | — | — |
+
+## 50. Dates, money and locale
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | 150 direct `Intl`/`toLocale*String` calls alongside 487 uses of the WAT helpers: two ways to format a date | grep | Lint-ban bare `toLocale*String()`; helpers only |
+| 2 | P2 | 21 places build naira strings by hand (`` `₦${…}` ``) next to 178 uses of currency helpers, so decimals and separators vary | grep | `formatCurrency` only |
+| 3 | P3 | Raw ISO dates in tables (Part 2 §20) | — | — |
+| 4 | P3 | Relative times ("2h ago") and absolute dates mixed without a rule | pattern | Lists: relative under 7 days, absolute after |
+
+## 51. State and component communication
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | 5 `CustomEvent` window events used as a message bus (sidebar toggle, sidebar state, …) | grep | Context or a tiny store |
+| 2 | P2 | `readDeptContext()` reads `window.location.pathname` on every request, so a component rendered outside the console path loses context | api-client.ts L26 | Provide dept context from the layout via context |
+| 3 | P3 | 34 `localStorage` keys with no naming scheme or versioning | grep | `matrix:<feature>:v1` keys + one helper |
+
+## 52. Freshness and realtime
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | Realtime used in **2** places; approvals, notifications and queues rely on polling/refocus, so a lead approving leave doesn't see the queue update for others | `.channel(` ×2 | Realtime (or short `refetchInterval`) for approval queues + notification count |
+| 2 | P3 | Manual "Refresh" buttons (Part 2 §11) are a symptom of this | — | — |
+| 3 | P3 | No "updated just now" indicator on dashboards | — | Show data age on dashboards |
+
+## 53. Notifications UX
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | Two settings screens (§40.3) | — | Merge |
+| 2 | P2 | Notification list is a DataTable page (filters, columns): heavy for an inbox | Part 2 | Inbox layout: grouped by day, one-line items, swipe/tap to mark read |
+| 3 | P3 | The bell's unread count isn't realtime (§52.1) | — | — |
+
+## 54. Type safety and code health
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | 157 `any` / `as any` | grep | Ratchet (Part 3 §35) |
+| 2 | P2 | 29 `eslint-disable` comments | grep | Review each; ratchet |
+| 3 | P2 | 26 files over 1,000 lines | find | Split on touch |
+| 4 | P3 | Dead config: admin `roles` arrays (§37.2), `adminOnly` (§36.6), `TableExportContext` (Part 2 §24) | — | Delete |
+| 5 | P3 | `deadcode` runs in CI yet missed the unused `cmdk` dependency and dead exports | ci.yml | Check the knip/deadcode config includes dependencies and exports |
+
+## 55. Testing
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P1 | 54 unit tests cover `lib/` logic only; **no component tests** | find | Testing Library tests for DataTable (list/sheet/actions), sidebars (visibility), `getSafeNextPath` |
+| 2 | P1 | 4 Playwright specs exist (`tests/e2e`) but **CI doesn't run them** | ci.yml runs lint, types, unit, dup, deadcode, audit | Run e2e on PRs against a seeded test project |
+| 3 | P2 | `ui:audit` not in CI or pre-push | Part 3 §35 | Add |
+| 4 | P2 | No visual regression | Part 3 §35 | Playwright screenshots at 375/1280 |
+
+## 56. Dependencies
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P3 | `cmdk` unused | §47.1 | Use it or remove it |
+| 2 | P2 | `jspdf` + `pdf-lib` overlap | §45.6 | One per job, lazy |
+| 3 | P3 | `framer-motion` used for effects CSS can do | §45.4 | Reduce |
+
+## 57. Observability
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | In-house error monitor exists; front-end errors don't carry route + user role + build id together | memory: error monitor | Attach context in the client error reporter |
+| 2 | P3 | No performance metrics (§45.7) | — | — |
+| 3 | P3 | No product analytics on key flows (leave request completion, approval time) | — | Events on submit/approve to measure UX changes |
+
+## 58. Microcopy
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | Titles don't match the sidebar (Part 2 §12) | — | — |
+| 2 | P2 | Mixed case: "View Full Detail", "Open details", "Review / Decision", "Edit kit" | Part 1 §5 | Sentence case for buttons and actions |
+| 3 | P3 | Marketing descriptions (Part 2 §12) | — | Plain sentences |
+| 4 | P3 | Generic empty states (Part 2 §18) | — | What happened + next step |
+
+## 59. First-run, help and empty states
+
+| # | Pri | Defect | Evidence | Fix |
+|---|---|---|---|---|
+| 1 | P2 | `/guide` exists (715 lines) but nothing points new staff to it after first login | navbar has a guide button only | Show the guide once on first login; link it from empty states |
+| 2 | P2 | Empty states rarely offer the next action (Part 2 §18) | — | `emptyAction` everywhere it makes sense |
+| 3 | P3 | No per-page "?" help for complex flows (leave stages, requisition stages) | — | Small "How this works" popover on staged workflows |
+
+## 60. Roadmap: the whole redesign in order
+
+| Phase | What | Sections | Why first |
+|---|---|---|---|
+| **0. Security (days)** | Open redirect; signature escaping; raw `fetch` → `apiFetch` (dept leak); admin dashboard scope guard; `/admin/it` 404 | §42.1, §43.2, §41.1, §39.7, §37.1 | Real exposure or broken links |
+| **1. Shared foundations** | `DataTable` fixes (sheet-first, actions, fields, cards off); `DetailSheet`, `DetailList`, `FormFooter`; `useShellBase()`; `useLogout()`; title template; `PageLoader` = `loading.tsx` props | Part 1 §0, §6; §38.13; §42.3; Part 3 §29, §28a | One change fixes hundreds of rows |
+| **2. Guardrails** | Lint rules + ratchet baseline; `ui:audit` + e2e in CI; page-type table in AGENTS.md; §8 decisions written down | Part 3 §35; §55 | Stops regressions while phase 3 runs |
+| **3. Sweeps (module by module)** | Skeleton props; header actions; titles; list rows/sheets; expanded panels; modals → sheets; status colours; dates; forms to rhf+zod | Parts 1–3 | Mechanical, parallelisable per module |
+| **4. UX upgrades** | ⌘K palette; breadcrumbs; realtime queues; inbox-style notifications; iOS install guide; offline page; first-run guide | §47, §52, §53, §48, §59 | Visible quality jump once the base is consistent |
+| **5. Cleanup** | Dead pages, duplicate routes, dead config, unused deps | Part 2 §24, Part 3 §34, §54, §56 | Lowest risk, do anytime |
