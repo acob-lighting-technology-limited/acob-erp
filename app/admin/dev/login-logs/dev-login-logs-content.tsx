@@ -27,7 +27,7 @@ import {
 } from "recharts"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SearchableSelect } from "@/components/ui/searchable-select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Input } from "@/components/ui/input"
 import { apiJson } from "@/lib/api-client"
 import { formatNumber } from "@/lib/format"
@@ -1245,20 +1245,17 @@ export function DevLoginLogsContent() {
           urlSync
         />
 
-        <Dialog open={selectedRowForStats !== null} onOpenChange={(open) => !open && setSelectedRowForStats(null)}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Access Profile: {selectedRowForStats?.full_name || "Unknown User"}</DialogTitle>
-              <DialogDescription>
-                Detailed sign-in history and network access analytics for {selectedRowForStats?.email}.
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedRowForStats && (
-              <UserStatsView email={selectedRowForStats.email} userId={selectedRowForStats.user_id} allLogs={rows} />
-            )}
-          </DialogContent>
-        </Dialog>
+        <DetailSheet
+          wide
+          open={selectedRowForStats !== null}
+          onOpenChange={(open) => !open && setSelectedRowForStats(null)}
+          title={`Access profile: ${selectedRowForStats?.full_name || "Unknown User"}`}
+          description={`Sign-in history and network access for ${selectedRowForStats?.email ?? ""}`}
+        >
+          {selectedRowForStats && (
+            <UserStatsView email={selectedRowForStats.email} userId={selectedRowForStats.user_id} allLogs={rows} />
+          )}
+        </DetailSheet>
       </div>
     </DataTablePage>
   )
