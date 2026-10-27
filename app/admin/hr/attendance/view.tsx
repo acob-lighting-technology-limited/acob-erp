@@ -212,14 +212,14 @@ const EVENT_LABELS: Record<string, string> = {
 
 function eventBadgeClass(eventType: string): string {
   if (eventType.startsWith("appeal_")) {
-    if (eventType === "appeal_rejected") return "bg-red-100 text-red-800"
-    if (eventType.includes("approved") || eventType.includes("resolved")) return "bg-emerald-100 text-emerald-800"
-    return "bg-amber-100 text-amber-800"
+    if (eventType === "appeal_rejected") return "bg-danger/15 text-danger"
+    if (eventType.includes("approved") || eventType.includes("resolved")) return "bg-success/15 text-success"
+    return "bg-warning/15 text-warning"
   }
-  if (eventType.startsWith("device_")) return "bg-blue-100 text-blue-800"
-  if (eventType.startsWith("manual_") || eventType.startsWith("bulk_")) return "bg-violet-100 text-violet-800"
-  if (eventType === "marked_incomplete") return "bg-cyan-100 text-cyan-800"
-  return "bg-gray-100 text-gray-800"
+  if (eventType.startsWith("device_")) return "bg-info/15 text-info"
+  if (eventType.startsWith("manual_") || eventType.startsWith("bulk_")) return "bg-purple/15 text-purple"
+  if (eventType === "marked_incomplete") return "bg-info/15 text-info"
+  return "bg-muted text-muted-foreground"
 }
 
 type ExemptionsPayload = {

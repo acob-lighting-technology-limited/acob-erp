@@ -196,7 +196,8 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge
                 className={
-                  ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ?? "bg-gray-100 text-gray-800"
+                  ATTENDANCE_STATUS_COLORS[r.current_status as UnifiedAttendanceStatus] ??
+                  "bg-muted text-muted-foreground"
                 }
               >
                 {ATTENDANCE_STATUS_LABELS[r.current_status as UnifiedAttendanceStatus] ?? r.current_status}
@@ -204,7 +205,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
               <span className="text-muted-foreground text-xs font-semibold">→</span>
               <Badge
                 className={
-                  ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-blue-100 text-blue-800"
+                  ATTENDANCE_STATUS_COLORS[r.requested_status as UnifiedAttendanceStatus] ?? "bg-info/15 text-info"
                 }
               >
                 {ATTENDANCE_STATUS_LABELS[r.requested_status as UnifiedAttendanceStatus] ?? r.requested_status}

@@ -165,12 +165,12 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full",
                 n.type === "error"
-                  ? "bg-red-100 text-red-600"
+                  ? "bg-danger/15 text-danger"
                   : n.type === "warning"
-                    ? "bg-yellow-100 text-yellow-600"
+                    ? "bg-warning/15 text-warning"
                     : n.type === "success"
-                      ? "bg-green-100 text-green-600"
-                      : "bg-blue-100 text-blue-600"
+                      ? "bg-success/15 text-success"
+                      : "bg-info/15 text-info"
               )}
             >
               <Icon className="h-4 w-4" />
@@ -366,12 +366,12 @@ export function AdminNotificationContent({ initialNotifications }: AdminNotifica
                   className={cn(
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
                     n.type === "error"
-                      ? "bg-red-100 text-red-600"
+                      ? "bg-danger/15 text-danger"
                       : n.type === "warning"
-                        ? "bg-yellow-100 text-yellow-600"
+                        ? "bg-warning/15 text-warning"
                         : n.type === "success"
-                          ? "bg-green-100 text-green-600"
-                          : "bg-blue-100 text-blue-600"
+                          ? "bg-success/15 text-success"
+                          : "bg-info/15 text-info"
                   )}
                 >
                   <Icon className="h-5 w-5" />

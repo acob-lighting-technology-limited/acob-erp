@@ -211,7 +211,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.current_status as UnifiedAttendanceStatus] ??
-                    "bg-gray-100 text-gray-800"
+                    "bg-muted text-muted-foreground"
                   }
                 >
                   {ATTENDANCE_STATUS_LABELS[appeal.current_status as UnifiedAttendanceStatus] ?? appeal.current_status}
@@ -220,7 +220,7 @@ export function AppealReviewDialog({ appeal, open, onClose, onSuccess }: AppealR
                 <Badge
                   className={
                     ATTENDANCE_STATUS_COLORS[appeal.requested_status as UnifiedAttendanceStatus] ??
-                    "bg-blue-100 text-blue-800"
+                    "bg-info/15 text-info"
                   }
                 >
                   {ATTENDANCE_STATUS_LABELS[appeal.requested_status as UnifiedAttendanceStatus] ??
