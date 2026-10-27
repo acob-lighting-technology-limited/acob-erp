@@ -13,7 +13,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { FeedbackDetailDialog } from "@/components/feedback/feedback-detail-dialog"
+import { FeedbackDetailSheet } from "@/components/feedback/feedback-detail-sheet"
 import type { FeedbackRecord } from "@/components/feedback/types"
 import { cn, formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
@@ -480,7 +480,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         urlSync
       />
 
-      <FeedbackDetailDialog
+      <FeedbackDetailSheet
         feedback={selectedFeedback}
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}

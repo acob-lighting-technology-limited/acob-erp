@@ -17,6 +17,13 @@ interface DetailSheetProps {
   leading?: ReactNode
   /** Status badges at the right of the header. They are kept clear of the close button. */
   badges?: ReactNode
+  /** A bar pinned directly under the header, above the scrolling body: the action a record is opened for. */
+  toolbar?: ReactNode
+  /**
+   * The body manages its own layout and scrolling (for example tabs, each with its own scroll area), so
+   * children are not wrapped in the padded, divided, scrolling column.
+   */
+  flush?: boolean
   /** Sticky actions. Laid out with space between, so pass a left group and a right group. */
   footer?: ReactNode
   /** Two-column content such as a document preview wants more room than a record's details do. */
@@ -39,6 +46,8 @@ export function DetailSheet({
   description,
   leading,
   badges,
+  toolbar,
+  flush = false,
   footer,
   wide = false,
   children,
@@ -69,13 +78,19 @@ export function DetailSheet({
                 )}
               </div>
             </div>
-            {badges && <div className="flex shrink-0 items-center gap-1.5">{badges}</div>}
+            {badges && <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end">{badges}</div>}
           </div>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="divide-y px-4 sm:px-5 [&>*]:py-4">{children}</div>
-        </div>
+        {toolbar}
+
+        {flush ? (
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="divide-y px-4 sm:px-5 [&>*]:py-4">{children}</div>
+          </div>
+        )}
 
         {footer && (
           <SheetFooter className="bg-muted/20 flex-row items-center justify-between gap-2 border-t px-4 py-3 sm:px-5">
