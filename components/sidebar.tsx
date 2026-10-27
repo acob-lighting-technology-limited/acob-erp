@@ -86,12 +86,6 @@ type NavItemDef = {
   /** Expansion or gloss for an abbreviated name, shown on hover. */
   description?: string
   children?: NavChild[]
-  /**
-   * The item points into the /admin shell. Hidden unless the viewer can enter
-   * it — /admin bounces everyone else back to /profile (see AdminLayout), so
-   * showing the link to ordinary staff is a guaranteed dead end.
-   */
-  adminOnly?: boolean
   badge?: number
 }
 type NavSectionDef = { key: string; label: string; items: NavItemDef[] }
@@ -321,14 +315,12 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const accountRole = profile?.role ? getRoleDisplayName(profile.role) : null
 
   const visibleSections: NavSectionDef[] = navigationSections.map((section) => {
-    const items = section.items
-      .filter((item) => !item.adminOnly || canAccessAdmin)
-      .map((item) => {
-        if (item.href === "/calendar" && calendarBadge > 0) {
-          return { ...item, badge: calendarBadge }
-        }
-        return item
-      })
+    const items = section.items.map((item) => {
+      if (item.href === "/calendar" && calendarBadge > 0) {
+        return { ...item, badge: calendarBadge }
+      }
+      return item
+    })
     const withMdDesk = showMdDesk && section.key === "management" ? [MD_DESK_NAV_ITEM, ...items] : items
     return {
       ...section,

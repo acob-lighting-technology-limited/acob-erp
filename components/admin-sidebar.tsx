@@ -129,7 +129,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Dashboard",
       href: base,
       icon: LayoutDashboard,
-      roles: [],
     },
     {
       section: "management",
@@ -137,7 +136,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       description: "Human Resources",
       href: `${base}/hr`,
       icon: Users,
-      roles: [],
       children: [
         { name: "Employees", href: `${base}/hr/employees` },
         // No "Departments" here — the dept shell is already scoped to one
@@ -153,7 +151,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       description: "Performance Management System",
       href: `${base}/pms`,
       icon: TrendingUp,
-      roles: [],
       children: pmsNavChildren(`${base}/pms`),
     },
     {
@@ -161,7 +158,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Accounts",
       href: `${base}/accounts`,
       icon: Landmark,
-      roles: [],
       children: [
         { name: "Requisitions", href: `${base}/accounts/requisitions` },
         { name: "Assets", href: `${base}/assets` },
@@ -172,7 +168,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Corporate Services",
       href: `${base}/corporate-services`,
       icon: Target,
-      roles: [],
       children: [
         { name: "Scorecard", href: `${base}/corporate-services/scorecard` },
         { name: "Risk Register", href: `${base}/corporate-services/risk-register` },
@@ -183,21 +178,18 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Tasks",
       href: `${base}/tasks`,
       icon: ClipboardList,
-      roles: [],
     },
     {
       section: "operations",
       name: "Help Desk",
       href: `${base}/help-desk`,
       icon: Ticket,
-      roles: [],
     },
     {
       section: "operations",
       name: "Reports",
       href: `${base}/reports`,
       icon: FileBarChart,
-      roles: [],
       children: [{ name: "Weekly", href: `${base}/reports/weekly-reports` }],
     },
     {
@@ -205,14 +197,12 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Correspondence",
       href: `${base}/correspondence`,
       icon: Mail,
-      roles: [],
     },
     {
       section: "operations",
       name: "Communications",
       href: `${base}/communications`,
       icon: Megaphone,
-      roles: [],
       children: [{ name: "Broadcast", href: `${base}/communications/broadcast` }],
     },
     {
@@ -220,7 +210,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Documentation",
       href: `${base}/documentation`,
       icon: FileText,
-      roles: [],
       children: [
         { name: "Policies", href: `${base}/documentation/policies` },
         { name: "SOPs", href: `${base}/documentation/sops` },
@@ -233,7 +222,6 @@ function buildDeptNavigation(deptId: string): NavItem[] {
       name: "Feedback",
       href: `${base}/feedback`,
       icon: MessageSquare,
-      roles: [],
     },
   ]
 }
@@ -258,7 +246,6 @@ type NavItem = {
   name: string
   href: string
   icon: React.ElementType
-  roles: string[]
   /** Expansion or gloss for an abbreviated name, shown on hover. */
   description?: string
   children?: NavChild[]
@@ -292,7 +279,6 @@ const adminNavigation: NavItem[] = [
     name: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "management",
@@ -300,7 +286,6 @@ const adminNavigation: NavItem[] = [
     description: "Human Resources",
     href: "/admin/hr",
     icon: Users,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Employees", href: "/admin/hr/employees" },
       { name: "Departments", href: "/admin/hr/departments" },
@@ -318,7 +303,6 @@ const adminNavigation: NavItem[] = [
     description: "Information Technology",
     href: "/admin/it",
     icon: Server,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Onboarding", href: "/admin/onboarding" },
       { name: "Mailboxes", href: "/admin/settings/mailboxes" },
@@ -333,7 +317,6 @@ const adminNavigation: NavItem[] = [
     name: "MD's Desk",
     href: "/admin/md-desk",
     icon: Briefcase,
-    roles: ["developer", "super_admin", "admin"],
     children: mdDeskNavChildren("/admin/md-desk"),
   },
   {
@@ -345,7 +328,6 @@ const adminNavigation: NavItem[] = [
     description: "Performance Management System",
     href: "/admin/pms",
     icon: TrendingUp,
-    roles: ["developer", "super_admin", "admin"],
     children: pmsNavChildren("/admin/pms"),
   },
   {
@@ -357,7 +339,6 @@ const adminNavigation: NavItem[] = [
     name: "Accounts",
     href: "/admin/accounts",
     icon: Landmark,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Requisitions", href: "/admin/accounts/requisitions" },
       { name: "Payroll", href: "/admin/payroll" },
@@ -382,7 +363,6 @@ const adminNavigation: NavItem[] = [
     name: "Portfolios",
     href: "/admin/portfolios",
     icon: Layers,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Portfolios", href: "/admin/portfolios" },
       { name: "Projects", href: "/admin/projects" },
@@ -394,7 +374,6 @@ const adminNavigation: NavItem[] = [
     name: "Corporate Services",
     href: "/admin/corporate-services",
     icon: Target,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Scorecard", href: "/admin/corporate-services/scorecard" },
       { name: "Risk Register", href: "/admin/corporate-services/risk-register" },
@@ -407,28 +386,24 @@ const adminNavigation: NavItem[] = [
     name: "Tasks",
     href: "/admin/tasks",
     icon: ClipboardList,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Help Desk",
     href: "/admin/help-desk",
     icon: Ticket,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Events",
     href: "/admin/events",
     icon: CalendarDays,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Reports",
     href: "/admin/reports",
     icon: FileBarChart,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       {
         name: "General Meeting",
@@ -450,14 +425,12 @@ const adminNavigation: NavItem[] = [
     name: "Correspondence",
     href: "/admin/correspondence",
     icon: Mail,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "operations",
     name: "Communications",
     href: "/admin/communications",
     icon: Megaphone,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Broadcast", href: "/admin/communications/broadcast" },
       {
@@ -479,7 +452,6 @@ const adminNavigation: NavItem[] = [
     name: "Documentation",
     href: "/admin/documentation",
     icon: FileText,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Policies", href: "/admin/documentation/policies" },
       { name: "SOPs", href: "/admin/documentation/sops" },
@@ -492,21 +464,18 @@ const adminNavigation: NavItem[] = [
     name: "Audit Logs",
     href: "/admin/audit-logs",
     icon: ShieldCheck,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "system",
     name: "Version History",
     href: "/admin/version-history",
     icon: History,
-    roles: ["developer", "super_admin", "admin"],
   },
   {
     section: "system",
     name: "Settings",
     href: "/admin/settings",
     icon: Settings,
-    roles: ["developer", "super_admin", "admin"],
     children: [
       { name: "Users", href: "/admin/settings/users" },
       { name: "Roles", href: "/admin/settings/roles" },
@@ -525,7 +494,6 @@ const adminNavigation: NavItem[] = [
     name: "Developer",
     href: "/admin/dev",
     icon: FlaskConical,
-    roles: ["developer"],
     children: [
       { name: "Login Logs", href: "/admin/dev/login-logs" },
       { name: "Role Escalations", href: "/admin/dev/role-escalations" },
@@ -670,17 +638,16 @@ export function AdminSidebar({
     profile?.role,
   ])
 
-  const canAccessRoute = (requiredRoles: string[], href: string) => {
+  const canAccessRoute = (href: string) => {
     if (!profile?.role || !accessContext) return false
     // Legacy role arrays are no longer authoritative under RBAC V2.
     // Use centralized policy evaluation so department leads with base role "employee"
     // still see allowed admin routes.
-    void requiredRoles
     return canAccessRouteV2(accessContext, resolveAdminRouteKeyV2(href))
   }
 
-  // In the dept shell use dept-scoped hrefs; roles[] is empty so canAccessRoute
-  // is bypassed — access is already guarded by requireDeptScope on the server.
+  // In the dept shell use dept-scoped hrefs. That navigation is not filtered here:
+  // access is guarded by requireDeptScope on the server.
   const activeNavigation = deptId ? buildDeptNavigation(deptId) : adminNavigation
 
   /**
@@ -695,8 +662,8 @@ export function AdminSidebar({
     if (!children) return undefined
     const kept: NavChild[] = []
     for (const child of children) {
-      const grandchildren = child.children?.filter((gc) => canAccessRoute([], gc.href))
-      const selfAllowed = canAccessRoute([], child.href)
+      const grandchildren = child.children?.filter((gc) => canAccessRoute(gc.href))
+      const selfAllowed = canAccessRoute(child.href)
       if (!selfAllowed && !grandchildren?.length) continue
       kept.push({
         ...child,
@@ -713,7 +680,7 @@ export function AdminSidebar({
     : activeNavigation.reduce<NavItem[]>((acc, item) => {
         if (item.href === "/admin/md-desk" && !showMdDesk) return acc
         const children = filterNavChildren(item.children)
-        const selfAllowed = canAccessRoute(item.roles, item.href)
+        const selfAllowed = canAccessRoute(item.href)
         if (!selfAllowed && !children) return acc
         const badge = item.href === "/admin/events" && pendingRsvps && pendingRsvps > 0 ? pendingRsvps : undefined
         acc.push({
