@@ -235,7 +235,7 @@ export function LunchContent({ initialData, currentUserId, initialTab = "poll" }
       const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
       opts.push({
         value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        label: d.toLocaleString("en-US", { month: "long", year: "numeric" }),
+        label: d.toLocaleString("en-NG", { timeZone: "Africa/Lagos", month: "long", year: "numeric" }),
       })
     }
     return opts

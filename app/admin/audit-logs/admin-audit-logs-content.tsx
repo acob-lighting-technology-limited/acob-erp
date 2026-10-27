@@ -54,7 +54,7 @@ export function AdminAuditLogsContent({
   const handleCopyEntry = useCallback(async (r: AuditLog) => {
     const userName = r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"
     const summary = getAuditLogSummary(r)
-    const text = `[${new Date(r.created_at).toLocaleString("en-US", { timeZone: "Africa/Lagos" })}] ${r.action.toUpperCase()} ${r.entity_type} — ${summary} (by ${userName})`
+    const text = `[${new Date(r.created_at).toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}] ${r.action.toUpperCase()} ${r.entity_type} — ${summary} (by ${userName})`
     try {
       await navigator.clipboard.writeText(text)
       toast.success("Entry copied")
@@ -110,7 +110,7 @@ export function AdminAuditLogsContent({
         render: (r) => (
           <div className="flex flex-col text-xs">
             <span className="font-medium">
-              {new Date(r.created_at).toLocaleDateString("en-US", {
+              {new Date(r.created_at).toLocaleDateString("en-NG", {
                 timeZone: "Africa/Lagos",
                 month: "short",
                 day: "numeric",
@@ -118,7 +118,7 @@ export function AdminAuditLogsContent({
               })}
             </span>
             <span className="text-muted-foreground">
-              {new Date(r.created_at).toLocaleTimeString("en-US", {
+              {new Date(r.created_at).toLocaleTimeString("en-NG", {
                 timeZone: "Africa/Lagos",
                 hour: "2-digit",
                 minute: "2-digit",
@@ -399,7 +399,7 @@ export function AdminAuditLogsContent({
         mobileRow={{
           title: (r) => getAuditLogSummary(r),
           subtitle: (r) =>
-            `${r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"} · ${r.entity_type} · ${new Date(r.created_at).toLocaleTimeString("en-US", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" })}`,
+            `${r.user ? `${r.user.first_name} ${r.user.last_name}` : "System"} · ${r.entity_type} · ${new Date(r.created_at).toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" })}`,
           trailing: (r) => (
             <Badge className={getAuditActionColor(r.action || "update")}>{formatName(r.action || "update")}</Badge>
           ),
@@ -419,7 +419,7 @@ export function AdminAuditLogsContent({
             <div className="mb-2 flex items-start justify-between">
               <Badge className={getAuditActionColor(r.action || "update")}>{formatName(r.action || "update")}</Badge>
               <span className="text-muted-foreground font-mono text-[10px]">
-                {new Date(r.created_at).toLocaleTimeString("en-US", {
+                {new Date(r.created_at).toLocaleTimeString("en-NG", {
                   timeZone: "Africa/Lagos",
                   hour: "2-digit",
                   minute: "2-digit",

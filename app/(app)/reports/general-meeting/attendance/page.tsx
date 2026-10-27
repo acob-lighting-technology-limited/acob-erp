@@ -53,7 +53,8 @@ function formatMeetingDate(dateStr?: string | null): string {
   if (parts.length !== 3 || parts.some((p) => Number.isNaN(p))) return dateStr
   const [y, m, d] = parts
   const date = new Date(y, m - 1, d)
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("en-NG", {
+    timeZone: "Africa/Lagos",
     weekday: "long",
     year: "numeric",
     month: "long",

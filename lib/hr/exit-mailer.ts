@@ -26,7 +26,12 @@ export interface ExitNotificationPayload {
 function formatDate(iso?: string): string {
   if (!iso) return ""
   try {
-    return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+    return new Date(iso).toLocaleDateString("en-GB", {
+      timeZone: "Africa/Lagos",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
   } catch {
     return iso
   }

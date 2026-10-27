@@ -176,7 +176,7 @@ function EventForm({
     try {
       const d = new Date(form.all_day ? `${form.start}T00:00:00${WAT_OFFSET}` : `${form.start}:00${WAT_OFFSET}`)
       if (Number.isNaN(d.getTime())) return "Monday"
-      return d.toLocaleDateString("en-US", { weekday: "long", timeZone: "Africa/Lagos" })
+      return d.toLocaleDateString("en-NG", { weekday: "long", timeZone: "Africa/Lagos" })
     } catch {
       return "Monday"
     }

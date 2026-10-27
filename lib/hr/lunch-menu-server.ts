@@ -355,6 +355,7 @@ export async function notifyStaffOfMenu(client: SupabaseClient, menuId: string, 
 
     const recipients = (profiles || []).map((p) => p.id as string)
     const label = new Date(`${date}T12:00:00+01:00`).toLocaleDateString("en-GB", {
+      timeZone: "Africa/Lagos",
       weekday: "long",
       day: "numeric",
       month: "long",

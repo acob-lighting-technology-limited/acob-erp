@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
-import { formatWATDateTime } from "@/lib/utils/date"
+import { formatClockTime, formatWATDateTime } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { PageWrapper, PageHeader } from "@/components/layout"
@@ -741,11 +741,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
         payload.meetingDate = meetingContext?.meetingDate
         payload.meetingWeek = meetingContext?.meetingWeek
         payload.meetingYear = meetingContext?.meetingYear
-        payload.meetingTime = new Date(`2000-01-01T${meetingTime}`).toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        })
+        payload.meetingTime = formatClockTime(meetingTime)
         payload.teamsLink = teamsLink
         payload.agenda = parseAgendaItems(agendaText)
         if (knowledgeDepartment !== "none") payload.knowledgeSharingDepartment = knowledgeDepartment

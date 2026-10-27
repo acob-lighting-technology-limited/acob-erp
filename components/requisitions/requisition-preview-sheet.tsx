@@ -310,7 +310,8 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
                   {requisition.payments.map((p) => (
                     <div key={p.id} className="space-y-0.5 border-b pb-2 text-xs last:border-b-0 last:pb-0">
                       <p className="font-medium">
-                        {formatNaira(p.amount)} via {p.method} on {new Date(p.paid_on).toLocaleDateString("en-GB")}
+                        {formatNaira(p.amount)} via {p.method} on{" "}
+                        {new Date(p.paid_on).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" })}
                       </p>
                       <p className="text-muted-foreground">
                         Recorded by {p.recorder?.full_name || "—"}

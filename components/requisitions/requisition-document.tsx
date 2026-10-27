@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 
 function formatDate(value: string | null | undefined) {
   if (!value) return ""
-  return new Date(value).toLocaleDateString("en-GB", {
+  return new Date(value).toLocaleDateString("en-NG", {
     day: "2-digit",
     month: "short",
     year: "numeric",

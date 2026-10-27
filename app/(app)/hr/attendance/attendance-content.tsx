@@ -343,7 +343,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         // Use noon UTC so timezone conversion (WAT +1) never shifts the calendar date
         const dateObj = new Date(`${workday}T12:00:00Z`)
         // Month label: "June 2026" — use en-US without day to avoid "1 June 2026" from en-GB defaults
-        const monthLabel = dateObj.toLocaleDateString("en-US", {
+        const monthLabel = dateObj.toLocaleDateString("en-NG", {
           month: "long",
           year: "numeric",
           timeZone: "Africa/Lagos",
@@ -359,7 +359,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
             clock_out: null,
             total_hours: null,
             status: "no_record",
-            dayLabel: dateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "Africa/Lagos" }),
+            dayLabel: dateObj.toLocaleDateString("en-NG", { weekday: "long", timeZone: "Africa/Lagos" }),
             dateLabel: formatWATDate(dateObj, { day: "2-digit", month: "long", year: "numeric" }),
             periodLabel: "-",
             monthLabel,
@@ -387,7 +387,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
         return {
           ...existing,
           total_hours: breakdown.total ?? existing.total_hours,
-          dayLabel: dateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "Africa/Lagos" }),
+          dayLabel: dateObj.toLocaleDateString("en-NG", { weekday: "long", timeZone: "Africa/Lagos" }),
           dateLabel: formatWATDate(dateObj, { day: "2-digit", month: "long", year: "numeric" }),
           periodLabel: `${existing.clock_in || "-"} - ${getClockOutLabel({ ...existing, date: workday })}`,
           monthLabel,

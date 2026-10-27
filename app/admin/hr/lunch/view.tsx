@@ -2118,7 +2118,7 @@ export function LunchRegisterPage({
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="min-w-36 text-center text-sm font-medium">
-                  {new Date(selectedMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  {formatWATDate(selectedMonth + "-01", { day: undefined, month: "long", year: "numeric" })}
                 </span>
                 <Button
                   variant="outline"
@@ -2754,7 +2754,7 @@ function EmployeeLunchExpandPanel({
   // Format day short: e.g. "Mon, Jul 13"
   function formatDayShort(dateString: string) {
     const d = new Date(dateString)
-    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    return d.toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", weekday: "short", month: "short", day: "numeric" })
   }
 
   return (

@@ -4,7 +4,7 @@
 const HINTS = {
   "tiny-text": "Minimum text size is text-xs (12px). Use text-xs.",
   "locale-without-en-ng":
-    "Use the helpers in @/lib/utils/date (formatWATDate, formatWATDateTime...). Business time is Africa/Lagos.",
+    "Use the helpers in @/lib/utils/date (formatWATDate...), or pass en-NG and timeZone: \"Africa/Lagos\". Business time is Lagos time.",
   "raw-img": "Use next/image. A raw <img> is only for email/PDF/OG renderers.",
   "window-dialogs": "Confirm with AlertDialog (or useConfirm) and notify with sonner. No window.confirm/alert/prompt.",
   "key-index": "Use a stable id as the React key, not the array index.",
@@ -45,8 +45,15 @@ export const RULES = [
   },
   {
     id: "locale-without-en-ng",
+    // a date or time formatted without en-NG or an explicit timeZone. A plain toLocaleString() could be a
+    // number, so only toLocaleDateString/TimeString and calls with date options count.
+    applies: (f) => f !== "lib/utils/date.ts",
     count: (text) =>
-      [...text.matchAll(/\.toLocale(?:Date|Time)?String\(([^)]*)\)/g)].filter((m) => !/en-NG/.test(m[1])).length,
+      [...text.matchAll(/\.toLocale(Date|Time)?String\(([^)]*)\)/g)].filter(
+        (m) =>
+          !/en-NG|timeZone/.test(m[2]) &&
+          (m[1] || /\b(year|month|day|hour|minute|second|weekday|dateStyle|timeStyle)\s*:/.test(m[2]))
+      ).length,
   },
   {
     id: "raw-img",

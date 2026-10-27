@@ -399,7 +399,7 @@ export function DevLoginLogsContent() {
       .map((m) => {
         const [year, monthStr] = m.split("-")
         const date = new Date(Number(year), Number(monthStr) - 1, 1)
-        const label = date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+        const label = date.toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", month: "long", year: "numeric" })
         return { value: m, label }
       })
   }, [rows])

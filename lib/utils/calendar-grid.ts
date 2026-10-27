@@ -11,7 +11,11 @@ export function monBasedDay(jsDay: number): number {
 /** "2026-10" → "October 2026". */
 export function formatMonthLabel(yearMonth: string): string {
   const [year, month] = yearMonth.split("-").map(Number)
-  return new Date(year, month - 1, 1).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+  return new Date(year, month - 1, 1).toLocaleDateString("en-GB", {
+    timeZone: "Africa/Lagos",
+    month: "long",
+    year: "numeric",
+  })
 }
 
 /** Step a "YYYY-MM" by `delta` months. */

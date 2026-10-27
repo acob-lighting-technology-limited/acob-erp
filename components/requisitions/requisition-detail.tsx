@@ -41,7 +41,7 @@ export type Viewer = RequisitionViewerActions & { is_admin: boolean }
 
 export function when(value: string | null) {
   if (!value) return ""
-  return new Date(value).toLocaleString("en-GB", {
+  return new Date(value).toLocaleString("en-NG", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -312,7 +312,7 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
                     <p>
                       <strong>{formatNaira(payment.amount)}</strong> by{" "}
                       {payment.method === "cash" ? "cash" : "transfer"} on{" "}
-                      {new Date(payment.paid_on).toLocaleDateString("en-GB")}
+                      {new Date(payment.paid_on).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" })}
                     </p>
                     <p className="text-muted-foreground text-xs">
                       {payment.recorder?.full_name || "—"}

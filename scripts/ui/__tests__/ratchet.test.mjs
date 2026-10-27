@@ -27,14 +27,19 @@ test("tiny-text counts 9, 10 and 11px but not 12px", () => {
   assert.equal(c["tiny-text"], 3)
 })
 
-test("locale-without-en-ng flags bare and wrong-locale calls only", () => {
+test("locale-without-en-ng flags dates with no en-NG or timeZone, never numbers", () => {
   const text = [
-    "a.toLocaleString()",
+    "a.toLocaleString()", // could be a number: not counted
     'a.toLocaleDateString("en-US")',
     'a.toLocaleDateString("en-NG", { timeZone: "Africa/Lagos" })',
     "a.toLocaleTimeString()",
+    'a.toLocaleString("en-US", { month: "long", year: "numeric" })',
+    'a.toLocaleString("en-US", { style: "currency", currency: "NGN" })', // money: not counted
+    'a.toLocaleDateString("en-GB", { timeZone: "Africa/Lagos" })', // explicit zone is enough
+    'a.toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" })', // en-CA key idiom with a zone
   ].join("\n")
   assert.equal(countFile("lib/x.ts", text)["locale-without-en-ng"], 3)
+  assert.equal(countFile("lib/utils/date.ts", text)["locale-without-en-ng"], undefined)
 })
 
 test("raw-img ignores email, pdf and og renderers", () => {

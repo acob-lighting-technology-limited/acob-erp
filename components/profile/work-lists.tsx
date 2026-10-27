@@ -404,7 +404,7 @@ export function RecentAttendanceCard({ items }: { items: WorkDayAttendanceItem[]
 /* ------------------------------ My Lunch History ----------------------------- */
 
 export function LunchHistoryCard({ lunchLogs }: { lunchLogs: LunchLogItem[] }) {
-  const currentMonthName = new Date().toLocaleString("en-US", { month: "long" })
+  const currentMonthName = new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos", month: "long" })
   const thisMonthLogs = lunchLogs.filter((log) => {
     const logDate = new Date(log.date)
     const now = new Date()

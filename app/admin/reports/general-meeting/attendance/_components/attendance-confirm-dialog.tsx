@@ -49,7 +49,7 @@ function formatTimeString(value: string | null): string {
   }
   const date = new Date(value)
   if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+    return date.toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" })
   }
   return value
 }

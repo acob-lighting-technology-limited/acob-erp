@@ -879,7 +879,7 @@ the expected stats count, tabs, filter count, action count, and table density.
 | Rule | Counts | Do this instead |
 |------|--------|-----------------|
 | `tiny-text` | `text-[9px]` to `text-[11px]` | `text-xs` is the minimum |
-| `locale-without-en-ng` | `toLocale*String()` without `en-NG` | `@/lib/utils/date` helpers |
+| `locale-without-en-ng` | a date or time `toLocale*String()` with neither `en-NG` nor a `timeZone` | `@/lib/utils/date` helpers, or `en-NG` and `timeZone: "Africa/Lagos"` |
 | `raw-img` | `<img>` outside email/PDF/OG renderers | `next/image` |
 | `window-dialogs` | `window.confirm/alert/prompt`, bare `alert()` | `AlertDialog`, sonner |
 | `key-index` | `key={i}`, `key={idx}`, `key={index}` | a stable id |

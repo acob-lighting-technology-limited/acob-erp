@@ -83,6 +83,7 @@ function formatNaira(amount: number | null): string {
 function formatDay(iso: string | null): string {
   if (!iso) return "-"
   return new Date(`${iso.slice(0, 10)}T12:00:00Z`).toLocaleDateString("en-GB", {
+    timeZone: "Africa/Lagos",
     day: "numeric",
     month: "short",
     year: "numeric",
