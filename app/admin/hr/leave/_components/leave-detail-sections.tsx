@@ -20,6 +20,7 @@ import { LeaveItem, approvalStageKey, resolvePersonName, resolveLeaveRouteStages
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { leaveEvidenceHref, leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { cn } from "@/lib/utils"
+import { DetailList, SectionHeading } from "@/components/ui/detail-list"
 
 // Shared by the leave side sheet and the expanded table row so both read the
 // approval route the same way.
@@ -68,15 +69,6 @@ function buildStageAudit(leave: LeaveItem) {
   }
 
   return { timeline, stageAuditMap }
-}
-
-export function SectionHeading({ title, aside }: { title: string; aside?: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">{title}</h3>
-      {typeof aside === "string" ? <span className="text-muted-foreground text-xs">{aside}</span> : aside}
-    </div>
-  )
 }
 
 export function LeaveStatusStrip({ leave }: { leave: LeaveItem }) {
@@ -152,38 +144,16 @@ export function LeaveOverlapNotice({ leave }: { leave: LeaveItem }) {
   )
 }
 
-function DetailField({
-  label,
-  value,
-  className,
-  valueClassName,
-}: {
-  label: string
-  value: string
-  className?: string
-  valueClassName?: string
-}) {
-  return (
-    <div className={cn("min-w-0", className)}>
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className={cn("text-foreground mt-0.5 font-medium break-words", valueClassName)}>{value}</dd>
-    </div>
-  )
-}
-
 export function LeaveDetailsList({ leave }: { leave: LeaveItem }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs sm:grid-cols-3">
-      <DetailField label="Resume date" value={safeDateDisplay(leave.resume_date)} />
-      <DetailField label="Reliever" value={resolvePersonName(leave.reliever) || "Not assigned"} />
-      <DetailField label="Department lead" value={resolvePersonName(leave.supervisor) || "—"} />
-      <DetailField
-        className="col-span-full"
-        label="Reason"
-        value={leave.reason || "No reason provided."}
-        valueClassName="font-normal leading-relaxed"
-      />
-    </dl>
+    <DetailList
+      items={[
+        { label: "Resume date", value: safeDateDisplay(leave.resume_date) },
+        { label: "Reliever", value: resolvePersonName(leave.reliever) || "Not assigned" },
+        { label: "Department lead", value: resolvePersonName(leave.supervisor) },
+        { label: "Reason", value: leave.reason || "No reason provided.", wide: true },
+      ]}
+    />
   )
 }
 

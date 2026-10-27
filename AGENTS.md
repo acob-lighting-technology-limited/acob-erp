@@ -130,6 +130,15 @@ Every rule here exists because breaking it already cost us something.
   (`` `min-w-[${x}]` `` never generates); use `style` for dynamic values.
 - **Dialogs on phones**: use `ResponsiveModal` (Dialog on desktop, bottom sheet on mobile)
   for forms, not a bare centred `Dialog`.
+- **Sheets and modals — pick by what the user is doing.** *Viewing or reviewing a record* (a profile,
+  a request and its approval trail, a document, a history) opens a **side sheet** built on
+  `DetailSheet` from `@/components/ui/detail-sheet`, with `DetailList` and `SectionHeading` from
+  `@/components/ui/detail-list` for the content. *Creating, editing or confirming* opens a modal
+  (`ResponsiveModal`, or `AlertDialog` to confirm). A long multi-section edit form is a page. Never
+  build a read-only record view as a centred modal, and never hand-roll a sheet shell: the shared one
+  keeps the width, header, divided sections and sticky footer the same everywhere, and keeps the header
+  badges clear of the close button.
+- **Name a component for what it renders.** A side sheet is `*-sheet.tsx`, a modal `*-dialog.tsx`.
 - **Every empty state** says what happened and offers one primary next action.
 
 ### Loading states and skeletons
