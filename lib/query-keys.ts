@@ -294,6 +294,13 @@ export const QUERY_KEYS = {
   correspondenceRequesters: (department: string) => ["correspondence-requesters", department],
   correspondenceCategories: () => ["correspondence-categories"],
 
+  // Documentation
+  controlledDocAcknowledgements: (docId: string | undefined, versionId: string | undefined) => [
+    "controlled-doc-acknowledgements",
+    docId,
+    versionId,
+  ],
+
   // Projects
   portfolios: () => ["portfolios"],
   sites: (portfolioId: string | null = null) => ["sites", portfolioId ?? "all"],

@@ -8,6 +8,7 @@ import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
 import { formatDocDate, type AcknowledgementStaffRow, type ControlledDocRow } from "@/lib/documentation/controlled"
 
@@ -24,7 +25,7 @@ export function ControlledDocAcknowledgementsSheet({ doc, onOpenChange }: Contro
   const [search, setSearch] = useState("")
 
   const { data, isLoading, error } = useQuery<{ data: AcknowledgementStaffRow[] }>({
-    queryKey: ["controlled-doc-acknowledgements", doc?.id, doc?.current_version?.id],
+    queryKey: QUERY_KEYS.controlledDocAcknowledgements(doc?.id, doc?.current_version?.id),
     queryFn: async () => {
       const res = await apiFetch(`/api/documentation/controlled/${doc?.id}/acknowledgements`, { cache: "no-store" })
       const payload = await res.json()
