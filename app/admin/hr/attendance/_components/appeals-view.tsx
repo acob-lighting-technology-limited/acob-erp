@@ -45,7 +45,12 @@ function statusBadge(
         <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
       )
     }
-    return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Both</Badge>
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Pending Lead</Badge>
+        <span className="text-muted-foreground pl-0.5 text-xs">Pending Admin</span>
+      </div>
+    )
   }
   if (stage === "pending_admin") {
     return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Pending Admin</Badge>

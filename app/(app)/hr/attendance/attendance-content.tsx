@@ -70,10 +70,64 @@ type AppealRecord = {
   id: string
   appeal_date: string
   status: string
+  stage?: string | null
+  initiated_by_role?: string | null
   requested_status: string
   appeal_reason: string
   resolution_note: string | null
   created_at: string
+}
+
+function renderAppealPendingBadge(appeal: AppealRecord) {
+  const stage = appeal.stage || "pending_lead"
+  if (stage === "pending_lead") {
+    if (appeal.initiated_by_role === "admin_manual") {
+      return (
+        <Badge
+          variant="outline"
+          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
+        >
+          Pending Lead
+        </Badge>
+      )
+    }
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <Badge
+          variant="outline"
+          className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
+        >
+          Pending Lead
+        </Badge>
+        <span className="text-muted-foreground pl-0.5 text-xs">Pending Admin</span>
+      </div>
+    )
+  }
+  if (stage === "pending_admin") {
+    return (
+      <Badge variant="outline" className="border-blue-500 bg-blue-500/10 font-medium text-blue-600 dark:text-blue-400">
+        Pending Admin
+      </Badge>
+    )
+  }
+  if (stage === "pending_hr_lead") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-purple-500 bg-purple-500/10 font-medium text-purple-600 dark:text-purple-400"
+      >
+        Pending HR Lead
+      </Badge>
+    )
+  }
+  return (
+    <Badge
+      variant="outline"
+      className="border-amber-500 bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400"
+    >
+      Pending
+    </Badge>
+  )
 }
 type UnifiedDay = {
   date: string
@@ -442,11 +496,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
           let content = null
 
           if (pendingAppeal) {
-            content = (
-              <Badge variant="outline" className="border-amber-500 bg-amber-500/5 text-amber-500 hover:bg-amber-500/5">
-                Pending
-              </Badge>
-            )
+            content = renderAppealPendingBadge(pendingAppeal)
           } else if (approvedAppeal) {
             return null
           } else if (hasRejected) {
@@ -756,7 +806,13 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                             label: rowAppeals.length > 1 ? `Latest Appeal (${rowAppeals.length} submitted)` : "Appeal",
                             value:
                               latestAppeal.status === "pending"
-                                ? "Pending approval"
+                                ? latestAppeal.stage === "pending_admin"
+                                  ? "Pending Admin"
+                                  : latestAppeal.stage === "pending_hr_lead"
+                                    ? "Pending HR Lead"
+                                    : latestAppeal.initiated_by_role === "admin_manual"
+                                      ? "Pending Lead"
+                                      : "Pending Lead (then Pending Admin)"
                                 : latestAppeal.status === "approved"
                                   ? "Approved"
                                   : latestAppeal.status === "resolved"
@@ -956,9 +1012,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                   {(isEligible || rowAppeals.length > 0) && (
                     <div className="border-border/40 flex items-center justify-end border-t pt-2">
                       {pendingAppeal ? (
-                        <Badge variant="outline" className="border-amber-500 bg-amber-500/5 text-amber-500">
-                          Pending Appeal
-                        </Badge>
+                        renderAppealPendingBadge(pendingAppeal)
                       ) : approvedAppeal ? (
                         <Badge variant="outline" className="border-emerald-500 bg-emerald-500/5 text-emerald-500">
                           Appeal Approved
