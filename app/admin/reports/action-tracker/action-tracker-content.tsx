@@ -1007,6 +1007,7 @@ export function ActionTrackerContent({
             {
               label: "Delete",
               icon: Trash2,
+              variant: "destructive",
               onClick: (row) => {
                 void handleDeleteDirective(row)
               },
