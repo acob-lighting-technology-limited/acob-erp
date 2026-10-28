@@ -58,7 +58,7 @@ import { cn } from "@/lib/utils"
 import { LunchMenuBuilderDialog } from "./_components/lunch-menu-builder-dialog"
 import { LunchDeadlineDialog } from "./_components/lunch-deadline-dialog"
 import { LunchVoteOverrideDialog } from "./_components/lunch-vote-override-dialog"
-import { LunchMenuViewersDialog } from "./_components/lunch-menu-viewers-dialog"
+import { LunchMenuViewersSheet } from "./_components/lunch-menu-viewers-sheet"
 import { LunchShareDialog } from "./_components/lunch-share-dialog"
 import { LunchExportDialog } from "./_components/lunch-export-dialog"
 import { getAttendanceMonthOptions } from "@/lib/hr/attendance-utils"
@@ -2171,7 +2171,7 @@ export function LunchRegisterPage({
         }}
       />
 
-      <LunchMenuViewersDialog
+      <LunchMenuViewersSheet
         open={viewersMenu !== null}
         onOpenChange={(open) => !open && setViewersMenu(null)}
         menu={viewersMenu}

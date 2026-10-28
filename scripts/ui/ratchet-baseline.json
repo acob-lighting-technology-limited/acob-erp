@@ -31,9 +31,7 @@
       "lib/starlink/billing-alerts.ts": 1,
       "lib/tasks/mailer.ts": 1
     },
-    "window-dialogs": {
-      "app/admin/dev/impersonation/impersonation-content.tsx": 1
-    },
+    "window-dialogs": {},
     "key-index": {},
     "dialog-in-page": {},
     "explicit-any": {
@@ -107,7 +105,6 @@
       "components/approval-signing/signing-setup.tsx": 1,
       "components/assets/AssetAssignDialog.tsx": 1,
       "components/assets/AssetFormDialog.tsx": 1,
-      "components/assets/AssetIssuesDialog.tsx": 1,
       "components/assets/AssetTypeDialog.tsx": 1,
       "components/correspondence/create-reference-dialog.tsx": 1,
       "components/onedrive/file-preview.tsx": 1,

@@ -17,7 +17,7 @@ import {
   type DataTableFilter,
   type DataTableTab,
 } from "@/components/ui/data-table"
-import { BookingReviewDialog } from "./_components/booking-review-dialog"
+import { BookingReviewSheet } from "./_components/booking-review-sheet"
 import { ResourceDialog } from "./_components/resource-dialog"
 import type { FleetAttachment, FleetBooking, FleetResource } from "./_components/fleet-types"
 import { apiFetch } from "@/lib/api-client"
@@ -573,7 +573,7 @@ export default function AdminFleetPage() {
         onCreateResource={() => void createResource()}
       />
 
-      <BookingReviewDialog
+      <BookingReviewSheet
         selectedBooking={selectedBooking}
         attachments={attachments}
         adminNote={adminNote}

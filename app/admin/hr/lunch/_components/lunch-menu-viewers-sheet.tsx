@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { Eye, Search, Clock, CheckCircle2, XCircle, AlertCircle, Utensils, UserX } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,7 @@ import { getInitials } from "@/lib/utils"
 import type { AdminLunchMenu, LunchEmployee } from "../view"
 import type { LunchMenuViewRecord, LunchVoteRecord } from "@/lib/hr/lunch-voting"
 
-interface LunchMenuViewersDialogProps {
+interface LunchMenuViewersSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   menu: AdminLunchMenu | null
@@ -24,13 +24,13 @@ interface LunchMenuViewersDialogProps {
 
 type FilterType = "all_viewers" | "during_window" | "after_deadline" | "voted" | "said_no" | "no_vote" | "not_viewed"
 
-export function LunchMenuViewersDialog({
+export function LunchMenuViewersSheet({
   open,
   onOpenChange,
   menu,
   employees,
   onOverrideVote,
-}: LunchMenuViewersDialogProps) {
+}: LunchMenuViewersSheetProps) {
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<FilterType>("all_viewers")
 
@@ -137,23 +137,16 @@ export function LunchMenuViewersDialog({
   if (!menu) return null
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] max-w-3xl flex-col gap-0 p-0">
-        <DialogHeader className="border-b p-5 pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="space-y-1">
-              <DialogTitle className="flex items-center gap-2 text-lg">
-                <Eye className="h-5 w-5 text-blue-500" />
-                Menu Viewers: {formatWATDate(menu.date, { weekday: "long", day: "numeric", month: "short" })}
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Tracked from publication until 11:59:59 PM WAT on{" "}
-                {formatWATDate(menu.date, { day: "numeric", month: "short" })}. Voting closed at{" "}
-                {formatWATTime(menu.resolvedDeadline)}.
-              </DialogDescription>
-            </div>
-          </div>
-
+    <DetailSheet
+      wide
+      flush
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Menu viewers: ${formatWATDate(menu.date, { weekday: "long", day: "numeric", month: "short" })}`}
+      leading={<Eye className="text-info h-5 w-5" />}
+      description={`Tracked from publication until 11:59:59 PM WAT on ${formatWATDate(menu.date, { day: "numeric", month: "short" })}. Voting closed at ${formatWATTime(menu.resolvedDeadline)}.`}
+      toolbar={
+        <div className="border-b px-4 pb-3 sm:px-5">
           {/* Quick Metrics Grid */}
           <div className="grid grid-cols-2 gap-2 pt-3 sm:grid-cols-4">
             <div className="bg-muted/40 rounded-lg border p-2.5">
@@ -224,110 +217,110 @@ export function LunchMenuViewersDialog({
               </SelectContent>
             </Select>
           </div>
-        </DialogHeader>
-
-        {/* List of Viewers */}
-        <div className="divide-border/60 max-h-[50vh] flex-1 divide-y overflow-y-auto p-4">
-          {filteredRows.length === 0 ? (
-            <div className="text-muted-foreground space-y-1 py-10 text-center text-xs">
-              <Eye className="text-muted-foreground/50 mx-auto mb-2 h-6 w-6" />
-              <p className="font-semibold">No records match this filter</p>
-              <p>Try clearing your search or switching filter categories.</p>
-            </div>
-          ) : (
-            filteredRows.map((row) => (
-              // Phones: name and Override on the first line, view status and vote below —
-              // one line squeezed the name to nothing and stacked the badges on top of it.
-              <div
-                key={row.id}
-                className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 text-xs sm:grid-cols-[2rem_minmax(0,1fr)_auto_auto]"
-              >
-                <div className="col-start-1 row-start-1">
-                  <Avatar className="h-8 w-8 shrink-0">
-                    {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.full_name} />}
-                    <AvatarFallback className="bg-muted text-xs font-semibold">
-                      {getInitials(row.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-                <div className="col-start-2 row-start-1 min-w-0">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-foreground truncate font-semibold">{row.full_name}</span>
-                      <span className="text-muted-foreground shrink-0 font-mono text-xs">{row.employee_number}</span>
-                    </div>
-                    <span className="text-muted-foreground block truncate text-xs">{row.department}</span>
+        </div>
+      }
+    >
+      {/* List of Viewers */}
+      <div className="divide-border/60 min-h-0 flex-1 divide-y overflow-y-auto p-4">
+        {filteredRows.length === 0 ? (
+          <div className="text-muted-foreground space-y-1 py-10 text-center text-xs">
+            <Eye className="text-muted-foreground/50 mx-auto mb-2 h-6 w-6" />
+            <p className="font-semibold">No records match this filter</p>
+            <p>Try clearing your search or switching filter categories.</p>
+          </div>
+        ) : (
+          filteredRows.map((row) => (
+            // Phones: name and Override on the first line, view status and vote below —
+            // one line squeezed the name to nothing and stacked the badges on top of it.
+            <div
+              key={row.id}
+              className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 text-xs sm:grid-cols-[2rem_minmax(0,1fr)_auto_auto]"
+            >
+              <div className="col-start-1 row-start-1">
+                <Avatar className="h-8 w-8 shrink-0">
+                  {row.avatar_url && <AvatarImage src={row.avatar_url} alt={row.full_name} />}
+                  <AvatarFallback className="bg-muted text-xs font-semibold">
+                    {getInitials(row.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+              <div className="col-start-2 row-start-1 min-w-0">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-foreground truncate font-semibold">{row.full_name}</span>
+                    <span className="text-muted-foreground shrink-0 font-mono text-xs">{row.employee_number}</span>
                   </div>
+                  <span className="text-muted-foreground block truncate text-xs">{row.department}</span>
                 </div>
-                <div className="col-span-2 col-start-2 row-start-2 flex flex-wrap items-center justify-between gap-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:flex-nowrap sm:justify-end sm:gap-3">
-                  {/* View Status & Timestamp */}
-                  <div className="flex items-center gap-2 text-right sm:block">
-                    {row.hasViewed ? (
-                      <div className="flex items-center gap-2 sm:block">
-                        <Badge
-                          variant="outline"
-                          className={
-                            row.viewedDuringWindow
-                              ? "border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-xs text-emerald-600"
-                              : "border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-xs text-amber-600"
-                          }
-                        >
-                          {row.viewedDuringWindow ? "During Voting" : "After Cut-off"}
+              </div>
+              <div className="col-span-2 col-start-2 row-start-2 flex flex-wrap items-center justify-between gap-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:flex-nowrap sm:justify-end sm:gap-3">
+                {/* View Status & Timestamp */}
+                <div className="flex items-center gap-2 text-right sm:block">
+                  {row.hasViewed ? (
+                    <div className="flex items-center gap-2 sm:block">
+                      <Badge
+                        variant="outline"
+                        className={
+                          row.viewedDuringWindow
+                            ? "border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-xs text-emerald-600"
+                            : "border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-xs text-amber-600"
+                        }
+                      >
+                        {row.viewedDuringWindow ? "During Voting" : "After Cut-off"}
+                      </Badge>
+                      <span className="text-muted-foreground block text-xs sm:mt-0.5">
+                        {row.first_viewed_at ? formatWATTime(row.first_viewed_at) : ""}
+                      </span>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="border-gray-200 px-1.5 py-0 text-xs text-gray-400">
+                      Not viewed
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Meal / Vote Status */}
+                <div className="min-w-0 text-right sm:min-w-[130px]">
+                  {row.vote ? (
+                    row.vote.is_eating ? (
+                      <div>
+                        <Badge className="inline-block max-w-[180px] truncate border-0 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 sm:max-w-[150px]">
+                          {row.mealChoice}
                         </Badge>
-                        <span className="text-muted-foreground block text-xs sm:mt-0.5">
-                          {row.first_viewed_at ? formatWATTime(row.first_viewed_at) : ""}
-                        </span>
                       </div>
                     ) : (
-                      <Badge variant="outline" className="border-gray-200 px-1.5 py-0 text-xs text-gray-400">
-                        Not viewed
+                      <Badge className="border-0 bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-600">
+                        Said No
                       </Badge>
-                    )}
-                  </div>
-
-                  {/* Meal / Vote Status */}
-                  <div className="min-w-0 text-right sm:min-w-[130px]">
-                    {row.vote ? (
-                      row.vote.is_eating ? (
-                        <div>
-                          <Badge className="inline-block max-w-[180px] truncate border-0 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 sm:max-w-[150px]">
-                            {row.mealChoice}
-                          </Badge>
-                        </div>
-                      ) : (
-                        <Badge className="border-0 bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-600">
-                          Said No
-                        </Badge>
-                      )
-                    ) : (
-                      <span className="text-muted-foreground text-xs italic">No vote</span>
-                    )}
-                  </div>
-                </div>
-                <div className="col-start-3 row-start-1 sm:col-start-4">
-                  {/* Override Action */}
-                  {onOverrideVote && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
-                          onClick={() => onOverrideVote(row.id)}
-                          aria-label="Change or set this employee's answer"
-                        >
-                          Override
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">{"Change or set this employee's answer"}</TooltipContent>
-                    </Tooltip>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground text-xs italic">No vote</span>
                   )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+              <div className="col-start-3 row-start-1 sm:col-start-4">
+                {/* Override Action */}
+                {onOverrideVote && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
+                        onClick={() => onOverrideVote(row.id)}
+                        aria-label="Change or set this employee's answer"
+                      >
+                        Override
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{"Change or set this employee's answer"}</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </DetailSheet>
   )
 }
