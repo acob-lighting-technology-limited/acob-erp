@@ -2,99 +2,59 @@
 
 Replaces the shorter review committed earlier today. Part 1 (§0–§9) covers tables, list rows, sheets and modals; Part 2 (§10–§25) covers each table page as a whole; Part 3 (§26–§35) covers every page in the app and how to keep it fixed; Part 4 (§36–§60) covers sidebars, dashboards, UX and the wider front end, with a phased roadmap.
 
-## Status: what branch `feat/ui-phase1-foundations` has fixed
+## Status: what branch `feat/ui-phase1-foundations` has done
 
-Everything below is committed on this branch, each as its own commit. Checks run on every commit:
-`lint:strict`, `type-check`, the unit suites and `ui:guard`. **None of it has been looked at in a
-browser**: the visual items below need a pass on localhost.
+Everything is committed on this branch. Every commit passed `lint:strict`, `type-check` and `ui:guard`
+(a few commits needed a follow-up to get the guard green again after a file rename), and the unit suites
+pass. A browser pass on localhost covered: the departments, competency, development-plan, review-cycle,
+leave Overview and booking-review dialogs and sheets; the leave More menu; the attendance and cycles pages;
+page titles; the skip link's presence; and the column-drag hydration warning (gone). **Not checked:** a
+real phone (the Chrome window cannot go below desktop width), and most of the other extracted dialogs.
 
-### Fixed
+### Done
 
-| Report § | What | Commit area |
+| Area | What | Report § |
 |---|---|---|
-| §42.1 | Open redirect on login: `?next=/\evil.com` and a tab-prefixed path bypassed the check | `lib/auth/safe-next-path.ts` |
-| §43.2 | Email signature HTML now escapes names, roles, emails and phones | `lib/signature/default-signature.ts` |
-| §41.1 | 56 client `/api` calls used bare `fetch`, so the dept console's scoping header was never sent; lint rule added | `apiFetch` everywhere |
-| §39.7 | Admin dashboard redirects before its queries run when there is no admin scope | `app/admin/page.tsx` |
-| §37.1 | `/admin/it` 404: the hub page now exists | `app/admin/it` |
-| §0.1–0.4, 0.6, §15 | Phone row sheet: opens on every tap, carries every column and the row's actions, flat fields, expandable panel inside it; Cards opt-in (6 tables keep them) | `components/ui/data-table` |
-| §6 (partly) | `DetailSheet`, `DetailList`, `SectionHeading` shared primitives; the leave sheet uses them | `components/ui/detail-*` |
-| §38 | 12 shared views no longer hard-code `/admin/…` links inside the dept console | `lib/dept/shell-links.ts`, `useShellBase` |
-| §36.9, §42.3 | One `useLogout()` replaces four logout copies and clears the query cache | `hooks/use-logout.ts` |
-| §29, §12 (partly) | Tab title template (`… \| Matrix`), 63 titles cleaned of their brand suffix, 57 more pages named | root layout + pages |
-| §28a (partly) | Notification settings, job description and employee detail now show one skeleton, not two | `PageLoader` |
-| §20 | 31 date/time calls now use Lagos time (en-NG, or the existing locale for server text); numbers untouched | across `app`, `lib` |
-| tiny text | 799 of 815 `text-[9–11px]` uses are now `text-xs` (the print sheet and signing canvas keep theirs) | admin, staff, components |
-| §34, §24 (partly) | Sign-up success page and the login error page's Sign up button removed; 31 dead role lists, `adminOnly`, `TableExportContext`, `cmdk` removed | various |
-| §35 | `ui:guard` (audit plus a per-file ratchet over 18 rules) runs in pre-push and CI; page-types table in AGENTS.md | `scripts/ui` |
+| Security | Open redirect on login; email signature HTML escaped; raw `fetch` → `apiFetch` (dept console scoping); admin dashboard scope guard; `/admin/it` hub; whole profile rows no longer serialised to the browser (layouts, 404, signature pages) | 42.1, 43.2, 41.1, 39.7, 37.1, 45.8 |
+| Session | `apiFetch` sends a lapsed session to login and back; 60 s timeout; queries do not retry 4xx; one `useLogout()` that clears the cache | 42.2, 42.3, 42.5, 41.7 |
+| `DataTable` | Phone sheet opens on every tap with every column and the row's actions; cards opt-in; auto-pagination past 50 rows; built-in export removed (every page exports through `ExportOptionsDialog` in the header); stable drag id | 0, 13, 15 |
+| Sheets | `DetailSheet` (toolbar and flush modes), `DetailList`; every record side sheet except the employee profile is on it; employee profile, asset history and issues, documents (admin and staff), role members, login-logs access profile, peer feedback, development plans, survey, acknowledgements, lunch viewers and booking review are sheets; one shared `ActionPointsSheet` | 1, 6 |
+| Dialogs | All 28 `<Dialog>`s that lived in page files are in `_components/`; `window.prompt` gone | 7 |
+| Page chrome | Back-link policy; titles match the sidebar; every page has a browser-tab title (108 server pages got metadata, 63 client pages became server wrappers); stats as a line on phones; header "More" menu (`HeaderMoreMenu`) on leave, UI errors, attendance, admin tasks, assets and the action tracker; Refresh buttons dropped where data refetches; requisition and help-desk ticket pages on `PageWrapper`/`PageHeader` | 11, 12, 16, 23, 27, 29 |
+| Colour | `success/warning/danger/info/purple` tone tokens with their own dark values; about 1,000 `dark:` pairs and 8 local status maps moved onto them; `StatusBadge` tones | 17, 22 |
+| Lists and panels | Expanded-row panels lose their own box styling; sentence-case micro-headings in the flagged panels; centred empty text uses `EmptyState compact`; destructive row actions styled | 3, 18, 21 |
+| Accessibility | Skip link and `#main-content`; both mobile drawers close on Escape, trap Tab, return focus and are `inert` when closed; reduced-motion for the shell width animation; 40 px sidebar touch targets; click-div rule ignores stopPropagation wrappers | 33, 36, 48, 49 |
+| Code health | 76 inline query keys moved to `QUERY_KEYS`; 76 index keys prefixed; dates on Lagos time; 799 tiny-text uses raised; dead code removed; commit-msg hook prints commitlint's own error | 20, 24, 41.2, 54 |
+| Guardrails | `ui:guard` (audit plus a per-file ratchet over 18 rules) in pre-push and CI | 35 |
 
 ### Corrections to this report
 
-- **§39.7 (admin dashboard "fails open")** was rated P0. The admin layout already redirects those users,
-  so it was defence in depth, not a live leak.
-- **§14 / §28a:** the five admin detail pages (bills, invoices, products, orders, suppliers) were listed
-  as having mismatched skeletons. Their `PageLoader` defaults equal their `loading.tsx` props, so they
-  are fine. The real mismatches were three pages, now fixed.
-- **§42.3** originally claimed the next user could inherit the previous user's cache. They cannot (login
-  does a full page load); the real gap was the Back button on a shared device, now closed by `useLogout`.
-- **The `locale-without-en-ng` ratchet rule** was relaxed: it now accepts an explicit `timeZone` and
-  ignores number formatting. The harm is the time zone, not the locale spelling.
-- **§24 deletions not done, on purpose:** `/birthday1`, `/birthday3`, `/birthday4` share components and CSS
-  with `/birthday` and are design variants you may still want to choose between; `/admin/hr/leave/test`
-  has its own admin API and may still be used.
+- §39.7 (admin dashboard "fails open") was defence in depth, not a live leak: the admin layout already redirects.
+- §14/§28a: the five admin detail pages' skeletons were fine; the real mismatches were three pages, now fixed.
+- §42.3: the next user could not inherit the previous user's cache; the real gap was the Back button, now closed.
+- §19 (icon buttons): all 17 flagged buttons already had a label further down the tag.
+- §30 (fixed pixel widths): all are table or calendar minimums inside `overflow-x-auto`.
+- §7 (modal clean-up): the base `DialogContent` already caps height, scrolls and becomes a bottom sheet on phones.
+- §39 staff `/profile`: an intentional dashboard, so it keeps its own frame.
+- The `locale-without-en-ng`, `click-div` and `select-star` rules were relaxed (explicit time zones, stopPropagation
+  wrappers and head-only count requests are fine).
 
-### Not done (needs a design decision or a visual pass)
+### Not done, and why
 
-- §1 the 16 modal-to-sheet moves, incl. the employee profile; §7 the 126 modal clean-ups; §6 the other 11
-  side sheets (they still hand-roll their shell).
-- §2–§5 per-table list rows, sheet field curation and expanded-panel rewrites (the shared sheet fix in §0
-  covers the common cause; per-page curation remains).
-- §11 header actions (More menu, Refresh buttons), §13 export consolidation, §16 stats as line badges,
-  §23 back-link policy: these need your decisions in §8.
-- §14 the ~130 skeleton prop mismatches (`list="responsive"` etc.) and §28 missing `loading.tsx`.
-- §17 status colour maps (14 files) and §18 empty states (25 files) still to move onto `StatusBadge` and
-  `EmptyState`; §27 hand-built page frames, §30 mobile layout, §33 accessibility (drawer focus trap,
-  skip link).
-- Done since (2): §17 local status colours (8 files) now use the tone tokens; §18 centred empty text
-  uses `EmptyState compact` (small inline hints stay as text); §13 one export system (the built-in
-  `DataTable` export is removed; every page exports through `ExportOptionsDialog` in the header);
-  §11 Refresh buttons removed on 6 query-driven pages, `HeaderMoreMenu` added and used on leave and UI
-  errors (the other header-button pages still need it); §1 rows 2, 6 and 14 (asset history, role
-  members, acknowledgements) are side sheets.
-- Done since (3): §1 rows 1, 2, 4, 6, 8, 9, 10, 13 and 14 are sheets: the employee profile
-  (`EmployeeProfileSheet`, with the edit form split out to `employee-edit-form.tsx`), asset history, admin
-  and staff document views (both on `DetailSheet`), role members, login-logs access profile, peer
-  feedback, development plans, survey responses, acknowledgements.
-- Left as modals on purpose or still to do in §1 (rows 11 and 12 are now one shared `ActionPointsSheet`): row 5 job descriptions (it prints a letterhead, which a
-  sheet would clip), row 3 asset issues (has an add form), row 7 lunch viewers (custom 330-line layout),
-  rows 11 and 12 action-tracker points (an editing view built twice; wants one shared sheet), and the
-  booking review.
-- Done since (4): every record side sheet except the employee profile now sits on `DetailSheet` (audit log,
-  appeal review, requisition and payment previews, MD queue, feedback, task, help-desk ticket, controlled
-  document, event). `DetailSheet` gained a `toolbar` slot and a `flush` mode for tabbed bodies. The
-  `*Dialog` file names of the task, ticket, appeal, controlled-doc and audit sheets were not renamed, to
-  avoid resetting their ratchet baselines.
-- Done since (5): §33 accessibility: a skip-to-content link and `#main-content` target in all three shells; both
-  mobile drawers close on Escape, trap Tab, return focus and are `inert` while closed
-  (`hooks/use-drawer-a11y.ts`); icon buttons were already labelled (the audit's count was a false
-  positive); the click-div rule now ignores stopPropagation wrappers. §11 `HeaderMoreMenu` also on
-  attendance and admin tasks.
-- Checked and left alone: §7 modal clean-up (the base `DialogContent` already caps height, scrolls and
-  becomes a bottom sheet on phones; the 67 call-site `max-h` values are deliberate margins); §30 fixed
-  pixel widths (all 7 are table or calendar minimums inside an `overflow-x-auto` wrapper); icon buttons.
-- Done since (6): all 28 `<Dialog>` blocks that were written inside page and view files now live in
-  `_components/` (the `dialog-in-page` baseline is zero); `HeaderMoreMenu` is on assets and the admin action
-  tracker (items can be links and async actions); the table column drag context has a stable id, which
-  removes a hydration warning that the dev overlay showed on every table page. Checked in a browser: the
-  departments dialog, the leave More menu and Overview dialog, and the skip link's presence.
-- Not done: a visual pass on a phone, and opening each of the other 26 extracted dialogs in a browser
-  (they are typed props over the same JSX, and tsc, lint and the guard pass).
-- Decided not to change: staff `/profile` is an intentional dashboard, not a table page, so it keeps its
-  own frame.
-- Done since: §22 `dark:` overrides now use the `success/warning/danger/info/purple` tone tokens
-  (about 1,000 pairs, 15 genuine one-offs left); §21 destructive styling on the two flagged tables.
-- §55 end-to-end tests in CI (needs a seeded test project; there is no staging database).
-- 81 pages still have no `metadata`; 63 pages are client-only `page.tsx`. The ratchet stops either growing.
+| Item | Why |
+|---|---|
+| End-to-end tests in CI (§55); deleting `/birthday1,3,4` and `/admin/hr/leave/test` (§24) | Pending by decision: needs a seeded test project; the variants share code with `/birthday` |
+| Job-description modal → sheet | It prints a letterhead, which a sheet would clip |
+| Employee profile on `DetailSheet` | Its tab bar and edit mode do not fit the shared layout; it is a plain right-hand sheet |
+| 180 `select("*")` calls (§45.8) | Most are API routes whose response shape is a contract, and many results are cast, so tsc cannot prove a column list is complete. The page-level ones that leaked whole rows to the browser are fixed |
+| 158 `any` (§54.1), 29 `eslint-disable`, 21 raw `<img>` | Each needs a real type or a reviewed exception; tsc reports errors at the use site, not the declaration |
+| 16 tiny-text uses | The print sheet and signing canvas, intentionally |
+| Per-page list rows, sheet field curation, the 4 "card-in-card" panel rewrites (§2–§5) | The shared `DataTable` fixes cover the common causes; what is left is per-page design (which fields to keep). The 81 "title · subtitle · trailing" rows are the standard list row, not a defect |
+| Features: ⌘K palette, realtime queues, inbox-style notifications, iOS install guide, first-login guide, offline page, product analytics (§47, §48, §52, §53, §57, §59) | New product work, not fixes |
+| Large migrations: 171 `apiFetch` writes to `useMutation` (§41.3), ~100 forms to react-hook-form (§46.1), framer-motion to CSS (§45.4), the 34 localStorage keys (§51.3) | Risky to do in bulk without tests; localStorage renames would reset users' saved settings |
+| Staff leave panel vs admin sections duplicate (§9.2) | A rebuild of the staff leave screen |
+| Phone visual pass (§30) | The Chrome window cannot be narrowed below desktop width; needs a device or the in-app browser |
+| Admin `/api/hr/performance/development-plans?user_id=all_admin` returns 500 | Found during the browser pass; not caused by this branch (no diff on the route) |
 
 **Scope:** every `DataTable` (120 instances in 104 files), its list row
 (`mobileRow`), slide-up sheet (`mobileRow.detail` or the auto-built one), expanded panel and
