@@ -74,6 +74,18 @@ browser**: the visual items below need a pass on localhost.
   document, event). `DetailSheet` gained a `toolbar` slot and a `flush` mode for tabbed bodies. The
   `*Dialog` file names of the task, ticket, appeal, controlled-doc and audit sheets were not renamed, to
   avoid resetting their ratchet baselines.
+- Done since (5): §33 accessibility: a skip-to-content link and `#main-content` target in all three shells; both
+  mobile drawers close on Escape, trap Tab, return focus and are `inert` while closed
+  (`hooks/use-drawer-a11y.ts`); icon buttons were already labelled (the audit's count was a false
+  positive); the click-div rule now ignores stopPropagation wrappers. §11 `HeaderMoreMenu` also on
+  attendance and admin tasks.
+- Checked and left alone: §7 modal clean-up (the base `DialogContent` already caps height, scrolls and
+  becomes a bottom sheet on phones; the 67 call-site `max-h` values are deliberate margins); §30 fixed
+  pixel widths (all 7 are table or calendar minimums inside an `overflow-x-auto` wrapper); icon buttons.
+- Not done: the 28 `<Dialog>` blocks still written in page files (moving them needs each page's state
+  passed as typed props, which is a manual change per page); `HeaderMoreMenu` on assets and the admin
+  action tracker (both files are at the 1,000-line cap and the extra markup would grow them); a visual
+  pass on a phone.
 - Decided not to change: staff `/profile` is an intentional dashboard, not a table page, so it keeps its
   own frame.
 - Done since: §22 `dark:` overrides now use the `success/warning/danger/info/purple` tone tokens

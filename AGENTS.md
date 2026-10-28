@@ -700,6 +700,10 @@ table or filter bar. Use `ExportOptionsDialog` from
 `@/components/admin/export-options-dialog`. Export logic lives in
 `@/lib/<section>/export.ts`.
 
+**Shells.** Every app shell renders `SkipToContent` first and the content area is `#main-content`. A
+hand-built slide-in drawer uses `useDrawerA11y` (Escape, focus trap, focus return, `inert` while closed);
+prefer `Sheet`, which does all of this already.
+
 **Header buttons.** A header shows one main button, Export when the page has one, and
 `HeaderMoreMenu` (`@/components/ui/patterns/header-more-menu`) for anything else. Do not add a
 Refresh button to a page whose data is a TanStack query: it refetches on window focus.
