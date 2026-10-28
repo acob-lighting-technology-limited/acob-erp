@@ -5,6 +5,9 @@ import { expandDepartmentScopeForQuery } from "@/lib/admin/rbac"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { DocumentationSections } from "@/app/admin/documentation/documentation-sections"
 
+export const metadata: Metadata = { title: "Dept Documentation" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

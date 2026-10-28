@@ -9,6 +9,9 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
+export const metadata: Metadata = { title: "Admin Signature details" }
+import type { Metadata } from "next"
+
 export default async function AdminEmployeeSignaturePage(props: { params: Promise<{ userId: string }> }) {
   const params = await props.params
   const supabase = await createClient()

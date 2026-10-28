@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { AssetIssuesPage } from "./view"
+export { default } from "./page-client"
 
-export default function AssetIssuesPageRoute() {
-  return <AssetIssuesPage />
-}
+export const metadata: Metadata = { title: "Admin Asset Issues" }

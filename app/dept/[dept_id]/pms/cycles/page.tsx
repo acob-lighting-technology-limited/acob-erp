@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { ReviewCyclesPage as AdminPmsCyclesPage } from "@/app/admin/pms/cycles/view"
 
+export const metadata: Metadata = { title: "Dept Cycles" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

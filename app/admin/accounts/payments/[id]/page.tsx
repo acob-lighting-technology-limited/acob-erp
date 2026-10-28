@@ -1,9 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { use } from "react"
-import { PaymentDetailView } from "@/components/payments/payment-detail-view"
+export { default } from "./page-client"
 
-export default function PaymentDetailsPage(props: { params: Promise<{ id: string }> }) {
-  const { id } = use(props.params)
-  return <PaymentDetailView paymentId={id} basePath="/admin/accounts/payments" scope="admin" />
-}
+export const metadata: Metadata = { title: "Admin Payment details" }

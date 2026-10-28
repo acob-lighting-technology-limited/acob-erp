@@ -2,7 +2,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AuthShell, authCardClassName } from "@/components/auth/auth-shell"
 import Link from "next/link"
+import type { Metadata } from "next"
 import { ErrorState } from "@/components/ui/patterns"
+
+export const metadata: Metadata = { title: "Sign-in error" }
 
 export default function AuthErrorPage() {
   return (

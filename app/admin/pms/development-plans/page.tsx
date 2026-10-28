@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { AdminDevelopmentPlansPage } from "./view"
+export { default } from "./page-client"
 
-export default function AdminDevelopmentPlansPageRoute() {
-  return <AdminDevelopmentPlansPage />
-}
+export const metadata: Metadata = { title: "Admin Development Plans" }

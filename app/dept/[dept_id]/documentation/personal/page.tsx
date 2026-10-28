@@ -7,6 +7,9 @@ import { AdminDocumentationContent } from "@/app/admin/documentation/admin-docum
 import type { Documentation, UserProfile, employeeMember } from "@/app/admin/documentation/admin-documentation-content"
 import type { UserRole } from "@/types/database"
 
+export const metadata: Metadata = { title: "Dept Personal" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

@@ -4,7 +4,10 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope, scopeHoldsAdminRoute } from "@/lib/admin/rbac"
+import type { Metadata } from "next"
 import { MailPolicySettings } from "@/components/admin/mail-policy-settings"
+
+export const metadata: Metadata = { title: "Admin Mail settings" }
 
 export default async function MailSettingsPage() {
   const supabase = await createClient()

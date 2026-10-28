@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { DeptPmsKpiView } from "./_components/dept-pms-kpi-view"
 
+export const metadata: Metadata = { title: "Dept KPI" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

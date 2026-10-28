@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import type { Metadata } from "next"
 import { KssRosterTable } from "@/components/reports/kss-roster-table"
+
+export const metadata: Metadata = { title: "KSS" }
 
 export default async function DashboardKssPage() {
   const supabase = await createClient()

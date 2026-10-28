@@ -5,6 +5,9 @@ import { formatCycleLabel } from "@/lib/pms/cadence"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { getCurrentUserPmsData } from "../_lib"
 
+export const metadata: Metadata = { title: "PMS CBT" }
+import type { Metadata } from "next"
+
 type ReviewQueryRow = {
   cbt_score: number | null
   review_cycle_id: string | null

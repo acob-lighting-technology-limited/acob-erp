@@ -5,6 +5,9 @@ import { PageHeader, PageWrapper } from "@/components/layout"
 import { PageSection } from "@/components/ui/patterns"
 import { IconFill } from "@/components/ui/icon-fill"
 
+export const metadata: Metadata = { title: "Dept Reports" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

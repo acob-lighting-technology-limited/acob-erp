@@ -38,7 +38,10 @@ import {
   collapseRecentActivity,
   isExcludedActivity,
 } from "@/components/admin/dashboard-helpers"
+import type { Metadata } from "next"
 import { logger } from "@/lib/logger"
+
+export const metadata: Metadata = { title: "Dept overview" }
 
 const log = logger("dept-dashboard")
 

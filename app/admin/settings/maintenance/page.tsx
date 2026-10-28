@@ -7,6 +7,9 @@ import { MaintenanceToggle } from "@/components/admin/maintenance-toggle"
 import { canManageMaintenanceMode, parseMaintenanceMode } from "@/lib/maintenance"
 import { formatWATDateTime } from "@/lib/utils/date"
 
+export const metadata: Metadata = { title: "Admin Maintenance" }
+import type { Metadata } from "next"
+
 export default async function SettingsMaintenancePage() {
   const supabase = await createClient()
   const {

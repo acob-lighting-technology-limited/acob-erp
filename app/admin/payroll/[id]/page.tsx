@@ -2,7 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { getRequestScope } from "@/lib/admin/api-scope"
 import { logger } from "@/lib/logger"
 import { notFound } from "next/navigation"
+import type { Metadata } from "next"
 import { PayrollWorksheetPage } from "./view"
+
+export const metadata: Metadata = { title: "Admin Payroll details" }
 
 const log = logger("payroll-worksheet-page")
 export const dynamic = "force-dynamic"

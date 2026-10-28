@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Wrench, ArrowRight, FileSignature, Droplet, Video } from "lucide-react"
 import { PageHeader, PageWrapper } from "@/components/layout"
 
+export const metadata: Metadata = { title: "Admin Tools" }
+import type { Metadata } from "next"
+
 const tools = [
   {
     name: "Email Signature",

@@ -5,6 +5,9 @@ import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { isAssignableEmploymentStatus } from "@/lib/workforce/assignment-policy"
 import { CommunicationsComposer } from "@/app/admin/communications/_components/communications-composer"
 
+export const metadata: Metadata = { title: "Dept Broadcast" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

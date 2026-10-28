@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { normalizeDepartmentName } from "@/shared/departments"
+import type { Metadata } from "next"
 import { WeeklyReportsContent } from "@/app/admin/reports/weekly-reports/weekly-reports-content"
+
+export const metadata: Metadata = { title: "Dept Weekly Reports" }
 
 interface DeptWeeklyReportsPageProps {
   params: Promise<{ dept_id: string }>

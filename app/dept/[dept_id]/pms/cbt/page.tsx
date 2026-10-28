@@ -1,5 +1,8 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
-import AdminPmsCbtPage from "@/app/admin/pms/cbt/page"
+import AdminPmsCbtPage from "@/app/admin/pms/cbt/page-client"
+
+export const metadata: Metadata = { title: "Dept CBT" }
+import type { Metadata } from "next"
 
 interface Props {
   params: Promise<{ dept_id: string }>

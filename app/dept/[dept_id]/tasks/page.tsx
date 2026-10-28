@@ -7,6 +7,9 @@ import { listAssignableProfiles } from "@/lib/workforce/assignment-policy"
 import { AdminTasksContent, type employee, type UserProfile } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task, TaskPersonSummary } from "@/types/task"
 
+export const metadata: Metadata = { title: "Dept Tasks" }
+import type { Metadata } from "next"
+
 type GoalFilterOption = { id: string; title: string }
 type GoalRow = { id: string; title: string }
 

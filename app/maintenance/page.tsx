@@ -1,6 +1,9 @@
 import { Wrench } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
+export const metadata: Metadata = { title: "Maintenance" }
+import type { Metadata } from "next"
+
 export default function MaintenancePage() {
   return (
     <div className="bg-background flex min-h-screen items-center justify-center p-4 sm:p-6">

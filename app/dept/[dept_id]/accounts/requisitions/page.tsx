@@ -1,6 +1,9 @@
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 import { RequisitionsListPage } from "@/components/requisitions/requisitions-list-page"
 
+export const metadata: Metadata = { title: "Dept Requisitions" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

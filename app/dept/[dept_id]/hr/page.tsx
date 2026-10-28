@@ -1,6 +1,9 @@
 import { HRAdminDashboard } from "@/app/admin/hr/view"
 import { requireDeptScope } from "@/lib/dept/require-dept-scope"
 
+export const metadata: Metadata = { title: "Dept HR" }
+import type { Metadata } from "next"
+
 interface Props {
   params: Promise<{ dept_id: string }>
 }

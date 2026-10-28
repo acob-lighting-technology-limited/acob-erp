@@ -5,6 +5,9 @@ import { normalizeDepartmentName } from "@/shared/departments"
 import { AdminReferenceGeneratorContent } from "@/app/admin/correspondence/admin-reference-generator-content"
 import type { CorrespondenceRecord } from "@/types/correspondence"
 
+export const metadata: Metadata = { title: "Dept Correspondence" }
+import type { Metadata } from "next"
+
 interface DeptCorrespondencePageProps {
   params: Promise<{ dept_id: string }>
 }

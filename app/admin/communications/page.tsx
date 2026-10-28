@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { CommunicationsPage } from "./view"
+export { default } from "./page-client"
 
-export default function CommunicationsPageRoute() {
-  return <CommunicationsPage />
-}
+export const metadata: Metadata = { title: "Admin Communications" }

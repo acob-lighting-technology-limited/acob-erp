@@ -4,7 +4,10 @@ import { resolveAdminScope } from "@/lib/admin/rbac"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { Clock } from "lucide-react"
 import { AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
+import type { Metadata } from "next"
 import { AttendanceForm } from "./_components/attendance-form"
+
+export const metadata: Metadata = { title: "Admin Attendance settings" }
 
 export default async function AttendanceSettingsPage() {
   const supabase = await createClient()

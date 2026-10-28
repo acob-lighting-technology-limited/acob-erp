@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { PmsAnalyticsPage } from "./view"
+export { default } from "./page-client"
 
-export default function PmsAnalyticsPageRoute() {
-  return <PmsAnalyticsPage />
-}
+export const metadata: Metadata = { title: "Admin PMS Analytics" }

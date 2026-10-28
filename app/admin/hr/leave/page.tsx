@@ -1,7 +1,5 @@
-"use client"
+import type { Metadata } from "next"
 
-import { LeaveApprovePage } from "./view"
+export { default } from "./page-client"
 
-export default function LeaveApprovePageRoute() {
-  return <LeaveApprovePage />
-}
+export const metadata: Metadata = { title: "Admin Leave" }
