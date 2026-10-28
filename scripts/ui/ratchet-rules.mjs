@@ -4,7 +4,7 @@
 const HINTS = {
   "tiny-text": "Minimum text size is text-xs (12px). Use text-xs.",
   "locale-without-en-ng":
-    "Use the helpers in @/lib/utils/date (formatWATDate...), or pass en-NG and timeZone: \"Africa/Lagos\". Business time is Lagos time.",
+    'Use the helpers in @/lib/utils/date (formatWATDate...), or pass en-NG and timeZone: "Africa/Lagos". Business time is Lagos time.',
   "raw-img": "Use next/image. A raw <img> is only for email/PDF/OG renderers.",
   "window-dialogs": "Confirm with AlertDialog (or useConfirm) and notify with sonner. No window.confirm/alert/prompt.",
   "key-index": "Use a stable id as the React key, not the array index.",
@@ -20,7 +20,7 @@ const HINTS = {
   "client-page": 'Make page.tsx a server component and move the interactive part into a "use client" child.',
   "page-missing-metadata": "Export `metadata` (a title) from a server page so the browser tab names the page.",
   "title-brand-suffix":
-    "The root layout appends | Matrix to every page title. Write only the page name, e.g. title: \"Leave\".",
+    'The root layout appends | Matrix to every page title. Write only the page name, e.g. title: "Leave".',
   "file-lines": "Do not grow a file over 1,000 lines. Extract into _components/, a hook, or lib/.",
 }
 
@@ -36,7 +36,23 @@ const count = (text, re) => (text.match(re) || []).length
 const isPage = (f) => /(^|\/)page\.tsx$/.test(f)
 const isViewLike = (f) => /(^|\/)(page|view)\.tsx$/.test(f) || /-content\.tsx$/.test(f)
 const inComponentsDir = (f) => f.startsWith("components/") || /\/_components\//.test(f)
-const startsClient = (text) => /^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*["']use client["']/.test(text)
+const startsClient = (text) => {
+  // Skip leading comments by hand: a nested-quantifier regex backtracks badly on `/*` runs.
+  let i = 0
+  for (;;) {
+    while (i < text.length && /\s/.test(text[i])) i++
+    if (text.startsWith("//", i)) {
+      const nl = text.indexOf("\n", i)
+      if (nl < 0) return false
+      i = nl + 1
+    } else if (text.startsWith("/*", i)) {
+      const end = text.indexOf("*/", i + 2)
+      if (end < 0) return false
+      i = end + 2
+    } else break
+  }
+  return /^["']use client["']/.test(text.slice(i, i + 12))
+}
 
 export const RULES = [
   {
@@ -57,8 +73,7 @@ export const RULES = [
   },
   {
     id: "raw-img",
-    applies: (f) =>
-      !/(email|pdf|opengraph-image|twitter-image|birthday|signature|pptx|export)/i.test(f),
+    applies: (f) => !/(email|pdf|opengraph-image|twitter-image|birthday|signature|pptx|export)/i.test(f),
     count: (text) => count(text, /<img\b/g),
   },
   {
@@ -99,8 +114,7 @@ export const RULES = [
   {
     id: "local-status-colour",
     applies: (f) => !/status-badge/.test(f),
-    count: (text) =>
-      count(text, /\bbg-(?:green|red|amber|yellow|blue|emerald|rose|orange)-100\s+text-/g),
+    count: (text) => count(text, /\bbg-(?:green|red|amber|yellow|blue|emerald|rose|orange)-100\s+text-/g),
   },
   {
     id: "fixed-px-width",

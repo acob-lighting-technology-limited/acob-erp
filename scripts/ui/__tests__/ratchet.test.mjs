@@ -19,7 +19,8 @@ test("a rule is not tripped by a comment that mentions what it forbids", () => {
 })
 
 test("urls inside strings survive comment stripping", () => {
-  assert.ok(stripComments('const u = "https://example.com/text-[10px]"').includes("https://example.com"))
+  const src = 'const u = "https://example.com/text-[10px]"'
+  assert.equal(stripComments(src), src)
 })
 
 test("tiny-text counts 9, 10 and 11px but not 12px", () => {
@@ -49,7 +50,8 @@ test("raw-img ignores email, pdf and og renderers", () => {
 })
 
 test("window-dialogs catches confirm, alert and prompt on window, and bare alert", () => {
-  const text = "window.confirm('x'); window.alert('y'); alert('z'); window.prompt('p'); confirm('ok'); notify.alert('n')"
+  const text =
+    "window.confirm('x'); window.alert('y'); alert('z'); window.prompt('p'); confirm('ok'); notify.alert('n')"
   assert.equal(countFile("components/x.tsx", text)["window-dialogs"], 4)
 })
 
@@ -117,7 +119,13 @@ test("client-page and page-missing-metadata only apply to page.tsx and agree wit
   assert.equal(countFile("app/a/page.tsx", withGen)["page-missing-metadata"], undefined)
 
   assert.equal(countFile("app/a/page.tsx", 'export { default } from "../b/page"')["page-missing-metadata"], undefined)
-  assert.equal(countFile("app/a/page.tsx", 'import { redirect } from "next/navigation"\nexport default function P() { redirect("/x") }')["page-missing-metadata"], undefined)
+  assert.equal(
+    countFile(
+      "app/a/page.tsx",
+      'import { redirect } from "next/navigation"\nexport default function P() { redirect("/x") }'
+    )["page-missing-metadata"],
+    undefined
+  )
 })
 
 test("file-lines counts only files over 1000 lines, by length", () => {
