@@ -23,7 +23,7 @@ export type ProvisionResult =
 
 /**
  * Makes sure the employee's company mailbox exists on cPanel with a fresh
- * password: created (default 1 GB quota) when missing, password reset when it
+ * password: created (default 250 MB quota) when missing, password reset when it
  * already exists. Records the outcome on profiles.mailbox_status so HR and ICT
  * can see failures, and never throws — onboarding must carry on without it.
  *

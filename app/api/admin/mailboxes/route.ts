@@ -4,6 +4,7 @@ import { requireApiAdminScope } from "@/lib/admin/api-scope"
 import { writeAuditLog } from "@/lib/audit/write-audit"
 import { CpanelError, createMailbox, getMailbox, isCpanelConfigured } from "@/lib/cpanel/client"
 import { loadMailboxReport } from "@/lib/cpanel/mailboxes"
+import { DEFAULT_MAILBOX_QUOTA_MB } from "@/lib/cpanel/quota"
 import { logger } from "@/lib/logger"
 import { ORG_STAFF_DOMAIN } from "@/lib/org-config"
 import { getClientId, rateLimit } from "@/lib/rate-limit"
@@ -22,11 +23,13 @@ const CreateMailboxSchema = z.object({
     .email("Enter a valid email address")
     .refine((e) => e.endsWith(`@${ORG_STAFF_DOMAIN.toLowerCase()}`), `Mailbox must be on @${ORG_STAFF_DOMAIN}`),
   password: z.string().min(8, "Password must be at least 8 characters long").max(128, "Password too long"),
-  quotaGb: z.coerce
+  quotaMb: z.coerce
     .number()
-    .int("Quota must be a whole number of gigabytes")
-    .min(1, "Minimum quota is 1 GB")
-    .max(500, "Maximum quota is 500 GB"),
+    .int("Quota must be a whole number of megabytes")
+    .min(100, "Minimum quota is 100 MB")
+    .max(500 * 1024, "Maximum quota is 500 GB")
+    .optional(),
+  quotaGb: z.coerce.number().min(0.1, "Minimum quota is 100 MB").max(500, "Maximum quota is 500 GB").optional(),
   linkType: z.enum(["staff", "project", "none"]),
   profileId: z.string().uuid("Invalid employee ID").optional().nullable(),
   projectId: z.string().uuid("Invalid project ID").optional().nullable(),
@@ -79,7 +82,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request body" }, { status: 400 })
   }
 
-  const { email, password, quotaGb, linkType, profileId, projectId } = parsed.data
+  const { email, password, quotaMb: rawQuotaMb, quotaGb: rawQuotaGb, linkType, profileId, projectId } = parsed.data
+  const quotaMb = rawQuotaMb ?? (rawQuotaGb != null ? Math.round(rawQuotaGb * 1024) : DEFAULT_MAILBOX_QUOTA_MB)
+  const quotaGb = Math.round((quotaMb / 1024) * 100) / 100
 
   if (linkType === "staff" && !profileId) {
     return NextResponse.json({ error: "Please select an employee to link this mailbox to" }, { status: 400 })
@@ -96,7 +101,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Mailbox ${email} already exists on cPanel` }, { status: 409 })
     }
 
-    const quotaMb = quotaGb * 1024
     await createMailbox(email, password, quotaMb)
 
     if (linkType === "staff" && profileId) {
@@ -126,6 +130,7 @@ export async function POST(request: NextRequest) {
         entityId: email,
         newValues: {
           email,
+          quota_mb: quotaMb,
           quota_gb: quotaGb,
           link_type: linkType,
           profile_id: profileId ?? null,
@@ -140,6 +145,7 @@ export async function POST(request: NextRequest) {
       {
         data: {
           email,
+          quotaMb,
           quotaGb,
           linkType,
           profileId: profileId ?? null,
