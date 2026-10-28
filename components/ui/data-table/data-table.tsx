@@ -77,6 +77,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Copy } from "lucide-react"
 import { ColumnHelp } from "./column-help"
+import { RowActionButtons } from "./row-action-buttons"
 import type { DataTableDetailConfig, DataTableProps, PaginationConfig, SortConfig } from "./types"
 import { columnsToSheetFields, deriveSheetActions } from "./detail-sheet-model"
 import { DataTableDetailSheet } from "./data-table-detail-sheet"
@@ -297,6 +298,7 @@ export function DataTable<TData>({
   // Actions
   rowActions,
   forceRowActionsDropdown,
+  inlineRowActions,
   bulkActions,
   selectable = false,
   // View
@@ -1412,21 +1414,8 @@ export function DataTable<TData>({
                           {(() => {
                             const visible = rowActions.filter((a) => !a.hidden || !a.hidden(row))
                             if (visible.length === 0) return null
-                            if (visible.length === 1 && !forceRowActionsDropdown) {
-                              const action = visible[0]
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant={action.variant === "destructive" ? "destructive" : "outline"}
-                                  onClick={() => {
-                                    action.onClick(row)
-                                  }}
-                                  className="h-7 gap-1 px-2 text-xs"
-                                >
-                                  {action.icon && <action.icon className="h-3.5 w-3.5" />}
-                                  {action.label}
-                                </Button>
-                              )
+                            if (inlineRowActions || (visible.length === 1 && !forceRowActionsDropdown)) {
+                              return <RowActionButtons actions={visible} row={row} />
                             }
                             return (
                               <DropdownMenu>

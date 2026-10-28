@@ -843,9 +843,8 @@ export function ActionTrackerContent({
           }}
           isLoading={isLoading}
           error={error instanceof Error ? error.message : null}
-          onRetry={() => {
-            void refetch()
-          }}
+          onRetry={() => void refetch()}
+          inlineRowActions
           rowActions={[
             {
               label: "View",

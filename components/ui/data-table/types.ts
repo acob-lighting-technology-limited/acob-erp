@@ -239,6 +239,8 @@ export interface DataTableProps<TData> {
   // ── Row Actions ──────────────────────────────────────────────────────────
   rowActions?: RowAction<TData>[]
   forceRowActionsDropdown?: boolean
+  /** Show every row action as a button instead of a menu. For rows with two or three actions. */
+  inlineRowActions?: boolean
 
   // ── Bulk Actions ─────────────────────────────────────────────────────────
   bulkActions?: BulkAction<TData>[]
