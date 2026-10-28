@@ -4,31 +4,21 @@ import { useMemo } from "react"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EmptyState } from "@/components/ui/patterns"
 import {
   DetailActionBar,
+  DetailBody,
   DetailCallout,
-  DetailField,
-  DetailFieldGrid,
+  DetailComposer,
+  DetailProperties,
+  DetailProperty,
   DetailSectionHeading,
+  DetailTimeline,
   DetailTimelineEntry,
 } from "@/components/ui/detail-dialog"
 import { PriorityBadge, TicketStatusBadge } from "@/components/dashboard/help-desk/ticket-badges"
-import {
-  Headset,
-  MessageSquare,
-  Building2,
-  CalendarDays,
-  AlertCircle,
-  Clock,
-  Tag,
-  Timer,
-  CheckCircle2,
-  Send,
-  User,
-} from "lucide-react"
+import { Headset, AlertCircle, Clock } from "lucide-react"
 import type { HelpDeskTicketDetailResponse } from "@/components/help-desk/help-desk-types"
 import type { HelpDeskStatus } from "@/lib/help-desk/server"
 import { formatDateTime } from "@/lib/format"
@@ -148,6 +138,7 @@ export function UserHelpDeskTicketDetailsDialog({
   return (
     <DetailSheet
       wide
+      flush
       open={open}
       onOpenChange={onOpenChange}
       title={ticket ? ticket.title : "Help desk ticket"}
@@ -203,9 +194,9 @@ export function UserHelpDeskTicketDetailsDialog({
         ) : null
       }
     >
-      <>
+      <DetailBody>
         {isLoading ? (
-          <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center text-sm">
+          <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center text-sm">
             <Clock className="text-primary/60 mb-2 h-8 w-8 animate-spin" />
             <LinesSkeleton lines={6} />
           </div>
@@ -235,7 +226,7 @@ export function UserHelpDeskTicketDetailsDialog({
                   </DetailCallout>
                 )}
                 {/* The approvals were fetched and then never shown: a procurement
-                          ticket could be rejected with a note nobody could read. */}
+                    ticket could be rejected with a note nobody could read. */}
                 {approvals.map((approval) => (
                   <DetailCallout
                     key={approval.id}
@@ -251,102 +242,69 @@ export function UserHelpDeskTicketDetailsDialog({
               </div>
             )}
 
-            <section className="space-y-1.5">
+            <section className="space-y-2">
               <DetailSectionHeading>What was reported</DetailSectionHeading>
               <p className="text-sm leading-relaxed whitespace-pre-wrap">
                 {ticket.description || <span className="text-muted-foreground">No description provided.</span>}
               </p>
             </section>
 
-            <section className="space-y-3">
+            <section className="space-y-2">
               <DetailSectionHeading>Details</DetailSectionHeading>
-              <DetailFieldGrid>
-                <DetailField icon={Building2} label="Service department">
-                  {ticket.service_department}
-                </DetailField>
-                {ticket.requester_department && (
-                  <DetailField icon={User} label="Raised from">
-                    {ticket.requester_department}
-                  </DetailField>
-                )}
-                <DetailField icon={Tag} label="Request type">
+              <DetailProperties>
+                <DetailProperty label="Service department">{ticket.service_department}</DetailProperty>
+                <DetailProperty label="Raised from">{ticket.requester_department}</DetailProperty>
+                <DetailProperty label="Request type">
                   <span className="capitalize">{formatLabel(ticket.request_type)}</span>
                   {ticket.category ? ` · ${ticket.category}` : ""}
-                </DetailField>
-                <DetailField icon={CalendarDays} label="Logged">
-                  {formatDateTime(ticket.created_at)}
-                </DetailField>
+                </DetailProperty>
+                <DetailProperty label="Logged">{formatDateTime(ticket.created_at)}</DetailProperty>
                 {/* Surfaced for the first time — the SLA target was on the record
-                          all along and the dialog never showed it. */}
+                    all along and the sheet never showed it. */}
                 {ticket.sla_target_at && (
-                  <DetailField icon={Timer} label="SLA target">
-                    {formatDateTime(ticket.sla_target_at)}
-                  </DetailField>
+                  <DetailProperty label="SLA target">{formatDateTime(ticket.sla_target_at)}</DetailProperty>
                 )}
                 {ticket.resolved_at && (
-                  <DetailField icon={CheckCircle2} label="Resolved">
-                    {formatDateTime(ticket.resolved_at)}
-                  </DetailField>
+                  <DetailProperty label="Resolved">{formatDateTime(ticket.resolved_at)}</DetailProperty>
                 )}
-                {ticket.closed_at && (
-                  <DetailField icon={CheckCircle2} label="Closed">
-                    {formatDateTime(ticket.closed_at)}
-                  </DetailField>
-                )}
-              </DetailFieldGrid>
+                {ticket.closed_at && <DetailProperty label="Closed">{formatDateTime(ticket.closed_at)}</DetailProperty>}
+              </DetailProperties>
             </section>
 
             {ratingSlot && (
-              <section className="space-y-3">
+              <section className="space-y-2">
                 <DetailSectionHeading>Rate this service</DetailSectionHeading>
                 {ratingSlot}
               </section>
             )}
 
-            {attachmentsSlot && <section className="space-y-3">{attachmentsSlot}</section>}
+            {attachmentsSlot && <section className="space-y-2">{attachmentsSlot}</section>}
+
             <section className="space-y-3">
               <DetailSectionHeading count={activity.length || undefined}>Activity</DetailSectionHeading>
               {onAddComment && setNewComment && (
-                <div className="space-y-2">
-                  <Textarea
-                    value={newComment}
-                    onChange={(event) => setNewComment(event.target.value)}
-                    placeholder="Post an activity note or progress update…"
-                    className="min-h-[72px] text-sm"
-                    aria-label="Add an activity"
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      className="gap-1.5"
-                      disabled={isPostingComment || !newComment.trim()}
-                      onClick={() => void onAddComment()}
-                    >
-                      <Send className="h-3.5 w-3.5" />
-                      {isPostingComment ? "Posting…" : "Post activity"}
-                    </Button>
-                  </div>
-                </div>
+                <DetailComposer
+                  value={newComment}
+                  onChange={setNewComment}
+                  busy={isPostingComment}
+                  onSubmit={onAddComment}
+                />
               )}
-
               {activity.length > 0 ? (
-                <ul className="space-y-3">
+                <DetailTimeline>
                   {activity.map((entry) => (
                     <DetailTimelineEntry key={entry.key} title={entry.title} timestamp={formatDateTime(entry.at)}>
                       {entry.body}
                     </DetailTimelineEntry>
                   ))}
-                </ul>
+                </DetailTimeline>
               ) : (
-                <p className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
-                  <MessageSquare className="h-4 w-4" />
-                  No activities yet.
-                </p>
+                <p className="text-muted-foreground text-sm">No activity yet.</p>
               )}
             </section>
           </>
         )}
-      </>
+      </DetailBody>
     </DetailSheet>
   )
 }
