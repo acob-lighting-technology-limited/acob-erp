@@ -108,7 +108,9 @@ export const RULES = [
   },
   {
     id: "click-div",
-    count: (text) => count(text, /<div\b[^>\n]*\sonClick=/g),
+    // A wrapper whose onClick only stops propagation keeps a row's click from firing. It has no action of
+    // its own, so there is nothing for a keyboard user to miss.
+    count: (text) => count(text, /<div\b[^>\n]*\sonClick=(?!\{\(?\w*\)?\s*=>\s*\w+\.stopPropagation\(\)\})/g),
   },
   {
     id: "client-page",

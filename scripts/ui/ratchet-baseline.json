@@ -378,11 +378,7 @@
       "components/auth/auth-shell.tsx": 1,
       "components/events/event-month-calendar.tsx": 1
     },
-    "click-div": {
-      "app/(app)/tasks/management/tasks-content.tsx": 1,
-      "app/admin/projects/_components/project-plan-board.tsx": 1,
-      "components/documentation/department-documents-browser.tsx": 3
-    },
+    "click-div": {},
     "client-page": {
       "app/(app)/accounts/payments/[id]/page.tsx": 1,
       "app/(app)/notifications/settings/page.tsx": 1,

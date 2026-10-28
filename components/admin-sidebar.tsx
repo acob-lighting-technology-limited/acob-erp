@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn, formatName, getInitials } from "@/lib/utils"
+import { useDrawerA11y } from "@/hooks/use-drawer-a11y"
 import { isActiveChild } from "@/lib/navigation/active-child"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
@@ -532,6 +533,7 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const drawerProps = useDrawerA11y(isMobileMenuOpen, () => setIsMobileMenuOpen(false))
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { isCollapsed } = useSidebar()
   const staffAvatars = useStaffAvatars()
@@ -545,12 +547,9 @@ export function AdminSidebar({
       e.stopPropagation()
       setIsMobileMenuOpen((prev) => !prev)
     }
-    window.addEventListener("toggle-mobile-sidebar", handleToggle)
-    document.addEventListener("toggle-mobile-sidebar", handleToggle)
-    return () => {
-      window.removeEventListener("toggle-mobile-sidebar", handleToggle)
-      document.removeEventListener("toggle-mobile-sidebar", handleToggle)
-    }
+    const targets = [window, document]
+    targets.forEach((target) => target.addEventListener("toggle-mobile-sidebar", handleToggle))
+    return () => targets.forEach((target) => target.removeEventListener("toggle-mobile-sidebar", handleToggle))
   }, [])
 
   // Notify navbar of sidebar state changes
@@ -1090,6 +1089,7 @@ export function AdminSidebar({
           onClick={() => setIsMobileMenuOpen(false)}
         />
         <aside
+          {...drawerProps}
           className={cn(
             "fixed inset-y-0 left-0 z-[60] flex w-64 flex-col border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] shadow-xl transition-transform duration-300 ease-out lg:hidden",
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"

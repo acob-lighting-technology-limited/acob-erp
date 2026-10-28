@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 
 import { cn, formatName, getInitials } from "@/lib/utils"
+import { useDrawerA11y } from "@/hooks/use-drawer-a11y"
 import { isActiveChild } from "@/lib/navigation/active-child"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
@@ -227,6 +228,7 @@ const NAV_ROUTE_ALIASES: RouteAliases = {}
 export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], showMdDesk = false }: SidebarProps) {
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const drawerProps = useDrawerA11y(isMobileMenuOpen, () => setIsMobileMenuOpen(false))
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const departmentCode = useDepartmentCode(profile?.department)
   const { isCollapsed } = useSidebar()
@@ -636,6 +638,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
         />
         {/* Mobile sidebar — slides in from the LEFT */}
         <aside
+          {...drawerProps}
           className={cn(
             "bg-card fixed inset-y-0 left-0 z-[60] flex w-64 flex-col border-r shadow-xl transition-transform duration-300 ease-out lg:hidden",
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"

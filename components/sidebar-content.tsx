@@ -19,7 +19,9 @@ export function SidebarContent({ children }: { children: React.ReactNode }) {
         stiffness: 300,
         damping: 30,
       }}
-      className="flex-1 pt-16 max-lg:pl-0"
+      id="main-content"
+      tabIndex={-1}
+      className="flex-1 pt-16 outline-none max-lg:pl-0"
     >
       {children}
     </motion.main>

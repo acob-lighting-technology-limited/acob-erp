@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar"
+import { SkipToContent } from "@/components/skip-to-content"
 import { SidebarContent } from "@/components/sidebar-content"
 import { AcoBot } from "@/components/acobot/acobot"
 import { MissingAvatarBanner } from "@/components/profile/missing-avatar-banner"
@@ -44,6 +45,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex min-h-screen">
+      <SkipToContent />
       <Sidebar
         user={userData}
         profile={profile || undefined}

@@ -1,6 +1,7 @@
 import { AdminSidebar } from "@/components/admin-sidebar"
 import { AdminScopeProvider } from "@/components/admin-scope-context"
 import { SidebarContent } from "@/components/sidebar-content"
+import { SkipToContent } from "@/components/skip-to-content"
 import { AcoBot } from "@/components/acobot/acobot"
 import { createClient } from "@/lib/supabase/server"
 import { resolveAdminScope } from "@/lib/admin/rbac"
@@ -59,6 +60,7 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="admin-shell flex min-h-screen" data-scope={isRestrictedView ? "lead" : "global"}>
+      <SkipToContent />
       <AdminSidebar
         user={userData}
         profile={profile}
