@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { Badge } from "@/components/ui/badge"
-import { DetailBody, DetailCallout, DetailSectionHeading } from "@/components/ui/detail-dialog"
+import { DetailCallout } from "@/components/ui/detail-dialog"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -101,101 +101,78 @@ export function ActionPointsSheet<T extends ActionPointTask>({
         ) : null
       }
       description={
-        department ? `${total} action point${total === 1 ? "" : "s"}` : "Update individual action point statuses."
+        department
+          ? `${department.completedPoints} of ${total} completed · ${department.inProgressPoints} in progress · ${department.notStartedPoints} not started`
+          : "Update individual action point statuses."
       }
     >
-      <DetailBody>
-        {department ? (
-          <section className="space-y-2.5">
-            <div className="bg-muted flex h-2 overflow-hidden rounded-full" aria-hidden>
-              <div className="bg-success" style={{ width: pct(department.completedPoints) }} />
-              <div className="bg-info" style={{ width: pct(department.inProgressPoints) }} />
-            </div>
-            <p className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
-              <span>
-                <span className="text-foreground font-medium">{department.completedPoints}</span> of {total} completed
-              </span>
-              <span>
-                <span className="text-foreground font-medium">{department.inProgressPoints}</span> in progress
-              </span>
-              <span>
-                <span className="text-foreground font-medium">{department.notStartedPoints}</span> not started
-              </span>
-            </p>
-          </section>
-        ) : null}
+      {department ? (
+        <div className="bg-muted flex h-1 shrink-0 overflow-hidden" aria-hidden>
+          <div className="bg-success" style={{ width: pct(department.completedPoints) }} />
+          <div className="bg-info" style={{ width: pct(department.inProgressPoints) }} />
+        </div>
+      ) : null}
 
-        <section className="space-y-2">
-          <DetailSectionHeading count={total || undefined}>Action points</DetailSectionHeading>
-          <ol className="divide-border/60 divide-y rounded-lg border">
-            {department?.tasks.map((task, index) => (
-              <li key={task.id} className="space-y-2 px-3.5 py-3">
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                  <div className="flex min-w-0 gap-2.5">
-                    <span className="text-muted-foreground w-5 shrink-0 text-sm tabular-nums">{index + 1}.</span>
-                    <div className="min-w-0 space-y-1">
-                      <p className="text-sm leading-snug font-medium">{task.title}</p>
-                      {task.description ? (
-                        <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
-                          {task.description}
-                        </p>
-                      ) : null}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-                        <span className={`text-xs ${getDueDateClassName(task)}`}>Due {formatDueDate(task)}</span>
-                        {task.assignees?.length ? (
-                          <span className="text-muted-foreground text-xs">
-                            {task.assignees.map((person) => person.name).join(", ")}
-                          </span>
-                        ) : null}
-                        {renderBlockerButton(task)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="w-full shrink-0 pl-[1.875rem] sm:w-36 sm:pl-0">
-                    {canMutateTask(task) ? (
-                      <Select value={task.status} onValueChange={(next) => void onStatusChange(task.id, next)}>
-                        <SelectTrigger className="h-8 text-xs">
+      <ol className="divide-border/60 min-h-0 flex-1 divide-y overflow-y-auto">
+        {department?.tasks.map((task, index) => (
+          <li key={task.id} className="flex items-start gap-3 px-4 py-2.5 sm:px-5">
+            <span className="text-muted-foreground w-4 shrink-0 pt-0.5 text-xs tabular-nums">{index + 1}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm leading-snug font-medium">{task.title}</p>
+              {task.description ? (
+                <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-relaxed">{task.description}</p>
+              ) : null}
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                <span className={`text-xs ${getDueDateClassName(task)}`}>Due {formatDueDate(task)}</span>
+                {task.assignees?.length ? (
+                  <span className="text-muted-foreground text-xs">
+                    {task.assignees.map((person) => person.name).join(", ")}
+                  </span>
+                ) : null}
+                {renderBlockerButton(task)}
+              </div>
+              {task.blocker_note ? (
+                <div className="mt-2">
+                  <DetailCallout tone="amber" label="Hindrance">
+                    {task.blocker_note}
+                  </DetailCallout>
+                </div>
+              ) : null}
+            </div>
+            <div className="w-28 shrink-0 sm:w-36">
+              {canMutateTask(task) ? (
+                <Select value={task.status} onValueChange={(next) => void onStatusChange(task.id, next)}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-block w-full cursor-not-allowed">
+                      <Select value={task.status} disabled>
+                        <SelectTrigger className="h-8 text-xs opacity-70">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
                       </Select>
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="inline-block w-full cursor-not-allowed">
-                            <Select value={task.status} disabled>
-                              <SelectTrigger className="h-8 text-xs opacity-70">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </Select>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>{getDisabledEditReason(task)}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                </div>
-
-                {task.blocker_note ? (
-                  <div className="pl-[1.875rem]">
-                    <DetailCallout tone="amber" label="Hindrance">
-                      {task.blocker_note}
-                    </DetailCallout>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </section>
-      </DetailBody>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{getDisabledEditReason(task)}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
     </DetailSheet>
   )
 }
