@@ -50,6 +50,7 @@ import { ExportColumnsDialog } from "@/components/admin/export-columns-dialog"
 import { EmployeeAssetsReportDialog } from "@/components/assets/EmployeeAssetsReportDialog"
 import { AssetHandoverDialog } from "@/components/assets/AssetHandoverDialog"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import {
   buildAssetExportRows,
   exportAssetsToExcel,
@@ -1346,12 +1347,7 @@ export function AdminAssetsContent({
       icon={Package}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          {issuesHref && (
-            <Button variant="outline" onClick={() => router.push(issuesHref)} className="gap-2" size="sm">
-              <AlertCircle className="h-4 w-4" />
-              Issues
-            </Button>
-          )}
+          <HeaderMoreMenu items={[{ label: "Asset issues", icon: AlertCircle, href: issuesHref }]} />
           <Button variant="outline" onClick={() => setExportOptionsOpen(true)} className="gap-2" size="sm">
             <Download className="h-4 w-4" />
             Export

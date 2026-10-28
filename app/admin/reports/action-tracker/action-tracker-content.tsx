@@ -27,6 +27,7 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { ExportOptionsDialog } from "@/components/admin/export-options-dialog"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { QUERY_KEYS } from "@/lib/query-keys"
@@ -768,10 +769,11 @@ export function ActionTrackerContent({
               <span className="hidden sm:inline">Export</span>
             </Button>
           ) : null}
-          <Button variant="outline" onClick={handleCarryForward} disabled={isCarryForwarding} size="sm" className="h-8">
-            <RefreshCw className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Carry Forward</span>
-          </Button>
+          <HeaderMoreMenu
+            items={[
+              { label: "Carry forward", icon: RefreshCw, onSelect: handleCarryForward, disabled: isCarryForwarding },
+            ]}
+          />
         </div>
       }
       stats={
@@ -1090,9 +1092,7 @@ export function ActionTrackerContent({
           setDirectiveDialogOpen(false)
           setEditingDirective(null)
         }}
-        onComplete={() => {
-          void refetch()
-        }}
+        onComplete={refetch}
         departments={canGlobalEdit ? initialDepartments : editableDepartments}
         editingDirective={editingDirective}
         defaultWeek={weekFilter}
@@ -1103,9 +1103,7 @@ export function ActionTrackerContent({
       <BlockerDialog
         isOpen={Boolean(blockerTarget)}
         onClose={() => setBlockerTarget(null)}
-        onComplete={() => {
-          void refetch()
-        }}
+        onComplete={refetch}
         target={blockerTarget}
         canEdit={canGlobalEdit || (blockerTarget ? editableDepartments.includes(blockerTarget.department) : false)}
       />
