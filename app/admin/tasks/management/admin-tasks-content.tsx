@@ -15,7 +15,6 @@ import {
   Trash2,
   Calendar,
   User,
-  Target,
   CheckCircle2,
   Clock,
   ShieldCheck,
@@ -26,6 +25,7 @@ import {
   Layers,
   Download,
 } from "lucide-react"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { isAssignableProfile } from "@/lib/workforce/assignment-policy"
 import { logger } from "@/lib/logger"
 import { TaskFormDialog } from "@/components/tasks/TaskFormDialog"
@@ -609,10 +609,9 @@ export function AdminTasksContent({
       onTabChange={(t) => setActiveTab(t as "tasks" | "user_plan")}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setIsWorkflowOpen(true)} className="h-8 gap-2">
-            <ArrowRight className="h-4 w-4" />
-            <span className="hidden sm:inline">Workflow Guide</span>
-          </Button>
+          <HeaderMoreMenu
+            items={[{ label: "Workflow guide", icon: ArrowRight, onSelect: () => setIsWorkflowOpen(true) }]}
+          />
           <Button variant="outline" size="sm" onClick={() => setIsExportOpen(true)} className="h-8 gap-2">
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Export</span>

@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { BarChart3, Download, FileText, Users, Clock, AlertCircle, Pencil, Info, Settings2, Mail } from "lucide-react"
+import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import { toast } from "sonner"
 import { logger } from "@/lib/logger"
 import {
@@ -1139,33 +1140,17 @@ export function AttendanceReportsPage({
       onTabChange={(t) => setActiveTab(t as AttendanceTab)}
       actions={
         <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" onClick={() => setReportDialogOpen(true)} size="sm" aria-label="Reports">
-                <Mail className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">Reports</span>
-                <span className="sr-only sm:hidden">Reports</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Attendance Reports</TooltipContent>
-          </Tooltip>
-          {canUseAttendanceManager && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => setManagerOpen(true)}
-                  size="sm"
-                  aria-label="Attendance Manager"
-                >
-                  <Settings2 className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Attendance Manager</span>
-                  <span className="sr-only sm:hidden">Attendance Manager</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Attendance Manager</TooltipContent>
-            </Tooltip>
-          )}
+          <HeaderMoreMenu
+            items={[
+              { label: "Attendance reports", icon: Mail, onSelect: () => setReportDialogOpen(true) },
+              {
+                label: "Attendance manager",
+                icon: Settings2,
+                onSelect: () => setManagerOpen(true),
+                hidden: !canUseAttendanceManager,
+              },
+            ]}
+          />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
