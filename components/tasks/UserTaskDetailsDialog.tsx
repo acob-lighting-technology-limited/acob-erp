@@ -12,7 +12,6 @@ import { isTaskOverdue } from "@/lib/tasks/overdue"
 import { cn, formatFullName } from "@/lib/utils"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import {
-  DetailActionBar,
   DetailBody,
   DetailCallout,
   DetailComposer,
@@ -48,6 +47,25 @@ interface UserTaskDetailsDialogProps {
   /** Posts a comment and refreshes taskUpdates. */
   onAddComment?: (content: string) => Promise<void>
   isPostingComment?: boolean
+}
+
+/** One sentence telling the viewer what the task needs from them now, given its status and their role. */
+function nextStepFor(status: string, canReview: boolean, ratingBlockedReason: string | null) {
+  switch (status) {
+    case "pending":
+      return "Start the task, then post progress updates below as you go."
+    case "in_progress":
+      return "Post progress updates below. When the work is done, submit it for review."
+    case "submitted_for_review":
+      if (!canReview) return "Submitted. Waiting for a lead or admin to review and rate it."
+      return ratingBlockedReason ?? "Review the work: approve and rate it, or send it back with a reason."
+    case "unable_to_complete":
+      return canReview
+        ? "A blocker was reported. Decide whether to reopen, reassign or close it."
+        : "Blocker reported. Waiting for a lead or admin to decide."
+    default:
+      return "This task is closed. Nothing further is needed."
+  }
 }
 
 export function UserTaskDetailsDialog({
@@ -129,14 +147,20 @@ export function UserTaskDetailsDialog({
         </>
       }
       toolbar={
-        <DetailActionBar label="Move this task to">
+        <div className="bg-muted/20 space-y-2.5 border-b px-4 py-3 sm:px-6">
+          <p className="text-sm">
+            <span className="font-medium">Next step: </span>
+            <span className="text-muted-foreground">
+              {nextStepFor(selectedTask.status, canReview, ratingBlockedReason)}
+            </span>
+          </p>
           <TaskStatusControl
             task={selectedTask}
             canReview={canReview}
             ratingBlockedReason={ratingBlockedReason}
             onChanged={() => onChanged?.()}
           />
-        </DetailActionBar>
+        </div>
       }
     >
       <DetailBody>
@@ -168,8 +192,38 @@ export function UserTaskDetailsDialog({
           </section>
         )}
 
+        <section className="space-y-3">
+          <DetailSectionHeading count={taskUpdates.length || undefined}>Activity</DetailSectionHeading>
+          {onAddComment && (
+            <DetailComposer
+              value={commentDraft}
+              onChange={setCommentDraft}
+              busy={isPostingComment}
+              onSubmit={async () => {
+                await onAddComment(commentDraft.trim())
+                setCommentDraft("")
+              }}
+            />
+          )}
+          {taskUpdates.length > 0 ? (
+            <DetailTimeline>
+              {taskUpdates.map((update) => (
+                <DetailTimelineEntry
+                  key={update.id}
+                  title={update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"}
+                  timestamp={formatWATDateTime(update.created_at)}
+                >
+                  {update.content}
+                </DetailTimelineEntry>
+              ))}
+            </DetailTimeline>
+          ) : (
+            <p className="text-muted-foreground text-sm">No activity yet.</p>
+          )}
+        </section>
+
         <section className="space-y-2">
-          <DetailSectionHeading>Details</DetailSectionHeading>
+          <DetailSectionHeading>Task details</DetailSectionHeading>
           <DetailProperties>
             <DetailProperty label="Assigned to">{assignedToName}</DetailProperty>
             <DetailProperty label="Period">
@@ -201,36 +255,6 @@ export function UserTaskDetailsDialog({
               </DetailProperty>
             )}
           </DetailProperties>
-        </section>
-
-        <section className="space-y-3">
-          <DetailSectionHeading count={taskUpdates.length || undefined}>Activity</DetailSectionHeading>
-          {onAddComment && (
-            <DetailComposer
-              value={commentDraft}
-              onChange={setCommentDraft}
-              busy={isPostingComment}
-              onSubmit={async () => {
-                await onAddComment(commentDraft.trim())
-                setCommentDraft("")
-              }}
-            />
-          )}
-          {taskUpdates.length > 0 ? (
-            <DetailTimeline>
-              {taskUpdates.map((update) => (
-                <DetailTimelineEntry
-                  key={update.id}
-                  title={update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"}
-                  timestamp={formatWATDateTime(update.created_at)}
-                >
-                  {update.content}
-                </DetailTimelineEntry>
-              ))}
-            </DetailTimeline>
-          ) : (
-            <p className="text-muted-foreground text-sm">No activity yet.</p>
-          )}
         </section>
       </DetailBody>
     </DetailSheet>
