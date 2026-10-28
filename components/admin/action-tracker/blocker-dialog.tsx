@@ -21,6 +21,7 @@ import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { logger } from "@/lib/logger"
 import { LinesSkeleton } from "@/components/skeletons/section-skeletons"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const log = logger("action-tracker-blocker-dialog")
 
@@ -85,7 +86,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
     isLoading: isLoadingEvidence,
     refetch: refetchEvidence,
   } = useQuery({
-    queryKey: ["action-tracker", "evidence", targetId],
+    queryKey: QUERY_KEYS.actionTracker("evidence", targetId),
     enabled: isOpen && Boolean(targetId),
     queryFn: async (): Promise<EvidenceRow[]> => {
       const response = await apiFetch(`/api/reports/action-tracker/${targetId}/evidence`, { cache: "no-store" })
@@ -144,7 +145,7 @@ export function BlockerDialog({ isOpen, onClose, onComplete, target, canEdit }: 
       if (!response.ok) throw new Error(payload?.error || "Failed to save the hindrance note")
 
       const uploaded = await uploadPendingFiles()
-      queryClient.invalidateQueries({ queryKey: ["action-tracker", "evidence", targetId] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.actionTracker("evidence", targetId) })
       toast.success(note.trim() ? "Hindrance recorded" : "Hindrance cleared")
       onComplete()
       if (uploaded) onClose()

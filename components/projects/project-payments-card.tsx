@@ -10,6 +10,7 @@ import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { toLocalISODate } from "@/lib/utils/date"
 import { projectPaymentStatus, type ProjectPaymentRow, type ProjectPaymentsData } from "@/lib/projects/project-payments"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const STATUS_CLASSES = {
   paid: "bg-success/15 text-success",
@@ -38,7 +39,7 @@ function receiptCount(payment: ProjectPaymentRow) {
  */
 export function ProjectPaymentsCard({ projectId }: { projectId: string }) {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["project-payments", projectId],
+    queryKey: QUERY_KEYS.projectPayments(projectId),
     queryFn: () => fetchProjectPayments(projectId),
   })
 

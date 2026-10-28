@@ -175,7 +175,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   const currentUserName = (currentUser?.full_name || "").trim()
 
   const { data: canonicalMeetingSetup } = useQuery({
-    queryKey: ["canonical-meeting-date", activeMeetingWeek.week, activeMeetingWeek.year],
+    queryKey: QUERY_KEYS.canonicalMeetingDate(activeMeetingWeek.week, activeMeetingWeek.year),
     enabled: mode !== "communications",
     queryFn: async (): Promise<{ meetingDate: string; meetingTime: string }> => {
       const res = await apiFetch(
@@ -193,7 +193,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
   })
 
   const { data: defaultAgendaData } = useQuery({
-    queryKey: ["meeting-reminder-default-agenda"],
+    queryKey: QUERY_KEYS.meetingReminderDefaultAgenda(),
     enabled: mode !== "communications",
     queryFn: async (): Promise<{ agenda: string[] }> => {
       const res = await apiFetch("/api/reports/meeting-agenda-default")
@@ -364,7 +364,7 @@ export function CommunicationsComposer({ employees, mode = "meetings", currentUs
     (rosterQuery.data ?? []).find((entry) => entry?.is_active !== false) ?? (rosterQuery.data ?? [])[0]
   // No roster entry for the week: the KSS rotation still knows which department presents.
   const rotationQuery = useQuery({
-    queryKey: ["admin-kss-rotation-week", rosterWeek?.week ?? 0, rosterWeek?.year ?? 0],
+    queryKey: QUERY_KEYS.adminKssRotationWeek(rosterWeek?.week ?? 0, rosterWeek?.year ?? 0),
     queryFn: async () =>
       (
         await apiJson<{ data?: { department?: unknown } | null }>(

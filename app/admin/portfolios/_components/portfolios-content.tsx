@@ -185,7 +185,7 @@ export function PortfoliosContent({ isAdmin = true, profiles = [] }: PortfoliosC
   // The charts need each task's dates, which the portfolio rollup leaves out, so
   // they read the projects list — only once the Charts tab is opened.
   const { data: chartProjects = [], isLoading: chartsLoading } = useQuery({
-    queryKey: ["projects", "charts"],
+    queryKey: QUERY_KEYS.projects("charts"),
     enabled: activeTab === "charts",
     queryFn: async (): Promise<ChartsProject[]> => {
       const res = await apiFetch("/api/projects", { cache: "no-store" })

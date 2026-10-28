@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { EmployeeRecipientPicker, type DirectoryEmployee } from "@/components/admin/employee-recipient-picker"
 import { formatDate } from "@/lib/format"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { apiFetch } from "@/lib/api-client"
 export type MeetingSource = {
@@ -94,7 +95,7 @@ export function MeetingSourceDialog({ open, onOpenChange, editing, onSaved }: Pr
   }, [employees, selectedEmployeeIds, externalEmails])
 
   const { data: meetings = [], isFetching: loadingMeetings } = useQuery({
-    queryKey: ["meeting-artifact-calendar", organizerToLoad],
+    queryKey: QUERY_KEYS.meetingArtifactCalendar(organizerToLoad),
     enabled: Boolean(organizerToLoad),
     queryFn: async (): Promise<CalendarMeeting[]> => {
       const res = await apiFetch(

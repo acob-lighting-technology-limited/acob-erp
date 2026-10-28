@@ -296,7 +296,7 @@ export function ManageUsersDialog({
   })
 
   const { data: approvalEmailPreview, isLoading: isLoadingApprovalPreview } = useQuery<ApprovalEmailPreview>({
-    queryKey: ["pending-approval-email-preview", selectedUser?.id],
+    queryKey: QUERY_KEYS.pendingApprovalEmailPreview(selectedUser?.id),
     queryFn: async () => {
       if (!selectedUser?.id) throw new Error("Missing context")
       const res = await apiFetch(`/api/admin/pending-users/${selectedUser.id}/approval-preview`)

@@ -10,6 +10,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { ResponsiveModal } from "@/components/ui/patterns/responsive-modal"
 import { apiFetch } from "@/lib/api-client"
 import type { MailboxReportRow } from "@/lib/cpanel/mailboxes"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface EmployeeOption {
   id: string
@@ -45,7 +46,7 @@ export function LinkDialog({
   const [saving, setSaving] = useState(false)
 
   const { data: optionsData } = useQuery({
-    queryKey: ["admin-mailbox-options"],
+    queryKey: QUERY_KEYS.adminMailboxOptions(),
     queryFn: async () => {
       const res = await apiFetch("/api/admin/mailboxes/options")
       const json = await res.json().catch(() => null)

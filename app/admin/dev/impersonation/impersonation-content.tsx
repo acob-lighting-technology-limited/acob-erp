@@ -10,6 +10,7 @@ import { DataTable } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { apiFetch } from "@/lib/api-client"
 
 type ImpersonationRow = {
@@ -107,7 +108,7 @@ export function DevImpersonationContent() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["dev-impersonation-targets"],
+    queryKey: QUERY_KEYS.devImpersonationTargets(),
     queryFn: fetchTargets,
   })
 

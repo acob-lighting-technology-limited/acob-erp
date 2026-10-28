@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/patterns"
 import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 interface BirthdayManagerDialogProps {
   open: boolean
@@ -73,7 +74,7 @@ export function BirthdayManagerDialog({ open, onOpenChange }: BirthdayManagerDia
   }
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["admin-hr-birthdays-all"],
+    queryKey: QUERY_KEYS.adminHrBirthdaysAll(),
     queryFn: fetchAllBirthdays,
     enabled: open,
   })

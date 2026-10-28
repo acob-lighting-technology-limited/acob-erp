@@ -56,6 +56,7 @@ import { toLocalISODate } from "@/lib/utils/date"
 import { apiJson } from "@/lib/api-client"
 import { fetchProjectTasks, projectTasksKey } from "@/lib/projects/work-tasks"
 import { WorkTasksTable } from "@/components/projects/work-tasks-table"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 /**
  * One project's own page: what it is, how it is going, its plans (the one
@@ -101,7 +102,7 @@ export function ProjectDetail({
     enabled: activeTab === "tasks",
   })
   const plansQuery = useQuery({
-    queryKey: ["project-plans", projectId],
+    queryKey: QUERY_KEYS.projectPlans(projectId),
     queryFn: async () =>
       (await apiJson<{ data: Array<{ id: string; name: string }> }>(`/api/projects/${projectId}/plans`)).data,
     enabled: activeTab === "tasks",
@@ -204,8 +205,8 @@ export function ProjectDetail({
             size="sm"
             onClick={() => {
               void queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY })
-              void queryClient.invalidateQueries({ queryKey: ["project-plans", project.id] })
-              void queryClient.invalidateQueries({ queryKey: ["project-tasks", project.id] })
+              void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projectPlans(project.id) })
+              void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projectTasks(project.id) })
             }}
           >
             <RefreshCw className="h-4 w-4 sm:mr-2" />

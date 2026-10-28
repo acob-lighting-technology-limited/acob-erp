@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils"
 import { apiFetch } from "@/lib/api-client"
 import type { AttendanceRosterItem } from "@/app/api/reports/general-meeting/attendance/route"
 import { formatTime as formatClockTime } from "@/lib/format"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 function formatTime(value: string | null): string {
   if (!value) return "—"
@@ -126,7 +127,7 @@ export default function AdminMeetingAttendancePage() {
     refetch: refetchSession,
     isLoading: sessionLoading,
   } = useQuery({
-    queryKey: ["general-meeting-session", week, year],
+    queryKey: QUERY_KEYS.generalMeetingSession(week, year),
     queryFn: async () => {
       const res = await apiFetch(`/api/reports/general-meeting/attendance/session?week=${week}&year=${year}`)
       const json = await res.json()
@@ -142,7 +143,7 @@ export default function AdminMeetingAttendancePage() {
     isLoading: attendanceLoading,
     error: attendanceError,
   } = useQuery({
-    queryKey: ["general-meeting-attendance", week, year],
+    queryKey: QUERY_KEYS.generalMeetingAttendance(week, year),
     queryFn: async () => {
       const res = await apiFetch(`/api/reports/general-meeting/attendance?week=${week}&year=${year}`)
       const json = await res.json()

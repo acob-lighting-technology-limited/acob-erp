@@ -41,6 +41,7 @@ import { ControlledDocActionDialog, type ControlledDocAction } from "./controlle
 import { ControlledDocFormDialog } from "./controlled-doc-form-dialog"
 import { ControlledDocVersionDialog } from "./controlled-doc-version-dialog"
 import { ControlledDocViewDialog } from "./controlled-doc-view-dialog"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 const REVIEW_LABELS = {
   overdue: "Overdue",
@@ -97,8 +98,8 @@ export function ControlledDocsRegister({ type, backLink, departmentName }: Contr
   const permissions = data?.permissions ?? { canCreate: false, manageableDepartments: [] }
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["controlled-docs", type] })
-    void queryClient.invalidateQueries({ queryKey: ["controlled-doc"] })
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.controlledDocs(type) })
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.controlledDoc() })
   }
 
   const stats = useMemo(() => {

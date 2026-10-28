@@ -15,6 +15,7 @@ import { getCurrentOfficeWeek } from "@/lib/meeting-week"
 import { MeetingSyncModal } from "./meeting-sync-modal"
 
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 type ArtifactTab = "attendance" | "transcript"
 
 type Row = {
@@ -52,7 +53,7 @@ export function MeetingRecordsContent() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["meeting-records", tab],
+    queryKey: QUERY_KEYS.meetingRecords(tab),
     queryFn: async (): Promise<Row[]> => {
       const res = await apiFetch(`/api/reports/meeting-week-documents?documentType=${tab}&currentOnly=true`)
       const payload = await res.json()

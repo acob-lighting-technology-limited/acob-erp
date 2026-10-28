@@ -169,7 +169,7 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
 
   // Fetch docs for ALL selected weeks so the sidebar and send payload are complete
   const { data: allMeetingDocuments = [] } = useQuery({
-    queryKey: ["meeting-week-documents-all", sortedSelectedWeeks, yearNumber],
+    queryKey: QUERY_KEYS.meetingWeekDocumentsAll(sortedSelectedWeeks, yearNumber),
     queryFn: async (): Promise<MeetingWeekDocument[]> => {
       const results = await Promise.all(
         sortedSelectedWeeks.map(async (w) => {
@@ -186,7 +186,7 @@ export function WeeklySummaryContent({ employees, presenterDirectory = [], curre
   })
 
   const { data: resolvedMeetingDate } = useQuery({
-    queryKey: ["meeting-mail-effective-date", representativeWeek, yearNumber],
+    queryKey: QUERY_KEYS.meetingMailEffectiveDate(representativeWeek, yearNumber),
     queryFn: async () => {
       const res = await apiFetch(`/api/admin/reports/meeting-date?week=${representativeWeek}&year=${yearNumber}`, {
         cache: "no-store",

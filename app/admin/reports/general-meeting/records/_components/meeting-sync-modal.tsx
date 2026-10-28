@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
 import { MeetingSourceDialog, type MeetingSource } from "./meeting-source-dialog"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { RowsSkeleton } from "@/components/skeletons/section-skeletons"
 
 type SourceRow = MeetingSource & {
@@ -199,7 +200,7 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["meeting-artifact-sources"],
+    queryKey: QUERY_KEYS.meetingArtifactSources(),
     enabled: open,
     queryFn: async (): Promise<SourceRow[]> => {
       const res = await apiFetch("/api/reports/meeting-artifacts/sources")
@@ -210,7 +211,7 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
   })
 
   const { data: docs = [] } = useQuery({
-    queryKey: ["meeting-artifact-occurrences"],
+    queryKey: QUERY_KEYS.meetingArtifactOccurrences(),
     enabled: open,
     queryFn: async (): Promise<DocRow[]> => {
       const [att, tr] = await Promise.all([
@@ -227,7 +228,7 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
     return cache
   }, [rows, docs])
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["meeting-artifact-sources"] })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.meetingArtifactSources() })
 
   const runSyncNow = async () => {
     setIsSyncing(true)
@@ -243,7 +244,7 @@ export function MeetingSyncModal({ open, onOpenChange }: Props) {
       if (payload?.data?.skipped) toast.info("Sync ran — nothing new right now.", { id: toastId })
       else toast.success(`Sync complete — ${imported} new artifact(s).`, { id: toastId })
       invalidate()
-      queryClient.invalidateQueries({ queryKey: ["meeting-artifact-occurrences"] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.meetingArtifactOccurrences() })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sync failed", { id: toastId })
     } finally {

@@ -6,6 +6,7 @@ import { Inbox } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import type { EmployeeMailboxActions, EmployeeMailboxState } from "@/lib/employees/mailbox-state"
 
 async function fetchEmployeeMailbox(employeeId: string): Promise<EmployeeMailboxState | null> {
@@ -51,7 +52,7 @@ export function EmployeeMailboxSection({
   const relevant = toStatus !== fromStatus && (leaving || returning)
 
   const { data: mailbox, isFetching } = useQuery({
-    queryKey: ["hr-employee-mailbox", employeeId],
+    queryKey: QUERY_KEYS.hrEmployeeMailbox(employeeId),
     queryFn: () => fetchEmployeeMailbox(employeeId),
     enabled: Boolean(employeeId) && relevant,
     staleTime: 60 * 1000,

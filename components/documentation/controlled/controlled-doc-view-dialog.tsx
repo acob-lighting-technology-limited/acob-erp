@@ -19,6 +19,7 @@ import {
   formatFileSize,
   type ControlledDocDetailResponse,
 } from "@/lib/documentation/controlled"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { ControlledDocStatusBadge, ReviewDateBadge } from "./controlled-doc-badges"
 
 interface ControlledDocViewDialogProps {
@@ -45,7 +46,7 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
   const [isAcknowledging, setIsAcknowledging] = useState(false)
 
   const { data, isLoading, error } = useQuery<ControlledDocDetailResponse>({
-    queryKey: ["controlled-doc", documentId],
+    queryKey: QUERY_KEYS.controlledDoc(documentId),
     queryFn: async () => {
       const res = await apiFetch(`/api/documentation/controlled/${documentId}`, { cache: "no-store" })
       const payload = await res.json()
@@ -80,11 +81,11 @@ export function ControlledDocViewDialog({ documentId, onOpenChange, onChanged }:
       const payload = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(payload.error || "Failed to record acknowledgement")
       toast.success(`Thanks — you've acknowledged ${doc.reference_code} v${current.version_number}`)
-      await queryClient.invalidateQueries({ queryKey: ["controlled-doc", doc.id] })
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.controlledDoc(doc.id) })
       onChanged?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to record acknowledgement")
-      await queryClient.invalidateQueries({ queryKey: ["controlled-doc", doc.id] })
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.controlledDoc(doc.id) })
     } finally {
       setIsAcknowledging(false)
     }

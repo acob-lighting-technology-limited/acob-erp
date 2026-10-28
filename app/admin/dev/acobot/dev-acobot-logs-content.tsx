@@ -10,6 +10,7 @@ import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/component
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Bot, Database, Download, Globe, MessageSquare, Users } from "lucide-react"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { apiFetch } from "@/lib/api-client"
 type AcobotSource = "erp" | "website"
@@ -81,7 +82,7 @@ export function DevAcobotLogsContent() {
     isLoading,
     error,
     refetch,
-  } = useQuery({ queryKey: ["acobot-logs", tab], queryFn: () => fetchAcobotLogs(tab) })
+  } = useQuery({ queryKey: QUERY_KEYS.acobotLogsKey(tab), queryFn: () => fetchAcobotLogs(tab) })
 
   const departmentOptions = useMemo(
     () =>

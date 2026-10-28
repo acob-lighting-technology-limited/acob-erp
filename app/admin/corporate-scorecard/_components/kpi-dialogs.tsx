@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 export const PERSPECTIVES = ["Financial", "Customer", "Internal Process", "Organizational Capacity"] as const
 
@@ -78,7 +79,7 @@ export function CreateKpiDialog({ open, onOpenChange, onChanged, planYear }: Cre
   const [isSaving, setIsSaving] = useState(false)
 
   const { data: deptData } = useQuery<{ data: Array<{ name: string }> }>({
-    queryKey: ["departments-all"],
+    queryKey: QUERY_KEYS.departmentsAll(),
     queryFn: async () => {
       const res = await apiFetch("/api/departments", { cache: "no-store" })
       const payload = await res.json()
@@ -366,7 +367,7 @@ export function EditKpiDialog({ row, onOpenChange, onChanged }: EditKpiDialogPro
   const [isSaving, setIsSaving] = useState(false)
 
   const { data: deptData } = useQuery<{ data: Array<{ name: string }> }>({
-    queryKey: ["departments-all"],
+    queryKey: QUERY_KEYS.departmentsAll(),
     queryFn: async () => {
       const res = await apiFetch("/api/departments", { cache: "no-store" })
       const payload = await res.json()

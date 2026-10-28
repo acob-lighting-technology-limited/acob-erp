@@ -199,7 +199,7 @@ export default function WeeklyReportsPortal() {
   const staffAvatars = useStaffAvatars()
 
   const { data: profileData } = useQuery({
-    queryKey: ["portal-weekly-reports-profile"],
+    queryKey: QUERY_KEYS.portalWeeklyReportsProfile(),
     queryFn: () => fetchProfileAndDepartments(supabase),
   })
 
@@ -221,7 +221,7 @@ export default function WeeklyReportsPortal() {
   const trackingData = useMemo(() => reportsData?.trackingData ?? [], [reportsData?.trackingData])
 
   const { data: lockState } = useQuery({
-    queryKey: ["portal-weekly-report-lock", weekFilter, yearFilter],
+    queryKey: QUERY_KEYS.portalWeeklyReportLock(weekFilter, yearFilter),
     queryFn: () => fetchWeeklyReportLockState(supabase, weekFilter, yearFilter),
   })
 

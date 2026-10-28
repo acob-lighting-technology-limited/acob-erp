@@ -24,6 +24,7 @@ import { formatNaira, stageTitle } from "@/lib/requisitions/format"
 import { amountChangeMessage, lineItemsTotal } from "@/lib/requisitions/limits"
 import { STAGE_VERBS } from "@/lib/requisitions/routing"
 import type { Requisition, RequisitionViewerActions } from "@/lib/requisitions/types"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 export type SignMode = "sign" | "reject"
 
@@ -64,7 +65,7 @@ export function SignDialog({
   const queryClient = useQueryClient()
   const setupNeeded = viewer.signing_setup_missing.length > 0
   const { data: signingStatus } = useQuery({
-    queryKey: ["signing-status"],
+    queryKey: QUERY_KEYS.signingStatus(),
     queryFn: () => apiJson<{ data: SigningStatus }>("/api/profile/signing").then((res) => res.data),
     enabled: open && setupNeeded,
   })
@@ -75,7 +76,7 @@ export function SignDialog({
       ]
     : viewer.signing_setup_missing
   const refreshSigningStatus = () => {
-    void queryClient.invalidateQueries({ queryKey: ["signing-status"] })
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.signingStatus() })
   }
 
   useEffect(() => {

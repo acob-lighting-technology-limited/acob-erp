@@ -16,6 +16,7 @@ import { apiFetch } from "@/lib/api-client"
 import { ragStatus, type RagStatus } from "@/lib/corporate-scorecard/attainment"
 import { exportSummaryToExcel, exportSummaryToPdf } from "@/lib/corporate-scorecard/export"
 import { PlanYearSelect } from "./plan-year-select"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type PerspectiveRollup = {
   perspective: string
@@ -76,7 +77,7 @@ export function ScorecardSummaryContent({
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
 
   const { data, isLoading, error, refetch } = useQuery<SummaryResponse>({
-    queryKey: ["corporate-scorecard-summary", selectedYear],
+    queryKey: QUERY_KEYS.corporateScorecardSummary(selectedYear),
     queryFn: async () => {
       const query = selectedYear ? `?year=${selectedYear}` : ""
       const res = await apiFetch(`/api/corporate-scorecard/summary${query}`, { cache: "no-store" })

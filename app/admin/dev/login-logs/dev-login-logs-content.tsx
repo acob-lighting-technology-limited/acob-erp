@@ -353,7 +353,7 @@ export function DevLoginLogsContent() {
   }, [selectedUser, rows])
 
   const { data: auditLogsData, isLoading: isLoadingAudit } = useQuery({
-    queryKey: ["dev-login-logs-audit", selectedDept, selectedUserId],
+    queryKey: QUERY_KEYS.devLoginLogsAudit(selectedDept, selectedUserId),
     queryFn: () => fetchDashboardAuditLogs(selectedDept, selectedUserId),
     enabled: rows.length > 0,
   })

@@ -45,6 +45,7 @@ import { NewRequisitionDialog } from "./new-requisition-dialog"
 import { SignDialog, type SignMode } from "./sign-dialog"
 import { statusBadgeVariant } from "./requisition-detail"
 import { RequisitionPreviewSheet } from "./requisition-preview-sheet"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 import { apiFetch } from "@/lib/api-client"
 export type RequisitionsSurface = "staff" | "admin" | "dept"
@@ -272,7 +273,7 @@ export function RequisitionsListPage({
   // rows for one view, so the count is the length of that view's list.
   const countQueries = useQueries({
     queries: views.map((v) => ({
-      queryKey: ["requisition-tab-count", v, v === "department" ? deptName : null],
+      queryKey: QUERY_KEYS.requisitionTabCount(v, v === "department" ? deptName : null),
       queryFn: async () => {
         const params = new URLSearchParams({ view: v })
         if (v === "department" && deptName) params.set("department", deptName)

@@ -72,7 +72,7 @@ export function WeekSetupCard() {
   )
 
   const { data: employees = [] } = useQuery({
-    queryKey: ["general-meeting-week-setup-employees"],
+    queryKey: QUERY_KEYS.generalMeetingWeekSetupEmployees(),
     queryFn: async (): Promise<EmployeeOption[]> => {
       const res = await apiFetch("/api/admin/reports/week-setup/employees", { cache: "no-store" })
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Failed to load employees")
@@ -115,7 +115,7 @@ export function WeekSetupCard() {
   }, [lockState])
 
   const { data: weekSetupData } = useQuery({
-    queryKey: ["general-meeting-week-setup", weekNumber, yearNumber],
+    queryKey: QUERY_KEYS.meetingWeekSetup(weekNumber, yearNumber),
     queryFn: async () => {
       const res = await apiFetch(`/api/admin/reports/week-setup?week=${weekNumber}&year=${yearNumber}`, {
         cache: "no-store",
@@ -257,10 +257,10 @@ export function WeekSetupCard() {
       toast.success("Week setup saved")
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.adminWeeklyReportLockState(weekNumber, yearNumber) }),
-        queryClient.invalidateQueries({ queryKey: ["general-meeting-week-setup", weekNumber, yearNumber] }),
-        queryClient.invalidateQueries({ queryKey: ["kss-roster-table"] }),
-        queryClient.invalidateQueries({ queryKey: ["kss-documents-table"] }),
-        queryClient.invalidateQueries({ queryKey: ["kss-selected-week-lock", weekNumber, yearNumber] }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.meetingWeekSetup(weekNumber, yearNumber) }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.kssRosterTable() }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.kssDocumentsTable() }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.kssSelectedWeekLock(weekNumber, yearNumber) }),
       ])
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Failed to save week setup")
@@ -272,7 +272,7 @@ export function WeekSetupCard() {
   // ── Office Year Config ──────────────────────────────────────────────────────
 
   const { data: yearRows = [], isLoading: yearConfigLoading } = useQuery<OfficeYearRow[]>({
-    queryKey: ["office-year-config"],
+    queryKey: QUERY_KEYS.officeYearConfig(),
     queryFn: async () => {
       const res = await apiFetch("/api/reports/office-year-config")
       const json = await res.json()
@@ -299,7 +299,7 @@ export function WeekSetupCard() {
     },
     onSuccess: (_data, variables) => {
       toast.success(`Week 1 for ${variables.year} set to January ${variables.anchor_day}`)
-      queryClient.invalidateQueries({ queryKey: ["office-year-config"] })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.officeYearConfig() })
       setEditingYear(null)
     },
     onError: (err: Error) => {

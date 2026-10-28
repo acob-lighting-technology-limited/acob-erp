@@ -134,7 +134,7 @@ export default function ActionTrackerPortal() {
   })
 
   const { data: lockState } = useQuery({
-    queryKey: ["dashboard-action-tracker-meeting-date", week, year],
+    queryKey: QUERY_KEYS.dashboardActionTrackerMeetingDate(week, year),
     queryFn: () => fetchWeeklyReportLockState(supabase, week, year),
   })
 

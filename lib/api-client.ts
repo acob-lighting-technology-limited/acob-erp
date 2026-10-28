@@ -1,3 +1,4 @@
+import { QUERY_KEYS } from "@/lib/query-keys"
 // Plain module on purpose, not "use client": it has no React in it and guards every browser global,
 // and lib code that is shared with route handlers imports it. Calling it on the server just sends a
 // plain fetch.
@@ -76,14 +77,16 @@ function redirectToLogin() {
   const { pathname, search } = window.location
   if (pathname.startsWith("/auth")) return
   redirectingToLogin = true
-  window.location.assign(`/auth/login?next=${encodeURIComponent(pathname + search)}`)
+  const url = new URL("/auth/login", window.location.origin)
+  url.searchParams.set("next", pathname + search)
+  window.location.assign(url.toString())
 }
 
 /**
  * apiFetch + JSON parse + throw on a non-2xx status, using the route's
  * `{ error }` body as the message. The standard queryFn for React Query:
  *
- *   useQuery({ queryKey: ["maintenance"], queryFn: () => apiJson<State>("/api/dev/maintenance") })
+ *   useQuery({ queryKey: QUERY_KEYS.maintenance(), queryFn: () => apiJson<State>("/api/dev/maintenance") })
  */
 export async function apiJson<T = unknown>(input: RequestInfo | URL, init: RequestInit = {}): Promise<T> {
   const response = await apiFetch(input, init)

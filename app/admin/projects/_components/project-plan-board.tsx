@@ -63,6 +63,7 @@ import type { employee } from "@/app/admin/tasks/management/admin-tasks-content"
 import type { Task } from "@/types/task"
 import type { Project } from "@/components/projects/project-list-content"
 import { fetchProjectTasks, projectTasksKey, type WorkTask } from "@/lib/projects/work-tasks"
+import { QUERY_KEYS } from "@/lib/query-keys"
 
 type Plan = {
   id: string
@@ -357,7 +358,7 @@ export function ProjectPlanBoard({
       setEditingTask(null)
       setTaskDialogPlan(null)
       void queryClient.invalidateQueries({ queryKey: tasksKey })
-      void queryClient.invalidateQueries({ queryKey: ["projects"] })
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projects() })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save task")
     } finally {

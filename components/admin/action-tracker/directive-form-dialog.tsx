@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getCurrentOfficeWeek, getOfficeWeekMonday } from "@/lib/meeting-week"
 import { toLocalISODate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { depsChanged } from "@/lib/utils/deps-changed"
 
 export interface EditableDirective {
@@ -81,7 +82,7 @@ export function DirectiveFormDialog({
   const [meetingDate, setMeetingDate] = useState("")
 
   const { data: staff = [] } = useQuery({
-    queryKey: ["action-tracker", "directive-staff-options"],
+    queryKey: QUERY_KEYS.actionTracker("directive-staff-options"),
     enabled: isOpen,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {

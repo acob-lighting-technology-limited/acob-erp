@@ -41,6 +41,7 @@ import { apiFetch } from "@/lib/api-client"
 import { formatWATDate } from "@/lib/utils/date"
 import { exportScorecardRegisterToExcel, exportScorecardRegisterToPdf } from "@/lib/corporate-scorecard/export"
 import { CreateKpiDialog, EditKpiDialog, ArchiveKpiDialog, PERSPECTIVES } from "./kpi-dialogs"
+import { QUERY_KEYS } from "@/lib/query-keys"
 import { PlanYearSelect } from "./plan-year-select"
 
 type Assignment = {
@@ -634,7 +635,7 @@ function ManageDepartmentsDialog({
   const [removingId, setRemovingId] = useState<string | null>(null)
 
   const { data: deptData } = useQuery<{ data: Array<{ name: string }> }>({
-    queryKey: ["departments-all"],
+    queryKey: QUERY_KEYS.departmentsAll(),
     queryFn: async () => {
       const res = await apiFetch("/api/departments", { cache: "no-store" })
       const payload = await res.json()

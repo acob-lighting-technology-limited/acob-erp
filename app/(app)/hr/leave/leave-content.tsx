@@ -188,7 +188,7 @@ export function LeaveContent({
   const [formData, setFormData] = useState(EMPTY_REQUEST_FORM)
 
   const { data: leaveRoutePreview } = useQuery<LeaveRoutePreview>({
-    queryKey: ["leave-flow-my-preview", formData.reliever_identifier || ""],
+    queryKey: QUERY_KEYS.leaveFlowMyPreview(formData.reliever_identifier || ""),
     queryFn: async () => {
       const relieverIdParam = formData.reliever_identifier
         ? `?reliever_id=${encodeURIComponent(formData.reliever_identifier)}`

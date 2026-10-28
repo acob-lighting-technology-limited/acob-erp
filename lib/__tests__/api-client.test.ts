@@ -79,15 +79,20 @@ test("a caller's own signal and FormData uploads are not given the default timeo
 test("a 401 sends the user to log in and back, once", async () => {
   const env = install("/hr/leave", "")
   const g = globalThis as unknown as {
-    window: { location: { pathname: string; search: string; assign: (u: string) => void } }
+    window: { location: { origin: string; pathname: string; search: string; assign: (u: string) => void } }
   }
   const assigned: string[] = []
-  g.window.location = { pathname: "/hr/leave", search: "?tab=mine", assign: (u: string) => assigned.push(u) }
+  g.window.location = {
+    origin: "http://x.test",
+    pathname: "/hr/leave",
+    search: "?tab=mine",
+    assign: (u: string) => assigned.push(u),
+  }
   ;(globalThis as unknown as { fetch: unknown }).fetch = async () => new Response("{}", { status: 401 })
   try {
     await apiFetch("/api/hr/leave")
     await apiFetch("/api/hr/leave")
-    assert.deepEqual(assigned, ["/auth/login?next=%2Fhr%2Fleave%3Ftab%3Dmine"])
+    assert.deepEqual(assigned, ["http://x.test/auth/login?next=%2Fhr%2Fleave%3Ftab%3Dmine"])
   } finally {
     env.restore()
   }
