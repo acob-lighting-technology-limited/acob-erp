@@ -17,19 +17,11 @@ import { AttendanceManagerDialog } from "./_components/attendance-manager-dialog
 import { useAdminScopeOptional } from "@/components/admin-scope-context"
 import { AttendanceReportDialog } from "./_components/attendance-report-dialog"
 import { AttendanceExportDialog } from "./_components/attendance-export-dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select } from "@/components/ui/select"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { Dialog } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { BarChart3, Download, FileText, Users, Clock, AlertCircle, Pencil, Info, Settings2, Mail } from "lucide-react"
 import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
@@ -43,13 +35,9 @@ import {
   toLocalYearMonth,
   isLate,
 } from "@/lib/hr/attendance-utils"
-import { formatWATDate, formatWATDateTime } from "@/lib/utils/date"
+import { formatWATDate } from "@/lib/utils/date"
 import { cn } from "@/lib/utils"
-import {
-  ATTENDANCE_STATUS_LABELS,
-  getManualStatusEditOptions,
-  isPermissionAttendanceStatus,
-} from "@/lib/hr/attendance-status"
+import { getManualStatusEditOptions, isPermissionAttendanceStatus } from "@/lib/hr/attendance-status"
 import { computeAttendanceDay, netDayHoursFor } from "@/lib/hr/attendance-ssot"
 import { type AttendancePolicy, DEFAULT_ATTENDANCE_POLICY } from "@/lib/org-config"
 import { StatusBadge, labelSource } from "./_components/status-badge"
@@ -58,6 +46,8 @@ import { apiFetch, apiJson } from "@/lib/api-client"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { formatNumber } from "@/lib/format"
+import { AttendanceDialog } from "./_components/attendance-dialog"
+import { DayTimelineDialog } from "./_components/day-timeline-dialog"
 
 const log = logger("hr-attendance-reports")
 
@@ -95,7 +85,7 @@ export interface AttendanceReport {
   cycle_label?: string
 }
 
-interface DayRecord {
+export interface DayRecord {
   id: string
   date: string
   clock_in: string | null
@@ -168,7 +158,7 @@ function daySourceLabel(day: CalendarDay): string {
   }
 }
 
-type TimelineEvent = {
+export type TimelineEvent = {
   id: string
   event_type: string
   from_status: string | null
@@ -180,7 +170,7 @@ type TimelineEvent = {
   metadata?: Record<string, unknown> | null
 }
 
-type TimelineContext = {
+export type TimelineContext = {
   holiday: string | null
   holiday_added_by: string | null
   on_leave: string | null
@@ -188,7 +178,7 @@ type TimelineContext = {
   exempt_reason: string | null
 }
 
-const EVENT_LABELS: Record<string, string> = {
+export const EVENT_LABELS: Record<string, string> = {
   device_punch_in: "Clocked in (device)",
   device_punch_out: "Clocked out (device)",
   self_clock_in: "Clocked in",
@@ -211,7 +201,7 @@ const EVENT_LABELS: Record<string, string> = {
   marked_incomplete: "Auto-marked incomplete",
 }
 
-function eventBadgeClass(eventType: string): string {
+export function eventBadgeClass(eventType: string): string {
   if (eventType.startsWith("appeal_")) {
     if (eventType === "appeal_rejected") return "bg-danger/15 text-danger"
     if (eventType.includes("approved") || eventType.includes("resolved")) return "bg-success/15 text-success"
@@ -243,7 +233,7 @@ function currentYearMonth() {
   return toLocalYearMonth()
 }
 
-function formatDayShort(dateString: string) {
+export function formatDayShort(dateString: string) {
   return formatWATDate(dateString, { weekday: "short", month: "short", day: "numeric" })
 }
 
@@ -674,160 +664,33 @@ export function EmployeeExpandPanel({ report, yearMonth, policy, onRecordChanged
         })}
       </div>
 
-      <Dialog open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{isCreating ? "Add Attendance Record" : "Edit Attendance Record"}</DialogTitle>
-            <DialogDescription>
-              {editTarget && `${report.user_name} — ${formatDayShort(editTarget.date)}`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {isOnTimePresent && !isOverridden ? (
-              <p className="text-muted-foreground text-sm">
-                This record is fully present and on-time. No overrides (LWP/AWP) are applicable.
-              </p>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={editForm.status}
-                    onValueChange={(value) => setEditForm((f) => ({ ...f, status: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>
-                    Comment (required) <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    required
-                    placeholder="Reason for this manual attendance change"
-                    value={editForm.manual_comment}
-                    onChange={(e) => setEditForm((f) => ({ ...f, manual_comment: e.target.value }))}
-                  />
-                  {!hasManualComment && (
-                    <p className="text-xs font-medium text-red-500">
-                      A comment is required for all manual attendance alterations.
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-            {isOverridden ? (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleRevert}
-                disabled={reverting || saving}
-              >
-                {reverting ? "Reverting…" : "Revert Override"}
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditTarget(null)} disabled={saving || reverting}>
-                Cancel
-              </Button>
-              {(!isOnTimePresent || !isOverridden) && (
-                <Button onClick={saveEdit} disabled={cannotSave || reverting}>
-                  {saving ? "Saving…" : isCreating ? "Create" : "Save"}
-                </Button>
-              )}
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AttendanceDialog
+        editTarget={editTarget}
+        setEditTarget={setEditTarget}
+        isCreating={isCreating}
+        report={report}
+        isOnTimePresent={isOnTimePresent}
+        isOverridden={isOverridden}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        statusOptions={statusOptions}
+        hasManualComment={hasManualComment}
+        handleRevert={handleRevert}
+        reverting={reverting}
+        saving={saving}
+        saveEdit={saveEdit}
+        cannotSave={cannotSave}
+      />
 
-      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Day Timeline</DialogTitle>
-            <DialogDescription>
-              {historyTarget ? `${report.user_name} — ${formatDayShort(historyTarget.date)}` : ""}
-            </DialogDescription>
-          </DialogHeader>
-
-          {historyContext && (historyContext.holiday || historyContext.on_leave || historyContext.exempt) && (
-            <div className="flex flex-wrap gap-2">
-              {historyContext.holiday && (
-                <Badge className="bg-info/15 text-info text-xs">
-                  Holiday — {historyContext.holiday}
-                  {historyContext.holiday_added_by ? ` · added by ${historyContext.holiday_added_by}` : ""}
-                </Badge>
-              )}
-              {historyContext.on_leave && (
-                <Badge className="bg-purple/15 text-purple text-xs">On leave — {historyContext.on_leave}</Badge>
-              )}
-              {historyContext.exempt && (
-                <Badge className="bg-purple/15 text-purple text-xs">
-                  Exempt{historyContext.exempt_reason ? ` — ${historyContext.exempt_reason}` : ""}
-                </Badge>
-              )}
-            </div>
-          )}
-
-          <div className="max-h-[420px] space-y-3 overflow-y-auto">
-            {historyLoading ? (
-              <p className="text-muted-foreground text-sm">Loading…</p>
-            ) : historyItems.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No recorded events for this day.</p>
-            ) : (
-              historyItems.map((item) => {
-                const label = EVENT_LABELS[item.event_type] ?? item.event_type.replaceAll("_", " ")
-                const fromLabel = item.from_status
-                  ? (ATTENDANCE_STATUS_LABELS[item.from_status as keyof typeof ATTENDANCE_STATUS_LABELS] ??
-                    item.from_status)
-                  : null
-                const toLabel = item.to_status
-                  ? (ATTENDANCE_STATUS_LABELS[item.to_status as keyof typeof ATTENDANCE_STATUS_LABELS] ??
-                    item.to_status)
-                  : null
-                const isAutomated = item.actor_name === null
-                return (
-                  <div key={item.id} className="rounded-md border p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className={`text-xs ${eventBadgeClass(item.event_type)}`}>{label}</Badge>
-                      <p className="text-sm font-medium">{isAutomated ? "System / Device" : item.actor_name}</p>
-                    </div>
-                    <p className="text-muted-foreground text-xs">{formatWATDateTime(item.created_at)}</p>
-                    {(fromLabel || toLabel) && (
-                      <p className="mt-1 text-xs">
-                        <span className="font-medium">Status:</span>{" "}
-                        <span className="text-muted-foreground">
-                          {fromLabel ? `${fromLabel} → ` : ""}
-                          {toLabel ?? "—"}
-                        </span>
-                      </p>
-                    )}
-                    {item.comment && (
-                      <p className="mt-1 text-xs">
-                        <span className="font-medium">Comment:</span>{" "}
-                        <span className="text-muted-foreground">{item.comment}</span>
-                      </p>
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DayTimelineDialog
+        historyOpen={historyOpen}
+        setHistoryOpen={setHistoryOpen}
+        historyTarget={historyTarget}
+        report={report}
+        historyContext={historyContext}
+        historyLoading={historyLoading}
+        historyItems={historyItems}
+      />
     </>
   )
 }

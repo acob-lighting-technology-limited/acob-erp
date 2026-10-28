@@ -8,31 +8,24 @@ import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { apiFetch, apiJson } from "@/lib/api-client"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { useHrProfiles } from "@/hooks/use-hr-profiles"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { personName } from "@/lib/format"
+import { NewDevelopmentPlanDialog } from "./_components/new-development-plan-dialog"
+import { EditDevelopmentPlanDialog } from "./_components/edit-development-plan-dialog"
 
-type Profile = {
+export type Profile = {
   id: string
   first_name: string | null
   last_name: string | null
@@ -65,7 +58,7 @@ type DevelopmentPlan = {
   review?: { id: string } | null
 }
 
-type Cycle = {
+export type Cycle = {
   id: string
   name: string
   review_type?: string | null
@@ -73,7 +66,7 @@ type Cycle = {
   end_date?: string | null
 }
 
-const FOCUS_LABELS: Record<string, string> = {
+export const FOCUS_LABELS: Record<string, string> = {
   general: "General",
   communication: "Communication",
   leadership: "Leadership",
@@ -586,193 +579,51 @@ export function AdminDevelopmentPlansPage({ backLinkHref }: { backLinkHref?: str
         skeletonRows={6}
       />
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>New Development Plan</DialogTitle>
-            <DialogDescription>
-              Create a development plan for an employee, optionally linked to a review cycle.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(event) => void handleCreate(event)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 space-y-2">
-                <Label>Employee *</Label>
-                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select employee…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {personName(employee)} {employee.department ? `(${employee.department})` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2 space-y-2">
-                <Label>Plan Title *</Label>
-                <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label>Focus Area</Label>
-                <Select value={focusArea} onValueChange={setFocusArea}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(FOCUS_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Priority</Label>
-                <Select value={priority} onValueChange={(value) => setPriority(value as "low" | "medium" | "high")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Review Cycle</Label>
-                <Select value={selectedCycle} onValueChange={setSelectedCycle}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {cycles
-                      .filter((cycle) => !cycle.review_type || cycle.review_type.toLowerCase() === "quarterly")
-                      .map((cycle) => (
-                        <SelectItem key={cycle.id} value={cycle.id}>
-                          {cycle.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Target Date</Label>
-                <Input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} />
-            </div>
-            <div className="space-y-2">
-              <Label>Action Steps</Label>
-              <Textarea value={actionLines} onChange={(event) => setActionLines(event.target.value)} rows={4} />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Plan"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <NewDevelopmentPlanDialog
+        isCreateOpen={isCreateOpen}
+        setIsCreateOpen={setIsCreateOpen}
+        handleCreate={handleCreate}
+        selectedEmployee={selectedEmployee}
+        setSelectedEmployee={setSelectedEmployee}
+        employees={employees}
+        title={title}
+        setTitle={setTitle}
+        focusArea={focusArea}
+        setFocusArea={setFocusArea}
+        priority={priority}
+        setPriority={setPriority}
+        selectedCycle={selectedCycle}
+        setSelectedCycle={setSelectedCycle}
+        cycles={cycles}
+        targetDate={targetDate}
+        setTargetDate={setTargetDate}
+        description={description}
+        setDescription={setDescription}
+        actionLines={actionLines}
+        setActionLines={setActionLines}
+        isSubmitting={isSubmitting}
+      />
 
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Development Plan</DialogTitle>
-            <DialogDescription>Update the plan details, status, and progress tracking.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(event) => void handleEdit(event)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 space-y-2">
-                <Label>Plan Title *</Label>
-                <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label>Focus Area</Label>
-                <Select value={focusArea} onValueChange={setFocusArea}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(FOCUS_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Priority</Label>
-                <Select value={priority} onValueChange={(value) => setPriority(value as "low" | "medium" | "high")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select
-                  value={status}
-                  onValueChange={(value) => setStatus(value as "active" | "completed" | "cancelled" | "on_hold")}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="on_hold">On Hold</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Progress %</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={progressPct}
-                  onChange={(event) => setProgressPct(event.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Target Date</Label>
-                <Input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditDevelopmentPlanDialog
+        isEditOpen={isEditOpen}
+        setIsEditOpen={setIsEditOpen}
+        handleEdit={handleEdit}
+        title={title}
+        setTitle={setTitle}
+        focusArea={focusArea}
+        setFocusArea={setFocusArea}
+        priority={priority}
+        setPriority={setPriority}
+        status={status}
+        setStatus={setStatus}
+        progressPct={progressPct}
+        setProgressPct={setProgressPct}
+        targetDate={targetDate}
+        setTargetDate={setTargetDate}
+        description={description}
+        setDescription={setDescription}
+        isSubmitting={isSubmitting}
+      />
 
       <DetailSheet
         open={Boolean(viewingPlan)}

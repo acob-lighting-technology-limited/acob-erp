@@ -10,21 +10,12 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Dialog } from "@/components/ui/dialog"
 import { ManageGrossSalaryDialog } from "@/components/hr/manage-gross-salary-dialog"
-import { FileText, Plus, DollarSign, Calendar, ClipboardList, Calculator } from "lucide-react"
+import { FileText, DollarSign, Calendar, ClipboardList, Calculator } from "lucide-react"
 import { toast } from "sonner"
 import { apiFetch } from "@/lib/api-client"
+import { CreatePayrollPeriodDialog } from "./_components/create-payroll-period-dialog"
 
 export interface PayrollPeriod {
   id: string
@@ -342,73 +333,14 @@ export function PayrollPeriodsPage({ initialData }: PayrollPeriodsPageProps) {
           <Calculator className="mr-1.5 h-4 w-4" /> Payroll Calculator
         </Link>
       </Button>
-      <Dialog open={openPeriod} onOpenChange={setOpenPeriod}>
-        <DialogTrigger asChild>
-          <Button size="sm">
-            <Plus className="mr-1.5 h-4 w-4" /> Create Period
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto">
-          <form onSubmit={handleCreatePeriod}>
-            <DialogHeader>
-              <DialogTitle>Create Payroll Period</DialogTitle>
-              <DialogDescription>Set up a monthly cycle dates configuration.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Period Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g. June 2026"
-                  value={periodForm.name}
-                  onChange={(e) => setPeriodForm({ ...periodForm, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date</Label>
-                  <Input
-                    id="start_date"
-                    type="date"
-                    value={periodForm.start_date}
-                    onChange={(e) => setPeriodForm({ ...periodForm, start_date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end_date">End Date</Label>
-                  <Input
-                    id="end_date"
-                    type="date"
-                    value={periodForm.end_date}
-                    onChange={(e) => setPeriodForm({ ...periodForm, end_date: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pay_date">Target Pay Date</Label>
-                <Input
-                  id="pay_date"
-                  type="date"
-                  value={periodForm.pay_date}
-                  onChange={(e) => setPeriodForm({ ...periodForm, pay_date: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpenPeriod(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                Create
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreatePayrollPeriodDialog
+        openPeriod={openPeriod}
+        setOpenPeriod={setOpenPeriod}
+        handleCreatePeriod={handleCreatePeriod}
+        periodForm={periodForm}
+        setPeriodForm={setPeriodForm}
+        loading={loading}
+      />
     </div>
   ) : null
 

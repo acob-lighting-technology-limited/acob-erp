@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { BadgeCheck, MapPin, Pencil, Plus, Trash2, Warehouse, WarehouseIcon, XCircle } from "lucide-react"
+import { BadgeCheck, MapPin, Pencil, Trash2, Warehouse, WarehouseIcon, XCircle } from "lucide-react"
 import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -18,17 +18,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
-import { FormFieldGroup } from "@/components/ui/patterns"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
+import { WarehouseDialog } from "./_components/warehouse-dialog"
 
-interface WarehouseData {
+export interface WarehouseData {
   id: string
   name: string
   code: string
@@ -260,66 +257,15 @@ export default function WarehousesPage() {
       description="Manage storage locations, operating status, and warehouse coverage."
       icon={WarehouseIcon}
       actions={
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Warehouse</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-            <form onSubmit={handleSubmit}>
-              <DialogHeader>
-                <DialogTitle>{editing ? "Edit" : "Create"} Warehouse</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FormFieldGroup label="Name">
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                      required
-                    />
-                  </FormFieldGroup>
-                  <FormFieldGroup label="Code">
-                    <Input
-                      id="code"
-                      value={formData.code}
-                      onChange={(event) => setFormData({ ...formData, code: event.target.value })}
-                      placeholder="e.g. WH-001"
-                      required
-                    />
-                  </FormFieldGroup>
-                </div>
-                <FormFieldGroup label="Address">
-                  <Textarea
-                    id="address"
-                    value={formData.address}
-                    onChange={(event) => setFormData({ ...formData, address: event.target.value })}
-                    rows={3}
-                  />
-                </FormFieldGroup>
-                <FormFieldGroup label="Active">
-                  <div className="flex items-center justify-end">
-                    <Switch
-                      id="is_active"
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                    />
-                  </div>
-                </FormFieldGroup>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">{editing ? "Update" : "Create"}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <WarehouseDialog
+          isDialogOpen={isDialogOpen}
+          setIsDialogOpen={setIsDialogOpen}
+          openCreate={openCreate}
+          handleSubmit={handleSubmit}
+          editing={editing}
+          formData={formData}
+          setFormData={setFormData}
+        />
       }
       stats={
         <StatGrid>

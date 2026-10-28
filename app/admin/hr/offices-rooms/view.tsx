@@ -6,7 +6,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, RowAction } from "@/components/ui/data-table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
   AlertDialog,
@@ -25,13 +24,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AlertTriangle, Mail, MapPin, Pencil, Plus, Trash2, Users } from "lucide-react"
+import { AlertTriangle, Mail, MapPin, Pencil, Trash2, Users } from "lucide-react"
 import { toast } from "sonner"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
@@ -40,17 +34,18 @@ import { logger } from "@/lib/logger"
 import { apiFetch } from "@/lib/api-client"
 import { personName } from "@/lib/format"
 import { DepartmentStatusBadge } from "@/app/admin/hr/departments/view"
+import { OfficesRoomsDialog } from "./_components/offices-rooms-dialog"
 
 const log = logger("hr-office-locations")
 
-const OFFICE_TYPE_OPTIONS = [
+export const OFFICE_TYPE_OPTIONS = [
   { value: "office", label: "Executive Office" },
   { value: "department_office", label: "Department Office" },
   { value: "conference_room", label: "Conference Room" },
   { value: "common_area", label: "Common Area" },
 ]
 
-interface OfficeLocation {
+export interface OfficeLocation {
   id: string
   name: string
   type: string
@@ -386,101 +381,17 @@ export function OfficeLocationsPage({
       icon={MapPin}
       actions={
         canManageLocations ? (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={openCreateDialog} size="sm" className="gap-2">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Room / Office</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-              <form onSubmit={handleSubmit}>
-                <DialogHeader>
-                  <DialogTitle>{editingLocation ? "Edit Room / Office" : "Add Room / Office"}</DialogTitle>
-                  <DialogDescription>
-                    {editingLocation
-                      ? "Update the room or office space details below."
-                      : "Add a new room or office space to the system."}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Room / Office Name</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                      placeholder="e.g., Technical Extension, MD Office"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="type">Space Type</Label>
-                    <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                      <SelectTrigger id="type">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {OFFICE_TYPE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="department">Linked Department</Label>
-                    <Select
-                      value={formData.department || "__none__"}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, department: value === "__none__" ? "" : value })
-                      }
-                    >
-                      <SelectTrigger id="department">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {departments.map((department) => (
-                          <SelectItem key={department} value={department}>
-                            {department}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(event) => setFormData({ ...formData, description: event.target.value })}
-                      placeholder="Brief description of this room or office..."
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="is_active">Active</Label>
-                    <Switch
-                      id="is_active"
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" loading={saving}>
-                    {editingLocation ? "Update" : "Create"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <OfficesRoomsDialog
+            isDialogOpen={isDialogOpen}
+            setIsDialogOpen={setIsDialogOpen}
+            openCreateDialog={openCreateDialog}
+            handleSubmit={handleSubmit}
+            editingLocation={editingLocation}
+            formData={formData}
+            setFormData={setFormData}
+            departments={departments}
+            saving={saving}
+          />
         ) : null
       }
       stats={

@@ -17,7 +17,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { FeedbackForm } from "@/components/feedback-form"
 import { FeedbackEditModal } from "@/components/feedback-edit-modal"
 import { SystemSurveyModal } from "@/components/survey/system-survey-modal"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
@@ -27,6 +26,7 @@ import { StatGrid } from "@/components/ui/stat-grid"
 import type { Feedback } from "./page"
 import type { SystemSatisfactionSurvey } from "@/types/survey"
 import { logger } from "@/lib/logger"
+import { SubmitFeedbackDialog } from "./_components/submit-feedback-dialog"
 
 const log = logger("feedback-feedback-content")
 
@@ -386,15 +386,11 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
         urlSync
       />
 
-      <Dialog open={isSubmitOpen} onOpenChange={setIsSubmitOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Submit Feedback</DialogTitle>
-            <DialogDescription>Share your thoughts with management.</DialogDescription>
-          </DialogHeader>
-          <FeedbackForm onFeedbackSubmitted={handleFeedbackSubmitted} variant="modal" />
-        </DialogContent>
-      </Dialog>
+      <SubmitFeedbackDialog
+        isSubmitOpen={isSubmitOpen}
+        setIsSubmitOpen={setIsSubmitOpen}
+        handleFeedbackSubmitted={handleFeedbackSubmitted}
+      />
 
       {showEditModal && selectedFeedback ? (
         <FeedbackEditModal

@@ -1,27 +1,18 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, Loader2, MessageSquare, Send, Users } from "lucide-react"
+import { MessageSquare, Send, Users } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { useCycleFilters, type CycleFilterCycle } from "@/components/pms/use-cycle-filters"
 import { useQuery } from "@tanstack/react-query"
 import { apiJson } from "@/lib/api-client"
@@ -29,8 +20,9 @@ import { QUERY_KEYS } from "@/lib/query-keys"
 import { usePerformanceCycles } from "@/hooks/use-performance-cycles"
 import { useHrProfiles } from "@/hooks/use-hr-profiles"
 import { formatDate, personName } from "@/lib/format"
+import { GivePeerFeedbackDialog } from "./_components/give-peer-feedback-dialog"
 
-type Profile = {
+export type Profile = {
   id: string
   first_name: string | null
   last_name: string | null
@@ -427,130 +419,31 @@ export default function PeerFeedbackPage() {
       )}
 
       {/* Give Feedback Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Give Peer Feedback</DialogTitle>
-            <DialogDescription>
-              Rate a colleague on their performance this cycle. Your name will not be shown to them.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Colleague</Label>
-              <Select value={selectedColleague} onValueChange={setSelectedColleague}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select colleague…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {colleagues.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {personName(c)} {c.department ? `(${c.department})` : ""}
-                      {alreadySubmittedKeys.has(`${c.id}:${selectedCycle}`) ? " ✓" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Review Cycle</Label>
-              <Select value={selectedCycle} onValueChange={setSelectedCycle}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select cycle…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cycles.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Overall Score (0–100) *</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="e.g. 85"
-                  value={score}
-                  onChange={(e) => setScore(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Collaboration</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="0–100"
-                  value={collaboration}
-                  onChange={(e) => setCollaboration(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Communication</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="0–100"
-                  value={communication}
-                  onChange={(e) => setCommunication(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Teamwork</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="0–100"
-                  value={teamwork}
-                  onChange={(e) => setTeamwork(e.target.value)}
-                />
-              </div>
-              <div className="col-span-2 space-y-2">
-                <Label>Professionalism</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="0–100"
-                  value={professionalism}
-                  onChange={(e) => setProfessionalism(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Comments (optional)</Label>
-              <Textarea
-                placeholder="Share specific observations or examples…"
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                rows={3}
-                maxLength={2000}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting} className="gap-2">
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Submit Feedback
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <GivePeerFeedbackDialog
+        isDialogOpen={isDialogOpen}
+        setIsDialogOpen={setIsDialogOpen}
+        handleSubmit={handleSubmit}
+        selectedColleague={selectedColleague}
+        setSelectedColleague={setSelectedColleague}
+        colleagues={colleagues}
+        alreadySubmittedKeys={alreadySubmittedKeys}
+        selectedCycle={selectedCycle}
+        setSelectedCycle={setSelectedCycle}
+        cycles={cycles}
+        score={score}
+        setScore={setScore}
+        collaboration={collaboration}
+        setCollaboration={setCollaboration}
+        communication={communication}
+        setCommunication={setCommunication}
+        teamwork={teamwork}
+        setTeamwork={setTeamwork}
+        professionalism={professionalism}
+        setProfessionalism={setProfessionalism}
+        comments={comments}
+        setComments={setComments}
+        isSubmitting={isSubmitting}
+      />
     </DataTablePage>
   )
 }

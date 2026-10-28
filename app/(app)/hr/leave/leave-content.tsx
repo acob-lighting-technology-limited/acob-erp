@@ -25,7 +25,6 @@ import {
 import { HeaderMoreMenu } from "@/components/ui/patterns/header-more-menu"
 import type { LeaveApprovalAudit, LeaveBalance, LeaveRequest, LeaveType } from "./page"
 
-import { LeaveTypesCard } from "@/components/leave/leave-types-card"
 import { LeaveDeleteConfirmDialog } from "@/components/leave/leave-delete-confirm-dialog"
 import { LeaveRequestFormDialog } from "@/components/leave/leave-request-form-dialog"
 import type { LeaveRequestFormData } from "@/components/leave/leave-request-form-dialog"
@@ -41,13 +40,16 @@ import type { DataTableColumn, DataTableFilter, DataTableTab, RowAction } from "
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { formatName } from "@/lib/utils"
 import { leaveRequestMissing } from "@/lib/hr/leave-request-rules"
 import { formatWATDateTime } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { leaveHandoverHref } from "@/lib/hr/leave-attachment-links"
 import { resolveLeaveRouteStages } from "@/lib/hr/leave-stages"
+import { LeaveOverviewDialog } from "./_components/leave-overview-dialog"
+import { RecentReviewHistoryDialog } from "./_components/recent-review-history-dialog"
+import { CannotCreateNewRequestDialog } from "./_components/cannot-create-new-request-dialog"
 
 interface LeaveContentProps {
   currentUserId: string
@@ -1270,65 +1272,27 @@ export function LeaveContent({
         onSubmit={handleSubmitRequest}
       />
 
-      <Dialog open={isOverviewOpen} onOpenChange={setIsOverviewOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Leave Overview</DialogTitle>
-            <DialogDescription>
-              Quick guide for leave balances, request flow, and what each leave type allows.
-            </DialogDescription>
-          </DialogHeader>
-          <LeaveTypesCard leaveTypes={leaveTypes} balanceMap={balanceMap} />
-        </DialogContent>
-      </Dialog>
+      <LeaveOverviewDialog
+        isOverviewOpen={isOverviewOpen}
+        setIsOverviewOpen={setIsOverviewOpen}
+        leaveTypes={leaveTypes}
+        balanceMap={balanceMap}
+      />
 
       {/* An approver's own decision trail. It lives in a dialog rather than a panel
           under the table so the record list stays the whole page — but it is not
           optional: without it there is no way to see what you already decided. */}
-      <Dialog open={isReviewHistoryOpen} onOpenChange={setIsReviewHistoryOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Recent Review History</DialogTitle>
-            <DialogDescription>Your latest acceptance and rejection decisions are recorded here.</DialogDescription>
-          </DialogHeader>
-          {pendingReviewHistory.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No review activity yet.</p>
-          ) : (
-            <ul className="max-h-[60vh] space-y-2 overflow-y-auto">
-              {pendingReviewHistory.slice(0, 25).map((item) => (
-                <li key={item.id} className="rounded-md border p-2.5 text-xs">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={item.status === "rejected" ? "destructive" : "outline"} className="capitalize">
-                      {item.status || "recorded"}
-                    </Badge>
-                    <span className="font-medium">{approvalStageLabel(item.stage_code || "approval_stage")}</span>
-                    <span className="text-muted-foreground">{item.request?.user?.full_name || "Employee"}</span>
-                    <span className="text-muted-foreground ml-auto">
-                      {item.approved_at ? formatWATDateTime(item.approved_at) : ""}
-                    </span>
-                  </div>
-                  {item.comments ? <p className="mt-1">{item.comments}</p> : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </DialogContent>
-      </Dialog>
+      <RecentReviewHistoryDialog
+        isReviewHistoryOpen={isReviewHistoryOpen}
+        setIsReviewHistoryOpen={setIsReviewHistoryOpen}
+        pendingReviewHistory={pendingReviewHistory}
+        approvalStageLabel={approvalStageLabel}
+      />
 
-      <Dialog open={isCreateBlockedOpen} onOpenChange={setIsCreateBlockedOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cannot Create New Request</DialogTitle>
-            <DialogDescription>
-              You already have an ongoing leave request. Submit a new one only after the current request is approved,
-              rejected, or cancelled.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button onClick={() => setIsCreateBlockedOpen(false)}>Okay</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CannotCreateNewRequestDialog
+        isCreateBlockedOpen={isCreateBlockedOpen}
+        setIsCreateBlockedOpen={setIsCreateBlockedOpen}
+      />
     </DataTablePage>
   )
 }

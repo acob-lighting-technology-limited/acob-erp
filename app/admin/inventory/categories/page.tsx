@@ -3,11 +3,11 @@
 import { useMemo, useState } from "react"
 import { formatWATDate } from "@/lib/utils/date"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Boxes, FolderOpen, Layers3, Pencil, Plus, Tag, Trash2 } from "lucide-react"
+import { Boxes, FolderOpen, Layers3, Pencil, Tag, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { QUERY_KEYS } from "@/lib/query-keys"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -17,17 +17,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { apiFetch } from "@/lib/api-client"
+import { CategoryDialog } from "./_components/category-dialog"
 
-interface Category {
+export interface Category {
   id: string
   name: string
   description: string | null
@@ -244,48 +242,15 @@ export default function CategoriesPage() {
       description="Organize products by category and track how each category is being used."
       icon={Boxes}
       actions={
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Add Category</span>
-              <span className="sm:hidden">Add</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-            <form onSubmit={handleSubmit}>
-              <DialogHeader>
-                <DialogTitle>{editingCategory ? "Edit" : "Create"} Category</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(event) => setFormData({ ...formData, description: event.target.value })}
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">{editingCategory ? "Update" : "Create"}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <CategoryDialog
+          isDialogOpen={isDialogOpen}
+          setIsDialogOpen={setIsDialogOpen}
+          openCreate={openCreate}
+          handleSubmit={handleSubmit}
+          editingCategory={editingCategory}
+          formData={formData}
+          setFormData={setFormData}
+        />
       }
       stats={
         <StatGrid>

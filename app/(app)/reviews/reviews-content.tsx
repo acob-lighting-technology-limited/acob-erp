@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
 import {
   FileText,
   Star,
@@ -13,19 +12,11 @@ import {
   BarChart2,
   MessageSquare,
   User,
-  CalendarDays,
   CheckCircle2,
 } from "lucide-react"
 import type { Review } from "./page"
 import { toast } from "sonner"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -34,6 +25,8 @@ import { formatName } from "@/lib/utils"
 import { formatWATDate } from "@/lib/utils/date"
 import { apiFetch } from "@/lib/api-client"
 import { useCycleFilters } from "@/components/pms/use-cycle-filters"
+import { AcknowledgePerformanceReviewDialog } from "./_components/acknowledge-performance-review-dialog"
+import { ReviewDetailsDialog } from "./_components/review-details-dialog"
 
 interface ReviewsContentProps {
   initialReviews: Review[]
@@ -447,43 +440,21 @@ export function ReviewsContent({ initialReviews, currentUserId }: ReviewsContent
         urlSync
       />
 
-      <Dialog open={Boolean(selectedReview)} onOpenChange={(open) => !open && setSelectedReview(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Acknowledge Performance Review</DialogTitle>
-            <DialogDescription>Confirm that you have read and understood this evaluation.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Any comments regarding this review?</p>
-              <Textarea
-                value={employeeComments}
-                onChange={(e) => setEmployeeComments(e.target.value)}
-                placeholder="Enter your feedback or comments here..."
-                rows={4}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedReview(null)}>
-              Cancel
-            </Button>
-            <Button onClick={acknowledgeReview} disabled={isSubmitting}>
-              {isSubmitting ? "Processing..." : "I Acknowledge this Review"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AcknowledgePerformanceReviewDialog
+        selectedReview={selectedReview}
+        setSelectedReview={setSelectedReview}
+        employeeComments={employeeComments}
+        setEmployeeComments={setEmployeeComments}
+        acknowledgeReview={acknowledgeReview}
+        isSubmitting={isSubmitting}
+      />
 
-      <Dialog open={Boolean(detailsReview)} onOpenChange={(open) => !open && setDetailsReview(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Review Details</DialogTitle>
-            <DialogDescription>{detailsReview ? getQuarterLabel(detailsReview) : "Review details"}</DialogDescription>
-          </DialogHeader>
-          {detailsReview ? renderReviewDetails(detailsReview) : null}
-        </DialogContent>
-      </Dialog>
+      <ReviewDetailsDialog
+        detailsReview={detailsReview}
+        setDetailsReview={setDetailsReview}
+        getQuarterLabel={getQuarterLabel}
+        renderReviewDetails={renderReviewDetails}
+      />
     </DataTablePage>
   )
 }

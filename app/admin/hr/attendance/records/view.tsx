@@ -8,14 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatGrid } from "@/components/ui/stat-grid"
 import { Clock, Calendar, Pencil, AlertCircle, Download, Building, FileText } from "lucide-react"
@@ -24,7 +17,7 @@ import { toast } from "sonner"
 import { toLocalISODate, formatWATDate } from "@/lib/utils/date"
 import { isEarlyDeparture, getManualStatusEditOptions, isPermissionAttendanceStatus } from "@/lib/hr/attendance-status"
 import { isLate } from "@/lib/hr/attendance-utils"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select } from "@/components/ui/select"
 import { apiFetch, apiJson } from "@/lib/api-client"
 import { StatusBadge, labelSource } from "../_components/status-badge"
 import { ClockTimes, NameWithDept } from "../_components/clock-times"
@@ -33,8 +26,9 @@ import { useDepartmentCodes } from "@/hooks/use-department-code"
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { QUERY_KEYS } from "@/lib/query-keys"
+import { EditAttendanceRecordDialog } from "./_components/edit-attendance-record-dialog"
 
-interface AttendanceRecord {
+export interface AttendanceRecord {
   id: string
   user_id: string
   user_name: string
@@ -49,7 +43,7 @@ interface AttendanceRecord {
   editor_first_name?: string | null
 }
 
-function formatDate(dateString: string) {
+export function formatDate(dateString: string) {
   return formatWATDate(dateString, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
 }
 
@@ -524,79 +518,20 @@ export function AdminAttendanceRecordsPage({
         }}
       />
 
-      <Dialog open={!!editRecord} onOpenChange={(open) => !open && setEditRecord(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Edit Attendance Record</DialogTitle>
-            <DialogDescription>
-              {editRecord && `${editRecord.user_name} — ${formatDate(editRecord.date)}`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {isOnTimePresent && !isOverridden ? (
-              <p className="text-muted-foreground text-sm">
-                This record is fully present and on-time. No overrides (LWP/AWP) are applicable.
-              </p>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={editForm.status}
-                    onValueChange={(value) => setEditForm((f) => ({ ...f, status: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>
-                    Comment (required) <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    value={editForm.manual_comment}
-                    onChange={(e) => setEditForm((f) => ({ ...f, manual_comment: e.target.value }))}
-                    placeholder="Reason for this manual attendance change"
-                  />
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-            {isOverridden ? (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleRevert}
-                disabled={reverting || saving}
-              >
-                {reverting ? "Reverting…" : "Revert Override"}
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditRecord(null)} disabled={saving || reverting}>
-                Cancel
-              </Button>
-              {(!isOnTimePresent || !isOverridden) && (
-                <Button onClick={saveEdit} disabled={cannotSave || reverting}>
-                  {saving ? "Saving..." : "Save"}
-                </Button>
-              )}
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EditAttendanceRecordDialog
+        editRecord={editRecord}
+        setEditRecord={setEditRecord}
+        isOnTimePresent={isOnTimePresent}
+        isOverridden={isOverridden}
+        editForm={editForm}
+        setEditForm={setEditForm}
+        statusOptions={statusOptions}
+        handleRevert={handleRevert}
+        reverting={reverting}
+        saving={saving}
+        saveEdit={saveEdit}
+        cannotSave={cannotSave}
+      />
     </>
   )
 }

@@ -33,7 +33,7 @@ import type { TaskFormState } from "@/components/tasks/TaskFormDialog"
 import { TaskDeleteDialog } from "@/components/tasks/TaskDeleteDialog"
 import { TaskReviewDecisionDialog } from "@/components/tasks/TaskReviewDecisionDialog"
 import { SELF_RATING_BLOCKED_REASON, isSelfRatingBlocked } from "@/lib/tasks/rating-authority"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog } from "@/components/ui/dialog"
 import { DataTable, DataTablePage } from "@/components/ui/data-table"
 import type { DataTableColumn, DataTableFilter, DataTableTab } from "@/components/ui/data-table"
 import { StatCard } from "@/components/ui/stat-card"
@@ -55,6 +55,7 @@ import {
   exportUserPlanToPdf,
   type TaskExportMeta,
 } from "@/lib/tasks/export"
+import { WorkflowGuideDialog } from "./_components/workflow-guide-dialog"
 
 const log = logger("tasks-management-admin-tasks-content")
 
@@ -958,40 +959,7 @@ export function AdminTasksContent({
         taskToDelete={taskToDelete}
       />
 
-      <Dialog open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tasks & PMS Governance Guide</DialogTitle>
-            <DialogDescription>
-              Understanding task lifecycles, review governance, and KPI scoring impact.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-2 text-xs">
-            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">1. Multi-Assignment & Individual Tasks</p>
-              <p className="text-muted-foreground">
-                When assigning a task to multiple team members, individual task instances are generated. Each employee
-                has direct, separate accountability.
-              </p>
-            </div>
-            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">2. Corporate KPI Alignment</p>
-              <p className="text-muted-foreground">
-                Every task is linked to an approved departmental Corporate KPI. The associated Strategic Goal and Pillar
-                are automatically aligned and feed directly into performance reviews and scorecard progress.
-              </p>
-            </div>
-            <div className="bg-muted/20 space-y-1 rounded-lg border p-3">
-              <p className="text-foreground font-semibold">3. Lead Review & Weight Scoring</p>
-              <p className="text-muted-foreground">
-                Submitted tasks require lead/admin approval to reach Completed status and award KPI points based on task
-                weight (1–5) and review rating. Blocked tasks can be reassigned (neutral for KPI), granted extensions,
-                or marked failed.
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <WorkflowGuideDialog isWorkflowOpen={isWorkflowOpen} setIsWorkflowOpen={setIsWorkflowOpen} />
     </DataTablePage>
   )
 }
