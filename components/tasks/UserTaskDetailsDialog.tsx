@@ -13,6 +13,7 @@ import { cn, formatFullName } from "@/lib/utils"
 import { TASK_WEIGHT_DEFAULT, getTaskWeightBadgeClass } from "@/lib/tasks/scoring"
 import {
   DetailBody,
+  DetailActionBar,
   DetailCallout,
   DetailComposer,
   DetailProperties,
@@ -96,6 +97,7 @@ export function UserTaskDetailsDialog({
   const dueLabel = selectedTask.due_date ? formatWATDate(selectedTask.due_date) : "No deadline"
   const startLabel = selectedTask.task_start_date ? formatWATDate(selectedTask.task_start_date) : null
   const endSource = selectedTask.task_end_date || selectedTask.due_date
+  const isClosed = ["completed", "reassigned", "failed", "cancelled"].includes(selectedTask.status)
 
   return (
     <DetailSheet
@@ -147,20 +149,16 @@ export function UserTaskDetailsDialog({
         </>
       }
       toolbar={
-        <div className="bg-muted/20 space-y-2.5 border-b px-4 py-3 sm:px-6">
-          <p className="text-sm">
-            <span className="font-medium">Next step: </span>
-            <span className="text-muted-foreground">
-              {nextStepFor(selectedTask.status, canReview, ratingBlockedReason)}
-            </span>
-          </p>
-          <TaskStatusControl
-            task={selectedTask}
-            canReview={canReview}
-            ratingBlockedReason={ratingBlockedReason}
-            onChanged={() => onChanged?.()}
-          />
-        </div>
+        !isClosed ? (
+          <DetailActionBar label="Next step" hint={nextStepFor(selectedTask.status, canReview, ratingBlockedReason)}>
+            <TaskStatusControl
+              task={selectedTask}
+              canReview={canReview}
+              ratingBlockedReason={ratingBlockedReason}
+              onChanged={() => onChanged?.()}
+            />
+          </DetailActionBar>
+        ) : undefined
       }
     >
       <DetailBody>
@@ -194,7 +192,7 @@ export function UserTaskDetailsDialog({
 
         <section className="space-y-3">
           <DetailSectionHeading count={taskUpdates.length || undefined}>Activity</DetailSectionHeading>
-          {onAddComment && (
+          {onAddComment && !isClosed && (
             <DetailComposer
               value={commentDraft}
               onChange={setCommentDraft}
@@ -218,7 +216,9 @@ export function UserTaskDetailsDialog({
               ))}
             </DetailTimeline>
           ) : (
-            <p className="text-muted-foreground text-sm">No activity yet.</p>
+            <p className="text-muted-foreground text-sm">
+              {isClosed ? "No activity was recorded before this task closed." : "No activity yet."}
+            </p>
           )}
         </section>
 

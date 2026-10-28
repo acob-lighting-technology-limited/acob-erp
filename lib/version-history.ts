@@ -128,6 +128,10 @@ export const RELEASES: Release[] = [
         items: ["Corporate KPIs have a plan year with a year picker", "Upload CBT questions in bulk from Excel or CSV"],
       },
       {
+        area: "Tasks",
+        items: ["Completed task sheets are quieter, with their activity kept read-only after closure"],
+      },
+      {
         area: "Tools",
         items: [
           "All ten PDF tools, including compress, OCR and passwords, now work on your device with no file size limit",
