@@ -61,14 +61,14 @@ export function DetailSheet({
         {...(description ? {} : { "aria-describedby": undefined })}
         className={cn("flex h-full w-full flex-col gap-0 p-0 sm:max-w-xl", wide && "md:max-w-2xl")}
       >
-        {/* pr-12 keeps the badges clear of the absolutely positioned close button */}
+        {/* pr-12 keeps the title clear of the absolutely positioned close button */}
         <SheetHeader className="bg-muted/20 space-y-0 border-b py-3.5 pr-12 pl-4 sm:pl-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2.5">
             <div className="flex min-w-0 items-center gap-3">
               {leading}
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <SheetTitle className="truncate text-base font-semibold">{title}</SheetTitle>
+                  <SheetTitle className="text-base leading-snug font-semibold break-words">{title}</SheetTitle>
                   {titleAside}
                 </div>
                 {description && (
@@ -78,7 +78,7 @@ export function DetailSheet({
                 )}
               </div>
             </div>
-            {badges && <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end">{badges}</div>}
+            {badges && <div className="flex flex-wrap items-center gap-1.5">{badges}</div>}
           </div>
         </SheetHeader>
 

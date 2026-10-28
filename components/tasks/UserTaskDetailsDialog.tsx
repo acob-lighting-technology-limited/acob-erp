@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageSquare, AlertTriangle, Send, Building2, CalendarDays, Target, User, Gauge, Star } from "lucide-react"
 import type { Task } from "@/types/task"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
 import { formatWATDateTime, formatWATDate, toLocalISODate } from "@/lib/utils/date"
@@ -82,7 +81,6 @@ export function UserTaskDetailsDialog({
   return (
     <DetailSheet
       wide
-      flush
       open={open}
       onOpenChange={onOpenChange}
       title={selectedTask.title}
@@ -139,157 +137,134 @@ export function UserTaskDetailsDialog({
         </DetailActionBar>
       }
     >
-      <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
-        <div className="border-b px-4 py-2 sm:px-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="activity" className="gap-1.5">
-              <span>Activity</span>
-              {taskUpdates.length > 0 && (
-                <Badge variant="secondary" className="h-5 px-1.5 text-xs font-normal">
-                  {taskUpdates.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+      {/* Anything that needs answering comes before the reference data. */}
+      {(selectedTask.unable_to_complete_reason || selectedTask.failure_reason || selectedTask.extension_reason) && (
+        <div className="space-y-2">
+          {selectedTask.unable_to_complete_reason && (
+            <DetailCallout tone="amber" label="Reported blocker">
+              {selectedTask.unable_to_complete_reason}
+            </DetailCallout>
+          )}
+          {selectedTask.failure_reason && (
+            <DetailCallout tone="rose" label="Failure note">
+              {selectedTask.failure_reason}
+            </DetailCallout>
+          )}
+          {selectedTask.extension_reason && (
+            <DetailCallout tone="blue" label="Extension granted for">
+              {selectedTask.extension_reason}
+            </DetailCallout>
+          )}
         </div>
+      )}
 
-        <TabsContent value="details" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-5 px-4 py-4 sm:px-6">
-            {/* Anything that needs answering comes before the reference data. */}
-            {(selectedTask.unable_to_complete_reason ||
-              selectedTask.failure_reason ||
-              selectedTask.extension_reason) && (
-              <div className="space-y-2">
-                {selectedTask.unable_to_complete_reason && (
-                  <DetailCallout tone="amber" label="Reported blocker">
-                    {selectedTask.unable_to_complete_reason}
-                  </DetailCallout>
-                )}
-                {selectedTask.failure_reason && (
-                  <DetailCallout tone="rose" label="Failure note">
-                    {selectedTask.failure_reason}
-                  </DetailCallout>
-                )}
-                {selectedTask.extension_reason && (
-                  <DetailCallout tone="blue" label="Extension granted for">
-                    {selectedTask.extension_reason}
-                  </DetailCallout>
+      {selectedTask.description && (
+        <section className="space-y-1.5">
+          <DetailSectionHeading>What was asked for</DetailSectionHeading>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedTask.description}</p>
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <DetailSectionHeading>Details</DetailSectionHeading>
+        <DetailFieldGrid>
+          <DetailField icon={User} label="Assigned to">
+            {assignedToName}
+          </DetailField>
+          <DetailField icon={CalendarDays} label="Period">
+            {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
+          </DetailField>
+          <DetailField icon={Target} label="Strategic goal">
+            {selectedTask.goal_title || <span className="text-muted-foreground">—</span>}
+          </DetailField>
+          <DetailField icon={Target} label="Corporate KPI">
+            {selectedTask.kpi_measure ? (
+              <div className="flex flex-col gap-0.5">
+                <span className="font-medium">{selectedTask.kpi_measure}</span>
+                {selectedTask.kpi_pillar && (
+                  <span className="text-muted-foreground text-xs">🎯 {selectedTask.kpi_pillar}</span>
                 )}
               </div>
-            )}
-
-            {selectedTask.description && (
-              <section className="space-y-1.5">
-                <DetailSectionHeading>What was asked for</DetailSectionHeading>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedTask.description}</p>
-              </section>
-            )}
-
-            <section className="space-y-3">
-              <DetailSectionHeading>Details</DetailSectionHeading>
-              <DetailFieldGrid>
-                <DetailField icon={User} label="Assigned to">
-                  {assignedToName}
-                </DetailField>
-                <DetailField icon={CalendarDays} label="Period">
-                  {startLabel || "—"} to {endSource ? formatWATDate(endSource) : "no deadline"}
-                </DetailField>
-                <DetailField icon={Target} label="Strategic goal">
-                  {selectedTask.goal_title || <span className="text-muted-foreground">—</span>}
-                </DetailField>
-                <DetailField icon={Target} label="Corporate KPI">
-                  {selectedTask.kpi_measure ? (
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium">{selectedTask.kpi_measure}</span>
-                      {selectedTask.kpi_pillar && (
-                        <span className="text-muted-foreground text-xs">🎯 {selectedTask.kpi_pillar}</span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </DetailField>
-                <DetailField icon={Gauge} label="Weight">
-                  <Badge
-                    variant="outline"
-                    className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
-                  >
-                    {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
-                  </Badge>
-                </DetailField>
-                <DetailField icon={Star} label="Rating">
-                  {selectedTask.rating ? (
-                    `${selectedTask.rating}/5`
-                  ) : (
-                    <span className="text-muted-foreground">Not yet rated</span>
-                  )}
-                </DetailField>
-                <DetailField icon={Building2} label="Created">
-                  {formatWATDateTime(selectedTask.created_at)}
-                </DetailField>
-                {selectedTask.reviewed_by_user && (
-                  <DetailField icon={User} label="Reviewed by">
-                    {formatFullName(selectedTask.reviewed_by_user.first_name, selectedTask.reviewed_by_user.last_name)}
-                    {selectedTask.reviewed_at && (
-                      <span className="text-muted-foreground"> · {formatWATDateTime(selectedTask.reviewed_at)}</span>
-                    )}
-                  </DetailField>
-                )}
-              </DetailFieldGrid>
-            </section>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="activity" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-          <div className="space-y-4 px-4 py-4 sm:px-6">
-            {onAddComment && (
-              <div className="space-y-2">
-                <Textarea
-                  value={commentDraft}
-                  onChange={(event) => setCommentDraft(event.target.value)}
-                  placeholder="Post an activity note or progress update…"
-                  className="min-h-[72px] text-sm"
-                  aria-label="Add an activity"
-                />
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    className="gap-1.5"
-                    disabled={isPostingComment || !commentDraft.trim()}
-                    onClick={async () => {
-                      await onAddComment(commentDraft.trim())
-                      setCommentDraft("")
-                    }}
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    {isPostingComment ? "Posting…" : "Post activity"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {taskUpdates.length > 0 ? (
-              <ul className="space-y-3">
-                {taskUpdates.map((update) => (
-                  <DetailTimelineEntry
-                    key={update.id}
-                    title={update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"}
-                    timestamp={formatWATDateTime(update.created_at)}
-                  >
-                    {update.content}
-                  </DetailTimelineEntry>
-                ))}
-              </ul>
             ) : (
-              <p className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
-                <MessageSquare className="h-4 w-4" />
-                No activities yet.
-              </p>
+              <span className="text-muted-foreground">—</span>
             )}
+          </DetailField>
+          <DetailField icon={Gauge} label="Weight">
+            <Badge
+              variant="outline"
+              className={cn("font-mono text-xs font-medium", getTaskWeightBadgeClass(selectedTask.weight))}
+            >
+              {selectedTask.weight ?? TASK_WEIGHT_DEFAULT}
+            </Badge>
+          </DetailField>
+          <DetailField icon={Star} label="Rating">
+            {selectedTask.rating ? (
+              `${selectedTask.rating}/5`
+            ) : (
+              <span className="text-muted-foreground">Not yet rated</span>
+            )}
+          </DetailField>
+          <DetailField icon={Building2} label="Created">
+            {formatWATDateTime(selectedTask.created_at)}
+          </DetailField>
+          {selectedTask.reviewed_by_user && (
+            <DetailField icon={User} label="Reviewed by">
+              {formatFullName(selectedTask.reviewed_by_user.first_name, selectedTask.reviewed_by_user.last_name)}
+              {selectedTask.reviewed_at && (
+                <span className="text-muted-foreground"> · {formatWATDateTime(selectedTask.reviewed_at)}</span>
+              )}
+            </DetailField>
+          )}
+        </DetailFieldGrid>
+      </section>
+
+      <section className="space-y-3">
+        <DetailSectionHeading count={taskUpdates.length || undefined}>Activity</DetailSectionHeading>
+        {onAddComment && (
+          <div className="space-y-2">
+            <Textarea
+              value={commentDraft}
+              onChange={(event) => setCommentDraft(event.target.value)}
+              placeholder="Post an activity note or progress update…"
+              className="min-h-[72px] text-sm"
+              aria-label="Add an activity"
+            />
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={isPostingComment || !commentDraft.trim()}
+                onClick={async () => {
+                  await onAddComment(commentDraft.trim())
+                  setCommentDraft("")
+                }}
+              >
+                <Send className="h-3.5 w-3.5" />
+                {isPostingComment ? "Posting…" : "Post activity"}
+              </Button>
+            </div>
           </div>
-        </TabsContent>
-      </Tabs>
+        )}
+
+        {taskUpdates.length > 0 ? (
+          <ul className="space-y-3">
+            {taskUpdates.map((update) => (
+              <DetailTimelineEntry
+                key={update.id}
+                title={update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"}
+                timestamp={formatWATDateTime(update.created_at)}
+              >
+                {update.content}
+              </DetailTimelineEntry>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
+            <MessageSquare className="h-4 w-4" />
+            No activities yet.
+          </p>
+        )}
+      </section>
     </DetailSheet>
   )
 }

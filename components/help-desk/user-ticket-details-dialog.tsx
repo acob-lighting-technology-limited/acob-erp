@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { EmptyState } from "@/components/ui/patterns"
 import {
   DetailActionBar,
@@ -149,7 +148,6 @@ export function UserHelpDeskTicketDetailsDialog({
   return (
     <DetailSheet
       wide
-      flush
       open={open}
       onOpenChange={onOpenChange}
       title={ticket ? ticket.title : "Help desk ticket"}
@@ -205,7 +203,7 @@ export function UserHelpDeskTicketDetailsDialog({
         ) : null
       }
     >
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <>
         {isLoading ? (
           <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center text-sm">
             <Clock className="text-primary/60 mb-2 h-8 w-8 animate-spin" />
@@ -227,150 +225,128 @@ export function UserHelpDeskTicketDetailsDialog({
             className="border-0 py-8"
           />
         ) : (
-          <Tabs defaultValue="details" className="flex h-full min-h-0 flex-1 flex-col">
-            <div className="border-b px-4 py-2 sm:px-6">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="activity" className="gap-1.5">
-                  <span>Activity</span>
-                  {activity.length > 0 && (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-xs font-normal">
-                      {activity.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="details" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-              <div className="space-y-5 px-4 py-4 sm:px-6">
-                {/* Anything needing an answer comes before the reference data. */}
-                {(showDepartmentRestriction || approvals.length > 0) && (
-                  <div className="space-y-2">
-                    {showDepartmentRestriction && (
-                      <DetailCallout tone="amber" label="Department ticket scope">
-                        This ticket is managed by the department&apos;s leads and IT administrators.
-                      </DetailCallout>
-                    )}
-                    {/* The approvals were fetched and then never shown: a procurement
+          <>
+            {/* Anything needing an answer comes before the reference data. */}
+            {(showDepartmentRestriction || approvals.length > 0) && (
+              <div className="space-y-2">
+                {showDepartmentRestriction && (
+                  <DetailCallout tone="amber" label="Department ticket scope">
+                    This ticket is managed by the department&apos;s leads and IT administrators.
+                  </DetailCallout>
+                )}
+                {/* The approvals were fetched and then never shown: a procurement
                           ticket could be rejected with a note nobody could read. */}
-                    {approvals.map((approval) => (
-                      <DetailCallout
-                        key={approval.id}
-                        tone={
-                          approval.status === "rejected" ? "rose" : approval.status === "approved" ? "emerald" : "blue"
-                        }
-                        label={`${formatLabel(approval.approval_stage)} — ${formatLabel(approval.status)}`}
-                      >
-                        {approval.decision_notes ||
-                          (approval.decided_at
-                            ? `Decided ${formatDateTime(approval.decided_at)}`
-                            : `Requested ${formatDateTime(approval.requested_at)}`)}
-                      </DetailCallout>
-                    ))}
-                  </div>
+                {approvals.map((approval) => (
+                  <DetailCallout
+                    key={approval.id}
+                    tone={approval.status === "rejected" ? "rose" : approval.status === "approved" ? "emerald" : "blue"}
+                    label={`${formatLabel(approval.approval_stage)} — ${formatLabel(approval.status)}`}
+                  >
+                    {approval.decision_notes ||
+                      (approval.decided_at
+                        ? `Decided ${formatDateTime(approval.decided_at)}`
+                        : `Requested ${formatDateTime(approval.requested_at)}`)}
+                  </DetailCallout>
+                ))}
+              </div>
+            )}
+
+            <section className="space-y-1.5">
+              <DetailSectionHeading>What was reported</DetailSectionHeading>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {ticket.description || <span className="text-muted-foreground">No description provided.</span>}
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <DetailSectionHeading>Details</DetailSectionHeading>
+              <DetailFieldGrid>
+                <DetailField icon={Building2} label="Service department">
+                  {ticket.service_department}
+                </DetailField>
+                {ticket.requester_department && (
+                  <DetailField icon={User} label="Raised from">
+                    {ticket.requester_department}
+                  </DetailField>
                 )}
-
-                <section className="space-y-1.5">
-                  <DetailSectionHeading>What was reported</DetailSectionHeading>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {ticket.description || <span className="text-muted-foreground">No description provided.</span>}
-                  </p>
-                </section>
-
-                <section className="space-y-3">
-                  <DetailSectionHeading>Details</DetailSectionHeading>
-                  <DetailFieldGrid>
-                    <DetailField icon={Building2} label="Service department">
-                      {ticket.service_department}
-                    </DetailField>
-                    {ticket.requester_department && (
-                      <DetailField icon={User} label="Raised from">
-                        {ticket.requester_department}
-                      </DetailField>
-                    )}
-                    <DetailField icon={Tag} label="Request type">
-                      <span className="capitalize">{formatLabel(ticket.request_type)}</span>
-                      {ticket.category ? ` · ${ticket.category}` : ""}
-                    </DetailField>
-                    <DetailField icon={CalendarDays} label="Logged">
-                      {formatDateTime(ticket.created_at)}
-                    </DetailField>
-                    {/* Surfaced for the first time — the SLA target was on the record
+                <DetailField icon={Tag} label="Request type">
+                  <span className="capitalize">{formatLabel(ticket.request_type)}</span>
+                  {ticket.category ? ` · ${ticket.category}` : ""}
+                </DetailField>
+                <DetailField icon={CalendarDays} label="Logged">
+                  {formatDateTime(ticket.created_at)}
+                </DetailField>
+                {/* Surfaced for the first time — the SLA target was on the record
                           all along and the dialog never showed it. */}
-                    {ticket.sla_target_at && (
-                      <DetailField icon={Timer} label="SLA target">
-                        {formatDateTime(ticket.sla_target_at)}
-                      </DetailField>
-                    )}
-                    {ticket.resolved_at && (
-                      <DetailField icon={CheckCircle2} label="Resolved">
-                        {formatDateTime(ticket.resolved_at)}
-                      </DetailField>
-                    )}
-                    {ticket.closed_at && (
-                      <DetailField icon={CheckCircle2} label="Closed">
-                        {formatDateTime(ticket.closed_at)}
-                      </DetailField>
-                    )}
-                  </DetailFieldGrid>
-                </section>
-
-                {ratingSlot && (
-                  <section className="space-y-3">
-                    <DetailSectionHeading>Rate this service</DetailSectionHeading>
-                    {ratingSlot}
-                  </section>
+                {ticket.sla_target_at && (
+                  <DetailField icon={Timer} label="SLA target">
+                    {formatDateTime(ticket.sla_target_at)}
+                  </DetailField>
                 )}
+                {ticket.resolved_at && (
+                  <DetailField icon={CheckCircle2} label="Resolved">
+                    {formatDateTime(ticket.resolved_at)}
+                  </DetailField>
+                )}
+                {ticket.closed_at && (
+                  <DetailField icon={CheckCircle2} label="Closed">
+                    {formatDateTime(ticket.closed_at)}
+                  </DetailField>
+                )}
+              </DetailFieldGrid>
+            </section>
 
-                {attachmentsSlot && <section className="space-y-3">{attachmentsSlot}</section>}
-              </div>
-            </TabsContent>
+            {ratingSlot && (
+              <section className="space-y-3">
+                <DetailSectionHeading>Rate this service</DetailSectionHeading>
+                {ratingSlot}
+              </section>
+            )}
 
-            <TabsContent value="activity" className="mt-0 min-h-0 flex-1 overflow-y-auto">
-              <div className="space-y-4 px-4 py-4 sm:px-6">
-                {onAddComment && setNewComment && (
-                  <div className="space-y-2">
-                    <Textarea
-                      value={newComment}
-                      onChange={(event) => setNewComment(event.target.value)}
-                      placeholder="Post an activity note or progress update…"
-                      className="min-h-[72px] text-sm"
-                      aria-label="Add an activity"
-                    />
-                    <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={isPostingComment || !newComment.trim()}
-                        onClick={() => void onAddComment()}
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        {isPostingComment ? "Posting…" : "Post activity"}
-                      </Button>
-                    </div>
+            {attachmentsSlot && <section className="space-y-3">{attachmentsSlot}</section>}
+            <section className="space-y-3">
+              <DetailSectionHeading count={activity.length || undefined}>Activity</DetailSectionHeading>
+              {onAddComment && setNewComment && (
+                <div className="space-y-2">
+                  <Textarea
+                    value={newComment}
+                    onChange={(event) => setNewComment(event.target.value)}
+                    placeholder="Post an activity note or progress update…"
+                    className="min-h-[72px] text-sm"
+                    aria-label="Add an activity"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={isPostingComment || !newComment.trim()}
+                      onClick={() => void onAddComment()}
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {isPostingComment ? "Posting…" : "Post activity"}
+                    </Button>
                   </div>
-                )}
+                </div>
+              )}
 
-                {activity.length > 0 ? (
-                  <ul className="space-y-3">
-                    {activity.map((entry) => (
-                      <DetailTimelineEntry key={entry.key} title={entry.title} timestamp={formatDateTime(entry.at)}>
-                        {entry.body}
-                      </DetailTimelineEntry>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
-                    <MessageSquare className="h-4 w-4" />
-                    No activities yet.
-                  </p>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+              {activity.length > 0 ? (
+                <ul className="space-y-3">
+                  {activity.map((entry) => (
+                    <DetailTimelineEntry key={entry.key} title={entry.title} timestamp={formatDateTime(entry.at)}>
+                      {entry.body}
+                    </DetailTimelineEntry>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground flex items-center gap-2 py-4 text-sm">
+                  <MessageSquare className="h-4 w-4" />
+                  No activities yet.
+                </p>
+              )}
+            </section>
+          </>
         )}
-      </div>
+      </>
     </DetailSheet>
   )
 }
