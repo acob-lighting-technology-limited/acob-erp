@@ -49,6 +49,8 @@ export interface TaskUpdate {
   content?: string
   update_type: string
   created_at: string
+  old_value?: string | null
+  new_value?: string | null
   user?: {
     first_name: string
     last_name: string
@@ -178,7 +180,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
       try {
         const { data, error } = await supabase
           .from("task_updates")
-          .select("id, content, update_type, created_at, user_id")
+          .select("id, content, update_type, created_at, old_value, new_value, user_id")
           .eq("task_id", taskId)
           .order("created_at", { ascending: false })
 
@@ -202,6 +204,8 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
           content: entry.content,
           update_type: entry.update_type,
           created_at: entry.created_at,
+          old_value: entry.old_value,
+          new_value: entry.new_value,
           user: entry.user_id ? profileMap.get(entry.user_id) : undefined,
         }))
         setTaskUpdates(normalizedUpdates)

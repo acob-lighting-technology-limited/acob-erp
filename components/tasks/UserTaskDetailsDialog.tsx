@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { DetailSheet } from "@/components/ui/detail-sheet"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle } from "lucide-react"
 import type { Task } from "@/types/task"
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl"
 import { TASK_STATUS_CONFIG, type TaskStatus } from "@/lib/tasks/constants"
+import { statusLabel } from "@/components/tasks/TaskStatusControl"
 import { formatWATDateTime, formatWATDate, toLocalISODate } from "@/lib/utils/date"
 import { isTaskOverdue } from "@/lib/tasks/overdue"
 import { cn, formatFullName } from "@/lib/utils"
@@ -28,10 +29,19 @@ interface TaskUpdate {
   content?: string
   update_type: string
   created_at: string
+  old_value?: string | null
+  new_value?: string | null
   user?: {
     first_name: string
     last_name: string
   }
+}
+
+type TaskTimelineEntry = {
+  key: string
+  at: string
+  title: ReactNode
+  body?: ReactNode
 }
 
 interface UserTaskDetailsDialogProps {
@@ -98,6 +108,65 @@ export function UserTaskDetailsDialog({
   const startLabel = selectedTask.task_start_date ? formatWATDate(selectedTask.task_start_date) : null
   const endSource = selectedTask.task_end_date || selectedTask.due_date
   const isClosed = ["completed", "reassigned", "failed", "cancelled"].includes(selectedTask.status)
+  const activity: TaskTimelineEntry[] = (() => {
+    const entries: TaskTimelineEntry[] = [
+      {
+        key: "assigned",
+        at: selectedTask.created_at,
+        title: <span className="font-medium">Assigned</span>,
+        body: `To ${assignedToName}`,
+      },
+      ...taskUpdates.map((update) => {
+        const actor = update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"
+        const nextStatus = update.new_value as TaskStatus | null
+        const config = nextStatus ? TASK_STATUS_CONFIG[nextStatus] : null
+
+        if (update.update_type === "status_change" && nextStatus && config) {
+          return {
+            key: update.id,
+            at: update.created_at,
+            title: (
+              <Badge variant={config.badgeVariant} className={cn("text-xs font-medium", config.color)}>
+                {statusLabel(nextStatus)}
+              </Badge>
+            ),
+            body: update.content ? `${actor} · ${update.content}` : actor,
+          }
+        }
+
+        return {
+          key: update.id,
+          at: update.created_at,
+          title: <span className="font-medium">{actor}</span>,
+          body: update.content || "Added an update",
+        }
+      }),
+    ]
+
+    const hasRecordedTerminalStatus = taskUpdates.some(
+      (update) => update.update_type === "status_change" && update.new_value === selectedTask.status
+    )
+    if (!hasRecordedTerminalStatus && ["completed", "failed", "cancelled"].includes(selectedTask.status)) {
+      const terminalStatus = selectedTask.status as TaskStatus
+      const config = TASK_STATUS_CONFIG[terminalStatus]
+      entries.push({
+        key: `terminal-${selectedTask.id}`,
+        at: selectedTask.reviewed_at || selectedTask.completed_at || selectedTask.updated_at || selectedTask.created_at,
+        title: (
+          <Badge variant={config.badgeVariant} className={cn("text-xs font-medium", config.color)}>
+            {statusLabel(terminalStatus)}
+          </Badge>
+        ),
+        body: selectedTask.reviewed_by_user
+          ? `${formatFullName(selectedTask.reviewed_by_user.first_name, selectedTask.reviewed_by_user.last_name)}${
+              selectedTask.rating ? ` · ${selectedTask.rating}/5` : ""
+            }`
+          : undefined,
+      })
+    }
+
+    return entries.sort((left, right) => left.at.localeCompare(right.at))
+  })()
 
   return (
     <DetailSheet
@@ -191,7 +260,7 @@ export function UserTaskDetailsDialog({
         )}
 
         <section className="space-y-3">
-          <DetailSectionHeading count={taskUpdates.length || undefined}>Activity</DetailSectionHeading>
+          <DetailSectionHeading count={activity.length}>Timeline</DetailSectionHeading>
           {onAddComment && !isClosed && (
             <DetailComposer
               value={commentDraft}
@@ -203,22 +272,16 @@ export function UserTaskDetailsDialog({
               }}
             />
           )}
-          {taskUpdates.length > 0 ? (
+          {activity.length > 0 ? (
             <DetailTimeline>
-              {taskUpdates.map((update) => (
-                <DetailTimelineEntry
-                  key={update.id}
-                  title={update.user ? formatFullName(update.user.first_name, update.user.last_name) : "System"}
-                  timestamp={formatWATDateTime(update.created_at)}
-                >
-                  {update.content}
+              {activity.map((entry) => (
+                <DetailTimelineEntry key={entry.key} title={entry.title} timestamp={formatWATDateTime(entry.at)}>
+                  {entry.body}
                 </DetailTimelineEntry>
               ))}
             </DetailTimeline>
           ) : (
-            <p className="text-muted-foreground text-sm">
-              {isClosed ? "No activity was recorded before this task closed." : "No activity yet."}
-            </p>
+            <p className="text-muted-foreground text-sm">No task history recorded.</p>
           )}
         </section>
 

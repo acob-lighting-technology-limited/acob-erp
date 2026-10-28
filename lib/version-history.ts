@@ -129,7 +129,10 @@ export const RELEASES: Release[] = [
       },
       {
         area: "Tasks",
-        items: ["Completed task sheets are quieter, with their activity kept read-only after closure"],
+        items: [
+          "Completed task sheets are quieter, with activity kept read-only after closure",
+          "Task sheets now show assignment, status changes, notes and review decisions in one timeline",
+        ],
       },
       {
         area: "Tools",
