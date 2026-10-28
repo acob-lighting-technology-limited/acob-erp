@@ -82,10 +82,13 @@ browser**: the visual items below need a pass on localhost.
 - Checked and left alone: §7 modal clean-up (the base `DialogContent` already caps height, scrolls and
   becomes a bottom sheet on phones; the 67 call-site `max-h` values are deliberate margins); §30 fixed
   pixel widths (all 7 are table or calendar minimums inside an `overflow-x-auto` wrapper); icon buttons.
-- Not done: the 28 `<Dialog>` blocks still written in page files (moving them needs each page's state
-  passed as typed props, which is a manual change per page); `HeaderMoreMenu` on assets and the admin
-  action tracker (both files are at the 1,000-line cap and the extra markup would grow them); a visual
-  pass on a phone.
+- Done since (6): all 28 `<Dialog>` blocks that were written inside page and view files now live in
+  `_components/` (the `dialog-in-page` baseline is zero); `HeaderMoreMenu` is on assets and the admin action
+  tracker (items can be links and async actions); the table column drag context has a stable id, which
+  removes a hydration warning that the dev overlay showed on every table page. Checked in a browser: the
+  departments dialog, the leave More menu and Overview dialog, and the skip link's presence.
+- Not done: a visual pass on a phone, and opening each of the other 26 extracted dialogs in a browser
+  (they are typed props over the same JSX, and tsc, lint and the guard pass).
 - Decided not to change: staff `/profile` is an intentional dashboard, not a table page, so it keeps its
   own frame.
 - Done since: §22 `dark:` overrides now use the `success/warning/danger/info/purple` tone tokens

@@ -319,7 +319,6 @@ export function DataTable<TData>({
   isLoading = false,
   error = null,
   onRetry,
-  // Empty
   emptyIcon: EmptyIcon = Inbox,
   emptyTitle = "No results found",
   emptyDescription = "Try adjusting your search or filters.",
@@ -1209,6 +1208,7 @@ export function DataTable<TData>({
 
   const tableInner = (
     <DndContext
+      id="data-table-columns"
       sensors={sensors}
       collisionDetection={closestCenter}
       modifiers={[restrictToHorizontalAxis]}
