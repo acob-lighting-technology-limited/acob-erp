@@ -41,7 +41,7 @@ export function PrintReceiptDialog({ open, onOpenChange, schedule, onDownloadDoc
         <div className="max-h-[60vh] space-y-2 overflow-y-auto py-4">
           {receiptItems.length > 0 ? (
             receiptItems.map((item, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border p-3">
+              <div key={`row-${i}`} className="flex items-center justify-between rounded-lg border p-3">
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-green-100 p-2 text-green-600">
                     <Receipt className="h-4 w-4" />

@@ -191,7 +191,7 @@ export function SignDialog({
                 <div className="space-y-3">
                   {isPetty ? (
                     requisition.line_items.map((line, i) => (
-                      <div key={i} className="grid grid-cols-[1fr_8rem] items-center gap-2">
+                      <div key={`row-${i}`} className="grid grid-cols-[1fr_8rem] items-center gap-2">
                         <span className="truncate text-sm">{line.description}</span>
                         <Input
                           inputMode="decimal"
@@ -216,7 +216,7 @@ export function SignDialog({
                     <div className="space-y-2">
                       <p className="text-muted-foreground text-xs">Re-split between the beneficiaries:</p>
                       {requisition.beneficiary_details.map((b, i) => (
-                        <div key={i} className="grid grid-cols-[1fr_8rem] items-center gap-2">
+                        <div key={`row-${i}`} className="grid grid-cols-[1fr_8rem] items-center gap-2">
                           <span className="truncate text-sm">{b.account_name}</span>
                           <Input
                             inputMode="decimal"

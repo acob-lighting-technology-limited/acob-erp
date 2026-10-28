@@ -10,7 +10,7 @@ export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
   return (
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex gap-4">
+        <div key={`skeleton-${i}`} className="flex gap-4">
           {Array.from({ length: cols }).map((_, j) => (
             <Skeleton key={j} className="h-10 flex-1" />
           ))}
@@ -25,7 +25,7 @@ export function CardSkeleton({ count = 3 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} className="h-40 w-full rounded-xl" />
+        <Skeleton key={`skeleton-${i}`} className="h-40 w-full rounded-xl" />
       ))}
     </div>
   )

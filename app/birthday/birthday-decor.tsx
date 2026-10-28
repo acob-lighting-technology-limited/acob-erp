@@ -44,7 +44,7 @@ function BalloonBunch({ side }: { side: "left" | "right" }) {
     >
       <defs>
         {BUNCH.map((b, i) => (
-          <radialGradient key={i} id={`bd-balloon-${side}-${i}`} cx="40%" cy="35%" r="70%">
+          <radialGradient key={`row-${i}`} id={`bd-balloon-${side}-${i}`} cx="40%" cy="35%" r="70%">
             <stop offset="0%" style={{ stopColor: `color-mix(in oklab, ${b.color} 55%, white)` }} />
             <stop offset="45%" style={{ stopColor: b.color }} />
             <stop offset="100%" style={{ stopColor: `color-mix(in oklab, ${b.color} 55%, black)` }} />
@@ -57,7 +57,7 @@ function BalloonBunch({ side }: { side: "left" | "right" }) {
         const knotY = b.y + 61 * b.s
         return (
           <g
-            key={i}
+            key={`row-${i}`}
             className="birthday-balloon-sway"
             style={
               {
@@ -111,7 +111,7 @@ export function BirthdayDecor() {
           const y = 4 + 120 * t * (1 - t)
           return (
             <path
-              key={i}
+              key={`row-${i}`}
               d={`M${x - 16} ${y} L${x + 16} ${y} L${x} ${y + 30} Z`}
               fill={CONFETTI_COLORS[i % 4]}
               fillOpacity="0.85"
@@ -125,7 +125,7 @@ export function BirthdayDecor() {
 
       {CONFETTI.map((c, i) => (
         <span
-          key={i}
+          key={`row-${i}`}
           className="birthday-confetti"
           style={
             {

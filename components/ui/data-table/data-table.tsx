@@ -1708,7 +1708,7 @@ export function DataTable<TData>({
                 <>
                   <div className="divide-y md:hidden">
                     {Array.from({ length: Math.min(skeletonRows, 6) }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-3 p-3">
+                      <div key={`skeleton-${i}`} className="flex items-center gap-3 p-3">
                         <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
                         <div className="min-w-0 flex-1 space-y-1.5">
                           <Skeleton className="h-4 w-36 max-w-full" />

@@ -74,7 +74,7 @@ function BeneficiaryTable({ req }: { req: Requisition }) {
           </thead>
           <tbody>
             {req.beneficiary_details.map((b, i) => (
-              <tr key={i}>
+              <tr key={`row-${i}`}>
                 <td className="border border-slate-500 p-1.5">{b.account_name}</td>
                 <td className="border border-slate-500 p-1.5 font-mono">{b.account_number}</td>
                 <td className="border border-slate-500 p-1.5">{b.bank_name}</td>
@@ -226,7 +226,7 @@ function PettyCashSheet({ req }: { req: Requisition }) {
         </thead>
         <tbody>
           {req.line_items.map((item, i) => (
-            <tr key={i}>
+            <tr key={`row-${i}`}>
               <td className="border border-slate-500 p-1.5 text-center">{i + 1}</td>
               <td className="border border-slate-500 p-1.5">{item.description}</td>
               <td className="border border-slate-500 p-1.5 text-right">{formatNaira(item.amount).slice(1)}</td>

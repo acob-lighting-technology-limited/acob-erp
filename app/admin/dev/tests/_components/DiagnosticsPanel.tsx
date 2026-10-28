@@ -126,7 +126,7 @@ export function DiagnosticsPanel<Row extends DiagnosticRowBase>({
                       const hint = row.resolved ? undefined : fixHint?.(row)
                       return (
                         <div
-                          key={i}
+                          key={`row-${i}`}
                           className={cn(
                             "rounded-md border px-3 py-2 text-xs",
                             row.resolved ? "border-success/30 bg-success/15" : "border-danger/30 bg-danger/15"

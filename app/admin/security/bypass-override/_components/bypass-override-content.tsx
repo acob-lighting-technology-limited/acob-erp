@@ -550,7 +550,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
                     </span>
                     <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                       {details.map((d, i) => (
-                        <div key={i} className="bg-background rounded border p-2">
+                        <div key={`row-${i}`} className="bg-background rounded border p-2">
                           <span className="text-muted-foreground block text-xs">{d.label}</span>
                           <span className="font-semibold">{d.value}</span>
                         </div>

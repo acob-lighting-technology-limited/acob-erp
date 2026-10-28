@@ -304,7 +304,7 @@ export function FinanceReportsPage({
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="bg-muted h-8 animate-pulse rounded-md" />
+                  <div key={`skeleton-${index}`} className="bg-muted h-8 animate-pulse rounded-md" />
                 ))}
               </div>
             ) : reportData.paymentsByMonth.length === 0 ? (
@@ -341,7 +341,7 @@ export function FinanceReportsPage({
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="bg-muted h-8 animate-pulse rounded-md" />
+                  <div key={`skeleton-${index}`} className="bg-muted h-8 animate-pulse rounded-md" />
                 ))}
               </div>
             ) : reportData.paymentsByCategory.length === 0 ? (

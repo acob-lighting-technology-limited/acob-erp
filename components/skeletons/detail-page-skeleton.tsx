@@ -37,7 +37,7 @@ export function DetailPageSkeleton({ showSidebar = true, sections = 2 }: DetailP
           {/* Main Content */}
           <div className={showSidebar ? "space-y-6 md:col-span-2" : "space-y-6"}>
             {[...Array(sections)].map((_, i) => (
-              <Card key={i}>
+              <Card key={`skeleton-${i}`}>
                 <CardHeader>
                   <Skeleton className="h-6 w-40" />
                 </CardHeader>
@@ -70,7 +70,7 @@ export function DetailPageSkeleton({ showSidebar = true, sections = 2 }: DetailP
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {[...Array(4)].map((_, i) => (
-                    <div key={i}>
+                    <div key={`skeleton-${i}`}>
                       <Skeleton className="h-3 w-16" />
                       <Skeleton className="mt-1 h-4 w-32" />
                     </div>

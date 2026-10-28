@@ -34,7 +34,7 @@ export function DashboardSkeleton({ statCards = 5, showActivity = true }: Dashbo
           <Skeleton className="mb-3 h-6 w-32" />
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
-              <Card key={i} className="border">
+              <Card key={`skeleton-${i}`} className="border">
                 <CardContent className="flex items-center gap-2 p-2.5">
                   <Skeleton className="h-8 w-8 rounded-lg" />
                   <div className="flex-1">
@@ -51,7 +51,7 @@ export function DashboardSkeleton({ statCards = 5, showActivity = true }: Dashbo
         {showActivity && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {[...Array(2)].map((_, i) => (
-              <Card key={i} className="border">
+              <Card key={`skeleton-${i}`} className="border">
                 <CardHeader className="bg-muted/30 border-b px-4 py-3">
                   <div className="flex items-center justify-between">
                     <Skeleton className="h-5 w-32" />

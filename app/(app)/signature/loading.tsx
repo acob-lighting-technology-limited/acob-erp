@@ -20,7 +20,7 @@ export default function SignatureLoading() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="space-y-2">
+                  <div key={`skeleton-${i}`} className="space-y-2">
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-10 w-full" />
                   </div>

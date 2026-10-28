@@ -308,7 +308,7 @@ export function CbtUploadDialog({
                   </p>
                   <ul className="text-muted-foreground list-disc space-y-1 pl-4">
                     {parseResult.errors.slice(0, 15).map((err, i) => (
-                      <li key={i}>
+                      <li key={`row-${i}`}>
                         Row {err.rowNumber}: {err.message}
                       </li>
                     ))}

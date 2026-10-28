@@ -40,7 +40,7 @@ export function ProfileSkeleton() {
         <CardContent>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-16 rounded-lg" />
+              <Skeleton key={`skeleton-${i}`} className="h-16 rounded-lg" />
             ))}
           </div>
         </CardContent>
@@ -54,7 +54,7 @@ export function ProfileSkeleton() {
         <CardContent>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-lg" />
+              <Skeleton key={`skeleton-${i}`} className="h-24 rounded-lg" />
             ))}
           </div>
         </CardContent>
@@ -69,14 +69,14 @@ export function ProfileSkeleton() {
           {/* Tabs Skeleton */}
           <div className="mb-4 flex gap-2">
             {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-9 w-24 rounded-md" />
+              <Skeleton key={`skeleton-${i}`} className="h-9 w-24 rounded-md" />
             ))}
           </div>
 
           {/* Table Skeleton */}
           <div className="space-y-3 rounded-lg border p-4">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4">
+              <div key={`skeleton-${i}`} className="flex items-center gap-4">
                 <Skeleton className="h-4 w-8" />
                 <Skeleton className="h-4 flex-1" />
                 <Skeleton className="h-6 w-20 rounded-full" />

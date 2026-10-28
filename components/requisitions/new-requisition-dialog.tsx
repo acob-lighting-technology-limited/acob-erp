@@ -433,7 +433,7 @@ export function NewRequisitionDialog({
                 <Label>Items</Label>
                 {lines.map((line, i) => (
                   <div
-                    key={i}
+                    key={`row-${i}`}
                     className="grid grid-cols-[1.5rem_1fr_7rem_2rem] items-center gap-2 sm:grid-cols-[1.5rem_1fr_9rem_2rem]"
                   >
                     <span className="text-muted-foreground text-right text-sm">{i + 1}</span>
@@ -491,7 +491,7 @@ export function NewRequisitionDialog({
             <div className="space-y-2">
               <Label>Beneficiary details</Label>
               {beneficiaries.map((b, i) => (
-                <div key={i} className="space-y-2 rounded-md border p-3">
+                <div key={`row-${i}`} className="space-y-2 rounded-md border p-3">
                   <div className="grid gap-2 sm:grid-cols-3">
                     <Input
                       aria-label={`Beneficiary ${i + 1} account name`}

@@ -77,7 +77,7 @@ export function ScheduleList({
 
         return (
           <div
-            key={index}
+            key={`row-${index}`}
             className={cn(
               "flex flex-col justify-between gap-3 p-3 sm:flex-row sm:items-center",
               item.status === "overdue" && "bg-danger/15"

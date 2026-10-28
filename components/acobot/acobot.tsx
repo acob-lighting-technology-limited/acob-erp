@@ -238,7 +238,7 @@ export function AcoBot({ userName }: AcoBotProps) {
                   <div className="border-border bg-card flex items-center gap-1 rounded-2xl rounded-bl-sm border px-3 py-2.5 shadow-sm">
                     {[0, 1, 2].map((i) => (
                       <motion.span
-                        key={i}
+                        key={`row-${i}`}
                         className="bg-muted-foreground/60 h-1.5 w-1.5 rounded-full"
                         animate={{ opacity: [0.3, 1, 0.3] }}
                         transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}

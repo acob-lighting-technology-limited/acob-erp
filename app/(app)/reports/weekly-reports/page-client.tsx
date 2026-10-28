@@ -648,7 +648,7 @@ export default function WeeklyReportsPortal() {
                   {autoNumberLines(report.work_done)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>
@@ -658,7 +658,7 @@ export default function WeeklyReportsPortal() {
                   {autoNumberLines(report.tasks_new_week)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>
@@ -668,7 +668,7 @@ export default function WeeklyReportsPortal() {
                   {autoNumberLines(report.challenges)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>

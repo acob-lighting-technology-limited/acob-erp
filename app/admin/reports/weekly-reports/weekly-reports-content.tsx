@@ -525,7 +525,7 @@ export function WeeklyReportsContent({
                   {autoNumberLines(report.work_done)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>
@@ -535,7 +535,7 @@ export function WeeklyReportsContent({
                   {autoNumberLines(report.tasks_new_week)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>
@@ -545,7 +545,7 @@ export function WeeklyReportsContent({
                   {autoNumberLines(report.challenges)
                     .split("\n")
                     .map((line, index) => (
-                      <div key={index}>{line}</div>
+                      <div key={`line-${index}`}>{line}</div>
                     ))}
                 </div>
               </div>

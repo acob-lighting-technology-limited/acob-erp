@@ -206,7 +206,7 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
                   </thead>
                   <tbody>
                     {requisition.line_items.map((item, idx) => (
-                      <tr key={idx} className="border-b last:border-b-0">
+                      <tr key={`row-${idx}`} className="border-b last:border-b-0">
                         <td className="p-2">{item.description}</td>
                         <td className="p-2 text-right font-mono font-medium">{formatNaira(item.amount)}</td>
                       </tr>
@@ -238,7 +238,7 @@ export function RequisitionPreviewSheet({ requisitionId, open, onOpenChange, onS
                   </thead>
                   <tbody>
                     {requisition.beneficiary_details.map((b, idx) => (
-                      <tr key={idx} className="border-b last:border-b-0">
+                      <tr key={`row-${idx}`} className="border-b last:border-b-0">
                         <td className="p-2 font-medium">{b.account_name}</td>
                         <td className="p-2 font-mono">{b.account_number}</td>
                         <td className="p-2">{b.bank_name}</td>

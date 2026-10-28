@@ -77,7 +77,7 @@ export default async function Image({ params }: { params: Promise<{ date: string
             const dishes = group.dishes.slice(0, MAX_DISHES)
             const more = group.dishes.length - dishes.length
             return (
-              <div key={index} style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+              <div key={`row-${index}`} style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
                 {group.name && (
                   <div
                     style={{

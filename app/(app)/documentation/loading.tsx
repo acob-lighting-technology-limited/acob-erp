@@ -20,7 +20,7 @@ export default function DocumentationLoading() {
       {/* Documentation Grid */}
       <div className="grid gap-4 md:grid-cols-2">
         {[...Array(6)].map((_, i) => (
-          <Card key={i}>
+          <Card key={`skeleton-${i}`}>
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1 space-y-2">

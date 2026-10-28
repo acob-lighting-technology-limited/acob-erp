@@ -23,7 +23,7 @@ export function CardGridPageSkeleton({ cards = 3, columns = 3 }: CardGridPageSke
 
         <div className={`grid gap-6 ${gridCols}`}>
           {[...Array(cards)].map((_, i) => (
-            <Card key={i} className="border-2">
+            <Card key={`skeleton-${i}`} className="border-2">
               <CardHeader className="flex flex-row items-start gap-4 pb-3">
                 <Skeleton className="h-12 w-12 rounded-lg" />
                 <div className="min-w-0 flex-1 space-y-2">

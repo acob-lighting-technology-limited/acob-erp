@@ -12,7 +12,7 @@ export function StepList({ steps }: { steps: StepResult[] }) {
     <div className="space-y-2">
       {steps.map((step, i) => (
         <div
-          key={i}
+          key={`row-${i}`}
           className={cn(
             "flex items-start gap-3 rounded-md border px-3 py-2 text-sm",
             step.status === "ok" && "border-success/30 bg-success/15",

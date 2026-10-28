@@ -1074,7 +1074,7 @@ export function LeaveContent({
                   </p>
                   <ul className="list-inside list-disc space-y-0.5 font-medium">
                     {r.department_overlaps.map((overlap, idx) => (
-                      <li key={idx}>
+                      <li key={`row-${idx}`}>
                         {overlap.full_name} ({overlap.status}) — {overlap.start_date} to {overlap.end_date}
                       </li>
                     ))}

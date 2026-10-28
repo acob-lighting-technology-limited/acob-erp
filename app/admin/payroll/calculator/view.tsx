@@ -1255,7 +1255,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                 <div className="space-y-1.5">
                   {taxDetail.brackets.map((b, idx) => (
                     <div
-                      key={idx}
+                      key={`row-${idx}`}
                       className="border-border/40 bg-background/60 flex items-center justify-between rounded border p-2 text-xs"
                     >
                       <div className="flex items-center gap-1.5">
@@ -1290,7 +1290,7 @@ export function PayrollCalculatorPage({ initialData }: CalculatorPageProps) {
                 <div className="space-y-1.5">
                   {reformTaxDetail.brackets.map((b, idx) => (
                     <div
-                      key={idx}
+                      key={`row-${idx}`}
                       className="border-border/40 bg-background/60 flex items-center justify-between rounded border p-2 text-xs"
                     >
                       <div className="flex items-center gap-1.5">

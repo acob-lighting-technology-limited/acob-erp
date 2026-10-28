@@ -39,7 +39,7 @@ export function StatGridSkeleton({ count, className }: { count: number; classNam
   return (
     <StatGrid className={className}>
       {Array.from({ length: count }, (_, i) => (
-        <StatCardSkeleton key={i} />
+        <StatCardSkeleton key={`skeleton-${i}`} />
       ))}
     </StatGrid>
   )

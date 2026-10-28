@@ -17,7 +17,7 @@ export default function Loading() {
         </div>
         <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-card p-5 sm:p-6">
+            <div key={`skeleton-${i}`} className="bg-card p-5 sm:p-6">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="mt-3 h-9 w-16" />
             </div>
@@ -25,7 +25,7 @@ export default function Loading() {
         </div>
         <div className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-xl" />
+            <Skeleton key={`skeleton-${i}`} className="h-40 rounded-xl" />
           ))}
         </div>
       </div>
