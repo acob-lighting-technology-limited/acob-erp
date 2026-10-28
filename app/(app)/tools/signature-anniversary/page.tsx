@@ -4,6 +4,9 @@ import { SignatureCreator } from "@/components/signature-creator"
 import { resolveAdminScope } from "@/lib/admin/rbac"
 import { PageHeader, PageWrapper } from "@/components/layout"
 import { FileSignature } from "lucide-react"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = { title: "Anniversary signature" }
 
 export default async function AnniversarySignaturePage(props: { searchParams: Promise<{ userId?: string }> }) {
   const searchParams = await props.searchParams
