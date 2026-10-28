@@ -28,7 +28,13 @@ export default async function AdminEmployeeSignaturePage(props: { params: Promis
   }
 
   // Fetch the target user's profile
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", params.userId).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "first_name, other_names, last_name, designation, phone_number, additional_phone, company_email, additional_email"
+    )
+    .eq("id", params.userId)
+    .single()
 
   if (!profile) {
     redirect("/admin/hr/employees")

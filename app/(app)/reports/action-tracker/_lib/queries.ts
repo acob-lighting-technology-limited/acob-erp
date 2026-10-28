@@ -51,7 +51,11 @@ export async function fetchActionTrackerMetadata(
 
   let profile: ActionTrackerMetadata["profile"] = null
   if (user) {
-    const { data: p } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+    const { data: p } = await supabase
+      .from("profiles")
+      .select("id, role, department, is_department_lead, lead_departments, admin_routes")
+      .eq("id", user.id)
+      .single()
     profile = p
   }
 

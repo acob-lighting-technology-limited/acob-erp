@@ -22,7 +22,13 @@ export default async function AnniversarySignaturePage(props: { searchParams: Pr
     }
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", targetUserId).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "first_name, other_names, last_name, designation, phone_number, additional_phone, company_email, additional_email"
+    )
+    .eq("id", targetUserId)
+    .single()
 
   return (
     <PageWrapper maxWidth="full" background="gradient">

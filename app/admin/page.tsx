@@ -108,7 +108,7 @@ export default async function AdminDashboardPage() {
     : null
   const scopedUserIds = profileIdsInScope ? profileIdsInScope.map((profileRow) => profileRow.id) : []
 
-  const { data: profile } = await dataClient.from("profiles").select("*").eq("id", user?.id).single()
+  const { data: profile } = await dataClient.from("profiles").select("first_name").eq("id", user?.id).single()
   const canSeeAuditActivity = Boolean(scope?.isAdminLike || scope?.isDepartmentLead)
 
   const todayIso = toLocalISODate()

@@ -85,7 +85,8 @@ export const RULES = [
   },
   {
     id: "select-star",
-    count: (text) => count(text, /\.select\(\s*(["'`])\*\1/g),
+    // A head-only count request returns no rows, so "*" costs nothing there.
+    count: (text) => count(text, /\.select\(\s*(["'`])\*\1(?!\s*,\s*\{[^}]*\bhead:\s*true)/g),
   },
   {
     id: "inline-query-key",

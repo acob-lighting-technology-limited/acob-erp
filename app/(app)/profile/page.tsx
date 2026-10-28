@@ -342,7 +342,11 @@ async function getProfileData() {
       .select("id, title, category, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
-    dataClient.from("feedback").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    dataClient
+      .from("feedback")
+      .select("id, feedback_type, title, description, status, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
     dataClient
       .from("correspondence_records")
       .select("id, reference_number, subject, status, created_at")

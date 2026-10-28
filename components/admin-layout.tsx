@@ -24,7 +24,14 @@ export async function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   // Fetch user profile with role
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
+  // Handed to client components as props: select only what they read.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "id, first_name, last_name, full_name, department, role, is_department_lead, lead_departments, admin_routes"
+    )
+    .eq("id", data.user.id)
+    .single()
 
   const scope = await resolveAdminScope(supabase, data.user.id)
   if (!profile || !scope) {

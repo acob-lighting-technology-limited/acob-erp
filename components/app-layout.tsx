@@ -27,7 +27,13 @@ export async function AppLayout({ children }: AppLayoutProps) {
   }
 
   // Fetch user profile
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
+  // The profile is handed to client components as props, so select only what they read: every column
+  // named here is serialised into the page.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, full_name, department, role, is_department_lead, lead_departments, avatar_path")
+    .eq("id", data.user.id)
+    .single()
   const adminScope = await resolveAdminScope(typedSupabase, data.user.id)
   const canAccessAdmin = Boolean(adminScope)
 

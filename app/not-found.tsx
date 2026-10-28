@@ -14,7 +14,11 @@ export default async function NotFound() {
     return <NotFoundContent />
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, department, role, is_department_lead, lead_departments")
+    .eq("id", user.id)
+    .single()
   const canAccessAdmin = Boolean(await resolveAdminScope(supabase, user.id))
 
   const userData = {
