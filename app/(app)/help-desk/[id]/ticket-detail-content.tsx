@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { formatWATDateTime } from "@/lib/utils/date"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { apiFetch } from "@/lib/api-client"
 import { StaffAvatar } from "@/components/ui/staff-avatar"
 import { useStaffAvatars } from "@/hooks/use-staff-avatars"
@@ -134,21 +135,16 @@ export function TicketDetailContent({
   const slaRemaining = ticket.sla_target_at ? new Date(ticket.sla_target_at).getTime() - now : null
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
-      <div className="space-y-2">
-        <Link href="/help-desk" className="text-sm text-slate-500 hover:underline">
-          Back to Help Desk
-        </Link>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="font-mono text-sm font-semibold">{ticket.ticket_number}</div>
-          <Badge>{ticket.status.replaceAll("_", " ")}</Badge>
-          <Badge variant="outline">{ticket.priority}</Badge>
-        </div>
-        <h1 className="text-3xl font-bold">{ticket.title}</h1>
+    <PageWrapper maxWidth="full">
+      <PageHeader title={ticket.title} backLink={{ href: "/help-desk", label: "Back to Help Desk" }} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="font-mono text-sm font-semibold">{ticket.ticket_number}</div>
+        <Badge>{ticket.status.replaceAll("_", " ")}</Badge>
+        <Badge variant="outline">{ticket.priority}</Badge>
         {slaRemaining !== null ? (
-          <div className={`text-sm ${slaRemaining < 0 ? "text-red-600" : "text-slate-500"}`}>
+          <span className={`text-sm ${slaRemaining < 0 ? "text-danger" : "text-muted-foreground"}`}>
             SLA {slaRemaining < 0 ? "breached" : "remaining"} {Math.abs(Math.round(slaRemaining / (1000 * 60 * 60)))}h
-          </div>
+          </span>
         ) : null}
       </div>
 
@@ -268,6 +264,6 @@ export function TicketDetailContent({
           ) : null}
         </div>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

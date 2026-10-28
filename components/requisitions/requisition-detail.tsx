@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { PageHeader, PageWrapper } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
@@ -197,24 +198,21 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
   const stages = requisition.stages || []
 
   return (
-    <div className="space-y-6 p-4 md:p-8 print:p-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={backHref}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to requisitions
-          </Link>
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => window.print()}>
-          <Printer className="mr-2 h-4 w-4" /> Print / Save PDF
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <h1 className="text-xl font-semibold">
-          {FORM_LABELS[requisition.form_type]} {requisition.requisition_number}
-        </h1>
-        <Badge variant={statusBadgeVariant(requisition.status)}>{STATUS_LABELS[requisition.status]}</Badge>
-        <span className="text-muted-foreground text-sm">{progressLabel(requisition)}</span>
+    <PageWrapper maxWidth="full" className="print:p-0">
+      <div className="space-y-3 print:hidden">
+        <PageHeader
+          title={`${FORM_LABELS[requisition.form_type]} ${requisition.requisition_number}`}
+          backLink={{ href: backHref, label: "Back to requisitions" }}
+          actions={
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" /> Print / Save PDF
+            </Button>
+          }
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={statusBadgeVariant(requisition.status)}>{STATUS_LABELS[requisition.status]}</Badge>
+          <span className="text-muted-foreground text-sm">{progressLabel(requisition)}</span>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -402,6 +400,6 @@ export function RequisitionDetail({ id, backHref }: { id: string; backHref: stri
         requisitionId={requisition.id}
         onDone={load}
       />
-    </div>
+    </PageWrapper>
   )
 }
