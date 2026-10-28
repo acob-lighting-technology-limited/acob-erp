@@ -303,7 +303,7 @@ export default function PeerFeedbackPage() {
           )}
           expandable={{
             render: (f) => (
-              <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+              <div className="space-y-3 text-xs">
                 <div className="space-y-1">
                   <span className="text-muted-foreground block text-xs font-semibold uppercase">Feedback Comments</span>
                   <p className="bg-background rounded border p-2.5 leading-relaxed">
@@ -383,7 +383,7 @@ export default function PeerFeedbackPage() {
           )}
           expandable={{
             render: (f) => (
-              <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+              <div className="space-y-4 text-xs">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div>
                     <span className="text-muted-foreground block text-xs font-semibold uppercase">Collaboration</span>

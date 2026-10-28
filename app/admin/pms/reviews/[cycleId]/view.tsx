@@ -645,7 +645,7 @@ export function AdminPmsQuarterReviewsPage({ backLinkHref }: { backLinkHref?: st
           }}
           expandable={{
             render: (r) => (
-              <div className="space-y-2 p-4 text-sm">
+              <div className="space-y-2 text-sm">
                 {r.strengths && (
                   <div>
                     <span className="text-muted-foreground font-medium">Strengths: </span>

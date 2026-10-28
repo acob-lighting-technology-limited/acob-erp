@@ -323,7 +323,7 @@ export function AdminAuditLogsContent({
         ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-6 border-t p-6">
+            <div className="space-y-6">
               <div className="space-y-2">
                 <h4 className="text-muted-foreground text-xs font-black tracking-widest uppercase">Log Summary</h4>
                 <p className="text-sm font-medium">{getAuditLogSummary(r)}</p>

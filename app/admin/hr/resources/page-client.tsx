@@ -416,7 +416,7 @@ export default function AdminFleetPage() {
           pagination={{ pageSize: 50 }}
           expandable={{
             render: (r) => (
-              <div className="grid gap-3 p-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
                 <div className="bg-muted/20 rounded-lg border p-2.5">
                   <span className="text-muted-foreground block text-xs font-medium">Trip Purpose & Reason</span>
                   <p className="text-foreground mt-1 whitespace-pre-wrap">{r.reason || "No reason provided"}</p>

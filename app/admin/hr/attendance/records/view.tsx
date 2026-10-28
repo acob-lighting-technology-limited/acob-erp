@@ -409,7 +409,7 @@ export function AdminAttendanceRecordsPage({
           isLoading={loading}
           expandable={{
             render: (r) => (
-              <div className="grid gap-3 p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                 <div className="bg-muted/20 rounded-lg border p-2.5">
                   <span className="text-muted-foreground block text-xs font-medium">Source</span>
                   <Badge variant="outline" className="mt-1 text-xs">

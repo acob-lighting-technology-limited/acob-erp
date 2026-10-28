@@ -235,7 +235,7 @@ export default function AdminJobDescriptionsPage() {
         ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-4 border-t p-6">
+            <div className="space-y-4">
               <div>
                 <h4 className="text-muted-foreground mb-2 flex items-center gap-2 text-xs font-black tracking-widest uppercase">
                   <UserCircle2 className="h-3 w-3" /> Designation Details

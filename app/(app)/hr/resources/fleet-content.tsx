@@ -625,7 +625,7 @@ export function FleetContent() {
         }}
         expandable={{
           render: (row) => (
-            <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+            <div className="space-y-3 text-xs">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
                   <span className="text-muted-foreground block text-xs font-semibold uppercase">

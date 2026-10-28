@@ -352,7 +352,7 @@ export function AdminFeedbackContent({ initialFeedback, initialStats }: AdminFee
         ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-4 border-t p-6">
+            <div className="space-y-4">
               <div>
                 <h4 className="text-muted-foreground mb-2 text-xs font-black tracking-widest uppercase">
                   Description / Feedback

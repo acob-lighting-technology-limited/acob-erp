@@ -623,7 +623,7 @@ export function HelpDeskContent({
         }}
         expandable={{
           render: (ticket) => (
-            <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+            <div className="space-y-4 text-xs">
               <div className="space-y-1.5">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">Description</span>
                 <p className="bg-background rounded border p-2.5 leading-relaxed whitespace-pre-wrap">

@@ -903,7 +903,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                 const latestAppeal = rowAppeals[0]
 
                 return (
-                  <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+                  <div className="space-y-3 text-xs">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <div>
                         <span className="text-muted-foreground block text-xs font-semibold uppercase">Clock In</span>

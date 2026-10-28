@@ -615,7 +615,7 @@ export function ProjectContent({ profiles = [], admin = false }: ProjectContentP
           }}
           expandable={{
             render: (r) => (
-              <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
+              <div className="space-y-3">
                 <ProjectSummary project={r} health={healthById.get(r.id)} />
                 <div className="flex justify-end">
                   <Button asChild size="sm" variant="outline">

@@ -324,7 +324,7 @@ export function CorporateScorecardRegister({ tabs, activeTab, onTabChange }: Cor
             const taskStats = r.task_stats || { total: 0, completed: 0, in_progress: 0 }
 
             return (
-              <div className="bg-card/60 space-y-4 rounded-lg border p-4 text-xs">
+              <div className="space-y-4 text-xs">
                 {/* Top Summary Banner: Pacing & Overall Attainment */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
                   <div className="flex items-center gap-2">

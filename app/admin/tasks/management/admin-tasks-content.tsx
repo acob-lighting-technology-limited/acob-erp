@@ -737,7 +737,7 @@ export function AdminTasksContent({
           ]}
           expandable={{
             render: (r) => (
-              <div className="grid grid-cols-1 gap-6 p-5 text-xs md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 text-xs md:grid-cols-2">
                 <div className="space-y-3">
                   <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
                     Description & Scope

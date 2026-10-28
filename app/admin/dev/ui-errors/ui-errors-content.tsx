@@ -344,7 +344,7 @@ export function UiErrorsContent({
         ]}
         expandable={{
           render: (row) => (
-            <div className="space-y-3 p-4 text-sm">
+            <div className="space-y-3 text-sm">
               <p className="break-all">
                 <strong>Reference:</strong> {row.id}
               </p>

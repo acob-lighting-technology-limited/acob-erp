@@ -516,7 +516,7 @@ export function BypassOverrideContent({ rows, error }: { rows: EnrichedBypassLog
             const details = getDetailedChanges(row)
 
             return (
-              <div className="bg-muted/40 space-y-4 rounded-lg border-2 p-4">
+              <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
                     <span className="text-muted-foreground block text-xs font-medium uppercase">Target / Entity</span>

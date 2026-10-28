@@ -1061,7 +1061,7 @@ export function LeaveContent({
         }}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-4 rounded-lg border p-4 text-xs">
+            <div className="space-y-4 text-xs">
               {r.department_overlaps && r.department_overlaps.length > 0 && (
                 <div className="border-warning/80 bg-warning/70 text-warning space-y-1 rounded-md border p-3 text-xs">
                   <div className="text-warning flex items-center gap-1.5 font-semibold">

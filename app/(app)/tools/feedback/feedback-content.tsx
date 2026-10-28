@@ -321,7 +321,7 @@ export function FeedbackContent({ initialFeedback, initialSurvey }: FeedbackCont
         )}
         expandable={{
           render: (row) => (
-            <div className="bg-muted/20 space-y-3 rounded-lg border p-4 text-xs">
+            <div className="space-y-3 text-xs">
               <div className="space-y-1">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">
                   Feedback Description

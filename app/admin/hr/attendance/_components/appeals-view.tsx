@@ -400,7 +400,7 @@ export function AppealsView({ lockedDepartment }: AppealsViewProps) {
         ]}
         expandable={{
           render: (r) => (
-            <div className="bg-muted/20 space-y-3.5 border-y p-4 text-sm">
+            <div className="space-y-3.5 text-sm">
               <div>
                 <span className="text-muted-foreground mb-1 block text-xs font-semibold tracking-wide uppercase">
                   {r.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Appeal Reason"}

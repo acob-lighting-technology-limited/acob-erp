@@ -678,7 +678,7 @@ export function AdminUserTasksPlan({
         expandable={{
           canExpand: (row) => row.tasks.length > 0,
           render: (row) => (
-            <div className="bg-muted/20 space-y-3 rounded-lg border p-3.5 sm:p-4">
+            <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-foreground text-xs font-bold tracking-wider uppercase">

@@ -658,7 +658,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
         )}
         expandable={{
           render: (t) => (
-            <div className="space-y-4 p-4 text-xs">
+            <div className="space-y-4 text-xs">
               <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
                   <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Task Title</span>
