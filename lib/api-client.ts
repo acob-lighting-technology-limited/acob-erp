@@ -43,20 +43,40 @@ export function readDeptContext(): string | null {
  *
  * Use this instead of the global fetch() for any client-side call to /api/*.
  */
-export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const method = (init.method || "GET").toUpperCase()
   const csrfToken = MUTATING_METHODS.has(method) ? readCsrfCookie() : null
   const deptContext = readDeptContext()
-
-  if (!csrfToken && !deptContext) {
-    return fetch(input, init)
-  }
 
   const headers = new Headers(init.headers)
   if (csrfToken) headers.set("x-csrf-token", csrfToken)
   if (deptContext) headers.set("x-dept-context", deptContext)
 
-  return fetch(input, { ...init, headers })
+  // A hung request on bad mobile data would leave a button spinning forever. Uploads (FormData) and callers
+  // that bring their own signal are left alone.
+  const signal =
+    init.signal ?? (typeof FormData !== "undefined" && init.body instanceof FormData ? undefined : timeoutSignal())
+
+  const response = await fetch(input, { ...init, headers, signal })
+  if (response.status === 401) redirectToLogin()
+  return response
+}
+
+const REQUEST_TIMEOUT_MS = 60_000
+function timeoutSignal(): AbortSignal | undefined {
+  return typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+    ? AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    : undefined
+}
+
+let redirectingToLogin = false
+/** The session lapsed mid-use: send the user to log in and bring them back, once, instead of a wall of failed toasts. */
+function redirectToLogin() {
+  if (typeof window === "undefined" || redirectingToLogin) return
+  const { pathname, search } = window.location
+  if (pathname.startsWith("/auth")) return
+  redirectingToLogin = true
+  window.location.assign(`/auth/login?next=${encodeURIComponent(pathname + search)}`)
 }
 
 /**

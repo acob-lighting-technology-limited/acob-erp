@@ -2,9 +2,11 @@
 commit_msg=$(cat "$1")
 
 # Check if the commit message follows the conventional format
-if ! echo "$commit_msg" | npx --no -- commitlint --edit "$1" > /dev/null 2>&1; then
+if ! lint_output=$(npx --no -- commitlint --edit "$1" 2>&1); then
   echo ""
-  echo "❌ Invalid commit message format!"
+  echo "❌ Commit message rejected by commitlint:"
+  echo ""
+  echo "$lint_output"
   echo ""
   echo "📝 Your commit message must follow this format:"
   echo "   type: description"
@@ -23,8 +25,6 @@ if ! echo "$commit_msg" | npx --no -- commitlint --edit "$1" > /dev/null 2>&1; t
   echo "   git commit -m \"feat: add new feature\""
   echo "   git commit -m \"fix: resolve bug\""
   echo "   git commit -m \"docs: update documentation\""
-  echo ""
-  echo "📖 For more help, see: COMMIT_GUIDE.md"
   echo ""
   exit 1
 fi

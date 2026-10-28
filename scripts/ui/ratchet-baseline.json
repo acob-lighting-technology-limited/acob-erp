@@ -523,7 +523,7 @@
       "app/admin/payroll/calculator/view.tsx": 1364,
       "app/admin/pms/reviews/view.tsx": 1094,
       "app/admin/reports/action-tracker/action-tracker-content.tsx": 1182,
-      "components/admin-sidebar.tsx": 1116,
+      "components/admin-sidebar.tsx": 1114,
       "components/documentation/department-documents-browser.tsx": 1827,
       "components/hr/manage-users-dialog.tsx": 1475,
       "components/payments/payments-table.tsx": 1176,

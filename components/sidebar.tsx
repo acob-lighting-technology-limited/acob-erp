@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
+import { useShellTransition } from "@/hooks/use-shell-transition"
 import {
   BookUser,
   Briefcase,
@@ -232,6 +233,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const departmentCode = useDepartmentCode(profile?.department)
   const { isCollapsed } = useSidebar()
+  const shellTransition = useShellTransition()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
   const calendarBadge = useCalendarBadgeCount()
@@ -500,7 +502,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
                                       href={grandchild.href}
                                       onClick={() => setIsMobileMenuOpen(false)}
                                       className={cn(
-                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150 max-lg:min-h-10",
                                         isGcActive ? activeCls : inactiveCls
                                       )}
                                     >
@@ -621,7 +623,7 @@ export function Sidebar({ user, profile, canAccessAdmin, deptConsoles = [], show
       <motion.aside
         initial={false}
         animate={{ width: isCollapsed ? 80 : 256 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        transition={shellTransition}
         className="bg-card hidden overflow-hidden border-r lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
         {sidebarJSX}

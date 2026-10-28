@@ -53,6 +53,7 @@ import type { UserRole } from "@/types/database"
 import type { DeptConsole } from "@/lib/dept/consoles"
 import { getRoleDisplayName } from "@/lib/permissions"
 import { motion } from "framer-motion"
+import { useShellTransition } from "@/hooks/use-shell-transition"
 import { normalizeDepartmentName } from "@/shared/departments"
 import { mdDeskNavChildren } from "@/components/md-desk/sections"
 import { pmsNavChildren } from "@/lib/pms/sections"
@@ -536,6 +537,7 @@ export function AdminSidebar({
   const drawerProps = useDrawerA11y(isMobileMenuOpen, () => setIsMobileMenuOpen(false))
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { isCollapsed } = useSidebar()
+  const shellTransition = useShellTransition()
   const staffAvatars = useStaffAvatars()
   const accountAvatarUrl = profile?.id ? staffAvatars[profile.id] : undefined
   const { data: pendingRsvps } = usePendingRsvpCount()
@@ -918,7 +920,7 @@ export function AdminSidebar({
                                       href={grandchild.href}
                                       onClick={() => setIsMobileMenuOpen(false)}
                                       className={cn(
-                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150",
+                                        "flex min-h-[28px] items-center rounded-md px-2 py-1 text-sm font-medium transition-colors duration-150 max-lg:min-h-10",
                                         isGcActive ? activeCls : inactiveCls
                                       )}
                                     >
@@ -1067,11 +1069,7 @@ export function AdminSidebar({
         animate={{
           width: isCollapsed ? 80 : 256,
         }}
-        transition={{
-          type: "spring",
-          stiffness: 300,
-          damping: 30,
-        }}
+        transition={shellTransition}
         className="hidden overflow-hidden border-r border-[var(--admin-sidebar-border)] bg-[var(--admin-sidebar-bg)] lg:fixed lg:top-16 lg:bottom-0 lg:flex lg:flex-col"
       >
         {sidebarJSX}
