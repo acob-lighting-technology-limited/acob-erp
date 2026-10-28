@@ -932,7 +932,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                     {latestAppeal ? (
                       <div className="space-y-3.5 border-t pt-3.5 text-sm">
                         <div>
-                          <span className="text-muted-foreground mb-1 block text-xs font-semibold tracking-wide uppercase">
+                          <span className="text-muted-foreground mb-1 block text-xs font-semibold">
                             {latestAppeal.initiated_by_role === "admin_manual" ? "Admin's Reason" : "Appeal Reason"}
                           </span>
                           <p className="text-foreground text-sm font-medium whitespace-pre-wrap">
@@ -941,9 +941,7 @@ export function AttendanceContent({ initialTodayRecord, initialRecentRecords }: 
                         </div>
 
                         <div>
-                          <span className="text-muted-foreground mb-2 block text-xs font-semibold tracking-wide uppercase">
-                            Audit History
-                          </span>
+                          <span className="text-muted-foreground mb-2 block text-xs font-semibold">Audit History</span>
                           <div className="bg-background/80 divide-y rounded-lg border text-xs">
                             {/* 1. Origin */}
                             <div className="flex flex-col justify-between gap-1 p-3 sm:flex-row sm:items-center">

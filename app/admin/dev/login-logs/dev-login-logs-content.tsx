@@ -198,19 +198,19 @@ function UserStatsView({
     <div className="space-y-6 py-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Total Logins</p>
+          <p className="text-muted-foreground text-xs font-medium">Total Logins</p>
           <p className="mt-1 text-xl font-bold">{userStats.total}</p>
         </div>
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Active Days</p>
+          <p className="text-muted-foreground text-xs font-medium">Active Days</p>
           <p className="mt-1 text-xl font-bold">{userStats.uniqueDays}</p>
         </div>
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Primary Method</p>
+          <p className="text-muted-foreground text-xs font-medium">Primary Method</p>
           <p className="mt-1 text-sm font-semibold capitalize">{userStats.preferredMethod.replace(/_/g, " ")}</p>
         </div>
         <div className="bg-muted/30 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">First Login</p>
+          <p className="text-muted-foreground text-xs font-medium">First Login</p>
           <p className="text-muted-foreground mt-1 truncate text-xs font-semibold">
             {userStats.firstLogin
               ? formatWATDate(userStats.firstLogin, { day: "2-digit", month: "short", year: "2-digit" })

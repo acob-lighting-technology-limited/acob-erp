@@ -382,23 +382,19 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
             <div className="grid gap-4 text-sm md:grid-cols-2">
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                    Comment
-                  </span>
+                  <span className="text-muted-foreground block text-xs font-semibold">Comment</span>
                   <p className="whitespace-pre-wrap">{r.comment || "No comment was typed."}</p>
                 </div>
                 {r.details && (
                   <div className="space-y-1">
-                    <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
-                      Recorded by the system
-                    </span>
+                    <span className="text-muted-foreground block text-xs font-semibold">Recorded by the system</span>
                     <p className="text-muted-foreground whitespace-pre-wrap">{r.details}</p>
                   </div>
                 )}
               </div>
               {r.days.length > 1 && (
                 <div className="space-y-1 md:col-span-2">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold">
                     Days changed · {r.days.length}
                   </span>
                   <p className="text-muted-foreground text-xs leading-relaxed">
@@ -410,7 +406,7 @@ export const ChangeLogView = forwardRef<ChangeLogViewHandle, ChangeLogViewProps>
               )}
               {r.appeal && (
                 <div className="space-y-1">
-                  <span className="text-muted-foreground block text-xs font-semibold tracking-wide uppercase">
+                  <span className="text-muted-foreground block text-xs font-semibold">
                     Appeal · {APPEAL_OUTCOME_LABELS[r.appeal.status] ?? r.appeal.status}
                   </span>
                   <p>

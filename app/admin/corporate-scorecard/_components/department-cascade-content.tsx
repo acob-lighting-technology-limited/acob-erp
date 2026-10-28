@@ -474,11 +474,9 @@ export function DepartmentCascadeContent({
           render: (r) => (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Corporate Target</p>
+                <p className="text-muted-foreground text-xs font-semibold">Corporate Target</p>
                 <p className="mt-1 text-sm">{r.target_text}</p>
-                <p className="text-muted-foreground mt-3 text-xs font-semibold tracking-wide uppercase">
-                  This Department&apos;s Target
-                </p>
+                <p className="text-muted-foreground mt-3 text-xs font-semibold">This Department&apos;s Target</p>
                 <p className="mt-1 text-sm">{r.department_target || "Not yet confirmed"}</p>
                 {r.task_stats && r.task_stats.total > 0 && (
                   <div className="mt-3 rounded-md border border-blue-500/20 bg-blue-500/5 p-2 text-xs">
@@ -493,13 +491,11 @@ export function DepartmentCascadeContent({
                 )}
               </div>
               <div>
-                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Proposed Action</p>
+                <p className="text-muted-foreground text-xs font-semibold">Proposed Action</p>
                 <p className="mt-1 text-sm">{r.proposed_action || "Not yet defined"}</p>
                 {r.latest_actual && (
                   <>
-                    <p className="text-muted-foreground mt-3 text-xs font-semibold tracking-wide uppercase">
-                      Latest Recorded Actual
-                    </p>
+                    <p className="text-muted-foreground mt-3 text-xs font-semibold">Latest Recorded Actual</p>
                     <p className="mt-1 text-sm">{r.latest_actual.note || "No note recorded"}</p>
                     <p className="text-muted-foreground mt-1 text-xs">
                       Recorded {formatWATDate(r.latest_actual.recorded_at)}

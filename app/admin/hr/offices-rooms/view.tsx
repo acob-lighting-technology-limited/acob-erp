@@ -466,10 +466,10 @@ export function OfficeLocationsPage({
                   <table className="w-full min-w-[640px] text-sm">
                     <thead className="bg-muted/30">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Employee</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Contact</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold tracking-wide uppercase">Role</th>
-                        <th className="px-3 py-2 text-right text-xs font-semibold tracking-wide uppercase">Action</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold">Employee</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold">Contact</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold">Role</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold">Action</th>
                       </tr>
                     </thead>
                     <tbody>

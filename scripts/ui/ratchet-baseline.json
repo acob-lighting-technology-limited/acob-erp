@@ -261,7 +261,7 @@
       "app/lunch/_components/lunch-share-view.tsx": 1
     },
     "file-lines": {
-      "app/(app)/hr/attendance/attendance-content.tsx": 1257,
+      "app/(app)/hr/attendance/attendance-content.tsx": 1255,
       "app/(app)/hr/leave/leave-content.tsx": 1299,
       "app/(app)/hr/lunch/lunch-content.tsx": 1112,
       "app/(app)/reports/action-tracker/page-client.tsx": 1096,

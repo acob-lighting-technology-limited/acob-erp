@@ -448,33 +448,19 @@ export function PmsTablePage({
 
                     return (
                       <div className="space-y-3">
-                        <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                          Assigned Tasks
-                        </p>
+                        <p className="text-muted-foreground text-xs font-semibold">Assigned Tasks</p>
                         <div className="overflow-x-auto rounded-lg border">
                           <table className="w-full text-sm">
                             <thead className="bg-muted/40">
                               <tr>
-                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Task</th>
-                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                  Status
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Type</th>
-                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                  Due Date
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                  Weight
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                  Rating
-                                </th>
-                                <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                  Earned
-                                </th>
-                                <th className="px-3 py-2 text-right text-xs font-bold tracking-wide uppercase">
-                                  Action
-                                </th>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Task</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Status</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Type</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Due Date</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Weight</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Rating</th>
+                                <th className="px-3 py-2 text-left text-xs font-bold">Earned</th>
+                                <th className="px-3 py-2 text-right text-xs font-bold">Action</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -607,28 +593,18 @@ export function PmsTablePage({
 
                       return (
                         <div className="space-y-3">
-                          <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                          <p className="text-muted-foreground text-xs font-semibold">
                             Daily Clock-in / Attendance Logs
                           </p>
                           <div className="overflow-x-auto rounded-lg border">
                             <table className="w-full text-sm">
                               <thead className="bg-muted/40">
                                 <tr>
-                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                    Date
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                    Clock In
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                    Clock Out
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                    Total Hours
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">
-                                    Status
-                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold">Date</th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold">Clock In</th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold">Clock Out</th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold">Total Hours</th>
+                                  <th className="px-3 py-2 text-left text-xs font-bold">Status</th>
                                 </tr>
                               </thead>
                               <tbody>

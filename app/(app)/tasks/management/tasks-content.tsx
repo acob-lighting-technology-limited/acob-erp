@@ -661,7 +661,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
             <div className="space-y-4 text-xs">
               <div className="flex flex-col gap-2 border-b pb-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
-                  <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Task Title</span>
+                  <span className="text-muted-foreground text-xs font-medium">Task Title</span>
                   <h3 className="text-foreground text-sm leading-snug font-semibold">{t.title}</h3>
                 </div>
                 <Tooltip>
@@ -684,9 +684,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-3">
-                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">
-                    Description & Scope
-                  </h4>
+                  <h4 className="text-foreground text-xs font-semibold">Description & Scope</h4>
 
                   {isTaskEscalated(t, toLocalISODate()) && (
                     <div className="border-destructive/40 bg-destructive/10 text-destructive rounded border p-2.5 dark:text-rose-400">
@@ -726,7 +724,7 @@ export function TasksContent({ initialTasks, userId, userProfile }: TasksContent
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-foreground text-xs font-semibold tracking-wider uppercase">Context & Details</h4>
+                  <h4 className="text-foreground text-xs font-semibold">Context & Details</h4>
                   <div className="bg-muted/20 grid grid-cols-2 gap-2 rounded-lg border p-3">
                     <div>
                       <span className="text-muted-foreground block text-xs">Strategic Goal:</span>

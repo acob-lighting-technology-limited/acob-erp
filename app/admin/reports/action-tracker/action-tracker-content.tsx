@@ -868,16 +868,16 @@ export function ActionTrackerContent({
           expandable={{
             render: (row) => (
               <div className="space-y-3">
-                <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Action Points</p>
+                <p className="text-muted-foreground text-xs font-semibold">Action Points</p>
                 <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">#</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Action Point</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Status</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Hindrance</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold tracking-wide uppercase">Due Date</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">#</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Action Point</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Status</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Hindrance</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold">Due Date</th>
                       </tr>
                     </thead>
                     <tbody>
