@@ -26,6 +26,9 @@ import { logger } from "@/lib/logger"
 import { createNotification } from "@/lib/notifications/create"
 
 const log = logger("admin-hr-attendance-appeals")
+
+const APPEAL_COLUMNS =
+  "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at, change_kind, change_payload, batch_id, overridden_by, overridden_at, override_reason, overridden_stage"
 export const dynamic = "force-dynamic"
 
 export type AppealWithProfile = {
@@ -140,8 +143,7 @@ export async function GET(request: NextRequest) {
     // Fetch appeals
     let appealsQuery = dataClient
       .from("attendance_appeals")
-      // "*" so the batch and override columns (20261030090000) come through when present.
-      .select("*")
+      .select(APPEAL_COLUMNS)
       .order("created_at", { ascending: false })
 
     if (statusParam !== "all") {
@@ -166,7 +168,7 @@ export async function GET(request: NextRequest) {
       if (scope.leadDepartments.includes(DEPT_ADMIN_HR) && (statusParam === "all" || statusParam === "pending")) {
         const { data: noLead } = await dataClient
           .from("attendance_appeals")
-          .select("*")
+          .select(APPEAL_COLUMNS)
           .eq("status", "pending")
           .eq("stage", "pending_hr_lead")
           .returns<AppealRow[]>()
@@ -708,8 +710,7 @@ export async function PATCH(request: NextRequest) {
 
     const { data: fetched, error: fetchError } = await dataClient
       .from("attendance_appeals")
-      // "*" so the period-change and batch columns come through when present.
-      .select("*")
+      .select(APPEAL_COLUMNS)
       .in("id", ids)
       .returns<AppealRow[]>()
 

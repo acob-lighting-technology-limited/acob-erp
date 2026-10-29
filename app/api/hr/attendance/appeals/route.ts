@@ -72,8 +72,9 @@ export async function GET(request: NextRequest) {
 
     let query = dataClient
       .from("attendance_appeals")
-      // "*" so the override columns (20261030090000) come through when present.
-      .select("*")
+      .select(
+        "id, attendance_record_id, user_id, appeal_date, current_status, requested_status, appeal_reason, status, stage, initiated_by_role, created_by, lead_reviewed_by, lead_reviewed_at, lead_resolution_note, admin_reviewed_by, admin_reviewed_at, admin_resolution_note, reviewed_by, reviewed_at, resolution_note, created_at, updated_at, overridden_by, overridden_at, override_reason, overridden_stage"
+      )
       .eq("user_id", user.id)
       .order("appeal_date", { ascending: false })
 
